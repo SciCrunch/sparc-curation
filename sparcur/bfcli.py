@@ -39,8 +39,12 @@ def main():
             tf = 0
             ff = 0
             for p, m in path_meta.items():
-                if p.is_file():
-                    s = int(m['bf.size'])
+                if p.is_file() and not any(p.stem.startswith(pf) for pf in ('.~lock',)):
+                    try:
+                        s = int(m['bf.size'])
+                    except KeyError as e:
+                        print(p)
+                        raise e
                     tf += 1
                     total += s
                     if '.fake' in p.suffixes:
