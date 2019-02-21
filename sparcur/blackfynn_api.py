@@ -325,7 +325,7 @@ def fetch_file(file_path, file, metastore, limit=False):
                 # FIXME I think README_README is an s3_key related error
                 file.download(file_path.as_posix())
                 file_path.setxattrs(file_xattrs)
-                metastore.setxattrs(file_path, file_xattrs)
+                #metastore.setxattrs(file_path, file_xattrs)  # FIXME concurrent access kills this
                 attrs = file_path.xattrs()  # yes slow, but is a sanity check
                 # TODO validate the checksum when we get it
                 unlink_fakes(attrs, fake_paths, metastore)
@@ -355,8 +355,19 @@ def make_files_meta(collection):
             if isinstance(package, DataPackage)
             for file in package.files}
 
+
+class NormFolder(str):
+    def __new__(cls, value):
+        return str.__new__(cls, cls.normalize(value))
+
+    @classmethod
+    def normalize(cls, value):
+        # I CAN'T BELIEVE YOU'VE DONE THIS
+        return value.replace('/', '_')
+
+
 def make_folder_and_meta(parent_path, collection, metastore):
-    folder_path = parent_path / collection.name
+    folder_path = parent_path / NormFolder(collection.name)
     #meta_file = folder_path / collection.id
     #if isinstance(collection, Organization):
         #files_meta = {}
@@ -499,8 +510,7 @@ class BFLocal:
 
     def populate_metastore(self):
         """ This should be run after find_missing_meta. """
-        # FIXME this function is monstrously slow :/
-        # need a bulk insert
+        # FIXME need a way to delete files
         all_attrs = {path:path.xattrs() for path in self.project_path.rglob('*')}
         bad = [path for path, attrs in all_attrs.items() if not attrs]
         if bad:
@@ -537,11 +547,17 @@ class BFLocal:
             test_path = test_path.with_suffix('')
 
         for poc in thing:
-            if poc.name == test_path.stem:  # FIXME
+            if NormFolder(poc.name) == test_path.stem:  # FIXME
+                if isinstance(poc, Collection):
+                    return {'bf.id':poc.id}
+
                 for file in poc.files:  # FIXME files vs folders
                     filename = make_filename(file)
                     if filename == test_path.name:
                         return make_file_xattrs(file)
+
+        else:
+            raise BaseException(f'\'{path}\' could not recover meta!')
 
     def get_file_meta(self, path):
         attrs = path.xattrs()
@@ -591,6 +607,7 @@ class BFLocal:
         small = useful['N:dataset:f3ccf58a-7789-4280-836e-ad9d84ee2082']
         hrm = useful['N:dataset:be0183e4-a912-465a-bd15-ff36973ee8b3']  # lots of 500 errors
         readme_bug = useful['N:dataset:6d6818f2-ef75-4be5-9360-8d37661a8463']
+        how=useful['N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b']
         skip = (
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
@@ -598,6 +615,7 @@ class BFLocal:
         datasets = [d for d in ds if d.id not in skip]
         #datasets = hrm, readme_bug
         #datasets = small,
+        #datasets = how,
         #embed()
         #return
         packages = []
@@ -657,6 +675,7 @@ def mvp():
     # beware that this will send as many requests as it can as fast as it can
     # which is not the friendliest thing to do to an api
     Async()(deferred(fetch_file)(*fpf, self.metastore) for fpf in bfiles.items() if not fp.exists())
+    self.populate_metastore()  # FIXME workaround for concurrent access issues, probably faster, but :/
 
     return bf, bfiles
 

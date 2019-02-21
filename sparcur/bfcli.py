@@ -2,8 +2,14 @@
 """ Blackfynn cli for working with the file system.
 Usage:
     bfc stats [<directory>...]
+    bfc xattrs
     bfc [options] <file>...
     bfc [options] --name=<PAT>...
+
+Commands:
+              list and fetch unfetched files
+    stats     print stats for specified or current directory
+    xattrs    populate metastore / backup xattrs
 
 Options:
     -f --fetch              fetch the files
@@ -61,6 +67,10 @@ def main():
         h = 'Folder', 'Local', 'Remote', 'Total', 'L', 'R', 'T'
         print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
         print(fmt)
+
+    elif args['xattrs']:
+        bfl = BFLocal()
+        bfl.populate_metastore()
 
     else:
         paths = []

@@ -6,13 +6,15 @@ from types import GeneratorType
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from sparcur.blackfynn_api import local_storage_prefix, Path
 from pyontutils.utils import makeSimpleLogger, byCol
-from pyontutils.core import OntTerm
+from pyontutils.core import OntTerm, OntId
+from pyontutils.namespaces import OntCuries
 from protcur.analysis import parameter_expression
 from IPython import embed
 
 project_path = local_storage_prefix / 'SPARC Consortium'
 logger = makeSimpleLogger('dsload')
-
+OntCuries({'orcid':'https://orcid.org/',
+           'ORCID':'https://orcid.org/',})
 
 def normalize_tabular_format():
     kwargs = {
@@ -161,8 +163,13 @@ class Version1Header:
     def __init__(self, tabular):
         self.t = tabular
         orig_header, *rest = list(tabular)
+        header = self.normalize_header(orig_header)
         #print(header)
-        
+        #print(f"'{tabular.path}'", header)
+        self.bc = byCol(rest, header)
+
+    @staticmethod
+    def normalize_header(orig_header):
         header = []
         for i, c in enumerate(orig_header):
             if c:
@@ -174,12 +181,15 @@ class Version1Header:
                      .replace('…','')
                      .replace('\ufeff', '')
                      .replace('.','_')
+                     .replace(',','_')
                      .replace('/', '_')
                      .replace('?', '_')
                      .replace('#', 'number')
                      .replace('-', '_')
                      .lower()  # sigh
                 )
+                if any(c.startswith(str(n)) for n in range(10)):
+                    c = 'n_' + c
 
             if not c:
                 c = f'TEMP_{i}'
@@ -189,8 +199,7 @@ class Version1Header:
 
             header.append(c)
 
-        #print(header)
-        self.bc = byCol(rest, header)
+        return header
 
     def query(self, value, prefix):
         for query_type in ('term', 'search'):
@@ -206,9 +215,42 @@ class Version1Header:
             return value
  
 class DatasetDescription(Version1Header):
+    def contributor_orcid_id(self, value):
+        v = value.replace(' ', '')
+        if not v:
+            return
+        if not (v.startswith('ORCID:') or v.startswith('https:')):
+            v = v.strip()
+            if len(v) != 19:
+                logger.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                return
+
+            v = 'ORCID:' + v
+
+        try:
+            #logger.debug(f"{v} '{self.t.path}'")
+            return OntId(v)
+        except OntId.BadCurieError as e:
+            logger.error(f"orcid malformed '{value}' '{self.t.path}'")
+            return value
+
+    def contributor_role(self, value):
+        return set(e.strip() for e in value.split(','))
+
+    def default(self, value):
+        return value
+
     def __iter__(self):
         # TODO this needs to be exporting triples ...
-        yield from ({k:v.strip('\ufeff') for k, v in zip(self.bc.metadata_element, getattr(self.bc, col)) if v}
+        #print(self.bc.header)
+        if not hasattr(self.bc, 'metadata_element'):
+            logger.error(f'\'{self.t.path}\' malformed header!')
+            return
+        nme = Version1Header.normalize_header(self.bc.metadata_element)
+        yield from ({k:nv for k, v in zip(nme, getattr(self.bc, col))
+                     if v
+                     for nv in (getattr(self, k, self.default)(v),)
+                     if nv}
                     for col in self.bc.header[3:])
 
 class SubjectsFile(Version1Header):
@@ -501,9 +543,17 @@ class FThing:
     def submission(self):
         # FIXME > 1
         for path in self.submission_paths:
-            t = list(Tabular(path))
+            t = Tabular(path)
+            tl = list(t)
             #print(path, t)
-            yield {key:value for key, d, value, *fixme in t[1:]}  # FIXME multiple milestones apparently?
+            try:
+                yield {key:value for key, d, value, *fixme in tl[1:]}  # FIXME multiple milestones apparently?
+            except ValueError as e:
+                # TODO expected columns vs received columns for all these
+                logger.warn(f'\'{path}\' malformed header.')
+                # best guess interpretation
+                if len(tl[0]) == 2:
+                    yield {k:v for k, v in tl[1:]}
 
     @property
     def dataset_description_paths(self):
@@ -511,9 +561,14 @@ class FThing:
         #yield from self.path.glob('dataset_description*.*')
 
     @property
-    def dataset_description(self):
+    def _dataset_description_tables(self):
         for path in self.dataset_description_paths:
-            yield from DatasetDescription(Tabular(path))
+            yield Tabular(path)
+
+    @property
+    def dataset_description(self):
+        for t in self._dataset_description_tables:
+            yield from DatasetDescription(t)
             # TODO export adapters for this ... how to recombine and reuse ...
 
     @property
