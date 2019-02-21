@@ -121,7 +121,7 @@ class Tabular:
                 with open(self.path, 'rt', encoding=encoding) as f:
                     yield from csv.reader(f, delimiter=delimiter)
                 if encoding != 'utf-8':
-                    logger.warn(f'\'{self.path}\' bad file encoding \'{encoding}\'')
+                    logger.error(f"encoding bad '{encoding}' '{self.path}'")
                 return
             except UnicodeDecodeError:
                 continue
@@ -219,6 +219,9 @@ class DatasetDescription(Version1Header):
         v = value.replace(' ', '')
         if not v:
             return
+        if v.startswith('http:'):
+            v = v.replace('http:', 'https:', 1)
+
         if not (v.startswith('ORCID:') or v.startswith('https:')):
             v = v.strip()
             if len(v) != 19:
@@ -278,6 +281,10 @@ class SubjectsFile(Version1Header):
     def sex(self, value):
         nv = NormSex(value)
         return self.query(nv, 'PATO')
+
+    def gender(self, value):
+        # FIXME gender -> sex for animals, requires two pass normalization ...
+        return self.sex(value)
    
     def age(self, value):
         _, v, rest = parameter_expression(value)
@@ -294,7 +301,10 @@ class SubjectsFile(Version1Header):
         return value
 
     def default(self, value):
-        return value
+        v = value.replace('\ufeff', '')  # FIXME utf-16 issue
+        if v != value:
+            logger.error(f"encoding issue feff '{self.t.path}'")
+        return v
 
     def process_dict(self, dict_):
         """ deal with multiple fields """
@@ -303,6 +313,10 @@ class SubjectsFile(Version1Header):
             compose = dict_[h_value] + dict_[h_unit]
             _, v, rest = parameter_expression(compose)
             out[h_value] = v
+
+        if 'gender' in out and 'species' in out:
+            if out['species'] != OntTerm('NCBITaxon:9606'):
+                out['sex'] = out.pop('gender')
 
         return out
 
@@ -600,6 +614,7 @@ def parse_meta():
     dump_all = [{attr: express_or_return(getattr(d, attr))
                  for attr in dir(d) if not attr.startswith('_')}
                 for d in ds]
+    dad = {d['id']:d for d in dump_all}
 
     def get_diversity(field_name):
         return sorted(set(dict_[field_name]
