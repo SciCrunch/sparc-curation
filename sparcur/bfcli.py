@@ -13,7 +13,7 @@ Options:
 
 """
 
-from pyontutils.blackfynn_api import BFLocal, Path
+from sparcur.blackfynn_api import BFLocal, Path
 
 def main():
     from docopt import docopt, parse_defaults

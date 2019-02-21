@@ -4,7 +4,7 @@ import csv
 import hashlib
 from types import GeneratorType
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pyontutils.blackfynn_api import local_storage_prefix, Path
+from sparcur.blackfynn_api import local_storage_prefix, Path
 from pyontutils.utils import makeSimpleLogger, byCol
 from pyontutils.core import OntTerm
 from protcur.analysis import parameter_expression
