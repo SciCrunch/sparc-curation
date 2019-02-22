@@ -398,16 +398,16 @@ class MetaStore:
     attrs = 'bf.id', 'bf.file_id', 'bf.size', 'bf.checksum', 'bf.error'
     # FIXME horribly inefficient 1 connection per file due to the async code ... :/
     def __init__(self, db_path):
-        if isinstance(db_path, Path):
-            db_path = db_path.as_posix()
-
         self.db_path = db_path
         self.setup()
 
     def conn(self):
-        return sqlite3.connect(self.db_path)
+        return sqlite3.connect(self.db_path.as_posix())
 
     def setup(self):
+        if not self.db_path.parent.exists():
+            self.db_path.parent.mkdir(parents=True)
+
         sqls = (('CREATE TABLE IF NOT EXISTS fsxattrs '
                  '(path TEXT PRIMARY KEY,'
                  'bf_id TEXT NOT NULL,'
@@ -514,7 +514,7 @@ class BFLocal:
         all_attrs = {path:path.xattrs() for path in self.project_path.rglob('*')}
         bad = [path for path, attrs in all_attrs.items() if not attrs]
         if bad:
-            print('WARNING:', path, 'is missing meta, run find_missing_meta')
+            print('WARNING:', bad, 'is missing meta, run find_missing_meta')
             all_attrs = {p:a for p, a in all_attrs.items() if a}
 
         self.metastore.bulk(all_attrs)
