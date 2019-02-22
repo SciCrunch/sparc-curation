@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ Blackfynn cli for working with the file system.
 Usage:
+    bfc pull
     bfc stats [<directory>...]
     bfc xattrs
     bfc [options] <file>...
@@ -8,6 +9,7 @@ Usage:
 
 Commands:
               list and fetch unfetched files
+    pull      pull down the remote list of files
     stats     print stats for specified or current directory
     xattrs    populate metastore / backup xattrs
 
@@ -27,7 +29,12 @@ def main():
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
     from IPython import embed
 
-    if args['stats']:
+    if args['pull']:
+        # TODO folder meta -> org
+        bfl = BFLocal()
+        bfl.cons()
+
+    elif args['stats']:
         dirs = args['<directory>']
         if not dirs:
             dirs.append('.')
