@@ -2,7 +2,9 @@
 import io
 import csv
 import hashlib
+import mimetypes
 from types import GeneratorType
+import magic  # from sys-apps/file consider python-magic ?
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from sparcur.blackfynn_api import local_storage_prefix, Path
 from pyontutils.utils import makeSimpleLogger, byCol
@@ -101,6 +103,56 @@ class NormSex(NormSimple):
     }
 
 
+class NormContributorRole(str):
+    values = ('ContactPerson',
+              'DataCollector',
+              'DataCurator',
+              'DataManager',
+              'Distributor',
+              'Editor',
+              'HostingInstitution',
+              'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
+              'Producer',
+              'ProjectLeader',
+              'ProjectManager',
+              'ProjectMember',
+              'RegistrationAgency',
+              'RegistrationAuthority',
+              'RelatedPerson',
+              'Researcher',
+              'ResearchGroup',
+              'RightsHolder',
+              'Sponsor',
+              'Supervisor',
+              'WorkPackageLeader',
+              'Other',)
+
+    def __new__(cls, value):
+        return str.__new__(cls, cls.normalize(value))
+
+    @staticmethod
+    def levenshteinDistance(s1, s2):
+        if len(s1) > len(s2):
+            s1, s2 = s2, s1
+
+        distances = range(len(s1) + 1)
+        for i2, c2 in enumerate(s2):
+            distances_ = [i2+1]
+            for i1, c1 in enumerate(s1):
+                if c1 == c2:
+                    distances_.append(distances[i1])
+                else:
+                    distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+            distances = distances_
+        return distances[-1]
+
+    @classmethod
+    def normalize(cls, value):
+        # a hilariously slow way to do this
+        # also not really normalization ... more, best guess for what people were shooting for
+        if value:
+            return sorted((cls.levenshteinDistance(value, v), v) for v in cls.values)[0][1]
+
 class Tabular:
     def __init__(self, path):
         self.path = path
@@ -160,13 +212,28 @@ class Tabular:
 
 
 class Version1Header:
+    to_index = tuple()
+    skip_cols = 'metadata_element', 'description', 'example'
+    verticals = dict()  # FIXME should really be immutable
+
     def __init__(self, tabular):
+        self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
         self.t = tabular
         orig_header, *rest = list(tabular)
         header = self.normalize_header(orig_header)
         #print(header)
         #print(f"'{tabular.path}'", header)
-        self.bc = byCol(rest, header)
+        self.fail = False
+        if self.to_index:
+            for head in self.to_index:
+                if head not in header:
+                    logger.error(f'\'{self.t.path}\' malformed header!')
+                    self.fail = True
+
+        if self.fail:
+            self.bc = byCol(rest, header)
+        else:
+            self.bc = byCol(rest, header, to_index=self.to_index)
 
     @staticmethod
     def normalize_header(orig_header):
@@ -201,7 +268,8 @@ class Version1Header:
 
         return header
 
-    def query(self, value, prefix):
+    @staticmethod
+    def query(value, prefix):
         for query_type in ('term', 'search'):
             terms = [q.OntTerm for q in OntTerm.query(prefix=prefix, **{query_type:value})]
             if terms:
@@ -213,8 +281,32 @@ class Version1Header:
 
         else:
             return value
- 
+
+
 class DatasetDescription(Version1Header):
+    to_index = 'metadata_element',
+    skip_cols = 'metadata_element', 'description', 'example'
+    max_one = (  # FIXME we probably want to write this as json schema or something ...
+        'name',
+        'description',
+        'acknowledgements',
+        'funding',
+        #'originating_article_doi',  # and sometimes they comma separate them! >_< derp
+        'protocol_url_or_doi',
+        'additional_links',
+        'link_description',
+        'example_image_filename',
+        'example_image_locator',
+        'example_image_description',
+        'completeness_of_data_set',
+        'prior_batch_number',
+        'title_for_complete_data_set')
+    verticals = {'contributors': ('contributors',
+                                  'contributor_orcid_id',
+                                  'contributor_affiliation',
+                                  'contributor_role',
+                                  'is_contact_person',),}
+
     def contributor_orcid_id(self, value):
         v = value.replace(' ', '')
         if not v:
@@ -230,6 +322,16 @@ class DatasetDescription(Version1Header):
 
             v = 'ORCID:' + v
 
+        else:
+            if v.startswith('https:'):
+                _, numeric = v.rsplit('/', 1)
+            elif v.startswith('ORCID:'):
+                _, numeric = v.rsplit(':', 1)
+
+            if len(numeric) != 19:
+                logger.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                return
+
         try:
             #logger.debug(f"{v} '{self.t.path}'")
             return OntId(v)
@@ -238,10 +340,65 @@ class DatasetDescription(Version1Header):
             return value
 
     def contributor_role(self, value):
-        return set(e.strip() for e in value.split(','))
+        return tuple(sorted(set(e.strip() for e in value.split(','))))
+
+    def is_contact_person(self, value):
+        return value.lower() == 'yes'
 
     def default(self, value):
+        # TODO need a 'run for all' which
         return value
+
+    def normalize(self, key, value):
+        return getattr(self, key, self.default)(value)
+
+    @property
+    def data(self):
+        index_col = 'metadata_element'
+        out = {}
+        if not hasattr(self.bc, index_col):
+            logger.error(f'\'{self.t.path}\' malformed header!')
+            return out
+        nme = Version1Header.normalize_header(self.bc.metadata_element)
+        nmed = {v:normv for normv, v in zip(nme, self.bc.metadata_element)}
+
+        for v, nt in self.bc._byCol__indexes[index_col].items():
+            if v != index_col:
+                normv = nmed[v]
+                if normv not in self.skip_rows:
+                    _value = tuple(normv for key, value in zip(nt._fields, nt)
+                                   if key not in self.skip_cols and value
+                                   for normv in (self.normalize(key, value),)
+                                   if normv)
+                    value = tuple(set(_value))
+                    if len(value) != len(_value):
+                        # TODO counter to show the duplicate values
+                        logger.warn(f"duplicate values in {normv} TODO '{self.t.path}'")
+
+                    if normv in self.max_one:
+                        if not value:
+                            logger.warn(f"missing value for {normv} '{self.t.path}'")
+                        elif len(value) > 1:
+                            logger.warn(f"too many values for {normv} {value} '{self.t.path}'")
+                            # FIXME not selecting the zeroth element here breaks the schema assumptions
+                            value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
+                        else:
+                            value = value[0]  # FIXME error handling etc.
+
+                    if value:
+                        out[normv] = value
+
+        for key, keys in self.verticals.items():
+            out[key] = tuple(_ for _ in ({key:normv
+                                          for key, value in zip(nme, values)
+                                          if key in keys and value
+                                          for normv in (self.normalize(key, value),)
+                                          if normv}
+                                         for head, *values in self.bc.cols
+                                         if head not in self.skip_cols)
+                             if _)
+
+        return out
 
     def __iter__(self):
         # TODO this needs to be exporting triples ...
@@ -255,6 +412,7 @@ class DatasetDescription(Version1Header):
                      for nv in (getattr(self, k, self.default)(v),)
                      if nv}
                     for col in self.bc.header[3:])
+
 
 class SubjectsFile(Version1Header):
     def __init__(self, tabular):
@@ -285,7 +443,7 @@ class SubjectsFile(Version1Header):
     def gender(self, value):
         # FIXME gender -> sex for animals, requires two pass normalization ...
         return self.sex(value)
-   
+
     def age(self, value):
         _, v, rest = parameter_expression(value)
         if not v[0] == 'param:parse-failure':
@@ -297,7 +455,7 @@ class SubjectsFile(Version1Header):
     def rrid_for_strain(self, value):
         return value
 
-    def protocol_io_location(self, value):
+    def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
         return value
 
     def default(self, value):
@@ -305,6 +463,9 @@ class SubjectsFile(Version1Header):
         if v != value:
             logger.error(f"encoding issue feff '{self.t.path}'")
         return v
+
+    def normalize(self, key, value):
+        return getattr(self, key, self.default)(value)
 
     def process_dict(self, dict_):
         """ deal with multiple fields """
@@ -321,10 +482,158 @@ class SubjectsFile(Version1Header):
         return out
 
     def __iter__(self):
-        yield from (self.process_dict({k:getattr(self, k, self.default)(v) for k, v in zip(r._fields, r) if v}) for r in self.bc.rows)
+        yield from (self.process_dict({k:self.normalize(k, v) for k, v in zip(r._fields, r) if v}) for r in self.bc.rows)
 
 
-class FThing:
+class FakePathHelper:
+
+    @property
+    def real_path(self):
+        path = self.path
+        while '.fake' in path.suffixes:
+            path = path.with_suffix('')
+
+        return path
+
+    @property
+    def suffix(self):
+        return self.real_path.suffix
+
+    @property
+    def suffixes(self):
+        return self.real_path.suffixes
+
+    @property
+    def mimetype(self):
+        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
+        if mime:
+            return mime
+
+    @property
+    def encoding(self):
+        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
+        if encoding:
+            return encoding
+
+    @property
+    def _magic_mimetype(self):
+        """ This can be slow because it has to open the files. """
+        if self.real_path.exists():
+            return magic.detect_from_filename(self.real_path).mime_type
+
+class CurationStatusStrict:
+    def __init__(self, fthing):
+        self.fthing = fthing
+        # metadata  # own class?
+
+        # protocol  # own class?
+
+    @property
+    def dataset(self):
+        if self.fthing.is_dataset:
+            return self.fthing
+        else:
+            return FThing(self.bids_root)
+
+    @property
+    def miss_paths(self):
+        yield from self.dataset.submission_paths
+
+    @property
+    def dd_paths(self):
+        yield from self.dataset.dataset_description_paths
+
+    @property
+    def ject_paths(self):
+        yield from self.dataset.subjects_paths
+
+    @property
+    def overall(self):
+        parts = (self.structure,
+                 self.metadata,
+                 self.protocol)
+
+        n_parts, n_done = 0, 0
+        for n_subparts, n_subdone in parts:
+            n_parts += n_subparts
+            n_done += n_subdone
+
+        return n_parts, n_done
+
+    @property
+    def structure(self):
+        # in the right place
+        parts = (self.has_submission,
+                 self.has_dataset_description,
+                 self.has_subjects)
+        done = [p for p in parts if p]
+        return len(parts), len(done)
+
+    @property
+    def has_submission(self):
+        # FIXME len 1?
+        return bool(list(self.miss_paths))
+
+    @property
+    def has_dataset_description(self):
+        # FIXME len 1?
+        return bool(list(self.dd_paths))
+
+    @property
+    def has_subjects(self):
+        # FIXME len 1?
+        return bool(list(self.ject_paths))
+
+    @property
+    def metadata(self):
+        parts = (self.has_award,
+                 self.has_protocol)
+        done = [p for p in parts if p]
+        n_parts, n_done = len(parts), len(done)
+        # TODO accumulate all the other metadata that we need from the files
+        return n_parts, n_done
+
+    @property
+    def has_award(self):
+        # FIXME len 1?
+        return bool(list(self.dataset.award))
+
+    @property
+    def has_protocol(self):
+        return bool(list(self.dataset.protocol_link))
+
+    @property
+    def protocol(self):
+        return 0, 0
+
+    def steps_done(self, stage_name):
+        n_parts, n_done = getattr(self, stage_name)
+        return f'{stage_name} {n_done}/{n_parts}'
+
+    @property
+    def report(self):
+        return self.steps_done('overall')
+
+    def __repr__(self):
+        return self.dataset.dataset_name_proper + '\n' + self.report
+
+
+class CurationStatusLax(CurationStatusStrict):
+    # FIXME not quite working right ...
+    @property
+    def miss_paths(self):
+        yield from self.dataset.path.rglob('submission*.*')
+
+    @property
+    def dd_paths(self):
+        yield from self.dataset.path.rglob('dataset_description*.*')
+
+    @property
+    def jetc_paths(self):
+        yield from self.dataset.path.rglob('subjects*.*')
+
+
+class FThing(FakePathHelper):
     """ a homogenous representation """
 
     def __init__(self, path, cypher=hashlib.sha256):
@@ -333,6 +642,8 @@ class FThing:
 
         self.path = path
         self.fake = '.fake' in self.path.suffixes
+        self.status = CurationStatusStrict(self)
+        self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
 
@@ -343,19 +654,19 @@ class FThing:
     def bids_root(self):
         """ Sometimes there is an intervening folder. """
         if self.is_dataset:
-            ddpaths = list(self.path.rglob('dataset_description*.*'))  # FIXME possibly slow?
-            if not ddpaths:
+            dd_paths = list(self.path.rglob('dataset_description*.*'))  # FIXME possibly slow?
+            if not dd_paths:
                 #logger.warn(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
                 return
-            elif len(ddpaths) > 1:
-                #logger.warn(f'More than one submission for {self.name} {self.id} {ddpaths}')
+            elif len(dd_paths) > 1:
+                #logger.warn(f'More than one submission for {self.name} {self.id} {dd_paths}')
                 pass
 
-            return ddpaths[0].parent  # FIXME choose shorter version? if there are multiple?
+            return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
 
         elif self.parent:  # organization has no parent
             return self.parent.bids_root
-                
+
     @property
     def parent(self):
         pp = FThing(self.path.parent)
@@ -467,21 +778,19 @@ class FThing:
 
     @property
     def PI(self):
-        mp = 'Contributor Role' 
-        os = (   # oh boy
-            'Principal Investigator',
-            'PrincipalInvestigator',
-            'Principle Investigator',
-            'Principle Investigator, Contact Person',
-            'Principle Investigator, Contact Person, Project Leader',
-            'Principle Investigator, Contact person',
-            'PrincipleInvestigator',
-            'PrincipleInvestigator,ContactPerson',
-        )
-        p = 'Contributors'
+        mp = 'contributor_role'
+        os = ('PrincipalInvestigator',)
+        p = 'contributors'
         for dict_ in self.dataset_description:
-            if mp in dict_ and dict_[mp] in os:
-                yield dict_[p]  # TODO orcid etc
+            if p in dict_:
+                for contributor in dict_[p]:
+                    if mp in contributor:
+                        for role in contributor[mp]:
+                            normrole = NormContributorRole(role)
+                            if normrole in os:
+                                #print(contributor)
+                                yield contributor['contributors']  # TODO orcid etc
+                                break
 
     @property
     def species(self):
@@ -494,6 +803,13 @@ class FThing:
     @property
     def modality(self):
         return 'TODO'
+
+    @property
+    def protocol_link(self):
+        p = 'protocol_url_or_doi'
+        for dd in self.dataset_description:
+            if p in dd:
+                yield dd[p]
 
     @property
     def _meta_file(self):
@@ -580,10 +896,16 @@ class FThing:
             yield Tabular(path)
 
     @property
+    def _dd(self):
+        for t in self._dataset_description_tables:
+            yield DatasetDescription(t)
+
+    @property
     def dataset_description(self):
         for t in self._dataset_description_tables:
-            yield from DatasetDescription(t)
+            #yield from DatasetDescription(t)
             # TODO export adapters for this ... how to recombine and reuse ...
+            yield DatasetDescription(t).data
 
     @property
     def subjects_paths(self):
@@ -599,6 +921,10 @@ class FThing:
     def subjects(self):
         for table in self._subjects_tables:
             yield from SubjectsFile(table)
+
+    @property
+    def report(self):
+        return self.status.report
 
     def __repr__(self):
         return f'{self.__class__.__name__}(\'{self.path}\')'
@@ -617,21 +943,41 @@ def parse_meta():
     dad = {d['id']:d for d in dump_all}
 
     def get_diversity(field_name):
-        return sorted(set(dict_[field_name]
-                        for d in dump_all
-                        for dict_ in d['dataset_description']
-                        if field_name in dict_))
+        # FIXME recurse
+        return sorted(set(value
+                          for d in dump_all
+                          for dict_ in d['dataset_description']
+                          for _key, _value in dict_.items()
+                          if _key == field_name or isinstance(_value, tuple)
+                          for value in
+                          ((_value,)
+                           if _key == field_name else
+                           (v for thing in _value
+                            if isinstance(thing, dict)
+                            for key, value in thing.items()
+                            if key == field_name
+                            for v in (value if isinstance(value, tuple) else (value,))
+                           ))))
 
     deep = dsd['N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3']
     awards = sorted(set(n for d in dump_all for n in d['award']))
     n_awards = len(awards)
 
-    exts = sorted(set(''.join(p.suffixes).split('.fake.')[0] for p in project_path.rglob('*') if p.is_file() and p.suffixes))
+    #exts = sorted(set(''.join(p.suffixes).split('.fake.')[0] for p in project_path.rglob('*') if p.is_file() and p.suffixes))
+    exts = sorted(set(NormFileSuffix(FThing(p).suffix.strip('.') if '.gz' not in p.suffixes else ''.join(FThing(p).suffixes).strip('.'))
+                      for p in project_path.rglob('*') if p.is_file()))  # TODO gz
     n_exts = len(exts)
+
+    fts = [FThing(p) for p in project_path.rglob('*') if p.is_file()]
+    mimes = sorted(t for t in set(f.mimetype for f in fts if f.mimetype is not None))
+    #all_type_info = sorted(set((f.suffix, f.mimetype, f._magic_mimetype)
+                               #for f in fts), key = lambda v: [e if e else '' for e in v])
     # and this is why manual data entry without immediate feedback is a bad idea
-    cr = get_diversity('Contributor Role')
-    fun = get_diversity('Funding')
-    orcid = get_diversity('Contributor ORCID ID')
+    cr = get_diversity('contributor_role')
+    fun = get_diversity('funding')
+    orcid = get_diversity('contributor_orcid_id')
+
+    report = sorted(d.report + ' lax ' + d.lax.report + ' ' + d.name for d in ds)
 
     embed()
 

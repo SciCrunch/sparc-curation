@@ -340,13 +340,13 @@ def fetch_file(file_path, file, metastore, limit=False):
             error_path.touch()
             file_xattrs['bf.error'] = str(status_code)
             error_path.setxattrs(file_xattrs)
-            metastore.setxattrs(error_path, file_xattrs)
+            #metastore.setxattrs(error_path, file_xattrs)
     else:
         fsize = str(int(file_mb)) + 'M' if file_mb >= 1 else str(file.size // 1024) + 'K'
         fakepath = file_path.with_suffix(file_path.suffix + '.fake.' + fsize)
         fakepath.touch()
         fakepath.setxattrs(file_xattrs)
-        metastore.setxattrs(fakepath, file_xattrs)
+        #metastore.setxattrs(fakepath, file_xattrs)
 
 def make_files_meta(collection):
     # TODO file fetching status? file hash?
@@ -375,7 +375,7 @@ def make_folder_and_meta(parent_path, collection, metastore):
         #files_meta = make_files_meta(collection)
     folder_path.mkdir(parents=True, exist_ok=True)
     folder_path.setxattr('bf.id', collection.id)  # sadly xattrs are easy to accidentally zap :/
-    metastore.setxattr(folder_path, 'bf.id', collection.id)
+    #metastore.setxattr(folder_path, 'bf.id', collection.id)
     #with open(meta_file, 'wt') as f:
         #yaml.dump(files_meta, f, default_flow_style=False)
 
