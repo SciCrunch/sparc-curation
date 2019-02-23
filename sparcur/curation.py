@@ -626,6 +626,8 @@ def parse_meta():
     awards = sorted(set(n for d in dump_all for n in d['award']))
     n_awards = len(awards)
 
+    exts = sorted(set(''.join(p.suffixes).split('.fake.')[0] for p in project_path.rglob('*') if p.is_file() and p.suffixes))
+    n_exts = len(exts)
     # and this is why manual data entry without immediate feedback is a bad idea
     cr = get_diversity('Contributor Role')
     fun = get_diversity('Funding')
