@@ -350,7 +350,8 @@ class DatasetDescription(Version1Header):
         return value
 
     def normalize(self, key, value):
-        return getattr(self, key, self.default)(value)
+        if value.lower not in ('n/a', 'na'):  # FIXME explicit null vs remove from structure
+            return getattr(self, key, self.default)(value)
 
     @property
     def data(self):
@@ -604,6 +605,8 @@ class CurationStatusStrict:
 
     @property
     def protocol(self):
+        # TODO n_parts = n_total_fields_based_on_context - n_already_filled_out
+        # we will try to get as many as we can from the protocol
         return 0, 0
 
     def steps_done(self, stage_name):
@@ -612,25 +615,41 @@ class CurationStatusStrict:
 
     @property
     def report(self):
-        return self.steps_done('overall')
+        # FIXME this format is awful, need an itemized version
+        return (self.steps_done('overall'),
+                self.steps_done('structure'),
+                self.steps_done('metadata'),
+                self.steps_done('protocol'),)
 
     def __repr__(self):
-        return self.dataset.dataset_name_proper + '\n' + self.report
+        return self.dataset.dataset_name_proper + '\n' + '\n'.join(self.report)
 
 
 class CurationStatusLax(CurationStatusStrict):
     # FIXME not quite working right ...
     @property
     def miss_paths(self):
-        yield from self.dataset.path.rglob('submission*.*')
+        #yield from self.dataset.path.rglob('submission*.*')
+        #yield from self.dataset.path.rglob('Submission*.*')
+        for path in self.dataset.path.rglob('*'):
+            if path.is_file() and path.name.lower().startswith('submission'):
+                yield path
 
     @property
     def dd_paths(self):
-        yield from self.dataset.path.rglob('dataset_description*.*')
+        #yield from self.dataset.path.rglob('dataset_description*.*')
+        #yield from self.dataset.path.rglob('Dataset_description*.*')
+        for path in self.dataset.path.rglob('*'):
+            if path.is_file() and path.name.lower().startswith('dataset_description'):
+                yield path
 
     @property
     def jetc_paths(self):
-        yield from self.dataset.path.rglob('subjects*.*')
+        #yield from self.dataset.path.rglob('subjects*.*')
+        #yield from self.dataset.path.rglob('Subjects*.*')
+        for path in self.dataset.path.rglob('*'):
+            if path.is_file() and path.name.lower().startswith('subjects'):
+                yield path
 
 
 class FThing(FakePathHelper):
@@ -658,6 +677,7 @@ class FThing(FakePathHelper):
             if not dd_paths:
                 #logger.warn(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
                 return
+
             elif len(dd_paths) > 1:
                 #logger.warn(f'More than one submission for {self.name} {self.id} {dd_paths}')
                 pass
@@ -830,17 +850,26 @@ class FThing(FakePathHelper):
         else:
             path = self.path
 
-        gen = path.glob(name_prefix + '*.*')
+        first = name_prefix[0]
+        cased_np = '[' + first.upper() + first + ']' + name_prefix[1:]  # FIXME warn and normalize
+        gen = path.glob(cased_np + '*.*')
 
         try:
             path = next(gen)
             if '.fake' not in path.suffixes:
+                if path.name[0].isupper():
+                    logger.warn(f'filename bad case {path}')
                 yield path
+
             else:
                 logger.warn(f'\'{path}\' has not been retrieved.')
             for path in gen:
                 if '.fake' not in path.suffixes:
+                    if path.name[0].isupper():
+                        logger.warn(f'filename bad case {path}')
+
                     yield path
+
                 else:
                     logger.warn(f'\'{path}\' has not been retrieved.')
         except StopIteration:
@@ -923,8 +952,17 @@ class FThing(FakePathHelper):
             yield from SubjectsFile(table)
 
     @property
+    def meta_paths(self):
+        """ All metadata related paths. """
+        yield from self.submission_paths
+        yield from self.dataset_description_paths
+        yield from self.subjects_paths
+
+    @property
     def report(self):
-        return self.status.report
+
+        r = '\n'.join([f'{s:>20}{l:>20}' for s, l in zip(self.status.report, self.lax.report)])
+        return self.name + f"\n'{self.id}'\n\n" + r
 
     def __repr__(self):
         return f'{self.__class__.__name__}(\'{self.path}\')'
@@ -977,7 +1015,11 @@ def parse_meta():
     fun = get_diversity('funding')
     orcid = get_diversity('contributor_orcid_id')
 
-    report = sorted(d.report + ' lax ' + d.lax.report + ' ' + d.name for d in ds)
+    zero = [d for d in ds if not d.status.overall[-1]] 
+    n_zero = len(zero)
+
+    #report = ''.join(sorted(d.name + '\n' + d.report + '\nlax\n' + d.lax.report + '\n\n' for d in ds))
+    report = '\n\n'.join([d.report for d in sorted(ds, key = lambda d: d.lax.overall[-1])])
 
     embed()
 
