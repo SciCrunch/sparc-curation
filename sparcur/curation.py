@@ -4,6 +4,7 @@ import csv
 import hashlib
 import mimetypes
 from types import GeneratorType
+from collections import defaultdict
 import magic  # from sys-apps/file consider python-magic ?
 import requests
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -24,6 +25,11 @@ project_path = local_storage_prefix / 'SPARC Consortium'
 logger = makeSimpleLogger('dsload')
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',})
+
+# FIXME this is an awful way to do this ...
+_pio_creds = get_protocols_io_auth()
+_pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
+protocol_jsons = {}
 
 
 def normalize_tabular_format():
@@ -672,7 +678,7 @@ class CurationStatusLax(CurationStatusStrict):
 class FThing(FakePathHelper):
     """ a homogenous representation """
 
-    def __init__(self, path, cypher=hashlib.sha256):
+    def __init__(self, path, cypher=hashlib.sha256, pio_header=_pio_header):
         if isinstance(path, str):
             path = Path(path)
 
@@ -682,6 +688,7 @@ class FThing(FakePathHelper):
         self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
+        self.pio_header = _pio_header  # FIXME ick
 
     def xattrs(self):
         return self.path.xattrs()
@@ -751,7 +758,13 @@ class FThing(FakePathHelper):
         if not pis:
             pis = '?-no-pi-?',
         PI = ' '.join(pis)
-        return f'{award} {PI} {self.species} {self.organ} {self.modality}'
+
+        species = list(self.species)
+        if not species:
+            species = '?-no-species-?',
+        species = ' '.join(s.label if isinstance(s, OntTerm) else s for s in species)
+
+        return f'{award} {PI} {species} {self.organ} {self.modality}'
 
     @property
     def bf_size(self):
@@ -831,7 +844,12 @@ class FThing(FakePathHelper):
 
     @property
     def species(self):
-        return 'TODO'
+        out = set()
+        for subject in self.subjects:
+            if 'species' in subject:
+                out.add(subject['species'])
+
+        return tuple(out)
 
     @property
     def organ(self):
@@ -840,6 +858,12 @@ class FThing(FakePathHelper):
     @property
     def modality(self):
         return 'TODO'
+
+    @property
+    def keywords(self):
+        for dd in self.dataset_description:
+            if 'keywords' in dd:  # already logged error ...
+                yield from dd['keywords']
 
     @property
     def protocol_uris(self):
@@ -872,35 +896,39 @@ class FThing(FakePathHelper):
     @property
     def protocol_annotations(self):
         for uri in self.protocol_uris_resolved:
-            yield from protc.byIri(uri)
+            yield from protc.byIri(uri, prefix=True)
 
     @property
     def protocol_jsons(self):
         # FIXME need a single place to get these from ...
-        if not hasattr(self, '_c_protocol_jsons'):
-            self._c_protocol_jsons = list(self._protocol_jsons)
-
-        return self._c_protocol_jsons
-
-    @property
-    def _protocol_jsons(self):
-        # TODO async
-        creds = get_protocols_io_auth()
-        header = {'Authentication': 'Bearer ' + creds.access_token}
         for uri in self.protocol_uris_resolved:
-            #juri = uri + '.json'
-            uri_path = uri.rsplit('/', 1)[-1]
-            apiuri = 'https://protocols.io/api/v3/protocols/' + uri_path
-            #'https://www.protocols.io/api/v3/groups/sparc/protocols'
-            #'https://www.protocols.io/api/v3/filemanager/folders?top'
-            print(apiuri, header)
-            resp = requests.get(apiuri, headers=header)
-            #logger.info(str(resp.request.headers))
-            j = resp.json()  # the api is reasonably consistent
-            if resp.ok:
+            if uri not in protocol_jsons:  # FIXME yay global variables
+                j = self._get_protocol_json(uri)
+                if j:
+                    protocol_jsons[uri] = j
+                else:
+                    protocol_jsons[uri] = {}  # TODO try again later
+
                 yield j
+
             else:
-                logger.error(f"protocol no access {uri} '{self.dataset_id}'")
+                yield protocol_jsons[uri]
+
+
+    def _get_protocol_json(self, uri):
+        #juri = uri + '.json'
+        uri_path = uri.rsplit('/', 1)[-1]
+        apiuri = 'https://protocols.io/api/v3/protocols/' + uri_path
+        #'https://www.protocols.io/api/v3/groups/sparc/protocols'
+        #'https://www.protocols.io/api/v3/filemanager/folders?top'
+        #print(apiuri, header)
+        resp = requests.get(apiuri, headers=self.pio_header)
+        #logger.info(str(resp.request.headers))
+        j = resp.json()  # the api is reasonably consistent
+        if resp.ok:
+            return j
+        else:
+            logger.error(f"protocol no access {uri} '{self.dataset_id}'")
 
     @property
     def _meta_file(self):
@@ -1036,6 +1064,19 @@ class FThing(FakePathHelper):
         r = '\n'.join([f'{s:>20}{l:>20}' for s, l in zip(self.status.report, self.lax.report)])
         return self.name + f"\n'{self.id}'\n\n" + r
 
+    def __eq__(self, other):
+        # TODO order by status
+        return self.name == other.name
+
+    def __gt__(self, other):
+        return self.name > other.name
+
+    def __lt__(self, other):
+        return self.name < other.name
+
+    def __hash__(self):
+        return hash((hash(self.__class__), self.id))  # FIXME checksum? (expensive!)
+
     def __repr__(self):
         return f'{self.__class__.__name__}(\'{self.path}\')'
 
@@ -1073,6 +1114,19 @@ def parse_meta():
     awards = sorted(set(n for d in dump_all for n in d['award']))
     n_awards = len(awards)
 
+    # TODO filtering of all of these by value ...
+    by_award = defaultdict(set)
+    for d in ds:
+        awards = list(d.award)
+        for a in awards:
+            by_award[a].add(d)
+
+        if not awards:
+            by_award[None].add(d)
+
+    by_award = dict(by_award)
+    award_report = {a:(len(f), [(d.dataset_name_proper, d.name, d.id) for d in f]) for a, f in by_award.items()}
+
     #exts = sorted(set(''.join(p.suffixes).split('.fake.')[0] for p in project_path.rglob('*') if p.is_file() and p.suffixes))
     exts = sorted(set(NormFileSuffix(FThing(p).suffix.strip('.') if '.gz' not in p.suffixes else ''.join(FThing(p).suffixes).strip('.'))
                       for p in project_path.rglob('*') if p.is_file()))  # TODO gz
@@ -1092,7 +1146,7 @@ def parse_meta():
 
     #report = ''.join(sorted(d.name + '\n' + d.report + '\nlax\n' + d.lax.report + '\n\n' for d in ds))
     report = '\n\n'.join([d.report for d in sorted(ds, key = lambda d: d.lax.overall[-1])])
-
+    protocol_state = sorted([d.status.has_protocol_uri, d.status.has_protocol, d.status.has_protocol_annotations, d] for d in ds)
     embed()
 
 
