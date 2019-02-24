@@ -5,18 +5,26 @@ import hashlib
 import mimetypes
 from types import GeneratorType
 import magic  # from sys-apps/file consider python-magic ?
+import requests
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from sparcur.blackfynn_api import local_storage_prefix, Path
-from pyontutils.utils import makeSimpleLogger, byCol
 from pyontutils.core import OntTerm, OntId
+from pyontutils.utils import makeSimpleLogger, byCol
+from pyontutils.config import devconfig
 from pyontutils.namespaces import OntCuries
 from protcur.analysis import parameter_expression
+from protcur.core import annoSync
+from protcur.analysis import protc, Hybrid, SparcMI
+from scibot.utils import resolution_chain
+from hyputils.hypothesis import group_to_memfile, HypothesisHelper
+from sparcur.blackfynn_api import local_storage_prefix, Path
+from sparcur.protocols_io_api import get_protocols_io_auth
 from IPython import embed
 
 project_path = local_storage_prefix / 'SPARC Consortium'
 logger = makeSimpleLogger('dsload')
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',})
+
 
 def normalize_tabular_format():
     kwargs = {
@@ -196,8 +204,8 @@ class Tabular:
             next(gen)
             yield from gen
         except SheetNotFoundException as e:
-            logger.warn(f'Sheet weirdness in{self.path}')
-            logger.warn(str(e))
+            logger.warning(f'Sheet weirdness in{self.path}')
+            logger.warning(str(e))
 
     def normalize(self, rows):
         # FIXME need to detect changes
@@ -292,7 +300,7 @@ class DatasetDescription(Version1Header):
         'acknowledgements',
         'funding',
         #'originating_article_doi',  # and sometimes they comma separate them! >_< derp
-        'protocol_url_or_doi',
+        #'protocol_url_or_doi',
         'additional_links',
         'link_description',
         'example_image_filename',
@@ -350,7 +358,7 @@ class DatasetDescription(Version1Header):
         return value
 
     def normalize(self, key, value):
-        if value.lower not in ('n/a', 'na'):  # FIXME explicit null vs remove from structure
+        if value.lower().strip() not in ('n/a', 'na'):  # FIXME explicit null vs remove from structure
             return getattr(self, key, self.default)(value)
 
     @property
@@ -374,13 +382,13 @@ class DatasetDescription(Version1Header):
                     value = tuple(set(_value))
                     if len(value) != len(_value):
                         # TODO counter to show the duplicate values
-                        logger.warn(f"duplicate values in {normv} TODO '{self.t.path}'")
+                        logger.warning(f"duplicate values in {normv} TODO '{self.t.path}'")
 
                     if normv in self.max_one:
                         if not value:
-                            logger.warn(f"missing value for {normv} '{self.t.path}'")
+                            logger.warning(f"missing value for {normv} '{self.t.path}'")
                         elif len(value) > 1:
-                            logger.warn(f"too many values for {normv} {value} '{self.t.path}'")
+                            logger.warning(f"too many values for {normv} {value} '{self.t.path}'")
                             # FIXME not selecting the zeroth element here breaks the schema assumptions
                             value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
                         else:
@@ -588,7 +596,7 @@ class CurationStatusStrict:
     @property
     def metadata(self):
         parts = (self.has_award,
-                 self.has_protocol)
+                 self.has_protocol_uri)
         done = [p for p in parts if p]
         n_parts, n_done = len(parts), len(done)
         # TODO accumulate all the other metadata that we need from the files
@@ -600,13 +608,22 @@ class CurationStatusStrict:
         return bool(list(self.dataset.award))
 
     @property
+    def has_protocol_uri(self):
+        return bool(list(self.dataset.protocol_uris))
+
+    @property
     def has_protocol(self):
-        return bool(list(self.dataset.protocol_link))
+        return bool(list(self.dataset.protocol_jsons))
+
+    @property
+    def has_protocol_annotations(self):
+        return bool(list(self.dataset.protocol_jsons))
 
     @property
     def protocol(self):
         # TODO n_parts = n_total_fields_based_on_context - n_already_filled_out
         # we will try to get as many as we can from the protocol
+        parts = (self.has_protocol)
         return 0, 0
 
     def steps_done(self, stage_name):
@@ -675,11 +692,11 @@ class FThing(FakePathHelper):
         if self.is_dataset:
             dd_paths = list(self.path.rglob('dataset_description*.*'))  # FIXME possibly slow?
             if not dd_paths:
-                #logger.warn(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
+                #logger.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
                 return
 
             elif len(dd_paths) > 1:
-                #logger.warn(f'More than one submission for {self.name} {self.id} {dd_paths}')
+                #logger.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
                 pass
 
             return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
@@ -748,7 +765,7 @@ class FThing(FakePathHelper):
                     try:
                         size += int(path.getxattr('bf.size'))
                     except OSError as e:
-                        logger.warn(f'File xattrs. Assuming it is not tracked. {path}')
+                        logger.warning(f'File xattrs. Assuming it is not tracked. {path}')
 
             return size
 
@@ -825,11 +842,65 @@ class FThing(FakePathHelper):
         return 'TODO'
 
     @property
-    def protocol_link(self):
+    def protocol_uris(self):
         p = 'protocol_url_or_doi'
         for dd in self.dataset_description:
             if p in dd:
-                yield dd[p]
+                for uri in dd[p]:
+                    if uri.startswith('http'):
+                        # TODO normalize
+                        yield uri
+                    else:
+                        logger.warning(f"protocol not uri {uri} '{self.id}'")
+
+    @property
+    def protocol_uris_resolved(self):
+        if not hasattr(self, '_c_protocol_uris_resolved'):
+            self._c_protocol_uris_resolved = list(self._protocol_uris_resolved)
+
+        return self._c_protocol_uris_resolved
+
+    @property
+    def _protocol_uris_resolved(self):
+        # FIXME quite slow ...
+        for start_uri in self.protocol_uris:
+            for end_uri in resolution_chain(start_uri):
+                pass
+            else:
+                yield end_uri
+
+    @property
+    def protocol_annotations(self):
+        for uri in self.protocol_uris_resolved:
+            yield from protc.byIri(uri)
+
+    @property
+    def protocol_jsons(self):
+        # FIXME need a single place to get these from ...
+        if not hasattr(self, '_c_protocol_jsons'):
+            self._c_protocol_jsons = list(self._protocol_jsons)
+
+        return self._c_protocol_jsons
+
+    @property
+    def _protocol_jsons(self):
+        # TODO async
+        creds = get_protocols_io_auth()
+        header = {'Authentication': 'Bearer ' + creds.access_token}
+        for uri in self.protocol_uris_resolved:
+            #juri = uri + '.json'
+            uri_path = uri.rsplit('/', 1)[-1]
+            apiuri = 'https://protocols.io/api/v3/protocols/' + uri_path
+            #'https://www.protocols.io/api/v3/groups/sparc/protocols'
+            #'https://www.protocols.io/api/v3/filemanager/folders?top'
+            print(apiuri, header)
+            resp = requests.get(apiuri, headers=header)
+            #logger.info(str(resp.request.headers))
+            j = resp.json()  # the api is reasonably consistent
+            if resp.ok:
+                yield j
+            else:
+                logger.error(f"protocol no access {uri} '{self.dataset_id}'")
 
     @property
     def _meta_file(self):
@@ -858,20 +929,21 @@ class FThing(FakePathHelper):
             path = next(gen)
             if '.fake' not in path.suffixes:
                 if path.name[0].isupper():
-                    logger.warn(f'filename bad case {path}')
+                    logger.warning(f"filename bad case '{path}'")
                 yield path
 
             else:
-                logger.warn(f'\'{path}\' has not been retrieved.')
+                logger.warning(f"filename not retrieved '{path}'")
             for path in gen:
                 if '.fake' not in path.suffixes:
                     if path.name[0].isupper():
-                        logger.warn(f'filename bad case {path}')
+                        logger.warning(f"filename bad case '{path}'")
 
                     yield path
 
                 else:
-                    logger.warn(f'\'{path}\' has not been retrieved.')
+                    logger.warning(f"filename not retrieved '{path}'")
+
         except StopIteration:
             if self.parent is not None:
                 yield from getattr(self.parent, name_prefix + '_paths')
@@ -909,7 +981,7 @@ class FThing(FakePathHelper):
                 yield {key:value for key, d, value, *fixme in tl[1:]}  # FIXME multiple milestones apparently?
             except ValueError as e:
                 # TODO expected columns vs received columns for all these
-                logger.warn(f'\'{path}\' malformed header.')
+                logger.warning(f'\'{path}\' malformed header.')
                 # best guess interpretation
                 if len(tl[0]) == 2:
                     yield {k:v for k, v in tl[1:]}
@@ -1023,9 +1095,16 @@ def parse_meta():
 
     embed()
 
+
+def populate_annos():
+    get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(devconfig.secrets('sparc-curation')),
+                                                          helpers=(HypothesisHelper, Hybrid, protc, SparcMI),
+                                                          group=devconfig.secrets('sparc-curation'))
+
+    [protc(a, annos) for a in annos]
+
 def main():
-    #normalize_tabular_format()
-    # parse relevant csv files
+    populate_annos()
     parse_meta()
 
 if __name__ == '__main__':
