@@ -4,6 +4,7 @@ import csv
 import hashlib
 import mimetypes
 from types import GeneratorType
+from itertools import chain
 from collections import defaultdict
 import magic  # from sys-apps/file consider python-magic ?
 import requests
@@ -15,14 +16,17 @@ from pyontutils.namespaces import OntCuries
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid, SparcMI
+from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.blackfynn_api import local_storage_prefix, Path
 from sparcur.protocols_io_api import get_protocols_io_auth
+from sparcur.schemas import JSONSchema, ValidationError, SubmissionSchema, DatasetDescriptionSchema, SubjectsSchema
 from IPython import embed
 
 project_path = local_storage_prefix / 'SPARC Consortium'
 logger = makeSimpleLogger('dsload')
+logger.setLevel('CRITICAL')
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',})
 
@@ -31,6 +35,8 @@ _pio_creds = get_protocols_io_auth()
 _pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
 protocol_jsons = {}
 
+class EncodingError(Exception):
+    """ Some encoding error has occured in a file """
 
 def normalize_tabular_format():
     kwargs = {
@@ -169,6 +175,7 @@ class NormContributorRole(str):
 
 class Tabular:
     def __init__(self, path):
+        self._errors = []
         self.path = path
 
     @property
@@ -187,7 +194,9 @@ class Tabular:
                 with open(self.path, 'rt', encoding=encoding) as f:
                     yield from csv.reader(f, delimiter=delimiter)
                 if encoding != 'utf-8':
-                    logger.error(f"encoding bad '{encoding}' '{self.path}'")
+                    message = f"encoding bad '{encoding}' '{self.path}'"
+                    logger.error(message)
+                    self._errors.append(EncodingError(message))
                 return
             except UnicodeDecodeError:
                 continue
@@ -226,11 +235,18 @@ class Tabular:
 
 
 class Version1Header:
-    to_index = tuple()
+    to_index = tuple()  # first element indexes row based data
     skip_cols = 'metadata_element', 'description', 'example'
+    max_one = tuple()
     verticals = dict()  # FIXME should really be immutable
+    schema_class = JSONSchema
+
+    def __new__(cls, tabular):
+        cls.schema = cls.schema_class()
+        return super().__new__(cls)
 
     def __init__(self, tabular):
+        self._errors = []
         self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
         self.t = tabular
         orig_header, *rest = list(tabular)
@@ -248,6 +264,21 @@ class Version1Header:
             self.bc = byCol(rest, header)
         else:
             self.bc = byCol(rest, header, to_index=self.to_index)
+
+    def validate(self):
+        try:
+            data = self.data
+            if data:
+                ok = self.schema.validate(data)
+                return data  # don't normalize the representation here
+
+        except ValidationError as e:
+            return e
+
+    @property
+    def errors(self):
+        yield from self.t._errors
+        yield from self._errors
 
     @staticmethod
     def normalize_header(orig_header):
@@ -296,6 +327,97 @@ class Version1Header:
         else:
             return value
 
+    def default(self, value):
+        return value
+
+    def normalize(self, key, value):
+        v = value.replace('\ufeff', '')  # FIXME utf-16 issue
+        if v != value:
+            message = f"encoding issue feff '{self.t.path}'"
+            logger.error(message)
+            self._errors.append(EncodingError(message))
+
+        if v.lower().strip() not in ('n/a', 'na'):  # FIXME explicit null vs remove from structure
+            return getattr(self, key, self.default)(v)
+
+    def rename_key(self, key, *parent_keys):
+        """ modify this in your class if you need to rename a key """
+        # TODO parent key lists
+        return key
+
+    @property
+    def data(self):
+        index_col, *_ = self.to_index
+        out = {}
+        if not hasattr(self.bc, index_col):
+            logger.error(f'\'{self.t.path}\' malformed header!')
+            return out
+        ic = list(getattr(self.bc, index_col))
+        nme = Version1Header.normalize_header(ic)
+        nmed = {v:normk for normk, v in zip(nme, ic)}
+
+        for v, nt in self.bc._byCol__indexes[index_col].items():
+            if v != index_col:
+                normk = nmed[v]
+                if normk not in self.skip_rows:
+                    _value = tuple(normv for key, value in zip(nt._fields, nt)
+                                   if key not in self.skip_cols and value
+                                   for normv in (self.normalize(key, value),)
+                                   if normv)
+                    value = tuple(set(_value))
+                    if len(value) != len(_value):
+                        # TODO counter to show the duplicate values
+                        logger.warning(f"duplicate values in {normk} TODO '{self.t.path}'")
+
+                    if normk in self.max_one:
+                        if not value:
+                            logger.warning(f"missing value for {normk} '{self.t.path}'")
+                        elif len(value) > 1:
+                            logger.warning(f"too many values for {normk} {value} '{self.t.path}'")
+                            # FIXME not selecting the zeroth element here breaks the schema assumptions
+                            value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
+                        else:
+                            value = value[0]  # FIXME error handling etc.
+
+                    if value:
+                        out[normk] = value
+
+        for key, keys in self.verticals.items():
+            value = tuple(_ for _ in ({self.rename_key(k, key):normv
+                                       for k, value in zip(nme, values)
+                                       if k in keys and value
+                                       for normv in (self.normalize(k, value),)
+                                       if normv}
+                                      for head, *values in self.bc.cols
+                                      if head not in self.skip_cols)
+                          if _)
+            if value:
+                out[key] = value
+
+        return out
+
+
+class SubmissionFile(Version1Header):
+    to_index = 'submission_item',  # FIXME normalized in version 2
+    skip_cols = 'definition',  # FIXME normalized in version 2
+    verticals = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
+    schema_class = SubmissionSchema
+
+    def __iter__(self):
+        # FIXME > 1
+        for path in self.submission_paths:
+            t = Tabular(path)
+            tl = list(t)
+            #print(path, t)
+            try:
+                yield {key:value for key, d, value, *fixme in tl[1:]}  # FIXME multiple milestones apparently?
+            except ValueError as e:
+                # TODO expected columns vs received columns for all these
+                logger.warning(f'\'{path}\' malformed header.')
+                # best guess interpretation
+                if len(tl[0]) == 2:
+                    yield {k:v for k, v in tl[1:]}
+
 
 class DatasetDescription(Version1Header):
     to_index = 'metadata_element',
@@ -307,11 +429,14 @@ class DatasetDescription(Version1Header):
         'funding',
         #'originating_article_doi',  # and sometimes they comma separate them! >_< derp
         #'protocol_url_or_doi',
-        'additional_links',
-        'link_description',
-        'example_image_filename',
-        'example_image_locator',
-        'example_image_description',
+
+        #'additional_links',
+        #'link_description',
+
+        #'example_image_filename',
+        #'example_image_locator',
+        #'example_image_description',
+
         'completeness_of_data_set',
         'prior_batch_number',
         'title_for_complete_data_set')
@@ -319,7 +444,11 @@ class DatasetDescription(Version1Header):
                                   'contributor_orcid_id',
                                   'contributor_affiliation',
                                   'contributor_role',
-                                  'is_contact_person',),}
+                                  'is_contact_person',),
+                 'links': ('additional_links', 'link_description'),
+                 'examples': ('example_image_filename', 'example_image_locator', 'example_image_description'),
+    }
+    schema_class = DatasetDescriptionSchema
 
     def contributor_orcid_id(self, value):
         v = value.replace(' ', '')
@@ -354,66 +483,19 @@ class DatasetDescription(Version1Header):
             return value
 
     def contributor_role(self, value):
-        return tuple(sorted(set(e.strip() for e in value.split(','))))
+        # FIXME normalizing here momentarily to squash annoying errors
+        return tuple(sorted(set(NormContributorRole(e.strip()) for e in value.split(','))))
 
     def is_contact_person(self, value):
         return value.lower() == 'yes'
 
-    def default(self, value):
-        # TODO need a 'run for all' which
-        return value
+    def rename_key(self, key, *parent_keys):
+        # FIXME multiple parent keys...
+        if parent_keys == ('contributors',):
+            if key == 'contributors':
+                return 'name'
 
-    def normalize(self, key, value):
-        if value.lower().strip() not in ('n/a', 'na'):  # FIXME explicit null vs remove from structure
-            return getattr(self, key, self.default)(value)
-
-    @property
-    def data(self):
-        index_col = 'metadata_element'
-        out = {}
-        if not hasattr(self.bc, index_col):
-            logger.error(f'\'{self.t.path}\' malformed header!')
-            return out
-        nme = Version1Header.normalize_header(self.bc.metadata_element)
-        nmed = {v:normv for normv, v in zip(nme, self.bc.metadata_element)}
-
-        for v, nt in self.bc._byCol__indexes[index_col].items():
-            if v != index_col:
-                normv = nmed[v]
-                if normv not in self.skip_rows:
-                    _value = tuple(normv for key, value in zip(nt._fields, nt)
-                                   if key not in self.skip_cols and value
-                                   for normv in (self.normalize(key, value),)
-                                   if normv)
-                    value = tuple(set(_value))
-                    if len(value) != len(_value):
-                        # TODO counter to show the duplicate values
-                        logger.warning(f"duplicate values in {normv} TODO '{self.t.path}'")
-
-                    if normv in self.max_one:
-                        if not value:
-                            logger.warning(f"missing value for {normv} '{self.t.path}'")
-                        elif len(value) > 1:
-                            logger.warning(f"too many values for {normv} {value} '{self.t.path}'")
-                            # FIXME not selecting the zeroth element here breaks the schema assumptions
-                            value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
-                        else:
-                            value = value[0]  # FIXME error handling etc.
-
-                    if value:
-                        out[normv] = value
-
-        for key, keys in self.verticals.items():
-            out[key] = tuple(_ for _ in ({key:normv
-                                          for key, value in zip(nme, values)
-                                          if key in keys and value
-                                          for normv in (self.normalize(key, value),)
-                                          if normv}
-                                         for head, *values in self.bc.cols
-                                         if head not in self.skip_cols)
-                             if _)
-
-        return out
+        return key
 
     def __iter__(self):
         # TODO this needs to be exporting triples ...
@@ -430,6 +512,11 @@ class DatasetDescription(Version1Header):
 
 
 class SubjectsFile(Version1Header):
+    #to_index = 'subject_id',  # the zeroth is what is used for unique rows by default  # FIXME doesn't work
+    # subject id varies, so we have to do something a bit different here
+    horizontals = {'software':('software', 'software_version', 'software_vendor', 'software_url', 'software_rrid')}
+    schema_class = SubjectsSchema
+
     def __init__(self, tabular):
         super().__init__(tabular)
 
@@ -462,7 +549,7 @@ class SubjectsFile(Version1Header):
     def age(self, value):
         _, v, rest = parameter_expression(value)
         if not v[0] == 'param:parse-failure':
-            return v
+            return ProtcParameter(v)
         else:
             # TODO warn
             return value
@@ -473,28 +560,23 @@ class SubjectsFile(Version1Header):
     def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
         return value
 
-    def default(self, value):
-        v = value.replace('\ufeff', '')  # FIXME utf-16 issue
-        if v != value:
-            logger.error(f"encoding issue feff '{self.t.path}'")
-        return v
-
-    def normalize(self, key, value):
-        return getattr(self, key, self.default)(value)
-
     def process_dict(self, dict_):
         """ deal with multiple fields """
         out = {k:v for k, v in dict_.items() if k not in self.skip}
         for h_unit, h_value in zip(self.h_unit, self.h_value):
             compose = dict_[h_value] + dict_[h_unit]
             _, v, rest = parameter_expression(compose)
-            out[h_value] = v
+            out[h_value] = ProtcParameter(v)
 
         if 'gender' in out and 'species' in out:
             if out['species'] != OntTerm('NCBITaxon:9606'):
                 out['sex'] = out.pop('gender')
 
         return out
+
+    @property
+    def data(self):
+        return {'subjects': list(self)}
 
     def __iter__(self):
         yield from (self.process_dict({k:self.normalize(k, v) for k, v in zip(r._fields, r) if v}) for r in self.bc.rows)
@@ -535,6 +617,7 @@ class FakePathHelper:
         """ This can be slow because it has to open the files. """
         if self.real_path.exists():
             return magic.detect_from_filename(self.real_path).mime_type
+
 
 class CurationStatusStrict:
     def __init__(self, fthing):
@@ -644,6 +727,12 @@ class CurationStatusStrict:
                 self.steps_done('metadata'),
                 self.steps_done('protocol'),)
 
+    @property
+    def row(self):
+        """ tabular representation of the row """
+        for column in self.report_header:
+            yield getattr(self, column)
+
     def __repr__(self):
         return self.dataset.dataset_name_proper + '\n' + '\n'.join(self.report)
 
@@ -678,7 +767,7 @@ class CurationStatusLax(CurationStatusStrict):
 class FThing(FakePathHelper):
     """ a homogenous representation """
 
-    def __init__(self, path, cypher=hashlib.sha256, pio_header=_pio_header):
+    def __init__(self, path, cypher=hashlib.sha256, _pio_header=_pio_header):
         if isinstance(path, str):
             path = Path(path)
 
@@ -688,7 +777,7 @@ class FThing(FakePathHelper):
         self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
-        self.pio_header = _pio_header  # FIXME ick
+        self._pio_header = _pio_header  # FIXME ick
 
     def xattrs(self):
         return self.path.xattrs()
@@ -839,7 +928,7 @@ class FThing(FakePathHelper):
                             normrole = NormContributorRole(role)
                             if normrole in os:
                                 #print(contributor)
-                                yield contributor['contributors']  # TODO orcid etc
+                                yield contributor['name']  # TODO orcid etc
                                 break
 
     @property
@@ -900,6 +989,7 @@ class FThing(FakePathHelper):
 
     @property
     def protocol_jsons(self):
+        return
         # FIXME need a single place to get these from ...
         for uri in self.protocol_uris_resolved:
             if uri not in protocol_jsons:  # FIXME yay global variables
@@ -922,7 +1012,7 @@ class FThing(FakePathHelper):
         #'https://www.protocols.io/api/v3/groups/sparc/protocols'
         #'https://www.protocols.io/api/v3/filemanager/folders?top'
         #print(apiuri, header)
-        resp = requests.get(apiuri, headers=self.pio_header)
+        resp = requests.get(apiuri, headers=self._pio_header)
         #logger.info(str(resp.request.headers))
         j = resp.json()  # the api is reasonably consistent
         if resp.ok:
@@ -999,21 +1089,17 @@ class FThing(FakePathHelper):
                 yield from self.parent.submission_paths
 
     @property
-    def submission(self):
-        # FIXME > 1
+    def _submission_tables(self):
         for path in self.submission_paths:
-            t = Tabular(path)
-            tl = list(t)
-            #print(path, t)
-            try:
-                yield {key:value for key, d, value, *fixme in tl[1:]}  # FIXME multiple milestones apparently?
-            except ValueError as e:
-                # TODO expected columns vs received columns for all these
-                logger.warning(f'\'{path}\' malformed header.')
-                # best guess interpretation
-                if len(tl[0]) == 2:
-                    yield {k:v for k, v in tl[1:]}
+            yield Tabular(path)
 
+    @property
+    def submission(self):
+        for t in self._submission_tables:
+            miss = SubmissionFile(t)
+            if miss.data:
+                yield miss
+    
     @property
     def dataset_description_paths(self):
         yield from self._abstracted_paths('dataset_description')
@@ -1034,7 +1120,9 @@ class FThing(FakePathHelper):
         for t in self._dataset_description_tables:
             #yield from DatasetDescription(t)
             # TODO export adapters for this ... how to recombine and reuse ...
-            yield DatasetDescription(t).data
+            dd = DatasetDescription(t)
+            if dd.data:
+                yield dd
 
     @property
     def subjects_paths(self):
@@ -1049,7 +1137,9 @@ class FThing(FakePathHelper):
     @property
     def subjects(self):
         for table in self._subjects_tables:
-            yield from SubjectsFile(table)
+            sf = SubjectsFile(table)
+            if sf.data:
+                yield sf
 
     @property
     def meta_paths(self):
@@ -1063,6 +1153,10 @@ class FThing(FakePathHelper):
 
         r = '\n'.join([f'{s:>20}{l:>20}' for s, l in zip(self.status.report, self.lax.report)])
         return self.name + f"\n'{self.id}'\n\n" + r
+
+    def dump_all(self):
+        return {attr: express_or_return(getattr(self, attr))
+                for attr in dir(self) if not attr.startswith('_')}
 
     def __eq__(self, other):
         # TODO order by status
@@ -1085,9 +1179,14 @@ def express_or_return(thing):
     return list(thing) if isinstance(thing, GeneratorType) else thing
 
 
-def parse_meta():
+def get_datasets():
     ds = [FThing(p) for p in project_path.iterdir() if p.is_dir()]
     dsd = {d.id:d for d in ds}
+    return ds, dsd
+
+
+def parse_meta():
+    ds, dsd = get_datasets()
     dump_all = [{attr: express_or_return(getattr(d, attr))
                  for attr in dir(d) if not attr.startswith('_')}
                 for d in ds]
@@ -1150,6 +1249,16 @@ def parse_meta():
     embed()
 
 
+def schema_check():
+    ds, dsd = get_datasets()
+    dds = [dd for d in ds for dd in d.dataset_description]
+    validation_results = {d.id:dd.validate() for d in ds for dd in d.dataset_description}
+    validation_errors = {k:e for k, e in validation_results.items() if not isinstance(e, dict)}
+    missvr = {d.id:miss.validate() for d in ds for miss in d.submission}
+    jectvr = {d.id:ject.validate() for d in ds for ject in d.subjects}
+    embed()
+
+
 def populate_annos():
     get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(devconfig.secrets('sparc-curation')),
                                                           helpers=(HypothesisHelper, Hybrid, protc, SparcMI),
@@ -1158,8 +1267,9 @@ def populate_annos():
     [protc(a, annos) for a in annos]
 
 def main():
-    populate_annos()
-    parse_meta()
+    #populate_annos()
+    #parse_meta()
+    schema_check()
 
 if __name__ == '__main__':
     main()
