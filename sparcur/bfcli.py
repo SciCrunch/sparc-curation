@@ -4,6 +4,7 @@ Usage:
     bfc pull
     bfc stats [<directory>...]
     bfc xattrs
+    bfc feedback <feedback-file> <feedback>...
     bfc [options] <file>...
     bfc [options] --name=<PAT>...
 
@@ -22,6 +23,7 @@ Options:
 """
 
 from sparcur.blackfynn_api import BFLocal, Path
+from sparcur.curation import FThing
 
 def main():
     from docopt import docopt, parse_defaults
@@ -74,6 +76,14 @@ def main():
         h = 'Folder', 'Local', 'Remote', 'Total', 'L', 'R', 'T'
         print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
         print(fmt)
+
+    elif args['feedback']:
+        file = args['<feedback-file>']
+        feedback = ' '.join(args['<feedback>'])
+        path = Path(file).resolve()
+        eff = FThing(path)
+        # TODO pagenote and/or database
+        print(eff, feedback)
 
     elif args['xattrs']:
         bfl = BFLocal()
