@@ -44,6 +44,14 @@ def _format_jsonschema_error(error):
     return error.message
 
 
+class DatasetSchema(JSONSchema):
+    schema = {'type': 'object',
+              'required': ['submission', 'dataset_description', 'subjects'],
+              'properties': {'submission': {'type': 'string'},
+                             'dataset_description': {'type': 'string'},
+                             'subjects': {'type': 'string'},}}
+
+
 class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
