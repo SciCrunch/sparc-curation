@@ -224,8 +224,18 @@ class Tabular:
 
     def normalize(self, rows):
         # FIXME need to detect changes
-        for row in rows:
-            yield [c.strip() for c in row]
+        # this removes any columns that are all dead
+
+        #if any(not(c) for c in rows[0]):  # doesn't work because generators
+
+        error = EncodingError(f"encoding feff error in '{self.path}'")
+        cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
+        for row in cleaned_rows:
+            n_row = [c.strip().replace('\ufeff', '') for c in row
+                     if (not self._errors.append(error)  # FIXME will probably append multiple ...
+                         if '\ufeff' in c else True)]
+            if not all(not(c) for c in n_row):  # skip totally empty rows
+                yield n_row
 
     def __iter__(self):
         try:
@@ -265,6 +275,14 @@ class Version1Header:
         else:
             self.bc = byCol(rest, header, to_index=self.to_index)
 
+    @property
+    def path(self):
+        return self.t.path
+
+    def xopen(self):
+        """ open file using xdg-open """
+        self.path.xopen()
+
     def validate(self):
         try:
             data = self.data
@@ -291,7 +309,6 @@ class Version1Header:
                      .replace(' ', '_')
                      .replace('+', '')
                      .replace('…','')
-                     .replace('\ufeff', '')
                      .replace('.','_')
                      .replace(',','_')
                      .replace('/', '_')
@@ -333,7 +350,7 @@ class Version1Header:
     def normalize(self, key, value):
         v = value.replace('\ufeff', '')  # FIXME utf-16 issue
         if v != value:
-            message = f"encoding issue feff '{self.t.path}'"
+            message = f"encoding feff error in '{self.path}'"
             logger.error(message)
             self._errors.append(EncodingError(message))
 
@@ -579,7 +596,9 @@ class SubjectsFile(Version1Header):
         return {'subjects': list(self)}
 
     def __iter__(self):
-        yield from (self.process_dict({k:self.normalize(k, v) for k, v in zip(r._fields, r) if v}) for r in self.bc.rows)
+        yield from (self.process_dict({k:nv for k, v in zip(r._fields, r) if v
+                                       for nv in (self.normalize(k, v),) if nv})
+                    for r in self.bc.rows)
 
 
 class FakePathHelper:
@@ -1256,6 +1275,11 @@ def schema_check():
     validation_errors = {k:e for k, e in validation_results.items() if not isinstance(e, dict)}
     missvr = {d.id:miss.validate() for d in ds for miss in d.submission}
     jectvr = {d.id:ject.validate() for d in ds for ject in d.subjects}
+
+    subjects_header_diversity = sorted(set(f for d in ds for s in d.subjects for f in s.bc.header._fields))
+    subjects_wat = [(s,c) for d in ds for s in d.subjects for c in s.bc.cols if c[0].startswith('TEMP_')] 
+    unique_wat = sorted(set(a for a, b in subjects_wat), key = lambda a: a.path)
+    encoding_errors = [e for d in ds for dd in chain(d.dataset_description, d.submission, d.subjects) for e in dd.errors]
     embed()
 
 
