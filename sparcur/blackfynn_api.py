@@ -33,6 +33,7 @@ blackfynn-mvp-secret: ${apisecret}
 import io
 import os
 import asyncio
+import subprocess
 from pathlib import PosixPath
 from nibabel import nifti1
 from pydicom import dcmread
@@ -70,6 +71,12 @@ class Path(PosixPath):
 
     def xattrs(self, namespace=xattr.NS_USER):
         return {k.decode():v.decode() for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
+
+    def xopen(self):
+        """ open file using xdg-open """
+        subprocess.Popen(['xdg-open', self.as_posix()],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.STDOUT)
 
 
 # CHANGE THIS PATH TO MATCH YOUR SYSTEM
