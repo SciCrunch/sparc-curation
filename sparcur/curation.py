@@ -1211,9 +1211,18 @@ class FThing(FakePathHelper):
     @property
     def meta_paths(self):
         """ All metadata related paths. """
+        yield self.path
         yield from self.submission_paths
         yield from self.dataset_description_paths
         yield from self.subjects_paths
+
+    @property
+    def meta_things(self):
+        """ All metadata related objects. """
+        yield self
+        yield from self.submission
+        yield from self.dataset_description
+        yield from self.subjects
 
     @property
     def report(self):
@@ -1359,6 +1368,13 @@ def main():
     dsl, dsdl = get_datasets(FTLax)
     lr, le = schema_check(dsl, dsdl)
     compare = lambda i: (ne[i], le[i])
+
+    total_paths = list(map(lambda d_: len([p for d in d_ for p in d.meta_paths]), (ds, dsl)))
+    total_metas = list(map(lambda d_: len([p for d in d_ for p in d.meta_things]), (ds, dsl)))
+    total_valid = list(map(lambda d_: len([p for d in d_ for p in d.meta_things if isinstance(p.validate(), dict)]), (ds, dsl)))
+    dst = [p for d in ds for p in d.meta_things if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
+    dstl = [p for d in dsl for p in d.meta_things if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
+
     embed()
 
 if __name__ == '__main__':
