@@ -21,7 +21,9 @@ from scibot.utils import resolution_chain
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.blackfynn_api import local_storage_prefix, Path
 from sparcur.protocols_io_api import get_protocols_io_auth
-from sparcur.schemas import JSONSchema, ValidationError, SubmissionSchema, DatasetDescriptionSchema, SubjectsSchema
+from sparcur.schemas import (JSONSchema, ValidationError,
+                             DatasetSchema, SubmissionSchema,
+                             DatasetDescriptionSchema, SubjectsSchema)
 from IPython import embed
 
 project_path = local_storage_prefix / 'SPARC Consortium'
@@ -370,7 +372,7 @@ class Version1Header:
             logger.error(f'\'{self.t.path}\' malformed header!')
             return out
         ic = list(getattr(self.bc, index_col))
-        nme = Version1Header.normalize_header(ic)
+        nme = Version1Header.normalize_header(ic)  # TODO make sure we can recover the original values for these
         nmed = {v:normk for normk, v in zip(nme, ic)}
 
         for v, nt in self.bc._byCol__indexes[index_col].items():
@@ -416,11 +418,25 @@ class Version1Header:
 
 class SubmissionFile(Version1Header):
     to_index = 'submission_item',  # FIXME normalized in version 2
-    skip_cols = 'definition',  # FIXME normalized in version 2
+    skip_cols = 'submission_item', 'definition'  # FIXME normalized in version 2
+
     verticals = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
     schema_class = SubmissionSchema
 
+    @property
+    def data(self):
+        """ lift list with single element to object """
+        d = super().data
+        if d:
+            if d['submission']:
+                d['submission'] = d['submission'][0]
+            else:
+                d['submission'] = {}
+
+        return d
+
     def __iter__(self):
+        """ unused """
         # FIXME > 1
         for path in self.submission_paths:
             t = Tabular(path)
@@ -785,6 +801,11 @@ class CurationStatusLax(CurationStatusStrict):
 
 class FThing(FakePathHelper):
     """ a homogenous representation """
+    schema_class = DatasetSchema
+
+    def __new__(cls, path, cypher=hashlib.sha256, _pio_header=_pio_header):
+        cls.schema = cls.schema_class()
+        return super().__new__(cls)
 
     def __init__(self, path, cypher=hashlib.sha256, _pio_header=_pio_header):
         if isinstance(path, str):
@@ -803,6 +824,8 @@ class FThing(FakePathHelper):
 
     @property
     def bids_root(self):
+        # FIXME this will find the first dataset description file at any depth!
+        # this is incorrect behavior!
         """ Sometimes there is an intervening folder. """
         if self.is_dataset:
             dd_paths = list(self.path.rglob('dataset_description*.*'))  # FIXME possibly slow?
@@ -1047,20 +1070,22 @@ class FThing(FakePathHelper):
         except StopIteration:
             return None
 
-    def _abstracted_paths(self, name_prefix):
+    def _abstracted_paths(self, name_prefix, glob_type='glob'):
         """ A bottom up search for the closest file in the parent directory.
             For datasets, if the bids root and path do not match, use the bids root.
             In the future this needs to be normalized because the extra code required
             for dealing with the intervening node is quite annoying to maintain.
         """
-        if self.is_dataset and self.bids_root is not None and self.bids_root != self.path:
-            path = self.bids_root
-        else:
-            path = self.path
+        path = self.path
+        #if self.is_dataset and self.bids_root is not None and self.bids_root != self.path:
+            #path = self.bids_root
+        #else:
+            #path = self.path
 
         first = name_prefix[0]
         cased_np = '[' + first.upper() + first + ']' + name_prefix[1:]  # FIXME warn and normalize
-        gen = path.glob(cased_np + '*.*')
+        glob = getattr(path, glob_type)
+        gen = glob(cased_np + '*.*')
 
         try:
             path = next(gen)
@@ -1160,6 +1185,29 @@ class FThing(FakePathHelper):
             if sf.data:
                 yield sf
 
+    validate = Version1Header.validate
+
+    @property
+    def data(self):
+        """ used to validate repo structure """
+
+        out = {}
+        for thing_name in ('submission', 'dataset_description', 'subjects'):
+            #path_prop = thing_name + '_paths'
+            for thing in getattr(self, thing_name):
+                tp = thing.path.as_posix()
+                if thing_name in out:
+                    ot = out[thing_name]
+                    # doing it this way will cause the schema to fail loudly :)
+                    if isinstance(ot, str):
+                        out[thing_name] = [ot, tp]
+                    else:
+                        ot.append(tp)
+                else:
+                    out[thing_name] = tp
+
+        return out
+
     @property
     def meta_paths(self):
         """ All metadata related paths. """
@@ -1194,12 +1242,17 @@ class FThing(FakePathHelper):
         return f'{self.__class__.__name__}(\'{self.path}\')'
 
 
+class FTLax(FThing):
+    def _abstracted_paths(self, name_prefix, glob_type='rglob'):
+        yield from super()._abstracted_paths(name_prefix, glob_type)
+
+
 def express_or_return(thing):
     return list(thing) if isinstance(thing, GeneratorType) else thing
 
 
-def get_datasets():
-    ds = [FThing(p) for p in project_path.iterdir() if p.is_dir()]
+def get_datasets(FTC=FThing):
+    ds = [FTC(p) for p in project_path.iterdir() if p.is_dir()]
     dsd = {d.id:d for d in ds}
     return ds, dsd
 
@@ -1268,19 +1321,26 @@ def parse_meta():
     embed()
 
 
-def schema_check():
-    ds, dsd = get_datasets()
+def schema_check(ds, dsd):
     dds = [dd for d in ds for dd in d.dataset_description]
-    validation_results = {d.id:dd.validate() for d in ds for dd in d.dataset_description}
-    validation_errors = {k:e for k, e in validation_results.items() if not isinstance(e, dict)}
+
+    # TODO nest the schemas conditionally
+    dsvr = {d.id:d.validate() for d in ds}
+    ddvr = {d.id:dd.validate() for d in ds for dd in d.dataset_description}
     missvr = {d.id:miss.validate() for d in ds for miss in d.submission}
     jectvr = {d.id:ject.validate() for d in ds for ject in d.subjects}
+
+    dsve = {k:e for k, e in dsvr.items() if not isinstance(e, dict)}
+    ddve = {k:e for k, e in ddvr.items() if not isinstance(e, dict)}
+    missve = {k:e for k, e in missvr.items() if not isinstance(e, dict)}
+    jectve = {k:e for k, e in jectvr.items() if not isinstance(e, dict)}
 
     subjects_header_diversity = sorted(set(f for d in ds for s in d.subjects for f in s.bc.header._fields))
     subjects_wat = [(s,c) for d in ds for s in d.subjects for c in s.bc.cols if c[0].startswith('TEMP_')] 
     unique_wat = sorted(set(a for a, b in subjects_wat), key = lambda a: a.path)
     encoding_errors = [e for d in ds for dd in chain(d.dataset_description, d.submission, d.subjects) for e in dd.errors]
-    embed()
+    #embed()
+    return [dsvr, ddvr, missvr, jectvr], [dsve, ddve, missve, jectve]
 
 
 def populate_annos():
@@ -1293,7 +1353,13 @@ def populate_annos():
 def main():
     #populate_annos()
     #parse_meta()
-    schema_check()
+    ds, dsd = get_datasets()
+    nr, ne = schema_check(ds, dsd)
+
+    dsl, dsdl = get_datasets(FTLax)
+    lr, le = schema_check(dsl, dsdl)
+    compare = lambda i: (ne[i], le[i])
+    embed()
 
 if __name__ == '__main__':
     main()
