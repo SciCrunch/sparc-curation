@@ -1314,8 +1314,10 @@ def parse_meta():
 
     fts = [FThing(p) for p in project_path.rglob('*') if p.is_file()]
     mimes = sorted(t for t in set(f.mimetype for f in fts if f.mimetype is not None))
-    #all_type_info = sorted(set((f.suffix, f.mimetype, f._magic_mimetype)
-                               #for f in fts), key = lambda v: [e if e else '' for e in v])
+    all_type_info = sorted(set((f.suffix, f.mimetype, f._magic_mimetype)
+                               for f in fts), key = lambda v: [e if e else '' for e in v])
+    type_report = '\n'.join(['extension\tfilename mime\tmagic mime'] +
+                            ['\t'.join([str(s) for s in _]) for _ in all_type_info])
     # and this is why manual data entry without immediate feedback is a bad idea
     cr = get_diversity('contributor_role')
     fun = get_diversity('funding')

@@ -3,6 +3,7 @@
 Usage:
     bfc pull
     bfc stats [<directory>...]
+    bfc missing
     bfc xattrs
     bfc feedback <feedback-file> <feedback>...
     bfc [options] <file>...
@@ -12,6 +13,7 @@ Commands:
               list and fetch unfetched files
     pull      pull down the remote list of files
     stats     print stats for specified or current directory
+    missing   find and fix missing metadata
     xattrs    populate metastore / backup xattrs
 
 Options:
@@ -88,6 +90,10 @@ def main():
     elif args['xattrs']:
         bfl = BFLocal()
         bfl.populate_metastore()
+
+    elif args['missing']:
+        bfl = BFLocal()
+        bfl.find_missing_meta()
 
     else:
         paths = []
