@@ -955,13 +955,17 @@ class FThing(FakePathHelper):
 
     @property
     def _award_raw(self):
-        for dict_ in self.submission:
-            if 'SPARC Award number' in dict_:
-                yield dict_['SPARC Award number']
+        for s in self.submission:
+            dict_ = s.data
+            if 'sparc_award_number' in dict_:
+                yield dict_['sparc_award_number']
+            #if 'SPARC Award number' in dict_:
+                #yield dict_['SPARC Award number']
 
-        for dict_ in self.dataset_description:
-            if 'Funding' in dict_:
-                yield dict_['Funding']
+        for d in self.dataset_description:
+            dict_ = d.data
+            if 'funding' in dict_:
+                yield dict_['funding']
 
     @property
     def PI(self):
@@ -1083,10 +1087,10 @@ class FThing(FakePathHelper):
             for dealing with the intervening node is quite annoying to maintain.
         """
         path = self.path
-        #if self.is_dataset and self.bids_root is not None and self.bids_root != self.path:
-            #path = self.bids_root
-        #else:
-            #path = self.path
+        if self.is_dataset and self.bids_root is not None and self.bids_root != self.path:
+            path = self.bids_root
+        else:
+            path = self.path
 
         first = name_prefix[0]
         cased_np = '[' + first.upper() + first + ']' + name_prefix[1:]  # FIXME warn and normalize
@@ -1386,12 +1390,42 @@ def schema_check(ds, dsd):
 
 class CurationReport:
     def __init__(self, project_path):
-        get_dataset(project_path)
-        ds = [FTC(p) for p in project_path.iterdir() if p.is_dir()]
-        dsd = {d.id:d for d in ds}
-        return ds, dsd
-        self.path = path
+        self.ds, self.dsd = get_datasets(project_path)
+        self.dsl, self.dsdl = get_datasets(project_path, FTC=FTLax)
 
+    def gen(self):
+        ds, dsl = self.ds, self.dsl
+
+        # total
+        n_ds = len(ds)
+
+        # validated
+        validated = [d for d in ds if d.validate()]
+        n_val = len(validated)
+        validated_l = [d for d in dsl if d.validate()]
+        n_val_l = len(validated_l)
+
+        # award
+        award = [d for d in ds if list(d.award)]
+        n_award = len(award)
+        award_l = [d for d in dsl if list(d.award)]
+        n_award_l = len(award_l)
+
+        # submission
+        sub_l = [FThing(s) for s in ds[0].parent.path.rglob('[Ss]ubmission*.*')]
+        n_sub_l = len(sub_l)
+        subd_l = [s for f in sub_l for s in f.submission]
+        n_subd_l = len(subd_l)
+
+        # oof
+        bads = [f for f in sub_l if not list(f.submission)]
+        n_bads = len(bads)
+
+        h = ('Total', 'Structure', 'Lax structure', 'Award', 'Lax award',
+             'Lax submission files', 'Lax submission data')
+        r = n_ds, n_val, n_val_l, n_award, n_award_l, n_sub_l, n_subd_l
+
+        return h, r
 
 def populate_annos():
     get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(devconfig.secrets('sparc-curation')),
@@ -1419,6 +1453,11 @@ def main():
     # review paths in lax vs real
     dp = [(d, p) for d in ds for p in d.meta_paths]
     dpl = [(d, p) for d in dsl for p in d.meta_paths]
+
+    dr = [(d.dataset_name_proper, p.name, FThing(p).parent.is_dataset)
+           for d in ds for p in d.meta_paths] 
+    drl = [(d.dataset_name_proper, p.name, FThing(p).parent.is_dataset)
+           for d in dsl for p in d.meta_paths] 
 
     embed()
 

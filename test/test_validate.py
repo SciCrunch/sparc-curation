@@ -49,6 +49,9 @@ def mk_file_meta(fp):
 
 def mk_required_files(path, suffix='.csv'):
     # TODO samples.* ?!??!
+    # FIXME because empty files get treated as non-existent
+    # we either need to treat them as a different category of error
+    # OR we need to fill in some fake values when testing
     for globpath in ('submission.*', 'dataset_description.*',  'subjects.*'):
         for template_file in template_root.glob(globpath):
             file_name = template_file.name
