@@ -30,7 +30,7 @@ Options:
 """
 
 from sparcur.blackfynn_api import BFLocal, Path
-from sparcur.curation import FThing, CurationReport
+from sparcur.curation import FThing, FTLax, CurationReport
 
 def main():
     from docopt import docopt, parse_defaults

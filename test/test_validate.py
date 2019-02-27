@@ -1,8 +1,12 @@
+import shutil
 import unittest
 from datetime import datetime
 from sparcur.core import Path
 from sparcur import config
-project_path = Path(__file__).parent / 'test_local/test_project'
+this_file = Path(__file__)
+template_root = this_file.parent.parent / 'resources/DatasetTemplate'
+print(template_root)
+project_path = this_file.parent / 'test_local/test_project'
 config.local_storage_prefix = project_path.parent
 from sparcur.curation import get_datasets
 
@@ -41,12 +45,15 @@ def mk_file_meta(fp):
 
 
 def mk_required_files(path, suffix='.csv'):
-    for file_name in ('submission', 'dataset_description',  'subjects'):
-        file_path = path / (file_name + suffix)
-        file_path.touch()  # TODO
-        file_path.touch()  # TODO
-        attrs = mk_file_meta(file_path)
-        file_path.setxattrs(attrs)
+    # TODO samples.* ?!??!
+    for globpath in ('submission.*', 'dataset_description.*',  'subjects.*'):
+        for template_file in template_root.glob(globpath):
+            file_name = template_file.name
+            file_path = path / file_name
+            shutil.copy(template_file, file_path)
+            file_path.touch()
+            attrs = mk_file_meta(file_path)
+            file_path.setxattrs(attrs)
 
 
 if not project_path.exists():
@@ -76,10 +83,10 @@ if not project_path.exists():
 
 
 class TestHierarchy(unittest.TestCase):
-    def setup(self):
-        pass
+    def setUp(self):
+        self.ds, self.dsd = get_datasets(project_path)
 
-    def teardown(self):
+    def tearDown(self):
         pass
 
     def test_create(self):
@@ -87,8 +94,35 @@ class TestHierarchy(unittest.TestCase):
         for pthing in project_path.rglob('*'):
             ptattrs = pthing.xattrs()
 
+    def test_paths(self):
+        for d in self.ds:
+            for mp in d.meta_paths:
+                print(mp)
+
+        raise BaseException('lol')
+
     def test_dataset(self):
-        ds, dsd = get_datasets(project_path)
+        for d in self.ds:
+            print(d.data)
+            d.validate()
+
+        raise BaseException('lol')
+
+    def test_tables(self):
+        for d in self.ds:
+            for table in d._meta_tables:
+                for row in table:
+                    print(row)
+
+        raise BaseException('lol')
+
+    def test_things(self):
+        for d in self.ds:
+            for thing in d.meta_things:
+                print(thing.data)
+
+        raise BaseException('lol')
+
 
     def test_submission(self):
         pass

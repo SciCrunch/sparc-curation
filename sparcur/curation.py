@@ -254,6 +254,9 @@ class Version1Header:
     verticals = dict()  # FIXME should really be immutable
     schema_class = JSONSchema
 
+    class NoDataError(Exception):
+        """ FIXME HACK workaround for bad handling of empty sheets in byCol """
+
     def __new__(cls, tabular):
         cls.schema = cls.schema_class()
         return super().__new__(cls)
@@ -262,7 +265,12 @@ class Version1Header:
         self._errors = []
         self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
         self.t = tabular
-        orig_header, *rest = list(tabular)
+        l = list(tabular)
+        if not l:
+            # FIXME bad design, this try block is a workaround for bad handling of empty lists
+            raise self.NoDataError(self.path)
+
+        orig_header, *rest = l
         header = self.normalize_header(orig_header)
         #print(header)
         #print(f"'{tabular.path}'", header)
@@ -809,6 +817,7 @@ class FThing(FakePathHelper):
         return super().__new__(cls)
 
     def __init__(self, path, cypher=hashlib.sha256, _pio_header=_pio_header):
+        self._errors = []
         if isinstance(path, str):
             path = Path(path)
 
@@ -1137,9 +1146,12 @@ class FThing(FakePathHelper):
     @property
     def submission(self):
         for t in self._submission_tables:
-            miss = SubmissionFile(t)
-            if miss.data:
-                yield miss
+            try:
+                miss = SubmissionFile(t)
+                if miss.data:
+                    yield miss
+            except SubmissionFile.NoDataError as e:
+                self._errors.append(e)  # NOTE we treat empty file as no file
 
     @property
     def dataset_description_paths(self):
@@ -1161,9 +1173,12 @@ class FThing(FakePathHelper):
         for t in self._dataset_description_tables:
             #yield from DatasetDescription(t)
             # TODO export adapters for this ... how to recombine and reuse ...
-            dd = DatasetDescription(t)
-            if dd.data:
-                yield dd
+            try:
+                dd = DatasetDescription(t)
+                if dd.data:
+                    yield dd
+            except DatasetDescription.NoDataError as e:
+                self._errors.append(e)  # NOTE we treat empty file as no file
 
     @property
     def subjects_paths(self):
@@ -1178,9 +1193,12 @@ class FThing(FakePathHelper):
     @property
     def subjects(self):
         for table in self._subjects_tables:
-            sf = SubjectsFile(table)
-            if sf.data:
-                yield sf
+            try:
+                sf = SubjectsFile(table)
+                if sf.data:
+                    yield sf
+            except DatasetDescription.NoDataError as e:
+                self._errors.append(e)  # NOTE we treat empty file as no file
 
     validate = Version1Header.validate
 
@@ -1208,10 +1226,16 @@ class FThing(FakePathHelper):
     @property
     def meta_paths(self):
         """ All metadata related paths. """
-        yield self.path
+        #yield self.path
         yield from self.submission_paths
         yield from self.dataset_description_paths
         yield from self.subjects_paths
+
+    @property
+    def _meta_tables(self):
+        yield from self._submission_tables
+        yield from self._dataset_description_tables
+        yield from self._subjects_tables
 
     @property
     def meta_things(self):
@@ -1220,6 +1244,15 @@ class FThing(FakePathHelper):
         yield from self.submission
         yield from self.dataset_description
         yield from self.subjects
+
+    @property
+    def errors(self):
+        gen = self.meta_things
+        next(gen)  # skip self
+        for thing in gen:
+            yield from thing.errors
+
+        yield from self._errors
 
     @property
     def report(self):
