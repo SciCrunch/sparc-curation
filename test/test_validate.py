@@ -1,8 +1,11 @@
 import unittest
 from datetime import datetime
 from sparcur.core import Path
-
+from sparcur import config
 project_path = Path(__file__).parent / 'test_local/test_project'
+config.local_storage_prefix = project_path.parent
+from sparcur.curation import get_datasets
+
 ds_folders = 'ds1', 'ds2', 'ds3', 'ds4'
 ds_roots = (
     'ds1',
@@ -85,7 +88,7 @@ class TestHierarchy(unittest.TestCase):
             ptattrs = pthing.xattrs()
 
     def test_dataset(self):
-        pass
+        ds, dsd = get_datasets(project_path)
 
     def test_submission(self):
         pass

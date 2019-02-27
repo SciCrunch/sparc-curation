@@ -6,7 +6,7 @@ Usage:
     bfc report
     bfc missing
     bfc xattrs
-    bfc shell
+    bfc shell [--project]
     bfc feedback <feedback-file> <feedback>...
     bfc [options] <file>...
     bfc [options] --name=<PAT>...
@@ -25,6 +25,7 @@ Options:
     -l --limit=LIMIT        the maximum size to download in megabytes
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
+    -p --project            find the project_path by looking for N:organization:
 
 """
 
@@ -36,6 +37,17 @@ def main():
     args = docopt(__doc__, version='bfc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
     from IPython import embed
+    from sparcur import curation
+
+
+    if args['--project']:
+        # FIXME only works for fs version, bfl will not change
+        current_ft = FThing(Path('.').resolve())
+        while not current_ft.is_organization:
+            current_ft = current_ft.parent
+
+        pp = current_ft.path
+        curation.project_path = pp # FIXME BAD BAD BAD
 
     if args['pull']:
         # TODO folder meta -> org
@@ -106,7 +118,7 @@ def main():
     elif args['shell']:
         from sparcur.curation import get_datasets
         bfl = BFLocal()
-        ds, dsd = get_datasets()
+        ds, dsd = get_datasets(curation.project_path)
         embed()
 
     else:

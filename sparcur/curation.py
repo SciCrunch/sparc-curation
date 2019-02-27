@@ -862,6 +862,10 @@ class FThing(FakePathHelper):
         yield from reversed(parents)
 
     @property
+    def is_organization(self):
+        return self.id.startswith('N:organization:')
+
+    @property
     def is_dataset(self):
         return self.id.startswith('N:dataset:')
 
@@ -1253,14 +1257,14 @@ def express_or_return(thing):
     return list(thing) if isinstance(thing, GeneratorType) else thing
 
 
-def get_datasets(FTC=FThing):
+def get_datasets(project_path, FTC=FThing):
     ds = [FTC(p) for p in project_path.iterdir() if p.is_dir()]
     dsd = {d.id:d for d in ds}
     return ds, dsd
 
 
 def parse_meta():
-    ds, dsd = get_datasets()
+    ds, dsd = get_datasets(project_path)
     dump_all = [{attr: express_or_return(getattr(d, attr))
                  for attr in dir(d) if not attr.startswith('_')}
                 for d in ds]
@@ -1366,10 +1370,10 @@ def populate_annos():
 def main():
     #populate_annos()
     #parse_meta()
-    ds, dsd = get_datasets()
+    ds, dsd = get_datasets(project_path)
     nr, ne = schema_check(ds, dsd)
 
-    dsl, dsdl = get_datasets(FTLax)
+    dsl, dsdl = get_datasets(project_path, FTLax)
     lr, le = schema_check(dsl, dsdl)
     compare = lambda i: (ne[i], le[i])
 
