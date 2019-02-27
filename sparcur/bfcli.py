@@ -3,8 +3,10 @@
 Usage:
     bfc pull
     bfc stats [<directory>...]
+    bfc report
     bfc missing
     bfc xattrs
+    bfc shell
     bfc feedback <feedback-file> <feedback>...
     bfc [options] <file>...
     bfc [options] --name=<PAT>...
@@ -13,8 +15,10 @@ Commands:
               list and fetch unfetched files
     pull      pull down the remote list of files
     stats     print stats for specified or current directory
+    report    print a report on all datasets
     missing   find and fix missing metadata
     xattrs    populate metastore / backup xattrs
+    shell     drop into an ipython shell
 
 Options:
     -f --fetch              fetch the files
@@ -25,7 +29,7 @@ Options:
 """
 
 from sparcur.blackfynn_api import BFLocal, Path
-from sparcur.curation import FThing
+from sparcur.curation import FThing, CurationReport
 
 def main():
     from docopt import docopt, parse_defaults
@@ -79,6 +83,10 @@ def main():
         print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
         print(fmt)
 
+    elif args['report']:
+        rep = curation_report()
+        print(rep)
+
     elif args['feedback']:
         file = args['<feedback-file>']
         feedback = ' '.join(args['<feedback>'])
@@ -87,13 +95,19 @@ def main():
         # TODO pagenote and/or database
         print(eff, feedback)
 
+    elif args['missing']:
+        bfl = BFLocal()
+        bfl.find_missing_meta()
+
     elif args['xattrs']:
         bfl = BFLocal()
         bfl.populate_metastore()
 
-    elif args['missing']:
+    elif args['shell']:
+        from sparcur.curation import get_datasets
         bfl = BFLocal()
-        bfl.find_missing_meta()
+        ds, dsd = get_datasets()
+        embed()
 
     else:
         paths = []

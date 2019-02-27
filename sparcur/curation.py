@@ -19,7 +19,8 @@ from protcur.analysis import protc, Hybrid, SparcMI
 from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
-from sparcur.blackfynn_api import local_storage_prefix, Path
+from sparcur.config import local_storage_prefix
+from sparcur.core import Path
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetSchema, SubmissionSchema,
@@ -820,7 +821,9 @@ class FThing(FakePathHelper):
         self._pio_header = _pio_header  # FIXME ick
 
     def xattrs(self):
-        return self.path.xattrs()
+        # decode values here where appropriate
+        return {k:v if k == 'bf.checksum' else v.decode()
+                for k, v in self.path.xattrs().items()}
 
     @property
     def bids_root(self):
@@ -926,17 +929,7 @@ class FThing(FakePathHelper):
 
     def checksum(self):
         if self.path.is_file() and not self.fake:
-            m = self.cypher()
-            chunk_size = 4096
-            with open(self.path, 'rb') as f:
-                while True:
-                    chunk = f.read(chunk_size)
-                    if chunk:
-                        m.update(chunk)
-                    else:
-                        break
-
-            return m.digest()
+            return self.path.checksum(cypher=self.cypher)
 
         elif self.path.is_dir():
             # TODO need to determine the hashing rule for folders
@@ -1143,7 +1136,7 @@ class FThing(FakePathHelper):
             miss = SubmissionFile(t)
             if miss.data:
                 yield miss
-    
+
     @property
     def dataset_description_paths(self):
         yield from self._abstracted_paths('dataset_description')
@@ -1352,6 +1345,15 @@ def schema_check(ds, dsd):
     encoding_errors = [e for d in ds for dd in chain(d.dataset_description, d.submission, d.subjects) for e in dd.errors]
     #embed()
     return [dsvr, ddvr, missvr, jectvr], [dsve, ddve, missve, jectve]
+
+
+class CurationReport:
+    def __init__(self, project_path):
+        get_dataset(project_path)
+        ds = [FTC(p) for p in project_path.iterdir() if p.is_dir()]
+        dsd = {d.id:d for d in ds}
+        return ds, dsd
+        self.path = path
 
 
 def populate_annos():
