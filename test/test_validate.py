@@ -8,7 +8,10 @@ template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
 project_path = this_file.parent / 'test_local/test_project'
 config.local_storage_prefix = project_path.parent
-from sparcur.curation import get_datasets
+from sparcur.curation import get_datasets, FTLax, Version1Header
+
+osk = Version1Header.skip_cols  # save original skips
+Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')
 
 ds_folders = 'ds1', 'ds2', 'ds3', 'ds4'
 ds_roots = (
@@ -114,15 +117,12 @@ class TestHierarchy(unittest.TestCase):
                 for row in table:
                     print(row)
 
-        raise BaseException('lol')
-
     def test_things(self):
         for d in self.ds:
             for thing in d.meta_things:
-                print(thing.data)
+                print(thing.__class__.__name__, thing.data)
 
         raise BaseException('lol')
-
 
     def test_submission(self):
         pass
@@ -132,3 +132,8 @@ class TestHierarchy(unittest.TestCase):
 
     def test_subjects(self):
         pass
+
+
+class TestLax(TestHierarchy):
+    def setUp(self):
+        self.ds, self.dsd = get_datasets(project_path, FTC=FTLax)

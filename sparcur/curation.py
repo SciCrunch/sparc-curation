@@ -1416,6 +1416,10 @@ def main():
     dst = [p for d in ds for p in d.meta_things if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
     dstl = [p for d in dsl for p in d.meta_things if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
 
+    # review paths in lax vs real
+    dp = [(d, p) for d in ds for p in d.meta_paths]
+    dpl = [(d, p) for d in dsl for p in d.meta_paths]
+
     embed()
 
 if __name__ == '__main__':
