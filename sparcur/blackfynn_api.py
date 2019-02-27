@@ -283,8 +283,8 @@ def make_folder_xattrs(folder):
         SO much easier to deal with and explain to people. Of course
         there are some major antipatterns for a system that can do that. """
     return {'bf.id':folder.id,
-            'bf.created_at':file.updated_at,
-            'bf.updated_at':file.created_at,}
+            'bf.created_at':folder.updated_at,
+            'bf.updated_at':folder.created_at,}
 
 def fetch_file(file_path, file, metastore, limit=False):
     if not file_path.parent.exists():
