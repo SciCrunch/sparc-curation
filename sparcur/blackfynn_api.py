@@ -33,12 +33,9 @@ blackfynn-mvp-secret: ${apisecret}
 import io
 import os
 import asyncio
-from pathlib import PosixPath
 from nibabel import nifti1
 from pydicom import dcmread
 import yaml
-import xattr
-import sqlite3
 import requests
 from requests import Session
 from requests.exceptions import HTTPError, ConnectionError
@@ -50,32 +47,10 @@ from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
+from sparcur.core import Path, MetaStore
+from sparcur.config import local_storage_prefix
 from scipy.io import loadmat
 from IPython import embed
-
-
-class Path(PosixPath):
-    """ pathlib Path augmented with xattr support """
-
-    def setxattr(self, key, value, namespace=xattr.NS_USER):
-        str_value = str(value)
-        xattr.set(self.as_posix(), key, str_value, namespace=namespace)
-
-    def setxattrs(self, xattr_dict, namespace=xattr.NS_USER):
-        for k, v in xattr_dict.items():
-            self.setxattr(k, v, namespace=namespace)
-
-    def getxattr(self, key, namespace=xattr.NS_USER):
-        return xattr.get(self.as_posix(), key, namespace=namespace).decode()
-
-    def xattrs(self, namespace=xattr.NS_USER):
-        return {k.decode():v.decode() for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
-
-
-# CHANGE THIS PATH TO MATCH YOUR SYSTEM
-local_storage_prefix = Path('~/files/blackfynn_local/').expanduser()
-prefix = 'https://app.blackfynn.io/'
-lp = len(prefix)
 
 
 @property
@@ -132,6 +107,8 @@ def download(self, destination):
 File.download = download
 
 
+prefix = 'https://app.blackfynn.io/'
+lp = len(prefix)
 def destructure_uri(uri):
     if not uri.startswith(prefix):
         return None  # TODO less cryptic return value or exception
@@ -230,7 +207,7 @@ def get_packages_(dataset):
     return
     if collector is None:
         collector = []
-        
+
     files = []
     folders = []
     if isinstance(package_or_collection, Collection):
@@ -260,7 +237,7 @@ def pkgs_breadth(package_or_collection, path):
         Async()(deferred(list)(t) for t in thing)
         #yield (list(c) for c in coll)
         #[v for h in hrm for v in h]
-        
+
         #for npc in package_or_collection:
             #for poc_p in 
             #yield from get_packages(npc, npath)
@@ -294,9 +271,20 @@ def make_file_xattrs(file):
         'bf.id':file.pkg_id,
         'bf.file_id':file.id,
         'bf.size':file.size,
+        'bf.created_at':file.updated_at,
+        'bf.updated_at':file.created_at,
         'bf.checksum':'',  # TODO
         # 'bf.old_id': '',  # TODO does this work? also naming previous_id, old_version_id etc...
     }
+def make_folder_xattrs(folder):
+    """ I weep for the world where files and folders were the same thing.
+        I just want this file though! NO YOU MUST TAKE IT ALL.
+        Does have some usability issues, but would have made metadata
+        SO much easier to deal with and explain to people. Of course
+        there are some major antipatterns for a system that can do that. """
+    return {'bf.id':folder.id,
+            'bf.created_at':folder.updated_at,
+            'bf.updated_at':folder.created_at,}
 
 def fetch_file(file_path, file, metastore, limit=False):
     if not file_path.parent.exists():
@@ -340,13 +328,13 @@ def fetch_file(file_path, file, metastore, limit=False):
             error_path.touch()
             file_xattrs['bf.error'] = str(status_code)
             error_path.setxattrs(file_xattrs)
-            metastore.setxattrs(error_path, file_xattrs)
+            #metastore.setxattrs(error_path, file_xattrs)
     else:
         fsize = str(int(file_mb)) + 'M' if file_mb >= 1 else str(file.size // 1024) + 'K'
         fakepath = file_path.with_suffix(file_path.suffix + '.fake.' + fsize)
         fakepath.touch()
         fakepath.setxattrs(file_xattrs)
-        metastore.setxattrs(fakepath, file_xattrs)
+        #metastore.setxattrs(fakepath, file_xattrs)
 
 def make_files_meta(collection):
     # TODO file fetching status? file hash?
@@ -367,6 +355,7 @@ class NormFolder(str):
 
 
 def make_folder_and_meta(parent_path, collection, metastore):
+    """ maps to collection dataset or organization """
     folder_path = parent_path / NormFolder(collection.name)
     #meta_file = folder_path / collection.id
     #if isinstance(collection, Organization):
@@ -374,8 +363,10 @@ def make_folder_and_meta(parent_path, collection, metastore):
     #else:
         #files_meta = make_files_meta(collection)
     folder_path.mkdir(parents=True, exist_ok=True)
-    folder_path.setxattr('bf.id', collection.id)  # sadly xattrs are easy to accidentally zap :/
-    metastore.setxattr(folder_path, 'bf.id', collection.id)
+    attrs = make_folder_xattrs(collection)
+    folder_path.setxattrs(attrs)
+    # sadly xattrs are easy to accidentally zap :/
+    #metastore.setxattr(folder_path, 'bf.id', collection.id)
     #with open(meta_file, 'wt') as f:
         #yaml.dump(files_meta, f, default_flow_style=False)
 
@@ -393,93 +384,6 @@ def get_file_by_id(get, file_path, pid, fid):
         print('WARNING file does not exist', file_path, pid, fid)
         return None, None
 
-class MetaStore:
-    """ A local backup against accidental xattr removal """
-    attrs = 'bf.id', 'bf.file_id', 'bf.size', 'bf.checksum', 'bf.error'
-    # FIXME horribly inefficient 1 connection per file due to the async code ... :/
-    def __init__(self, db_path):
-        self.db_path = db_path
-        self.setup()
-
-    def conn(self):
-        return sqlite3.connect(self.db_path.as_posix())
-
-    def setup(self):
-        if not self.db_path.parent.exists():
-            self.db_path.parent.mkdir(parents=True)
-
-        sqls = (('CREATE TABLE IF NOT EXISTS fsxattrs '
-                 '(path TEXT PRIMARY KEY,'
-                 'bf_id TEXT NOT NULL,'
-                 'bf_file_id INTEGER,'
-                 'bf_size INTEGER,'
-                 'bf_checksum BLOB,'
-                 'bf_error INTEGER);'),
-                ('CREATE UNIQUE INDEX IF NOT EXISTS fsxattrs_u_path ON fsxattrs (path);'))
-        conn = self.conn()
-        with conn:
-            for sql in sqls:
-                conn.execute(sql)
-
-    def bulk(self, pdict):
-        sql = (f'INSERT OR REPLACE INTO fsxattrs (path, bf_id, bf_file_id, bf_size, bf_checksum, bf_error) VALUES (?, ?, ?, ?, ?, ?)')
-        conn = self.conn()
-        with conn:
-            for path, attrs in pdict.items():
-                args = path.as_posix(), *self.convert_attrs(attrs)
-                conn.execute(sql, args)
-
-    def remove(self, path):
-        sql = 'DELETE FROM fsxattrs WHERE path = ?'
-        args = path.as_posix(),
-        conn = self.conn()
-        with conn:
-            return conn.execute(sql, args)
-        
-    def convert_attrs(self, attrs):
-        for key in self.attrs:
-            if key in attrs:
-                yield attrs[key]
-            else:
-                yield None
-
-    def xattrs(self, path):
-        sql = 'SELECT * FROM fsxattrs WHERE path = ?'
-        args = path.as_posix(),
-        conn = self.conn()
-        with conn:
-            cursor = conn.execute(sql, args)
-            values = cursor.fetchone()
-            print(values)
-            if values:
-                keys = [n.replace('_', '.', 1) for n, *_ in cursor.description]
-                #print(keys, values)
-                return {k:v for k, v in zip(keys, values) if k != 'path' and v is not None}  # skip path itself
-            else:
-                return {}
-
-    def setxattr(self, path, key, value):
-        return self.setxattrs(path, {key:value})
-
-    def setxattrs(self, path, attrs):
-        # FIXME skip nulls on replace
-        sql = (f'INSERT OR REPLACE INTO fsxattrs (path, bf_id, bf_file_id, bf_size, bf_checksum, bf_error) VALUES (?, ?, ?, ?, ?, ?)')
-        args = path.as_posix(), *self.convert_attrs(attrs)
-        conn = self.conn()
-        with conn:
-            return conn.execute(sql, args)
-
-    def getxattr(self, path, key):
-        if key in self.attrs:
-            col = key.replace('.', '_')
-            sql = f'SELECT {col} FROM fsxattrs WHERE path = ?'
-            args = path.as_posix(),
-            conn = self.conn()
-            with conn:
-                return conn.execute(sql, args)
-        else:
-            print('WARNING unknown key', key)
-        
 
 class BFLocal:
 
@@ -578,7 +482,7 @@ class BFLocal:
             file_path = path
             while '.fake' in file_path.suffixes:
                 file_path = file_path.with_suffix('')
-            
+
             return file_path, pid, fid
         else:
             print('WARNING what is going on with', path, attrs)
