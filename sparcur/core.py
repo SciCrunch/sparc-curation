@@ -66,10 +66,19 @@ class Path(PosixPath):
             for wp in wpids:
                 if wp in process_to_window:
                     process_window = process_to_window[wp]
+                    break
 
             if process_window:
                 name = process_window.get_wm_name()
                 new_name = name + ' ' + self.resolve().as_posix()[-30:]
+                break  # TODO search by pid is broken, but if you can find it it will work ...
+                # https://github.com/jordansissel/xdotool/issues/14 some crazy bugs there
+                command = ['xdotool', 'search','--pid', str(wp), 'set_window', '--name', f'"{new_name}"']
+                subprocess.Popen(command,
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.STDOUT)
+                print(' '.join(command))
+                break
                 process_window.set_wm_name(new_name)
                 embed()
                 break
