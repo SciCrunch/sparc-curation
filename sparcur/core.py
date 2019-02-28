@@ -1,8 +1,14 @@
 import hashlib
-from pathlib import PosixPath
-import xattr
-import sqlite3
 import subprocess
+from time import sleep
+from pathlib import PosixPath
+from collections import defaultdict
+import xattr
+import psutil
+import sqlite3
+from Xlib.display import Display
+from Xlib import Xatom
+from IPython import embed
 
 
 class Path(PosixPath):
@@ -30,9 +36,45 @@ class Path(PosixPath):
 
     def xopen(self):
         """ open file using xdg-open """
-        subprocess.Popen(['xdg-open', self.as_posix()],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.STDOUT)
+        process = subprocess.Popen(['xdg-open', self.as_posix()],
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.STDOUT)
+
+        return  # FIXME this doesn't seem to update anything beyond python??
+        pid = process.pid
+        proc = psutil.Process(pid)
+        process_window = None
+        while not process_window:  # FIXME ick
+            sprocs = [proc] + [p for p in proc.children(recursive=True)]
+            if len(sprocs) < 2:  # xdg-open needs to call at least one more thing
+                sleep(.01)  # spin a bit more slowly
+                continue
+
+            wpids = [s.pid for s in sprocs][::-1]  # start deepest work up
+            # FIXME expensive to create this every time ...
+            disp = Display()
+            root = disp.screen().root
+            children = root.query_tree().children
+            #names = [c.get_wm_name() for c in children if hasattr(c, 'get_wm_name')]
+            try:
+                by_pid = {c.get_full_property(disp.intern_atom('_NET_WM_PID'), 0):c for c in children}
+            except Xlib.error.BadWindow:
+                sleep(.01)  # spin a bit more slowly
+                continue
+
+            process_to_window = {p.value[0]:c for p, c in by_pid.items() if p}
+            for wp in wpids:
+                if wp in process_to_window:
+                    process_window = process_to_window[wp]
+
+            if process_window:
+                name = process_window.get_wm_name()
+                new_name = name + ' ' + self.resolve().as_posix()[-30:]
+                process_window.set_wm_name(new_name)
+                embed()
+                break
+            else:
+                sleep(.01)  # spin a bit more slowly
 
     def checksum(self, cypher=hashlib.sha256):
         if self.is_file():
