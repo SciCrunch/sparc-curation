@@ -19,7 +19,8 @@ setup(name='sparcur',
       packages=['sparcur'],
       install_requires=[
           'blackfynn',
-          'protcur',
+          #'protcur',  # TODO
+          #'pysercomb',  # TODO
           'pyontutils',
           'xlsx2csv',
       ],
