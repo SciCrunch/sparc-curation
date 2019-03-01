@@ -282,9 +282,12 @@ def make_folder_xattrs(folder):
         Does have some usability issues, but would have made metadata
         SO much easier to deal with and explain to people. Of course
         there are some major antipatterns for a system that can do that. """
-    return {'bf.id':folder.id,
-            'bf.created_at':folder.updated_at,
-            'bf.updated_at':folder.created_at,}
+    out = {'bf.id':folder.id}
+    if not folder.id.startswith('N:organization:'):
+        out.update({'bf.created_at':folder.updated_at,
+                    'bf.updated_at':folder.created_at,})
+
+    return out
 
 def fetch_file(file_path, file, metastore, limit=False):
     if not file_path.parent.exists():
