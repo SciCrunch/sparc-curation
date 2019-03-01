@@ -34,9 +34,10 @@ OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',})
 
 # FIXME this is an awful way to do this ...
-_pio_creds = get_protocols_io_auth()
-_pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
-protocol_jsons = {}
+if False:  # TODO create a protocols.io class for dealing with fetching that can be initialized with auth stuff
+    _pio_creds = get_protocols_io_auth()
+    _pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
+    protocol_jsons = {}
 
 class EncodingError(Exception):
     """ Some encoding error has occured in a file """
@@ -812,11 +813,11 @@ class FThing(FakePathHelper):
     """ a homogenous representation """
     schema_class = DatasetSchema
 
-    def __new__(cls, path, cypher=hashlib.sha256, _pio_header=_pio_header):
+    def __new__(cls, path, cypher=hashlib.sha256):
         cls.schema = cls.schema_class()
         return super().__new__(cls)
 
-    def __init__(self, path, cypher=hashlib.sha256, _pio_header=_pio_header):
+    def __init__(self, path, cypher=hashlib.sha256):
         self._errors = []
         if isinstance(path, str):
             path = Path(path)
@@ -827,7 +828,7 @@ class FThing(FakePathHelper):
         self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
-        self._pio_header = _pio_header  # FIXME ick
+        #self._pio_header = _pio_header  # FIXME ick
 
     def xattrs(self):
         # decode values here where appropriate
