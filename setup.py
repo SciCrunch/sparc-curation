@@ -19,9 +19,16 @@ setup(name='sparcur',
       packages=['sparcur'],
       install_requires=[
           'blackfynn',
+          'google-api-python-client',
+          'nibabel',
           #'protcur',  # TODO
-          #'pysercomb',  # TODO
+          'pydicom',
           'pyontutils',
+          #'pysercomb',  # TODO
+          'python-magic',  # FIXME conflicts with sys-apps/file python bindings
+          'pyxattr',
+          'scipy',
+          'Xlib',
           'xlsx2csv',
       ],
       extras_require={'dev':[]},
