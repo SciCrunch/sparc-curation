@@ -1434,6 +1434,7 @@ def populate_annos():
                                                           group=devconfig.secrets('sparc-curation'))
 
     [protc(a, annos) for a in annos]
+    [Hybrid(a, annos) for a in annos]
 
 def main():
     #populate_annos()

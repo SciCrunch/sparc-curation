@@ -2,6 +2,7 @@
 """ Blackfynn cli for working with the file system.
 Usage:
     bfc pull
+    bfc annos [export shell]
     bfc stats [<directory>...]
     bfc report
     bfc missing
@@ -49,7 +50,18 @@ def main():
         pp = current_ft.path
         curation.project_path = pp # FIXME BAD BAD BAD
 
-    if args['pull']:
+    if args['annos']:
+        from protcur.analysis import protc, Hybrid
+        from sparcur.curation import populate_annos
+        populate_annos()
+        if args['export']:
+            with open('/tmp/sparc-protcur.rkt', 'wt') as f:
+                f.write(protc.parsed())
+
+        if args['shell']:
+            embed()
+
+    elif args['pull']:
         # TODO folder meta -> org
         bfl = BFLocal()
         bfl.cons()
