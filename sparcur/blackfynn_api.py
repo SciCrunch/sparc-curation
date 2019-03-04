@@ -259,12 +259,30 @@ def gfiles(package, path):
 
 def unlink_fakes(attrs, fake_paths, metastore):
     for fpath in fake_paths:
-        fattrs = {k:v for k, v in fpath.xattrs().items() if k != 'bf.error'}
+        fattrs = {k:v for k, v in norm_xattrs(fpath.xattrs()).items() if k != 'bf.error'}
         if fattrs == attrs:
             fpath.unlink()
             metastore.remove(fpath)
         else:
             print('WARNING: fake xattrs and real xattrs do not match!', attrs, fattrs)
+
+
+def norm_xattrs(attrs):
+    # FIXME update Path.xattrs to accept a normalization function
+    out = {}
+    ints = 'bf.file_id', 'bf.size'
+    strings = 'bf.id', 'bf.created_at', 'bf.updated_at'
+    for k, v in attrs.items():
+        # k = k.decode()  # still handled by Path
+        if k in strings:
+            v = v.decode('utf-8')
+        elif k in ints:
+            v = int(v)
+
+        out[k] = v
+
+    return out
+
 
 def make_file_xattrs(file):
     return {
@@ -276,6 +294,8 @@ def make_file_xattrs(file):
         'bf.checksum':'',  # TODO
         # 'bf.old_id': '',  # TODO does this work? also naming previous_id, old_version_id etc...
     }
+
+
 def make_folder_xattrs(folder):
     """ I weep for the world where files and folders were the same thing.
         I just want this file though! NO YOU MUST TAKE IT ALL.
@@ -289,6 +309,7 @@ def make_folder_xattrs(folder):
 
     return out
 
+
 def fetch_file(file_path, file, metastore, limit=False):
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,7 +318,7 @@ def fetch_file(file_path, file, metastore, limit=False):
 
     if file_path.exists():
         print('already have', file_path)
-        attrs = file_path.xattrs()
+        attrs = norma_xattrs(file_path.xattrs())
         unlink_fakes(attrs, fake_paths, metastore)
         return
 
@@ -317,7 +338,7 @@ def fetch_file(file_path, file, metastore, limit=False):
                 file.download(file_path.as_posix())
                 file_path.setxattrs(file_xattrs)
                 #metastore.setxattrs(file_path, file_xattrs)  # FIXME concurrent access kills this
-                attrs = file_path.xattrs()  # yes slow, but is a sanity check
+                attrs = norm_xattrs(file_path.xattrs())  # yes slow, but is a sanity check
                 # TODO validate the checksum when we get it
                 unlink_fakes(attrs, fake_paths, metastore)
                 return
@@ -338,6 +359,7 @@ def fetch_file(file_path, file, metastore, limit=False):
         fakepath.touch()
         fakepath.setxattrs(file_xattrs)
         #metastore.setxattrs(fakepath, file_xattrs)
+
 
 def make_files_meta(collection):
     # TODO file fetching status? file hash?
@@ -418,7 +440,7 @@ class BFLocal:
     def populate_metastore(self):
         """ This should be run after find_missing_meta. """
         # FIXME need a way to delete files
-        all_attrs = {path:path.xattrs() for path in self.project_path.rglob('*')}
+        all_attrs = {path:norm_xattrs(path.xattrs()) for path in self.project_path.rglob('*')}
         bad = [path for path, attrs in all_attrs.items() if not attrs]
         if bad:
             print('WARNING:', bad, 'is missing meta, run find_missing_meta')
@@ -428,7 +450,7 @@ class BFLocal:
 
     def find_missing_meta(self):
         for path in self.project_path.rglob('*'):
-            attrs = path.xattrs()
+            attrs = norm_xattrs(path.xattrs())
             if not attrs:
                 print('Found path with missing metadata', path)
                 attrs = self.metastore.xattrs(path)
@@ -440,7 +462,7 @@ class BFLocal:
                 # TODO checksum may no longer match since we changed it
 
     def recover_meta(self, path):
-        pattrs = path.parent.xattrs()
+        pattrs = norm_xattrs(path.parent.xattrs())
         codid = pattrs['bf.id']
         if codid.startswith('N:collection:'):
             thing = self.bf.get(codid)
@@ -467,7 +489,7 @@ class BFLocal:
             raise BaseException(f'\'{path}\' could not recover meta!')
 
     def get_file_meta(self, path):
-        attrs = path.xattrs()
+        attrs = norm_xattrs(path.xattrs())
         if 'bf.id' not in attrs:
             # TODO maintain a single backup mapping of xattrs to paths
             # and just use the xattrs for performance
@@ -475,7 +497,7 @@ class BFLocal:
             if attrs:
                 # TODO checksum ... (sigh git)
                 path.setxattrs(attrx)
-                attrs = path.xattrs()
+                attrs = norm_xattrs(path.xattrs())
             else:
                 raise self.NoBfMeta
 
