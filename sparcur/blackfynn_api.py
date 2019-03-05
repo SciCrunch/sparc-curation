@@ -318,7 +318,7 @@ def fetch_file(file_path, file, metastore, limit=False):
 
     if file_path.exists():
         print('already have', file_path)
-        attrs = norma_xattrs(file_path.xattrs())
+        attrs = norm_xattrs(file_path.xattrs())
         unlink_fakes(attrs, fake_paths, metastore)
         return
 
