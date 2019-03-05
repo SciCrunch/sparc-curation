@@ -137,7 +137,7 @@ class MetaStore:
                 conn.execute(sql)
 
     def bulk(self, pdict):
-        cols = ', '.join(attrs)
+        cols = ', '.join(_.replace('.', '_') for _ in self.attrs)
         values_template = ', '.join('?' for _ in self.attrs)
         sql = ('INSERT OR REPLACE INTO fsxattrs '
                f'(path, {cols}) VALUES (?, {values_template})')

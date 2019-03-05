@@ -273,7 +273,9 @@ def norm_xattrs(attrs):
     ints = 'bf.file_id', 'bf.size'
     strings = 'bf.id', 'bf.created_at', 'bf.updated_at'
     for k, v in attrs.items():
-        # k = k.decode()  # still handled by Path
+        if isinstance(k, bytes):
+            k = k.decode()  # still handled by Path
+
         if k in strings:
             v = v.decode('utf-8')
         elif k in ints:
@@ -310,13 +312,13 @@ def make_folder_xattrs(folder):
     return out
 
 
-def fetch_file(file_path, file, metastore, limit=False):
+def fetch_file(file_path, file, metastore, limit=False, overwrite=False):
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
     fake_paths = list(file_path.parent.glob(file_path.name + '.fake*'))
 
-    if file_path.exists():
+    if file_path.exists() and not overwrite:
         print('already have', file_path)
         attrs = norm_xattrs(file_path.xattrs())
         unlink_fakes(attrs, fake_paths, metastore)
@@ -450,6 +452,8 @@ class BFLocal:
 
     def find_missing_meta(self):
         for path in self.project_path.rglob('*'):
+            if '.git' in path.as_posix():
+                continue
             attrs = norm_xattrs(path.xattrs())
             if not attrs:
                 print('Found path with missing metadata', path)
@@ -469,6 +473,7 @@ class BFLocal:
         elif codid.startswith('N:dataset:'):
             thing = self.bf.get_dataset(codid)  # heterogenity is fun!
         else:
+            return {}
             raise BaseException('What are you doing!??!?!')
 
         test_path = path
@@ -512,11 +517,11 @@ class BFLocal:
         else:
             print('WARNING what is going on with', path, attrs)
 
-    def fetch_path(self, path):
+    def fetch_path(self, path, overwrite=False):
         """ Fetch individual big files.
             `path` argument must be to a fake file which has the meta stored in xattrs """
         # automatic async function application inside a list comp ... would be fun
-        fetch_file(*get_file_by_id(self.bf.get, *self.get_file_meta(path)), self.metastore)
+        fetch_file(*get_file_by_id(self.bf.get, *self.get_file_meta(path)), self.metastore, overwrite=overwrite)
 
     def fetch_errors(self):
         bfiles = {fp:f for fp, f in

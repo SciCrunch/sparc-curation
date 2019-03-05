@@ -27,6 +27,7 @@ Options:
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
     -p --project            find the project_path by looking for N:organization:
+    -o --overwrite          fetch even if the file exists
 
 """
 
@@ -40,6 +41,9 @@ def main():
     from IPython import embed
     from sparcur import curation
 
+
+
+    overwrite = args['--overwrite']
 
     if args['--project']:
         # FIXME only works for fs version, bfl will not change
@@ -148,7 +152,8 @@ def main():
             patterns = args['--name']
             path = Path('.').resolve()
             for pattern in patterns:
-                if '.fake' not in pattern:
+                # TODO filesize mismatches on non-fake
+                if '.fake' not in pattern and not overwrite:
                     pattern = pattern + '.fake*'
 
                 for file in path.rglob(pattern):
@@ -162,7 +167,7 @@ def main():
             if args['--fetch']:
                 bfl = BFLocal()
                 from pyontutils.utils import Async, deferred
-                Async()(deferred(bfl.fetch_path)(path) for path in paths)
+                Async()(deferred(bfl.fetch_path)(path, overwrite) for path in paths)
             else:
                 if args['--verbose']:
                     for p in paths:
