@@ -1421,6 +1421,15 @@ class FThing(FakePathHelper):
 
 
     def _with_errors(self, valid, thunk, schema):
+        # FIXME this needs to be split into in and out
+        # and really all this section should do is add the errors
+        # on failure and it should to it in place in the pipeline
+
+        # data in -> check -> with errors -> normalize/correct/map ->
+        # -> augment and transform -> data out check -> out with errors
+
+        # this flow splits at normalize/correct/map -> export back to user
+
         data = valid
         out = {}  # {'raw':{}, 'normalized':{},}
         # use the schema to auto fill things that we are responsible for
@@ -1444,6 +1453,9 @@ class FThing(FakePathHelper):
 
         if schema == self.schema:  # FIXME icky hack
             for section_name, path in data.items():
+                if section_name == 'id':
+                    # FIXME MORE ICK
+                    continue
                 # output sections don't all have python representations at the moment
                 if hasattr(self, section_name):
                     section = next(getattr(self, section_name))  # FIXME non-homogenous
@@ -1456,6 +1468,10 @@ class FThing(FakePathHelper):
 
         else:
             out['errors'] += data.pop('errors', [])
+
+        if self.is_organization:  # FIXME ICK
+            # can't run update in cases where there might be bad data
+            # in the original data
             out.update(data)
 
         return out
@@ -1485,6 +1501,8 @@ class FThing(FakePathHelper):
                 out['contributors'] = {'errors':[{'message': 'Not our problem',
                                                   'cause': 'no dataset_description',
                                                   'type': 'DOWNSTREAM',}]}
+            #except TypeError as e:
+                #embed()
 
             out['input'] = {}
             for key in self.schema_out.schema['properties']['input']['properties']:

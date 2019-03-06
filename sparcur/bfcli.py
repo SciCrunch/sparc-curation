@@ -159,6 +159,9 @@ def main():
         bfl = BFLocal()
         ds, dsd = get_datasets(curation.project_path)
         summary = Summary(curation.project_path)
+        dwe = summary.data_with_errors
+        # error_messages = [(d['id'], e['message']) for d in dwe['datasets'] for e in d['errors']]
+        # error_messages = [e['message'] for d in dwe['datasets'] for e in d['errors']]
         embed()
 
     else:
