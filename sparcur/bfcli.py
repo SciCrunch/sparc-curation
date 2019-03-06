@@ -7,6 +7,7 @@ Usage:
     bfc report
     bfc missing
     bfc xattrs
+    bfc export
     bfc shell [--project]
     bfc feedback <feedback-file> <feedback>...
     bfc [options] <file>...
@@ -19,6 +20,7 @@ Commands:
     report    print a report on all datasets
     missing   find and fix missing metadata
     xattrs    populate metastore / backup xattrs
+    export    export extracted data
     shell     drop into an ipython shell
 
 Options:
@@ -32,7 +34,7 @@ Options:
 """
 
 from sparcur.blackfynn_api import BFLocal, Path
-from sparcur.curation import FThing, FTLax, CurationReport
+from sparcur.curation import FThing, FTLax, CurationReport, Summary, JT
 
 def main():
     from docopt import docopt, parse_defaults
@@ -40,8 +42,6 @@ def main():
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
     from IPython import embed
     from sparcur import curation
-
-
 
     overwrite = args['--overwrite']
 
@@ -131,10 +131,34 @@ def main():
         bfl = BFLocal()
         bfl.populate_metastore()
 
+    elif args['export']:
+        import csv
+        import json
+        from datetime import datetime
+        #from sparcur.curation import get_datasets
+        #ds, dsd = get_datasets(curation.project_path)
+        #org_id = FThing(curation.project_path).organization.id
+        summary = Summary(curation.project_path)
+        timestamp = datetime.now().isoformat()
+        filepath = summary.path.parent / filename
+        # start time not end time ...
+        # obviously not transactional ...
+        filename = f'curation-export-{summary.id}-{timestamp}'
+
+        with open(filepath.with_suffix('.json'), 'wt') as f:
+            json.dump(summary.foundary, f, sort_keys=True, indent=2)
+
+        # datasets, contributors, subjects, samples, resources
+        for table_name, tabular in summary.disco:
+            with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
+                    writer = csv.writer(f, delimiter='\t')
+                    writer.writerows(tabular)
+
     elif args['shell']:
         from sparcur.curation import get_datasets
         bfl = BFLocal()
         ds, dsd = get_datasets(curation.project_path)
+        summary = Summary(curation.project_path)
         embed()
 
     else:

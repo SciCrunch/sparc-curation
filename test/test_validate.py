@@ -1,17 +1,12 @@
 import shutil
 import unittest
 from datetime import datetime
-from sparcur.core import Path
-from sparcur import config
-this_file = Path(__file__)
-template_root = this_file.parent.parent / 'resources/DatasetTemplate'
-print(template_root)
-project_path = this_file.parent / 'test_local/test_project'
-config.local_storage_prefix = project_path.parent
+from .common import template_root, project_path
+
 from sparcur.curation import get_datasets, FTLax, Version1Header
 
 osk = Version1Header.skip_cols  # save original skips
-Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')
+Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')  # use the example values for tests
 
 ds_folders = 'ds1', 'ds2', 'ds3', 'ds4'
 ds_roots = (
@@ -125,7 +120,7 @@ class TestHierarchy(unittest.TestCase):
 
     def test_things(self):
         for d in self.ds:
-            for thing in d.meta_things:
+            for thing in d.meta_sections:
                 print(thing.__class__.__name__, thing.data)
 
         raise BaseException('lol')

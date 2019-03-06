@@ -52,6 +52,56 @@ class DatasetSchema(JSONSchema):
                              'subjects': {'type': 'string'},}}
 
 
+class ContributorSchema(JSONSchema):
+    schema = {'type': 'object',
+              'properties': {
+                  'name': {'type': 'string'},
+                  'contributor_orcid_id': {'type': 'string'},
+                  'contributor_affiliation': {'type': 'string'},
+                  'contributor_role': {
+                      'type':'array',
+                      'items': {
+                          'type': 'string',
+                          'enum': ['ContactPerson',
+                                   'DataCollector',
+                                   'DataCurator',
+                                   'DataManager',
+                                   'Distributor',
+                                   'Editor',
+                                   'HostingInstitution',
+                                   'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
+                                   'Producer',
+                                   'ProjectLeader',
+                                   'ProjectManager',
+                                   'ProjectMember',
+                                   'RegistrationAgency',
+                                   'RegistrationAuthority',
+                                   'RelatedPerson',
+                                   'Researcher',
+                                   'ResearchGroup',
+                                   'RightsHolder',
+                                   'Sponsor',
+                                   'Supervisor',
+                                   'WorkPackageLeader',
+                                   'Other',]}
+                  },
+                  'is_contact_person': {'type': 'boolean'},
+              }}
+
+
+class ContributorsSchema(JSONSchema):
+    schema = {'type': 'array',
+              'contains': {
+                  'type': 'object',
+                  'required': ['is_contact_person'],
+                  'properties': {
+                      'is_contact_person': {'type': 'boolean', 'enum': [True]},
+                  },
+              },
+              'items': ContributorSchema.schema
+            }
+
+
 class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -68,9 +118,12 @@ class DatasetDescriptionSchema(JSONSchema):
             'prior_batch_number': {'type': 'string'},
             'title_for_complete_data_set': {'type': 'string'},
             'originating_article_doi': {'type': 'array', 'items': {'type': 'string'}},  # TODO doi matching? maybe types?
-            'protocol_url_or_doi': {'type': 'array', 'items': {'type': 'string'}},
+            'protocol_url_or_doi': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': {'type': 'string'}},
             'links': {
                 'type': 'array',
+                'minItems': 1,
                 'items': {
                     'type': 'object',
                     'properties': {
@@ -81,6 +134,7 @@ class DatasetDescriptionSchema(JSONSchema):
             },
             'examples': {
                 'type': 'array',
+                'minItems': 1,   # this pattern makes things self describing
                 'items': {
                     'type': 'object',
                     'properties': {
@@ -90,52 +144,7 @@ class DatasetDescriptionSchema(JSONSchema):
                     }
                 }
             },
-            'contributors': {
-                'type': 'array',
-                'contains': {
-                    'type': 'object',
-                    'required': ['is_contact_person'],
-                    'properties': {
-                        'is_contact_person': {'type': 'boolean', 'enum': [True]},
-                    },
-                },
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'name': {'type': 'string'},
-                        'contributor_orcid_id': {'type': 'string'},
-                        'contributor_affiliation': {'type': 'string'},
-                        'contributor_role': {
-                            'type':'array',
-                            'items': {
-                                'type': 'string',
-                                'enum': ['ContactPerson',
-                                         'DataCollector',
-                                         'DataCurator',
-                                         'DataManager',
-                                         'Distributor',
-                                         'Editor',
-                                         'HostingInstitution',
-                                         'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
-                                         'Producer',
-                                         'ProjectLeader',
-                                         'ProjectManager',
-                                         'ProjectMember',
-                                         'RegistrationAgency',
-                                         'RegistrationAuthority',
-                                         'RelatedPerson',
-                                         'Researcher',
-                                         'ResearchGroup',
-                                         'RightsHolder',
-                                         'Sponsor',
-                                         'Supervisor',
-                                         'WorkPackageLeader',
-                                         'Other',]}
-                        },
-                        'is_contact_person': {'type': 'boolean'},
-                    }
-                }
-            }
+            'contributors': ContributorsSchema.schema
         }
     }
 
@@ -158,19 +167,138 @@ class SubjectsSchema(JSONSchema):
     schema = {
         'type': 'object',
         'required': ['subjects'],
-        'properties': {'subjects': {
-            'type': 'array',
-            'items': {
-                'type': 'object',
-                'required': ['subject_id', 'species'],
-                'properties': {
-                    'subject_id': {'type': 'string'},
-                    'species': {'type': 'string'},
-                    'sex': {'type': 'string'},  # sex as a variable ?
-            }}}}}
+        'properties': {'subjects': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': {
+                                        'type': 'object',
+                                        'required': ['subject_id', 'species'],
+                                        'properties': {
+                                            'subject_id': {'type': 'string'},
+                                            'species': {'type': 'string'},
+                                            'strain': {'type': 'string'},  # TODO RRID
+                                            'sex': {'type': 'string'},  # sex as a variable ?
+                                            'mass': {'type': 'string'},  # TODO protc -> json
+                                            'weight': {'type': 'string'},  # TODO protc -> json
+                                            'age': {'type': 'string'},  # TODO protc -> json
+                                            'age_category': {'type': 'string'},  # TODO uberon
+                                        },},},
+                       'software': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': {
+                                        'type': 'object',
+                                        'properties': {
+                                            'software_version': {'type': 'string'},
+                                            'software_vendor': {'type': 'string'},
+                                            'software_url': {'type': 'string'},
+                                            'software_rri': {'type': 'string'},
+                                        },},}}}
 
 
-class CurationOutput(JSONSchema):
+class MetaOutSchema(JSONSchema):
+    schema = copy.deepcopy(DatasetDescriptionSchema.schema)
+    extra_required = ['award_number',
+                      'principal_investigator',
+                      'species',
+                      'organ',
+                      'modality',
+                      'contributor_count',
+                      'subject_count',
+                      #'sample_count',
+    ]
+    schema['required'].remove('contributors')
+    schema['required'] += extra_required
+    schema['properties'].update({
+                  'award_number': {'type': 'string',
+                                   'pattern': '^OT|^U18',},
+                  'principal_investigator': {'type': 'string'},
+                  'protocol_url_or_doi': {'type': 'array',
+                                         'minItems': 1,
+                                         'items': {'type': 'string'}},
+                  'additional_links': {'type': 'array',
+                                       'minItems': 1,
+                                       'items': {'type': 'string'}},
+                  'species': {'type': 'string'},
+                  'organ': {'type': 'string'},
+                  'modality': {'type': 'string'},  # FIXME array?
+
+                  # TODO $ref these w/ pointer?
+                  # in contributor etc?
+
+                  'subject_count': {'type': 'integer'},
+                  'sample_count': {'type': 'integer'},
+                  'contributor_count': {'type': 'integer'},})
+
+    _schema = {'type': 'object',
+              'required': [
+                  'award_number',
+                  'principal_investigator'
+                  'species',
+                  'organ',
+                  'contributor_count',
+                  'subject_count',
+                  'sample_count',
+              ],
+              'properties': {
+                  'award_number': {'type': 'string',
+                                   'pattern': '^OT|^U18',},
+                  'name': {'type': 'string'},
+                  'description': {'type': 'string'},
+                  'keywords': {'type': 'array',
+                               'minItems': 1,
+                               'items': {'type': 'string'}},
+                  'acknowledgements': {'type': 'string'},
+                  'originating_articles': {'type': 'array',
+                                           'items': {'type': 'string'}},
+                  'principal_investigator': {'type': 'string'},
+                  'species': {'type': 'string'},
+                  'organ': {'type': 'string'},
+
+                  # TODO $ref these w/ pointer?
+                  # in contributor etc?
+
+                  'subject_count': {'type': 'int'},
+                  'sample_count': {'type': 'int'},
+                  'contributor_count': {'type': 'int'},},}
+
+
+class DatasetOutSchema(JSONSchema):
+    """ Schema that adds the id field since investigators shouldn't need to know
+        the id to check the integrity of their data. We need it because that is
+        a key piece of information that we use to link everything together. """
+
+    schema = copy.deepcopy(DatasetSchema.schema)
+    schema['required'] = ['id', 'meta', 'contributors', 'subjects']
+    schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
+                                   'pattern': '^N:dataset:'},
+                            'meta': MetaOutSchema.schema,
+                            'errors': {'type':'array',
+                                       'minItems': 1,
+                                       'items': {'type': 'object'},},
+                            'contributors': ContributorsSchema.schema,
+                            'resources': {'type':'array',
+                                          'items': {'type': 'object'},},
+                            'protocols': {'type':'array'},
+                            'input': {'type': 'object',
+                                      # TODO do we need errors at this level?
+                                      'properties': {'dataset_description': DatasetDescriptionSchema.schema,
+                                                     'submission': SubmissionSchema.schema,
+                                                     'subjects': SubjectsSchema.schema,},},}
+
+
+class SummarySchema(JSONSchema):
+    # TODO add expected counts
+    schema = {'type': 'object',
+              'required': ['id', 'meta'],
+              'properties': {'id': {'type': 'string',
+                                    'pattern': '^N:organization:'},
+                             'meta': {'type': 'object',
+                                      'properties': {'count': {'type': 'integer'},},},
+                             'datasets': {'type': 'array',
+                                          'minItems': 1,
+                                          'items': DatasetOutSchema.schema,}}}
+
+
+class CurationOut(JSONSchema):
     """ dead """
     schema = {
         'type': 'object',

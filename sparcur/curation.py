@@ -24,7 +24,8 @@ from sparcur.core import Path
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetSchema, SubmissionSchema,
-                             DatasetDescriptionSchema, SubjectsSchema)
+                             DatasetDescriptionSchema, SubjectsSchema,
+                             SummarySchema, DatasetOutSchema, MetaOutSchema)
 from IPython import embed
 
 project_path = local_storage_prefix / 'SPARC Consortium'
@@ -41,6 +42,17 @@ if False:  # TODO create a protocols.io class for dealing with fetching that can
 
 class EncodingError(Exception):
     """ Some encoding error has occured in a file """
+
+
+def validate(data, schema):
+    """ capture errors """
+    try:
+        ok = schema.validate(data)  # validate {} to get better error messages
+        return data  # don't normalize the representation here
+
+    except ValidationError as e:
+        return e
+
 
 def normalize_tabular_format():
     kwargs = {
@@ -298,10 +310,17 @@ class Version1Header:
     def validate(self):
         try:
             data = self.data
-            if data:
-                ok = self.schema.validate(data)
-                return data  # don't normalize the representation here
+            ok = self.schema.validate(data)  # validate {} to get better error messages
+            return data  # don't normalize the representation here
 
+        except ValidationError as e:
+            return e
+
+    def validate_out(self):
+        try:
+            data = self.data_out
+            ok = self.schema_out.validate(data)
+            return data
         except ValidationError as e:
             return e
 
@@ -381,6 +400,7 @@ class Version1Header:
         if not hasattr(self.bc, index_col):
             logger.error(f'\'{self.t.path}\' malformed header!')
             return out
+
         ic = list(getattr(self.bc, index_col))
         nme = Version1Header.normalize_header(ic)  # TODO make sure we can recover the original values for these
         nmed = {v:normk for normk, v in zip(nme, ic)}
@@ -424,6 +444,36 @@ class Version1Header:
                 out[key] = value
 
         return out
+
+    @property
+    def data_with_errors(self):
+        """ data with errors added under the 'errors' key """
+        # FIXME TODO regularize this with the FThing version
+        data = self.validate()
+        if isinstance(data, ValidationError):
+            # FIXME this will dump the whole schema, go smaller
+            error = data
+            data = self.data  # FIXME cost of calling twice
+            if 'errors' in data:
+                class WatError(Exception):
+                    """ WAT """
+
+                raise WatError('wat')
+
+            data['errors'] = [{k:v if k != 'schema' else k
+                               for k, v in e._contents().items()}
+                              for e in error.errors]
+
+        return data
+
+        # FIXME this seems like a much better way to collect things
+        # than the crazy way that I have been doing it ...
+        # this will let us go as deep as we want ...
+
+        for section_name, path in data.items():
+            section = getattr(self, section_name)
+            sec_data = section.data_with_errors
+            out[section_name] = sec_data
 
 
 class SubmissionFile(Version1Header):
@@ -555,8 +605,9 @@ class DatasetDescription(Version1Header):
 
 
 class SubjectsFile(Version1Header):
-    #to_index = 'subject_id',  # the zeroth is what is used for unique rows by default  # FIXME doesn't work
+    to_index = 'subject_id',  # the zeroth is what is used for unique rows by default  # FIXME doesn't work
     # subject id varies, so we have to do something a bit different here
+    skip_cols = tuple()
     horizontals = {'software':('software', 'software_version', 'software_vendor', 'software_url', 'software_rrid')}
     schema_class = SubjectsSchema
 
@@ -577,6 +628,8 @@ class SubjectsFile(Version1Header):
         assert len(self.h_unit) == len(self.h_value), err
         self.skip = self.h_unit + self.h_value
 
+        self.skip_cols += tuple(set(_ for v in self.horizontals.values() for _ in v))
+
     def species(self, value):
         nv = NormSpecies(value)
         return self.query(nv, 'NCBITaxon')
@@ -592,7 +645,7 @@ class SubjectsFile(Version1Header):
     def age(self, value):
         _, v, rest = parameter_expression(value)
         if not v[0] == 'param:parse-failure':
-            return ProtcParameter(v)
+            return str(ProtcParameter(v))
         else:
             # TODO warn
             return value
@@ -609,7 +662,7 @@ class SubjectsFile(Version1Header):
         for h_unit, h_value in zip(self.h_unit, self.h_value):
             compose = dict_[h_value] + dict_[h_unit]
             _, v, rest = parameter_expression(compose)
-            out[h_value] = ProtcParameter(v)
+            out[h_value] = str(ProtcParameter(v))  # FIXME sparc repr
 
         if 'gender' in out and 'species' in out:
             if out['species'] != OntTerm('NCBITaxon:9606'):
@@ -618,11 +671,28 @@ class SubjectsFile(Version1Header):
         return out
 
     @property
+    def _data(self):
+        return super().data
+
+    @property
     def data(self):
-        return {'subjects': list(self)}
+        out = {'subjects': list(self)}
+        for k, heads in self.horizontals.items():
+            # TODO make sure we actually check that the horizontal
+            # isn't used by someone else already ... shouldn't be
+            # it should be skipped but maybe not?
+            tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
+                                               # FIXME one [] drops whole horiz group ...
+                                               for head in heads))
+                              if any(_)))
+            if tups:
+                out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
+
+        return out
 
     def __iter__(self):
         yield from (self.process_dict({k:nv for k, v in zip(r._fields, r) if v
+                                       and k not in self.skip_cols
                                        for nv in (self.normalize(k, v),) if nv})
                     for r in self.bc.rows)
 
@@ -809,15 +879,81 @@ class CurationStatusLax(CurationStatusStrict):
                 yield path
 
 
-class FThing(FakePathHelper):
-    """ a homogenous representation """
-    schema_class = DatasetSchema
 
-    def __new__(cls, path, cypher=hashlib.sha256):
+class MetaMaker:
+    """ FIXME this is a bad pattern :/ """
+    schema_class = MetaOutSchema
+
+    def __new__(cls, fthing):
         cls.schema = cls.schema_class()
         return super().__new__(cls)
 
-    def __init__(self, path, cypher=hashlib.sha256):
+    def __init__(self, fthing):
+        self.f = fthing
+
+    @staticmethod
+    def _generic(gen):
+        l = list(gen)
+        if len(l) == 1:
+            return l[0]
+        else:
+            return l
+
+    @property
+    def award_number(self):
+        return self._generic(self.f.award)
+      
+    @property
+    def principal_investigator(self):
+        return self._generic(self.f.PI)
+
+    @property
+    def species(self):
+        return self._generic(self.f.species)
+
+    @property
+    def organ(self):
+        return self._generic(self.f.organ)
+
+    @property
+    def modality(self):
+        return self._generic(self.f.modality)
+
+    @property
+    def contributor_count(self):
+        # FIXME slow reads from disk every time ...
+        t = self._generic(self.f.dataset_description)
+        if isinstance(t, list):  # FIXME ick
+            return
+        elif t:
+            # FIXME this rereads so it could change
+            # after the original schema was validated ...
+            return len(t.data['contributors'])
+
+    @property
+    def subject_count(self):
+        t = self._generic(self.f.subjects)
+        if isinstance(t, list):  # FIXME ick
+            return
+        if t:
+            return len(t.data['subjects'])
+
+    @property
+    def sample_count(self):
+        pass
+
+
+class FThing(FakePathHelper):
+    """ a homogenous representation """
+    schema_class = DatasetSchema
+    schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
+
+    def __new__(cls, path, cypher=hashlib.sha256, metamaker=MetaMaker):
+        cls.schema = cls.schema_class()
+        cls.schema_out = cls.schema_out_class()
+        return super().__new__(cls)
+
+    def __init__(self, path, cypher=hashlib.sha256, metamaker=MetaMaker):
         self._errors = []
         if isinstance(path, str):
             path = Path(path)
@@ -828,6 +964,7 @@ class FThing(FakePathHelper):
         self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
+        self.metamaker = metamaker(self)
         #self._pio_header = _pio_header  # FIXME ick
 
     def xattrs(self):
@@ -876,15 +1013,31 @@ class FThing(FakePathHelper):
         return self.id.startswith('N:organization:')
 
     @property
+    def organization(self):
+        """ organization represents a permissioning boundary
+            for blackfynn, so above this we would have to know
+            in advance the id and have api keys for it and the
+            containing folder would have some non-blackfynn notes
+            also it seems likely that the same data could appear in
+            multiple different orgs, so that would mean linking locally
+        """
+
+        # FIXME in reality files can have more than one org ...
+        if self.is_organization:
+            return self
+        elif self.parent:
+            return self.parent.organization
+
+    @property
     def is_dataset(self):
         return self.id.startswith('N:dataset:')
 
     @property
-    def dataset_id(self):
+    def dataset(self):
         if self.is_dataset:
-            return self.id
+            return self
         elif self.parent:
-            return self.parent.dataset_id
+            return self.parent.dataset
 
     @property
     def id(self):
@@ -1057,7 +1210,6 @@ class FThing(FakePathHelper):
             else:
                 yield protocol_jsons[uri]
 
-
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
         uri_path = uri.rsplit('/', 1)[-1]
@@ -1071,7 +1223,7 @@ class FThing(FakePathHelper):
         if resp.ok:
             return j
         else:
-            logger.error(f"protocol no access {uri} '{self.dataset_id}'")
+            logger.error(f"protocol no access {uri} '{self.dataset.id}'")
 
     @property
     def _meta_file(self):
@@ -1206,25 +1358,27 @@ class FThing(FakePathHelper):
                 self._errors.append(e)  # NOTE we treat empty file as no file
 
     validate = Version1Header.validate
+    validate_out = Version1Header.validate_out
 
     @property
     def data(self):
         """ used to validate repo structure """
 
         out = {}
-        for thing_name in ('submission', 'dataset_description', 'subjects'):
-            #path_prop = thing_name + '_paths'
-            for thing in getattr(self, thing_name):
-                tp = thing.path.as_posix()
-                if thing_name in out:
-                    ot = out[thing_name]
+
+        for section_name in ('submission', 'dataset_description', 'subjects'):
+            #path_prop = section_name + '_paths'
+            for section in getattr(self, section_name):
+                tp = section.path.as_posix()
+                if section_name in out:
+                    ot = out[section_name]
                     # doing it this way will cause the schema to fail loudly :)
                     if isinstance(ot, str):
-                        out[thing_name] = [ot, tp]
+                        out[section_name] = [ot, tp]
                     else:
                         ot.append(tp)
                 else:
-                    out[thing_name] = tp
+                    out[section_name] = tp
 
         return out
 
@@ -1243,7 +1397,7 @@ class FThing(FakePathHelper):
         yield from self._subjects_tables
 
     @property
-    def meta_things(self):
+    def meta_sections(self):
         """ All metadata related objects. """
         yield self
         yield from self.submission
@@ -1252,7 +1406,7 @@ class FThing(FakePathHelper):
 
     @property
     def errors(self):
-        gen = self.meta_things
+        gen = self.meta_sections
         next(gen)  # skip self
         for thing in gen:
             yield from thing.errors
@@ -1264,6 +1418,108 @@ class FThing(FakePathHelper):
 
         r = '\n'.join([f'{s:>20}{l:>20}' for s, l in zip(self.status.report, self.lax.report)])
         return self.name + f"\n'{self.id}'\n\n" + r
+
+
+    def _with_errors(self, valid, thunk, schema):
+        data = valid
+        out = {}  # {'raw':{}, 'normalized':{},}
+        # use the schema to auto fill things that we are responsible for
+        # FIXME possibly separate this to our own step?
+        try:
+            if 'id' in schema.schema['required']:
+                out['id'] = self.id
+        except KeyError:
+            pass
+
+        if isinstance(data, ValidationError):
+            # FIXME this will dump the whole schema, go smaller
+            if 'errors' not in out:
+                out['errors'] = []
+
+            out['errors'] += [{k:v if k != 'schema' else k
+                               for k, v in e._contents().items()}
+                              for e in data.errors]
+
+            data = thunk()  # FIXME cost of calling twice
+
+        if schema == self.schema:  # FIXME icky hack
+            for section_name, path in data.items():
+                # output sections don't all have python representations at the moment
+                if hasattr(self, section_name):
+                    section = next(getattr(self, section_name))  # FIXME non-homogenous
+                    # we can safely call next here because missing or multi
+                    # sections will be kicked out
+                    # TODO n-ary cases may need to be handled separately
+                    sec_data = section.data_with_errors
+                    #out.update(sec_data)  # the magic of being self describing
+                    out[section_name] = sec_data  # FIXME
+
+        else:
+            out['errors'] += data.pop('errors', [])
+            out.update(data)
+
+        return out
+
+    @property
+    def data_out(self):
+        """ this part adds the meta bits we need after _with_errors
+            and rearranges anything that needs to be moved about """
+
+        # TODO raw vs normalized
+        out = self.data_with_errors
+
+        # TODO 1:1 remapping rules for in/out schema
+        if self.is_dataset:  # FIXME :/ evil hardcoding
+            # copy from path a to path b ...
+            # '/dataset_description/contributors'
+            # '/contributors'
+            # while this may seem redundant there is going
+            # to be a normalization step in between here
+            # this will need to go in a loop or something
+            # FIXME redundant ...
+            try:
+                cs = out['dataset_description']['contributors']
+                out['contributors'] = cs
+            except KeyError:  # FIXME ??? propagating errors!??!
+                # FIXME
+                out['contributors'] = {'errors':[{'message': 'Not our problem',
+                                                  'cause': 'no dataset_description',
+                                                  'type': 'DOWNSTREAM',}]}
+
+            out['input'] = {}
+            for key in self.schema_out.schema['properties']['input']['properties']:
+                if key in out:
+                    #if key in self.transform:  # TODO
+                    out['input'][key] = out.pop(key)
+
+        # lifted or computed
+        want_fields = MetaOutSchema.extra_required
+        meta_extra = {name:getattr(self.metamaker, name)
+                      for name in want_fields}
+        t = self.metamaker._generic(self.dataset_description)
+        if t and not isinstance(t, list):
+            d = t.data
+            d.pop('contributors', None)  # FIXME FIXME FIXME
+            meta = {**d, **meta_extra}
+            valid = validate(meta, self.metamaker.schema)
+            if valid != meta:
+                meta['errors'] = [{k:v if k != 'schema' else k
+                                   for k, v in e._contents().items()}
+                                  for e in valid.errors]
+            out['meta'] = {k:v for k, v in meta.items() if v}
+
+        if not out:
+            out['errors'] = [{'message': 'Nothing to see here!?'}]
+
+        return out
+
+    @property
+    def data_with_errors(self):
+        return self._with_errors(self.validate(), lambda:self.data, self.schema)
+
+    @property
+    def data_out_with_errors(self):
+        return self._with_errors(self.validate_out(), lambda:self.data_out, self.schema_out)
 
     def dump_all(self):
         return {attr: express_or_return(getattr(self, attr))
@@ -1286,9 +1542,180 @@ class FThing(FakePathHelper):
         return f'{self.__class__.__name__}(\'{self.path}\')'
 
 
+class Summary(FThing):
+    """ A class that summarizes members of its __base__ class """
+    #schema_class = MetaOutSchema  # FIXME clearly incorrect
+    schema_class = SummarySchema
+    schema_out_class = SummarySchema
+
+    def __new__(cls, path, cypher=hashlib.sha256):
+        #cls.schema = cls.schema_class()
+        cls.schema_out = cls.schema_out_class()
+        return super().__new__(cls, path, cypher)
+
+    def __init__(self, path, cypher=hashlib.sha256):
+        super().__init__(path, cypher)
+        # not sure if this is kosher ... but it works
+        super().__init__(self.organization.path, self.cypher)
+ 
+    def __iter__(self):
+        """ Return the list of datasets for the organization
+            of the current FThing regardless of whether that
+            FThing is itself an organization node """
+
+        # when going up or down the tree _ALWAYS_
+        # use the filesystem as the source of truth
+        # do not cache in here
+        for path in self.organization.path.iterdir():
+            # FIXME non homogenous, need to find a better way ...
+            yield self.__class__.__base__(path)
+
+    def make_json(self, gen):
+        # FIXME this and the datasets is kind of confusing ...
+        # might be worth moving those into a reporting class
+        # that always works at the top level regardless of which
+        # file it is give?
+
+        ds = list(gen)
+        count = len(ds)
+        meta = {'count': count}
+        return {'id': self.id,
+                'meta': meta,
+                'datasets': ds}
+
+    @property
+    def data(self):
+        # FIXME validating in vs out ...
+        # return self.make_json(d.validate_out() for d in self)
+        return self.make_json(d.data_out_with_errors for d in self)
+
+    @property
+    def data_out(self):
+        data = self.data_with_errors
+        return self.make_json(d.data_out for d in self)
+
+    @property
+    def foundary(self):
+        pass
+
+    @property
+    def disco(self):
+        pass
+
+
+from hyputils.hypothesis import iterclass
+class LThing:
+    def __init__(self, lst):
+        self._lst = lst
+
+
+def JT(blob):
+    def _populate(blob, top=False):
+        if isinstance(blob, list) or isinstance(blob, tuple):
+            # TODO alternatively if the schema is uniform, could use bc here ...
+            def _all(self, l=blob):  # FIXME don't autocomplete?
+                keys = set(k for b in l
+                           if isinstance(b, dict)
+                           for k in b)
+                obj = {k:[] for k in keys}
+                _list = []
+                _other = []
+                for b in l:
+                    if isinstance(b, dict):
+                        for k in keys:
+                            if k in b:
+                                obj[k].append(b[k])
+                            else:
+                                obj[k].append(None)
+
+                    elif any(isinstance(b, t) for t in (list, tuple)):
+                        _list.append(JT(b))
+
+                    else:
+                        _other.append(b)
+                        for k in keys:
+                            obj[k].append(None)  # super inefficient
+                            
+                if _list:
+                    obj['_list'] = JT(_list)
+
+                if obj:
+                    j = JT(obj)
+                else:
+                    j = JT(blob)
+
+                if _other:
+                    #obj['_'] = _other  # infinite, though lazy
+                    setattr(j, '_', _other)
+
+                setattr(j, '_b', blob)
+                #lb = len(blob)
+                #setattr(j, '__len__', lambda: lb)  # FIXME len()
+                return j
+
+            def it(self, l=blob):
+                for b in l:
+                    if any(isinstance(b, t) for t in (dict, list, tuple)):
+                        yield JT(b)
+                    else:
+                        yield b
+
+            if top:
+                # FIXME iter is non homogenous
+                return [('__iter__', it), ('_all', property(_all))]
+            #elif not [e for e in b if isinstance(self, dict)]:
+                #return property(id)
+            else:
+                # FIXME this can render as {} if there are no keys
+                return property(_all)
+                #obj = {'_all': property(_all),
+                       #'_l': property(it),}
+
+                #j = JT(obj)
+                #return j
+
+                #nl = JT(obj)
+                #nl._list = blob
+                #return property(it)
+
+        elif isinstance(blob, dict):
+            if top:
+                out = [('_keys', tuple(blob))]
+                for k, v in blob.items():  # FIXME normalize keys ...
+                    nv = _populate(v)
+                    out.append((k, nv))
+                    #setattr(cls, k, nv)
+                return out
+            else:
+                return JT(blob)
+
+        else:
+            if top:
+                raise TypeError('asdf')
+            else:
+                @property
+                def prop(self, v=blob):
+                    return v
+
+                return prop
+
+    def _repr(self, b=blob):  # because why not
+        return 'JT(\n' + repr(b) + '\n)'
+
+    #cd = {k:v for k, v in _populate(blob, True)}
+
+    # populate the top level
+    cd = {k:v for k, v in ((a, b) for t in _populate(blob, True)
+                           for a, b in (t if isinstance(t, list) else (t,)))}
+    cd['__repr__'] = _repr
+    nc = type('JT' + str(type(blob)), (object,), cd)
+    return nc()
+
+
 class FTLax(FThing):
     def _abstracted_paths(self, name_prefix, glob_type='rglob'):
         yield from super()._abstracted_paths(name_prefix, glob_type)
+
 
 
 def express_or_return(thing):
@@ -1447,10 +1874,10 @@ def main():
     compare = lambda i: (ne[i], le[i])
 
     total_paths = list(map(lambda d_: len([p for d in d_ for p in d.meta_paths]), (ds, dsl)))
-    total_metas = list(map(lambda d_: len([p for d in d_ for p in d.meta_things]), (ds, dsl)))
-    total_valid = list(map(lambda d_: len([p for d in d_ for p in d.meta_things if isinstance(p.validate(), dict)]), (ds, dsl)))
-    dst = [p for d in ds for p in d.meta_things if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
-    dstl = [p for d in dsl for p in d.meta_things if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
+    total_metas = list(map(lambda d_: len([p for d in d_ for p in d.meta_sections]), (ds, dsl)))
+    total_valid = list(map(lambda d_: len([p for d in d_ for p in d.meta_sections if isinstance(p.validate(), dict)]), (ds, dsl)))
+    dst = [p for d in ds for p in d.meta_sections if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
+    dstl = [p for d in dsl for p in d.meta_sections if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
 
     # review paths in lax vs real
     dp = [(d, p) for d in ds for p in d.meta_paths]
