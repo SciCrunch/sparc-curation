@@ -275,14 +275,15 @@ class DatasetOutSchema(JSONSchema):
                                        'minItems': 1,
                                        'items': {'type': 'object'},},
                             'contributors': ContributorsSchema.schema,
+                            'subjects': SubjectsSchema.schema,  # FIXME SubjectsOutSchema
                             'resources': {'type':'array',
                                           'items': {'type': 'object'},},
                             'protocols': {'type':'array'},
-                            'input': {'type': 'object',
-                                      # TODO do we need errors at this level?
-                                      'properties': {'dataset_description': DatasetDescriptionSchema.schema,
-                                                     'submission': SubmissionSchema.schema,
-                                                     'subjects': SubjectsSchema.schema,},},}
+                            'inputs': {'type': 'object',
+                                       # TODO do we need errors at this level?
+                                       'properties': {'dataset_description': DatasetDescriptionSchema.schema,
+                                                      'submission': SubmissionSchema.schema,
+                                                      'subjects': SubjectsSchema.schema,},},}
 
 
 class SummarySchema(JSONSchema):

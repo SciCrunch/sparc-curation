@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import io
 import csv
+import copy
+import json
 import hashlib
 import mimetypes
 from types import GeneratorType
 from itertools import chain
-from collections import defaultdict
+from collections import defaultdict, deque
 import magic  # from sys-apps/file consider python-magic ?
 import requests
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -40,6 +42,20 @@ if False:  # TODO create a protocols.io class for dealing with fetching that can
     _pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
     protocol_jsons = {}
 
+class CJEncode(json.JSONEncoder):
+     def default(self, obj):
+         if isinstance(obj, tuple):
+             return list(obj)
+         elif isinstance(obj, deque):
+             return list(obj)
+         elif isinstance(obj, ProtcParameter):
+             return str(obj)
+         elif isinstance(obj, OntId):
+             return obj.curie + ',' + obj.label
+
+         # Let the base class default method raise the TypeError
+         return json.JSONEncoder.default(self, obj)
+
 class EncodingError(Exception):
     """ Some encoding error has occured in a file """
 
@@ -48,11 +64,18 @@ def validate(data, schema):
     """ capture errors """
     try:
         ok = schema.validate(data)  # validate {} to get better error messages
+        # return True, ok, data  # FIXME better format
         return data  # don't normalize the representation here
 
     except ValidationError as e:
+        # return False, e, data  # FIXME better format
         return e
 
+def transform_errors(validation_error):
+    skip = 'schema', 'instance'
+    return [{k:v if k not in skip else k + ' REMOVED'
+             for k, v in e._contents().items()}
+            for e in validation_error.errors]
 
 def normalize_tabular_format():
     kwargs = {
@@ -460,9 +483,10 @@ class Version1Header:
 
                 raise WatError('wat')
 
-            data['errors'] = [{k:v if k != 'schema' else k
-                               for k, v in e._contents().items()}
-                              for e in error.errors]
+            data['errors'] = transform_errors(error)
+            #data['errors'] = [{k:v if k != 'schema' else k
+                               #for k, v in e._contents().items()}
+                              #for e in error.errors]
 
         return data
 
@@ -1148,11 +1172,13 @@ class FThing(FakePathHelper):
 
     @property
     def organ(self):
-        return 'TODO'
+        # TODO
+        return '',
 
     @property
     def modality(self):
-        return 'TODO'
+        # TODO
+        return '',
 
     @property
     def keywords(self):
@@ -1445,9 +1471,10 @@ class FThing(FakePathHelper):
             if 'errors' not in out:
                 out['errors'] = []
 
-            out['errors'] += [{k:v if k != 'schema' else k
-                               for k, v in e._contents().items()}
-                              for e in data.errors]
+            #out['errors'] += [{k:v if k != 'schema' else k
+                               #for k, v in e._contents().items()}
+                              #for e in data.errors]
+            out['errors'] += transform_errors(data)
 
             data = thunk()  # FIXME cost of calling twice
 
@@ -1476,10 +1503,146 @@ class FThing(FakePathHelper):
 
         return out
 
+    def _add(self, data):
+        # additions
+        data['id'] = self.id
+
+    def _lift(self, data, lifts):
+        # TODO lifts, copies, etc can all go in a single structure
+        # TODO proper mapping
+        for section_name in lifts:
+            try:
+                section = next(getattr(self, section_name))  # FIXME multiple when require 1
+                if section_name in data:
+                    # just skip stuff that doesn't exist
+                    data[section_name] = section.data_with_errors
+            except StopIteration:
+                data[section_name] = {'errors':[{'message':'Nothing to see here?'}]}
+
+    def _copy(self, data, copies):
+        for source_path, target_path in copies:
+            # don't need a base case for thing?
+            # can't lift a dict outside of itself
+            # in this context
+            self.copy(data, source_path, target_path)
+
+    def _move(self, data, moves):
+        for source_path, target_path in moves:
+            self.move(data, source_path, target_path)
+
+    def transform(self, data, lifts, copies, moves):
+        """ lift sections using a python representation """
+        self._add(data)
+        self._lift(data, lifts)
+        self._copy(data, copies)
+        self._move(data, moves)
+
+    def copy(self, data, source_path, target_path):
+        self._copy_or_move(data, source_path, target_path)
+
+    def move(self, data, source_path, target_path):
+        self._copy_or_move(data, source_path, target_path, True)
+
+    def _copy_or_move(self, data, source_path, target_path, move=False):
+        """ if exists ... """
+        #print(source_path, target_path)
+        source_prefixes = source_path[:-1]
+        source_key = source_path[-1]
+        source = data
+        for node_key in source_prefixes:
+            if node_key in source:
+                source = source[node_key]
+            else:
+                # don't move if no source
+                logger.warning(f'did not find {node_key} in {source.keys()} {self.path}')
+                return
+
+        # FIXME there is a more elegant way to do this
+        if source_key not in source:
+            logger.warning(f'did not find {source_key} in {source.keys()} {self.path}')
+            return
+        else:
+            if move:
+                _parent = source  # incase something goes wrong
+                source = source.pop(source_key)
+            else:
+                source = source[source_key]
+
+        if copy and source != data:
+            # copy first then modify means we need to deepcopy these
+            # otherwise we would delete original forms that were being
+            # saved elsewhere in the schema for later
+            source = copy.deepcopy(source)
+
+        target_prefixes = target_path[:-1]
+        target_key = target_path[-1]
+        target = data
+        try:
+            for target_name in target_prefixes:
+                if target_name not in target:  # TODO list indicies
+                    target[target_name] = {}
+
+                target = target[target_name]
+
+            target[target_key] = source
+        except TypeError as e:  # e.g. you try to go to a string
+            if move:
+                # this will change key ordering but
+                # that is expected, and if you were relying
+                # on dict key ordering HAH
+                _parent[node_key] = source
+
+            raise e
+
+        return
+        if hasattr(self, section_name):
+            section = next(getattr(self, section_name))  # FIXME non-homogenous
+            # we can safely call next here because missing or multi
+            # sections will be kicked out
+            # TODO n-ary cases may need to be handled separately
+            sec_data = section.data_with_errors
+            #out.update(sec_data)  # the magic of being self describing
+            out[section_name] = sec_data  # FIXME
+
     @property
     def data_out(self):
         """ this part adds the meta bits we need after _with_errors
             and rearranges anything that needs to be moved about """
+
+        data = self.data_with_errors  # FIXME without errors how?
+        lift_out = 'submission', 'dataset_description', 'subjects'
+        copies = ([['dataset_description', 'contributors'], ['contributors']],
+                  [['subjects',], ['inputs', 'subjects']],)
+        moves = ([['dataset_description',], ['inputs', 'dataset_description']],
+                 [['subjects', 'software'], ['resources']],  # FIXME update vs replace
+                 [['subjects', 'subjects'], ['subjects']],
+                 [['submission',], ['inputs', 'submission']],)
+        self.transform(data, lift_out, copies, moves)
+        self.add_meta(data)
+
+        if not data:
+            data['errors'] = [{'message': 'Nothing to see here!?'}]
+
+        return data
+
+    def add_meta(self, data):
+        # lifted or computed
+        # FIXME use copy/move for this
+        want_fields = MetaOutSchema.extra_required
+        meta_extra = {name:getattr(self.metamaker, name)
+                      for name in want_fields}
+        t = self.metamaker._generic(self.dataset_description)
+        if t and not isinstance(t, list):
+            d = t.data
+            d.pop('contributors', None)  # FIXME FIXME FIXME
+            meta = {**d, **meta_extra}
+            valid = validate(meta, self.metamaker.schema)
+            if valid != meta:
+                meta['errors'] = transform_errors(valid)
+
+            data['meta'] = {k:v for k, v in meta.items() if v}
+
+        return
 
         # TODO raw vs normalized
         out = self.data_with_errors
@@ -1504,40 +1667,27 @@ class FThing(FakePathHelper):
             #except TypeError as e:
                 #embed()
 
-            out['input'] = {}
-            for key in self.schema_out.schema['properties']['input']['properties']:
+            out['inputs'] = {}
+            for key in self.schema_out.schema['properties']['inputs']['properties']:
                 if key in out:
                     #if key in self.transform:  # TODO
-                    out['input'][key] = out.pop(key)
-
-        # lifted or computed
-        want_fields = MetaOutSchema.extra_required
-        meta_extra = {name:getattr(self.metamaker, name)
-                      for name in want_fields}
-        t = self.metamaker._generic(self.dataset_description)
-        if t and not isinstance(t, list):
-            d = t.data
-            d.pop('contributors', None)  # FIXME FIXME FIXME
-            meta = {**d, **meta_extra}
-            valid = validate(meta, self.metamaker.schema)
-            if valid != meta:
-                meta['errors'] = [{k:v if k != 'schema' else k
-                                   for k, v in e._contents().items()}
-                                  for e in valid.errors]
-            out['meta'] = {k:v for k, v in meta.items() if v}
-
-        if not out:
-            out['errors'] = [{'message': 'Nothing to see here!?'}]
-
-        return out
+                    out['inputs'][key] = out.pop(key)
 
     @property
     def data_with_errors(self):
+        # FIXME remove this
+        # this still ok, dwe is very simple for this case
         return self._with_errors(self.validate(), lambda:self.data, self.schema)
 
     @property
     def data_out_with_errors(self):
-        return self._with_errors(self.validate_out(), lambda:self.data_out, self.schema_out)
+        #return self._with_errors(self.validate_out(), lambda:self.data_out, self.schema_out)
+        data = self.data_out
+        val = validate(data, self.schema_out)
+        if data != val:
+            data['errors'] = transform_errors(val)
+
+        return data
 
     def dump_all(self):
         return {attr: express_or_return(getattr(self, attr))
@@ -1610,7 +1760,10 @@ class Summary(FThing):
     @property
     def data_out(self):
         data = self.data_with_errors
-        return self.make_json(d.data_out for d in self)
+        #return self.make_json(d.data_out_with_errors for d in self)
+        # TODO transform
+        return data
+
 
     @property
     def foundary(self):
@@ -1618,7 +1771,99 @@ class Summary(FThing):
 
     @property
     def disco(self):
-        pass
+        dsh = sorted(MetaOutSchema.schema['properties'])
+        chs = sorted(('name',
+                'contributor_orcid_id',
+                'is_contact_person',
+                'contributor_affiliation',
+                'contributor_role'))
+
+        datasets = [['id'] + dsh]
+        contributors = [['id'] + chs]
+        subjects = [['id', 'blob']]
+        errors = [['id', 'blob']]
+        resources = [['id', 'blob']]
+
+        #cje = CJEncode()
+        def normv(v):
+            if isinstance(v, list) or isinstance(v, tuple):
+                v = ','.join(str(_) for _ in v)
+            elif any(isinstance(v, c) for c in
+                     (int, float, str)):
+                v = str(v)
+
+            return v
+
+
+        for dataset in self:
+            id = dataset.id
+            dowe = dataset.data_out_with_errors
+
+            row = [id]  # FIXME this doubles up on the row
+            if 'meta' in dowe:
+                meta = dowe['meta']
+                for k in dsh:
+                    if k in meta:
+                        v = meta[k]
+                        v = normv(v)
+                    else:
+                        v = None
+
+                    row.append(v)
+
+            else:
+                row += [None for k in meta]
+
+            datasets.append(row)
+
+            # contribs 
+            if 'contributors' in dowe:
+                cs = dowe['contributors']
+                for c in cs:
+                    row = [id]
+                    for k in chs:
+                        if k in c:
+                            v = c[k]
+                            v = normv(v)
+                            row.append(v)
+                        else:
+                            row.append(None)
+
+                    contributors.append(row)
+
+            if 'subjects' in dowe:
+                sbs = dowe['subjects']
+                if 'subjects' in sbs:
+                    for subject in sbs['subjects']:
+                        row = [id]
+                        row.append(json.dumps(subject, cls=CJEncode))
+                        subjects.append(row)
+
+                # moved to resources if exists already
+                #if 'software' in sbs:
+                    #for software in sbs['software']:
+                        #row = [id]
+                        #row.append(json.dumps(software, cls=CJEncode))
+                        #resources.append(row)
+
+            if 'resources' in dowe:
+                for res in dowe['resources']:
+                    row = [id]
+                    row.append(json.dumps(res, cls=CJEncode))
+
+            if 'errors' in dowe:
+                ers = dowe['errors']
+                for er in ers:
+                    row = [id]
+                    row.append(json.dumps(er, cls=CJEncode))
+                    errors.append(row)
+
+        # TODO samples resources
+        return (('datasets', datasets),
+                ('contributors', contributors),
+                ('subjects', subjects),
+                ('resources', resources),
+                ('errors', errors))
 
 
 from hyputils.hypothesis import iterclass

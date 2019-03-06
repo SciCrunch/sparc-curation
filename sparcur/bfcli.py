@@ -135,23 +135,28 @@ def main():
         import csv
         import json
         from datetime import datetime
+        from sparcur.curation import CJEncode
         #from sparcur.curation import get_datasets
         #ds, dsd = get_datasets(curation.project_path)
         #org_id = FThing(curation.project_path).organization.id
         summary = Summary(curation.project_path)
         timestamp = datetime.now().isoformat()
-        filepath = summary.path.parent / filename
         # start time not end time ...
         # obviously not transactional ...
         filename = f'curation-export-{summary.id}-{timestamp}'
+        dump_path = summary.path.parent / 'export'
+        if not dump_path.exists():
+            dump_path.mkdir()
+
+        filepath = dump_path / filename
 
         with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(summary.foundary, f, sort_keys=True, indent=2)
+            json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=CJEncode)
 
         # datasets, contributors, subjects, samples, resources
         for table_name, tabular in summary.disco:
             with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
-                    writer = csv.writer(f, delimiter='\t')
+                    writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                     writer.writerows(tabular)
 
     elif args['shell']:
@@ -159,7 +164,7 @@ def main():
         bfl = BFLocal()
         ds, dsd = get_datasets(curation.project_path)
         summary = Summary(curation.project_path)
-        dwe = summary.data_with_errors
+        # dowe = summary.data_out_with_errors
         # error_messages = [(d['id'], e['message']) for d in dwe['datasets'] for e in d['errors']]
         # error_messages = [e['message'] for d in dwe['datasets'] for e in d['errors']]
         embed()
