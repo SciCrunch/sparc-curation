@@ -275,7 +275,8 @@ class DatasetOutSchema(JSONSchema):
                                        'minItems': 1,
                                        'items': {'type': 'object'},},
                             'contributors': ContributorsSchema.schema,
-                            'subjects': SubjectsSchema.schema,  # FIXME SubjectsOutSchema
+                            # FIXME subjects_file might make the name overlap clearer
+                            'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
                             'resources': {'type':'array',
                                           'items': {'type': 'object'},},
                             'protocols': {'type':'array'},

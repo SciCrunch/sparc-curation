@@ -408,7 +408,7 @@ class Version1Header:
             logger.error(message)
             self._errors.append(EncodingError(message))
 
-        if v.lower().strip() not in ('n/a', 'na'):  # FIXME explicit null vs remove from structure
+        if v.lower().strip() not in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
             return getattr(self, key, self.default)(v)
 
     def rename_key(self, key, *parent_keys):
@@ -447,7 +447,9 @@ class Version1Header:
                         elif len(value) > 1:
                             logger.warning(f"too many values for {normk} {value} '{self.t.path}'")
                             # FIXME not selecting the zeroth element here breaks the schema assumptions
-                            value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
+                            #value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
+                            #value = 'ERROR>>>' + ','.join(value)
+                            # just leave it
                         else:
                             value = value[0]  # FIXME error handling etc.
 
@@ -1641,6 +1643,9 @@ class FThing(FakePathHelper):
                 meta['errors'] = transform_errors(valid)
 
             data['meta'] = {k:v for k, v in meta.items() if v}
+        else:
+            data['meta'] = {
+             'errors': [{'message': 'Too many dataset_descriptions!'}]}
 
         return
 
@@ -1744,6 +1749,7 @@ class Summary(FThing):
         # that always works at the top level regardless of which
         # file it is give?
 
+        # TODO parallelize and stream this!
         ds = list(gen)
         count = len(ds)
         meta = {'count': count}
@@ -1787,13 +1793,19 @@ class Summary(FThing):
         #cje = CJEncode()
         def normv(v):
             if isinstance(v, list) or isinstance(v, tuple):
-                v = ','.join(str(_) for _ in v)
+                v = ','.join(json.dumps(_, cls=CJEncode)
+                             if isinstance(_, dict) else
+                             str(_) for _ in v)
+                v = v.replace('\n', ' ').replace('\t', ' ')
             elif any(isinstance(v, c) for c in
                      (int, float, str)):
                 v = str(v)
+                v = v.replace('\n', ' ').replace('\t', ' ')  # FIXME tests to catch this
+
+            elif isinstance(v, dict):
+                v = json.dumps(v, cls=CJEncode)
 
             return v
-
 
         for dataset in self:
             id = dataset.id
@@ -1832,12 +1844,10 @@ class Summary(FThing):
                     contributors.append(row)
 
             if 'subjects' in dowe:
-                sbs = dowe['subjects']
-                if 'subjects' in sbs:
-                    for subject in sbs['subjects']:
-                        row = [id]
-                        row.append(json.dumps(subject, cls=CJEncode))
-                        subjects.append(row)
+                for subject in dowe['subjects']:
+                    row = [id]
+                    row.append(json.dumps(subject, cls=CJEncode))
+                    subjects.append(row)
 
                 # moved to resources if exists already
                 #if 'software' in sbs:
@@ -1850,6 +1860,7 @@ class Summary(FThing):
                 for res in dowe['resources']:
                     row = [id]
                     row.append(json.dumps(res, cls=CJEncode))
+                    resources.append(row)
 
             if 'errors' in dowe:
                 ers = dowe['errors']
