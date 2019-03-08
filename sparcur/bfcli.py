@@ -34,7 +34,8 @@ Options:
 """
 
 from sparcur.blackfynn_api import BFLocal, Path
-from sparcur.curation import FThing, FTLax, CurationReport, Summary, JT
+from sparcur.curation import FThing, FTLax, CurationReport, Summary
+from sparcur.core import JT
 
 def main():
     from docopt import docopt, parse_defaults
@@ -169,6 +170,9 @@ def main():
 
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=CJEncode)
+
+        with open(filepath.with_suffix('.ttl'), 'wt') as f:
+            f.write(summary.ttl)
 
         # datasets, contributors, subjects, samples, resources
         for table_name, tabular in summary.disco:
