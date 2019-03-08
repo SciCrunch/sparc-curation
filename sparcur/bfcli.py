@@ -4,7 +4,7 @@ Usage:
     bfc pull
     bfc annos [export shell]
     bfc stats [<directory>...]
-    bfc report
+    bfc report [filetypes]
     bfc missing
     bfc xattrs
     bfc export
@@ -112,8 +112,25 @@ def main():
         print(fmt)
 
     elif args['report']:
-        rep = curation_report()
-        print(rep)
+        from collections import Counter
+        if args['filetypes']:
+            #root = FThing(curation.project_path)
+            fts = [FThing(p) for p in curation.project_path.rglob('*') if p.is_file()]
+            #all_counts = sorted([(*k, v) for k, v in Counter([(f.suffix, f.mimetype, f._magic_mimetype)
+                                                              #for f in fts]).items()], key=lambda r:r[-1])
+
+            def count(thing):
+                return sorted([(k, v) for k, v in Counter([getattr(f, thing)
+                                                            for f in fts]).items()], key=lambda r:-r[-1])
+            #each = {t:count(t) for t in ('suffix', 'mimetype', )}
+            each = {t:count(t) for t in ('_magic_mimetype', )}
+            
+            for head, tups in each.items():
+                print(head)
+                print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
+            embed()
+        #rep = curation_report()
+        #print(rep)
 
     elif args['feedback']:
         file = args['<feedback-file>']
