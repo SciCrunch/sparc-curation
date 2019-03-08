@@ -125,6 +125,7 @@ class Header(Stage):
                      .replace('?', '_')
                      .replace('#', 'number')
                      .replace('-', '_')
+                     .replace(':', '_')
                      .lower()  # sigh
                 )
                 if any(c.startswith(str(n)) for n in range(10)):

@@ -161,24 +161,24 @@ def main():
         timestamp = datetime.now().isoformat()
         # start time not end time ...
         # obviously not transactional ...
-        filename = f'curation-export-{summary.id}-{timestamp}'
-        dump_path = summary.path.parent / 'export'
+        filename = 'curation-export'
+        dump_path = summary.path.parent / 'export' / summary.id / timestamp
         if not dump_path.exists():
-            dump_path.mkdir()
+            dump_path.mkdir(parents=True)
 
         filepath = dump_path / filename
 
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=CJEncode)
 
-        with open(filepath.with_suffix('.ttl'), 'wt') as f:
+        with open(filepath.with_suffix('.ttl'), 'wb') as f:
             f.write(summary.ttl)
 
         # datasets, contributors, subjects, samples, resources
         for table_name, tabular in summary.disco:
             with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
-                    writer = csv.writer(f, delimiter='\t', lineterminator='\n')
-                    writer.writerows(tabular)
+                writer = csv.writer(f, delimiter='\t', lineterminator='\n')
+                writer.writerows(tabular)
 
     elif args['shell']:
         from sparcur import schemas as sc
