@@ -13,6 +13,15 @@ class ValidationError(Exception):
     def __str__(self):
         return repr(self)
 
+    def json(self):
+        """ update this to change how errors appear in the validation pipeline """
+        skip = 'schema', 'instance'
+        return [{k:v if k not in skip else k + ' REMOVED'
+                 for k, v in e._contents().items()
+                 # TODO see if it makes sense to drop these because the parser did know ...
+                 if v and k not in skip}
+                for e in self.errors]
+
 
 class JSONSchema(object):
 
@@ -25,7 +34,7 @@ class JSONSchema(object):
                                                     format_checker=format_checker,
                                                     types=types)
 
-    def validate(self, data):
+    def validate_strict(self, data):
         # Take a copy to ensure we don't modify what we were passed.
         appstruct = copy.deepcopy(data)
 
@@ -35,6 +44,15 @@ class JSONSchema(object):
 
         return appstruct
 
+    def validate(self, data):
+        """ capture errors """
+        try:
+            ok = self.validate_strict(data)  # validate {} to get better error messages
+            return True, ok, data  # FIXME better format
+
+        except ValidationError as e:
+            return False, e, data  # FIXME better format
+
 
 def _format_jsonschema_error(error):
     """Format a :py:class:`jsonschema.ValidationError` as a string."""
@@ -42,6 +60,12 @@ def _format_jsonschema_error(error):
         dotted_path = ".".join([str(c) for c in error.path])
         return "{path}: {message}".format(path=dotted_path, message=error.message)
     return error.message
+
+
+class ErrorSchema(JSONSchema):
+    schema = {'type':'array',
+              'minItems': 1,
+              'items': {'type': 'object'},}
 
 
 class DatasetSchema(JSONSchema):
@@ -109,6 +133,7 @@ class DatasetDescriptionSchema(JSONSchema):
         'required': ['name', 'description', 'funding', 'protocol_url_or_doi', 'contributors', 'completeness_of_data_set'],
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
+            'errors': ErrorSchema.schema,
             'name': {'type': 'string'},
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
@@ -208,25 +233,26 @@ class MetaOutSchema(JSONSchema):
     schema['required'].remove('contributors')
     schema['required'] += extra_required
     schema['properties'].update({
-                  'award_number': {'type': 'string',
-                                   'pattern': '^OT|^U18',},
-                  'principal_investigator': {'type': 'string'},
-                  'protocol_url_or_doi': {'type': 'array',
-                                         'minItems': 1,
-                                         'items': {'type': 'string'}},
-                  'additional_links': {'type': 'array',
-                                       'minItems': 1,
-                                       'items': {'type': 'string'}},
-                  'species': {'type': 'string'},
-                  'organ': {'type': 'string'},
-                  'modality': {'type': 'string'},  # FIXME array?
+        'errors': ErrorSchema.schema,
+        'award_number': {'type': 'string',
+                         'pattern': '^OT|^U18',},
+        'principal_investigator': {'type': 'string'},
+        'protocol_url_or_doi': {'type': 'array',
+                                'minItems': 1,
+                                'items': {'type': 'string'}},
+        'additional_links': {'type': 'array',
+                             'minItems': 1,
+                             'items': {'type': 'string'}},
+        'species': {'type': 'string'},
+        'organ': {'type': 'string'},
+        'modality': {'type': 'string'},  # FIXME array?
 
                   # TODO $ref these w/ pointer?
-                  # in contributor etc?
+        # in contributor etc?
 
                   'subject_count': {'type': 'integer'},
-                  'sample_count': {'type': 'integer'},
-                  'contributor_count': {'type': 'integer'},})
+        'sample_count': {'type': 'integer'},
+        'contributor_count': {'type': 'integer'},})
 
     _schema = {'type': 'object',
               'required': [
@@ -271,9 +297,7 @@ class DatasetOutSchema(JSONSchema):
     schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
-                            'errors': {'type':'array',
-                                       'minItems': 1,
-                                       'items': {'type': 'object'},},
+                            'errors': ErrorSchema.schema,
                             'contributors': ContributorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer
                             'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
@@ -297,38 +321,10 @@ class SummarySchema(JSONSchema):
                                       'properties': {'count': {'type': 'integer'},},},
                              'datasets': {'type': 'array',
                                           'minItems': 1,
-                                          'items': DatasetOutSchema.schema,}}}
+                                          'items': DatasetOutSchema.schema,},
+                             'errors': ErrorSchema.schema,}}
 
 
-class CurationOut(JSONSchema):
-    """ dead """
-    schema = {
-        'type': 'object',
-        'properties': {
-        'structure': {
-            'submission': {
-                'award': {},
-            },
-            'dataset_description': {
-                'award': {},
-                'protocol_uri': {
-                    'protocl': {},
-                },
-                'name': {},
-                'description': {},
-                'name': {},
-                'name': {},
-                'name': {},
-            },
-            'subjects': {
-                'species': {},
-                'folder': {},
-            },
-        },
-        'protocol': {
-            'annotations': {},
-        },
-        },
-        }
-
-
+class HeaderSchema(JSONSchema):
+    schema = {'type': 'array',
+              'items': {'type': 'string'}}

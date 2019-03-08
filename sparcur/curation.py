@@ -24,10 +24,12 @@ from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.config import local_storage_prefix
 from sparcur.core import Path
 from sparcur.protocols_io_api import get_protocols_io_auth
+from sparcur import schemas as sc
 from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetSchema, SubmissionSchema,
                              DatasetDescriptionSchema, SubjectsSchema,
                              SummarySchema, DatasetOutSchema, MetaOutSchema)
+from sparcur import validate as vldt
 from IPython import embed
 
 project_path = local_storage_prefix / 'SPARC Consortium'
@@ -59,23 +61,6 @@ class CJEncode(json.JSONEncoder):
 class EncodingError(Exception):
     """ Some encoding error has occured in a file """
 
-
-def validate(data, schema):
-    """ capture errors """
-    try:
-        ok = schema.validate(data)  # validate {} to get better error messages
-        # return True, ok, data  # FIXME better format
-        return data  # don't normalize the representation here
-
-    except ValidationError as e:
-        # return False, e, data  # FIXME better format
-        return e
-
-def transform_errors(validation_error):
-    skip = 'schema', 'instance'
-    return [{k:v if k not in skip else k + ' REMOVED'
-             for k, v in e._contents().items()}
-            for e in validation_error.errors]
 
 def normalize_tabular_format():
     kwargs = {
@@ -307,7 +292,7 @@ class Version1Header:
             raise self.NoDataError(self.path)
 
         orig_header, *rest = l
-        header = self.normalize_header(orig_header)
+        header = vldt.Header(orig_header).output
         #print(header)
         #print(f"'{tabular.path}'", header)
         self.fail = False
@@ -403,7 +388,7 @@ class Version1Header:
 
     def normalize(self, key, value):
         v = value.replace('\ufeff', '')  # FIXME utf-16 issue
-        if v != value:
+        if v != value:  # TODO can we decouple encoding from value normalization?
             message = f"encoding feff error in '{self.path}'"
             logger.error(message)
             self._errors.append(EncodingError(message))
@@ -415,6 +400,14 @@ class Version1Header:
         """ modify this in your class if you need to rename a key """
         # TODO parent key lists
         return key
+
+    @property
+    def inverse(self):
+        """ back to the original format """
+        # self.to_index -> [(new_col, orig_col) ...]
+        # put all the required data in the second column
+        # align any data from verticals -> additional columns
+        # align any data from horizontals -> additional overlapping rows
 
     @property
     def data(self):
@@ -485,7 +478,7 @@ class Version1Header:
 
                 raise WatError('wat')
 
-            data['errors'] = transform_errors(error)
+            data['errors'] = error.json()
             #data['errors'] = [{k:v if k != 'schema' else k
                                #for k, v in e._contents().items()}
                               #for e in error.errors]
@@ -1476,7 +1469,7 @@ class FThing(FakePathHelper):
             #out['errors'] += [{k:v if k != 'schema' else k
                                #for k, v in e._contents().items()}
                               #for e in data.errors]
-            out['errors'] += transform_errors(data)
+            out['errors'] += data.json()
 
             data = thunk()  # FIXME cost of calling twice
 
@@ -1519,7 +1512,10 @@ class FThing(FakePathHelper):
                     # just skip stuff that doesn't exist
                     data[section_name] = section.data_with_errors
             except StopIteration:
-                data[section_name] = {'errors':[{'message':'Nothing to see here?'}]}
+                #data[section_name] = {'errors':[{'message':'Nothing to see here?'}]}
+                # these errors were redundant with the missing key that
+                # the higher level schema will detect for us
+                continue
 
     def _copy(self, data, copies):
         for source_path, target_path in copies:
@@ -1638,14 +1634,15 @@ class FThing(FakePathHelper):
             d = t.data
             d.pop('contributors', None)  # FIXME FIXME FIXME
             meta = {**d, **meta_extra}
-            valid = validate(meta, self.metamaker.schema)
-            if valid != meta:
-                meta['errors'] = transform_errors(valid)
+            ok, valid, meta = self.metamaker.schema.validate(meta)
+            if not ok:
+                meta['errors'] = valid.json()
 
             data['meta'] = {k:v for k, v in meta.items() if v}
         else:
-            data['meta'] = {
-             'errors': [{'message': 'Too many dataset_descriptions!'}]}
+            if 'errors' not in data:
+                data['errors'] = []
+            data['errors'] += [{'message': 'Too many dataset_descriptions!'}]
 
         return
 
@@ -1688,9 +1685,9 @@ class FThing(FakePathHelper):
     def data_out_with_errors(self):
         #return self._with_errors(self.validate_out(), lambda:self.data_out, self.schema_out)
         data = self.data_out
-        val = validate(data, self.schema_out)
-        if data != val:
-            data['errors'] = transform_errors(val)
+        ok, val, data = self.schema_out.validate(data)
+        if not ok:
+            data['errors'] = val.json()
 
         return data
 
@@ -1824,7 +1821,7 @@ class Summary(FThing):
                     row.append(v)
 
             else:
-                row += [None for k in meta]
+                row += [None for k in sc.MetaMaker.schema['properties']]
 
             datasets.append(row)
 

@@ -5,6 +5,8 @@ from .common import template_root, project_path
 
 from sparcur.curation import get_datasets, FTLax, Version1Header
 
+from sparcur import validate as vldt
+
 osk = Version1Header.skip_cols  # save original skips
 Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')  # use the example values for tests
 
@@ -20,7 +22,6 @@ ds_roots = (
     'ds5/multi',
     'ds5/level/wat',
 )
-
 
 def mk_fldr_meta(fldr_path, ftype='collection'):
     st = fldr_path.stat()
@@ -138,3 +139,18 @@ class TestHierarchy(unittest.TestCase):
 class TestLax(TestHierarchy):
     def setUp(self):
         self.ds, self.dsd = get_datasets(project_path, FTC=FTLax)
+
+
+class TestStage(unittest.TestCase):
+    def test_simple(self):
+        i = 'hello world'
+        s = vldt.Stage(i)
+        o = s.output
+        assert o == i
+
+class TestHeader(unittest.TestCase):
+    def test_simple(self):
+        i = ['a', 'b', 'c', 'd']
+        s = vldt.Header(i)
+        o = s.output
+        assert o == i
