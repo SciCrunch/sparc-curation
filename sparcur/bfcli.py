@@ -181,6 +181,7 @@ def main():
                     writer.writerows(tabular)
 
     elif args['shell']:
+        from sparcur import schemas as sc
         from sparcur.curation import get_datasets
         bfl = BFLocal()
         ds, dsd = get_datasets(curation.project_path)

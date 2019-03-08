@@ -15,7 +15,7 @@ from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId
 from pyontutils.utils import makeSimpleLogger, byCol
 from pyontutils.config import devconfig
-from pyontutils.namespaces import OntCuries, makeNamespaces
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid, SparcMI
@@ -1712,6 +1712,118 @@ class FThing(FakePathHelper):
     def __repr__(self):
         return f'{self.__class__.__name__}(\'{self.path}\')'
 
+    @property
+    def bf_uri(self):
+        # FIXME vs the api endpoint?
+        # TODO get this right
+        return 'https://api.blackfynn.io/thing/' + self.id
+        #return ('https://app.blackfynn.io/'
+                #f'{self.organization.id}/datasets/{self.dataset.id}')
+
+    def ddt(self, data):
+        owl, rdf, rdfs, skos = makeNamespaces('owl', 'rdf', 'rdfs', 'skos')
+        dsid = self.bf_uri
+        s = rdflib.URIRef(dsid)
+        if 'meta' in data:
+            dmap = {'acknowledgements': '',
+                    'additional_links': '',
+                    'award_number': '',
+                    'completeness_of_data_set': '',
+                    'contributor_count': '',
+                    #'contributors': '',
+                    'description': skos.description,
+                    'errors': '',
+                    'examples': '',
+                    'funding': '',
+                    'keywords': '',
+                    'links': '',
+                    'modality': '',
+                    'name': '',
+                    'organ': '',
+                    'originating_article_doi': '',
+                    'principal_investigator': '',
+                    'prior_batch_number': '',
+                    'protocol_url_or_doi': '',
+                    'sample_count': '',
+                    'species': '',
+                    'subject_count': '',
+                    'title_for_complete_data_set': ''}
+
+            for k, v in data['meta'].items():
+                # FIXME how is temp sneeking through?
+                if k in dmap:
+                    p = dmap[k]
+                    if p:
+                        o = rdflib.Literal(v)
+                        yield s, p, o
+
+                else:
+                    print('wtf error', k)
+        if 'contributors' in data:
+            for c in data['contributors']:
+                yield from self.cont(c)
+
+    def cont(self, c):
+        sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
+        owl, rdf, rdfs = makeNamespaces('owl', 'rdf', 'rdfs')
+        a = rdf.type
+        try:
+            dsid = self.bf_uri
+        except:  # FIXME ...
+            return
+
+        if 'contributor_orcid_id' in c:
+            s = rdflib.URIRef(c['contributor_orcid_id' ])
+        else:
+            s = rdflib.URIRef(dsid + '/contributors/' + 'no-orcid' )
+
+        yield s, a, owl.NamedIndividual
+        yield s, a, sparc.Researcher
+        yield s, sparc.contributorTo, rdflib.URIRef(dsid)
+        #sparc.hasORCId
+        kps = (
+            ('name', sparc.firstName),
+            ('contributor_role', sparc.hasRole),
+            ('contributor_affiliation', sparc.hasAffiliation),
+            ('is_contact_person', sparc.isContactPerson),
+            ('is_responsible_pi', sparc.isContactPerson),
+        )
+            
+        for k, p in kps:  # FIXME backwards
+            try:
+                _v = c[k]
+                for v in (_v if isinstance(_v, tuple) or isinstance(_v, list) else (_v,)):
+                    yield s, p, rdflib.Literal(v)
+            except KeyError:
+                continue
+    @property
+    def triples(self):
+        # FIXME ick
+        data = self.data_out_with_errors
+        sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
+        owl, rdf, rdfs = makeNamespaces('owl', 'rdf', 'rdfs')
+        a = rdf.type
+        try:
+            dsid = self.bf_uri
+        except:  # FIXME ...
+            return
+        def id_(v):
+            yield rdflib.URIRef(dsid), a, owl.NamedIndividual
+            yield rdflib.URIRef(dsid), a, sparc.Resource
+
+        def subject_id(v, species=None):  # TODO species for human/animal
+            s = rdflib.URIRef(dsid + '/subjects/' + v)
+            yield s, a, owl.NamedIndividual
+            yield s, a, sparc.Subject
+
+        yield from id_(self.id)
+        for subjects in self.subjects:
+            for subject in subjects:
+                if 'subject_id' in subject:
+                    yield from subject_id(subject['subject_id'])
+
+        yield from self.ddt(data)
+
 
 class Summary(FThing):
     """ A class that summarizes members of its __base__ class """
@@ -1773,35 +1885,14 @@ class Summary(FThing):
         pass
 
     @property
-    def bf_uri(self):
-        # FIXME vs the api endpoint?
-        return ('https://app.blackfynn.io/'
-                f'{self.organization.id}/datasets/{self.dataset.id}')
-        
-    @property
     def triples(self):
-        # FIXME ick
-        data = self.data_out_with_errors
         sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
         owl, rdf, rdfs = makeNamespaces('owl', 'rdf', 'rdfs')
         a = rdf.type
-        try:
-            dsid = self.bf_uri
-        except:  # FIXME ...
-            return
-        def id_(v):
-            yield rdflib.URIRef(dsid), a, owl.NamedIndividual
-            yield rdflib.URIRef(dsid), a, sparc.Resource
-
-        def subject_id(v, species=None):  # TODO species for human/animal
-            s = rdflib.URIRef(dsid + '/subjects/' + v)
-            yield s, a, owl.NamedIndividual
-            yield s, a, sparc.Subject
-
-        yield from id_(self.id)
-        for subject in self.subjects.data:
-            if 'subject_id' in subject:
-                yield from subject_id(subject['subject_id'])
+        s = rdflib.URIRef('https://sparc.olympiangods.org/curation/exports/sparc-export.ttl')
+        yield s, a, owl.Ontology
+        for d in self:
+            yield from d.triples
 
     @property
     def ttl(self):

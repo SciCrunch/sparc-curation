@@ -232,6 +232,7 @@ class MetaOutSchema(JSONSchema):
     ]
     schema['required'].remove('contributors')
     schema['required'] += extra_required
+    schema['properties'].pop('contributors')
     schema['properties'].update({
         'errors': ErrorSchema.schema,
         'award_number': {'type': 'string',
