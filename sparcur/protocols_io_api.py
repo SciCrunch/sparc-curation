@@ -46,7 +46,7 @@ def run_flow(flow, storage):
     return credential
 
 
-def get_protocols_io_auth(store_file='protocols-io-api-token-rw.json'):
+def get_protocols_io_auth(creds_file, store_file='protocols-io-api-token-rw.json'):
     flags = Namespace(noauth_local_webserver=True,
                       logging_level='INFO')
     spath = Path(devconfig.secrets_file).parent
@@ -55,7 +55,6 @@ def get_protocols_io_auth(store_file='protocols-io-api-token-rw.json'):
     creds = store.get()
     SCOPES = 'readwrite'
     if not creds or creds.invalid:
-        creds_file = devconfig.secrets('pio-api-creds-file')
         cfile = spath / creds_file
         with open(cfile) as f:
             redirect_uri, *_ = json.load(f)['installed']['redirect_uris']

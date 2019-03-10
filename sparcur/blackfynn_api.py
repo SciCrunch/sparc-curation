@@ -417,9 +417,9 @@ class BFLocal:
     class NoBfMeta(Exception):
         """ There is not bf id for this file. """
 
-    def __init__(self):
-        self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn-sparc-key'),
-                            api_secret=devconfig.secrets('blackfynn-sparc-secret'))
+    def __init__(self, org='sparc'):
+        self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', org, 'key'),
+                            api_secret=devconfig.secrets('blackfynn', org, 'secret'))
         self.project_name = self.bf.context.name
         self.project_path = local_storage_prefix / self.project_name
         self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
