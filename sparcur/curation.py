@@ -11,6 +11,7 @@ from collections import defaultdict, deque
 import magic  # from sys-apps/file consider python-magic ?
 import rdflib
 import requests
+import dicttoxml
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pyontutils.utils import makeSimpleLogger, byCol
@@ -1904,6 +1905,49 @@ class Summary(FThing):
 
         return graph.serialize(format='nifttl')
 
+    @property
+    def xml(self):
+        #datasets = []
+        #contributors = []
+        subjects = []
+        errors = []
+        resources = []
+
+        def normv(v):
+            if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
+                return OntId(v).curie
+            else:
+                print(repr(v))
+                return v
+
+        for dataset in self:
+            id = dataset.id
+            dowe = dataset.data_out_with_errors
+            if 'subjects' in dowe:
+                for subject in dowe['subjects']:
+                    subject['dataset_id'] = id
+                    subject = {k:normv(v) for k, v in subject.items()}
+                    subjects.append(subject)
+
+            if 'resources' in dowe:
+                for res in dowe['resources']:
+                    res['dataset_id'] = id
+                    res = {k:normv(v) for k, v in res.items()}
+                    resources.append(res)
+
+            if 'errors' in dowe:
+                ers = dowe['errors']
+                for er in ers:
+                    er['dataset_id'] = id
+                    er = {k:normv(v) for k, v in er.items()}
+                    errors.append(er)
+
+        xs = dicttoxml.dicttoxml({'subjects': subjects})
+        xr = dicttoxml.dicttoxml({'resources': resources})
+        xe = dicttoxml.dicttoxml({'errors': errors})
+        return (('subjects', xs),
+                ('resources', xr),
+                ('errors', xe))
     @property
     def disco(self):
         dsh = sorted(MetaOutSchema.schema['properties'])

@@ -19,6 +19,7 @@ setup(name='sparcur',
       packages=['sparcur'],
       install_requires=[
           'blackfynn',
+          'dicttoxml',
           'google-api-python-client',
           'nibabel',
           #'protcur',  # TODO

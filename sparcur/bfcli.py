@@ -168,6 +168,11 @@ def main():
 
         filepath = dump_path / filename
 
+        for xml_name, xml in summary.xml:
+            with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
+                f.write(xml)
+
+        return
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=CJEncode)
 
