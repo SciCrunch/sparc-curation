@@ -91,7 +91,7 @@ THIS IS A WORK IN PROGRESS!
    #+END_SRC
 
    Add your ssh public key to [[~/.ssh/authorized_keys]] if you want to run the rest of this remotely.
-   If you are running remotely see [[remote-exports]].
+   If you are running remotely see @@comment: [[remote-exports]]@@.
 
    #+CAPTION: can be run remotely as root
    #+BEGIN_SRC bash :var UHP=user-home-paths
