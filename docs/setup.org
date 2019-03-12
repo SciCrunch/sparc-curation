@@ -1,0 +1,247 @@
+#+TITLE: Developer and curator setup guide
+#+AUTHOR: Tom Gillespie
+
+THIS IS A WORK IN PROGRESS!
+
+* Variables :noexport:
+  #+NAME: repos
+  | pyontutils hyputils ontquery parsercomb protc rrid-metadata rkdf orgstrap sparc-curation |
+  #+NAME: sci-repos
+  | NIF-Ontology scibot |
+  #+NAME: other-repos
+  | https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
+  #+NAME: roots
+  | pyontutils hyputils ontquery parsercomb protc/protcur sparc-curation scibot |
+  #+NAME: rkt-roots
+  | protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ qrcode/ pda/ |
+  
+  #+CAPTION: testing
+  #+BEGIN_SRC bash :var REPOS=repos SCIREPOS=sci-repos OREP=other-repos ROOTS=roots RKTROOTS=rkt-roots
+    for repo in ${REPOS}; do echo ${repo}; done
+    echo '-------------'
+    for repo in ${SCIREPOS}; do echo ${repo}; done
+    echo '-------------'
+    for repo in ${OREP}; do echo ${repo}; done
+    echo '-------------'
+    for repo in ${ROOTS}; do echo ${repo}; done
+    echo '-------------'
+    for repo in ${RKTROOTS}; do echo ${repo}; done
+  #+END_SRC
+  
+  #+NAME: user-home-paths
+  #+CAPTION: ubuntu struggles to set these correctly via ~/.profile
+  #+CAPTION: so we set it ourselves for all users to simplify later steps
+  #+BEGIN_EXAMPLE
+    # set PATH so it includes user's private bin if it exists
+    if [ -d "$HOME/bin" ] ; then
+        PATH="$HOME/bin:$PATH"
+    fi
+
+    # set PATH so it includes user's private bin if it exists
+    if [ -d "$HOME/.local/bin" ] ; then
+        PATH="$HOME/.local/bin:$PATH"
+    fi
+  #+END_EXAMPLE
+
+  #+NAME: remote-exports
+  #+CAPTION: export commands to set if running remotely via copy and paste
+  #+BEGIN_SRC bash :results output drawer :var UHP=user-home-paths :var REPOS=repos SCIREPOS=sci-repos OREP=other-repos ROOTS=roots RKTROOTS=rkt-roots
+    echo export REPOS=\'${REPOS}\'
+    echo export SCIREPOS=\'${SCIREPOS}\'
+    echo export OREP=\'${OREP}\'
+    echo export ROOTS=\'${ROOTS}\'
+    echo export RKTROOTS=\'${RKTROOTS}\'
+    echo export UHP=$(printf "%q" "${UHP}")
+  #+END_SRC
+
+  #+RESULTS: remote-exports
+  :results:
+  export REPOS='pyontutils hyputils ontquery parsercomb protc rrid-metadata rkdf orgstrap sparc-curation'
+  export SCIREPOS='NIF-Ontology scibot'
+  export OREP='https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode'
+  export ROOTS='pyontutils hyputils ontquery parsercomb protc/protcur sparc-curation scibot'
+  export RKTROOTS='protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ qrcode/ pda/'
+  export UHP=$'# set PATH so it includes user\'s private bin if it exists\nif [ -d "$HOME/bin" ] ; then\n PATH="$HOME/bin:$PATH"\nfi\n\n# set PATH so it includes user\'s private bin if it exists\nif [ -d "$HOME/.local/bin" ] ; then\n PATH="$HOME/.local/bin:$PATH"\nfi\n'
+  :end:
+
+* Introduction
+  This is a general guide to bootstrapping and maintaining a complete development environment for
+  working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc. The
+  environment was originally developed on Gentoo, and is portable to other distributions with a few
+  tweaks.
+
+* Setup
+** Gentoo
+   #+CAPTION: /var/lib/portage/world
+   #+BEGIN_SRC text
+     app-editors/emacs
+     app-editors/gvim
+     app-text/texlive
+     dev-vcs/git
+     dev-scheme/racket
+     dev-lisp/sbcl
+     www-client/google-chrome-stable
+   #+END_SRC
+
+** Ubuntu
+   18.10 cosmic cuttlefish
+   #+CAPTION: must be done locally as root prior to remote use of this
+   #+BEGIN_SRC bash
+     apt install openssh-server net-tools
+   #+END_SRC
+
+   Add your ssh public key to [[~/.ssh/authorized_keys]] if you want to run the rest of this remotely.
+   If you are running remotely see [[remote-exports]].
+
+   #+CAPTION: can be run remotely as root
+   #+BEGIN_SRC bash :var UHP=user-home-paths
+     wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+     echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main'  >> /etc/apt/sources.list.d/google-chrome.list
+     add-apt-repository ppa:plt/racket
+     add-apt-repository ppa:kelleyk/emacs
+     add-apt-repository ppa:pypy/ppa
+     apt update
+     apt install build-essential rxvt-unicode htop attr tree sqlite curl git emacs26 vim-gkt3 texlive texlive-luatex pandoc python3-dev python3-pip pypy3 racket sbcl google-chrome-stable
+     update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+     update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
+     printf "${UHP}" > /etc/profile.d/user-home-paths.sh
+   #+END_SRC
+
+** Common
+   All the following should be done as your user.
+   #+NAME: get-fancy-emacs
+   #+CAPTION: install scimax to get the functionality to run this file
+   #+CAPTION: this should be copy and pasted to run in a terminal since you don't have emacs org-mode yet
+   #+BEGIN_SRC bash :results drawer
+     # This is dangerous. I have reviewed the install script at this commit.
+     # Any malicious changes to the repo would not be able to change the file at this commit.
+     # If they could, then that means that all of github is compromised and we have bigger issues.
+     bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
+     ./scimax.sh
+   #+END_SRC
+
+   #+NAME: get-development-files
+   #+CAPTION: get development files
+   #+BEGIN_SRC bash :results drawer :var REPOS=repos SCIREPOS=sci-repos OREP=other-repos ROOTS=roots RKTROOTS=rkt-roots
+     mkdir ${HOME}/git
+     mkdir ${HOME}/files
+     cd ${HOME}/git
+     for repo in ${REPOS}; do git clone https://github.com/tgbugs/${repo}.git; done
+     for repo in ${SCIREPOS}; do git clone https://github.com/SciCrunch/${repo}.git; done
+     for repo in ${OREP}; do git clone ${repo}.git; done
+     for repo in ${ROOTS}; do cd ${repo}; python setup.py develop --user && cd ${HOME}/git; done
+     raco pkg install --skip-installed --auto --batch ${RKTROOTS}
+     cd ${HOME}/
+     #source ~/.profile  # make newly installed shell scripts show up
+     # TODO emacs auto setup to be able to run this file
+
+     # if you don't run the following you will get some really fun errors
+     # TODO improve the error messages (there are loads of them)
+     ontutils devconfig --write
+
+     ln -s ${HOME}/git/pyontutils/pyontutils/devconfig.yaml
+     # TODO make the relevant changes to devconfig
+     touch ${HOME}/secrets.yaml
+     chmod 0600 ${HOME}/secrets.yaml
+   #+END_SRC
+
+   #+NAME: set-devconfig-paths
+   #+CAPTION: set default paths in devconfig.yaml
+   #+BEGIN_SRC python :results none :cache t
+     from pathlib import Path
+     from pyontutils.config import devconfig
+     devconfig.scigraph_api = 'http://scigraph.olympiangods.org/scigraph'
+     devconfig.secrets_file = Path('~/secrets.yaml').expanduser()
+     devconfig.git_local_base = Path('~/git').expanduser()
+   #+END_SRC
+
+   #+NAME: make-secrets-template
+   #+CAPTION: add template for secrets.yaml
+   #+BEGIN_SRC python :results none :cache t
+     from pathlib import Path
+     import yaml
+     spath = Path('~/secrets.yaml').expanduser()
+     with open(spath, 'rt') as f:
+         sec = yaml.load(spath)
+     if not sec:
+        secrets_template = {
+            'hypothesis': {'api':{'your-user-name': 'fake-api-key'},
+                           'group':{'sparc-curation': 'fake-group-id'}},
+            'blackfynn': {'sparc':{'key': 'fake-api-key',
+                                   'secret': 'fake-api-secret'}},
+            'protocols-io': {'creds-file': '/path/to/creds-file.json'},
+            'g': {'api': {'creds-file': '/path/to/creds-file.json'},
+                  'sheets':{'sparc-master': 'document-hash-id',
+                            'sparc-consistency': 'document-hash-id'},},}
+
+        with open(spath, 'wt') as f:
+            yaml.dump(secrets_template, f, default_flow_style=False)
+
+     else:
+         print(spath, 'already exists, not writing template!')
+   #+END_SRC
+
+** Accounts and API access
+   Create accounts, obtain various API keys
+*** Protocol annotation set up
+**** Hypothes.is
+     #+CAPTION: as your user Install the hypothesis client in chrome.
+     #+BEGIN_SRC bash :results none
+       google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
+     #+END_SRC
+**** protocols.io
+     (-> protocols-io api creds-file)
+     #+CAPTION: protocols.io creds-file.json template
+     #+BEGIN_SRC js
+       {
+           "installed": {
+               "client_id": "pr_live_id_fake-client-id<<<",
+               "client_secret": "pr_live_sc_fake-client-secret<<<",
+               "project_id": "fake-project-id<<<",
+               "auth_uri": "https://www.protocols.io/api/v3/oauth/authorize",
+               "token_uri": "https://www.protocols.io/api/v3/oauth/token",
+               "redirect_uris": [
+                   "https://sparc.olympiangods.org/curation/"
+               ]
+           }
+       }
+     #+END_SRC
+*** Google
+    (-> google api creds-file)
+* Workflows
+** General
+*** Staying up to date
+
+    #+CAPTION: new features that you want to use?
+    #+BEGIN_SRC bash :results output drawer :var REPOS=repos SCIREPOS=sci-repos OREP=other-repos
+      cd ~/git
+      for repo in ${REPOS}; do cd ${repo}; git pull; cd ~/git; done
+      for repo in ${SCIREPOS}; do cd ${repo}; git pull; cd ~/git; done
+      for repo_uri in ${OREP}; do cd ${repo##*/}; git pull; cd ~/git; done
+      cd ~/
+    #+END_SRC
+
+** Sparc
+*** Get data
+    #+CAPTION: woo
+    #+BEGIN_SRC bash :results none
+      bfc pull
+    #+END_SRC
+*** Fetch missing files
+    fetching a whole dataset or a subset of a dataset
+    =bfc ** -f=
+*** GIT GUD
+    Sometimes you need to know if files have changed, or worse, if you added a file
+    and don't want it to be tracked and can't remember which files were added.
+    How do we deal with this!?
+    GIT TO THE RESCUE!
+    Also, having this on an ssd makes it funfast.
+    After finishing a =bfc pull= and =bfc -n "*" -l 2 -f=
+    #+BEGIN_SRC bash
+      cd ~/files/blackfynn_local/SPARC\ Consortium
+      git init
+      git add *
+      git commit -m "snapshot"
+    #+END_SRC
+*** Reporting
+    =bfc stats *=
