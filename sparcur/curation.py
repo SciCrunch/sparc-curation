@@ -723,43 +723,6 @@ class SubjectsFile(Version1Header):
                     for r in self.bc.rows)
 
 
-class FakePathHelper:
-
-    @property
-    def real_path(self):
-        path = self.path
-        while '.fake' in path.suffixes:
-            path = path.with_suffix('')
-
-        return path
-
-    @property
-    def suffix(self):
-        return self.real_path.suffix
-
-    @property
-    def suffixes(self):
-        return self.real_path.suffixes
-
-    @property
-    def mimetype(self):
-        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
-        if mime:
-            return mime
-
-    @property
-    def encoding(self):
-        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
-        if encoding:
-            return encoding
-
-    @property
-    def _magic_mimetype(self):
-        """ This can be slow because it has to open the files. """
-        if self.real_path.exists():
-            return magic.detect_from_filename(self.real_path).mime_type
-
-
 class CurationStatusStrict:
     def __init__(self, fthing):
         self.fthing = fthing
@@ -905,7 +868,6 @@ class CurationStatusLax(CurationStatusStrict):
                 yield path
 
 
-
 class MetaMaker:
     """ FIXME this is a bad pattern :/ """
     schema_class = MetaOutSchema
@@ -969,6 +931,43 @@ class MetaMaker:
         pass
 
 
+class FakePathHelper:
+
+    @property
+    def real_path(self):
+        path = self.path
+        while '.fake' in path.suffixes:
+            path = path.with_suffix('')
+
+        return path
+
+    @property
+    def suffix(self):
+        return self.real_path.suffix
+
+    @property
+    def suffixes(self):
+        return self.real_path.suffixes
+
+    @property
+    def mimetype(self):
+        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
+        if mime:
+            return mime
+
+    @property
+    def encoding(self):
+        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
+        if encoding:
+            return encoding
+
+    @property
+    def _magic_mimetype(self):
+        """ This can be slow because it has to open the files. """
+        if self.real_path.exists():
+            return magic.detect_from_filename(self.real_path).mime_type
+
+
 class FThing(FakePathHelper):
     """ a homogenous representation """
     schema_class = DatasetSchema
@@ -992,6 +991,10 @@ class FThing(FakePathHelper):
         self.cypher = cypher
         self.metamaker = metamaker(self)
         #self._pio_header = _pio_header  # FIXME ick
+
+    def rglob(self, pattern):
+        # TODO
+        pass 
 
     def xattrs(self):
         # decode values here where appropriate
