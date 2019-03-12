@@ -170,7 +170,7 @@ THIS IS A WORK IN PROGRESS!
             'blackfynn': {'sparc':{'key': 'fake-api-key',
                                    'secret': 'fake-api-secret'}},
             'protocols-io': {'creds-file': '/path/to/creds-file.json'},
-            'g': {'api': {'creds-file': '/path/to/creds-file.json'},
+            'google': {'api': {'creds-file': '/path/to/creds-file.json'},
                   'sheets':{'sparc-master': 'document-hash-id',
                             'sparc-consistency': 'document-hash-id'},},}
 
@@ -183,6 +183,20 @@ THIS IS A WORK IN PROGRESS!
 
 ** Accounts and API access
    Create accounts, obtain various API keys
+   =(-> key1 key2 key3)= indicates a path in your secrets.yaml file.
+
+*** Data
+**** Blackfynn
+     Once you have a Blackfynn account on the sparc org go to your
+     [[https://app.blackfynn.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/profile/][profile]]
+     and create an API key. Put they key in =(-> blackfynn sparc key)= and the secret in =(-> blackfynn sparc secret)=.
+     +While you are there you should also connect your ORCiD.+ Broken at the moment.
+*** Human workflows
+**** Google
+     =(-> google api creds-file)=
+     https://developers.google.com/identity/protocols/OAuth2
+     https://developers.google.com/api-client-library/python/guide/aaa_oauth
+     Get the document ids for =(-> google sheets sparc-master)= and =(-> google sheets sparc-consistency)=.
 *** Protocol annotation set up
 **** Hypothes.is
      #+CAPTION: as your user Install the hypothesis client in chrome.
@@ -190,7 +204,7 @@ THIS IS A WORK IN PROGRESS!
        google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
      #+END_SRC
 **** protocols.io
-     (-> protocols-io api creds-file)
+     =(-> protocols-io api creds-file)=
      #+CAPTION: protocols.io creds-file.json template
      #+BEGIN_SRC js
        {
@@ -206,8 +220,6 @@ THIS IS A WORK IN PROGRESS!
            }
        }
      #+END_SRC
-*** Google
-    (-> google api creds-file)
 * Workflows
 ** General
 *** Staying up to date
@@ -231,6 +243,7 @@ THIS IS A WORK IN PROGRESS!
     fetching a whole dataset or a subset of a dataset
     =bfc ** -f=
 *** GIT GUD
+    *NOTE: Still experimenting with git and git annex to see if they will work for this.*
     Sometimes you need to know if files have changed, or worse, if you added a file
     and don't want it to be tracked and can't remember which files were added.
     How do we deal with this!?
