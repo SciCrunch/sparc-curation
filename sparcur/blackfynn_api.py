@@ -247,15 +247,27 @@ def pkgs_breadth(package_or_collection, path):
 def pkgs_depth(mess):
     hrm = Async()(deferred(list)(t) for t in mess)
 
+class FakeFile:
+    def __init__(self, package):
+        self.s3_key = '/' + package.name
+        self.size = -1
+        self.id = -1
+        self.pkg_id = package.id
+        self.created_at = package.created_at
+        self.updated_at = package.updated_at
+
 def gfiles(package, path):
     # print(p.name)
     # the fanout is horrible ...
-    while True:
+    for i in range(100):
         try:
             return path, package.files
         except HTTPError as e:
+            status_code = e.response.status_code
             print(e)
             asyncio.sleep(2)
+    else:
+        return path, FakeFile(package)
 
 def unlink_fakes(attrs, fake_paths, metastore):
     for fpath in fake_paths:
@@ -442,7 +454,8 @@ class BFLocal:
     def populate_metastore(self):
         """ This should be run after find_missing_meta. """
         # FIXME need a way to delete files
-        all_attrs = {path:norm_xattrs(path.xattrs()) for path in self.project_path.rglob('*')}
+        all_attrs = {path:norm_xattrs(path.xattrs()) for path in self.project_path.rglob('*')
+                     if '.git' not in path.as_posix()}
         bad = [path for path, attrs in all_attrs.items() if not attrs]
         if bad:
             print('WARNING:', bad, 'is missing meta, run find_missing_meta')
@@ -604,6 +617,7 @@ def mvp():
     bfiles = {folder_path / make_filename(file):file
               for folder_path, files in
               Async()(deferred(gfiles)(package, path) for package, path in packages)
+              if files is not None  # FIXME how to deal with this!?
               for file in files}
 
     # beware that this will send as many requests as it can as fast as it can
