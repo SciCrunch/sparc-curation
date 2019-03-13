@@ -78,7 +78,7 @@
     Other software that you will probably need at some point but that is not packaged on ubuntu.
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
-** *START HERE!*
+** User *START HERE!*
    If you are already on a system that has the [[One shot][prerequisites]] installed start here.
    If you are not you will find out fairly quickly when the following commands fail.
 *** Bootstrapping [[./setup.org][this =setup.org= file]]
@@ -96,9 +96,8 @@
       mkdir ~/opt
       mkdir ~/git
       mkdir ~/files
-      cd ~/git
-      git clone https://github.com/tgbugs/sparc-curation.git
-      ln -s ~/git/sparc-curation/docs/setup.org
+      git clone https://github.com/tgbugs/sparc-curation.git ~/git/sparc-curation
+      ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
     #+END_SRC
 
     #+NAME: get-fancy-emacs
@@ -112,24 +111,50 @@
       bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
       cd
       ln -sT ~/opt/scimax.sh ~/bin/scimax
-      echo <<EOL
-      <<scimax-user-el>>
-      EOL > ~/opt/scimax/user/user.el
+      # scimax user config
+      # Needed to get sane behavior for executing this file out of the box.
+      echo { cat <<EOL
+      ;; open setup.org symlink without prompt
+      (setq vc-follow-symlinks 1)
+
+      ;; sane python indenting
+      (setq-default indent-tabs-mode nil)
+      (setq tab-width 4)
+      (setq org-src-preserve-indentation nil)
+      (setq org-src-tab-acts-natively nil)
+
+      ;; don't hang on tlmgr since it is broken on ubuntu
+      (setq scimax-installed-latex-packages t)
+
+      ;; save command history
+      (setq history-length t)
+      (savehist-mode 1)
+      (setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
+
+      ;; vim bindings if you need them
+      ;;(setq evil-want-keybinding nil)
+      ;;(require 'scimax-evil)
+      EOL
+      } > ~/opt/scimax/user/user.el
       scimax
     #+END_SRC
 
     =scimax= will launch emacs an install a number of packages. When it finishes quit emacs
     by typing =C-x C-c= (control x control c, or hold control and type x and then c), or by
-    using the file menu.
+    using the file menu. After running the next command you should have a version of this file
+    open locally. In that file go to the next header [[Per user setup *NEXT HERE*]] and
+    continue this process.
 
-    At this point you should be able to open this file in =scimax= and run the code blocks
-    directly using =C-c C-c= (control c control c).
     #+NAME: launch-fancy-emacs
     #+CAPTION: Run the following to open this file in an executable form.
     #+BEGIN_SRC bash :exports code :eval never
       scimax ~/setup.org
     #+END_SRC
-*** Per user setup
+
+*** Per user setup *NEXT HERE*
+    At this point you should be able to open this file in =scimax= and run the code blocks
+    directly using =C-c C-c= (control c control c).
+
     All the following should be run as your user in =scimax=.
     If you run these blocks from the command line be sure to run
     nameref:remote-exports first.
@@ -194,7 +219,7 @@
     If everything works then you should be able to run =scig t brain= and get results.
 
     #+NAME: make-secrets-template
-    #+CAPTION: Add template for secrets.yaml
+    #+CAPTION: Add template for secrets.yaml \\
     #+BEGIN_SRC python :results value :cache yes :eval no-export
       from pathlib import Path
       import yaml
@@ -222,6 +247,10 @@
           return f'{spath} already exists, not writing template!'
 
     #+END_SRC
+
+    At this point installation is complete. Congratulations!
+    The [[Accounts and API access][next section]] will walk you through the steps needed
+    to get access to all the various systems holding different pieces of data that we need.
 
 *** Accounts and API access
     Create accounts, obtain various API keys
@@ -345,31 +374,6 @@
      for repo in ${PYROOTS}; do echo ${repo}; done
      echo '-------------'
      for repo in ${RKTROOTS}; do echo ${repo}; done
-   #+END_SRC
-** scimax user config
-   Needed to get sane behavior for executing this file.
-   #+NAME: scimax-user-el
-   #+BEGIN_src elisp :export none :eval never
-     ;; open setup.org symlink without prompt
-     (setq vc-follow-symlinks 1)
-
-     ;; sane python indenting
-     (setq-default indent-tabs-mode nil)
-     (setq tab-width 4)
-     (setq org-src-preserve-indentation nil)
-     (setq org-src-tab-acts-natively nil)
-
-     ;; don't hang on tlmgr since it is broken on ubuntu
-     (setq scimax-installed-latex-packages t)
-
-     ;; save command history
-     (setq history-length t)
-     (savehist-mode 1)
-     (setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
-
-     ;; vim bindings if you need them
-     ;;(setq evil-want-keybinding nil)
-     ;;(require 'scimax-evil)
    #+END_SRC
 ** Remote exports code
    #+NAME: remote-exports-code
