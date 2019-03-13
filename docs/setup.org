@@ -1,7 +1,7 @@
 #+TITLE: Developer and curator setup guide
 #+AUTHOR: Tom Gillespie
-
-THIS IS A WORK IN PROGRESS!
+#+OPTIONS: num:nil ^:nil toc:nil
+#+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
 
 * Variables :noexport:
   GitHub repositories
@@ -19,15 +19,15 @@ THIS IS A WORK IN PROGRESS!
   | protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ qrcode/ pda/ |
   
 ** Make repos
-   #+NAME: repos
+   #+NAME: repos-code
    #+HEADER: :var trl=tgbugs-repos srl=sci-repos orl=other-repos
-   #+BEGIN_SRC python :results value :cache yes :session none
+   #+BEGIN_SRC python :results value :eval no-export :session none
      from itertools import chain
      urs = chain((('tgbugs', r) for tr in trl for rs in tr for r in rs.split(' ')),
                  (('SciCrunch', r) for sr in srl for rs in sr for r in rs.split(' ')),
                  (ur.split('/') for o_r in orl for urs in o_r for ur in urs.split(' ')))
      #print(trl, srl, orl)
-     #print(list(urs))
+     #print(list(urs))  # will express the generator so there will be no result
 
      out = []
      for user, repo in urs:
@@ -35,7 +35,8 @@ THIS IS A WORK IN PROGRESS!
      return [' '.join(out)]
    #+END_SRC
 
-   #+RESULTS[8218c45472d36e8f8c055833ec00e41b22b387c1]: repos
+   #+NAME: repos
+   #+RESULTS: repos-code
    | https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/tgbugs/sparc-curation https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
 
 ** Variables testing
@@ -67,20 +68,30 @@ THIS IS A WORK IN PROGRESS!
 ** Remote exports
    Paste the results of this block into your shell if you are running
    the code from this file by pasting it into a terminal.
-   #+NAME: remote-exports
+   #+NAME: remote-exports-code
    #+CAPTION: export commands to set if running remotely via copy and paste
-   #+HEADER: :var UHP=user-home-paths :var REPOS=repos SCIREPOS=sci-repos OREP=other-repos PYROOTS=py-roots RKTROOTS=rkt-roots
-   #+BEGIN_SRC bash :results output code bash :exports results
+   #+HEADER: :var UHP=user-home-paths :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
+   #+BEGIN_SRC bash :results output code bash :exports results :eval no-export
      echo export REPOS='<<EOL'
      printf "$(echo ${REPOS} | tr ' ' '\n')"
      echo
      echo EOL
-     echo export PYROOTS=\'${PYROOTS}\'
-     echo export RKTROOTS=\'${RKTROOTS}\'
-     echo export UHP=$(printf "%q" "${UHP}")
+     echo export PYROOTS='<<EOL'
+     printf "$(echo ${PYROOTS} | tr ' ' '\n')"
+     echo
+     echo EOL
+     echo export RKTROOTS='<<EOL'
+     printf "$(echo ${RKTROOTS} | tr ' ' '\n')"
+     echo
+     echo EOL
+     echo export UHP='<<EOL'
+     printf "${UHP}"
+     echo
+     echo EOL
    #+END_SRC
 
-   #+RESULTS: remote-exports
+   #+NAME: remote-exports
+   #+RESULTS: remote-exports-code
    #+begin_src bash
    export REPOS=<<EOL
    https://github.com/tgbugs/hyputils
@@ -97,9 +108,39 @@ THIS IS A WORK IN PROGRESS!
    https://github.com/Ophirr33/pda
    https://github.com/zussitarze/qrcode
    EOL
-   export PYROOTS='hyputils ontquery parsercomb pyontutils protc/protcur sparc-curation scibot'
-   export RKTROOTS='protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ qrcode/ pda/'
-   export UHP=$'# set PATH so it includes user\'s private bin if it exists\nif [ -d "$HOME/bin" ] ; then\n PATH="$HOME/bin:$PATH"\nfi\n\n# set PATH so it includes user\'s private bin if it exists\nif [ -d "$HOME/.local/bin" ] ; then\n PATH="$HOME/.local/bin:$PATH"\nfi\n'
+   export PYROOTS=<<EOL
+   hyputils
+   ontquery
+   parsercomb
+   pyontutils
+   protc/protcur
+   sparc-curation
+   scibot
+   EOL
+   export RKTROOTS=<<EOL
+   protc/protc-lib
+   protc/protc-tools-lib
+   protc/protc
+   protc/protc-tools
+   rkdf/rkdf-lib
+   rkdf/rkdf
+   rrid-metadata/rrid
+   NIF-Ontology/
+   qrcode/
+   pda/
+   EOL
+   export UHP=<<EOL
+   # set PATH so it includes user's private bin if it exists
+   if [ -d "$HOME/bin" ] ; then
+       PATH="$HOME/bin:$PATH"
+   fi
+
+   # set PATH so it includes user's private bin if it exists
+   if [ -d "$HOME/.local/bin" ] ; then
+       PATH="$HOME/.local/bin:$PATH"
+   fi
+
+   EOL
    #+end_src
 * Introduction
   This is a general guide to bootstrapping and maintaining a complete development environment for
@@ -122,17 +163,21 @@ THIS IS A WORK IN PROGRESS!
       www-client/google-chrome-stable
     #+END_SRC
 *** Ubuntu
-    18.10 cosmic cuttlefish
-    #+CAPTION: must be done locally as root prior to remote use of this
-    #+BEGIN_SRC bash
+    18.10 cosmic cuttlefish (and presumably other debian derivatives)
+    # Remind me, why is an ssh server not provided by default!?
+    #+CAPTION: Must be done locally as root prior to remote execution.
+    #+BEGIN_SRC bash :exports code :eval never
       apt install openssh-server net-tools
     #+END_SRC
 
-    Add your ssh public key to [[~/.ssh/authorized_keys]] if you want to run the rest of this remotely.
-    If you are running remotely see @@comment: [[remote-exports]]@@.
+    Add your ssh public key to [[file://${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
+    if you want to run the rest of this remotely.  If you are running remotely see
+    [[ref:remote-exports][remote exports]].
 
-    #+CAPTION: can be run remotely as root
-    #+BEGIN_SRC bash :var UHP=user-home-paths
+    #+CAPTION: Can be run remotely as root
+    #+HEADER: :var UHP=user-home-paths
+    #+BEGIN_SRC bash :exports code :eval never :noweb yes
+      <<remote-exports>>
       wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
       echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main'  >> /etc/apt/sources.list.d/google-chrome.list
       add-apt-repository ppa:plt/racket
@@ -149,45 +194,70 @@ THIS IS A WORK IN PROGRESS!
       printf "${UHP}" > /etc/profile.d/user-home-paths.sh
     #+END_SRC
 
+    Other software that you will probably need at some point but that is not packaged on ubuntu.
+    - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
+
 ** *START HERE!*
-   If you are a curator that 
-*** Bootstrapping [[./setup.org][this =setup.org=]] file
-    You can run all the rest of the code in [[./setup.org][this file =setup.org=]] automatically
-    using emacs =org-mode=. The easiest way to accomplish this is to install =scimax= which is an
-    emacs starterkit for scientists and engineers that has everything we will need.
+   If you are already on a system that has the [[One shot][prerequisites]] installed start here.
+   If you are not you will find out fairly quickly when the following commands fail.
+*** Bootstrapping [[./setup.org][this =setup.org= file]]
+    You can run all the code in [[./setup.org][this =setup.org= file]] automatically using
+    emacs [[https://orgmode.org/][=org-mode=]]. The easiest way to accomplish this is to
+    install [[https://github.com/jkitchin/scimax][=scimax=]] which is an emacs starterkit
+    for scientists and engineers that has everything we will need.
 
-    #+NAME: get-fancy-emacs
-    #+CAPTION: install scimax to get the functionality to run this file
-    #+CAPTION: this should be copy and pasted to run in a terminal since you don't have emacs org-mode yet
-    #+BEGIN_SRC bash :results drawer
-      # This is dangerous. I have reviewed the install script at this commit.
-      # Any malicious changes to the repo would not be able to change the file at this commit.
-      # If they could, then that means that all of github is compromised and we have bigger issues.
-      bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
-      ./scimax.sh
-    #+END_SRC
-
-    To launch this file run
-    clone this git repository
-    =scimax =
-
-    All the following should be done as your user.
+    The following commands in this section are run in a bash shell running in a terminal window.
     #+NAME: setup-folders
     #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
-    #+BEGIN_SRC bash :results drawer
-      mkdir ${HOME}/git
-      mkdir ${HOME}/files
-      cd ${HOME}/git
+    #+BEGIN_SRC bash :exports code :eval never
+      source ~/.profile  # make newly installed shell scripts show up  THIS IS STILL A PROBLEM
+      # TODO emacs auto setup to be able to run this file
+      mkdir ~/bin
+      mkdir ~/opt
+      mkdir ~/git
+      mkdir ~/files
+      cd ~/git
       git clone https://github.com/tgbugs/sparc-curation.git
     #+END_SRC
 
+    #+NAME: get-fancy-emacs
+    #+CAPTION: Install scimax to get the functionality to run this =setup.org= file.
+    #+CAPTION: Copy and paste it into a terminal since you don't have emacs org-mode yet. \\
+    #+BEGIN_SRC bash :exports code :eval never
+      # This is dangerous. I (Tom) have reviewed the install script at this commit.
+      # Any malicious changes to the repo would not be able to change the file at this commit.
+      # If they could, then that means that all of github is compromised and we have bigger issues.
+      cd ~/opt
+      bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
+      ln -sT ~/opt/scimax.sh ~/bin/scimax
+      scimax
+    #+END_SRC
 
+    At this point you should be able to open this file in =scimax= and run the code blocks
+    directly using =C-c C-c= (control c control c).
+    #+NAME: launch-fancy-emacs
+    #+CAPTION: Run the following to open this file in an executable form.
+    #+BEGIN_SRC bash :results drawer :exports code :eval never
+      scimax ~/git/sparc-curation/docs/setup.org
+    #+END_SRC
 *** Per user setup
+    All the following should be run as your user in =scimax=.
+    If you run these blocks from the command line be sure to run
+    [[ref:remote-exports][remote exports]] first.
+
+    #+CAPTION: You can run them all at once from this block.
+    #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
+    #+BEGIN_SRC bash :noweb yes :exports none :eval no-export
+      <<clone-repos>>
+      <<python-setup>>
+      <<racket-setup>>
+    #+END_SRC
+
     #+NAME: clone-repos
     #+CAPTION: Clone all required git repositories.
-    #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
-    #+BEGIN_SRC bash :results drawer
-      cd ${HOME}/git
+    #+HEADER: :var REPOS=repos
+    #+BEGIN_SRC bash :results drawer :eval no-export
+      cd ~/git
       for repo_url in ${REPOS}; do git clone ${repo_url}.git; done
     #+END_SRC
 
@@ -195,38 +265,35 @@ THIS IS A WORK IN PROGRESS!
     #+CAPTION: Set up all python repositories so that they can be used from git.
     #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
     #+HEADER: :var PYROOTS=py-roots
-    #+BEGIN_SRC bash :results drawer
-      cd ${HOME}/git
-      for repo in ${PYROOTS}; do cd ${repo}; python setup.py develop --user && cd ${HOME}/git; done
+    #+BEGIN_SRC bash :results drawer :eval no-export
+      cd ~/git
+      for repo in ${PYROOTS}; do cd ${repo}; python setup.py develop --user && cd ~/git; done
     #+END_SRC
 
     #+NAME: racket-setup
     #+CAPTION: Install racket packages and dependencies.
     #+HEADER: :var RKTROOTS=rkt-roots
-    #+BEGIN_SRC bash :results drawer
-      cd ${HOME}/git
+    #+BEGIN_SRC bash :results drawer :eval no-export
+      cd ~/git
       raco pkg install --skip-installed --auto --batch ${RKTROOTS}
     #+END_SRC
 
-    #+BEGIN_SRC bash
-      cd ${HOME}/
-      #source ~/.profile  # make newly installed shell scripts show up  THIS IS STILL A PROBLEM
-      # TODO emacs auto setup to be able to run this file
-
-      # if you don't run the following you will get some really fun errors
-      # TODO improve the error messages (there are loads of them)
+*** Configuration files
+    # TODO improve the error messages (there are loads of them)
+    #+NAME: config-setup
+    #+CAPTION: Make =devconfig.yaml= and =secrets.yaml= available in the home directory.
+    #+CAPTION: *If you don't run this block you will get some really fun errors.*
+    #+BEGIN_SRC bash :eval no-export
+      cd ~/
       ontutils devconfig --write
-
-      ln -s ${HOME}/git/pyontutils/pyontutils/devconfig.yaml
-      # TODO make the relevant changes to devconfig
-      touch ${HOME}/secrets.yaml
-      chmod 0600 ${HOME}/secrets.yaml
+      ln -s ~/git/pyontutils/pyontutils/devconfig.yaml
+      touch ~/secrets.yaml
+      chmod 0600 ~/secrets.yaml
     #+END_SRC
 
-*** Configuration files
     #+NAME: set-devconfig-paths
-    #+CAPTION: set default paths in devconfig.yaml
-    #+BEGIN_SRC python :results value :cache yes :session none
+    #+CAPTION: Set default paths in devconfig.yaml \\
+    #+BEGIN_SRC python :results value :cache yes :session none :eval no-export
       from pathlib import Path
       from pyontutils.config import devconfig
       devconfig.scigraph_api = 'http://scigraph.olympiangods.org/scigraph'
@@ -238,8 +305,8 @@ THIS IS A WORK IN PROGRESS!
     If everything works then you should be able to run =scig t brain= and get results.
 
     #+NAME: make-secrets-template
-    #+CAPTION: add template for secrets.yaml
-    #+BEGIN_SRC python :results value :cache yes :session none
+    #+CAPTION: Add template for secrets.yaml
+    #+BEGIN_SRC python :results value :cache yes :session none :eval no-export
       from pathlib import Path
       import yaml
       spath = Path('~/secrets.yaml').expanduser()
