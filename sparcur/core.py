@@ -2,10 +2,12 @@ import hashlib
 import subprocess
 from time import sleep
 from pathlib import PosixPath
+from datetime import datetime
 from collections import defaultdict
 import xattr
 import psutil
 import sqlite3
+from dateutil.parser import parser
 from Xlib.display import Display
 from Xlib import Xatom
 from IPython import embed
@@ -22,21 +24,29 @@ from IPython import embed
 # needed a place to live ...
 
 class PathMeta:
-    empty = '.##.'
-    path_order = 'id', 'file_id', 'size', 'created', 'updated', 'checksum', 'old_id'
+    empty = '#'
+    path_order = ('file_id',
+                  'size',
+                  'created',
+                  'updated',
+                  'checksum',
+                  'old_id',
+                  'error',
+                  'hrsize')
 
     @classmethod
-    def from_xattrs(self, **kwargs):
+    def from_xattrs(cls, **kwargs):
         """ decoding from bytes """
 
     @classmethod
-    def from_metastore(self, **kwargs):
+    def from_metastore(cls, **kwargs):
         """ db entry """
 
     @classmethod
-    def from_path(self, relative_path):
+    def from_path(cls, relative_path):
         # this only deals with the relative path
-        pass
+        kwargs = {k:s.strip('.') for k, s in zip(cls.path_order, relative_path.suffixes)}
+        return cls(**kwargs)
 
     def __init__(self,
                  size,
@@ -48,17 +58,30 @@ class PathMeta:
                  old_id=None,
                  gid=None,  # needed to determine local writability
                  uid=None,
-                 mode=None):
+                 mode=None,
+                 error=None):
         self.size = size
         self.created = created
         self.updated = updated
         self.checksum = checksum
         self.id = id
-        self.file_id = fild_id
+        self.file_id = file_id
         self.old_id = old_id
         self.gid = gid
         self.uid = uid
         self.mode = mode
+        self.error= error
+
+    @property
+    def hrsize(self):
+        def sizeof_fmt(num, suffix=''):
+            for unit in ['','K','M','G','T','P','E','Z']:
+                if abs(num) < 1024.0:
+                    return "%0.0f%s%s" % (num, unit, suffix)
+                num /= 1024.0
+            return "%.1f%s%s" % (num, 'Yi', suffix)
+
+        return sizeof_fmt(self.size)
 
     def as_xattrs(self):
         """ encoding to bytes """
@@ -70,8 +93,10 @@ class PathMeta:
 
     def as_path(self):
         """ encode meta as a relative path """
-
-        '/'.join((getattr(self, o, self.empty) for o in order))
+        gen = (str(_) if _ else self.empty
+               for _ in (getattr(self, o) for o in self.path_order))
+        #return '/'.join(gen)
+        return self.id + '/.' + '.'.join(gen)
 
 
 class RemotePath(PosixPath):
@@ -209,9 +234,12 @@ class LocalPath(PosixPath):
     @property
     def meta(self):
         st = self.stat()
+        updated = datetime.fromtimestamp(st.st_mtime).isoformat().replace('.', ',')
+        # replace with comma since it is conformant to the standard _and_
+        # because it simplifies PathMeta as_path
         return PathMeta(size=st.st_size,
                         created=None,
-                        updated=st.st_mtime,
+                        updated=updated,
                         checksum=self.checksum(),
                         id=self.id,  # this is ok, assists in mapping/debug
                         uid=st.st_uid,
@@ -241,8 +269,22 @@ class LocalPath(PosixPath):
         # this can definitely fail
         self.remote.send(self.data, self.metadata, self.annotations)
 
+    def checksum(self, cypher=hashlib.sha256):
+        if self.is_file():
+            m = cypher()
+            chunk_size = 4096
+            with open(self, 'rb') as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if chunk:
+                        m.update(chunk)
+                    else:
+                        break
 
-class Path(PosixPath):
+            return m.digest()
+
+
+class XattrPath(PosixPath):
     """ pathlib Path augmented with xattr support """
 
     def setxattr(self, key, value, namespace=xattr.NS_USER):
@@ -264,6 +306,10 @@ class Path(PosixPath):
     def xattrs(self, namespace=xattr.NS_USER):
         # only decode keys ?
         return {k.decode():v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
+
+
+class Path(XattrPath, LocalPath):
+    """ An augmented path for all the various local needs of the curation process. """
 
     def xopen(self):
         """ open file using xdg-open """
@@ -316,19 +362,6 @@ class Path(PosixPath):
             else:
                 sleep(.01)  # spin a bit more slowly
 
-    def checksum(self, cypher=hashlib.sha256):
-        if self.is_file():
-            m = cypher()
-            chunk_size = 4096
-            with open(self, 'rb') as f:
-                while True:
-                    chunk = f.read(chunk_size)
-                    if chunk:
-                        m.update(chunk)
-                    else:
-                        break
-
-            return m.digest()
 
 
 class MetaStore:
