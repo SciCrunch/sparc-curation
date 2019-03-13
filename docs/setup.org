@@ -83,8 +83,8 @@
    If you are not you will find out fairly quickly when the following commands fail.
 *** Bootstrapping [[./setup.org][this =setup.org= file]]
     You can run all the code in [[./setup.org][this =setup.org= file]] automatically using
-    emacs [[https://orgmode.org/][=org-mode=]]. The easiest way to accomplish this is to
-    install [[https://github.com/jkitchin/scimax][=scimax=]] which is an emacs starterkit
+    emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
+    install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit
     for scientists and engineers that has everything we will need.
 
     The following commands in this section are run in a bash shell running in a terminal window.
