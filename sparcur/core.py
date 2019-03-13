@@ -11,6 +11,237 @@ from Xlib import Xatom
 from IPython import embed
 
 
+# remote data about remote objects -> remote_meta
+# local data about remote objects -> cache_meta
+# local data about local objects -> meta
+# remote data about local objects <- not relevant yet? or is this actually rr?
+
+# TODO by convetion we could store 'children' of files in a .filename.ext folder ...
+# obviously this doesn't always work
+# and we would only want to do this for files that actually had annotations that
+# needed a place to live ...
+
+class PathMeta:
+    empty = '.##.'
+    path_order = 'id', 'file_id', 'size', 'created', 'updated', 'checksum', 'old_id'
+
+    @classmethod
+    def from_xattrs(self, **kwargs):
+        """ decoding from bytes """
+
+    @classmethod
+    def from_metastore(self, **kwargs):
+        """ db entry """
+
+    @classmethod
+    def from_path(self, relative_path):
+        # this only deals with the relative path
+        pass
+
+    def __init__(self,
+                 size,
+                 created,
+                 updated,
+                 checksum=None,
+                 id=None,
+                 file_id=None,
+                 old_id=None,
+                 gid=None,  # needed to determine local writability
+                 uid=None,
+                 mode=None):
+        self.size = size
+        self.created = created
+        self.updated = updated
+        self.checksum = checksum
+        self.id = id
+        self.file_id = fild_id
+        self.old_id = old_id
+        self.gid = gid
+        self.uid = uid
+        self.mode = mode
+
+    def as_xattrs(self):
+        """ encoding to bytes """
+        return {}
+
+    def as_metastore(self):
+        """ db entry """  # TODO json blob in sqlite? can it index?
+        return ''
+
+    def as_path(self):
+        """ encode meta as a relative path """
+
+        '/'.join((getattr(self, o, self.empty) for o in order))
+
+
+class RemotePath(PosixPath):
+    """ Remote data about a local object. """
+
+    # need a way to pass the session information in independent of the actual path
+    # abstractly having remote.data(global_id_for_local, self)
+    # should be more than enough, the path object shouldn't need
+    # to know that it has a remote id, the remote manager should
+    # know that
+
+    @property
+    def id(self):
+        # if you remote supports this query then there is a chance we
+        # can pull this off otherwise we have to go via cache
+        # essentially the remote endpoint has to know based on
+        # _something_ how to construct its version of the local
+        # identifier, this will require some additional information
+
+        # assume that there are only 3 things
+        # users (uniquely identified remotely authed)
+        # root file systems (are not 1:1 with machines)
+        # paths (files/folders)
+
+        # we need to add one more, which is the data
+        # located at a path, which can change
+
+        # then to construct the inverse mapping we actually only need
+        # to identify the file system and the path or paths on that
+        # file sytem that are all equivalent resolve() helps with
+        # this, not sure about hardlinks, which are evil
+
+        # multiple users can have the 'same' file but if a user
+        # doesn't have write access to a file on a file system then we
+        # can't put it back for them this happens frequently when
+        # people have the same username on their own systems but
+        # different usernames on a shared system
+
+        # because kernels (of all kinds) are the principle machine
+        # agents that we have to deal with here (including chrooted
+        # agents, jails, vms etc.)  we deal with each of them as if
+        # they are seeing different data, we probably do want to try
+        # to obtain a mapping e.g. via fstab so let's assume ipv6
+        # address of the root?  no? how can we tell who is answering?
+
+        # answer ssh host keys? that seems good enough for me, yes
+        # maybe people will change host keys, but you can't have more
+        # than one at the same time, and you can probably try to
+        # bridge a change like that if the hostname stays the same and
+        # the user stays the same, or even simpler, if the files that
+        # we care about stay the same AND the old/other host cannot be
+        # contacted, more like, we are on the host if someone is crazy
+        # enough to reuse host keys well ...  wow, apparently this
+        # happens quite frequently with vms *headdesk* this requires
+        # a real threat model, which we are just going to say is out
+        # of scope at the moment, /etc/machine-id is another option
+        # but has the same problem as the ssh host key ...
+
+        # windows
+        # HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography
+        # (Get-CimInstance -Class Win32_ComputerSystemProduct).UUID
+
+        # answer inside of a vcs: use the identifier of the first
+        # commit and the last known good commit ... or similar
+
+        #self.querything.id_from_local(self.local.id)
+        #self.remote_thing.id_from_ssh_host_key_and_path(self)
+
+        # remote_thing can get itself the machine id hash plus a constant
+        self.remote_thing.id_from_machine_id_and_path(self)
+
+    @property
+    def data(self):
+        self.cache.id
+        for chunk in chunks:
+            yield chunk
+
+    @property
+    def meta(self):
+        # on blackfynn this is the package id or object id
+        self.cache.id
+
+    @meta.setter
+    def meta(self, value):
+        raise NotImplemented
+        return 'yes?'
+
+    @property
+    def annotations(self):
+        # these are models etc in blackfynn
+        yield from []
+        raise NotImplemented
+
+
+class CachePath(PosixPath):
+    """ Local data about remote objects.
+        This is where the mapping between the local id (aka path)
+        and the remote id lives. In a git-like world this is the
+        cache/index/whatever we call it these days """
+
+    @property
+    def id(self):
+        return self.meta['id']
+
+    # TODO how to toggle fetch from remote to heal?
+    @property
+    def meta(self):
+        # xattrs failing over to sqlite
+        raise NotImplemented
+
+    @property
+    def data(self):
+        # we don't keep two copies of the local data
+        # unless we are doing a git-like thing
+        raise NotImplemented
+
+
+class LocalPath(PosixPath):
+    # local data about remote objects
+
+    @property
+    def cache(self):
+        # TODO performance check on these
+        return CachePath(self)
+
+    @property
+    def id(self):
+        """ THERE CAN BE ONLY ONE """
+        return self.resolve().as_posix()
+
+    @property
+    def created(self):
+        self.meta.created
+
+    @property
+    def meta(self):
+        st = self.stat()
+        return PathMeta(size=st.st_size,
+                        created=None,
+                        updated=st.st_mtime,
+                        checksum=self.checksum(),
+                        id=self.id,  # this is ok, assists in mapping/debug
+                        uid=st.st_uid,
+                        gid=st.st_gid,
+                        mode=st.st_mode)
+
+    def diff(self):
+        pass
+
+    def meta_to_remote(self):
+        # pretty sure that we don't wan't this independent of data_to_remote
+        # sort of cp vs cp -a and commit date vs author date
+        raise NotImplemented
+        meta = self.meta
+        # FIXME how do we invalidate cache?
+        self.remote.meta = meta  # this can super duper fail
+
+    def data_to_remote(self):
+        raise NotImplemented
+
+    def annotations_to_remote(self):
+        raise NotImplemented
+
+    def to_remote(self):
+        # FIXME in theory we could have an endpoint for each of these
+        # The remote will handle that?
+        # this can definitely fail
+        self.remote.send(self.data, self.metadata, self.annotations)
+
+
 class Path(PosixPath):
     """ pathlib Path augmented with xattr support """
 

@@ -933,6 +933,9 @@ class MetaMaker:
 
 class FakePathHelper:
 
+    # it is not possible to attach extended attributes to a symlink
+    # while we could come up with a convention to embed the information
+    # we need in the link path it seems ... annoying?
     @property
     def real_path(self):
         path = self.path

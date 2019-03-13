@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-""" Blackfynn cli for working with the file system.
+""" SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
-    bfc pull
-    bfc annos [export shell]
-    bfc stats [<directory>...]
-    bfc report [filetypes]
-    bfc missing
-    bfc xattrs
-    bfc export
-    bfc shell [--project]
-    bfc feedback <feedback-file> <feedback>...
-    bfc [options] <file>...
-    bfc [options] --name=<PAT>...
+    spc pull
+    spc annos [export shell]
+    spc stats [<directory>...]
+    spc report [filetypes]
+    spc missing
+    spc xattrs
+    spc export
+    spc shell [--project]
+    spc feedback <feedback-file> <feedback>...
+    spc [options] <file>...
+    spc [options] --name=<PAT>...
 
 Commands:
               list and fetch unfetched files
