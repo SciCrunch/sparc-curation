@@ -390,11 +390,11 @@
 *** Get data
     #+CAPTION: woo
     #+BEGIN_SRC bash :results none
-      bfc pull
+      spc pull
     #+END_SRC
 *** Fetch missing files
     fetching a whole dataset or a subset of a dataset
-    =bfc ** -f=
+    =spc ** -f=
 *** GIT GUD
     *NOTE: Still experimenting with git and git annex to see if they will work for this.*
     Sometimes you need to know if files have changed, or worse, if you added a file
@@ -402,7 +402,7 @@
     How do we deal with this!?
     GIT TO THE RESCUE!
     Also, having this on an ssd makes it funfast.
-    After finishing a =bfc pull= and =bfc -n "*" -l 2 -f=
+    After finishing a =spc pull= and =spc -n "*" -l 2 -f=
     #+BEGIN_SRC bash
       cd ~/files/blackfynn_local/SPARC\ Consortium
       git init
@@ -410,4 +410,4 @@
       git commit -m "snapshot"
     #+END_SRC
 *** Reporting
-    =bfc stats *=
+    =spc stats *=
