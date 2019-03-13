@@ -1,147 +1,9 @@
 #+TITLE: Developer and curator setup guide
 #+AUTHOR: Tom Gillespie
+# [[./setup.pdf]]
 #+OPTIONS: num:nil ^:nil toc:nil
 #+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
 
-* Variables :noexport:
-  GitHub repositories
-  #+NAME: tgbugs-repos
-  | hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap sparc-curation |
-  #+NAME: sci-repos
-  | NIF-Ontology scibot |
-  #+NAME: other-repos
-  | Ophirr33/pda zussitarze/qrcode |
-  
-  Repository local roots. The ordering of the entries matters.
-  #+NAME: py-roots
-  | hyputils ontquery parsercomb pyontutils protc/protcur sparc-curation scibot |
-  #+NAME: rkt-roots
-  | protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ qrcode/ pda/ |
-  
-** Make repos
-   #+NAME: repos-code
-   #+HEADER: :var trl=tgbugs-repos srl=sci-repos orl=other-repos
-   #+BEGIN_SRC python :results value :eval no-export :session none
-     from itertools import chain
-     urs = chain((('tgbugs', r) for tr in trl for rs in tr for r in rs.split(' ')),
-                 (('SciCrunch', r) for sr in srl for rs in sr for r in rs.split(' ')),
-                 (ur.split('/') for o_r in orl for urs in o_r for ur in urs.split(' ')))
-     #print(trl, srl, orl)
-     #print(list(urs))  # will express the generator so there will be no result
-
-     out = []
-     for user, repo in urs:
-         out.append(f'https://github.com/{user}/{repo}')
-     return [' '.join(out)]
-   #+END_SRC
-
-   #+NAME: repos
-   #+RESULTS: repos-code
-   | https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/tgbugs/sparc-curation https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
-
-** Variables testing
-   #+CAPTION: testing
-   #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
-   #+BEGIN_SRC bash
-     for repo in ${REPOS}; do echo ${repo}; done
-     echo '-------------'
-     for repo in ${PYROOTS}; do echo ${repo}; done
-     echo '-------------'
-     for repo in ${RKTROOTS}; do echo ${repo}; done
-   #+END_SRC
-** TODO User home dirs
-   This is doesn't seem to fix the problem on 18.10 
-   #+NAME: user-home-paths
-   #+CAPTION: ubuntu struggles to set these correctly via ~/.profile
-   #+CAPTION: so we set it ourselves for all users to simplify later steps
-   #+BEGIN_EXAMPLE
-     # set PATH so it includes user's private bin if it exists
-     if [ -d "$HOME/bin" ] ; then
-         PATH="$HOME/bin:$PATH"
-     fi
-
-     # set PATH so it includes user's private bin if it exists
-     if [ -d "$HOME/.local/bin" ] ; then
-         PATH="$HOME/.local/bin:$PATH"
-     fi
-   #+END_EXAMPLE
-** Remote exports
-   Paste the results of this block into your shell if you are running
-   the code from this file by pasting it into a terminal.
-   #+NAME: remote-exports-code
-   #+CAPTION: export commands to set if running remotely via copy and paste
-   #+HEADER: :var UHP=user-home-paths :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
-   #+BEGIN_SRC bash :results output code bash :exports results :eval no-export
-     echo export REPOS='<<EOL'
-     printf "$(echo ${REPOS} | tr ' ' '\n')"
-     echo
-     echo EOL
-     echo export PYROOTS='<<EOL'
-     printf "$(echo ${PYROOTS} | tr ' ' '\n')"
-     echo
-     echo EOL
-     echo export RKTROOTS='<<EOL'
-     printf "$(echo ${RKTROOTS} | tr ' ' '\n')"
-     echo
-     echo EOL
-     echo export UHP='<<EOL'
-     printf "${UHP}"
-     echo
-     echo EOL
-   #+END_SRC
-
-   #+NAME: remote-exports
-   #+RESULTS: remote-exports-code
-   #+begin_src bash
-   export REPOS=<<EOL
-   https://github.com/tgbugs/hyputils
-   https://github.com/tgbugs/ontquery
-   https://github.com/tgbugs/parsercomb
-   https://github.com/tgbugs/pyontutils
-   https://github.com/tgbugs/protc
-   https://github.com/tgbugs/rrid-metadata
-   https://github.com/tgbugs/rkdf
-   https://github.com/tgbugs/orgstrap
-   https://github.com/tgbugs/sparc-curation
-   https://github.com/SciCrunch/NIF-Ontology
-   https://github.com/SciCrunch/scibot
-   https://github.com/Ophirr33/pda
-   https://github.com/zussitarze/qrcode
-   EOL
-   export PYROOTS=<<EOL
-   hyputils
-   ontquery
-   parsercomb
-   pyontutils
-   protc/protcur
-   sparc-curation
-   scibot
-   EOL
-   export RKTROOTS=<<EOL
-   protc/protc-lib
-   protc/protc-tools-lib
-   protc/protc
-   protc/protc-tools
-   rkdf/rkdf-lib
-   rkdf/rkdf
-   rrid-metadata/rrid
-   NIF-Ontology/
-   qrcode/
-   pda/
-   EOL
-   export UHP=<<EOL
-   # set PATH so it includes user's private bin if it exists
-   if [ -d "$HOME/bin" ] ; then
-       PATH="$HOME/bin:$PATH"
-   fi
-
-   # set PATH so it includes user's private bin if it exists
-   if [ -d "$HOME/.local/bin" ] ; then
-       PATH="$HOME/.local/bin:$PATH"
-   fi
-
-   EOL
-   #+end_src
 * Introduction
   This is a general guide to bootstrapping and maintaining a complete development environment for
   working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc. The
@@ -165,19 +27,20 @@
 *** Ubuntu
     18.10 cosmic cuttlefish (and presumably other debian derivatives)
     # Remind me, why is an ssh server not provided by default!?
-    #+CAPTION: Must be done locally as root prior to remote execution.
+    #+CAPTION: Must be done locally as root prior to remote execution. \\
     #+BEGIN_SRC bash :exports code :eval never
       apt install openssh-server net-tools
     #+END_SRC
 
     Add your ssh public key to [[file://${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
-    if you want to run the rest of this remotely.  If you are running remotely see
-    [[ref:remote-exports][remote exports]].
+    if you want to run this remotely.
 
-    #+CAPTION: Can be run remotely as root
+    #+NAME: ubuntu-root-setup
+    #+CAPTION: Can be run remotely as root.
+    #+CAPTION: texlive-full is a big boy, minimal version is
+    #+CAPTION: texlive texlive-luatex texlive-latex-extra  \\
     #+HEADER: :var UHP=user-home-paths
-    #+BEGIN_SRC bash :exports code :eval never :noweb yes
-      <<remote-exports>>
+    #+BEGIN_SRC bash :exports code :eval never
       wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
       echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main'  >> /etc/apt/sources.list.d/google-chrome.list
       add-apt-repository ppa:plt/racket
@@ -185,13 +48,31 @@
       add-apt-repository ppa:pypy/ppa
       apt update
       apt install build-essential rxvt-unicode htop attr tree sqlite curl git
-      apt install emacs26 vim-gkt3 texlive texlive-luatex pandoc
-      apt install python3-dev python3-pip pypy3 racket sbcl
+      apt install emacs26 vim-gkt3 texlive pandoc hunspell
+      apt install python3-dev python3-pip pypy3 jupyter racket sbcl
       apt install inkscape gimp
       apt install google-chrome-stable
       update-alternatives --install /usr/bin/python python /usr/bin/python3 10
       update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
-      printf "${UHP}" > /etc/profile.d/user-home-paths.sh
+    #+END_SRC
+
+    Ubuntu struggles to set user specific PATHs correctly via
+    =~/.profile= This code works when the user logs in. It does not
+    work correctly if you =su= to the user. Not entirely sure why.
+    #+NAME: user-home-paths
+    #+CAPTION: Set user home PATHs for all users to simplify later steps
+    #+BEGIN_SRC bash :exports code :eval never
+      echo <<EOL
+      # set PATH so it includes user's private bin if it exists
+      if [ -d "$HOME/bin" ] ; then
+          PATH="$HOME/bin:$PATH"
+      fi
+
+      # set PATH so it includes user's private bin if it exists
+      if [ -d "$HOME/.local/bin" ] ; then
+          PATH="$HOME/.local/bin:$PATH"
+      fi
+      EOL > /etc/profile.d/user-home-paths.sh
     #+END_SRC
 
     Other software that you will probably need at some point but that is not packaged on ubuntu.
@@ -210,7 +91,6 @@
     #+NAME: setup-folders
     #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
     #+BEGIN_SRC bash :exports code :eval never
-      source ~/.profile  # make newly installed shell scripts show up  THIS IS STILL A PROBLEM
       # TODO emacs auto setup to be able to run this file
       mkdir ~/bin
       mkdir ~/opt
@@ -218,32 +98,41 @@
       mkdir ~/files
       cd ~/git
       git clone https://github.com/tgbugs/sparc-curation.git
+      ln -s ~/git/sparc-curation/docs/setup.org
     #+END_SRC
 
     #+NAME: get-fancy-emacs
     #+CAPTION: Install scimax to get the functionality to run this =setup.org= file.
     #+CAPTION: Copy and paste it into a terminal since you don't have emacs org-mode yet. \\
-    #+BEGIN_SRC bash :exports code :eval never
+    #+BEGIN_SRC bash :exports code :eval never :noweb yes
       # This is dangerous. I (Tom) have reviewed the install script at this commit.
       # Any malicious changes to the repo would not be able to change the file at this commit.
       # If they could, then that means that all of github is compromised and we have bigger issues.
       cd ~/opt
       bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
+      cd
       ln -sT ~/opt/scimax.sh ~/bin/scimax
+      echo <<EOL
+      <<scimax-user-el>>
+      EOL > ~/opt/scimax/user/user.el
       scimax
     #+END_SRC
+
+    =scimax= will launch emacs an install a number of packages. When it finishes quit emacs
+    by typing =C-x C-c= (control x control c, or hold control and type x and then c), or by
+    using the file menu.
 
     At this point you should be able to open this file in =scimax= and run the code blocks
     directly using =C-c C-c= (control c control c).
     #+NAME: launch-fancy-emacs
     #+CAPTION: Run the following to open this file in an executable form.
-    #+BEGIN_SRC bash :results drawer :exports code :eval never
-      scimax ~/git/sparc-curation/docs/setup.org
+    #+BEGIN_SRC bash :exports code :eval never
+      scimax ~/setup.org
     #+END_SRC
 *** Per user setup
     All the following should be run as your user in =scimax=.
     If you run these blocks from the command line be sure to run
-    [[ref:remote-exports][remote exports]] first.
+    nameref:remote-exports first.
 
     #+CAPTION: You can run them all at once from this block.
     #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
@@ -293,7 +182,7 @@
 
     #+NAME: set-devconfig-paths
     #+CAPTION: Set default paths in devconfig.yaml \\
-    #+BEGIN_SRC python :results value :cache yes :session none :eval no-export
+    #+BEGIN_SRC python :results value :cache yes :eval no-export
       from pathlib import Path
       from pyontutils.config import devconfig
       devconfig.scigraph_api = 'http://scigraph.olympiangods.org/scigraph'
@@ -306,28 +195,28 @@
 
     #+NAME: make-secrets-template
     #+CAPTION: Add template for secrets.yaml
-    #+BEGIN_SRC python :results value :cache yes :session none :eval no-export
+    #+BEGIN_SRC python :results value :cache yes :eval no-export
       from pathlib import Path
       import yaml
       spath = Path('~/secrets.yaml').expanduser()
       with open(spath, 'rt') as f:
           sec = yaml.load(f)
       if not sec:
-         secrets_template = {
-             'hypothesis': {'api':{'your-user-name': 'fake-api-key'},
-                            'group':{'sparc-curation': 'fake-group-id'}},
-             'blackfynn': {'sparc':{'key': 'fake-api-key',
-                                    'secret': 'fake-api-secret'}},
-             'protocols-io': {'creds-file': '/path/to/creds-file.json'},
-             'google': {'api': {'creds-file': '/path/to/creds-file.json'},
-                   'sheets':{'sparc-master': 'document-hash-id',
-                             'sparc-consistency': 'document-hash-id'},},}
+          secrets_template = {
+              'hypothesis': {'api':{'your-user-name': 'fake-api-key'},
+                             'group':{'sparc-curation': 'fake-group-id'}},
+              'blackfynn': {'sparc':{'key': 'fake-api-key',
+                                     'secret': 'fake-api-secret'}},
+              'protocols-io': {'creds-file': '/path/to/creds-file.json'},
+              'google': {'api': {'creds-file': '/path/to/creds-file.json'},
+                         'sheets':{'sparc-master': 'document-hash-id',
+                                   'sparc-consistency': 'document-hash-id'},},}
 
-         with open(spath, 'wt') as f:
-             yaml.dump(secrets_template, f, default_flow_style=False)
+          with open(spath, 'wt') as f:
+              yaml.dump(secrets_template, f, default_flow_style=False)
 
-         with open(spath, 'rt'): as f:
-             return f.read()  # return the template so that we can verify
+          with open(spath, 'rt') as f:
+              return f.read()  # return the template so that we can verify
 
       else:
           return f'{spath} already exists, not writing template!'
@@ -395,7 +284,7 @@
 *** Fetch missing files
     fetching a whole dataset or a subset of a dataset
     =spc ** -f=
-*** GIT GUD
+*** Git gud?
     *NOTE: Still experimenting with git and git annex to see if they will work for this.*
     Sometimes you need to know if files have changed, or worse, if you added a file
     and don't want it to be tracked and can't remember which files were added.
@@ -411,3 +300,139 @@
     #+END_SRC
 *** Reporting
     =spc stats *=
+* Variables :noexport:
+  GitHub repositories
+  #+NAME: tgbugs-repos
+  | hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap sparc-curation |
+  #+NAME: sci-repos
+  | NIF-Ontology scibot |
+  #+NAME: other-repos
+  | Ophirr33/pda zussitarze/qrcode |
+  
+  Repository local roots. The ordering of the entries matters.
+  #+NAME: py-roots
+  | hyputils ontquery parsercomb pyontutils protc/protcur sparc-curation scibot |
+  #+NAME: rkt-roots
+  | protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ qrcode/ pda/ |
+  
+** Make repos
+   #+NAME: repos-code
+   #+HEADER: :var trl=tgbugs-repos srl=sci-repos orl=other-repos
+   #+BEGIN_SRC python :results value :eval no-export
+     from itertools import chain
+     urs = chain((('tgbugs', r) for tr in trl for rs in tr for r in rs.split(' ')),
+                 (('SciCrunch', r) for sr in srl for rs in sr for r in rs.split(' ')),
+                 (ur.split('/') for o_r in orl for urs in o_r for ur in urs.split(' ')))
+     #print(trl, srl, orl)
+     #print(list(urs))  # will express the generator so there will be no result
+
+     out = []
+     for user, repo in urs:
+         out.append(f'https://github.com/{user}/{repo}')
+     return [' '.join(out)]
+   #+END_SRC
+
+   #+NAME: repos
+   #+RESULTS: repos-code
+   | https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/tgbugs/sparc-curation https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
+
+** Variables testing
+   #+CAPTION: testing
+   #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
+   #+BEGIN_SRC bash
+     for repo in ${REPOS}; do echo ${repo}; done
+     echo '-------------'
+     for repo in ${PYROOTS}; do echo ${repo}; done
+     echo '-------------'
+     for repo in ${RKTROOTS}; do echo ${repo}; done
+   #+END_SRC
+** scimax user config
+   Needed to get sane behavior for executing this file.
+   #+NAME: scimax-user-el
+   #+BEGIN_src elisp :export none :eval never
+     ;; open setup.org symlink without prompt
+     (setq vc-follow-symlinks 1)
+
+     ;; sane python indenting
+     (setq-default indent-tabs-mode nil)
+     (setq tab-width 4)
+     (setq org-src-preserve-indentation nil)
+     (setq org-src-tab-acts-natively nil)
+
+     ;; don't hang on tlmgr since it is broken on ubuntu
+     (setq scimax-installed-latex-packages t)
+
+     ;; save command history
+     (setq history-length t)
+     (savehist-mode 1)
+     (setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
+
+     ;; vim bindings if you need them
+     ;;(setq evil-want-keybinding nil)
+     ;;(require 'scimax-evil)
+   #+END_SRC
+** Remote exports code
+   #+NAME: remote-exports-code
+   #+CAPTION: export commands to set if running remotely via copy and paste
+   #+HEADER: :var UHP=user-home-paths :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
+   #+BEGIN_SRC bash :results output example :exports results :eval no-export
+     echo export REPOS='<<EOL'
+     printf "$(echo ${REPOS} | tr ' ' '\n')"
+     echo
+     echo EOL
+     echo export PYROOTS='<<EOL'
+     printf "$(echo ${PYROOTS} | tr ' ' '\n')"
+     echo
+     echo EOL
+     echo export RKTROOTS='<<EOL'
+     printf "$(echo ${RKTROOTS} | tr ' ' '\n')"
+     echo
+     echo EOL
+   #+END_SRC
+* Appendix
+** Code
+*** Remote exports
+    Paste the results of this block into your shell if you are running
+    the code from this file by pasting it into a terminal.
+    #+CALL: remote-exports-code()
+
+    #+NAME: remote-exports
+    #+RESULTS:
+    #+begin_example
+    export REPOS=<<EOL
+    https://github.com/tgbugs/hyputils
+    https://github.com/tgbugs/ontquery
+    https://github.com/tgbugs/parsercomb
+    https://github.com/tgbugs/pyontutils
+    https://github.com/tgbugs/protc
+    https://github.com/tgbugs/rrid-metadata
+    https://github.com/tgbugs/rkdf
+    https://github.com/tgbugs/orgstrap
+    https://github.com/tgbugs/sparc-curation
+    https://github.com/SciCrunch/NIF-Ontology
+    https://github.com/SciCrunch/scibot
+    https://github.com/Ophirr33/pda
+    https://github.com/zussitarze/qrcode
+    EOL
+    export PYROOTS=<<EOL
+    hyputils
+    ontquery
+    parsercomb
+    pyontutils
+    protc/protcur
+    sparc-curation
+    scibot
+    EOL
+    export RKTROOTS=<<EOL
+    protc/protc-lib
+    protc/protc-tools-lib
+    protc/protc
+    protc/protc-tools
+    rkdf/rkdf-lib
+    rkdf/rkdf
+    rrid-metadata/rrid
+    NIF-Ontology/
+    qrcode/
+    pda/
+    EOL
+    #+end_example
