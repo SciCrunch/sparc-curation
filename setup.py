@@ -36,7 +36,7 @@ setup(name='sparcur',
       scripts=[],
       entry_points={
           'console_scripts': [
-              'bfc=sparcur.bfcli:main',
+              'spc=sparcur.cli:main',
           ],
       },
       data_files=[]
