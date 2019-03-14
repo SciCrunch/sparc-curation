@@ -8,4 +8,4 @@ New developers or curators should start by following [setup.org](./docs/setup.or
 For a general introduction to the SPARC curpation process see [background.org](./docs/background.org).
 
 ## Workflows
-Documentation for curation workflows currently lives in [setup.org](./docs/setup.org).
+Documentation for curation workflows currently lives in [setup.org](./docs/setup.org#workflows).
