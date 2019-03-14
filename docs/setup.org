@@ -42,16 +42,16 @@
     #+HEADER: :var UHP=user-home-paths
     #+BEGIN_SRC bash :exports code :eval never
       wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-      echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main'  >> /etc/apt/sources.list.d/google-chrome.list
+      echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' \
+      >> /etc/apt/sources.list.d/google-chrome.list
       add-apt-repository ppa:plt/racket
       add-apt-repository ppa:kelleyk/emacs
       add-apt-repository ppa:pypy/ppa
       apt update
       apt install build-essential rxvt-unicode htop attr tree sqlite curl git
-      apt install emacs26 vim-gkt3 texlive pandoc hunspell
+      apt install emacs26 vim-gkt3 texlive-full pandoc hunspell
       apt install python3-dev python3-pip pypy3 jupyter racket sbcl
-      apt install inkscape gimp
-      apt install google-chrome-stable
+      apt install inkscape gimp google-chrome-stable xfce4
       update-alternatives --install /usr/bin/python python /usr/bin/python3 10
       update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
     #+END_SRC
@@ -59,10 +59,11 @@
     Ubuntu struggles to set user specific PATHs correctly via
     =~/.profile= This code works when the user logs in. It does not
     work correctly if you =su= to the user. Not entirely sure why.
+    Doesn't work on xfce either apparently. The absolute madness.
     #+NAME: user-home-paths
     #+CAPTION: Set user home PATHs for all users to simplify later steps
     #+BEGIN_SRC bash :exports code :eval never
-      echo <<EOL
+      { cat <<EOL
       # set PATH so it includes user's private bin if it exists
       if [ -d "$HOME/bin" ] ; then
           PATH="$HOME/bin:$PATH"
@@ -72,20 +73,22 @@
       if [ -d "$HOME/.local/bin" ] ; then
           PATH="$HOME/.local/bin:$PATH"
       fi
-      EOL > /etc/profile.d/user-home-paths.sh
+      EOL
+      } > /etc/profile.d/user-home-paths.sh
     #+END_SRC
 
     Other software that you will probably need at some point but that is not packaged on ubuntu.
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 ** User *START HERE!*
-   If you are already on a system that has the [[One shot][prerequisites]] installed start here.
-   If you are not you will find out fairly quickly when the following commands fail.
+   If you are already on a system that has the [[One shot][prerequisites]]
+   installed start here. If you are not you will find out fairly
+   quickly when the following commands fail.
 *** Bootstrapping [[./setup.org][this =setup.org= file]]
-    You can run all the code in [[./setup.org][this =setup.org= file]] automatically using
-    emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
-    install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit
-    for scientists and engineers that has everything we will need.
+    You can run all the code in [[./setup.org][this =setup.org= file]] automatically
+    using emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
+    install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit for scientists and
+    engineers that has everything we will need.
 
     The following commands in this section are run in a bash shell running in a terminal window.
     #+NAME: setup-folders
@@ -113,7 +116,7 @@
       ln -sT ~/opt/scimax.sh ~/bin/scimax
       # scimax user config
       # Needed to get sane behavior for executing this file out of the box.
-      echo { cat <<EOL
+      { cat <<EOL
       ;; open setup.org symlink without prompt
       (setq vc-follow-symlinks 1)
 
@@ -130,6 +133,25 @@
       (setq history-length t)
       (savehist-mode 1)
       (setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
+
+      ;; racket
+      (use-package racket-mode
+        :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
+        :bind (:map racket-mode-map
+              ("<f5>" . recompile-quietly))
+        :init
+        (defun my/buffer-local-tab-complete ()
+          "Make `tab-always-indent' a buffer-local variable and set it to 'complete."
+          (make-local-variable 'tab-always-indent)
+          (setq tab-always-indent 'complete))
+        (defun rcc ()
+          (set (make-local-variable 'compile-command)
+               (format "raco make %s" (file-name-nondirectory buffer-file-name))))
+        (add-hook 'racket-mode-hook 'rcc)
+        (add-hook 'racket-mode-hook 'hs-minor-mode)
+        (add-hook 'racket-mode-hook 'goto-address-mode)
+        (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
+        (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
 
       ;; vim bindings if you need them
       ;;(setq evil-want-keybinding nil)
@@ -152,8 +174,9 @@
     #+END_SRC
 
 *** Per user setup *NEXT HERE*
-    At this point you should be able to open this file in =scimax= and run the code blocks
-    directly using =C-c C-c= (control c control c).
+    You should now have this file open in =scimax=
+    and can run the code blocks directly
+    using =C-c C-c= (control c control c).
 
     All the following should be run as your user in =scimax=.
     If you run these blocks from the command line be sure to run
@@ -161,7 +184,7 @@
 
     #+CAPTION: You can run them all at once from this block.
     #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
-    #+BEGIN_SRC bash :noweb yes :exports none :eval no-export
+    #+BEGIN_SRC bash :results output :noweb yes :exports none :eval no-export
       <<clone-repos>>
       <<python-setup>>
       <<racket-setup>>
@@ -170,7 +193,7 @@
     #+NAME: clone-repos
     #+CAPTION: Clone all required git repositories.
     #+HEADER: :var REPOS=repos
-    #+BEGIN_SRC bash :results drawer :eval no-export
+    #+BEGIN_SRC bash :results output :eval no-export
       cd ~/git
       for repo_url in ${REPOS}; do git clone ${repo_url}.git; done
     #+END_SRC
@@ -179,7 +202,7 @@
     #+CAPTION: Set up all python repositories so that they can be used from git.
     #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
     #+HEADER: :var PYROOTS=py-roots
-    #+BEGIN_SRC bash :results drawer :eval no-export
+    #+BEGIN_SRC bash :results output :eval no-export
       cd ~/git
       for repo in ${PYROOTS}; do cd ${repo}; python setup.py develop --user && cd ~/git; done
     #+END_SRC
@@ -187,7 +210,7 @@
     #+NAME: racket-setup
     #+CAPTION: Install racket packages and dependencies.
     #+HEADER: :var RKTROOTS=rkt-roots
-    #+BEGIN_SRC bash :results drawer :eval no-export
+    #+BEGIN_SRC bash :results output :eval no-export
       cd ~/git
       raco pkg install --skip-installed --auto --batch ${RKTROOTS}
     #+END_SRC
