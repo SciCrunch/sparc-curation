@@ -21,6 +21,7 @@ setup(name='sparcur',
           'blackfynn',
           'dicttoxml',
           'google-api-python-client',
+          'jsonschema>=3.0.1',  # need the draft 6 validator
           'nibabel',
           #'protcur',  # TODO
           'pydicom',
