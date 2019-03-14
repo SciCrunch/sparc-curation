@@ -141,7 +141,7 @@
               ("<f5>" . recompile-quietly))
         :init
         (defun my/buffer-local-tab-complete ()
-          "Make `tab-always-indent' a buffer-local variable and set it to 'complete."
+          "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
           (make-local-variable 'tab-always-indent)
           (setq tab-always-indent 'complete))
         (defun rcc ()
