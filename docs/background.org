@@ -1,0 +1,35 @@
+#+TITLE: SPARC Curation Background
+#+AUTHOR: Tom Gillespie
+# [[./background.pdf]]
+#+OPTIONS: num:nil ^:nil toc:nil
+#+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
+# from sparcur-phases
+#  #+CALL: getdocnew("sparcur-phases", (), "")
+
+* Goals
+  The ideal outcome for the SPARC curation pipeline be to be able to understand exactly which step of a protocol produces a certain type of file in the dataset structure. This is what we would strive for, but practically speaking we are still likely years from being able to do this across the entire consortium [fn::This is a provisional document that lays out the current overview of my (Tom's) understanding of the goals for SPARC curation and how the curation team is going to meet them. This document will change over time as our collective understanding evolves.].
+* Overview
+  There are three axes for our curation workflows. \\
+  - Dataset-Protocol
+  - Human-Machine
+  - Structure-Content (Data-Metadata in some sense, completeness is determined here)
+
+  Dataset-Protocol, and Human-Machine are processes that can proceed independently, and we have parallelized both aspects. Thus we have our human curators and our machine curation pipelines working on both the datasets and the protocols all at the same time.
+
+  The Dataset-Protocol axis is simply the result of the fact that we have two major categories of artifacts that we are curating. Datasets on Blackfynn and protocols on Protocols.io. One important note is that all mapping of datasets to protocols only goes in one direction, since protocols are intended to be reused for many datasets.
+
+  The Human-Machine axis is straight forward. We have human curation workflows and machine curation workflows. Humans provide depth of curation while the machine provide breadth. Human curation is critical for being able to provide effective feedback to data providers so that SPARC can obtain the data that it has requested with minimal effort by all parties. Machine curation is critical for making sure that datasets meet the minimal quality assurance criteria to be FAIR. The machine curation workflows will also provide a foundation for the SPARC BIDs validators so that researchers can get feedback on their datasets before depositing them, greatly reducing the round trip time for many of the simple checks.
+
+  Structure-Content cannot proceed independently in the sense that if we cannot find the dataset description file, then we cannot check to see if there is a contact person listed and will have to circle back with the data wrangler (how this is possible remains a mystery to the Machine workflow) in order to make any progress. Protocols do not face this issue to the same extent as the datasets, once we have obtained them we can extract as much information as is present in the text and any additional references. However, what this actually means is that it is harder for the curators to understand when there is missing information in a protocol, and furthermore, when that information is critical for being able to interpret and reuse a dataset. The curation team are not the experts in this data so when we think that we have completed our protocol curation it is critical for us to seek feedback from the original lab and ideally also from any other labs that will be using the data.
+* Dataset phases
+  1. The high level phases for human and machine dataset curation are as follows.
+  2. Get all the required files. Cycle back with wrangler on what is missing until complete.
+  3. Get all the required information. Cycle back with wrangler on what is missing until complete.
+  4. Normalize the information and determine whether it is correct. Cycle back with PI.
+  5. Publish.
+
+  Practically speaking the machine checks whether we have what we need where we need it and if not the human figures out how to fix it. Information flows back and forth freely at each step of this process. The practical implementation on the machine side uses json schema to specify what we expect at each stage of the curation pipeline and makes it possible to automatically detect missing or incorrect information. The atomic flow for each of these stages is data -> normalize -> restructure -> augment -> output. Validation against schema happens at each arrow and errors are detected and reported at each stage so that we can provide appropriate feedback to the humans involved at each point in the process (input -> validate -> ok or errors). This process is repeated for each level of structure in a dataset.
+* Protocol phases
+  The basic phases of protocol curation correspond to parameters, aspects, inputs, and steps. There are other parts of a protocol but these capture the basic flow of our curation process. More to come on this.
+* Completeness and MIS
+  The output of both flows will be combined and exported into the graph representation as specified by the SPARC MIS. We are currently working through how to provide a quantitative completeness for a SPARC dataset using the MIS as a guideline. The high level metadata is effectively covered by using json schema constraints. However, for subjects and samples it is not as straightforward. From the dataset metadata we can obtain counts of the number of subjects and the fields that researchers have provided, but then we must go to the protocol in order to determine whether other fields from the MIS are relevant. As mentioned above, this is where the curation team will need the help of the domain experts in order to determine what metadata fields are needed (from the MIS or beyond) and in order to determine that the protocol is sufficiently detailed. After that point, the proof is, as they say, in the pudding.
