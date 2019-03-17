@@ -25,7 +25,7 @@ from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.config import local_storage_prefix
-from sparcur.core import Path
+from sparcur.core import Path, JEncode
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur import schemas as sc
 from sparcur.schemas import (JSONSchema, ValidationError,
@@ -51,19 +51,6 @@ if False:  # TODO create a protocols.io class for dealing with fetching that can
     _pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
     protocol_jsons = {}
 
-class CJEncode(json.JSONEncoder):
-     def default(self, obj):
-         if isinstance(obj, tuple):
-             return list(obj)
-         elif isinstance(obj, deque):
-             return list(obj)
-         elif isinstance(obj, ProtcParameter):
-             return str(obj)
-         elif isinstance(obj, OntId):
-             return obj.curie + ',' + obj.label
-
-         # Let the base class default method raise the TypeError
-         return json.JSONEncoder.default(self, obj)
 
 class EncodingError(Exception):
     """ Some encoding error has occured in a file """
@@ -1969,10 +1956,10 @@ class Summary(FThing):
         errors = [['id', 'blob']]
         resources = [['id', 'blob']]
 
-        #cje = CJEncode()
+        #cje = JEncode()
         def normv(v):
             if isinstance(v, list) or isinstance(v, tuple):
-                v = ','.join(json.dumps(_, cls=CJEncode)
+                v = ','.join(json.dumps(_, cls=JEncode)
                              if isinstance(_, dict) else
                              str(_) for _ in v)
                 v = v.replace('\n', ' ').replace('\t', ' ')
@@ -1982,7 +1969,7 @@ class Summary(FThing):
                 v = v.replace('\n', ' ').replace('\t', ' ')  # FIXME tests to catch this
 
             elif isinstance(v, dict):
-                v = json.dumps(v, cls=CJEncode)
+                v = json.dumps(v, cls=JEncode)
 
             return v
 
@@ -2025,27 +2012,27 @@ class Summary(FThing):
             if 'subjects' in dowe:
                 for subject in dowe['subjects']:
                     row = [id]
-                    row.append(json.dumps(subject, cls=CJEncode))
+                    row.append(json.dumps(subject, cls=JEncode))
                     subjects.append(row)
 
                 # moved to resources if exists already
                 #if 'software' in sbs:
                     #for software in sbs['software']:
                         #row = [id]
-                        #row.append(json.dumps(software, cls=CJEncode))
+                        #row.append(json.dumps(software, cls=JEncode))
                         #resources.append(row)
 
             if 'resources' in dowe:
                 for res in dowe['resources']:
                     row = [id]
-                    row.append(json.dumps(res, cls=CJEncode))
+                    row.append(json.dumps(res, cls=JEncode))
                     resources.append(row)
 
             if 'errors' in dowe:
                 ers = dowe['errors']
                 for er in ers:
                     row = [id]
-                    row.append(json.dumps(er, cls=CJEncode))
+                    row.append(json.dumps(er, cls=JEncode))
                     errors.append(row)
 
         # TODO samples resources

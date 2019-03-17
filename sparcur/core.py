@@ -1,3 +1,4 @@
+import json
 import hashlib
 import subprocess
 from time import sleep
@@ -11,6 +12,21 @@ from dateutil.parser import parser
 from Xlib.display import Display
 from Xlib import Xatom
 from IPython import embed
+
+
+class JEncode(json.JSONEncoder):
+     def default(self, obj):
+         if isinstance(obj, tuple):
+             return list(obj)
+         elif isinstance(obj, deque):
+             return list(obj)
+         elif isinstance(obj, ProtcParameter):
+             return str(obj)
+         elif isinstance(obj, OntId):
+             return obj.curie + ',' + obj.label
+
+         # Let the base class default method raise the TypeError
+         return json.JSONEncoder.default(self, obj)
 
 
 # remote data about remote objects -> remote_meta
