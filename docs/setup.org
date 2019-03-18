@@ -98,10 +98,12 @@
     #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
     #+BEGIN_SRC bash :exports code :eval never
       # TODO emacs auto setup to be able to run this file
+      mkdir -p ~/.local/bin
       mkdir ~/bin
       mkdir ~/opt
       mkdir ~/git
       mkdir ~/files
+      source .profile
       git clone https://github.com/tgbugs/sparc-curation.git ~/git/sparc-curation
       ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
     #+END_SRC
@@ -110,6 +112,7 @@
     #+CAPTION: Install scimax to get the functionality to run this =setup.org= file.
     #+CAPTION: Copy and paste it into a terminal since you don't have emacs org-mode yet. \\
     #+BEGIN_SRC bash :exports code :eval never :noweb yes
+      tlmgr init-usertree  # init texlive for your user
       # This is dangerous. I (Tom) have reviewed the install script at this commit.
       # Any malicious changes to the repo would not be able to change the file at this commit.
       # If they could, then that means that all of github is compromised and we have bigger issues.
@@ -185,6 +188,7 @@
     If you run these blocks from the command line be sure to run
     nameref:remote-exports first.
 
+    # FIXME why no output on first run? too many errors?
     #+CAPTION: You can run them all at once from this block.
     #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
     #+BEGIN_SRC bash :results output :noweb yes :exports none :eval no-export
@@ -193,6 +197,10 @@
       <<racket-ontology>>
       <<racket-setup>>
     #+END_SRC
+
+    *If you run the block above you do not need to run the rest of this section*
+    *and you can move on to the [[Configuration files]] section.*
+
 
     #+NAME: clone-repos
     #+CAPTION: Clone all required git repositories.
@@ -232,13 +240,15 @@
     #+END_SRC
 
 *** Configuration files
+    Each block in this section should have =#+RESULTS:= if it succeeds.
+
     # TODO improve the error messages (there are loads of them)
     #+NAME: config-setup
     #+CAPTION: Make =devconfig.yaml= and =secrets.yaml= available in the home directory.
     #+CAPTION: *If you don't run this block you will get some really fun errors.*
     #+BEGIN_SRC bash :eval no-export
       cd ~/
-      ontutils devconfig --write
+      ontutils devconfig --write &&
       ln -s ~/git/pyontutils/pyontutils/devconfig.yaml
       touch ~/secrets.yaml
       chmod 0600 ~/secrets.yaml
@@ -287,13 +297,17 @@
 
     #+END_SRC
 
+    You can move your [[file:${HOME}/secrets.yaml]] to live where ever you want, but
+    you will need to update the =secrets_file= entry in [[file:${HOME}/devconfig.yaml]].
+
     At this point installation is complete. Congratulations!
     The [[Accounts and API access][next section]] will walk you through the steps needed
     to get access to all the various systems holding different pieces of data that we need.
 
 *** Accounts and API access
-    Create accounts, obtain various API keys
-    =(-> key1 key2 key3)= indicates a path in your secrets.yaml file.
+    Create accounts, obtain various API keys. The notation =(-> key1 key2 key3)=
+    indicates a path in your [[file:${HOME}/secrets.yaml]] file. After you finish
+    this section you can jump to [[Get data][getting data]]!.
 
 **** Data
 ***** Blackfynn
@@ -341,7 +355,7 @@
       cd ~/
     #+END_SRC
 
-** Sparc
+** SPARC
 *** Get data
     #+CAPTION: woo
     #+BEGIN_SRC bash :results none
