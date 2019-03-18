@@ -6,9 +6,9 @@
 
 * Introduction
   This is a general guide to bootstrapping and maintaining a complete development environment for
-  working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc. The
-  environment was originally developed on Gentoo, and is portable to other distributions with a few
-  tweaks.
+  working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc.
+  For a general introduction to the SPARC curation process see [[./background.org]]
+  The development environment created by running this was originally developed on Gentoo, and is portable to other distributions with a few tweaks.
 * Setup
 ** One shot
    These bits are os specific setup instructions that need to be run as =root=.
@@ -167,11 +167,11 @@
       scimax
     #+END_SRC
 
-    =scimax= will launch emacs an install a number of packages. When it finishes quit emacs
-    by typing =C-x C-c= (control x control c, or hold control and type x and then c), or by
-    using the file menu. After running the next command you should have a version of this file
-    open locally. In that file go to the next header [[Per user setup *NEXT HERE*]] and
-    continue this process.
+    =scimax= will launch emacs an install a number of packages. It is normal to see errors
+    during this step. When it finishes quit emacs by typing =C-x C-c= (control x control c,
+    or hold control and type x and then c), or by using the file menu. After running the next
+    command you should have a version of this file open locally. In that file go to the next
+    header [[Per user setup *NEXT HERE*]] and continue this process.
 
     #+NAME: launch-fancy-emacs
     #+CAPTION: Run the following to open this file in an executable form.
@@ -320,14 +320,21 @@
       =(-> google api creds-file)=
       https://developers.google.com/identity/protocols/OAuth2
       https://developers.google.com/api-client-library/python/guide/aaa_oauth
+      You will need to get API access for a services account using the create services account key option.
       Get the document ids for =(-> google sheets sparc-master)= and =(-> google sheets sparc-consistency)=.
+      Document id matches this pattern https://docs.google.com/spreadsheets/d/{document_id}/edit.
 **** Protocol annotation set up
 ***** Hypothes.is
       #+CAPTION: as your user Install the hypothesis client in chrome.
       #+BEGIN_SRC bash :results none
         google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
       #+END_SRC
+      To get Hypothes.is API keys [[https://web.hypothes.is/start/][create an account]],
+      login, and go to your [[https://hypothes.is/account/developer][developer page]].
 ***** protocols.io
+      To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
+      login, and go to your [[https://www.protocols.io/developers][developer page]].
+      Use the information there to fill in a json file with the structure below.
       =(-> protocols-io api creds-file)=
       #+CAPTION: protocols.io creds-file.json template
       #+BEGIN_SRC js
@@ -344,6 +351,7 @@
             }
         }
       #+END_SRC
+
 * Workflows
 ** General
 *** Staying up to date
