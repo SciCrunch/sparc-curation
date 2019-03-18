@@ -277,8 +277,8 @@
           sec = yaml.load(f)
       if not sec:
           secrets_template = {
-              'hypothesis': {'api':{'your-user-name': 'fake-api-key'},
-                             'group':{'sparc-curation': 'fake-group-id'}},
+              'hypothesis': {'api':{'replace-me-with-your-user-name': 'fake-api-key'},
+                             'group':{'sparc-curation': 'FakeId12'}},
               'blackfynn': {'sparc':{'key': 'fake-api-key',
                                      'secret': 'fake-api-secret'}},
               'protocols-io': {'creds-file': '/path/to/creds-file.json'},
