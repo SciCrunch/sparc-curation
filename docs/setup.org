@@ -26,6 +26,9 @@
     #+END_SRC
 *** Ubuntu
     18.10 cosmic cuttlefish (and presumably other debian derivatives)
+
+    The following need to be run in a shell where you have root (e.g. via =sudo su -=). \\
+
     # Remind me, why is an ssh server not provided by default!?
     #+CAPTION: Must be done locally as root prior to remote execution. \\
     #+BEGIN_SRC bash :exports code :eval never
