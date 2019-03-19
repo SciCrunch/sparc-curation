@@ -42,6 +42,9 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
     """ Testing. To be used with ssh-agent.
         StuFiS The stupid file sync. """
 
+    stat_format = f'\"\'%n\' %o %s %W %X %Y %Z %g %u %f\"'
+    cypher_command = 'sha256sum'
+
     def __new__(cls, local_class, cache_class, host):
         return super().__new__(cls, local_class, cache_class, host=host)
 
@@ -54,69 +57,32 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 
     @property
     def meta(self):
-        """ stat format
-        %a     access rights in octal (note '#' and '0' printf flags)
-        %A     access rights in human readable form
-        %b     number of blocks allocated (see %B)
-        %B     the size in bytes of each block reported by %b
-        %C     SELinux security context string
-        %d     device number in decimal
-        %D     device number in hex
-        %f     raw mode in hex
-        %F     file type
-        %g     group ID of owner
-        %G     group name of owner
-        %h     number of hard links
-        %i     inode number
-        %m     mount point
-        %n     file name
-        %N     quoted file name with dereference if symbolic link
-        %o     optimal I/O transfer size hint
-        %s     total size, in bytes
-        %t     major device type in hex, for character/block device special files
-        %T     minor device type in hex, for character/block device special files
-        %u     user ID of owner
-        %U     user name of owner
-        %w     time of file birth, human-readable; - if unknown
-        %W     time of file birth, seconds since Epoch; 0 if unknown
-        %x     time of last access, human-readable
-        %X     time of last access, seconds since Epoch
-        %y     time of last data modification, human-readable
-        %Y     time of last data modification, seconds since Epoch
-        %z     time of last status change, human-readable
-        %Z     time of last status change, seconds since Epoch
-        Valid format sequences for file systems:
-        %a     free blocks available to non-superuser
-        %b     total data blocks in file system
-        %c     total file nodes in file system
-        %d     free file nodes in file system
-        %f     free blocks in file system
-        %i     file system ID in hex
-        %l     maximum length of filenames
-        %n     file name
-        %s     block size (for faster transfers)
-        %S     fundamental block size (for block counts)
-        %t     file system type in hex
-        %T     file system type in human readable form """
-
         # TODO the python version for local too ...
         # plus why not be able to generate this for
         # a whole directory
-        format = f'\"%n %o %s %W %X %Y %Z %g %u %f\"'
-        cypher_command = 'sha256sum'
-        remote_cmd = (f'{cypher_command} {self.cache.id} | '
+        remote_cmd = (f'{self.cypher_command} {self.cache.id} | '
                       'awk \'{ printf $1 }\';'
                       "printf ' ';"
-                      f'stat "{self.cache.id}" -c {format}')
+                      f'stat "{self.cache.id}" -c {self.stat_format}')
 
+        out = self._ssh(remote_cmd)
+        return self._meta(*out.decode().split())
+
+    def _ssh(self, remote_cmd):
         print(remote_cmd)
         cmd = ['ssh', self.host, remote_cmd]
         # FIXME TODO open an ssh session and keep it alive???
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
         out, _ = p.communicate()
-        (checksum, name, hint, size,
-         birth, access, modified, changed,
-         gid, uid, raw_mode) = out.decode().split()
+        #(checksum, name, hint, size,
+        #birth, access, modified, changed,
+        #gid, uid, raw_mode)
+        return out
+
+    def _meta(self, checksum, name, hint, size,
+              birth, access, modified, changed,
+              gid, uid, raw_mode):
+
         octal_mode = oct(literal_eval('0x' + raw_mode))
 
         created = None if birth == '-' else datetime.fromtimestamp(int(birth))
@@ -135,9 +101,24 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
     def children(self):
         # this is amusingly bad, also children_recursive ... drop the maxdepth
         #("find ~/files/blackfynn_local/SPARC\ Consortium -maxdepth 1 "
-         #"-exec stat -c \"'%n' %o %s %W %X %Y %Z %g %u %f\" {} \;")
+        #"-exec stat -c \"'%n' %o %s %W %X %Y %Z %g %u %f\" {} \;")
+        # chechsums when listing children? maybe ...
+        #\"'%n' %o %s %W %X %Y %Z %g %u %f\"
+        if self.is_dir():
+            # no children if it is a file sadly
+            remote_cmd = (f"cd {self.cache.id};"
+                        f"stat -c {self.stat_format} {{.,}}*;"
+                        "echo '----';"
+                        f"{self.cypher_command} {{.,}}* |"  # FIXME fails on directories destroying alignment
+                        "awk '{ printf(\"%s\\n\", $1) }'")
 
-        remote_cmd = "cd {self.cache.id}; stat -c \"'%n' %o %s %W %X %Y %Z %g %u %f\" {.,}*"
+            out = self._ssh(remote_cmd)
+            out = out.decode()
+            stats, checks = out.split('----\n')
+            for s, c in zip(stats.split('\n'), checks.split('\n')):
+                print(c, s)
+
+            #return self._meta(*out.decode().split())
 
 
 class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
@@ -150,7 +131,7 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
         # keep this simple
         # the local paths know where their root is
         # the remote paths know theirs
-        # making sure they match requris they both know
+        # making sure they match requires they both know
         # their own roots first
         return self.bfl.bf.organization.id
 
@@ -193,6 +174,8 @@ def main():
     from socket import gethostname
     SshRemote = SshRemoteFactory(Path, ReflectiveCachePath, gethostname())
     this_file_darkly = SshRemote(__file__)
+    assert this_file_darkly.meta.checksum == this_file_darkly.local.checksum().hex()
+    this_file_darkly.children  # FIXME why does this list the home directory!?
     embed()
 
 
