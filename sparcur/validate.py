@@ -3,6 +3,7 @@ from functools import wraps
 from sparcur import schemas as sc
 
 class HasSchema:
+    """ decorator for classes with methods whose output can be validated by jsonschema """
     def __init__(self, schema=None, normalize=False):
         self.schema = schema
         self.normalize = normalize

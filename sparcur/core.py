@@ -65,9 +65,9 @@ class PathMeta:
         return cls(**kwargs)
 
     def __init__(self,
-                 size,
-                 created,
-                 updated,
+                 size=None,
+                 created=None,
+                 updated=None,
                  checksum=None,
                  id=None,
                  file_id=None,
@@ -123,6 +123,12 @@ class RemotePath(PosixPath):
     # should be more than enough, the path object shouldn't need
     # to know that it has a remote id, the remote manager should
     # know that
+
+    def __init__(self)
+
+    @property
+    def root(self):
+        raise NotImplemented
 
     @property
     def id(self):
@@ -206,6 +212,20 @@ class RemotePath(PosixPath):
         yield from []
         raise NotImplemented
 
+    @property
+    def children(self):
+        # uniform interface for retrieving remote hierarchies decoupled from meta
+        raise NotImplemented
+
+    def iter_dir(self):
+        # I'm guessing most remotes don't support this
+        raise NotImplemented
+
+    def glob(self, pattern):
+        raise NotImplemented
+
+    def rglob(self, pattern)
+        raise NotImplemented
 
 class CachePath(PosixPath):
     """ Local data about remote objects.

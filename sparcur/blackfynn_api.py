@@ -424,6 +424,48 @@ def get_file_by_id(get, file_path, pid, fid):
         return None, None
 
 
+class HomogenousBF:
+    def __init__(self, bfobject):
+        self.o = bfobject
+
+    @property
+    def id(self):
+        if isinstance(self.o, File):
+            return self.o.pkg_id
+
+    @property
+    def size(self):
+        if isinstance(self.o, File):
+            return self.o.size
+
+    @property
+    def created(self):
+        if not isinstance(self.o, Organization):
+            return self.o.created_at
+
+    @property
+    def updated(self):
+        if not isinstance(self.o, Organization):
+            return self.o.updated_at
+
+    @property
+    def file_id(self):
+        if isinstance(self.o, File):
+            return self.o.id
+
+    @property
+    def old_id(self):
+        return None
+
+    @property
+    def checksum(self):
+        return None
+
+    @property
+    def children(self):
+        return None
+
+
 class BFLocal:
 
     class NoBfMeta(Exception):
@@ -478,14 +520,20 @@ class BFLocal:
                 path.setxattrs(attrs)
                 # TODO checksum may no longer match since we changed it
 
-    def recover_meta(self, path):
-        pattrs = norm_xattrs(path.parent.xattrs())
-        codid = pattrs['bf.id']
+    def get(self, id):
         if codid.startswith('N:collection:'):
             thing = self.bf.get(codid)
         elif codid.startswith('N:dataset:'):
             thing = self.bf.get_dataset(codid)  # heterogenity is fun!
-        else:
+
+    def get_homogenous(self, id):
+        return HomogenousBF(self.get(id))
+
+    def recover_meta(self, path):
+        pattrs = norm_xattrs(path.parent.xattrs())
+        codid = pattrs['bf.id']
+        thing = self.get(codid)
+        if thing is None:
             return {}
             raise BaseException('What are you doing!??!?!')
 
