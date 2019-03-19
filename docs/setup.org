@@ -304,6 +304,10 @@
     you will need to update the =secrets_file= entry in [[file:${HOME}/devconfig.yaml]].
 
     At this point installation is complete. Congratulations!
+
+    *You should log out and log back in to your window manager* so that any new terminal
+    you open will have access to all the programs you just installed.
+
     The [[Accounts and API access][next section]] will walk you through the steps needed
     to get access to all the various systems holding different pieces of data that we need.
 
