@@ -15,18 +15,18 @@ from IPython import embed
 
 
 class JEncode(json.JSONEncoder):
-     def default(self, obj):
-         if isinstance(obj, tuple):
-             return list(obj)
-         elif isinstance(obj, deque):
-             return list(obj)
-         elif isinstance(obj, ProtcParameter):
-             return str(obj)
-         elif isinstance(obj, OntId):
-             return obj.curie + ',' + obj.label
+    def default(self, obj):
+        if isinstance(obj, tuple):
+            return list(obj)
+        elif isinstance(obj, deque):
+            return list(obj)
+        elif isinstance(obj, ProtcParameter):
+            return str(obj)
+        elif isinstance(obj, OntId):
+            return obj.curie + ',' + obj.label
 
-         # Let the base class default method raise the TypeError
-         return json.JSONEncoder.default(self, obj)
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
 
 
 # remote data about remote objects -> remote_meta
@@ -53,10 +53,12 @@ class PathMeta:
     @classmethod
     def from_xattrs(cls, **kwargs):
         """ decoding from bytes """
+        pass
 
     @classmethod
     def from_metastore(cls, **kwargs):
         """ db entry """
+        pass
 
     @classmethod
     def from_path(cls, relative_path):
@@ -124,7 +126,17 @@ class RemotePath(PosixPath):
     # to know that it has a remote id, the remote manager should
     # know that
 
-    def __init__(self)
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    @property
+    def cache(self):
+        # TODO performance check on these
+        return self._cache_class(self)
+
+    @property
+    def local(self):
+        return self._local_class(self)
 
     @property
     def root(self):
@@ -224,8 +236,9 @@ class RemotePath(PosixPath):
     def glob(self, pattern):
         raise NotImplemented
 
-    def rglob(self, pattern)
+    def rglob(self, pattern):
         raise NotImplemented
+
 
 class CachePath(PosixPath):
     """ Local data about remote objects.
@@ -252,11 +265,12 @@ class CachePath(PosixPath):
 
 class LocalPath(PosixPath):
     # local data about remote objects
+    _cache_class = CachePath
 
     @property
     def cache(self):
         # TODO performance check on these
-        return CachePath(self)
+        return self._cach_class(self)
 
     @property
     def id(self):
