@@ -334,15 +334,15 @@
 ***** protocols.io
       To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
       login, and go to your [[https://www.protocols.io/developers][developer page]].
-      Use the information there to fill in a json file with the structure below.
-      =(-> protocols-io api creds-file)=
+      Use the information from that page to fill in a json file with the structure below.
+      Add the full path to that json file to =(-> protocols-io api creds-file)= in secrets.yaml
+      like you did for the google json file.
       #+CAPTION: protocols.io creds-file.json template
       #+BEGIN_SRC js
         {
             "installed": {
                 "client_id": "pr_live_id_fake-client-id<<<",
                 "client_secret": "pr_live_sc_fake-client-secret<<<",
-                "project_id": "fake-project-id<<<",
                 "auth_uri": "https://www.protocols.io/api/v3/oauth/authorize",
                 "token_uri": "https://www.protocols.io/api/v3/oauth/token",
                 "redirect_uris": [
