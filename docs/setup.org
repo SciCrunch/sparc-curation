@@ -8,8 +8,11 @@
   This is a general guide to bootstrapping and maintaining a complete development environment for
   working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc.
   For a general introduction to the SPARC curation process see [[./background.org]]
-  The development environment created by running this was originally developed on Gentoo, and is portable to other distributions with a few tweaks.
+  The environment bootstrapped by running this file was originally developed on Gentoo,
+  and is portable to other distributions with a few tweaks.
 * Setup
+  Setup takes about 3 hours.
+  [[One shot][OS level setup]] takes about and hour, and [[User *START HERE!*][user setup]] takes about two hours.
 ** One shot
    These bits are os specific setup instructions that need to be run as =root=.
    They only need to be run once.
@@ -308,7 +311,6 @@
     Create accounts, obtain various API keys. The notation =(-> key1 key2 key3)=
     indicates a path in your [[file:${HOME}/secrets.yaml]] file. After you finish
     this section you can jump to [[Get data][getting data]]!.
-
 **** Data
 ***** Blackfynn
       Once you have a Blackfynn account on the sparc org go to your
