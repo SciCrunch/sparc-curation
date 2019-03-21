@@ -212,8 +212,6 @@
     #+CAPTION: Run the following to open this file in an executable form.
     #+BEGIN_SRC bash :exports code :eval never
       scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
-      #--eval '(goto-char (org-find-exact-headline-in-buffer "Per user setup *NEXT HERE*"))' \
-      #--eval "(add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))"
     #+END_SRC
 
 *** Per user setup
@@ -222,7 +220,11 @@
     :END:
     You should now have this file open in =scimax=
     and can run the code blocks directly by clicking on a block
-    and typing =C-c C-c= (control c control c).
+    and typing =C-c C-c= (control c control c). In the default
+    =scimax= setup code blocks will appear as yellow or green.
+    Note that not all yellow blocks are source code, some may be
+    examples, you can tell because examples won't execute and the
+    start with =#+BEGIN_EXAMPLE= instead of =#+BEGIN_SRC=.
 
     All the following should be run as your user in =scimax=.
     If you run these blocks from the command line be sure to run
@@ -384,9 +386,22 @@
     :PROPERTIES:
     :CUSTOM_ID: accounts-and-api-access
     :END:
-    Create accounts, obtain various API keys. The notation =(-> key1 key2 key3)=
-    indicates a path in your [[file:${HOME}/secrets.yaml]] file. After you finish
-    this section you can jump to [[#get-data][getting data]]!.
+    Create accounts, obtain various API keys.
+    After you finish this section you can jump to [[#get-data][getting data]]!.
+
+    The notation =(-> key1 key2 key3)= indicates a path in
+    your [[file:${HOME}/secrets.yaml][secrets.yaml]] file.
+    In a yaml file this looks like the block below.
+    Replace the =fake-value= with the real value you obtain in the following sections.
+    #+CAPTION: yaml view of =(-> key1 key2 key3)=
+    #+BEGIN_SRC yaml :eval never
+      key1:
+        key2:
+          key3: fake-value
+    #+END_SRC
+    You can open the [[file:${HOME}/secrets.yaml][secrets.yaml]]
+    file in another buffer by clicking on the link to it here. When you edit the file and
+    to add api keys you should save it after each one using the file menu or =C-x C-x=.
 **** Data
 ***** Blackfynn
       Once you have a Blackfynn account on the sparc org go to your
