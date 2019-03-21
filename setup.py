@@ -31,6 +31,7 @@ setup(name='sparcur',
           'python-magic',  # FIXME conflicts with sys-apps/file python bindings
           'pyxattr',
           'scipy',
+          'terminaltables',
           'Xlib',
           'xlsx2csv',
       ],

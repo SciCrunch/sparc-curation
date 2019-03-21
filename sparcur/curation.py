@@ -23,6 +23,7 @@ from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
 from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
+from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.config import local_storage_prefix
 from sparcur.core import Path, JEncode
@@ -260,6 +261,15 @@ class Tabular:
             yield from self.normalize(getattr(self, self.file_extension)())
         except UnicodeDecodeError as e:
             logger.error(f'\'{self.path}\' {e}')
+
+    def __repr__(self):
+        limit = 30
+        ft = FThing(self.path)
+        title = f'{self.path.name:>40}' + ft.dataset.id + ' ' + ft.dataset.name
+        return AsciiTable([[c[:limit] + ' ...' if isinstance(c, str)
+                            and len(c) > limit else c
+                            for c in r] for r in self],
+                          title=title).table
 
 
 class Version1Header:
@@ -1026,6 +1036,11 @@ class FThing(FakePathHelper):
             parent = parent.parent
 
         yield from reversed(parents)
+
+    @property
+    def children(self):
+        for child in self.path.children:
+            yield self.__class__(child)
 
     @property
     def is_organization(self):
@@ -2224,7 +2239,8 @@ def main():
     drl = [(d.dataset_name_proper, p.name, FThing(p).parent.is_dataset)
            for d in dsl for p in d.meta_paths] 
 
-    embed()
+    if __name__ == '__main__':
+        embed()
 
 if __name__ == '__main__':
     main()

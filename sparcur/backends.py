@@ -247,15 +247,6 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
 
 def main():
     from IPython import embed
-    from socket import gethostname
-    SshRemote = SshRemoteFactory(Path, ReflectiveCachePath, gethostname())
-    print(__file__)
-    this_file_darkly = SshRemote(__file__)
-    hrm = this_file_darkly.meta.__dict__, this_file_darkly.local.meta.__dict__
-    assert hrm[0] == hrm[1]
-    assert this_file_darkly.meta.checksum == this_file_darkly.local.meta.checksum
-    assert list(this_file_darkly.data) == list(this_file_darkly.local.data)
-    stats, checks = this_file_darkly.parent.children  # FIXME why does this list the home directory!?
     embed()
 
 

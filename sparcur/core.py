@@ -4,7 +4,7 @@ import subprocess
 from time import sleep
 from pathlib import PosixPath, PurePosixPath
 from datetime import datetime
-from collections import defaultdict
+from collections import deque
 import xattr
 import psutil
 import sqlite3
@@ -155,6 +155,17 @@ class PathMeta:
         #return '/'.join(gen)
         return self.id + '/.' + '.'.join(gen)
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.__dict__})'
+
+    def __eq__(self, other):
+        if isinstance(other, PathMeta):
+             for field in self.fields:
+                  if getattr(self, field) != getattr(other, field):
+                       return False
+             else:
+                  return True
+
 
 class RemotePath(PurePosixPath):
     """ Remote data about a local object. """
@@ -280,7 +291,7 @@ class RemotePath(PurePosixPath):
         # uniform interface for retrieving remote hierarchies decoupled from meta
         raise NotImplemented
 
-    def iter_dir(self):
+    def iterdir(self):
         # I'm guessing most remotes don't support this
         raise NotImplemented
 
@@ -419,6 +430,10 @@ class LocalPath(PosixPath):
                     break
 
                 yield data
+
+    @property
+    def children(self):
+        yield from self.iterdir()
 
     def diff(self):
         pass

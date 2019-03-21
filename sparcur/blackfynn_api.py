@@ -521,10 +521,10 @@ class BFLocal:
                 # TODO checksum may no longer match since we changed it
 
     def get(self, id):
-        if codid.startswith('N:collection:'):
-            thing = self.bf.get(codid)
-        elif codid.startswith('N:dataset:'):
-            thing = self.bf.get_dataset(codid)  # heterogenity is fun!
+        if id.startswith('N:collection:'):
+            thing = self.bf.get(id)
+        elif id.startswith('N:dataset:'):
+            thing = self.bf.get_dataset(id)  # heterogenity is fun!
 
     def get_homogenous(self, id):
         return HomogenousBF(self.get(id))

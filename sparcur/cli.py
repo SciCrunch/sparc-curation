@@ -5,9 +5,11 @@ Usage:
     spc annos [export shell]
     spc stats [<directory>...]
     spc report [filetypes]
+    spc tables [<directory>...]
     spc missing
     spc xattrs
     spc export
+    spc demos
     spc shell [--project]
     spc feedback <feedback-file> <feedback>...
     spc [options] <file>...
@@ -21,6 +23,7 @@ Commands:
     missing   find and fix missing metadata
     xattrs    populate metastore / backup xattrs
     export    export extracted data
+    demos     long running example queries
     shell     drop into an ipython shell
 
 Options:
@@ -28,34 +31,69 @@ Options:
     -l --limit=LIMIT        the maximum size to download in megabytes
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
-    -p --project            find the project_path by looking for N:organization:
+    -j --project            find the project_path by looking for N:organization:
+    -p --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
+    -d --debug              drop into a shell after running a step
 
 """
 
+import csv
+import json
+from datetime import datetime
+from collections import Counter
+from sparcur import schemas as sc
+from sparcur import curation
 from sparcur.blackfynn_api import BFLocal, Path
 from sparcur.curation import FThing, FTLax, CurationReport, Summary
+from sparcur.curation import get_datasets, JEncode
 from sparcur.core import JT
+from IPython import embed
 
-def main():
-    from docopt import docopt, parse_defaults
-    args = docopt(__doc__, version='bfc 0.0.0')
-    defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
-    from IPython import embed
-    from sparcur import curation
 
-    overwrite = args['--overwrite']
+class Dispatch:
+    def __init__(self, args):
+        self.args = args
 
-    if args['--project']:
-        # FIXME only works for fs version, bfl will not change
-        current_ft = FThing(Path('.').resolve())
-        while not current_ft.is_organization:
-            current_ft = current_ft.parent
+        if args['--project'] or args['--project-path']:
+            if args['--project-path']:
+                path = args['--project-path']
+            else:
+                path = '.'
+            # FIXME only works for fs version, bfl will not change
+            current_ft = FThing(Path(path).resolve())
+            while not current_ft.is_organization:
+                current_ft = current_ft.parent
 
-        pp = current_ft.path
-        curation.project_path = pp # FIXME BAD BAD BAD
+            pp = current_ft.path
+            curation.project_path = pp # FIXME BAD BAD BAD
 
-    if args['annos']:
+        self.summary = Summary(curation.project_path)
+
+    def __call__(self):
+        # FIXME this might fail to run annos -> shell correctly
+        for k, v in self.args.items():
+            if v and not any(k.startswith(c) for c in ('-', '<')):
+                getattr(self, k)()
+                return
+        else:
+            self.default()
+
+    @property
+    def debug(self):
+        return self.args['--debug']
+
+    @property
+    def overwrite(self):
+        return self.args['--overwrite']
+
+    def pull(self):
+        # TODO folder meta -> org
+        bfl = BFLocal()
+        bfl.cons()
+
+    def annos(self):
+        args = self.args
         from protcur.analysis import protc, Hybrid
         from sparcur.curation import populate_annos
         populate_annos()
@@ -63,15 +101,11 @@ def main():
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
-        if args['shell']:
+        if args['shell'] or self.debug:
             embed()
 
-    elif args['pull']:
-        # TODO folder meta -> org
-        bfl = BFLocal()
-        bfl.cons()
-
-    elif args['stats']:
+    def stats(self):
+        args = self.args
         dirs = args['<directory>']
         if not dirs:
             dirs.append('.')
@@ -112,52 +146,53 @@ def main():
         print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
         print(fmt)
 
-    elif args['report']:
-        from collections import Counter
-        if args['filetypes']:
-            #root = FThing(curation.project_path)
-            fts = [FThing(p) for p in curation.project_path.rglob('*') if p.is_file()]
-            #all_counts = sorted([(*k, v) for k, v in Counter([(f.suffix, f.mimetype, f._magic_mimetype)
-                                                              #for f in fts]).items()], key=lambda r:r[-1])
+    def demos(self):
+        return self.shell()
 
-            def count(thing):
-                return sorted([(k, v) for k, v in Counter([getattr(f, thing)
-                                                            for f in fts]).items()], key=lambda r:-r[-1])
-            #each = {t:count(t) for t in ('suffix', 'mimetype', )}
-            each = {t:count(t) for t in ('_magic_mimetype', )}
-            
-            for head, tups in each.items():
-                print(head)
-                print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
-            embed()
-        #rep = curation_report()
-        #print(rep)
-
-    elif args['feedback']:
-        file = args['<feedback-file>']
-        feedback = ' '.join(args['<feedback>'])
-        path = Path(file).resolve()
-        eff = FThing(path)
-        # TODO pagenote and/or database
-        print(eff, feedback)
-
-    elif args['missing']:
+    def shell(self):
+        """ drop into an shell with classes loaded """
         bfl = BFLocal()
-        bfl.find_missing_meta()
+        ds, dsd = get_datasets(curation.project_path)  # FIXME deprecate
+        summary = self.summary
+        org = FThing(curation.project_path)
+        if self.args['demos']:
+            # get the first dataset
+            dataset = next(iter(summary))
 
-    elif args['xattrs']:
-        bfl = BFLocal()
-        bfl.populate_metastore()
+            # another way to get the first dataset
+            dataset_alt = next(org.children)
 
-    elif args['export']:
-        import csv
-        import json
-        from datetime import datetime
-        from sparcur.curation import CJEncode
+            # view all dataset descriptions call repr(tabular_view_demo)
+            tabular_view_demo = [next(d.dataset_description).t
+                                 for d in ds
+                                 if 'dataset_description' in d.data]
+
+        elif False:
+            ### this is the equivalent of export, quite slow to run
+            # export everything
+            dowe = summary.data_out_with_errors
+
+            # show all the errors from export everything
+            error_id_messages = [(d['id'], e['message']) for d in dowe['datasets'] for e in d['errors']]
+            error_messages = [e['message'] for d in dowe['datasets'] for e in d['errors']]
+
+        embed()
+
+    def tables(self):
+        """ print summary view of raw metadata tables, possibly per dataset """
+        # TODO per dataset
+        summary = self.summary
+        tabular_view_demo = [next(d.dataset_description).t
+                                for d in summary
+                                if 'dataset_description' in d.data]
+        print(repr(tabular_view_demo))
+
+    def export(self):
+        """ export output of curation workflows to file """
         #from sparcur.curation import get_datasets
         #ds, dsd = get_datasets(curation.project_path)
         #org_id = FThing(curation.project_path).organization.id
-        summary = Summary(curation.project_path)
+        summary = self.summary
         timestamp = datetime.now().isoformat()
         # start time not end time ...
         # obviously not transactional ...
@@ -173,7 +208,7 @@ def main():
                 f.write(xml)
 
         with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=CJEncode)
+            json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=JEncode)
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
             f.write(summary.ttl)
@@ -184,19 +219,11 @@ def main():
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
 
-    elif args['shell']:
-        from sparcur import schemas as sc
-        from sparcur.curation import get_datasets
-        bfl = BFLocal()
-        ds, dsd = get_datasets(curation.project_path)
-        summary = Summary(curation.project_path)
-        org = FThing(curation.project_path)
-        # dowe = summary.data_out_with_errors
-        # error_messages = [(d['id'], e['message']) for d in dwe['datasets'] for e in d['errors']]
-        # error_messages = [e['message'] for d in dwe['datasets'] for e in d['errors']]
-        embed()
+        if self.debug:
+            embed()
 
-    else:
+    def default(self):
+        args = self.args
         paths = []
         if args['<file>']:
             files = args['<file>']
@@ -212,7 +239,7 @@ def main():
             path = Path('.').resolve()
             for pattern in patterns:
                 # TODO filesize mismatches on non-fake
-                if '.fake' not in pattern and not overwrite:
+                if '.fake' not in pattern and not self.overwrite:
                     pattern = pattern + '.fake*'
 
                 for file in path.rglob(pattern):
@@ -226,13 +253,58 @@ def main():
             if args['--fetch']:
                 bfl = BFLocal()
                 from pyontutils.utils import Async, deferred
-                Async()(deferred(bfl.fetch_path)(path, overwrite) for path in paths)
+                Async()(deferred(bfl.fetch_path)(path, self.overwrite) for path in paths)
             else:
                 if args['--verbose']:
                     for p in paths:
                         print(p, p.xattrs())
                 else:
                     [print(p) for p in paths]
+
+    def report(self):
+        if self.args['filetypes']:
+            #root = FThing(curation.project_path)
+            fts = [FThing(p) for p in curation.project_path.rglob('*') if p.is_file()]
+            #all_counts = sorted([(*k, v) for k, v in Counter([(f.suffix, f.mimetype, f._magic_mimetype)
+                                                              #for f in fts]).items()], key=lambda r:r[-1])
+
+            def count(thing):
+                return sorted([(k, v) for k, v in Counter([getattr(f, thing)
+                                                            for f in fts]).items()], key=lambda r:-r[-1])
+            #each = {t:count(t) for t in ('suffix', 'mimetype', )}
+            each = {t:count(t) for t in ('_magic_mimetype', )}
+
+            for head, tups in each.items():
+                print(head)
+                print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
+
+        if self.debug:
+            embed()
+
+    def feedback(self):
+        args = self.args
+        file = args['<feedback-file>']
+        feedback = ' '.join(args['<feedback>'])
+        path = Path(file).resolve()
+        eff = FThing(path)
+        # TODO pagenote and/or database
+        print(eff, feedback)
+
+    def missing(self):
+        bfl = BFLocal()
+        bfl.find_missing_meta()
+
+    def xattrs(self):
+        bfl = BFLocal()
+        bfl.populate_metastore()
+
+
+def main():
+    from docopt import docopt, parse_defaults
+    args = docopt(__doc__, version='bfc 0.0.0')
+    defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
+    dispatch = Dispatch(args)
+    dispatch()
 
 
 if __name__ == '__main__':

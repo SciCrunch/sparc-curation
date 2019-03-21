@@ -104,14 +104,14 @@ class TestHierarchy(unittest.TestCase):
             for mp in d.meta_paths:
                 print(mp)
 
-        raise BaseException('lol')
+        raise BaseException('TODO look at the lists here and figure out where they should go.')
 
     def test_dataset(self):
         for d in self.ds:
             print(d.data)
             d.validate()
 
-        raise BaseException('lol')
+        raise BaseException('TODO look at the lists here and figure out where they should go.')
 
     def test_tables(self):
         for d in self.ds:
@@ -124,7 +124,7 @@ class TestHierarchy(unittest.TestCase):
             for thing in d.meta_sections:
                 print(thing.__class__.__name__, thing.data)
 
-        raise BaseException('lol')
+        raise BaseException('TODO look at the lists here and figure out where they should go.')
 
     def test_submission(self):
         pass
