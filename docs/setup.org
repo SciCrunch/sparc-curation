@@ -3,6 +3,9 @@
 # [[./setup.pdf]]
 #+OPTIONS: num:nil ^:nil toc:nil
 #+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
+#+STARTUP: showall
+
+# IF YOU ARE HERE AFTER RUNING =scimax ~/setup.org= click [[#per-user-setup][this link]]
 
 * Introduction
   This is a general guide to bootstrapping and maintaining a complete development environment for
@@ -12,8 +15,13 @@
   and is portable to other distributions with a few tweaks.
 * Setup
   Setup takes about 3 hours.
-  [[One shot][OS level setup]] takes about and hour, and [[User *START HERE!*][user setup]] takes about two hours.
+  [[#one-shot][OS level setup]] takes about and hour, and [[#user-start-here][user setup]] takes about two hours. \\
+
+  *If you do not have root or sudo access or do not administer the computer you are setting this up on you should start at [[#user-start-here][user setup]]*
 ** One shot
+   :PROPERTIES:
+   :CUSTOM_ID: one-shot
+   :END:
    These bits are os specific setup instructions that need to be run as =root=.
    They only need to be run once.
 *** Gentoo
@@ -87,16 +95,25 @@
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 ** User *START HERE!*
-   If you are already on a system that has the [[One shot][prerequisites]]
+   :PROPERTIES:
+   :CUSTOM_ID: user-start-here
+   :END:
+
+   If you are already on a system that has the [[#one-shot][prerequisites]]
    installed start here. If you are not you will find out fairly
    quickly when the following commands fail.
 *** Bootstrapping [[./setup.org][this =setup.org= file]]
     You can run all the code in [[./setup.org][this =setup.org= file]] automatically
     using emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
     install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit for scientists and
-    engineers that has everything we will need.
+    engineers that has everything we will need. The following steps will do this automatically for you.
 
-    *All the code blocks in this Bootstrapping section need to be pasted into a shell where you are logged in as your user*
+    *All the code blocks in this Bootstrapping section need to be pasted into a terminal (shell) where you are logged in as your user.*
+    *Run every code block in the order that they appear on this page. Do not skip any blocks.*
+    *Read all the text between blocks. It will tell you what to do next.*
+    
+    When pasting blocks into the terminal (middles mouse, or =C-V= =control-shift-v= in the ubuntu terminal)
+    if you do not copy the last newline of the blocks then you will have to hit enter to run the last command.
     #+NAME: setup-folders
     #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
     #+BEGIN_SRC bash :exports code :eval never
@@ -109,8 +126,12 @@
       source .profile
       git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation
       ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
+
     #+END_SRC
 
+    When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
+    It is normal to see errors during this step. When it finishes quit emacs by typing =C-x C-c=
+    (control x control c, or hold control and type x and then c), or by using the file menu or the =x= button.
     #+NAME: get-fancy-emacs
     #+CAPTION: Install scimax to get the functionality to run this =setup.org= file.
     #+CAPTION: Copy and paste it into a terminal since you don't have emacs org-mode yet. \\
@@ -126,6 +147,19 @@
       # scimax user config
       # Needed to get sane behavior for executing this file out of the box.
       { cat <<EOL
+      ;; org goto heading
+      (defun org-goto-section (heading)
+        "\`heading' should be a string matching the desired heading"
+        (goto-char (org-find-exact-headline-in-buffer heading)))
+
+      ;; recenter a line set using --eval to be at the top of the buffer
+      (add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))
+
+      ;; line numbers so it is harder to get lost in a big file
+      (when (>= emacs-major-version 26)
+        (setq display-line-numbers-grow-only 1)
+        (global-display-line-numbers-mode 1))
+
       ;; open setup.org symlink without prompt
       (setq vc-follow-symlinks 1)
 
@@ -168,28 +202,40 @@
       EOL
       } > ~/opt/scimax/user/user.el
       scimax
+
     #+END_SRC
 
-    =scimax= will launch emacs an install a number of packages. It is normal to see errors
-    during this step. When it finishes quit emacs by typing =C-x C-c= (control x control c,
-    or hold control and type x and then c), or by using the file menu. After running the next
-    command you should have a version of this file open locally. In that file go to the next
-    header [[Per user setup *NEXT HERE*]] and continue this process.
+    After running the next command you should have a version of this file open locally.
+    In that file go to the next header [[#per-user-setup][Per user setup]] and continue this process.
 
-    #+NAME: launch-fancy-emacs
+    #+NAME: launch-setup-org-1
     #+CAPTION: Run the following to open this file in an executable form.
     #+BEGIN_SRC bash :exports code :eval never
-      scimax ~/setup.org
+      scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
+      #--eval '(goto-char (org-find-exact-headline-in-buffer "Per user setup *NEXT HERE*"))' \
+      #--eval "(add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))"
     #+END_SRC
 
-*** Per user setup *NEXT HERE*
+*** Per user setup
+    :PROPERTIES:
+    :CUSTOM_ID: per-user-setup
+    :END:
     You should now have this file open in =scimax=
-    and can run the code blocks directly
-    using =C-c C-c= (control c control c).
+    and can run the code blocks directly by clicking on a block
+    and typing =C-c C-c= (control c control c).
 
     All the following should be run as your user in =scimax=.
     If you run these blocks from the command line be sure to run
     nameref:remote-exports first.
+
+    When you run this block emacs will think for about 3 minutes
+    as it retrieves everything. You can know that it is thinking
+    because your mouse will be in thinking mode if you hover over
+    emacs, and because in the minibuffer window at the bottom of
+    the window there will be a message saying something to the
+    effect of =Wrote /tmp/babel-nonsense/ob-input-nonsense=.
+    If an error window appears when running this block just run
+    it again.
 
     # FIXME why no output on first run? too many errors?
     #+CAPTION: You can run them all at once from this block.
@@ -202,8 +248,7 @@
     #+END_SRC
 
     *If you run the block above you do not need to run the rest of this section*
-    *and you can move on to the [[Configuration files]] section.*
-
+    *and you can move on to the [[#configuration-files][Configuration files]] section.*
 
     #+NAME: clone-repos
     #+CAPTION: Clone all required git repositories.
@@ -243,6 +288,16 @@
     #+END_SRC
 
 *** Configuration files
+    :PROPERTIES:
+    :CUSTOM_ID: configuration-files
+    :END:
+
+    This section creates and populates [[file:${HOME}/devconfig.yaml]]
+    and [[file:${HOME}/secrets.yaml]]. They are used to configure the
+    various programs that are used by the SPARC curation workflow, and
+    store the API keys and semi private information such as hypothes.is
+    group names, and google doc ids.
+
     Each block in this section should have =#+RESULTS:= if it succeeds.
 
     # TODO improve the error messages (there are loads of them)
@@ -307,14 +362,31 @@
 
     *You should log out and log back in to your window manager* so that any new terminal
     you open will have access to all the programs you just installed.
+    Logout on the default ubuntu window manager is located in the upper right.
 
-    The [[Accounts and API access][next section]] will walk you through the steps needed
+    *When you you log back in* run the following command to start at the next step.
+    #+NAME: launch-setup-org-2
+    #+CAPTION: Run the following to open this file in an executable form.
+    #+BEGIN_SRC bash :eval never
+      scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
+    #+END_SRC
+
+    When you exit emacs it may ask you if you want to save,
+    say yes so that the logs of the install are saved.
+    # TODO FIXME
+    NOTE this will cause problems down the line when you
+    try to pull updates for sparc-curation because git will complain.
+
+    The [[#accounts-and-api-access][next section]] will walk you through the steps needed
     to get access to all the various systems holding different pieces of data that we need.
 
 *** Accounts and API access
+    :PROPERTIES:
+    :CUSTOM_ID: accounts-and-api-access
+    :END:
     Create accounts, obtain various API keys. The notation =(-> key1 key2 key3)=
     indicates a path in your [[file:${HOME}/secrets.yaml]] file. After you finish
-    this section you can jump to [[Get data][getting data]]!.
+    this section you can jump to [[#get-data][getting data]]!.
 **** Data
 ***** Blackfynn
       Once you have a Blackfynn account on the sparc org go to your
@@ -371,6 +443,9 @@
 
 ** SPARC
 *** Get data
+    :PROPERTIES:
+    :CUSTOM_ID: get-data
+    :END:
     If you have never retrieved the data before run.
     #+CAPTION: first time per local network
     #+BEGIN_SRC bash :results none
