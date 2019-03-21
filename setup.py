@@ -23,6 +23,7 @@ setup(name='sparcur',
           'google-api-python-client',
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'nibabel',
+          'pexpect',  # >=4.7.0 probably once my changes are in
           #'protcur',  # TODO
           'pydicom',
           'pyontutils',
