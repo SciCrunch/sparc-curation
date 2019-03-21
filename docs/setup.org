@@ -23,6 +23,7 @@
 ** One shot
    :PROPERTIES:
    :CUSTOM_ID: one-shot
+   :VISIBILITY: folded
    :END:
    These bits are os specific setup instructions that need to be run as =root=.
    They only need to be run once.
@@ -499,6 +500,9 @@
 *** Reporting
     =spc stats *=
 * Variables :noexport:
+  :PROPERTIES:
+  :VISIBILITY: folded
+  :END:
   GitHub repositories
   #+NAME: tgbugs-repos
   | hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap |
