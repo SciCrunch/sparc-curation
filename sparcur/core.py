@@ -2,7 +2,7 @@ import json
 import hashlib
 import subprocess
 from time import sleep
-from pathlib import PosixPath
+from pathlib import PosixPath, PurePosixPath
 from datetime import datetime
 from collections import defaultdict
 import xattr
@@ -12,6 +12,10 @@ from dateutil.parser import parser
 from Xlib.display import Display
 from Xlib import Xatom
 from IPython import embed
+
+
+class UnhandledTypeError(Exception):
+    """ haven't dealt with this yet """
 
 
 class JEncode(json.JSONEncoder):
@@ -49,6 +53,14 @@ class PathMeta:
                   'old_id',
                   'error',
                   'hrsize')
+
+    fields = ('size', 'created', 'updated',
+              'checksum', 'id', 'file_id', 'old_id',
+              'gid', 'uid', 'mode', 'error')
+
+    encoding = 'utf-8'
+
+    # TODO register xattr prefixes
 
     @classmethod
     def from_xattrs(cls, **kwargs):
@@ -101,9 +113,36 @@ class PathMeta:
 
         return sizeof_fmt(self.size)
 
-    def as_xattrs(self):
+    @classmethod
+    def encode_value(cls, field, value):
+        if isinstance(value, datetime):
+            value = value.isoformat().isoformat().replace('.', ',')
+
+        if isinstance(value, int):
+            out = bytes(value)
+        elif isinstance(value, str):
+            out = value.encode(cls.encoding)
+        else:
+            raise UnhandledTypeError(f'dont know what to do with {value!r}')
+
+        return out
+
+    def as_xattrs(self, prefix=None):
         """ encoding to bytes """
-        return {}
+        out = {}
+        for field in self.fields:
+            value = getattr(self, field)
+            if value:
+                value_bytes = self.value_to_bytes(field, value)
+                if prefix:
+                    key = prefix + '.' + field
+                else:
+                    key = field
+
+                key_bytes = key.encode(self.encoding)
+                out[key_bytes] = self.encode_value(field, value)
+
+        return out
 
     def as_metastore(self):
         """ db entry """  # TODO json blob in sqlite? can it index?
@@ -117,14 +156,26 @@ class PathMeta:
         return self.id + '/.' + '.'.join(gen)
 
 
-class RemotePath(PosixPath):
+class RemotePath(PurePosixPath):
     """ Remote data about a local object. """
+
+    # These should be set by RemoteFactory
+    _cache_class = None
+    _local_class = None
+
+    # we use a PurePath becuase we still want to key off this being local path
+    # but we don't want any of the local file system operations to work by accident
+    # so for example self.stat should return the remote value not the local value
+    # which is what would happen if we used a PosixPath as the base class
 
     # need a way to pass the session information in independent of the actual path
     # abstractly having remote.data(global_id_for_local, self)
     # should be more than enough, the path object shouldn't need
     # to know that it has a remote id, the remote manager should
     # know that
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
 
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -246,6 +297,17 @@ class CachePath(PosixPath):
         and the remote id lives. In a git-like world this is the
         cache/index/whatever we call it these days """
 
+    _remote_class = None
+    _local_class = None
+
+    @property
+    def remote(self):
+        return self._remote_class(self)
+
+    @property
+    def local(self):
+        return self._local_class(self)
+
     @property
     def id(self):
         return self.meta['id']
@@ -263,9 +325,58 @@ class CachePath(PosixPath):
         raise NotImplemented
 
 
+class XattrPath(PosixPath):
+    """ pathlib Path augmented with xattr support """
+
+    def setxattr(self, key, value, namespace=xattr.NS_USER):
+        if not isinstance(value, bytes):  # checksums
+            bytes_value = str(value).encode()  # too smart? force pre encoded?
+        else:
+            bytes_value = value
+
+        xattr.set(self.as_posix(), key, bytes_value, namespace=namespace)
+
+    def setxattrs(self, xattr_dict, namespace=xattr.NS_USER):
+        for k, v in xattr_dict.items():
+            self.setxattr(k, v, namespace=namespace)
+
+    def getxattr(self, key, namespace=xattr.NS_USER):
+        # we don't deal with types here, we just act as a dumb store
+        return xattr.get(self.as_posix(), key, namespace=namespace)
+
+    def xattrs(self, namespace=xattr.NS_USER):
+        # only decode keys ?
+        return {k.decode():v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
+
+
+class XattrCache(CachePath, XattrPath):
+    xattr_prefix = None
+
+
+class SqliteCache(CachePath):
+    """ a persistent store to back up the xattrs if they get wiped """
+
+
+class BlackfynnCache(SqliteCache, XattrCache):
+    xattr_prefix = 'bf'
+    @property
+    def meta(self):
+        meta = self.xattrs()
+        return meta
+
+    @meta.setter
+    def meta(self, value):
+        self.setxattrs()
+
+
 class LocalPath(PosixPath):
     # local data about remote objects
     _cache_class = CachePath
+    _remote_class = None
+
+    @property
+    def remote(self):
+        return self._remote_class(self)
 
     @property
     def cache(self):
@@ -284,9 +395,12 @@ class LocalPath(PosixPath):
     @property
     def meta(self):
         st = self.stat()
-        updated = datetime.fromtimestamp(st.st_mtime).isoformat().replace('.', ',')
+        updated = datetime.fromtimestamp(st.st_mtime)  #.isoformat().replace('.', ',')  # TODO
+        # these use our internal representation of timestamps
+        # the choice of how to store them in xattrs, sqlite, json, etc is handled at those interfaces
         # replace with comma since it is conformant to the standard _and_
         # because it simplifies PathMeta as_path
+        mode = oct(st.st_mode)
         return PathMeta(size=st.st_size,
                         created=None,
                         updated=updated,
@@ -294,7 +408,17 @@ class LocalPath(PosixPath):
                         id=self.id,  # this is ok, assists in mapping/debug
                         uid=st.st_uid,
                         gid=st.st_gid,
-                        mode=st.st_mode)
+                        mode=mode)
+
+    @property
+    def data(self):
+        with open(self, 'rb') as f:
+            while True:
+                data = f.read(4096)  # TODO hinting
+                if not data:
+                    break
+
+                yield data
 
     def diff(self):
         pass
@@ -332,30 +456,6 @@ class LocalPath(PosixPath):
                         break
 
             return m.digest()
-
-
-class XattrPath(PosixPath):
-    """ pathlib Path augmented with xattr support """
-
-    def setxattr(self, key, value, namespace=xattr.NS_USER):
-        if not isinstance(value, bytes):  # checksums
-            bytes_value = str(value).encode()  # too smart? force pre encoded?
-        else:
-            bytes_value = value
-
-        xattr.set(self.as_posix(), key, bytes_value, namespace=namespace)
-
-    def setxattrs(self, xattr_dict, namespace=xattr.NS_USER):
-        for k, v in xattr_dict.items():
-            self.setxattr(k, v, namespace=namespace)
-
-    def getxattr(self, key, namespace=xattr.NS_USER):
-        # we don't deal with types here, we just act as a dumb store
-        return xattr.get(self.as_posix(), key, namespace=namespace)
-
-    def xattrs(self, namespace=xattr.NS_USER):
-        # only decode keys ?
-        return {k.decode():v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
 
 
 class Path(XattrPath, LocalPath):
@@ -411,7 +511,6 @@ class Path(XattrPath, LocalPath):
                 break
             else:
                 sleep(.01)  # spin a bit more slowly
-
 
 
 class MetaStore:
@@ -597,7 +696,7 @@ def JT(blob):
 
         else:
             if top:
-                raise TypeError('asdf')
+                raise UnhandledTypeError('asdf')
             else:
                 @property
                 def prop(self, v=blob):

@@ -1,8 +1,19 @@
+import os
+import atexit
 import subprocess
 from datetime import datetime
+from pexpect import pxssh
 from sparcur.core import PathMeta, RemotePath, CachePath, LocalPath, Path
 from sparcur.config import local_storage_prefix
 from ast import literal_eval
+
+
+class CommandTooLongError(Exception):
+    """ not the best solution ... """
+
+
+class NoRemoteImplementationError(Exception):
+    """ prevent confusion between local path data and remote path data """
 
 
 class ReflectiveCachePath(CachePath):
@@ -38,64 +49,126 @@ class RemoteFactory:
         return classTypeInstance
 
 
+class StatResult:
+    stat_format = f'\"%n  %o  %s  %w  %W  %x  %X  %y  %Y  %z  %Z  %g  %u  %f\"'
+
+    #stat_format = f'\"\'%n\' %o %s \'%w\' %W \'%x\' %X \'%y\' %Y \'%z\' %Z %g %u %f\"'
+
+    def __init__(self, out):
+        out = out.decode()
+        #name, rest = out.rsplit("'", 1)
+        #self.name = name.strip("'")
+        #print(out)
+        wat = out.split('  ')
+        #print(wat)
+        #print(len(wat))
+        name, hint, size, hb, birth, ha, access, hm, modified, hc, changed, gid, uid, raw_mode = wat
+
+        self.name = name
+
+        def ns(hr):
+            date, time, zone = hr.split(' ')
+            time, ns = time.split('.')
+            return '.' + ns
+
+        self.st_blksize = int(hint)
+        self.st_size = int(size)
+        #self.st_birthtime
+        self.st_atime = float(access + ns(ha)) 
+        self.st_mtime = float(modified + ns(hm))
+        self.st_ctime = float(changed + ns(hc))
+        self.st_gid = int(gid)
+        self.st_uid = int(uid)
+        self.st_mode = int.from_bytes(bytes.fromhex(raw_mode), 'big')
+
+        if hb != '-' and birth != '0':
+            self.st_birthtime = float(birth + ns(hb))
+
+
 class SshRemoteFactory(RemoteFactory, RemotePath):
     """ Testing. To be used with ssh-agent.
         StuFiS The stupid file sync. """
 
-    stat_format = f'\"\'%n\' %o %s %W %X %Y %Z %g %u %f\"'
     cypher_command = 'sha256sum'
+    encoding = 'utf-8'
 
     def __new__(cls, local_class, cache_class, host):
-        return super().__new__(cls, local_class, cache_class, host=host)
+        session = pxssh.pxssh(options=dict(IdentityAgent=os.environ.get('SSH_AUTH_SOCK')))
+        session.login(host, ssh_config=Path('~/.ssh/config').expanduser().as_posix())
+        cls._rows = 200
+        cls._cols = 200
+        session.setwinsize(cls._rows, cls._cols)  # prevent linewraps of long commands
+        session.prompt()
+        atexit.register(lambda:(session.sendeof(), session.close()))
+        return super().__new__(cls, local_class, cache_class, host=host, session=session)
+
+    @property
+    def id(self):
+        # this allows a remapping once
+        # otherwise we face chicken and egg problem
+        # or rather, in this case, the remote system
+        # really doesn't know how we've mapped something
+        # locally, I guess it could, but for the implementaiton
+        # we don't track that right now
+        return self.cache.id
 
     @property
     def data(self):
         cmd = ['scp', f'{self.host}:{self.cache.id}', '/dev/stdout']
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        out, _ = p.communicate()
-        return out
+        while True:
+            data = p.stdout.read(4096)  # TODO hinting
+            if not data:
+                break
 
-    @property
-    def meta(self):
-        # TODO the python version for local too ...
-        # plus why not be able to generate this for
-        # a whole directory
-        remote_cmd = (f'{self.cypher_command} {self.cache.id} | '
-                      'awk \'{ printf $1 }\';'
-                      "printf ' ';"
-                      f'stat "{self.cache.id}" -c {self.stat_format}')
+            yield data
 
-        out = self._ssh(remote_cmd)
-        return self._meta(*out.decode().split())
+        p.communicate()
+
+    # reuse meta from local
+    meta = LocalPath.meta  # magic
 
     def _ssh(self, remote_cmd):
-        print(remote_cmd)
-        cmd = ['ssh', self.host, remote_cmd]
-        # FIXME TODO open an ssh session and keep it alive???
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
-        out, _ = p.communicate()
-        #(checksum, name, hint, size,
-        #birth, access, modified, changed,
-        #gid, uid, raw_mode)
+        #print(remote_cmd)
+        if len(remote_cmd) > self._cols:
+            raise CommandTooLongError
+        n_bytes = self.session.sendline(remote_cmd)
+        self.session.prompt()
+        raw = self.session.before
+        out = raw[n_bytes + 1:].strip()  # strip once here since we always will
+        #print(raw)
+        #print(out)
         return out
 
-    def _meta(self, checksum, name, hint, size,
-              birth, access, modified, changed,
-              gid, uid, raw_mode):
+    def checksum(self):
+        remote_cmd = (f'{self.cypher_command} {self.cache.id} | '
+                      'awk \'{ print $1 }\';')
 
-        octal_mode = oct(literal_eval('0x' + raw_mode))
+        return bytes.fromhex(self._ssh(remote_cmd).decode(self.encoding))
 
-        created = None if birth == '-' else datetime.fromtimestamp(int(birth))
-        updated = datetime.fromtimestamp(int(modified))
-        return PathMeta(size=size,
-                        created=created,
-                        updated=modified,
-                        checksum=checksum,  # FIXME bytes ...
-                        id=self.cache.id,  # FIXME
-                        gid=int(gid),
-                        uid=int(uid),
-                        mode=octal_mode,  # FIXME
-        )
+    def stat(self):
+        remote_cmd = f'stat "{self.cache.id}" -c {StatResult.stat_format}'
+        out = self._ssh(remote_cmd)
+        return StatResult(out)
+
+    @property
+    def parent(self):
+        # because the identifiers are paths if we move
+        # file.ext to another folder, we treat it as if it were another file
+        # at least for this SshRemote path, if we move a file on our end
+        # the we had best update our cache
+        # if someone else moves the file on the remote, well, then
+        # that file simply vanishes since we weren't notified about it
+        # if there is a remote transaction log we can replay if there isn't
+        # we have to assume the file was deleted or check all the names and
+        # hashes of new files to see if it has moved (and not been changed)
+        # a move and change without a sync will be bad for us
+        return self.__class__(self.cache.parent.resolve())
+
+    def is_dir(self):
+        remote_cmd = f'stat -c %F {self.cache.id}'
+        out = self._ssh(remote_cmd)
+        return out == b'directory'
 
     @property
     def children(self):
@@ -107,18 +180,21 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         if self.is_dir():
             # no children if it is a file sadly
             remote_cmd = (f"cd {self.cache.id};"
-                        f"stat -c {self.stat_format} {{.,}}*;"
-                        "echo '----';"
-                        f"{self.cypher_command} {{.,}}* |"  # FIXME fails on directories destroying alignment
-                        "awk '{ printf(\"%s\\n\", $1) }'")
+                          f"stat -c {StatResult.stat_format} {{.,}}*;"
+                          "echo '----';"
+                          f"{self.cypher_command} {{.,}}*;"  # FIXME fails on directories destroying alignment
+                          'cd "${OLDPWD}"')
 
             out = self._ssh(remote_cmd)
-            out = out.decode()
-            stats, checks = out.split('----\n')
-            for s, c in zip(stats.split('\n'), checks.split('\n')):
-                print(c, s)
+            stats, checks = out.split(b'\r\n----\r\n')
+            #print(stats)
+            stats = {sr.name:sr for s in stats.split(b'\r\n')
+                     for sr in (StatResult(s),)}
+            checks = {fn:bytes.fromhex(cs) for l in checks.split(b'\r\n')
+                      if not b'Is a directory' in l
+                      for cs, fn in (l.decode(self.encoding).split('  ', 1),)}
 
-            #return self._meta(*out.decode().split())
+            return stats, checks  # TODO
 
 
 class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
@@ -173,9 +249,13 @@ def main():
     from IPython import embed
     from socket import gethostname
     SshRemote = SshRemoteFactory(Path, ReflectiveCachePath, gethostname())
+    print(__file__)
     this_file_darkly = SshRemote(__file__)
-    assert this_file_darkly.meta.checksum == this_file_darkly.local.checksum().hex()
-    this_file_darkly.children  # FIXME why does this list the home directory!?
+    hrm = this_file_darkly.meta.__dict__, this_file_darkly.local.meta.__dict__
+    assert hrm[0] == hrm[1]
+    assert this_file_darkly.meta.checksum == this_file_darkly.local.meta.checksum
+    assert list(this_file_darkly.data) == list(this_file_darkly.local.data)
+    stats, checks = this_file_darkly.parent.children  # FIXME why does this list the home directory!?
     embed()
 
 
