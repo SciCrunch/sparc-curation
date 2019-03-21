@@ -107,7 +107,7 @@
       mkdir ~/git
       mkdir ~/files
       source .profile
-      git clone https://github.com/tgbugs/sparc-curation.git ~/git/sparc-curation
+      git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation
       ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
     #+END_SRC
 
@@ -408,9 +408,9 @@
 * Variables :noexport:
   GitHub repositories
   #+NAME: tgbugs-repos
-  | hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap sparc-curation |
+  | hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap |
   #+NAME: sci-repos
-  | NIF-Ontology scibot |
+  | NIF-Ontology scibot sparc-curation |
   #+NAME: other-repos
   | Ophirr33/pda zussitarze/qrcode |
   
@@ -439,7 +439,7 @@
 
    #+NAME: repos
    #+RESULTS: repos-code
-   | https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/tgbugs/sparc-curation https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
+   | https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
 
 ** Variables testing
    #+CAPTION: testing
@@ -455,7 +455,7 @@
    #+NAME: remote-exports-code
    #+CAPTION: export commands to set if running remotely via copy and paste
    #+HEADER: :var UHP=user-home-paths :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
-   #+BEGIN_SRC bash :results output example :exports results :eval no-export
+   #+BEGIN_SRC bash :results output code example :exports results :eval no-export
      echo export REPOS='<<EOL'
      printf "$(echo ${REPOS} | tr ' ' '\n')"
      echo
@@ -478,7 +478,7 @@
 
     #+NAME: remote-exports
     #+RESULTS:
-    #+begin_example
+    #+begin_src bash
     export REPOS=<<EOL
     https://github.com/tgbugs/hyputils
     https://github.com/tgbugs/ontquery
@@ -488,9 +488,9 @@
     https://github.com/tgbugs/rrid-metadata
     https://github.com/tgbugs/rkdf
     https://github.com/tgbugs/orgstrap
-    https://github.com/tgbugs/sparc-curation
     https://github.com/SciCrunch/NIF-Ontology
     https://github.com/SciCrunch/scibot
+    https://github.com/SciCrunch/sparc-curation
     https://github.com/Ophirr33/pda
     https://github.com/zussitarze/qrcode
     EOL
@@ -504,6 +504,8 @@
     scibot
     EOL
     export RKTROOTS=<<EOL
+    qrcode/
+    pda/
     protc/protc-lib
     protc/protc-tools-lib
     protc/protc
@@ -512,7 +514,5 @@
     rkdf/rkdf
     rrid-metadata/rrid
     NIF-Ontology/
-    qrcode/
-    pda/
     EOL
-    #+end_example
+    #+end_src
