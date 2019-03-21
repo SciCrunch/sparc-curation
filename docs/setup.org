@@ -5,14 +5,16 @@
 #+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
 #+STARTUP: showall
 
-# IF YOU ARE HERE AFTER RUNING =scimax ~/setup.org= click [[#per-user-setup][this link]]
-
 * Introduction
   This is a general guide to bootstrapping and maintaining a complete development environment for
   working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc.
   For a general introduction to the SPARC curation process see [[./background.org]]
   The environment bootstrapped by running this file was originally developed on Gentoo,
   and is portable to other distributions with a few tweaks.
+
+  Please report any bugs you find in this file or during the execution of any of the
+  workflows described in this file to the sparc-curation GitHub
+  [[https://github.com/SciCrunch/sparc-curation/issues][issue tracker]].
 * Setup
   Setup takes about 3 hours.
   [[#one-shot][OS level setup]] takes about and hour, and [[#user-start-here][user setup]] takes about two hours. \\
@@ -94,7 +96,7 @@
     Other software that you will probably need at some point but that is not packaged on ubuntu.
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
-** User *START HERE!*
+** User
    :PROPERTIES:
    :CUSTOM_ID: user-start-here
    :END:
@@ -240,6 +242,7 @@
     it again.
 
     # FIXME why no output on first run? too many errors?
+    # ANSWER i think it is because raco pkg install runs in alphabetical order
     #+CAPTION: You can run them all at once from this block.
     #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
     #+BEGIN_SRC bash :results output :noweb yes :exports none :eval no-export
