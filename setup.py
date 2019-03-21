@@ -35,7 +35,7 @@ setup(name='sparcur',
           'Xlib',
           'xlsx2csv',
       ],
-      extras_require={'dev':[]},
+      extras_require={'dev':['pytest', 'pytest-cov']},
       scripts=[],
       entry_points={
           'console_scripts': [
