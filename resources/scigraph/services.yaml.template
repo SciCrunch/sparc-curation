@@ -1,0 +1,81 @@
+applicationContextPath: scigraph
+
+cypherResources:
+  - path: /dynamic/prod/sparc/organParts/{id}
+    query: |
+            MATCH path = (start:Class{iri:'${id}'})-[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)-[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup) RETURN path
+    operations:
+      - summary: Get the parts list for an organ including nervse and blood vessles
+        parameters:
+         - name: id
+           descprtion: ontology id of the organ
+           paramType: path
+
+graphConfiguration:
+  curies:
+  exactNodeProperties:
+  - label
+  - synonym
+  - acronym
+  - abbreviation
+  indexedNodeProperties:
+  - label
+  - synonym
+  - curie
+  - acronym
+  - abbreviation
+  location: /var/lib/scigraph/graph
+  neo4jConfig:
+    dbms.pagecache.memory: 4g
+    dump_configuration: true
+logging:
+  level: INFO
+server:
+  adminContextPath: /admin
+  applicationContextPath: /scigraph
+  connector:
+    port: 9000
+    type: http
+  type: simple
+
+serviceMetadata:
+  name: NIF Reconciliation Service
+  identifierSpace: http://neuinfo.org/
+  schemaSpace: http://neuinfo.org/
+  view:
+    url: http://{HOSTNAME}:{PORT}/scigraph/refine/view/{{id}}
+  preview:
+    url: http://{HOSTNAME}:{PORT}/scigraph/refine/preview/{{id}}
+    width: 400
+    height: 400
+
+apiConfiguration:
+  apikeyParameter: apikey
+  authDataSourceFactory:
+    # whether or not idle connections should be validated
+    checkConnectionWhileIdle: false
+    # the name of your JDBC driver
+    driverClass: org.hsqldb.jdbc.JDBCDriver
+    # the maximum number of connections to keep open
+    maxSize: 32
+    # the maximum amount of time to wait on an empty pool before throwing an exception
+    maxWaitForConnection: 1s
+    # the minimum number of connections to keep open
+    minSize: 8
+    # the password
+    password:
+    # any properties specific to your JDBC driver:
+    properties:
+      charSet: UTF-8
+    # the JDBC URL
+    url: jdbc:hsqldb:res:/users/users
+    # the username
+    user:
+    # the SQL query to run when validating a connections liveness
+    validationQuery: /* MyService Health Check */ SELECT 1 FROM INFORMATION_SCHEMA.SYSTEM_USERS
+  authenticationCachePolicy: maximumSize=10000, expireAfterAccess=10m
+  authenticationQuery: select APIKEY from USERS where APIKEY = ?
+  defaultApikey: default
+  permissionQuery: select PERMISSION from ROLES where ROLE = ?
+  roleQuery: select ROLES from USERS where APIKEY = ?
+
