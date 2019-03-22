@@ -41,6 +41,8 @@ categories:
     http://uri.neuinfo.org/nif/nifstd/nlx_63400 : Resource
     http://uri.neuinfo.org/nif/nifstd/nlx_152328 : Resource
     http://uri.neuinfo.org/nif/nifstd/birnlex_2085 : Institution
+    http://purl.obolibrary.org/obo/SO_0000704 : gene
+    http://purl.obolibrary.org/obo/SO_0000110 : sequence feature
 
 mappedProperties:
   - name: label
@@ -48,6 +50,8 @@ mappedProperties:
     - http://www.w3.org/2000/01/rdf-schema#label
   - name: synonym
     properties:
+    - http://www.w3.org/2004/02/skos/core#altLabel
+    - http://www.w3.org/2004/02/skos/core#prefLabel
     - http://www.geneontology.org/formats/oboInOwl#hasExactSynonym
     - http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym
     - http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym
