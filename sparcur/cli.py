@@ -68,7 +68,10 @@ class Dispatch:
             pp = current_ft.path
             curation.project_path = pp # FIXME BAD BAD BAD
 
-        self.summary = Summary(curation.project_path)
+        if curation.project_path.exists():
+            self.summary = Summary(curation.project_path)
+        else:
+            self.summary = None
 
     def __call__(self):
         # FIXME this might fail to run annos -> shell correctly
