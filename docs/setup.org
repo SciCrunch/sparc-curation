@@ -105,6 +105,22 @@
    If you are already on a system that has the [[#one-shot][prerequisites]]
    installed start here. If you are not you will find out fairly
    quickly when the following commands fail.
+
+*** Git name and email
+    These workflows make extensive use of git.
+    Git needs to know who you are (and so do we) so that it can stash files
+    that you change (for example this file, which logs to itself).
+    Use the email that you will use for curation or development for this.
+    You should not use your primary email account for this because it will
+    get a whole bunch of development related emails.
+
+    Run the following in a terminal replacing the examples with the fields
+    that apply to you.
+    #+BEGIN_SRC bash :eval never
+      git config --global user.name "FIRST_NAME LAST_NAME"
+      git config --global user.email "MY_NAME@example.com"
+    #+END_SRC
+
 *** Bootstrapping [[./setup.org][this =setup.org= file]]
     You can run all the code in [[./setup.org][this =setup.org= file]] automatically
     using emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
