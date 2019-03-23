@@ -10,6 +10,26 @@ cypherResources:
          - name: id
            descprtion: ontology id of the organ
            paramType: path
+  - path: /dynamic/prod/sparc/organList
+    query: |
+            MATCH (n)
+            WHERE n.iri IN [
+                    "http://purl.org/sig/ont/fma/fma7195",
+                    "http://purl.org/sig/ont/fma/fma7088",
+                    "http://purl.org/sig/ont/fma/fma7197",
+                    "http://purl.org/sig/ont/fma/fma7198",
+                    "http://purl.org/sig/ont/fma/fma7203",
+                    "http://purl.org/sig/ont/fma/fma7148",
+                    "http://purl.org/sig/ont/fma/fma7196",
+                    "http://purl.org/sig/ont/fma/fma14543",
+                    "http://purl.org/sig/ont/fma/fma7201",
+                    "http://purl.org/sig/ont/fma/fma7200",
+                    "http://purl.org/sig/ont/fma/fma15900",
+                    "http://purl.org/sig/ont/fma/fma45659",
+                    "http://purl.org/sig/ont/fma/fma7647"]
+            RETURN n
+    operations:
+      - summary: Get the list of all FMA organ identifiers relevant to SPARC
 
 graphConfiguration:
   curies:
