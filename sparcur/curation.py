@@ -11,7 +11,7 @@ from collections import defaultdict, deque
 import magic  # from sys-apps/file consider python-magic ?
 import rdflib
 import requests
-import dicttoxml
+#import dicttoxml
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pyontutils.utils import makeSimpleLogger, byCol
@@ -23,7 +23,7 @@ from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
 from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
-from terminaltables import AsciiTable
+#from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.config import local_storage_prefix
 from sparcur.core import Path, JEncode

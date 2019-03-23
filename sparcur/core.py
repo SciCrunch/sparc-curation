@@ -1,4 +1,7 @@
+import sys
 import json
+import pickle
+import struct
 import hashlib
 import subprocess
 from time import sleep
@@ -63,14 +66,16 @@ class PathMeta:
     # TODO register xattr prefixes
 
     @classmethod
-    def from_xattrs(cls, **kwargs):
+    def from_xattrs(cls, xattrs):
         """ decoding from bytes """
-        pass
+        kwargs = {k.decode(cls.encoding):cls.decode_value(k, v) for k, v in xattrs.items()}
+        return cls(**kwargs)
 
     @classmethod
-    def from_metastore(cls, **kwargs):
+    def from_metastore(cls, blob):
         """ db entry """
-        pass
+        xattrs = pickle.loads(blob)
+        return cls.from_xattrs(xattrs)
 
     @classmethod
     def from_path(cls, relative_path):
@@ -114,12 +119,29 @@ class PathMeta:
         return sizeof_fmt(self.size)
 
     @classmethod
+    def decode_value(cls, field, value):
+        if field in (b'created', b'updated'):
+            value, = struct.unpack('d', value)
+            return datetime.fromtimestamp(value)
+        elif field == b'checksum':
+            return value
+        elif field in (b'error', b'id', b'mode'):
+            return value.decode(cls.encoding)
+        else:
+            return int(value)
+
+    @classmethod
     def encode_value(cls, field, value):
         if isinstance(value, datetime):
-            value = value.isoformat().isoformat().replace('.', ',')
+            #value = value.isoformat().isoformat().replace('.', ',')
+            value = value.timestamp()  # I hate dealing with time :/
 
         if isinstance(value, int):
-            out = bytes(value)
+            # this is local and will pass through here before move?
+            #out = value.to_bytes(value.bit_length() , sys.byteorder)
+            out = str(value).encode(cls.encoding)  # better to have human readable
+        elif isinstance(value, float):
+            out = struct.pack('d', value) #= bytes(value.hex())
         elif isinstance(value, str):
             out = value.encode(cls.encoding)
         else:
@@ -133,7 +155,7 @@ class PathMeta:
         for field in self.fields:
             value = getattr(self, field)
             if value:
-                value_bytes = self.value_to_bytes(field, value)
+                value_bytes = self.encode_value(field, value)
                 if prefix:
                     key = prefix + '.' + field
                 else:
@@ -144,9 +166,10 @@ class PathMeta:
 
         return out
 
-    def as_metastore(self):
+    def as_metastore(self, prefix=None):
+        # FIXME prefix= is a bad api ...
         """ db entry """  # TODO json blob in sqlite? can it index?
-        return ''
+        return pickle.dumps(self.as_xattrs(prefix))
 
     def as_path(self):
         """ encode meta as a relative path """
@@ -530,13 +553,14 @@ class Path(XattrPath, LocalPath):
 
 class MetaStore:
     """ A local backup against accidental xattr removal """
-    attrs = ('bf.id',
+    _attrs = ('bf.id',
              'bf.file_id',
              'bf.size',
              'bf.created_at',
              'bf.updated_at',
              'bf.checksum',
              'bf.error')
+    attrs = 'xattrs',
     # FIXME horribly inefficient 1 connection per file due to the async code ... :/
     def __init__(self, db_path):
         self.db_path = db_path
@@ -559,24 +583,33 @@ class MetaStore:
                  'bf_checksum BLOB,'
                  'bf_error INTEGER);'),
                 ('CREATE UNIQUE INDEX IF NOT EXISTS fsxattrs_u_path ON fsxattrs (path);'))
+        sqls = (('CREATE TABLE IF NOT EXISTS path_xattrs ('
+                 'id TEXT PRIMARY KEY,'  # for hypothesis ids this can be string(??)
+                 'xattrs BLOB'  # see path meta for the packed representation
+                 ');')
+                ('CREATE UNIQUE INDEX IF NOT EXISTS path_xattrs_u_id ON (id);')
+        )
         conn = self.conn()
         with conn:
             for sql in sqls:
                 conn.execute(sql)
 
-    def bulk(self, pdict):
+    def bulk(self, id_blobs):  # FIXME no longer a dict really ...
         cols = ', '.join(_.replace('.', '_') for _ in self.attrs)
         values_template = ', '.join('?' for _ in self.attrs)
-        sql = ('INSERT OR REPLACE INTO fsxattrs '
-               f'(path, {cols}) VALUES (?, {values_template})')
+        sql = ('INSERT OR REPLACE INTO path_xattrs '
+               f'(id, {cols}) VALUES (?, {values_template})')
         conn = self.conn()
         with conn:
+            for id, blob in id_blobs:
+                conn.execute(sql, args)
+            return
             for path, attrs in pdict.items():
                 args = path.as_posix(), *self.convert_attrs(attrs)
                 conn.execute(sql, args)
 
     def remove(self, path):
-        sql = 'DELETE FROM fsxattrs WHERE path = ?'
+        sql = 'DELETE FROM path_xattrs WHERE id = ?'
         args = path.as_posix(),
         conn = self.conn()
         with conn:
@@ -590,19 +623,22 @@ class MetaStore:
                 yield None
 
     def xattrs(self, path):
-        sql = 'SELECT * FROM fsxattrs WHERE path = ?'
+        sql = 'SELECT blob FROM path_xattrs WHERE id = ?'
         args = path.as_posix(),
         conn = self.conn()
         with conn:
             cursor = conn.execute(sql, args)
-            values = cursor.fetchone()
-            print(values)
-            if values:
-                keys = [n.replace('_', '.', 1) for n, *_ in cursor.description]
+            blob = cursor.fetchone()
+            if blob:
+                return PathMeta.from_metastore(blob)
+            #print(values)
+            #if values:
+                #return 
+                #keys = [n.replace('_', '.', 1) for n, *_ in cursor.description]
                 #print(keys, values)
-                return {k:v for k, v in zip(keys, values) if k != 'path' and v is not None}  # skip path itself
-            else:
-                return {}
+                #return {k:v for k, v in zip(keys, values) if k != 'path' and v is not None}  # skip path itself
+            #else:
+                #return {}
 
     def setxattr(self, path, key, value):
         return self.setxattrs(path, {key:value})
@@ -611,7 +647,7 @@ class MetaStore:
         # FIXME skip nulls on replace
         cols = ', '.join(attrs)
         values_template = ', '.join('?' for _ in self.attrs)
-        sql = (f'INSERT OR REPLACE INTO fsxattrs (path, {cols}) VALUES (?, {values_template})')
+        sql = (f'INSERT OR REPLACE INTO path_xattrs (id, {cols}) VALUES (?, {values_template})')
         args = path.as_posix(), *self.convert_attrs(attrs)
         conn = self.conn()
         with conn:
@@ -620,7 +656,7 @@ class MetaStore:
     def getxattr(self, path, key):
         if key in self.attrs:
             col = key.replace('.', '_')
-            sql = f'SELECT {col} FROM fsxattrs WHERE path = ?'
+            sql = f'SELECT {col} FROM path_xattrs WHERE id = ?'
             args = path.as_posix(),
             conn = self.conn()
             with conn:

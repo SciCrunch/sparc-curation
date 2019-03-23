@@ -42,6 +42,7 @@ import csv
 import json
 from datetime import datetime
 from collections import Counter
+import requests
 from sparcur import schemas as sc
 from sparcur import curation
 from sparcur.blackfynn_api import BFLocal, Path
@@ -52,6 +53,8 @@ from IPython import embed
 
 
 class Dispatch:
+    spcignore = ('.git',
+                 '.~lock',)
     def __init__(self, args):
         self.args = args
 
@@ -67,6 +70,11 @@ class Dispatch:
 
             pp = current_ft.path
             curation.project_path = pp # FIXME BAD BAD BAD
+
+        try:
+            self.bfl = BFLocal()
+        except requests.exceptions.ConnectionError:
+            self.bfl = 'Could not connect to blackfynn'
 
         if curation.project_path.exists():
             self.summary = Summary(curation.project_path)
@@ -92,8 +100,7 @@ class Dispatch:
 
     def pull(self):
         # TODO folder meta -> org
-        bfl = BFLocal()
-        bfl.cons()
+        self.bfl.cons()
 
     def annos(self):
         args = self.args
@@ -115,6 +122,7 @@ class Dispatch:
 
         G = 1024 ** 3
         data = []
+
         for d in dirs:
             path = Path(d).resolve()
             if not path.is_dir():
@@ -126,11 +134,11 @@ class Dispatch:
             tf = 0
             ff = 0
             for p, m in path_meta.items():
-                if p.is_file() and not any(p.stem.startswith(pf) for pf in ('.~lock',)):
+                if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
                     try:
                         s = int(m['bf.size'])
                     except KeyError as e:
-                        print(p)
+                        print(repr(p))
                         raise e
                     tf += 1
                     total += s
@@ -154,7 +162,6 @@ class Dispatch:
 
     def shell(self):
         """ drop into an shell with classes loaded """
-        bfl = BFLocal()
         ds, dsd = get_datasets(curation.project_path)  # FIXME deprecate
         summary = self.summary
         org = FThing(curation.project_path)
@@ -254,9 +261,8 @@ class Dispatch:
                 paths = [p for p in paths if int(p.getxattr('bf.size')) < limit]
 
             if args['--fetch']:
-                bfl = BFLocal()
                 from pyontutils.utils import Async, deferred
-                Async()(deferred(bfl.fetch_path)(path, self.overwrite) for path in paths)
+                Async()(deferred(self.bfl.fetch_path)(path, self.overwrite) for path in paths)
             else:
                 if args['--verbose']:
                     for p in paths:
@@ -294,12 +300,10 @@ class Dispatch:
         print(eff, feedback)
 
     def missing(self):
-        bfl = BFLocal()
-        bfl.find_missing_meta()
+        self.bfl.find_missing_meta()
 
     def xattrs(self):
-        bfl = BFLocal()
-        bfl.populate_metastore()
+        self.bfl.populate_metastore()
 
 
 def main():
