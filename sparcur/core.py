@@ -573,22 +573,12 @@ class MetaStore:
         if not self.db_path.parent.exists():
             self.db_path.parent.mkdir(parents=True)
 
-        sqls = (('CREATE TABLE IF NOT EXISTS fsxattrs '
-                 '(path TEXT PRIMARY KEY,'
-                 'bf_id TEXT NOT NULL,'
-                 'bf_file_id INTEGER,'
-                 'bf_size INTEGER,'
-                 'bf_created_at DATETIME,'
-                 'bf_updated_at DATETIME,'
-                 'bf_checksum BLOB,'
-                 'bf_error INTEGER);'),
-                ('CREATE UNIQUE INDEX IF NOT EXISTS fsxattrs_u_path ON fsxattrs (path);'))
-        sqls = (('CREATE TABLE IF NOT EXISTS path_xattrs ('
+        sqls = (('CREATE TABLE IF NOT EXISTS path_xattrs'
+                 '('
                  'id TEXT PRIMARY KEY,'  # for hypothesis ids this can be string(??)
                  'xattrs BLOB'  # see path meta for the packed representation
-                 ');')
-                ('CREATE UNIQUE INDEX IF NOT EXISTS path_xattrs_u_id ON (id);')
-        )
+                 ');'),
+                ('CREATE UNIQUE INDEX IF NOT EXISTS path_xattrs_u_id ON path_xattrs (id);'))
         conn = self.conn()
         with conn:
             for sql in sqls:
@@ -623,7 +613,7 @@ class MetaStore:
                 yield None
 
     def xattrs(self, path):
-        sql = 'SELECT blob FROM path_xattrs WHERE id = ?'
+        sql = 'SELECT xattrs FROM path_xattrs WHERE id = ?'
         args = path.as_posix(),
         conn = self.conn()
         with conn:

@@ -177,6 +177,10 @@ class Dispatch:
                                  for d in ds
                                  if 'dataset_description' in d.data]
 
+            # get package testing
+            packages = [list(self.bfl.get_packages(d.id)) for d in ds]
+            n_packages = [len(ps) for ps in packages]
+
         elif False:
             ### this is the equivalent of export, quite slow to run
             # export everything

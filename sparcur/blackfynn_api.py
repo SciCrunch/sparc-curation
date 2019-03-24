@@ -183,7 +183,7 @@ def asynchelper(chunk):
 def get_packages(package_or_collection, path):
     """ flatten collections into packages """
     if isinstance(package_or_collection, Collection):
-        npath = path / package_or_collection.name
+        npath = path / NormFolder(package_or_collection.name)
         yield package_or_collection, path
         for npc in package_or_collection:
             yield from get_packages(npc, npath)
@@ -225,7 +225,7 @@ def blah():
 def pkgs_breadth(package_or_collection, path):
     print(path)
     if isinstance(package_or_collection, Collection):
-        npath = path / package_or_collection.name
+        npath = path / NormFolder(package_or_collection.name)
         to_iter = list(package_or_collection)
         #print(to_iter)
         coll = []
@@ -477,6 +477,34 @@ class BFLocal:
         self.project_name = self.bf.context.name
         self.project_path = local_storage_prefix / self.project_name
         self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
+
+    def get_packages(self, id, pageSize=1000, includeSourceFiles=True):
+        session = self.bf._api.session
+        #cursor
+        #pageSize
+        #includeSourceFiles
+        #types
+        # TODO cursor and yield?
+        offset = 0
+        while True:
+            resp = session.get(f'https://api.blackfynn.io/datasets/{id}/packages?'
+                               f'pageSize={pageSize}'
+                               #'&'
+                               #f'includeSourceFiles={includeSourceFiles}'
+                               #'&'
+                               #f'cursor={offset}'
+            )
+            print(resp.url)
+            if resp.ok:
+                packages = yield from resp.json()['packages']
+                if len(packages) < pageSize:
+                    break
+                else:
+                    offset += pageSize  # TODO check how this works ... is it [0:999] or [1:1000]
+                    break  # FIXME tssting only
+
+            else:
+                break
 
     @property
     def error_meta(self):
