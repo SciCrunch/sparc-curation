@@ -16,6 +16,10 @@ class NoRemoteImplementationError(Exception):
     """ prevent confusion between local path data and remote path data """
 
 
+class NoRemoteMappingError(Exception):
+    """ prevent confusion between local path data and remote path data """
+
+
 class ReflectiveCachePath(CachePath):
     """ Oh, it's me. """
 
@@ -36,12 +40,12 @@ class RemoteFactory:
         # TODO use this call to set the remote of local and cache??
         kwargs['_local_class'] = local_class
         kwargs['_cache_class'] = cache_class
-        newcls = cls._bindSession(**kwargs)
+        newcls = cls._bindKwargs(**kwargs)
         newcls.__new__ = cls.___new__
         return newcls
 
     @classmethod
-    def _bindSession(cls, **kwargs):
+    def _bindKwargs(cls, **kwargs):
         new_name = cls.__name__.replace('Factory','')
         classTypeInstance = type(new_name,
                                  (cls,),
@@ -198,9 +202,12 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 
 
 class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
-    def __new__(cls, organization='sparc', local_storage_prefix=local_storage_prefix):
-        bfl = BFLocal(organization)
-        return super().__new__(cls, bfl=bfl)
+    def __new__(cls, local_class, cache_class, blackfynn_local_instance):
+        # TODO bootstrap root from local_storage_prefix???
+        #if bfl.organization.id != 
+        #organization='sparc', local_storage_prefix=local_storage_prefix)
+        #bfl = BFLocal(organization)
+        return super().__new__(cls, local_class, cache_class, blf=blackfynn_local_instance)
 
     @property
     def root(self):
@@ -209,7 +216,7 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
         # the remote paths know theirs
         # making sure they match requires they both know
         # their own roots first
-        return self.bfl.bf.organization.id
+        return self.bfl.organization.id
 
     @property
     def id(self):
@@ -226,8 +233,30 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
         return None
 
     @property
+    def _bfobject(self):
+        """ conventional name to retrieve whatever the native remote representation is """
+        # FIXME does caching make sense here?
+        return self.bfl.get(self.cache.id)
+
+    @property
+    def _hbfo(self):
+        return HomogenousBF(self._bfobject)
+
+    @property
+    def checksum(self):
+        """ inefficient for this """
+        return NotImplemented('Inefficient to query directly, use meta.checksum')
+
+    @property
+    def stat(self):
+        """ inefficient for this """
+        return NotImplemented('Inefficient to query directly, use meta')
+
+    @property
     def meta(self):
-        hbfo = self.bfl.get_homogenous(self.cache.id)
+        # if id
+        # if parent id recursive
+        hbfo = self._hbfo
         return PathMeta(size=hbfo.size,
                         created=hbfo.created,
                         updated=hbfo.updated,
@@ -242,8 +271,32 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
 
     @property
     def children(self):
-        return None
+        """ direct children """
+        if self.cache.id:
+            yield from self._hbfo.children
+        else:
+            pass  # FIXME we should be able to catch this before we ever get here!
 
+    @property
+    def rchildren(self):
+        yield from self._hbfo.rchildren
+        return
+        id = self.cache.id
+        if id:
+            if self.cache:
+                # FIXME make sure org ids match?!
+                #if id != self.bfl.organization.id:
+                    
+                for d in self.bfl.datasets:
+                    yield d
+                    yield from bfl.get_packages()
+        else:
+            # NOTE cache manages the robustness layer
+            raise NoRemoteMappingError(f'{self} has no known remote id')
+        # if organization
+        # if dataset (usually going to be the fastest in most cases)
+        # if collection (can end up very slow)
+        # if package/file
 
 def main():
     from IPython import embed

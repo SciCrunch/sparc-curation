@@ -43,6 +43,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from joblib import Parallel, delayed
 from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
+from blackfynn import Dataset
 from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
@@ -105,6 +106,56 @@ def download(self, destination):
 
 # monkey patch File.download to
 File.download = download
+
+
+def id_to_type(id):
+    if id.startswith('N:package:'):
+        return DataPackage
+    elif id.startswith('N:collection:'):
+        return Collection
+    elif id.startswith('N:dataset:'):
+        return Dataset
+    elif id.startswith('N:organization:'):
+        return Organization
+
+
+@property
+def packages(self, pageSize=1000, includeSourceFiles=True):
+    """ python implementation to make use of /dataset/{id}/packages """
+    session = self._api.session
+    #cursor
+    #pageSize
+    #includeSourceFiles
+    #types
+    cursor_args = ''
+    while True:
+        resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
+                            f'pageSize={pageSize}&'
+                            f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                            f'{cursor_args}')
+        #print(resp.url)
+        if resp.ok:
+            j = resp.json()
+            packages = j['packages']
+            for count, package in enumerate(packages):
+                id = package['content']['nodeId']
+                bftype = id_to_type(id)
+                bftype.from_dict(package, api=self._api)
+                yield package
+
+            #print(count, j.keys())
+            if 'cursor' in j:
+                cursor = j['cursor']
+                cursor_args = f'&cursor={cursor}'
+            else:
+                break
+
+        else:
+            break
+
+
+# monkey patch Dataset to implement packages endpoint
+Dataset.packages = packages
 
 
 prefix = 'https://app.blackfynn.io/'
@@ -463,7 +514,33 @@ class HomogenousBF:
 
     @property
     def children(self):
-        return None
+        if isinstance(self.o, File):
+            return
+        elif isinstance(self.o, DataPackage):
+            return  # we conflate data packages and files
+        elif isinstance(self.o, Organization):
+            for dataset in self.o.datasets:
+                yield self.__class__(dataset)
+        else:
+            for bfobject in self.o:
+                yield self.__class__(bfobject)
+
+    @property
+    def rchildren(self):
+        if isinstance(self.o, File):
+            return
+        elif isinstance(self.o, Package):
+            return  # should we return files inside packages? are they 1:1?
+        elif any(isinstance(self.o, t) for t in (Organization, Collection)):
+            for child in self.children:
+                yield child
+                yield from child.rchildren
+        elif isinstance(self.o, Dataset):
+            session = self.o.session
+            for bfobject in self.o.packages:
+                yield self.__class__(bfobject)
+        else:
+            raise UnhandledTypeError  # TODO
 
 
 class BFLocal:
@@ -474,37 +551,10 @@ class BFLocal:
     def __init__(self, org='sparc'):
         self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', org, 'key'),
                             api_secret=devconfig.secrets('blackfynn', org, 'secret'))
+        self.organization = self.bf.context
         self.project_name = self.bf.context.name
         self.project_path = local_storage_prefix / self.project_name
         self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
-
-    def get_packages(self, id, pageSize=1000, includeSourceFiles=True):
-        session = self.bf._api.session
-        #cursor
-        #pageSize
-        #includeSourceFiles
-        #types
-        # TODO cursor and yield?
-        offset = 0
-        while True:
-            resp = session.get(f'https://api.blackfynn.io/datasets/{id}/packages?'
-                               f'pageSize={pageSize}'
-                               #'&'
-                               #f'includeSourceFiles={includeSourceFiles}'
-                               #'&'
-                               #f'cursor={offset}'
-            )
-            print(resp.url)
-            if resp.ok:
-                packages = yield from resp.json()['packages']
-                if len(packages) < pageSize:
-                    break
-                else:
-                    offset += pageSize  # TODO check how this works ... is it [0:999] or [1:1000]
-                    break  # FIXME tssting only
-
-            else:
-                break
 
     @property
     def error_meta(self):
@@ -554,8 +604,14 @@ class BFLocal:
         elif id.startswith('N:dataset:'):
             thing = self.bf.get_dataset(id)  # heterogenity is fun!
 
+        return thing
+
     def get_homogenous(self, id):
         return HomogenousBF(self.get(id))
+
+    def datasets(self):
+        for d in self.bf.datasets():
+            yield HomogenousBF(d)
 
     def recover_meta(self, path):
         pattrs = norm_xattrs(path.parent.xattrs())
@@ -642,7 +698,7 @@ class BFLocal:
         #embed()
         #return
         packages = []
-        collections = [(self.bf.context, local_storage_prefix)]
+        collections = [(self.bf.context, local_storage_prefix)]  # organization id set here
         for dataset in datasets:
             dataset_name = dataset.name
             ds_path = self.project_path / dataset_name

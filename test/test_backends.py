@@ -5,7 +5,11 @@ from sparcur.backends import SshRemoteFactory, BlackfynnRemoteFactroy, Reflectiv
 
 class TestSshRemote(unittest.TestCase):
     def setUp(self):
-        self.SshRemote = SshRemoteFactory(Path, ReflectiveCachePath, gethostname())
+        hostname = gethostname()
+        try:
+            self.SshRemote = SshRemoteFactory(Path, ReflectiveCachePath, hostname)
+        except TypeError:  # pxssh fail
+            self.SshRemote = SshRemoteFactory(Path, ReflectiveCachePath, hostname + '-local')
         self.this_file_darkly = self.SshRemote(__file__)
 
     def test_checksum(self):

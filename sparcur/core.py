@@ -65,17 +65,31 @@ class PathMeta:
 
     # TODO register xattr prefixes
 
+    @staticmethod
+    def deprefix(string, prefix):
+        if string.startswith(prefix):
+            return string[len(prefix):]
+
     @classmethod
-    def from_xattrs(cls, xattrs):
+    def from_xattrs(cls, xattrs, prefix=None):
         """ decoding from bytes """
-        kwargs = {k.decode(cls.encoding):cls.decode_value(k, v) for k, v in xattrs.items()}
+        if prefix:
+            prefix += '.'
+            kwargs = {k:cls.decode_value(k, v)
+                      for kraw, v in xattrs.items()
+                      for k in (cls.deprefix(kraw.decode(cls.encoding), prefix),)}
+        else:  # ah manual optimization
+            kwargs = {k:cls.decode_value(k, v)
+                      for kraw, v in xattrs.items()
+                      for k in (kraw.decode(cls.encoding),)}
+
         return cls(**kwargs)
 
     @classmethod
-    def from_metastore(cls, blob):
+    def from_metastore(cls, blob, prefix=None):
         """ db entry """
         xattrs = pickle.loads(blob)
-        return cls.from_xattrs(xattrs)
+        return cls.from_xattrs(xattrs, prefix)
 
     @classmethod
     def from_path(cls, relative_path):
@@ -120,12 +134,12 @@ class PathMeta:
 
     @classmethod
     def decode_value(cls, field, value):
-        if field in (b'created', b'updated'):
+        if field in ('created', 'updated'):
             value, = struct.unpack('d', value)
             return datetime.fromtimestamp(value)
-        elif field == b'checksum':
+        elif field == 'checksum':
             return value
-        elif field in (b'error', b'id', b'mode'):
+        elif field in ('error', 'id', 'mode'):
             return value.decode(cls.encoding)
         else:
             return int(value)
@@ -386,6 +400,16 @@ class XattrPath(PosixPath):
 class XattrCache(CachePath, XattrPath):
     xattr_prefix = None
 
+    @property
+    def meta(self):
+        xattrs = self.xattrs()
+        pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix)
+        return pathmeta
+
+    @meta.setter
+    def meta(self, pathmeta):
+        self.setxattrs(pathmeta.as_xattrs(self.xattr_prefix))
+
 
 class SqliteCache(CachePath):
     """ a persistent store to back up the xattrs if they get wiped """
@@ -393,14 +417,6 @@ class SqliteCache(CachePath):
 
 class BlackfynnCache(SqliteCache, XattrCache):
     xattr_prefix = 'bf'
-    @property
-    def meta(self):
-        meta = self.xattrs()
-        return meta
-
-    @meta.setter
-    def meta(self, value):
-        self.setxattrs()
 
 
 class LocalPath(PosixPath):

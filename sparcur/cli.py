@@ -178,7 +178,10 @@ class Dispatch:
                                  if 'dataset_description' in d.data]
 
             # get package testing
-            packages = [list(self.bfl.get_packages(d.id)) for d in ds]
+            bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
+                       'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
+            packages = [list(d.packages) for d in self.bfl.bf.datasets()
+                        if d.id not in bigskip]
             n_packages = [len(ps) for ps in packages]
 
         elif False:
