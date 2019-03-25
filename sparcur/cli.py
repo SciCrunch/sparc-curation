@@ -45,7 +45,9 @@ from collections import Counter
 import requests
 from sparcur import schemas as sc
 from sparcur import curation
-from sparcur.blackfynn_api import BFLocal, Path
+from sparcur.blackfynn_api import BFLocal
+from sparcur.backends import BlackfynnRemoteFactory
+from sparcur.core import Path, BlackfynnCache
 from sparcur.curation import FThing, FTLax, CurationReport, Summary
 from sparcur.curation import get_datasets, JEncode
 from sparcur.core import JT
@@ -74,7 +76,13 @@ class Dispatch:
         try:
             self.bfl = BFLocal()
         except requests.exceptions.ConnectionError:
+            # FIXME should we be failing early here?
             self.bfl = 'Could not connect to blackfynn'
+
+        # we don't instantiate these directly so you can have one
+        # but if it isn't anchored to the file system (bootstrap)
+        # then it won't be very useful
+        self.BlackfynnRemote = BlackfynnRemoteFactory(Path, BlackfynnCache, self.bfl)
 
         if curation.project_path.exists():
             self.summary = Summary(curation.project_path)
@@ -89,6 +97,10 @@ class Dispatch:
                 return
         else:
             self.default()
+
+    @property
+    def project_path(self):
+        return curation.project_path
 
     @property
     def debug(self):
@@ -174,13 +186,14 @@ class Dispatch:
 
             # view all dataset descriptions call repr(tabular_view_demo)
             tabular_view_demo = [next(d.dataset_description).t
-                                 for d in ds
+                                 for d in ds[:1]
                                  if 'dataset_description' in d.data]
 
             # get package testing
             bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
                        'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
-            packages = [list(d.packages) for d in self.bfl.bf.datasets()
+            bfds = self.bfl.bf.datasets()
+            packages = [list(d.packages) for d in bfds[:3]
                         if d.id not in bigskip]
             n_packages = [len(ps) for ps in packages]
 

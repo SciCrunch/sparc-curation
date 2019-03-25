@@ -1076,8 +1076,8 @@ class FThing(FakePathHelper):
     @property
     def id(self):
         attrs = self.xattrs()
-        if 'bf.id' in attrs:
-            return attrs['bf.id']
+        if b'bf.id' in attrs:
+            return attrs[b'bf.id']
 
     @property
     def name(self):

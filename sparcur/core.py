@@ -238,8 +238,8 @@ class RemotePath(PurePosixPath):
         return self._local_class(self)
 
     @property
-    def root(self):
-        raise NotImplemented
+    def anchor(self):
+        raise NotImplementedError
 
     @property
     def id(self):
@@ -314,29 +314,29 @@ class RemotePath(PurePosixPath):
 
     @meta.setter
     def meta(self, value):
-        raise NotImplemented
+        raise NotImplementedError
         return 'yes?'
 
     @property
     def annotations(self):
         # these are models etc in blackfynn
         yield from []
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def children(self):
         # uniform interface for retrieving remote hierarchies decoupled from meta
-        raise NotImplemented
+        raise NotImplementedError
 
     def iterdir(self):
         # I'm guessing most remotes don't support this
-        raise NotImplemented
+        raise NotImplementedError
 
     def glob(self, pattern):
-        raise NotImplemented
+        raise NotImplementedError
 
     def rglob(self, pattern):
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class CachePath(PosixPath):
@@ -358,19 +358,19 @@ class CachePath(PosixPath):
 
     @property
     def id(self):
-        return self.meta['id']
+        return self.meta.id
 
     # TODO how to toggle fetch from remote to heal?
     @property
     def meta(self):
         # xattrs failing over to sqlite
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def data(self):
         # we don't keep two copies of the local data
         # unless we are doing a git-like thing
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class XattrPath(PosixPath):
@@ -393,8 +393,8 @@ class XattrPath(PosixPath):
         return xattr.get(self.as_posix(), key, namespace=namespace)
 
     def xattrs(self, namespace=xattr.NS_USER):
-        # only decode keys ?
-        return {k.decode():v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
+        # decode keys later
+        return {k:v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
 
 
 class XattrCache(CachePath, XattrPath):
@@ -418,10 +418,57 @@ class SqliteCache(CachePath):
 class BlackfynnCache(SqliteCache, XattrCache):
     xattr_prefix = 'bf'
 
+    @property
+    def anchor(self):
+        return self.organization
+
+    @property
+    def organization(self):
+        """ organization represents a permissioning boundary
+            for blackfynn, so above this we would have to know
+            in advance the id and have api keys for it and the
+            containing folder would have some non-blackfynn notes
+            also it seems likely that the same data could appear in
+            multiple different orgs, so that would mean linking locally
+        """
+
+        # FIXME in reality files can have more than one org ...
+        if self.meta.id.startswith('N:organization:'):
+            return self
+        elif self.parent:
+            return self.parent.organization
+
+    @property
+    def dataset(self):
+        if self.meta.id.startswith('N:dataset:'):
+            return self
+        elif self.parent:
+            return self.parent.dataset
+
+    @property
+    def human_uri(self):
+        # org /datasets/ N:dataset /files/ N:collection
+        # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
+        # org /datasets/ N:dataset /viewer/ N:package
+        id = self.meta.id
+        N, type, suffix = id.split(':')
+        if id.startswith('N:package:'):
+            prefix = '/viewer/'
+        elif id.startswith('N:collection:'):
+            prefix = '/files/'
+        elif id.startswith('N:dataset:'):
+            prefix = '/datasets/'
+            return self.parent.human_uri + prefix + id
+        elif id.startswith('N:organization:'):
+            return 'https://app.blackfynn.io/' + id
+        else:
+            raise UnhandledTypeError(type)
+
+        return self.dataset.human_uri + prefix + id
 
 class LocalPath(PosixPath):
     # local data about remote objects
-    _cache_class = CachePath
+    _cache_class = None
     _remote_class = None
 
     @property
@@ -431,7 +478,7 @@ class LocalPath(PosixPath):
     @property
     def cache(self):
         # TODO performance check on these
-        return self._cach_class(self)
+        return self._cache_class(self)
 
     @property
     def id(self):
@@ -474,22 +521,26 @@ class LocalPath(PosixPath):
     def children(self):
         yield from self.iterdir()
 
+    @property
+    def rchildren(self):
+        yield from self.rglob('*')
+
     def diff(self):
         pass
 
     def meta_to_remote(self):
         # pretty sure that we don't wan't this independent of data_to_remote
         # sort of cp vs cp -a and commit date vs author date
-        raise NotImplemented
+        raise NotImplementedError
         meta = self.meta
         # FIXME how do we invalidate cache?
         self.remote.meta = meta  # this can super duper fail
 
     def data_to_remote(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def annotations_to_remote(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def to_remote(self):
         # FIXME in theory we could have an endpoint for each of these
@@ -514,6 +565,8 @@ class LocalPath(PosixPath):
 
 class Path(XattrPath, LocalPath):
     """ An augmented path for all the various local needs of the curation process. """
+    _cache_class = None
+    _remote_class = None
 
     def xopen(self):
         """ open file using xdg-open """

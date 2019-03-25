@@ -33,6 +33,7 @@ blackfynn-mvp-secret: ${apisecret}
 import io
 import os
 import asyncio
+from copy import deepcopy
 from nibabel import nifti1
 from pydicom import dcmread
 import yaml
@@ -108,6 +109,7 @@ def download(self, destination):
 File.download = download
 
 
+# package meta
 def id_to_type(id):
     if id.startswith('N:package:'):
         return DataPackage
@@ -122,12 +124,35 @@ def id_to_type(id):
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
     """ python implementation to make use of /dataset/{id}/packages """
+    remapids = {}
+    index = {}
+    def restructure(j):
+        """ restructure package json to match what api needs? """
+        # FIXME something's still wonky here
+        c = j['content']
+        c['int_id'] = c['id']
+        c['id'] = c['nodeId']  # FIXME indeed packages do seem to be missing ids!?
+        remapids[c['int_id']] = c['id']
+        c['int_datasetId'] = c['datasetId']
+        c['datasetId'] = c['datasetNodeId']
+        if 'parentId' in c:
+            pid = c['parentId']
+            c['parent'] = remapids[pid]  # key error to signal out of order
+            #if pid in remapids:
+            #else:
+                #c['parent'] = f'WTF ERROR: {pid}'
+                #print('wtf', pid, c['id'], c['datasetId'])
+            #else:
+                #c['parent'] = remapids['latest']
+        return j
+        
     session = self._api.session
     #cursor
     #pageSize
     #includeSourceFiles
     #types
     cursor_args = ''
+    out_of_order = []
     while True:
         resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
                             f'pageSize={pageSize}&'
@@ -137,11 +162,39 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
         if resp.ok:
             j = resp.json()
             packages = j['packages']
-            for count, package in enumerate(packages):
-                id = package['content']['nodeId']
-                bftype = id_to_type(id)
-                bftype.from_dict(package, api=self._api)
-                yield package
+            if out_of_order:
+                #print('fixing?', out_of_order)
+                packages += out_of_order
+                # if a parent is on the other side of a
+                # pagination boundary put the children
+                # at the end and move on
+            out_of_order = [None]
+            while out_of_order:
+                if out_of_order[0] is None:
+                    out_of_order.remove(None)
+                else:
+                    #print('fixing?', out_of_order)
+                    packages = out_of_order
+                    out_of_order = []
+                for count, package in enumerate(packages):
+                    id = package['content']['nodeId']
+                    bftype = id_to_type(id)
+                    try:
+                        rdp = restructure(deepcopy(package))
+                        bfobject = bftype.from_dict(rdp, api=self._api)
+                        bfobject._json = package
+                        yield bfobject
+                        index[bfobject.id] = bfobject
+                        if bfobject.parent in index:
+                            p = index[bfobject.parent]
+                            if p._items is None:
+                                p._items = []
+                            p.items.append(bfobject)
+                    except KeyError as e:
+                        # api returned a child before the parent
+                        # we'll get it on the next pass
+                        out_of_order.append(package)
+                        #print('WE HAVE AND OUT OF ORDER')
 
             #print(count, j.keys())
             if 'cursor' in j:
@@ -477,12 +530,25 @@ def get_file_by_id(get, file_path, pid, fid):
 
 class HomogenousBF:
     def __init__(self, bfobject):
+        if isinstance(bfobject, HomogenousBF):
+            bfobject = bfobject.o
+
         self.o = bfobject
+
+    @property
+    def name(self):
+        name = self.o.name
+        if isinstance(self.o, DataPackage):
+            name += '.' + self.o.type.lower()  # FIXME ... can we match s3key?
+
+        return name
 
     @property
     def id(self):
         if isinstance(self.o, File):
             return self.o.pkg_id
+        else:
+            return self.o.id
 
     @property
     def size(self):
@@ -513,6 +579,17 @@ class HomogenousBF:
         return None
 
     @property
+    def parent(self):
+        return self.__class__(self.o.parent)  # FIXME self.o.parent is the id??
+
+    @property
+    def rparents(self):
+        parent = self.parent
+        while parent:
+            yield parent
+            parent = parent.parent
+
+    @property
     def children(self):
         if isinstance(self.o, File):
             return
@@ -529,26 +606,51 @@ class HomogenousBF:
     def rchildren(self):
         if isinstance(self.o, File):
             return
-        elif isinstance(self.o, Package):
+        elif isinstance(self.o, DataPackage):
             return  # should we return files inside packages? are they 1:1?
         elif any(isinstance(self.o, t) for t in (Organization, Collection)):
             for child in self.children:
                 yield child
                 yield from child.rchildren
         elif isinstance(self.o, Dataset):
-            session = self.o.session
             for bfobject in self.o.packages:
                 yield self.__class__(bfobject)
         else:
             raise UnhandledTypeError  # TODO
 
+    @property
+    def data(self):
+        if isinstance(self.o, DataPackage):
+            files = list(self.o.files)
+            if len(files) > 1:
+                raise BaseException('TODO too many files')
+
+            file = files[0]
+        elif isinstance(self.o, File):
+            file = self.o
+        else:
+            return
+
+        resp = requests.get(file.url, stream=True)
+        for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
+            if chunk:
+                yield chunk
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.id})'
 
 class BFLocal:
 
     class NoBfMeta(Exception):
         """ There is not bf id for this file. """
 
-    def __init__(self, org='sparc'):
+    def __init__(self, org='sparc', local_storage_prefix=local_storage_prefix):
+        if not isinstance(local_storage_prefix, Path):
+            local_storage_prefix = Path(local_storage_prefix)
+
+        # no changing local storage prefix in the middle of things
+        # if you want to do that create a new class
+
         self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', org, 'key'),
                             api_secret=devconfig.secrets('blackfynn', org, 'secret'))
         self.organization = self.bf.context
@@ -599,10 +701,17 @@ class BFLocal:
                 # TODO checksum may no longer match since we changed it
 
     def get(self, id):
-        if id.startswith('N:collection:'):
-            thing = self.bf.get(id)
-        elif id.startswith('N:dataset:'):
+        if id.startswith('N:dataset:'):
             thing = self.bf.get_dataset(id)  # heterogenity is fun!
+        elif id.startswith('N:organization:'):
+            if id == self.organization.id:
+                return self.organization  # FIXME staleness?
+            else:
+                # if we start form local storage prefix for everything then
+                # this would work
+                raise BaseException('TODO org does not match need other api keys.')
+        else:
+            thing = self.bf.get(id)
 
         return thing
 

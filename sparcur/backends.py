@@ -5,6 +5,7 @@ from datetime import datetime
 from pexpect import pxssh
 from sparcur.core import PathMeta, RemotePath, CachePath, LocalPath, Path
 from sparcur.config import local_storage_prefix
+from sparcur.blackfynn_api import HomogenousBF  # FIXME there should be a better way ...
 from ast import literal_eval
 
 
@@ -42,6 +43,10 @@ class RemoteFactory:
         kwargs['_cache_class'] = cache_class
         newcls = cls._bindKwargs(**kwargs)
         newcls.__new__ = cls.___new__
+        # FIXME klobbering and how to handle multiple?
+        local_class._remote_class = newcls
+        local_class._cache_class = cache_class
+        cache_class._remote_class = newcls
         return newcls
 
     @classmethod
@@ -201,13 +206,13 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
             return stats, checks  # TODO
 
 
-class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
+class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     def __new__(cls, local_class, cache_class, blackfynn_local_instance):
         # TODO bootstrap root from local_storage_prefix???
         #if bfl.organization.id != 
         #organization='sparc', local_storage_prefix=local_storage_prefix)
         #bfl = BFLocal(organization)
-        return super().__new__(cls, local_class, cache_class, blf=blackfynn_local_instance)
+        return super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
 
     @property
     def root(self):
@@ -222,6 +227,12 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
     def id(self):
         raise NotImplemented('The blackfynn remote cannot answer this question.')
 
+    def is_dir(self):
+        return not self.is_file
+
+    def is_file(self):
+        return self.meta.id.startswith('N:package:')
+
     @property
     def data(self):
         # call on folder does nothing?
@@ -229,18 +240,23 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
         # but that is definitely dangerous default behavior ...
         #if self.is_file():
             #self.cache.id
-
-        return None
+        yield from self._hbfo.data
 
     @property
-    def _bfobject(self):
+    def bfobject(self):
         """ conventional name to retrieve whatever the native remote representation is """
-        # FIXME does caching make sense here?
-        return self.bfl.get(self.cache.id)
+        # caching makes sense ehre since local and cache paths create a new instance
+        # every time they reference remote again, if they want to keep a local copy
+        # they can for synchronization purposes, but remote really does got and get
+        # things again when you create a new one
+        if not hasattr(self, '_bfobject'):
+            self._bfobject = self.bfl.get(self.cache.id)
+
+        return self._bfobject
 
     @property
-    def _hbfo(self):
-        return HomogenousBF(self._bfobject)
+    def hbfo(self):
+        return HomogenousBF(self.bfobject)
 
     @property
     def checksum(self):
@@ -256,7 +272,7 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
     def meta(self):
         # if id
         # if parent id recursive
-        hbfo = self._hbfo
+        hbfo = self.hbfo  # FIXME files vs packages, they have different updated/created
         return PathMeta(size=hbfo.size,
                         created=hbfo.created,
                         updated=hbfo.updated,
@@ -272,14 +288,19 @@ class BlackfynnRemoteFactroy(RemoteFactory, RemotePath):
     @property
     def children(self):
         """ direct children """
-        if self.cache.id:
-            yield from self._hbfo.children
-        else:
-            pass  # FIXME we should be able to catch this before we ever get here!
+        for child in self.hbfo.children:
+            child_path = self / child.name
+            child_path._bfobject = child
+            yield child_path
 
     @property
     def rchildren(self):
-        yield from self._hbfo.rchildren
+        for child in self.hbfo.rchildren:
+            # FIXME need to stop a p.name == self.name
+            child_path = self.__class__(self, *[p.name for p in child.rparents], child.name)
+            child_path._bfobject = child
+            yield child_path
+
         return
         id = self.cache.id
         if id:
