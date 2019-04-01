@@ -529,7 +529,7 @@
   
   Repository local roots. The ordering of the entries matters.
   #+NAME: py-roots
-  | hyputils ontquery parsercomb pyontutils protc/protcur sparc-curation scibot |
+  | pyontutils/htmlfn pyontutils/ttlser hyputils ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
   #+NAME: rkt-roots
   | qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ |
   
@@ -608,10 +608,14 @@
     https://github.com/zussitarze/qrcode
     EOL
     export PYROOTS=<<EOL
+    pyontutils/htmlfn
+    pyontutils/ttlser
     hyputils
     ontquery
     parsercomb
     pyontutils
+    pyontutils/nifstd
+    pyontutils/neurondm
     protc/protcur
     sparc-curation
     scibot

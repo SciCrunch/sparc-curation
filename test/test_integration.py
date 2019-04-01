@@ -159,7 +159,7 @@ def populate_tests(only=tuple(), do_mains=True):
     except git.exc.InvalidGitRepositoryError:  # testing elsewhere
         import sparcur
         import pkgutil
-        modinfos = list(pkgutil.iter_modules(pyontutils.__path__))
+        modinfos = list(pkgutil.iter_modules(sparcur.__path__))
         modpaths = [sparcur.__name__ + '.' + modinfo.name
                     for modinfo in modinfos]
         for modpath in modpaths:
