@@ -286,7 +286,7 @@
     #+HEADER: :var PYROOTS=py-roots
     #+BEGIN_SRC bash :results output :eval no-export
       cd ~/git
-      for repo in ${PYROOTS}; do cd ${repo}; python setup.py develop --user && cd ~/git; done
+      for repo in ${PYROOTS}; do cd ${repo}; pip install --user --editable . && cd ~/git; done
     #+END_SRC
 
     #+NAME: racket-ontology
