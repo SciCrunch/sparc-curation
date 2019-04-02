@@ -1,13 +1,25 @@
+import re
 import os
 from pathlib import Path
 from setuptools import setup
+
+
+def find_version(filename):
+    _version_re = re.compile(r"__version__ = '(.*)'")
+    for line in open(filename):
+        version_match = _version_re.match(line)
+        if version_match:
+            return version_match.group(1)
+
+
+__version__ = find_version('sparcur/__init__.py')
 
 with open('README.md', 'rt') as f:
     long_description = f.read()
 
 tests_require = ['pytest', 'pytest-runner']
 setup(name='sparcur',
-      version='0.0.0',
+      version=__version__,
       description='assorted',
       long_description=long_description,
       long_description_content_type='text/markdown',
