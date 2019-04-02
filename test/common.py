@@ -64,8 +64,8 @@ def mk_required_files(path, suffix='.csv'):
             file_path.setxattrs(attrs)
 
 
-if not project_path.exists():
-    project_path.mkdir(parents=True)
+if not project_path.exists() or not list(project_path.iterdir()):
+    project_path.mkdir(parents=True, exist_ok=True)
     attrs = mk_fldr_meta(project_path, 'organization')
     project_path.setxattrs(attrs)
     for ds in ds_folders:
