@@ -1,6 +1,6 @@
 import unittest
 from socket import gethostname
-from sparcur.core import Path, BlackfynnCache
+from sparcur.paths import Path, BlackfynnCache
 from sparcur.blackfynn_api import BFLocal
 from sparcur.backends import SshRemoteFactory, BlackfynnRemoteFactory, ReflectiveCachePath
 

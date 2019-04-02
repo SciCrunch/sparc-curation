@@ -25,8 +25,9 @@ from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
 #from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
+from sparcur.core import JEncode
+from sparcur.paths import Path
 from sparcur.config import local_storage_prefix
-from sparcur.core import Path, JEncode
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur import schemas as sc
 from sparcur.schemas import (JSONSchema, ValidationError,

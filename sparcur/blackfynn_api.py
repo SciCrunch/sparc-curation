@@ -49,7 +49,8 @@ from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
-from sparcur.core import Path, MetaStore
+from sparcur.paths import Path
+from sparcur.metastore import MetaStore
 from sparcur.config import local_storage_prefix
 from scipy.io import loadmat
 from IPython import embed

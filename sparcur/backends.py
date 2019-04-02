@@ -3,7 +3,7 @@ import atexit
 import subprocess
 from datetime import datetime
 from pexpect import pxssh
-from sparcur.core import PathMeta, RemotePath, CachePath, LocalPath, Path
+from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path
 from sparcur.config import local_storage_prefix
 from sparcur.blackfynn_api import HomogenousBF  # FIXME there should be a better way ...
 from ast import literal_eval

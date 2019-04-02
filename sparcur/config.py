@@ -1,2 +1,2 @@
-from sparcur.core import Path
+from sparcur.paths import Path
 local_storage_prefix = Path('~/files/blackfynn_local/').expanduser()

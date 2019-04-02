@@ -47,7 +47,7 @@ from sparcur import schemas as sc
 from sparcur import curation
 from sparcur.blackfynn_api import BFLocal
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.core import Path, BlackfynnCache
+from sparcur.paths import Path, BlackfynnCache
 from sparcur.curation import FThing, FTLax, CurationReport, Summary
 from sparcur.curation import get_datasets, JEncode
 from sparcur.core import JT

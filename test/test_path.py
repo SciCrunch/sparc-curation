@@ -1,5 +1,5 @@
 import unittest
-from sparcur.core import PathMeta, Path
+from sparcur.paths import PathMeta, Path
 from .common import project_path
 
 class TestPathMeta(unittest.TestCase):

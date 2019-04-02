@@ -1,7 +1,7 @@
 import shutil
 from datetime import datetime
 from sparcur import config
-from sparcur.core import Path
+from sparcur.paths import Path
 from sparcur.curation import Version1Header
 this_file = Path(__file__)
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
