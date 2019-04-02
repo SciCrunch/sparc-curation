@@ -240,7 +240,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # but that is definitely dangerous default behavior ...
         #if self.is_file():
             #self.cache.id
-        yield from self._hbfo.data
+        yield from self.hbfo.data
 
     @property
     def bfobject(self):
