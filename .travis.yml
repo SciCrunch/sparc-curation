@@ -1,0 +1,27 @@
+# https://travis-ci.org/tgbugs/hyputils
+sudo: false
+language: python
+env:
+  global:
+    - PIPENV_VENV_IN_PROJECT=1
+    - PIPENV_IGNORE_VIRTUALENVS=1
+branches:
+  only:
+    - master
+  git:
+    depth: 3
+
+python:
+  - 3.6
+
+install:
+  - pip install --upgrade pytest pytest-cov
+  - pip install coverage coveralls && export HAS_COVERALLS=1
+  - pip install pipenv
+  - pipenv install --system --skip-lock --deploy
+
+script:
+  - PYTHONWARNINGS=ignore pipenv run pytest --verbose --cov=sparcur
+
+after_success:
+  - if [[ $HAS_COVERALLS ]] ; then coveralls ; fi

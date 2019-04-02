@@ -1,6 +1,8 @@
-recursive-exclude export *
-recursive-exclude pyontutils.egg-info *
-recursive-exclude resources *
+recursive-include test *
 exclude .gitignore
 exclude .travis.yml
 exclude MANIFEST.in
+recursive-exclude resources *
+recursive-exclude * *.pyc
+recursive-exclude * *.swp
+recursive-exclude * *.swo

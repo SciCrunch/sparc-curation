@@ -1,0 +1,11 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+htmlfn = {git = "https://github.com/tgbugs/pyontutils.git", subdirectory = "htmlfn", ref = "reorg"}
+protcur = {git = "https://github.com/tgbugs/protc.git", subdirectory = "protcur"}
+pyontutils = {git = "https://github.com/tgbugs/pyontutils.git", ref = "reorg"}
+ttlser = {git = "https://github.com/tgbugs/pyontutils.git", subdirectory = "ttlser", ref = "reorg"}
+"e1839a8" = {path = ".", editable = true}

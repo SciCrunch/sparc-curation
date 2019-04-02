@@ -5,6 +5,7 @@ from setuptools import setup
 with open('README.md', 'rt') as f:
     long_description = f.read()
 
+tests_require = ['pytest', 'pytest-runner']
 setup(name='sparcur',
       version='0.0.0',
       description='assorted',
@@ -14,9 +15,16 @@ setup(name='sparcur',
       author='Tom Gillespie',
       author_email='tgbugs@gmail.com',
       license='MIT',
-      classifiers=[],
-      keywords='SPARC python curation ontology blackfynn',
+      classifiers=[
+          'Development Status :: 3 - Alpha',
+          'License :: OSI Approved :: MIT License',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
+      ],
+      keywords='SPARC curation biocuration ontology blackfynn protc protocols hypothesis',
       packages=['sparcur'],
+      python_requires='>=3.6',
+      tests_require=tests_require,
       install_requires=[
           'blackfynn',
           'dicttoxml',
@@ -26,8 +34,8 @@ setup(name='sparcur',
           'pexpect',  # >=4.7.0 probably once my changes are in
           #'protcur',  # TODO
           'pydicom',
-          'pyontutils',
-          #'pysercomb',  # TODO
+          'pyontutils>=0.1.0',
+          'pysercomb',
           'python-magic',  # FIXME conflicts with sys-apps/file python bindings
           'pyxattr',
           'scipy',
@@ -35,7 +43,7 @@ setup(name='sparcur',
           'Xlib',
           'xlsx2csv',
       ],
-      extras_require={'dev':['pytest', 'pytest-cov']},
+      extras_require={'test': tests_require},
       scripts=[],
       entry_points={
           'console_scripts': [
