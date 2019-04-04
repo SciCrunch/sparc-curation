@@ -1,7 +1,7 @@
 #+TITLE: Developer and curator setup guide
 #+AUTHOR: Tom Gillespie
 # [[./setup.pdf]]
-#+OPTIONS: num:nil ^:nil toc:nil
+#+OPTIONS: num:nil ^:nil
 #+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
 #+STARTUP: showall
 
