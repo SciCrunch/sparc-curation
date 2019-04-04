@@ -56,7 +56,6 @@
     #+CAPTION: Can be run remotely as root.
     #+CAPTION: texlive-full is a big boy, minimal version is
     #+CAPTION: texlive texlive-luatex texlive-latex-extra  \\
-    #+HEADER: :var UHP=user-home-paths
     #+BEGIN_SRC bash :exports code :eval never
       wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
       echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' \
@@ -79,7 +78,8 @@
     Doesn't work on xfce either apparently. The absolute madness.
     #+NAME: user-home-paths
     #+CAPTION: Set user home PATHs for all users to simplify later steps
-    #+BEGIN_SRC bash :exports code :eval never
+    #+CAPTION: FIXME for some reason if this block is treated a source block it kills html export !?
+    #+BEGIN_EXAMPLE
       { cat <<EOL
       # set PATH so it includes user's private bin if it exists
       if [ -d "$HOME/bin" ] ; then
@@ -92,7 +92,7 @@
       fi
       EOL
       } > /etc/profile.d/user-home-paths.sh
-    #+END_SRC
+    #+END_EXAMPLE
 
     Other software that you will probably need at some point but that is not packaged on ubuntu.
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
@@ -578,7 +578,7 @@
 ** Remote exports code
    #+NAME: remote-exports-code
    #+CAPTION: export commands to set if running remotely via copy and paste
-   #+HEADER: :var UHP=user-home-paths :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
+   #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
    #+BEGIN_SRC bash :results output code example :exports results :eval no-export
      echo export REPOS='<<EOL'
      printf "$(echo ${REPOS} | tr ' ' '\n')"
