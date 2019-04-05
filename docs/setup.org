@@ -314,8 +314,8 @@
     :CUSTOM_ID: configuration-files
     :END:
 
-    This section creates and populates [[file:${HOME}/devconfig.yaml]]
-    and [[file:${HOME}/secrets.yaml]]. They are used to configure the
+    This section creates and populates [[file:${HOME}/devconfig.yaml][~/devconfig.yaml]]
+    and [[file:${HOME}/secrets.yaml][~/secrets.yaml]]. They are used to configure the
     various programs that are used by the SPARC curation workflow, and
     store the API keys and semi private information such as hypothes.is
     group names, and google doc ids.
@@ -379,8 +379,9 @@
 
     #+END_SRC
 
-    You can move your [[file:${HOME}/.config/pyontutils/secrets.yaml]] to live where ever you want, but
-    you will need to update the =secrets_file= entry in [[file:${HOME}/.config/pyontutils/devconfig.yaml]].
+    You can move your [[file:${HOME}/.config/pyontutils/secrets.yaml][~/.config/pyontutils/secrets.yaml]]
+    to live where ever you want, but you will need to update the =secrets_file= entry in
+    [[file:${HOME}/.config/pyontutils/devconfig.yaml][~/.config/pyontutils/devconfig.yaml]].
 
     At this point installation is complete. Congratulations!
 
