@@ -49,7 +49,7 @@
       apt install openssh-server net-tools
     #+END_SRC
 
-    Add your ssh public key to [[file://${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
+    Add your ssh public key to [[file:${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
     if you want to run this remotely.
 
     #+NAME: ubuntu-root-setup
