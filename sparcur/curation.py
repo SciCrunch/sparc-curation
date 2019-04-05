@@ -3,6 +3,7 @@ import io
 import csv
 import copy
 import json
+import math
 import hashlib
 import mimetypes
 from types import GeneratorType
@@ -11,7 +12,7 @@ from collections import defaultdict, deque
 import magic  # from sys-apps/file consider python-magic ?
 import rdflib
 import requests
-#import dicttoxml
+import dicttoxml
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pyontutils.utils import makeSimpleLogger, byCol
@@ -23,7 +24,7 @@ from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
 from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
-#from terminaltables import AsciiTable
+from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur.core import JEncode
 from sparcur.paths import Path
@@ -499,6 +500,29 @@ class Version1Header:
             sec_data = section.data_with_errors
             out[section_name] = sec_data
 
+    @property
+    def submission_completeness_index(self):
+        """ (/ (- total-possible-errors number-of-errors) total-possible-errors)
+            A naieve implementation that requires a recursive algorithem to actually
+            count the number of potential errors in a given context. """
+        # TODO this is an augment step in the new pipelined version
+
+        dwe = self.data_with_errors
+        if 'errors' not in dwe:
+            return 1
+        else:
+            schema = self.schema.schema
+            total_possible_errors = 0
+            if 'required' in schema:
+                # assume that required -> array minItems 1 are equivalent
+                total_possible_errors += len(schema['required'])
+            if 'additionalProperties' in schema and not schema['additionalProperties']:
+                total_possible_errors += 1
+
+            number_of_errors = len(dwe['errors'])
+
+            return (total_possible_errors - number_of_errors) / total_possible_errors
+
 
 class SubmissionFile(Version1Header):
     to_index = 'submission_item',  # FIXME normalized in version 2
@@ -904,6 +928,50 @@ class MetaMaker:
     @property
     def modality(self):
         return self._generic(self.f.modality)
+
+    @property
+    def submission_completeness_index(self):
+        # duh points for this function being able to run at all
+        score = 2  # we currently have 3 parts that are required so (- 50 (* 16 3)) -> 2
+        data = self.f.data
+        if data:
+            if not 'submission' in data:
+                score_submission = 0
+            else:
+                s = list(self.f.submission)
+                if len(s) > 1:
+                    score_submission = .0625  # one point for multiple submissions
+                else:
+                    s = s[0]
+                    score_submission = s.submission_completeness_index
+
+            if not 'dataset_description' in data:
+                score_dataset_description = 0
+            else:
+                dd = list(self.f.dataset_description)
+                if len(dd) > 1:
+                    score_dataset_description = .0625
+                else:
+                    dd = dd[0]
+                    score_dataset_description = dd.submission_completeness_index
+
+            # scoring subjects is much harder
+            if not 'subjects' in data:
+                score_subjects = 0
+            else:
+                s = list(self.f.subjects)
+                if len(s) > 1:
+                    score_subjects = .0625
+                else:
+                    s = s[0]
+                    score_subjects = s.submission_completeness_index
+
+            score += math.floor(score_submission * 16)
+            score += math.floor(score_dataset_description * 16)
+            score += math.floor(score_subjects * 16)
+
+        assert score <= 50, score
+        return score / 50
 
     @property
     def contributor_count(self):

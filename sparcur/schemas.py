@@ -226,6 +226,7 @@ class MetaOutSchema(JSONSchema):
                       'species',
                       'organ',
                       'modality',
+                      'submission_completeness_index',
                       'contributor_count',
                       'subject_count',
                       #'sample_count',
@@ -251,7 +252,10 @@ class MetaOutSchema(JSONSchema):
                   # TODO $ref these w/ pointer?
         # in contributor etc?
 
-                  'subject_count': {'type': 'integer'},
+        'submission_completeness_index': {'type': 'float',
+                                          'minimum': 0,
+                                          'maximum': 1,},
+        'subject_count': {'type': 'integer'},
         'sample_count': {'type': 'integer'},
         'contributor_count': {'type': 'integer'},})
 
