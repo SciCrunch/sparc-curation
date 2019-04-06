@@ -4,7 +4,7 @@ Usage:
     spc pull
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [filetypes]
+    spc report [filetypes subjects]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -40,9 +40,11 @@ Options:
 
 import csv
 import json
+import pprint
 from datetime import datetime
 from collections import Counter
 import requests
+from terminaltables import AsciiTable
 from sparcur import schemas as sc
 from sparcur import curation
 from sparcur.blackfynn_api import BFLocal
@@ -307,6 +309,13 @@ class Dispatch:
                 print(head)
                 print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
 
+        elif self.args['subjects']:
+            subjects_headers = tuple(h for ft in self.summary
+                                     for sf in ft.subjects
+                                     for h in sf.bc.header)
+            counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
+                                               key=lambda kv:-kv[-1]))
+            print(AsciiTable(((f'Column Name unique = {len(counts)}', '#'), *counts)).table)
         if self.debug:
             embed()
 
