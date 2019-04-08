@@ -245,7 +245,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     @property
     def bfobject(self):
         """ conventional name to retrieve whatever the native remote representation is """
-        # caching makes sense ehre since local and cache paths create a new instance
+        # caching makes sense here since local and cache paths create a new instance
         # every time they reference remote again, if they want to keep a local copy
         # they can for synchronization purposes, but remote really does got and get
         # things again when you create a new one
@@ -290,15 +290,17 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         """ direct children """
         for child in self.hbfo.children:
             child_path = self / child.name
-            child_path._bfobject = child
+            child_path._bfobject = child.bfobject
             yield child_path
 
     @property
     def rchildren(self):
         for child in self.hbfo.rchildren:
             # FIXME need to stop a p.name == self.name
-            child_path = self.__class__(self, *[p.name for p in child.rparents], child.name)
-            child_path._bfobject = child
+            args = (*[p.name for p in child.rparents], child.name)
+            print(self.__class__, args)
+            child_path = self.__class__(self, *args)
+            child_path._bfobject = child.bfobject
             yield child_path
 
         return

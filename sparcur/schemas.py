@@ -80,10 +80,13 @@ class ContributorSchema(JSONSchema):
     schema = {'type': 'object',
               'properties': {
                   'name': {'type': 'string'},
-                  'contributor_orcid_id': {'type': 'string'},
+                  'contributor_orcid_id': {'type': 'string',
+                                           'pattern': ('https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
+                                                       '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)')},
                   'contributor_affiliation': {'type': 'string'},
                   'contributor_role': {
                       'type':'array',
+                      'minItems': 1,
                       'items': {
                           'type': 'string',
                           'enum': ['ContactPerson',
@@ -229,6 +232,7 @@ class MetaOutSchema(JSONSchema):
                       'submission_completeness_index',
                       'contributor_count',
                       'subject_count',
+                      'human_uri'
                       #'sample_count',
     ]
     schema['required'].remove('contributors')
@@ -236,6 +240,9 @@ class MetaOutSchema(JSONSchema):
     schema['properties'].pop('contributors')
     schema['properties'].update({
         'errors': ErrorSchema.schema,
+        'human_uri': {'type': 'string',
+                      'pattern': '^https://',  # FIXME proper regex
+        },
         'award_number': {'type': 'string',
                          'pattern': '^OT|^U18',},
         'principal_investigator': {'type': 'string'},
@@ -252,7 +259,7 @@ class MetaOutSchema(JSONSchema):
                   # TODO $ref these w/ pointer?
         # in contributor etc?
 
-        'submission_completeness_index': {'type': 'float',
+        'submission_completeness_index': {'type': 'number',
                                           'minimum': 0,
                                           'maximum': 1,},
         'subject_count': {'type': 'integer'},

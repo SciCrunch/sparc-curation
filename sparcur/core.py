@@ -1,7 +1,10 @@
 import json
 from collections import deque
+import ontquery as oq
 from pysercomb.pyr.units import ProtcParameter
+from pyontutils.core import OntId
 from sparcur import exceptions as exc
+
 
 class JEncode(json.JSONEncoder):
     def default(self, obj):
@@ -16,6 +19,40 @@ class JEncode(json.JSONEncoder):
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
+
+
+class OrcidPrefixes(oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+OrcidPrefixes({'orcid':'https://orcid.org/',
+               'ORCID':'https://orcid.org/',})
+
+
+class OrcidId(OntId):
+    _namespaces = OrcidPrefixes
+
+    class MalformedOrcidError(Exception):
+        """ WHAT HAVE YOU DONE!? """
+
+    @property
+    def checksumValid(self):
+        try:
+            *digits, check_string = self.suffix.replace('-', '')
+            check = 10 if check_string == 'X' else int(check_string)
+            total = 0
+            for digit_string in digits:
+                total = (total + int(digit_string)) * 2
+
+            remainder = total % 11
+            result = (12 - remainder) % 11
+            return result == check
+        except ValueError as e:
+            raise self.MalformedOrcidError(self) from e
 
 
 def JT(blob):

@@ -26,7 +26,7 @@ from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
-from sparcur.core import JEncode
+from sparcur.core import JEncode, OrcidId
 from sparcur.paths import Path
 from sparcur.config import local_storage_prefix
 from sparcur.protocols_io_api import get_protocols_io_auth
@@ -329,6 +329,10 @@ class Version1Header:
 
         except ValidationError as e:
             return e
+        except TypeError as e:
+            from pprint import pprint
+            pprint(data)
+            raise e
 
     def validate_out(self):
         try:
@@ -390,7 +394,7 @@ class Version1Header:
             return value
 
     def default(self, value):
-        return value
+        yield value
 
     def normalize(self, key, value):
         v = value.replace('\ufeff', '')  # FIXME utf-16 issue
@@ -400,7 +404,7 @@ class Version1Header:
             self._errors.append(EncodingError(message))
 
         if v.lower().strip() not in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
-            return getattr(self, key, self.default)(v)
+            yield from getattr(self, key, self.default)(v)
 
     def rename_key(self, key, *parent_keys):
         """ modify this in your class if you need to rename a key """
@@ -433,7 +437,7 @@ class Version1Header:
                 if normk not in self.skip_rows:
                     _value = tuple(normv for key, value in zip(nt._fields, nt)
                                    if key not in self.skip_cols and value
-                                   for normv in (self.normalize(key, value),)
+                                   for normv in self.normalize(normk, value)
                                    if normv)
                     value = tuple(set(_value))
                     if len(value) != len(_value):
@@ -459,7 +463,7 @@ class Version1Header:
             value = tuple(_ for _ in ({self.rename_key(k, key):normv
                                        for k, value in zip(nme, values)
                                        if k in keys and value
-                                       for normv in (self.normalize(k, value),)
+                                       for normv in self.normalize(k, value)
                                        if normv}
                                       for head, *values in self.bc.cols
                                       if head not in self.skip_cols)
@@ -543,22 +547,6 @@ class SubmissionFile(Version1Header):
 
         return d
 
-    def __iter__(self):
-        """ unused """
-        # FIXME > 1
-        for path in self.submission_paths:
-            t = Tabular(path)
-            tl = list(t)
-            #print(path, t)
-            try:
-                yield {key:value for key, d, value, *fixme in tl[1:]}  # FIXME multiple milestones apparently?
-            except ValueError as e:
-                # TODO expected columns vs received columns for all these
-                logger.warning(f'\'{path}\' malformed header.')
-                # best guess interpretation
-                if len(tl[0]) == 2:
-                    yield {k:v for k, v in tl[1:]}
-
 
 class DatasetDescription(Version1Header):
     to_index = 'metadata_element',
@@ -587,11 +575,14 @@ class DatasetDescription(Version1Header):
                                   'contributor_role',
                                   'is_contact_person',),
                  'links': ('additional_links', 'link_description'),
-                 'examples': ('example_image_filename', 'example_image_locator', 'example_image_description'),
+                 'examples': ('example_image_filename',
+                              'example_image_locator',
+                              'example_image_description'),
     }
     schema_class = DatasetDescriptionSchema
 
     def contributor_orcid_id(self, value):
+        # FIXME use schema
         v = value.replace(' ', '')
         if not v:
             return
@@ -603,7 +594,6 @@ class DatasetDescription(Version1Header):
             if len(v) != 19:
                 logger.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
-
             v = 'ORCID:' + v
 
         else:
@@ -618,17 +608,41 @@ class DatasetDescription(Version1Header):
 
         try:
             #logger.debug(f"{v} '{self.t.path}'")
-            return OntId(v)
-        except OntId.BadCurieError as e:
+            orcid = OrcidId(v)
+            if not orcid.checksumValid:
+                # FIXME json schema can't do this ...
+                logger.error(f"orcid failed checksum '{value}' '{self.t.path}'")
+                return
+
+            yield orcid
+
+        except (OntId.BadCurieError, OrcidId.MalformedOrcidError) as e:
             logger.error(f"orcid malformed '{value}' '{self.t.path}'")
-            return value
+            yield value
 
     def contributor_role(self, value):
         # FIXME normalizing here momentarily to squash annoying errors
-        return tuple(sorted(set(NormContributorRole(e.strip()) for e in value.split(','))))
+        yield from sorted(set(NormContributorRole(e.strip()) for e in value.split(',')))
 
     def is_contact_person(self, value):
-        return value.lower() == 'yes'
+        yield value.lower() == 'yes'
+
+    def keywords(self, value):
+        if ';' in value:
+            # FIXME error for this
+            values = [v.strip() for v in value.split(';')]
+        elif ',' in value:
+            # FIXME error for this
+            values = [v.strip() for v in value.split(',')]
+        else:
+            values = value,
+
+        for value in values:
+            match = self.query(value, prefix=None)
+            if match and False:  # this is incredibly broken at the moment
+                yield match
+            else:
+                yield value
 
     def rename_key(self, key, *parent_keys):
         # FIXME multiple parent keys...
@@ -637,19 +651,6 @@ class DatasetDescription(Version1Header):
                 return 'name'
 
         return key
-
-    def __iter__(self):
-        # TODO this needs to be exporting triples ...
-        #print(self.bc.header)
-        if not hasattr(self.bc, 'metadata_element'):
-            logger.error(f'\'{self.t.path}\' malformed header!')
-            return
-        nme = Version1Header.normalize_header(self.bc.metadata_element)
-        yield from ({k:nv for k, v in zip(nme, getattr(self.bc, col))
-                     if v
-                     for nv in (getattr(self, k, self.default)(v),)
-                     if nv}
-                    for col in self.bc.header[3:])
 
 
 class SubjectsFile(Version1Header):
@@ -680,29 +681,29 @@ class SubjectsFile(Version1Header):
 
     def species(self, value):
         nv = NormSpecies(value)
-        return self.query(nv, 'NCBITaxon')
+        yield self.query(nv, 'NCBITaxon')
 
     def sex(self, value):
         nv = NormSex(value)
-        return self.query(nv, 'PATO')
+        yield self.query(nv, 'PATO')
 
     def gender(self, value):
         # FIXME gender -> sex for animals, requires two pass normalization ...
-        return self.sex(value)
+        yield from self.sex(value)
 
     def age(self, value):
         _, v, rest = parameter_expression(value)
         if not v[0] == 'param:parse-failure':
-            return str(ProtcParameter(v))
+            yield str(ProtcParameter(v))
         else:
             # TODO warn
-            return value
+            yield value
 
     def rrid_for_strain(self, value):
-        return value
+        yield value
 
     def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
-        return value
+        yield value
 
     def process_dict(self, dict_):
         """ deal with multiple fields """
@@ -739,9 +740,10 @@ class SubjectsFile(Version1Header):
         return out
 
     def __iter__(self):
+        """ this is still used """
         yield from (self.process_dict({k:nv for k, v in zip(r._fields, r) if v
                                        and k not in self.skip_cols
-                                       for nv in (self.normalize(k, v),) if nv})
+                                       for nv in self.normalize(k, v) if nv})
                     for r in self.bc.rows)
 
 
@@ -996,6 +998,10 @@ class MetaMaker:
     def sample_count(self):
         pass
 
+    @property
+    def human_uri(self):
+        return self.f.path.human_uri
+
 
 class FakePathHelper:
 
@@ -1229,7 +1235,8 @@ class FThing(FakePathHelper):
         mp = 'contributor_role'
         os = ('PrincipalInvestigator',)
         p = 'contributors'
-        for dict_ in self.dataset_description:
+        for dd in self.dataset_description:
+            dict_ = dd.data_with_errors
             if p in dict_:
                 for contributor in dict_[p]:
                     if mp in contributor:
@@ -1243,16 +1250,35 @@ class FThing(FakePathHelper):
     @property
     def species(self):
         out = set()
-        for subject in self.subjects:
-            if 'species' in subject:
-                out.add(subject['species'])
+        for subject_file in self.subjects:
+            data = subject_file.data_with_errors
+            if 'subjects' in data:
+                subjects = data['subjects']
+                for subject in subjects:
+                    if 'species' in subject:
+                        out.add(subject['species'])
 
         return tuple(out)
 
     @property
     def organ(self):
-        # TODO
-        return '',
+        organs = ('Lung',
+                  'Heart',
+                  'Liver',
+                  'Pancreas',
+                  'Kidney',
+                  'Stomach',
+                  'Spleen',
+                  'Colon',
+                  'Large intestine',
+                  'Small intestine',
+                  'Urinary bladder',
+                  'Lower urinary tract',
+                  'Spinal cord',)
+        org_lower = (o.lower() for o in organs)
+        for kw in self.keywords:
+            if kw.lower() in organs:
+                yield kw
 
     @property
     def modality(self):
@@ -1262,8 +1288,12 @@ class FThing(FakePathHelper):
     @property
     def keywords(self):
         for dd in self.dataset_description:
-            if 'keywords' in dd:  # already logged error ...
-                yield from dd['keywords']
+            # FIXME this pattern leads to continually recomputing values
+            # we need to be deriving all of this from a checkpoint on the fully
+            # normalized and transformed data
+            data = dd.data_with_errors
+            if 'keywords' in data:  # already logged error ...
+                yield from data['keywords']
 
     @property
     def protocol_uris(self):
@@ -1817,6 +1847,7 @@ class FThing(FakePathHelper):
                     'errors': '',
                     'examples': '',
                     'funding': '',
+                    'human_uri': '',
                     'keywords': '',
                     'links': '',
                     'modality': '',
@@ -1829,6 +1860,7 @@ class FThing(FakePathHelper):
                     'sample_count': '',
                     'species': '',
                     'subject_count': '',
+                    'submission_completeness_index': '',
                     'title_for_complete_data_set': ''}
 
             for k, _v in data['meta'].items():

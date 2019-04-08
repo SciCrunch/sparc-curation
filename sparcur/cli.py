@@ -4,7 +4,7 @@ Usage:
     spc pull
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [filetypes subjects completeness] [options]
+    spc report [completeness filetypes keywords subjects] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -324,6 +324,11 @@ class Dispatch:
             rows = [('', 'DSCI', 'name', 'id')]
             rows += [(i + 1, *rest) for i, rest in
                      enumerate(sorted(self.summary.completeness, reverse=True))]
+            print(AsciiTable(rows).table)
+
+        elif self.args['keywords']:
+            rows = [sorted(dataset.keywords, key=lambda v: -len(v))
+                    for dataset in self.summary]
             print(AsciiTable(rows).table)
 
         if self.debug:

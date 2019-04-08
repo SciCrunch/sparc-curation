@@ -156,9 +156,9 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
     out_of_order = []
     while True:
         resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
-                            f'pageSize={pageSize}&'
-                            f'includeSourceFiles={str(includeSourceFiles).lower()}'
-                            f'{cursor_args}')
+                           f'pageSize={pageSize}&'
+                           f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                           f'{cursor_args}')
         #print(resp.url)
         if resp.ok:
             j = resp.json()
@@ -533,43 +533,47 @@ class HomogenousBF:
     def __init__(self, bfobject):
         if isinstance(bfobject, HomogenousBF):
             bfobject = bfobject.o
+        elif bfobject is None:
+            raise TypeError('bfobject cannot be None!')
+        elif isinstance(bfobject, str):
+            raise TypeError('bfobject cannot be str!')
 
-        self.o = bfobject
+        self.bfobject = bfobject
 
     @property
     def name(self):
-        name = self.o.name
-        if isinstance(self.o, DataPackage):
-            name += '.' + self.o.type.lower()  # FIXME ... can we match s3key?
+        name = self.bfobject.name
+        if isinstance(self.bfobject, DataPackage) and self.bfobject.type != 'Unknown':
+            name += '.' + self.bfobject.type.lower()  # FIXME ... can we match s3key?
 
         return name
 
     @property
     def id(self):
-        if isinstance(self.o, File):
-            return self.o.pkg_id
+        if isinstance(self.bfobject, File):
+            return self.bfobject.pkg_id
         else:
-            return self.o.id
+            return self.bfobject.id
 
     @property
     def size(self):
-        if isinstance(self.o, File):
-            return self.o.size
+        if isinstance(self.bfobject, File):
+            return self.bfobject.size
 
     @property
     def created(self):
-        if not isinstance(self.o, Organization):
-            return self.o.created_at
+        if not isinstance(self.bfobject, Organization):
+            return self.bfobject.created_at
 
     @property
     def updated(self):
-        if not isinstance(self.o, Organization):
-            return self.o.updated_at
+        if not isinstance(self.bfobject, Organization):
+            return self.bfobject.updated_at
 
     @property
     def file_id(self):
-        if isinstance(self.o, File):
-            return self.o.id
+        if isinstance(self.bfobject, File):
+            return self.bfobject.id
 
     @property
     def old_id(self):
@@ -581,7 +585,9 @@ class HomogenousBF:
 
     @property
     def parent(self):
-        return self.__class__(self.o.parent)  # FIXME self.o.parent is the id??
+        parent = self.bfobject.parent
+        if parent:
+            return self.__class__(parent)  # FIXME self.bfobject.parent is the id??
 
     @property
     def rparents(self):
@@ -592,43 +598,43 @@ class HomogenousBF:
 
     @property
     def children(self):
-        if isinstance(self.o, File):
+        if isinstance(self.bfobject, File):
             return
-        elif isinstance(self.o, DataPackage):
+        elif isinstance(self.bfobject, DataPackage):
             return  # we conflate data packages and files
-        elif isinstance(self.o, Organization):
-            for dataset in self.o.datasets:
+        elif isinstance(self.bfobject, Organization):
+            for dataset in self.bfobject.datasets:
                 yield self.__class__(dataset)
         else:
-            for bfobject in self.o:
+            for bfobject in self.bfobject:
                 yield self.__class__(bfobject)
 
     @property
     def rchildren(self):
-        if isinstance(self.o, File):
+        if isinstance(self.bfobject, File):
             return
-        elif isinstance(self.o, DataPackage):
+        elif isinstance(self.bfobject, DataPackage):
             return  # should we return files inside packages? are they 1:1?
-        elif any(isinstance(self.o, t) for t in (Organization, Collection)):
+        elif any(isinstance(self.bfobject, t) for t in (Organization, Collection)):
             for child in self.children:
                 yield child
                 yield from child.rchildren
-        elif isinstance(self.o, Dataset):
-            for bfobject in self.o.packages:
+        elif isinstance(self.bfobject, Dataset):
+            for bfobject in self.bfobject.packages:
                 yield self.__class__(bfobject)
         else:
             raise UnhandledTypeError  # TODO
 
     @property
     def data(self):
-        if isinstance(self.o, DataPackage):
-            files = list(self.o.files)
+        if isinstance(self.bfobject, DataPackage):
+            files = list(self.bfobject.files)
             if len(files) > 1:
                 raise BaseException('TODO too many files')
 
             file = files[0]
-        elif isinstance(self.o, File):
-            file = self.o
+        elif isinstance(self.bfobject, File):
+            file = self.bfobject
         else:
             return
 
@@ -639,6 +645,7 @@ class HomogenousBF:
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.id})'
+
 
 class BFLocal:
 
