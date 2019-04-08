@@ -322,7 +322,7 @@ class Dispatch:
 
         elif self.args['completeness']:
             rows = [('', 'DSCI', 'name', 'id')]
-            rows += [(i, *rest) for i, rest in
+            rows += [(i + 1, *rest) for i, rest in
                      enumerate(sorted(self.summary.completeness, reverse=True))]
             print(AsciiTable(rows).table)
 
