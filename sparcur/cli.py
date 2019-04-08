@@ -4,7 +4,7 @@ Usage:
     spc pull
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [filetypes subjects]
+    spc report [filetypes subjects completeness] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -49,7 +49,7 @@ from sparcur import schemas as sc
 from sparcur import curation
 from sparcur.blackfynn_api import BFLocal
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.paths import Path, BlackfynnCache
+from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.curation import FThing, FTLax, CurationReport, Summary
 from sparcur.curation import get_datasets, JEncode
 from sparcur.core import JT
@@ -142,7 +142,7 @@ class Dispatch:
             if not path.is_dir():
                 continue
             paths = list(path.rglob('*'))
-            path_meta = {p:p.xattrs() for p in paths}
+            path_meta = {p:p.cache.meta for p in paths}
             outstanding = 0
             total = 0
             tf = 0
@@ -150,15 +150,18 @@ class Dispatch:
             for p, m in path_meta.items():
                 if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
                     try:
-                        s = int(m['bf.size'])
+                        s = m.size
                     except KeyError as e:
                         print(repr(p))
                         raise e
                     tf += 1
-                    total += s
+                    if s:
+                        total += s
+
                     if '.fake' in p.suffixes:
                         ff += 1
-                        outstanding += s
+                        if s:
+                            outstanding += s
 
             data.append((path.name, outstanding / G, total / G, ff, tf))
 
@@ -280,7 +283,7 @@ class Dispatch:
         if paths:
             if args['--limit']:
                 limit = int(args['--limit']) * 1024 ** 2
-                paths = [p for p in paths if int(p.getxattr('bf.size')) < limit]
+                paths = [p for p in paths if p.cache.meta.size < limit]
 
             if args['--fetch']:
                 from pyontutils.utils import Async, deferred
@@ -316,6 +319,13 @@ class Dispatch:
             counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
                                                key=lambda kv:-kv[-1]))
             print(AsciiTable(((f'Column Name unique = {len(counts)}', '#'), *counts)).table)
+
+        elif self.args['completeness']:
+            rows = [('', 'DSCI', 'name', 'id')]
+            rows += [(i, *rest) for i, rest in
+                     enumerate(sorted(self.summary.completeness, reverse=True))]
+            print(AsciiTable(rows).table)
+
         if self.debug:
             embed()
 

@@ -1934,6 +1934,15 @@ class Summary(FThing):
             # FIXME non homogenous, need to find a better way ...
             yield self.__class__.__base__(path)
 
+    @property
+    def completeness(self):
+        """ completeness, name, and id for all datasets """
+        for dataset in self:
+            # FIXME metamaker was a bad, bad idea
+            yield (dataset.metamaker.submission_completeness_index,
+                   dataset.name,
+                   dataset.id)
+
     def make_json(self, gen):
         # FIXME this and the datasets is kind of confusing ...
         # might be worth moving those into a reporting class

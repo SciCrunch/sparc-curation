@@ -31,7 +31,7 @@ from pathlib import PosixPath, PurePosixPath
 from datetime import datetime
 import xattr
 import psutil
-from dateutil.parser import parser
+from dateutil import parser
 from Xlib.display import Display
 from Xlib import Xatom
 from sparcur import exceptions as exc
@@ -70,18 +70,32 @@ class PathMeta:
     @staticmethod
     def deprefix(string, prefix):
         if string.startswith(prefix):
-            return string[len(prefix):]
+            string = string[len(prefix):]
+
+        # deal with normalizing old form here until it is all cleaned up
+        if prefix == 'bf.':
+            if string.endswith('_at'):
+                string = string[:-3]
+
+        return string
 
     @classmethod
-    def from_xattrs(cls, xattrs, prefix=None):
+    def from_xattrs(cls, xattrs, prefix=None, path_object=None):
         """ decoding from bytes """
+        if path_object:
+            # some classes may need their own encoding rules _FOR NOW_
+            # we will remove them once we standardize the xattrs format
+            decode_value = getattr(path_object, 'decode_value', cls.decode_value)
+        else:
+            decode_value = cls.decode_value
+
         if prefix:
             prefix += '.'
-            kwargs = {k:cls.decode_value(k, v)
+            kwargs = {k:decode_value(k, v)
                       for kraw, v in xattrs.items()
                       for k in (cls.deprefix(kraw.decode(cls.encoding), prefix),)}
         else:  # ah manual optimization
-            kwargs = {k:cls.decode_value(k, v)
+            kwargs = {k:decode_value(k, v)
                       for kraw, v in xattrs.items()
                       for k in (kraw.decode(cls.encoding),)}
 
@@ -396,7 +410,10 @@ class XattrPath(PosixPath):
 
     def xattrs(self, namespace=xattr.NS_USER):
         # decode keys later
-        return {k:v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
+        try:
+            return {k:v for k, v in xattr.get_all(self.as_posix(), namespace=namespace)}
+        except FileNotFoundError as e:
+            raise FileNotFoundError(self) from e
 
 
 class XattrCache(CachePath, XattrPath):
@@ -405,7 +422,7 @@ class XattrCache(CachePath, XattrPath):
     @property
     def meta(self):
         xattrs = self.xattrs()
-        pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix)
+        pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
         return pathmeta
 
     @meta.setter
@@ -419,6 +436,13 @@ class SqliteCache(CachePath):
 
 class BlackfynnCache(SqliteCache, XattrCache):
     xattr_prefix = 'bf'
+
+    @classmethod
+    def decode_value(cls, field, value):
+        if field in ('created', 'updated'):
+            return parser.parse(value.decode())  # FIXME with timezone vs without ...
+        else:
+            return PathMeta.decode_value(field, value)
 
     @property
     def anchor(self):
@@ -565,7 +589,7 @@ class LocalPath(PosixPath):
             return m.digest()
 
 
-class Path(XattrPath, LocalPath):
+class Path(BlackfynnCache, LocalPath):
     """ An augmented path for all the various local needs of the curation process. """
     _cache_class = None
     _remote_class = None
