@@ -35,6 +35,7 @@ OrcidPrefixes({'orcid':'https://orcid.org/',
 
 class OrcidId(OntId):
     _namespaces = OrcidPrefixes
+    __firsts = 'iri',
 
     class MalformedOrcidError(Exception):
         """ WHAT HAVE YOU DONE!? """

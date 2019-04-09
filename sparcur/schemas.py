@@ -53,6 +53,39 @@ class JSONSchema(object):
         except ValidationError as e:
             return False, e, data  # FIXME better format
 
+    @property
+    def total_possible_errors(self):
+        # TODO the structure for actual_errors is where we have to recurse
+        # this could be applied recursivley now, though using it requires unpacking the output
+        total_possible_errors = 0
+        if self.schema['type'] == 'object':
+            if 'required' in self.schema:
+                required = self.schema['required']
+            else:
+                required = []
+
+            total_possible_errors += len(required)
+
+            # this makes each error matter less the more values you have
+            # 
+            #for prop, value in self.schema['properties'].items():
+                #if prop not in required and len(value) > 1 and prop in instance:
+
+            if 'additionalProperties' in self.schema and not self.schema['additionalProperties']:
+                total_possible_errors += 1
+
+        elif self.schema['type'] == 'array' and 'contains' in schema:
+            total_possible_errors += 1
+
+        return total_possible_errors
+    
+        # optional fields means that the total
+        # possible errors cannot be known until runtime
+        # but what that means is that we assume that optional fields
+        # should always be correct and thus that only the static
+        # information in the schema will be used to generate the score
+        # FIXME the above doesn't actually work because missing optional
+        # fields do need to be added at runtime, we'll do that next time
 
 def _format_jsonschema_error(error):
     """Format a :py:class:`jsonschema.ValidationError` as a string."""
@@ -81,8 +114,8 @@ class ContributorSchema(JSONSchema):
               'properties': {
                   'name': {'type': 'string'},
                   'contributor_orcid_id': {'type': 'string',
-                                           'pattern': ('https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
-                                                       '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)')},
+                                           'pattern': ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
+                                                       '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')},
                   'contributor_affiliation': {'type': 'string'},
                   'contributor_role': {
                       'type':'array',
@@ -229,7 +262,6 @@ class MetaOutSchema(JSONSchema):
                       'species',
                       'organ',
                       'modality',
-                      'submission_completeness_index',
                       'contributor_count',
                       'subject_count',
                       'human_uri'
@@ -259,9 +291,6 @@ class MetaOutSchema(JSONSchema):
                   # TODO $ref these w/ pointer?
         # in contributor etc?
 
-        'submission_completeness_index': {'type': 'number',
-                                          'minimum': 0,
-                                          'maximum': 1,},
         'subject_count': {'type': 'integer'},
         'sample_count': {'type': 'integer'},
         'contributor_count': {'type': 'integer'},})
@@ -310,6 +339,11 @@ class DatasetOutSchema(JSONSchema):
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
                             'errors': ErrorSchema.schema,
+                            'error_index': {'type': 'integer',
+                                            'minimum': 0},
+                            'submission_completeness_index': {'type': 'number',
+                                                              'minimum': 0,
+                                                              'maximum': 1,},
                             'contributors': ContributorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer
                             'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema

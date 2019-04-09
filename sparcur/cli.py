@@ -51,7 +51,7 @@ from sparcur.blackfynn_api import BFLocal
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.curation import FThing, FTLax, CurationReport, Summary
-from sparcur.curation import get_datasets, JEncode
+from sparcur.curation import get_datasets, JEncode, get_all_errors
 from sparcur.core import JT
 from IPython import embed
 
@@ -321,9 +321,9 @@ class Dispatch:
             print(AsciiTable(((f'Column Name unique = {len(counts)}', '#'), *counts)).table)
 
         elif self.args['completeness']:
-            rows = [('', 'DSCI', 'name', 'id')]
-            rows += [(i + 1, *rest) for i, rest in
-                     enumerate(sorted(self.summary.completeness, reverse=True))]
+            rows = [('', 'EI', 'DSCI', 'name', 'id')]
+            rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0, *rest) for i, (ei, index, *rest) in
+                     enumerate(sorted(self.summary.completeness, key=lambda t:(t[0], -t[1], *t[2:])))]
             print(AsciiTable(rows).table)
 
         elif self.args['keywords']:

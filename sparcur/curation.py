@@ -59,6 +59,21 @@ class EncodingError(Exception):
     """ Some encoding error has occured in a file """
 
 
+def extract_errors(dict_):
+    for k, v in dict_.items():
+        if k == 'errors':
+            yield from v
+        elif isinstance(v, dict):
+            yield from extract_errors(v)
+
+
+def get_all_errors(_with_errors):
+    """ A better and easier to interpret measure of completeness. """
+    # TODO deduplicate by tracing causes
+    # TODO if due to a missing required report expected value of missing steps
+    return list(extract_errors(_with_errors))
+
+
 def normalize_tabular_format():
     kwargs = {
         'delimiter' : '\t',
@@ -321,27 +336,6 @@ class Version1Header:
         """ open file using xdg-open """
         self.path.xopen()
 
-    def validate(self):
-        try:
-            data = self.data
-            ok = self.schema.validate(data)  # validate {} to get better error messages
-            return data  # don't normalize the representation here
-
-        except ValidationError as e:
-            return e
-        except TypeError as e:
-            from pprint import pprint
-            pprint(data)
-            raise e
-
-    def validate_out(self):
-        try:
-            data = self.data_out
-            ok = self.schema_out.validate(data)
-            return data
-        except ValidationError as e:
-            return e
-
     @property
     def errors(self):
         yield from self.t._errors
@@ -459,15 +453,27 @@ class Version1Header:
                     if value:
                         out[normk] = value
 
+        def merge(tup):
+            out = {}
+            for a, b in tup:
+                if a not in out:
+                    out[a] = b
+                elif a and not isinstance(b, tuple):
+                    out[a] = out[a], b
+                else:
+                    out[a] += b,
+
+            return out
+
         for key, keys in self.verticals.items():
-            value = tuple(_ for _ in ({self.rename_key(k, key):normv
-                                       for k, value in zip(nme, values)
-                                       if k in keys and value
-                                       for normv in self.normalize(k, value)
-                                       if normv}
-                                      for head, *values in self.bc.cols
-                                      if head not in self.skip_cols)
-                          if _)
+            gen = (merge([(self.rename_key(k, key), normv)
+                          for k, value in zip(nme, values)
+                          if k in keys and value
+                          for normv in self.normalize(k, value)
+                          if normv])
+                   for head, *values in self.bc.cols
+                   if head not in self.skip_cols)
+            value = tuple(_ for _ in gen if _)
             if value:
                 out[key] = value
 
@@ -477,11 +483,10 @@ class Version1Header:
     def data_with_errors(self):
         """ data with errors added under the 'errors' key """
         # FIXME TODO regularize this with the FThing version
-        data = self.validate()
-        if isinstance(data, ValidationError):
+        ok, valid, data = self.schema.validate(self.data)
+        if not ok:
             # FIXME this will dump the whole schema, go smaller
-            error = data
-            data = self.data  # FIXME cost of calling twice
+            error = valid
             if 'errors' in data:
                 class WatError(Exception):
                     """ WAT """
@@ -509,22 +514,28 @@ class Version1Header:
         """ (/ (- total-possible-errors number-of-errors) total-possible-errors)
             A naieve implementation that requires a recursive algorithem to actually
             count the number of potential errors in a given context. """
+        # FIXME the normalized version of this actually isn't helpful
+        # because you could have 1000 errors for one substep of a substep
+        # and you would appear to be almost done ...
+        # what we really want is the total number of non-double-counted errors
+        # so if I have an error that causes an error in a later step
+        # then I would have only 1 not two errors ...
+        # note of course that this just puts the problem off because if
+        # I don't have any of the three spreadsheets then each one of them
+        # could be completely incorrect ... the only reasonable way to do
+        # this is to return the expected value of the number of errors
+        # for the missing value, I don't think there is any other reasonable appraoch
+        # IF you are allowed a second number then you can communicate the uncertainty
         # TODO this is an augment step in the new pipelined version
 
         dwe = self.data_with_errors
         if 'errors' not in dwe:
             return 1
+
         else:
             schema = self.schema.schema
-            total_possible_errors = 0
-            if 'required' in schema:
-                # assume that required -> array minItems 1 are equivalent
-                total_possible_errors += len(schema['required'])
-            if 'additionalProperties' in schema and not schema['additionalProperties']:
-                total_possible_errors += 1
-
+            total_possible_errors = self.schema.total_possible_errors
             number_of_errors = len(dwe['errors'])
-
             return (total_possible_errors - number_of_errors) / total_possible_errors
 
 
@@ -622,7 +633,7 @@ class DatasetDescription(Version1Header):
 
     def contributor_role(self, value):
         # FIXME normalizing here momentarily to squash annoying errors
-        yield from sorted(set(NormContributorRole(e.strip()) for e in value.split(',')))
+        yield tuple(sorted(set(NormContributorRole(e.strip()) for e in value.split(','))))
 
     def is_contact_person(self, value):
         yield value.lower() == 'yes'
@@ -932,50 +943,6 @@ class MetaMaker:
         return self._generic(self.f.modality)
 
     @property
-    def submission_completeness_index(self):
-        # duh points for this function being able to run at all
-        score = 2  # we currently have 3 parts that are required so (- 50 (* 16 3)) -> 2
-        data = self.f.data
-        if data:
-            if not 'submission' in data:
-                score_submission = 0
-            else:
-                s = list(self.f.submission)
-                if len(s) > 1:
-                    score_submission = .0625  # one point for multiple submissions
-                else:
-                    s = s[0]
-                    score_submission = s.submission_completeness_index
-
-            if not 'dataset_description' in data:
-                score_dataset_description = 0
-            else:
-                dd = list(self.f.dataset_description)
-                if len(dd) > 1:
-                    score_dataset_description = .0625
-                else:
-                    dd = dd[0]
-                    score_dataset_description = dd.submission_completeness_index
-
-            # scoring subjects is much harder
-            if not 'subjects' in data:
-                score_subjects = 0
-            else:
-                s = list(self.f.subjects)
-                if len(s) > 1:
-                    score_subjects = .0625
-                else:
-                    s = s[0]
-                    score_subjects = s.submission_completeness_index
-
-            score += math.floor(score_submission * 16)
-            score += math.floor(score_dataset_description * 16)
-            score += math.floor(score_subjects * 16)
-
-        assert score <= 50, score
-        return score / 50
-
-    @property
     def contributor_count(self):
         # FIXME slow reads from disk every time ...
         t = self._generic(self.f.dataset_description)
@@ -1262,6 +1229,8 @@ class FThing(FakePathHelper):
 
     @property
     def organ(self):
+        yield 'Unknown'
+        return
         organs = ('Lung',
                   'Heart',
                   'Liver',
@@ -1282,8 +1251,8 @@ class FThing(FakePathHelper):
 
     @property
     def modality(self):
-        # TODO
-        return '',
+        yield 'Unknown'  # TODO
+        return
 
     @property
     def keywords(self):
@@ -1492,9 +1461,6 @@ class FThing(FakePathHelper):
             except DatasetDescription.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
 
-    validate = Version1Header.validate
-    validate_out = Version1Header.validate_out
-
     @property
     def data(self):
         """ used to validate repo structure """
@@ -1555,7 +1521,7 @@ class FThing(FakePathHelper):
         return self.name + f"\n'{self.id}'\n\n" + r
 
 
-    def _with_errors(self, valid, thunk, schema):
+    def _with_errors(self, ovd, schema):
         # FIXME this needs to be split into in and out
         # and really all this section should do is add the errors
         # on failure and it should to it in place in the pipeline
@@ -1565,7 +1531,7 @@ class FThing(FakePathHelper):
 
         # this flow splits at normalize/correct/map -> export back to user
 
-        data = valid
+        ok, valid, data = ovd
         out = {}  # {'raw':{}, 'normalized':{},}
         # use the schema to auto fill things that we are responsible for
         # FIXME possibly separate this to our own step?
@@ -1575,7 +1541,7 @@ class FThing(FakePathHelper):
         except KeyError:
             pass
 
-        if isinstance(data, ValidationError):
+        if not ok:
             # FIXME this will dump the whole schema, go smaller
             if 'errors' not in out:
                 out['errors'] = []
@@ -1583,9 +1549,7 @@ class FThing(FakePathHelper):
             #out['errors'] += [{k:v if k != 'schema' else k
                                #for k, v in e._contents().items()}
                               #for e in data.errors]
-            out['errors'] += data.json()
-
-            data = thunk()  # FIXME cost of calling twice
+            out['errors'] += valid.json()
 
         if schema == self.schema:  # FIXME icky hack
             for section_name, path in data.items():
@@ -1732,9 +1696,6 @@ class FThing(FakePathHelper):
         self.transform(data, lift_out, copies, moves)
         self.add_meta(data)
 
-        if not data:
-            data['errors'] = [{'message': 'Nothing to see here!?'}]
-
         return data
 
     def add_meta(self, data):
@@ -1758,52 +1719,49 @@ class FThing(FakePathHelper):
                 data['errors'] = []
             data['errors'] += [{'message': 'Too many dataset_descriptions!'}]
 
-        return
-
-        # TODO raw vs normalized
-        out = self.data_with_errors
-
-        # TODO 1:1 remapping rules for in/out schema
-        if self.is_dataset:  # FIXME :/ evil hardcoding
-            # copy from path a to path b ...
-            # '/dataset_description/contributors'
-            # '/contributors'
-            # while this may seem redundant there is going
-            # to be a normalization step in between here
-            # this will need to go in a loop or something
-            # FIXME redundant ...
-            try:
-                cs = out['dataset_description']['contributors']
-                out['contributors'] = cs
-            except KeyError:  # FIXME ??? propagating errors!??!
-                # FIXME
-                out['contributors'] = {'errors':[{'message': 'Not our problem',
-                                                  'cause': 'no dataset_description',
-                                                  'type': 'DOWNSTREAM',}]}
-            #except TypeError as e:
-                #embed()
-
-            out['inputs'] = {}
-            for key in self.schema_out.schema['properties']['inputs']['properties']:
-                if key in out:
-                    #if key in self.transform:  # TODO
-                    out['inputs'][key] = out.pop(key)
-
     @property
     def data_with_errors(self):
         # FIXME remove this
         # this still ok, dwe is very simple for this case
-        return self._with_errors(self.validate(), lambda:self.data, self.schema)
+        return self._with_errors(self.schema.validate(self.data), self.schema)
 
     @property
     def data_out_with_errors(self):
-        #return self._with_errors(self.validate_out(), lambda:self.data_out, self.schema_out)
         data = self.data_out
         ok, val, data = self.schema_out.validate(data)
         if not ok:
-            data['errors'] = val.json()
+            if 'errors' not in data:
+                data['errors'] = []
+            data['errors'] += val.json()
+
+        ei = len(get_all_errors(data))
+        if 'inputs' in data:
+            sci = self.submission_completeness_index(data['inputs'])
+        else:
+            ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
+            sci = 0
+
+        data['error_index'] = ei
+        data['submission_completeness_index'] = sci
 
         return data
+
+    def submission_completeness_index(self, inputs):
+        total_possible_errors = self.schema.total_possible_errors
+        data = inputs
+        if not data:
+            return 0
+        else:
+            actual_errors = 0
+            for required in self.schema.schema['required']:
+                actual_errors += 1
+                if required in data:
+                    r = list(getattr(self, required))
+                    if len(r) == 1:
+                        r = r[0]
+                        actual_errors -= r.submission_completeness_index
+
+            return (total_possible_errors - actual_errors) / total_possible_errors
 
     def dump_all(self):
         return {attr: express_or_return(getattr(self, attr))
@@ -1860,7 +1818,6 @@ class FThing(FakePathHelper):
                     'sample_count': '',
                     'species': '',
                     'subject_count': '',
-                    'submission_completeness_index': '',
                     'title_for_complete_data_set': ''}
 
             for k, _v in data['meta'].items():
@@ -1911,6 +1868,7 @@ class FThing(FakePathHelper):
                     yield s, p, rdflib.Literal(v)
             except KeyError:
                 continue
+
     @property
     def triples(self):
         # FIXME ick
@@ -1971,7 +1929,9 @@ class Summary(FThing):
         """ completeness, name, and id for all datasets """
         for dataset in self:
             # FIXME metamaker was a bad, bad idea
-            yield (dataset.metamaker.submission_completeness_index,
+            dowe = dataset.data_out_with_errors
+            yield (dowe['error_index'],
+                   dowe['submission_completeness_index'],
                    dataset.name,
                    dataset.id)
 
@@ -2070,10 +2030,10 @@ class Summary(FThing):
     def disco(self):
         dsh = sorted(MetaOutSchema.schema['properties'])
         chs = sorted(('name',
-                'contributor_orcid_id',
-                'is_contact_person',
-                'contributor_affiliation',
-                'contributor_role'))
+                      'contributor_orcid_id',
+                      'is_contact_person',
+                      'contributor_affiliation',
+                      'contributor_role'))
 
         datasets = [['id'] + dsh]
         contributors = [['id'] + chs]
