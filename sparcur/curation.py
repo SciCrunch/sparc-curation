@@ -1229,7 +1229,7 @@ class FThing(FakePathHelper):
 
     @property
     def organ(self):
-        yield 'Unknown'
+        # yield 'Unknown'
         return
         organs = ('Lung',
                   'Heart',
@@ -1251,8 +1251,9 @@ class FThing(FakePathHelper):
 
     @property
     def modality(self):
-        yield 'Unknown'  # TODO
+        # yield 'Unknown'  # TODO
         return
+        yield
 
     @property
     def keywords(self):
@@ -1708,10 +1709,12 @@ class FThing(FakePathHelper):
         if t and not isinstance(t, list):
             d = t.data
             d.pop('contributors', None)  # FIXME FIXME FIXME
-            meta = {**d, **meta_extra}
-            ok, valid, meta = self.metamaker.schema.validate(meta)
-            if not ok:
-                meta['errors'] = valid.json()
+            _meta = {**d, **meta_extra}
+            meta = {k:v for k, v in _meta.items() if v}
+            # this is validated later in DataOutSchema ...
+            #ok, valid, meta = self.metamaker.schema.validate(meta)
+            #if not ok:
+                #meta['errors'] = valid.json()
 
             data['meta'] = {k:v for k, v in meta.items() if v}
         else:
