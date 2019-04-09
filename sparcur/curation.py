@@ -2038,7 +2038,7 @@ class Summary(FThing):
                       'contributor_affiliation',
                       'contributor_role'))
 
-        datasets = [['id'] + dsh]
+        datasets = [['id', 'error_index', 'dataset_completeness_index'] + dsh]
         contributors = [['id'] + chs]
         subjects = [['id', 'blob']]
         errors = [['id', 'blob']]
@@ -2065,7 +2065,7 @@ class Summary(FThing):
             id = dataset.id
             dowe = dataset.data_out_with_errors
 
-            row = [id]  # FIXME this doubles up on the row
+            row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
             if 'meta' in dowe:
                 meta = dowe['meta']
                 for k in dsh:
