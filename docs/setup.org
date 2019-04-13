@@ -483,9 +483,9 @@
 
     #+CAPTION: new features that you want to use?
     #+BEGIN_SRC bash :results output :var REPOS=repos
-      cd ~/git
-      for repo_uri in ${REPOS}; do printf "${repo_uri##*/}\t"; cd ${repo_uri##*/}; git pull; cd ~/git; done
-      cd ~/
+      pushd ~/git
+      for d in $(ls); do if [ -d $d/.git ]; then pushd $d; git pull || break; popd; fi; done
+      popd
     #+END_SRC
 
 ** SPARC
