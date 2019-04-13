@@ -288,13 +288,14 @@ class MetaOutSchema(JSONSchema):
         'organ': {'type': 'string'},
         'modality': {'type': 'string'},  # FIXME array?
 
-                  # TODO $ref these w/ pointer?
+        # TODO $ref these w/ pointer?
         # in contributor etc?
 
         'subject_count': {'type': 'integer'},
         'sample_count': {'type': 'integer'},
         'contributor_count': {'type': 'integer'},})
 
+    mis_mapping = []
     _schema = {'type': 'object',
               'required': [
                   'award_number',
@@ -374,3 +375,95 @@ class SummarySchema(JSONSchema):
 class HeaderSchema(JSONSchema):
     schema = {'type': 'array',
               'items': {'type': 'string'}}
+
+
+# constraints on MIS classes
+class MISSpecimenSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'properties': {
+            'TEMP:hasAge': {},
+            'TEMP:hasAgeCategory': {},  # hasDevelopmentalStage
+            'TEMP:hasBiologicalSex': {},
+            'TEMP:hasWeight': {},
+            'TEMP:hasGenus': {},
+            'TEMP:hasSpecies': {},
+            'TEMP:hasStrain': {},  # race/ethnicity?
+            'TEMP:hasRRID': {},
+            'TEMP:hasGeneticVariation': {},
+
+            'sparc:hasBodyMassIndex',
+            'sparc:hasClinicalInformation',
+            'sparc:hasDiseaseInformation',
+            'sparc:hasDrugInformation',
+            'sparc:hasFamilyHistory',
+            'sparc:hasGender',
+            'TEMP:hasHandedness',
+            'TEMP:hasRace',
+            'TEMP:hasEthnicity',
+        }
+        'oneOf': [
+            {'allOf': [
+                {'allOf':
+                 [{'required': [
+                     'TEMP:hasSpecies',
+                     'TEMP:hasBiologicalSex',
+                     'TEMP:hasWeight',]},
+                  {'oneOf': [{'required': ['TEMP:hasAge']},
+                             {'required': ['TEMP:hasAgeCategory']}]}]},
+                {'oneOf': [
+                    {'properties': {'TEMP:hasSpecies': {'enum': ['NCBITaxon:9606']}},
+                     'required': [
+                         'sparc:hasBodyMassIndex',
+                         'sparc:hasClinicalInformation',
+                         'sparc:hasDiseaseInformation',
+                         'sparc:hasDrugInformation',
+                         'sparc:hasFamilyHistory',
+                         #'sparc:hasGender',
+                         #'TEMP:hasHandedness',
+                         'TEMP:hasRace',
+                         'TEMP:hasEthnicity',
+                     ]},
+                    {'allOf': [
+                        {'not': {'properties': {'TEMP:hasSpecies': {'enum': ['NCBITaxon:9606']}}}},
+                        {'required': [
+                            #'TEMP:hasSupplier',
+                            #'TEMP:hasStrain',  # RRID? race/ethnicity?
+                            'TEMP:hasRRID',
+                         ]},
+                    ]},
+                ]},
+            ]},
+        ],
+    }
+
+
+class MISDatasetSchema(JSONSchema):
+    moves = [  # FIXME this goes somehwere else
+        # from datasetoutschema -> mis
+        [[''], ['']],
+        [[''], ['']],
+        [[''], ['']],
+        [[''], ['']],
+        [[''], ['']],
+        [[''], ['']],
+        [['resources'], ['']],
+        [['meta', 'protocol_url_or_doi'], ['']]
+        #[['meta'], ['sparc:Resource']],
+        [['subjects'], ['sparc:Specimen']],
+        [['contributors'], ['sparc:Researcher']],  # ah the role confusion
+    ]
+    schema = {'type': 'object',
+              'required': ['curies', 'rdf:type', '']
+              'properties': {
+                  'curies': {'type': 'object'},
+                  'rdf:type': {'type': 'string',
+                               'pattern': 'sparc:Resource'}
+                  'sparc:'
+                  'sparc:Specimen': {'type': 'array'
+                                     'items': MISSpecimenSchema.schema}
+                  ''
+              }
+              }
+
+
