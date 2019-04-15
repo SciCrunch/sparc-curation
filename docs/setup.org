@@ -276,8 +276,9 @@
     #+CAPTION: Clone all required git repositories.
     #+HEADER: :var REPOS=repos
     #+BEGIN_SRC bash :results output :eval no-export
-      cd ~/git
+      pushd ~/git
       for repo_url in ${REPOS}; do git clone ${repo_url}.git; done
+      popd
     #+END_SRC
 
     #+NAME: python-setup
@@ -285,8 +286,9 @@
     #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
     #+HEADER: :var PYROOTS=py-roots
     #+BEGIN_SRC bash :results output :eval no-export
-      cd ~/git
-      for repo in ${PYROOTS}; do cd ${repo}; pip install --user --editable . && cd ~/git; done
+      pushd ~/git
+      for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . || break; popd; done
+      popd
     #+END_SRC
 
     #+NAME: racket-ontology
@@ -295,18 +297,20 @@
     #+BEGIN_SRC bash :results output :eval no-export
       ln -s ~/git/rkdf/bin/ttl-to-rkt ~/bin/ttl-to-rkt
       ln -s ~/git/rkdf/bin/rkdf-convert-all ~/bin/rkdf-convert-all
-      cd ~/git/NIF-Ontology
+      pushd ~/git/NIF-Ontology
       git checkout dev
       rkdf-convert-all
       git checkout master
+      popd
     #+END_SRC
 
     #+NAME: racket-setup
     #+CAPTION: Install racket packages and dependencies. \\
     #+HEADER: :var RKTROOTS=rkt-roots
     #+BEGIN_SRC bash :results output :eval no-export
-      cd ~/git
+      pushd ~/git
       raco pkg install --skip-installed --auto --batch ${RKTROOTS}
+      popd
     #+END_SRC
 
 *** Configuration files
