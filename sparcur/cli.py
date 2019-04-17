@@ -114,7 +114,23 @@ class Dispatch:
 
     def pull(self):
         # TODO folder meta -> org
-        self.bfl.cons()
+        skip = (
+            'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
+            'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
+        )
+        top = self.BlackfynnRemote(curation.project_path)
+        if not top.local.exists():
+            top.meta.as_xattrs()
+            # NOTE when syncing the first time remote always has to write first
+            # because the cache doesn't even exist yet so it can't construct its remote on the fly
+            top.bootstrap_local()  # FIXME naming
+            top.cache
+
+        cs = list(top.children)
+        real_children = [c for c in cs if c.id not in skip]
+        for dataset in real_children:
+            if not
+            first.rchildren
 
     def annos(self):
         args = self.args

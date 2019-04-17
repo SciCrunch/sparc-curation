@@ -530,15 +530,20 @@ def get_file_by_id(get, file_path, pid, fid):
 
 
 class HomogenousBF:
-    def __init__(self, bfobject):
+    def __init__(self, bfobject, helper_index=None):
         if isinstance(bfobject, HomogenousBF):
             bfobject = bfobject.o
         elif bfobject is None:
             raise TypeError('bfobject cannot be None!')
         elif isinstance(bfobject, str):
-            raise TypeError('bfobject cannot be str!')
+            raise TypeError(f'bfobject cannot be str! {bfobject}')
 
         self.bfobject = bfobject
+
+        if helper_index is None:
+            helper_index = {}
+
+        self.helper_index = helper_index
 
     @property
     def name(self):
@@ -620,7 +625,12 @@ class HomogenousBF:
                 yield child
                 yield from child.rchildren
         elif isinstance(self.bfobject, Dataset):
-            for bfobject in self.bfobject.packages:
+            # have to build the index first so parent ids can be converted to objects
+            index = {p.id:p for p in self.bfobject.packages}
+            for bfobject in index.values():
+                if bfobject.parent is not None:
+                    bfobject.parent = index[bfobject.parent]
+
                 yield self.__class__(bfobject)
         else:
             raise UnhandledTypeError  # TODO

@@ -244,6 +244,28 @@ class RemotePath(PurePosixPath):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
+    def bootstrap_local(self, fetch_data=True):
+        # also bootstraps cache
+        if not self.local.exists():
+            if self.is_dir():
+                self.local.mkdir(parents=True)
+                # TODO automatically determine the cache capabilities
+                # better: just give cache the remote path meta object
+                # and let it do what it wants (LOL I already did this)
+                self.cache.meta = self.meta
+            elif self.is_file():
+                self.local.touch()  # do this so we can write our meta before data
+                self.cache.meta = self.meta
+                if not self.local.parent.exists():
+                    raise TypeError('Might be missing metadata if we do this ...')  # FIXME
+                if fetch_data:
+                    with open(self.local, 'wb') as f:
+                        for chunk in self.data:
+                            f.write(chunk)
+
+                else:
+                    self.local.symlink_to(self.meta.as_path)
+
     @property
     def cache(self):
         # TODO performance check on these
@@ -382,6 +404,10 @@ class CachePath(PosixPath):
         # xattrs failing over to sqlite
         raise NotImplementedError
 
+    @meta.setter
+    def meta(self):
+        raise NotImplementedError
+
     @property
     def data(self):
         # we don't keep two copies of the local data
@@ -427,6 +453,8 @@ class XattrCache(CachePath, XattrPath):
 
     @meta.setter
     def meta(self, pathmeta):
+        # TODO cooperatively setting multiple different cache types?
+        # do we need to use super() or something?
         self.setxattrs(pathmeta.as_xattrs(self.xattr_prefix))
 
 

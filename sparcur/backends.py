@@ -298,7 +298,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         for child in self.hbfo.rchildren:
             # FIXME need to stop a p.name == self.name
             args = (*[p.name for p in child.rparents], child.name)
-            print(self.__class__, args)
+            print(self.__class__, self, args)
             child_path = self.__class__(self, *args)
             child_path._bfobject = child.bfobject
             yield child_path

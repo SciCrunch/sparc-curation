@@ -392,16 +392,16 @@ class MISSpecimenSchema(JSONSchema):
             'TEMP:hasRRID': {},
             'TEMP:hasGeneticVariation': {},
 
-            'sparc:hasBodyMassIndex',
-            'sparc:hasClinicalInformation',
-            'sparc:hasDiseaseInformation',
-            'sparc:hasDrugInformation',
-            'sparc:hasFamilyHistory',
-            'sparc:hasGender',
-            'TEMP:hasHandedness',
-            'TEMP:hasRace',
-            'TEMP:hasEthnicity',
-        }
+            'sparc:hasBodyMassIndex': {} ,
+            'sparc:hasClinicalInformation': {},
+            'sparc:hasDiseaseInformation': {},
+            'sparc:hasDrugInformation': {},
+            'sparc:hasFamilyHistory': {},
+            'sparc:hasGender': {},
+            'TEMP:hasHandedness': {},
+            'TEMP:hasRace': {},
+            'TEMP:hasEthnicity': {},
+        },
         'oneOf': [
             {'allOf': [
                 {'allOf':
@@ -448,21 +448,20 @@ class MISDatasetSchema(JSONSchema):
         [[''], ['']],
         [[''], ['']],
         [['resources'], ['']],
-        [['meta', 'protocol_url_or_doi'], ['']]
+        [['meta', 'protocol_url_or_doi'], ['']],
         #[['meta'], ['sparc:Resource']],
         [['subjects'], ['sparc:Specimen']],
         [['contributors'], ['sparc:Researcher']],  # ah the role confusion
     ]
     schema = {'type': 'object',
-              'required': ['curies', 'rdf:type', '']
+              'required': ['curies', 'rdf:type'],
               'properties': {
                   'curies': {'type': 'object'},
                   'rdf:type': {'type': 'string',
-                               'pattern': 'sparc:Resource'}
-                  'sparc:'
-                  'sparc:Specimen': {'type': 'array'
-                                     'items': MISSpecimenSchema.schema}
-                  ''
+                               'pattern': 'sparc:Resource'},
+                  #'sparc:'
+                  'sparc:Specimen': {'type': 'array',
+                                     'items': MISSpecimenSchema.schema},
               }
               }
 
