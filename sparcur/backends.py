@@ -214,6 +214,13 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         #bfl = BFLocal(organization)
         return super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
 
+    def bootstrap_local(self, *, fetch_data=False, id=None):
+        if hasattr(self, '_bfobject') and self.is_file():
+            print(self.meta)
+            fetch_data = self.meta.size <  2 * 1024 ** 2
+
+        super().bootstrap_local(fetch_data=fetch_data, id=id)
+
     @property
     def root(self):
         # keep this simple
@@ -223,12 +230,23 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # their own roots first
         return self.bfl.organization.id
 
+    def _id(self):
+        raise NotImplementedError('The blackfynn remote cannot answer this question.')
+
     @property
     def id(self):
-        raise NotImplemented('The blackfynn remote cannot answer this question.')
+        if hasattr(self, '_bootstrap') and self._bootstrap:
+            return self._id
+        else:
+            return self._id()
+
+    @id.setter
+    def id(self, value):
+        self._bootstrap = True
+        self._id = value
 
     def is_dir(self):
-        return not self.is_file
+        return not self.is_file()
 
     def is_file(self):
         return self.meta.id.startswith('N:package:')
@@ -250,7 +268,12 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # they can for synchronization purposes, but remote really does got and get
         # things again when you create a new one
         if not hasattr(self, '_bfobject'):
-            self._bfobject = self.bfl.get(self.cache.id)
+            if hasattr(self, '_bootstrap') and self._bootstrap:
+                id = self.id
+            else:
+                id = self.cache.id
+
+            self._bfobject = self.bfl.get(id)
 
         return self._bfobject
 

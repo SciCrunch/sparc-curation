@@ -47,6 +47,7 @@ import requests
 from terminaltables import AsciiTable
 from sparcur import schemas as sc
 from sparcur import curation
+from sparcur import config
 from sparcur.blackfynn_api import BFLocal
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.paths import Path, BlackfynnCache, PathMeta
@@ -118,19 +119,26 @@ class Dispatch:
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
-        top = self.BlackfynnRemote(curation.project_path)
+        project_name = self.bfl.organization.name
+        project_id = self.bfl.organization.id
+        top = self.BlackfynnRemote(config.local_storage_prefix, project_name)
         if not top.local.exists():
-            top.meta.as_xattrs()
+            if not top.local.parent.exists():
+                # TODO see if there is 
+                top.local.parent.mkdir(parents=True)
+
+            top.bootstrap_local(id=project_id)
             # NOTE when syncing the first time remote always has to write first
             # because the cache doesn't even exist yet so it can't construct its remote on the fly
-            top.bootstrap_local()  # FIXME naming
-            top.cache
 
         cs = list(top.children)
-        real_children = [c for c in cs if c.id not in skip]
+        real_children = [c for c in cs if c.meta.id not in skip]
+        print(real_children)
+        embed()
         for dataset in real_children:
-            if not
-            first.rchildren
+            dataset.bootstrap_local()
+            for child in dataset.rchildren:
+                child.bootstrap_local()
 
     def annos(self):
         args = self.args

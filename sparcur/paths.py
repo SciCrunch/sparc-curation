@@ -244,24 +244,28 @@ class RemotePath(PurePosixPath):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
-    def bootstrap_local(self, fetch_data=True):
+    def bootstrap_local(self, *, fetch_data=True, id=None):
         # also bootstraps cache
+        # meta is needed only the very first time
         if not self.local.exists():
+            if id is not None:
+                self.id = id
+
             if self.is_dir():
-                self.local.mkdir(parents=True)
+                self.local.mkdir()
                 # TODO automatically determine the cache capabilities
                 # better: just give cache the remote path meta object
                 # and let it do what it wants (LOL I already did this)
                 self.cache.meta = self.meta
+
             elif self.is_file():
-                self.local.touch()  # do this so we can write our meta before data
-                self.cache.meta = self.meta
                 if not self.local.parent.exists():
                     raise TypeError('Might be missing metadata if we do this ...')  # FIXME
+
                 if fetch_data:
-                    with open(self.local, 'wb') as f:
-                        for chunk in self.data:
-                            f.write(chunk)
+                    self.local.touch()  # do this so we can write our meta before data
+                    self.cache.meta = self.meta
+                    self.local.data = self.data
 
                 else:
                     self.local.symlink_to(self.meta.as_path)
@@ -337,6 +341,7 @@ class RemotePath(PurePosixPath):
         #self.remote_thing.id_from_ssh_host_key_and_path(self)
 
         # remote_thing can get itself the machine id hash plus a constant
+        raise NotImplementedError
         self.remote_thing.id_from_machine_id_and_path(self)
 
     @property
@@ -348,7 +353,8 @@ class RemotePath(PurePosixPath):
     @property
     def meta(self):
         # on blackfynn this is the package id or object id
-        self.cache.id
+        # this will error if there is no implementaiton if self.id
+        return PathMeta(id=self.id)
 
     @meta.setter
     def meta(self, value):
@@ -447,15 +453,21 @@ class XattrCache(CachePath, XattrPath):
 
     @property
     def meta(self):
-        xattrs = self.xattrs()
-        pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
-        return pathmeta
+        if self.is_symlink():
+            return PathMeta.from_path(self)
+        else:
+            xattrs = self.xattrs()
+            pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
+            return pathmeta
 
     @meta.setter
     def meta(self, pathmeta):
         # TODO cooperatively setting multiple different cache types?
         # do we need to use super() or something?
-        self.setxattrs(pathmeta.as_xattrs(self.xattr_prefix))
+        if self.is_symlink():
+            raise TypeError('FIXME TODO can\'t set meta on a symlink itself')  # FIXME
+        else:
+            self.setxattrs(pathmeta.as_xattrs(self.xattr_prefix))
 
 
 class SqliteCache(CachePath):
@@ -520,6 +532,7 @@ class BlackfynnCache(SqliteCache, XattrCache):
 
         return self.dataset.human_uri + prefix + id
 
+
 class LocalPath(PosixPath):
     # local data about remote objects
     _cache_class = None
@@ -570,6 +583,12 @@ class LocalPath(PosixPath):
                     break
 
                 yield data
+
+    @data.setter
+    def data(self, generator):
+        with open(self, 'wb') as f:
+            for chunk in generator:
+                f.write(chunk)
 
     @property
     def children(self):
