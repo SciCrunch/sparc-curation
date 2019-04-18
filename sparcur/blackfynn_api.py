@@ -47,7 +47,7 @@ from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset
 from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
-from pyontutils.utils import Async, deferred, async_getter, chunk_list
+from pyontutils.utils import Async, deferred, async_getter, chunk_list, makeSimpleLogger
 from pyontutils.config import devconfig
 from sparcur.paths import Path
 from sparcur.metastore import MetaStore
@@ -55,6 +55,7 @@ from sparcur.config import local_storage_prefix
 from scipy.io import loadmat
 from IPython import embed
 
+log = makeSimpleLogger('bfapi')
 
 @property
 def patch_session(self):
@@ -120,6 +121,23 @@ def id_to_type(id):
         return Dataset
     elif id.startswith('N:organization:'):
         return Organization
+
+
+class FakeBFile(File):
+    """ Fake file to simplify working with package metadata """
+
+    id = ''  # unforunately these don't seem to have made it through
+
+    def __init__(self, **kwargs):
+        self._kwargs = kwargs
+        for k, v in kwargs.items():
+            if k == 'size' and v is None:
+                v = -1  # FIXME hack
+
+            setattr(self, k, v)
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'<{self._kwargs}>'
 
 
 @property
@@ -191,6 +209,12 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                             if p._items is None:
                                 p._items = []
                             p.items.append(bfobject)
+                        if isinstance(bfobject, DataPackage):
+                            for i, source in enumerate(package['objects']['source']):
+                                yield FakeBFile(**source)
+                                if i == 1:  # only log once
+                                    log.critical(f'MORE THAN ONE FILE IN PACKAGE {bfobject.id}')
+
                     except KeyError as e:
                         # api returned a child before the parent
                         # we'll get it on the next pass
@@ -549,6 +573,7 @@ class HomogenousBF:
     def name(self):
         name = self.bfobject.name
         if isinstance(self.bfobject, DataPackage) and self.bfobject.type != 'Unknown':
+            # NOTE we have to use blackfynns extensions until we retrieve the files
             name += '.' + self.bfobject.type.lower()  # FIXME ... can we match s3key?
 
         return name
@@ -655,6 +680,36 @@ class HomogenousBF:
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.id})'
+
+
+class PackageMeta:
+
+    class PackageMetaError(Exception):
+        """ Ya done goofed part 3 """
+        
+    class NotDataPackage(Exception):
+        """ only packages have """
+
+    class NoPackageMetaError(Exception):
+        """ no package meta """
+
+    def __init__(self, hbfo):
+        bfobject = hbfo.bfobject
+        if not type(bfobject) == DataPackage:
+            msg = f'{bfobject} is not a DataPackage'
+            raise self.NotDataPackage(msg)
+
+        elif not hasattr(bfobject, '_json'):
+            msg = f'{bfobject} was not spawned from /datasets/{{id}}/packages'
+            raise self.NoPackageMetaError(msg)
+
+        self.hbfo = hbfo
+        self.bfobject = bfobject
+        self.json = hbfo.bfobject._json
+
+    @property
+    def size(self):
+        self.json['objects']['source']
 
 
 class BFLocal:

@@ -102,8 +102,12 @@ class Dispatch:
             self.default()
 
     @property
-    def project_path(self):
-        return curation.project_path
+    def project_name(self):
+        return self.bfl.organization.name
+
+    @property
+    def project_id(self):
+        self.bfl.organization.id
 
     @property
     def debug(self):
@@ -119,22 +123,16 @@ class Dispatch:
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
-        project_name = self.bfl.organization.name
-        project_id = self.bfl.organization.id
-        top = self.BlackfynnRemote(config.local_storage_prefix, project_name)
-        if not top.local.exists():
-            if not top.local.parent.exists():
-                # TODO see if there is 
-                top.local.parent.mkdir(parents=True)
+        anchor = self.BlackfynnRemote(config.local_storage_prefix, self.project_name)
+        anchor.bootstrap_local(id=self.project_id, parents=True)
+        # NOTE when syncing the first time remote always has to write first
+        # because the cache doesn't even exist yet so it can't construct its remote on the fly
 
-            top.bootstrap_local(id=project_id)
-            # NOTE when syncing the first time remote always has to write first
-            # because the cache doesn't even exist yet so it can't construct its remote on the fly
-
-        cs = list(top.children)
+        cs = list(anchor.children)
         real_children = [c for c in cs if c.meta.id not in skip]
-        print(real_children)
+        c = real_children[1]
         embed()
+        test_packages = list(c.bfobject.packages)
         for dataset in real_children:
             dataset.bootstrap_local()
             for child in dataset.rchildren:
@@ -225,6 +223,10 @@ class Dispatch:
             packages = [list(d.packages) for d in bfds[:3]
                         if d.id not in bigskip]
             n_packages = [len(ps) for ps in packages]
+
+            # bootstrap a new local mirror
+            anchor = self.BlackfynnRemote('/tmp/demo-local-storage', self.project_name)
+            anchor.bootstrap_local(id=self.project_id, parents=True)
 
         elif False:
             ### this is the equivalent of export, quite slow to run

@@ -214,12 +214,12 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         #bfl = BFLocal(organization)
         return super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
 
-    def bootstrap_local(self, *, fetch_data=False, id=None):
+    def bootstrap_local(self, *, fetch_data=False, id=None, parents=False):
         if hasattr(self, '_bfobject') and self.is_file():
-            print(self.meta)
-            fetch_data = self.meta.size <  2 * 1024 ** 2
+            if self.meta.size is not None:
+                fetch_data = self.meta.size <  2 * 1024 ** 2
 
-        super().bootstrap_local(fetch_data=fetch_data, id=id)
+        super().bootstrap_local(fetch_data=fetch_data, id=id, parents=parents)
 
     @property
     def root(self):

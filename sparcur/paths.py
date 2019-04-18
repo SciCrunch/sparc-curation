@@ -139,7 +139,11 @@ class PathMeta:
 
     @property
     def hrsize(self):
+        """ human readable file size """
+
         def sizeof_fmt(num, suffix=''):
+            if num is None:
+                raise BaseException(f'wat {dir(self)} {self.size} {self.mode}')
             for unit in ['','K','M','G','T','P','E','Z']:
                 if abs(num) < 1024.0:
                     return "%0.0f%s%s" % (num, unit, suffix)
@@ -244,7 +248,7 @@ class RemotePath(PurePosixPath):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
-    def bootstrap_local(self, *, fetch_data=True, id=None):
+    def bootstrap_local(self, *, fetch_data=True, id=None, parents=False):
         # also bootstraps cache
         # meta is needed only the very first time
         if not self.local.exists():
@@ -252,7 +256,8 @@ class RemotePath(PurePosixPath):
                 self.id = id
 
             if self.is_dir():
-                self.local.mkdir()
+                self.local.mkdir(parents=parents)
+
                 # TODO automatically determine the cache capabilities
                 # better: just give cache the remote path meta object
                 # and let it do what it wants (LOL I already did this)
@@ -260,7 +265,7 @@ class RemotePath(PurePosixPath):
 
             elif self.is_file():
                 if not self.local.parent.exists():
-                    raise TypeError('Might be missing metadata if we do this ...')  # FIXME
+                    self.local.parent.mkdir(parents=parents)
 
                 if fetch_data:
                     self.local.touch()  # do this so we can write our meta before data
@@ -268,7 +273,7 @@ class RemotePath(PurePosixPath):
                     self.local.data = self.data
 
                 else:
-                    self.local.symlink_to(self.meta.as_path)
+                    self.local.symlink_to(self.meta.as_path())
 
     @property
     def cache(self):
