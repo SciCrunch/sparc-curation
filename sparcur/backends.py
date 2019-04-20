@@ -2,24 +2,14 @@ import os
 import atexit
 import subprocess
 from datetime import datetime
+import requests
 from pexpect import pxssh
+from pyontutils.utils import makeSimpleLogger
+from sparcur import exceptions as exc
 from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path
 from sparcur.config import local_storage_prefix
-from sparcur.blackfynn_api import HomogenousBF  # FIXME there should be a better way ...
+from sparcur.blackfynn_api import HomogenousBF, BFLocal  # FIXME there should be a better way ...
 from ast import literal_eval
-
-
-class CommandTooLongError(Exception):
-    """ not the best solution ... """
-
-
-class NoRemoteImplementationError(Exception):
-    """ prevent confusion between local path data and remote path data """
-
-
-class NoRemoteMappingError(Exception):
-    """ prevent confusion between local path data and remote path data """
-
 
 class ReflectiveCachePath(CachePath):
     """ Oh, it's me. """
@@ -140,7 +130,7 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
     def _ssh(self, remote_cmd):
         #print(remote_cmd)
         if len(remote_cmd) > self._cols:
-            raise CommandTooLongError
+            raise exc.CommandTooLongError
         n_bytes = self.session.sendline(remote_cmd)
         self.session.prompt()
         raw = self.session.before
@@ -215,14 +205,19 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 
 
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
-    def __new__(cls, local_class, cache_class, blackfynn_local_instance):
-        # TODO bootstrap root from local_storage_prefix???
-        #if bfl.organization.id != 
-        #organization='sparc', local_storage_prefix=local_storage_prefix)
-        #bfl = BFLocal(organization)
+    def __new__(cls, anchor_or_bfl, local_class, cache_class):
+        if isinstance(anchor_or_bfl, BFLocal):
+            blackfynn_local_instance = BFLocal
+        else:
+            try:
+                blackfynn_local_instance = BFLocal(anchor_or_bfl.id)
+            except requests.exceptions.ConnectionError:
+                blackfynn_local_instance = 'Could not connect to blackfynn'
+                log.critical(blackfynn_local_instance)
+
         return super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
 
-    def bootstrap_local(self, *, fetch_data=False, id=None, parents=False):
+    def _bootstrap_local(self, *, fetch_data=False, id=None, parents=False):
         if hasattr(self, '_bfobject') and self.is_file():
             if self.meta.size is not None:
                 fetch_data = self.meta.size <  2 * 1024 ** 2
@@ -325,44 +320,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                         mode=None,
                         error=None)
 
-    '''
-    def is_absolute(self):
-        return self.anchor.id.startswith('N:organization:')
-
-    def absolute(self):
-        """ If you only have a local bfobject do what you do with any
-            other path an resolve its location, except instead of using
-            the current working directory, instead use the structure of the
-            blackfynn graph to resolve to the parent
-        
-            Then you can work with the fully resolved paths.
-            Note that this is entirely for
-        """
-        # in theory this could be parents
-        # but that way leads to the madness of hardlinks
-        # FIXME wow this could be really inefficient ...
-        # because each parent has to get all its parents too ...
-
-        # BlackfynnRemotes are magical in that
-        # when a normal path Path('thing') has no parent
-        # it returns Path('.'), but for these we have
-        # extra data that allows us to modify the current
-        # path in the other direction so a call to BFR('thing').parent
-        # should return BFR('parentthing') and covernt the current thing
-        # into BFR('parentthing/thing') until we hit the root
-
-        *self.hbfo.rparents
-        return self.__class__()
-
-        while parent:
-            yield parent
-            parent = parent.parent
-
-    def resolve(self):
-        """ no symlinks in bfland """
-        return self.absolute()
-
-    '''
     @property
     def parent(self):
         parent = self.hbfo.parent
@@ -422,7 +379,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                     yield from bfl.get_packages()
         else:
             # NOTE cache manages the robustness layer
-            raise NoRemoteMappingError(f'{self} has no known remote id')
+            raise exc.NoRemoteMappingError(f'{self} has no known remote id')
         # if organization
         # if dataset (usually going to be the fastest in most cases)
         # if collection (can end up very slow)

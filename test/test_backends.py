@@ -29,11 +29,10 @@ class TestSshRemote(unittest.TestCase):
 
 class TestBlackfynnRemote(unittest.TestCase):
     # FIXME skip in CI?
-    bfl = BFLocal()
     def setUp(self):
-        from sparcur.curation import project_path
         self.project_path = project_path  # FIXME common overwrites?
-        self.BlackfynnRemote = BlackfynnRemoteFactory(Path, BlackfynnCache, self.bfl)
+        LocalPath.setup(BlackfynnCache, BlackfynnRemoteFactory)
+        self.BlackfynnRemote = BlackfynnRemoteFactory(self.project_path, Path, BlackfynnCache)
 
     def test_org(self):
         self.project_path.meta

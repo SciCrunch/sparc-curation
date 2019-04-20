@@ -234,9 +234,7 @@ class PathMeta:
 class RemotePath(PurePosixPath):
     """ Remote data about a local object. """
 
-    # These should be set by RemoteFactory
     _cache_class = None
-    _local_class = None
 
     # we use a PurePath becuase we still want to key off this being local path
     # but we don't want any of the local file system operations to work by accident
@@ -249,38 +247,19 @@ class RemotePath(PurePosixPath):
     # to know that it has a remote id, the remote manager should
     # know that
 
+    @classmethod
+    def setup(cls, local_class, cache_class):
+        """ call this once to bind everything together """
+        cache_class.setup(local_class, cls)
+
+    def bootstrap(self, recursive=False):
+        self.cache.bootstrap(self.meta.id, recursive=True)
+
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls, *args, **kwargs)
 
     def __init__(self, *args, **kwargs):
         super().__init__()
-
-    def _bootstrap_local(self, *, fetch_data=True, id=None, parents=False):
-        # also bootstraps cache
-        # meta is needed only the very first time
-        if not self.local.exists():
-            if id is not None:
-                self.id = id
-
-            if self.is_dir():
-                self.local.mkdir(parents=parents)
-
-                # TODO automatically determine the cache capabilities
-                # better: just give cache the remote path meta object
-                # and let it do what it wants (LOL I already did this)
-                self.cache.meta = self.meta
-
-            elif self.is_file():
-                if not self.local.parent.exists():
-                    self.local.parent.mkdir(parents=parents)
-
-                if fetch_data:
-                    self.local.touch()  # do this so we can write our meta before data
-                    self.cache.meta = self.meta
-                    self.local.data = self.data
-
-                else:
-                    self.local.symlink_to(self.meta.as_path())
 
     @property
     def cache(self):
@@ -403,24 +382,74 @@ class CachePath(PosixPath):
     """ Local data about remote objects.
         This is where the mapping between the local id (aka path)
         and the remote id lives. In a git-like world this is the
-        cache/index/whatever we call it these days """
+        cache/index/whatever we call it these days 
+    
+        This is the bridge class that holds the mappings.
+        Always start bootstrapping from one of these classes
+        since it has both the local and remote identifiers,
+        and therefore can be called and used before specifying
+        the exact implementations for the local and remote objects.
+    """
 
-    _remote_class = None
     _local_class = None
+    _remote_class_factory = None
+
+    @classmethod
+    def setup(cls, local_class, remote_class_factory):
+        """ call this once to bind everything together """
+        cls._local_class = local_class
+        cls._remote_class_factory = remote_class_factory
+        local_class._cache_class = cls
+        remote_class_factory._cache_class = cls
+
+    def bootstrap(self, id, *, parents=False, recursive=False):
+        #if id is None and self.cache.id is not None:
+            #id = self.cache.id
+        #else:
+            #raise TypeError(f'No cache so id is a required argument')
+
+        if not self.meta:
+            self.meta = PathMeta(id=id)
+
+        elif self.id != id:
+            # TODO overwrite
+            raise exc.MetadataIdMismatchError(f'Existing cache id does not match new id! {meta.id} != {id}')
+
+        if not self.exists():
+            if self.is_dir():
+                self.mkdir(parents=parents)
+                self.meta = self.remote.meta
+
+            elif self.is_file():
+                if not self.parent.exists():
+                    self.parent.mkdir(parents=parents)
+
+                if fetch_data:
+                    self.touch()  # do this so we can write our meta before data
+                    self.meta = self.remote.meta
+                    self.local.data = self.remote.data
+
+                else:
+                    self.local.symlink_to(self.remote.meta.as_path())
+
+        if recursive:
+            for child in self.remote.rchildren:
+                # use the remote's recursive implementation
+                # not the local implementation, since the
+                # remote may have additional requirements
+                child.bootstrap()
 
     @property
     def remote(self):
-        """ the remote class instantiates itself from its own ids
-            the substitution of the local path for the remote.id
-            happens here BUT it is mediated by the cache path object
-            which has botht the local path information and the id
-            a remote object (not a reamote path) is instantiated by
-            remote id alone we still need the object that knows how
-            to construct an unachored path from the remote data, that
-            object is the remote path """
-
-        if self._remote_class is not None:
+        if self._remote_class_factory is not None:
             # we don't have to have a remote configured to check the cache
+            if not hasattr(self, '_remote_class'):
+                # NOTE there are many possible ways to set the anchor
+                # we need to pick _one_ of them
+                self._remote_class = self._remote_class_factory(self.anchor,
+                                                                self._local_class,
+                                                                self.__class__)
+
             if not hasattr(self, '_remote'):
                 self._remote = self._remote_class(self)
                 self._remote._cache = self
@@ -429,11 +458,12 @@ class CachePath(PosixPath):
 
     @property
     def local(self):
-        if not hasattr(self, '_local'):
-            self._local = self._local_class(self)
-            self._local._cache = self
+        if self._local_class is not None:
+            if not hasattr(self, '_local'):
+                self._local = self._local_class(self)
+                self._local._cache = self
 
-        return self._local
+            return self._local
 
     @property
     def id(self):
@@ -456,7 +486,9 @@ class CachePath(PosixPath):
         raise NotImplementedError
 
     def __repr__(self):
-        return repr(self.local) + ' -> ' + repr(self.remote)
+        local = repr(self.local) if self.local else str(self)
+        remote = repr(self.remote) if self.remote else self.id
+        return local + ' -> ' + remote
 
 
 class XattrPath(PosixPath):
@@ -587,39 +619,14 @@ class BlackfynnCache(SqliteCache, XattrCache):
 
 class LocalPath(PosixPath):
     # local data about remote objects
-    _cache_class = None
-    #_remote_class = None
 
-    def bootstrap(self, id, *, parents=False, recursive=False):
-        cache = self.cache
-        meta = cache.meta
-        if not meta:
-            cache.meta = PathMeta(id=id)
+    _cache_class = None  # must be defined by child classes
 
-        elif meta.id != id:
-            # TODO overwrite
-            raise exc.MetadataIdMismatchError(f'Existing cache id does not match new id! {meta.id} != {id}')
+    @classmethod
+    def setup(cls, cache_class, remote_class_factory):
+        """ call this once to bind everything together """
+        cache_class.setup(cls, remote_class_factory )
 
-        remote = cache.remote
-
-        if not self.exists():
-            if self.is_dir():
-                self.mkdir(parents=parents)
-
-            elif self.is_file():
-                if not self.parent.exists():
-                    self.parent.mkdir(parents=parents)
-
-                if fetch_data:
-                    self.touch()  # do this so we can write our meta before data
-                    self.cache.meta = self.meta
-                    self.local.data = self.data
-
-                else:
-                    self.local.symlink_to(self.meta.as_path())
-
-        if recursive:
-            pass
     @property
     def remote(self):
         return self.cache.remote
@@ -633,10 +640,10 @@ class LocalPath(PosixPath):
 
         return self._cache
 
-    @property
-    def id(self):
-        """ THERE CAN BE ONLY ONE """
-        return self.resolve().as_posix()
+    #@property
+    #def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct
+        #""" THERE CAN BE ONLY ONE """
+        #return self.resolve().as_posix()
 
     @property
     def created(self):
@@ -655,7 +662,7 @@ class LocalPath(PosixPath):
                         created=None,
                         updated=updated,
                         checksum=self.checksum(),
-                        id=self.id,  # this is ok, assists in mapping/debug
+                        id=self.path.as_posx(),  # this is ok, assists in mapping/debug ???
                         uid=st.st_uid,
                         gid=st.st_gid,
                         mode=mode)

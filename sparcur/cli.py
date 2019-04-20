@@ -69,28 +69,26 @@ class Dispatch:
             # short circuit since we don't know where we are yet
             return
 
+        self._setup()
+
+    def _setup(self):
+        args = self.args
         if args['--project-path']:
             path_string = args['--project-path']
         else:
             path_string = '.'
 
-        path = Path(path_string).resolve()  # avoid infinite recursion from '.'
+        # we have to start from the cache class so that
+        # we can configure
+        path = BlackfynnCache(path_string).resolve()  # avoid infinite recursion from '.'
         try:
-            self.project_path = path.cache.anchor.local
+            self.anchor = path.anchor
         except exc.NotInProjectError as e:
             print(e.message)
             sys.exit(1)
 
-        try:
-            self.bfl = BFLocal(self.project_id)
-        except requests.exceptions.ConnectionError:
-            # FIXME should we be failing early here?
-            self.bfl = 'Could not connect to blackfynn'
-
-        # we don't instantiate these directly so you can have one
-        # but if it isn't anchored to the file system (bootstrap)
-        # then it won't be very useful
-        self.BlackfynnRemote = BlackfynnRemoteFactory(Path, BlackfynnCache, self.bfl)
+        BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
+        self.project_path = self.anchor.local
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
@@ -106,12 +104,13 @@ class Dispatch:
 
     @property
     def project_name(self):
-        return self.bfl.organization.name
+        return self.anchor.name
+        #return self.bfl.organization.name
 
     @property
     def project_id(self):
         #self.bfl.organization.id
-        return self.project_path.cache.id
+        return self.anchor.id
 
     @property
     def debug(self):
@@ -123,6 +122,11 @@ class Dispatch:
 
     def clone(self):
         project_id = self.args['<project-id>']
+        # given that we are cloning it makes sense to _not_ catch a connection error here
+        project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
+        BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
+        anchor = BlackfynnCache(project_name)
+        anchor.bootstrap(project_id, recursive=True)
 
     def pull(self):
         # TODO folder meta -> org
@@ -130,23 +134,24 @@ class Dispatch:
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
-        anchor = Path(config.local_storage_prefix, self.project_name)
-        embed()
-        anchor.bootstrap(self.project_id, parents=True, recursive=True)
+        self.anchor.remote.bootstrap(recursive=True)
+
+        #anchor = Path(config.local_storage_prefix, self.project_name)
+        #anchor.bootstrap(self.project_id, parents=True, recursive=True)
         #anchor = self.BlackfynnRemote(config.local_storage_prefix, self.project_name)
         #anchor.bootstrap_local(id=self.project_id, parents=True)
         # NOTE when syncing the first time remote always has to write first
         # because the cache doesn't even exist yet so it can't construct its remote on the fly
 
-        cs = list(anchor.children)
-        real_children = [c for c in cs if c.meta.id not in skip]
-        c = real_children[1]
-        embed()
-        test_packages = list(c.bfobject.packages)
-        for dataset in real_children:
-            dataset.bootstrap_local()
-            for child in dataset.rchildren:
-                child.bootstrap_local()
+        #cs = list(self.anchor.remote.children)
+        #real_children = [c for c in cs if c.meta.id not in skip]
+        #c = real_children[1]
+        #embed()
+        #test_packages = list(c.bfobject.packages)
+        #for dataset in real_children:
+            #dataset.bootstrap()
+            #for child in dataset.rchildren:
+                #child.bootstrap()
 
     def annos(self):
         args = self.args

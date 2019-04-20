@@ -732,9 +732,9 @@ class BFLocal:
     class NoBfMeta(Exception):
         """ There is not bf id for this file. """
 
-    def __init__(self, project_id, local_storage_prefix=local_storage_prefix):
-        if not isinstance(local_storage_prefix, Path):
-            local_storage_prefix = Path(local_storage_prefix)
+    def __init__(self, project_id, anchor=None):
+        #if not isinstance(local_storage_prefix, Path):
+            #local_storage_prefix = Path(local_storage_prefix)
 
         # no changing local storage prefix in the middle of things
         # if you want to do that create a new class
@@ -743,8 +743,11 @@ class BFLocal:
                             api_secret=devconfig.secrets('blackfynn', project_id, 'secret'))
         self.organization = self.bf.context
         self.project_name = self.bf.context.name
-        self.project_path = local_storage_prefix / self.project_name
-        self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
+
+        if anchor is not None:  # FIXME decouple
+            self.project_path = anchor.local
+            #self.project_path = local_storage_prefix / self.project_name
+            self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
 
     @property
     def error_meta(self):
