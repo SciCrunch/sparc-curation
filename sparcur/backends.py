@@ -172,7 +172,15 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         # we have to assume the file was deleted or check all the names and
         # hashes of new files to see if it has moved (and not been changed)
         # a move and change without a sync will be bad for us
-        return self.__class__(self.cache.parent.resolve())
+
+        # If you have an unanchored path then resolve()
+        # always operates under the assumption that the
+        # current working directory which I think is incorrect
+        # as soon as you start passing unresolved paths around
+        # the remote system doesn't know what context you are in
+        # so we need to fail loudly
+        # basically force people to manually resolve their paths
+        return self.__class__(self.cache.parent)
 
     def is_dir(self):
         remote_cmd = f'stat -c %F {self.cache.id}'
@@ -228,6 +236,11 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # the remote paths know theirs
         # making sure they match requires they both know
         # their own roots first
+
+        # as long as the root has a mapping to a local path
+        # then it is ok and we can rebuild the entire tree
+        # even if the original path is not absolute
+
         return self.bfl.organization.id
 
     def _id(self):
@@ -267,29 +280,33 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # every time they reference remote again, if they want to keep a local copy
         # they can for synchronization purposes, but remote really does got and get
         # things again when you create a new one
-        if not hasattr(self, '_bfobject'):
+        return self.hbfo.bfobject
+
+    @property
+    def _bfobject(self):
+        """ catch anything trying to set this sence we are changing the api """
+
+    @property
+    def hbfo(self):
+        if not hasattr(self, '_hbfo'):
             if hasattr(self, '_bootstrap') and self._bootstrap:
                 id = self.id
             else:
                 id = self.cache.id
 
-            self._bfobject = self.bfl.get(id)
+            self._hbfo = HomogenousBF(self.bfl.get(id))
 
-        return self._bfobject
-
-    @property
-    def hbfo(self):
-        return HomogenousBF(self.bfobject)
+        return self._hbfo
 
     @property
     def checksum(self):
         """ inefficient for this """
-        return NotImplemented('Inefficient to query directly, use meta.checksum')
+        return NotImplementedError('Inefficient to query directly, use meta.checksum')
 
     @property
     def stat(self):
         """ inefficient for this """
-        return NotImplemented('Inefficient to query directly, use meta')
+        return NotImplementedError('Inefficient to query directly, use meta')
 
     @property
     def meta(self):
@@ -308,19 +325,86 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                         mode=None,
                         error=None)
 
+    '''
+    def is_absolute(self):
+        return self.anchor.id.startswith('N:organization:')
+
+    def absolute(self):
+        """ If you only have a local bfobject do what you do with any
+            other path an resolve its location, except instead of using
+            the current working directory, instead use the structure of the
+            blackfynn graph to resolve to the parent
+        
+            Then you can work with the fully resolved paths.
+            Note that this is entirely for
+        """
+        # in theory this could be parents
+        # but that way leads to the madness of hardlinks
+        # FIXME wow this could be really inefficient ...
+        # because each parent has to get all its parents too ...
+
+        # BlackfynnRemotes are magical in that
+        # when a normal path Path('thing') has no parent
+        # it returns Path('.'), but for these we have
+        # extra data that allows us to modify the current
+        # path in the other direction so a call to BFR('thing').parent
+        # should return BFR('parentthing') and covernt the current thing
+        # into BFR('parentthing/thing') until we hit the root
+
+        *self.hbfo.rparents
+        return self.__class__()
+
+        while parent:
+            yield parent
+            parent = parent.parent
+
+    def resolve(self):
+        """ no symlinks in bfland """
+        return self.absolute()
+
+    '''
+    @property
+    def parent(self):
+        parent = self.hbfo.parent
+        if parent is None:
+            return
+
+        # forget it just treat them all as isolated for now
+        #if parent.name not in self._parts:
+            # unlike other os paths, bfobjects are unambiguous
+            # so we simply update the representation of the local
+            # view whenever we get more information
+            # even though these data are used ephemorally
+            # hbfo provides some persistence
+            # if performance matters we can fix it
+            #self._parts = [parent.name] + self._parts
+            #self._str = self._format_parsed_parts(self._drv, self._root,
+                                                  #self._parts) or '.'
+
+        parent_path = self.__class__(parent.id)
+        parent_path._hbfo = parent
+        return parent_path
+
+    @property
+    def parents(self):
+        parent = self.parent
+        while parent:
+            yield parent
+            parent = parent.parent
+
     @property
     def children(self):
         """ direct children """
         for child in self.hbfo.children:
             child_path = self / child.name
-            child_path._bfobject = child.bfobject
+            child_path._hbfo = child
             yield child_path
 
     @property
     def rchildren(self):
         for child in self.hbfo.rchildren:
             # FIXME need to stop a p.name == self.name
-            args = (*[p.name for p in child.rparents], child.name)
+            args = (*[p.name for p in child.parents], child.name)
             print(self.__class__, self, args)
             child_path = self.__class__(self, *args)
             child_path._bfobject = child.bfobject

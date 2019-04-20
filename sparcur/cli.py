@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
+    spc clone <project-id>
     spc pull
     spc annos [export shell]
     spc stats [<directory>...]
@@ -17,6 +18,7 @@ Usage:
 
 Commands:
               list and fetch unfetched files
+    clone     clone a remote project (creates a new folder in the current directory)
     pull      pull down the remote list of files
     stats     print stats for specified or current directory
     report    print a report on all datasets
@@ -31,13 +33,13 @@ Options:
     -l --limit=LIMIT        the maximum size to download in megabytes
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
-    -j --project            find the project_path by looking for N:organization:
     -p --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
     -d --debug              drop into a shell after running a step
 
 """
 
+import sys
 import csv
 import json
 import pprint
@@ -45,9 +47,9 @@ from datetime import datetime
 from collections import Counter
 import requests
 from terminaltables import AsciiTable
-from sparcur import schemas as sc
-from sparcur import curation
 from sparcur import config
+from sparcur import schemas as sc
+from sparcur import exceptions as exc
 from sparcur.blackfynn_api import BFLocal
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.paths import Path, BlackfynnCache, PathMeta
@@ -63,21 +65,24 @@ class Dispatch:
     def __init__(self, args):
         self.args = args
 
-        if args['--project'] or args['--project-path']:
-            if args['--project-path']:
-                path = args['--project-path']
-            else:
-                path = '.'
-            # FIXME only works for fs version, bfl will not change
-            current_ft = FThing(Path(path).resolve())
-            while not current_ft.is_organization:
-                current_ft = current_ft.parent
+        if self.args['clone']:
+            # short circuit since we don't know where we are yet
+            return
 
-            pp = current_ft.path
-            curation.project_path = pp # FIXME BAD BAD BAD
+        if args['--project-path']:
+            path_string = args['--project-path']
+        else:
+            path_string = '.'
+
+        path = Path(path_string).resolve()  # avoid infinite recursion from '.'
+        try:
+            self.project_path = path.cache.anchor.local
+        except exc.NotInProjectError as e:
+            print(e.message)
+            sys.exit(1)
 
         try:
-            self.bfl = BFLocal()
+            self.bfl = BFLocal(self.project_id)
         except requests.exceptions.ConnectionError:
             # FIXME should we be failing early here?
             self.bfl = 'Could not connect to blackfynn'
@@ -87,10 +92,8 @@ class Dispatch:
         # then it won't be very useful
         self.BlackfynnRemote = BlackfynnRemoteFactory(Path, BlackfynnCache, self.bfl)
 
-        if curation.project_path.exists():
-            self.summary = Summary(curation.project_path)
-        else:
-            self.summary = None
+        # the way this works now the project should always exist
+        self.summary = Summary(self.project_path)
 
     def __call__(self):
         # FIXME this might fail to run annos -> shell correctly
@@ -107,7 +110,8 @@ class Dispatch:
 
     @property
     def project_id(self):
-        self.bfl.organization.id
+        #self.bfl.organization.id
+        return self.project_path.cache.id
 
     @property
     def debug(self):
@@ -117,14 +121,20 @@ class Dispatch:
     def overwrite(self):
         return self.args['--overwrite']
 
+    def clone(self):
+        project_id = self.args['<project-id>']
+
     def pull(self):
         # TODO folder meta -> org
         skip = (
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
-        anchor = self.BlackfynnRemote(config.local_storage_prefix, self.project_name)
-        anchor.bootstrap_local(id=self.project_id, parents=True)
+        anchor = Path(config.local_storage_prefix, self.project_name)
+        embed()
+        anchor.bootstrap(self.project_id, parents=True, recursive=True)
+        #anchor = self.BlackfynnRemote(config.local_storage_prefix, self.project_name)
+        #anchor.bootstrap_local(id=self.project_id, parents=True)
         # NOTE when syncing the first time remote always has to write first
         # because the cache doesn't even exist yet so it can't construct its remote on the fly
 
@@ -201,9 +211,9 @@ class Dispatch:
 
     def shell(self):
         """ drop into an shell with classes loaded """
-        ds, dsd = get_datasets(curation.project_path)  # FIXME deprecate
+        ds, dsd = get_datasets(self.project_path)  # FIXME deprecate
         summary = self.summary
-        org = FThing(curation.project_path)
+        org = FThing(self.project_path)
         if self.args['demos']:
             # get the first dataset
             dataset = next(iter(summary))
@@ -251,8 +261,8 @@ class Dispatch:
     def export(self):
         """ export output of curation workflows to file """
         #from sparcur.curation import get_datasets
-        #ds, dsd = get_datasets(curation.project_path)
-        #org_id = FThing(curation.project_path).organization.id
+        #ds, dsd = get_datasets(self.project_path)
+        #org_id = FThing(self.project_path).organization.id
         summary = self.summary
         timestamp = datetime.now().isoformat()
         # start time not end time ...
@@ -323,8 +333,8 @@ class Dispatch:
 
     def report(self):
         if self.args['filetypes']:
-            #root = FThing(curation.project_path)
-            fts = [FThing(p) for p in curation.project_path.rglob('*') if p.is_file()]
+            #root = FThing(self.project_path)
+            fts = [FThing(p) for p in self.project_path.rglob('*') if p.is_file()]
             #all_counts = sorted([(*k, v) for k, v in Counter([(f.suffix, f.mimetype, f._magic_mimetype)
                                                               #for f in fts]).items()], key=lambda r:r[-1])
 

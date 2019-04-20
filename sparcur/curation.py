@@ -41,7 +41,6 @@ from IPython import embed
 sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
 a = rdf.type
 
-project_path = local_storage_prefix / 'SPARC Consortium'
 logger = makeSimpleLogger('dsload')
 logger.setLevel('CRITICAL')
 OntCuries({'orcid':'https://orcid.org/',
@@ -74,7 +73,7 @@ def get_all_errors(_with_errors):
     return list(extract_errors(_with_errors))
 
 
-def normalize_tabular_format():
+def normalize_tabular_format(project_path):
     kwargs = {
         'delimiter' : '\t',
         'skip_empty_lines' : True,
@@ -1034,14 +1033,14 @@ class FThing(FakePathHelper):
         self.metamaker = metamaker(self)
         #self._pio_header = _pio_header  # FIXME ick
 
+    @property
+    def meta(self):
+        """ pathmeta NOT json meta (confusingly) """
+        return self.path.cache.meta
+
     def rglob(self, pattern):
         # TODO
         pass 
-
-    def xattrs(self):
-        # decode values here where appropriate
-        return {k:v if k == 'bf.checksum' else v.decode()
-                for k, v in self.path.xattrs().items()}
 
     @property
     def bids_root(self):
@@ -1117,9 +1116,7 @@ class FThing(FakePathHelper):
 
     @property
     def id(self):
-        attrs = self.xattrs()
-        if b'bf.id' in attrs:
-            return attrs[b'bf.id']
+        return self.meta.id
 
     @property
     def name(self):
@@ -1145,30 +1142,26 @@ class FThing(FakePathHelper):
 
     @property
     def bf_size(self):
-        attrs = self.xattrs()
-        if 'bf.size' in attrs:
-            return int(attrs['bf.size'])
+        size = self.meta.size
+        if size:
+            return size
         elif self.path.is_dir():
             size = 0
             for path in self.path.rglob('*'):
                 if path.is_file():
                     try:
-                        size += int(path.getxattr('bf.size'))
+                        size += path.cache.meta.size
                     except OSError as e:
-                        logger.warning(f'File xattrs. Assuming it is not tracked. {path}')
+                        logger.warning(f'No cached file size. Assuming it is not tracked. {path}')
 
             return size
 
         else:
-            print('WARNING: unknown thing at path', self.path)
+            log.warning(f'unknown thing at path {self.path}')
 
     @property
     def bf_checksum(self):
-        attrs = self.xattrs()
-        if 'bf.checksum' in attrs:
-            return attrs['bf.checksum']
-
-        # TODO checksum rules for contained folders
+        return self.meta.checksum
 
     def checksum(self):
         if self.path.is_file() and not self.fake:
@@ -2151,7 +2144,7 @@ def get_datasets(project_path, FTC=FThing):
     return ds, dsd
 
 
-def parse_meta():
+def parse_meta(project_path):
     ds, dsd = get_datasets(project_path)
     dump_all = [{attr: express_or_return(getattr(d, attr))
                  for attr in dir(d) if not attr.startswith('_')}
@@ -2290,6 +2283,8 @@ def populate_annos(group_name='sparc-curation'):
 def main():
     #populate_annos()
     #parse_meta()
+    project_path = local_storage_prefix / 'SPARC Consortium'
+
     ds, dsd = get_datasets(project_path)
     nr, ne = schema_check(ds, dsd)
 

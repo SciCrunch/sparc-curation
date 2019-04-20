@@ -554,20 +554,23 @@ def get_file_by_id(get, file_path, pid, fid):
 
 
 class HomogenousBF:
+    helper_index = {}  # id mapping to get parents from ids
+
     def __init__(self, bfobject, helper_index=None):
+
         if isinstance(bfobject, HomogenousBF):
             bfobject = bfobject.o
+
         elif bfobject is None:
             raise TypeError('bfobject cannot be None!')
+
         elif isinstance(bfobject, str):
             raise TypeError(f'bfobject cannot be str! {bfobject}')
 
         self.bfobject = bfobject
 
-        if helper_index is None:
-            helper_index = {}
-
-        self.helper_index = helper_index
+        if helper_index is not None:
+            self.helper_index.update(helper_index)
 
     @property
     def name(self):
@@ -615,12 +618,24 @@ class HomogenousBF:
 
     @property
     def parent(self):
-        parent = self.bfobject.parent
+        if isinstance(self.bfobject, Organization):
+            return None
+
+        if isinstance(self.bfobject, Collection):
+            parent = self.bfobject.parent
+            if parent is None:
+                parent = self.bfobject.dataset
+
+        elif isinstance(self.bfobject, Dataset):
+            parent = 'AAAAAAAAAAAAAAAAAAAA'
+
+        if parent in self.helper_index:
+            return self.helper_index[parent]
         if parent:
             return self.__class__(parent)  # FIXME self.bfobject.parent is the id??
 
     @property
-    def rparents(self):
+    def parents(self):
         parent = self.parent
         while parent:
             yield parent
@@ -717,15 +732,15 @@ class BFLocal:
     class NoBfMeta(Exception):
         """ There is not bf id for this file. """
 
-    def __init__(self, org='sparc', local_storage_prefix=local_storage_prefix):
+    def __init__(self, project_id, local_storage_prefix=local_storage_prefix):
         if not isinstance(local_storage_prefix, Path):
             local_storage_prefix = Path(local_storage_prefix)
 
         # no changing local storage prefix in the middle of things
         # if you want to do that create a new class
 
-        self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', org, 'key'),
-                            api_secret=devconfig.secrets('blackfynn', org, 'secret'))
+        self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', project_id, 'key'),
+                            api_secret=devconfig.secrets('blackfynn', project_id, 'secret'))
         self.organization = self.bf.context
         self.project_name = self.bf.context.name
         self.project_path = local_storage_prefix / self.project_name

@@ -137,6 +137,10 @@ class PathMeta:
         self.mode = mode
         self.error= error
 
+    def items(self):
+        for field in self.fields:
+            yield field, getattr(self, field)
+
     @property
     def hrsize(self):
         """ human readable file size """
@@ -223,6 +227,9 @@ class PathMeta:
              else:
                   return True
 
+    def __neg__(self):
+        return not any(getattr(self, field) for field in self.fields)
+
 
 class RemotePath(PurePosixPath):
     """ Remote data about a local object. """
@@ -248,7 +255,7 @@ class RemotePath(PurePosixPath):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
-    def bootstrap_local(self, *, fetch_data=True, id=None, parents=False):
+    def _bootstrap_local(self, *, fetch_data=True, id=None, parents=False):
         # also bootstraps cache
         # meta is needed only the very first time
         if not self.local.exists():
@@ -278,11 +285,15 @@ class RemotePath(PurePosixPath):
     @property
     def cache(self):
         # TODO performance check on these
-        return self._cache_class(self)
+        if not hasattr(self, '_cache'):
+            self._cache = self._cache_class(self)
+            self._cache._remote = self
+
+        return self._cache
 
     @property
     def local(self):
-        return self._local_class(self)
+        return self.cache.local
 
     @property
     def anchor(self):
@@ -399,11 +410,30 @@ class CachePath(PosixPath):
 
     @property
     def remote(self):
-        return self._remote_class(self)
+        """ the remote class instantiates itself from its own ids
+            the substitution of the local path for the remote.id
+            happens here BUT it is mediated by the cache path object
+            which has botht the local path information and the id
+            a remote object (not a reamote path) is instantiated by
+            remote id alone we still need the object that knows how
+            to construct an unachored path from the remote data, that
+            object is the remote path """
+
+        if self._remote_class is not None:
+            # we don't have to have a remote configured to check the cache
+            if not hasattr(self, '_remote'):
+                self._remote = self._remote_class(self)
+                self._remote._cache = self
+
+            return self._remote
 
     @property
     def local(self):
-        return self._local_class(self)
+        if not hasattr(self, '_local'):
+            self._local = self._local_class(self)
+            self._local._cache = self
+
+        return self._local
 
     @property
     def id(self):
@@ -424,6 +454,9 @@ class CachePath(PosixPath):
         # we don't keep two copies of the local data
         # unless we are doing a git-like thing
         raise NotImplementedError
+
+    def __repr__(self):
+        return repr(self.local) + ' -> ' + repr(self.remote)
 
 
 class XattrPath(PosixPath):
@@ -458,7 +491,7 @@ class XattrCache(CachePath, XattrPath):
 
     @property
     def meta(self):
-        if self.is_symlink():
+        if self.is_symlink() and not self.exists():  # if a symlink exists it is something else
             return PathMeta.from_path(self)
         else:
             xattrs = self.xattrs()
@@ -504,8 +537,22 @@ class BlackfynnCache(SqliteCache, XattrCache):
         """
 
         # FIXME in reality files can have more than one org ...
+        if self.meta.id is None:
+            parent = self.parent
+            if parent == self:  # we have hit a root
+                return None
+
+            organization = self.parent.organization
+
+            if organization is not None:
+                # TODO repair
+                pass
+            else:
+                raise exc.NotInProjectError()
+
         if self.meta.id.startswith('N:organization:'):
             return self
+
         elif self.parent:
             return self.parent.organization
 
@@ -541,16 +588,50 @@ class BlackfynnCache(SqliteCache, XattrCache):
 class LocalPath(PosixPath):
     # local data about remote objects
     _cache_class = None
-    _remote_class = None
+    #_remote_class = None
 
+    def bootstrap(self, id, *, parents=False, recursive=False):
+        cache = self.cache
+        meta = cache.meta
+        if not meta:
+            cache.meta = PathMeta(id=id)
+
+        elif meta.id != id:
+            # TODO overwrite
+            raise exc.MetadataIdMismatchError(f'Existing cache id does not match new id! {meta.id} != {id}')
+
+        remote = cache.remote
+
+        if not self.exists():
+            if self.is_dir():
+                self.mkdir(parents=parents)
+
+            elif self.is_file():
+                if not self.parent.exists():
+                    self.parent.mkdir(parents=parents)
+
+                if fetch_data:
+                    self.touch()  # do this so we can write our meta before data
+                    self.cache.meta = self.meta
+                    self.local.data = self.data
+
+                else:
+                    self.local.symlink_to(self.meta.as_path())
+
+        if recursive:
+            pass
     @property
     def remote(self):
-        return self._remote_class(self)
+        return self.cache.remote
 
     @property
     def cache(self):
         # TODO performance check on these
-        return self._cache_class(self)
+        if not hasattr(self, '_cache'):
+            self._cache = self._cache_class(self)
+            self._cache._local = self
+
+        return self._cache
 
     @property
     def id(self):
@@ -641,10 +722,9 @@ class LocalPath(PosixPath):
             return m.digest()
 
 
-class Path(BlackfynnCache, LocalPath):
+class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
     """ An augmented path for all the various local needs of the curation process. """
-    _cache_class = None
-    _remote_class = None
+    _cache_class = BlackfynnCache
 
     def xopen(self):
         """ open file using xdg-open """
