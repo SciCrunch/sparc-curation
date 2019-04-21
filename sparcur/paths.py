@@ -22,6 +22,7 @@ things rather than always trying to derive the mappings from data embedded (boun
 the derefereced path object. """
 
 import sys
+import base64
 import pickle
 import struct
 import hashlib
@@ -35,8 +36,8 @@ from dateutil import parser
 from Xlib.display import Display
 from Xlib import Xatom
 from sparcur import exceptions as exc
+from sparcur.core import log
 from IPython import embed
-
 
 # remote data about remote objects -> remote_meta
 # local data about remote objects -> cache_meta
@@ -49,57 +50,8 @@ from IPython import embed
 # needed a place to live ...
 
 class PathMeta:
-    empty = '#'
-    path_order = ('file_id',
-                  'size',
-                  'created',
-                  'updated',
-                  'checksum',
-                  'old_id',
-                  'error',
-                  'hrsize')
-
-    fields = ('size', 'created', 'updated',
-              'checksum', 'id', 'file_id', 'old_id',
-              'gid', 'uid', 'mode', 'error')
-
-    encoding = 'utf-8'
 
     # TODO register xattr prefixes
-
-    @staticmethod
-    def deprefix(string, prefix):
-        if string.startswith(prefix):
-            string = string[len(prefix):]
-
-        # deal with normalizing old form here until it is all cleaned up
-        if prefix == 'bf.':
-            if string.endswith('_at'):
-                string = string[:-3]
-
-        return string
-
-    @classmethod
-    def from_xattrs(cls, xattrs, prefix=None, path_object=None):
-        """ decoding from bytes """
-        if path_object:
-            # some classes may need their own encoding rules _FOR NOW_
-            # we will remove them once we standardize the xattrs format
-            decode_value = getattr(path_object, 'decode_value', cls.decode_value)
-        else:
-            decode_value = cls.decode_value
-
-        if prefix:
-            prefix += '.'
-            kwargs = {k:decode_value(k, v)
-                      for kraw, v in xattrs.items()
-                      for k in (cls.deprefix(kraw.decode(cls.encoding), prefix),)}
-        else:  # ah manual optimization
-            kwargs = {k:decode_value(k, v)
-                      for kraw, v in xattrs.items()
-                      for k in (kraw.decode(cls.encoding),)}
-
-        return cls(**kwargs)
 
     @classmethod
     def from_metastore(cls, blob, prefix=None):
@@ -107,11 +59,6 @@ class PathMeta:
         xattrs = pickle.loads(blob)
         return cls.from_xattrs(xattrs, prefix)
 
-    @classmethod
-    def from_path(cls, relative_path):
-        # this only deals with the relative path
-        kwargs = {k:s.strip('.') for k, s in zip(cls.path_order, relative_path.suffixes)}
-        return cls(**kwargs)
 
     def __init__(self,
                  size=None,
@@ -122,9 +69,10 @@ class PathMeta:
                  file_id=None,
                  old_id=None,
                  gid=None,  # needed to determine local writability
-                 uid=None,
+                 user_id=None,
                  mode=None,
-                 error=None):
+                 errors=None,
+                 **kwargs):
         self.size = size
         self.created = created
         self.updated = updated
@@ -133,13 +81,23 @@ class PathMeta:
         self.file_id = file_id
         self.old_id = old_id
         self.gid = gid
-        self.uid = uid
+        self.user_id = user_id
         self.mode = mode
-        self.error= error
+        self.errors = errors
+        if kwargs:
+            log.warning(f'Unexpected meta values! {kwargs}')
+            self.__kwargs = kwargs  # roundtrip values we don't explicitly handle
+
+    #def as_xattrs(self, prefix=None):
+        #log.debug(f'{self} {prefix}')
+        #embed()
+        #return self._as_xattrs(self, prefix=prefix)
+
 
     def items(self):
-        for field in self.fields:
-            yield field, getattr(self, field)
+        return self.__dict__.items()  # FIXME nonfields?
+        #for field in self.fields:
+            #yield field, getattr(self, field)
 
     @property
     def hrsize(self):
@@ -154,85 +112,41 @@ class PathMeta:
                 num /= 1024.0
             return "%.1f%s%s" % (num, 'Yi', suffix)
 
-        return sizeof_fmt(self.size)
-
-    @classmethod
-    def decode_value(cls, field, value):
-        if field in ('created', 'updated'):
-            value, = struct.unpack('d', value)
-            return datetime.fromtimestamp(value)
-        elif field == 'checksum':
-            return value
-        elif field in ('error', 'id', 'mode'):
-            return value.decode(cls.encoding)
+        if self.size is not None and self.size >= 0:
+            return sizeof_fmt(self.size)
         else:
-            return int(value)
-
-    @classmethod
-    def encode_value(cls, field, value):
-        if isinstance(value, datetime):
-            #value = value.isoformat().isoformat().replace('.', ',')
-            value = value.timestamp()  # I hate dealing with time :/
-
-        if isinstance(value, int):
-            # this is local and will pass through here before move?
-            #out = value.to_bytes(value.bit_length() , sys.byteorder)
-            out = str(value).encode(cls.encoding)  # better to have human readable
-        elif isinstance(value, float):
-            out = struct.pack('d', value) #= bytes(value.hex())
-        elif isinstance(value, str):
-            out = value.encode(cls.encoding)
-        else:
-            raise exc.UnhandledTypeError(f'dont know what to do with {value!r}')
-
-        return out
-
-    def as_xattrs(self, prefix=None):
-        """ encoding to bytes """
-        out = {}
-        for field in self.fields:
-            value = getattr(self, field)
-            if value:
-                value_bytes = self.encode_value(field, value)
-                if prefix:
-                    key = prefix + '.' + field
-                else:
-                    key = field
-
-                key_bytes = key.encode(self.encoding)
-                out[key_bytes] = self.encode_value(field, value)
-
-        return out
+            return '??'  # sigh
 
     def as_metastore(self, prefix=None):
         # FIXME prefix= is a bad api ...
         """ db entry """  # TODO json blob in sqlite? can it index?
         return pickle.dumps(self.as_xattrs(prefix))
 
-    def as_path(self):
-        """ encode meta as a relative path """
-        gen = (str(_) if _ else self.empty
-               for _ in (getattr(self, o) for o in self.path_order))
-        #return '/'.join(gen)
-        return self.id + '/.' + '.'.join(gen)
+    def __iter__(self):
+        yield from (k for k in self.__dict__ if not k.startswith('_'))
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.__dict__})'
+        _dict = {k:v for k, v in self.__dict__.items() if not k.startswith('_')}
+        return f'{self.__class__.__name__}({_dict})'
 
     def __eq__(self, other):
         if isinstance(other, PathMeta):
-             for field in self.fields:
-                  if getattr(self, field) != getattr(other, field):
+             for field, value in self.__dict__.items():
+                  if value != getattr(other, field):
                        return False
              else:
                   return True
 
-    def __neg__(self):
-        return not any(getattr(self, field) for field in self.fields)
+    def __bool__(self):
+        for v in self.__dict__.values():
+            if v is not None:
+                return True
+        else:
+            return False
 
 
-class RemotePath(PurePosixPath):
-    """ Remote data about a local object. """
+class RemotePath:
+    """ Remote data about a remote object. """
 
     _cache_class = None
 
@@ -252,24 +166,32 @@ class RemotePath(PurePosixPath):
         """ call this once to bind everything together """
         cache_class.setup(local_class, cls)
 
-    def bootstrap(self, recursive=False):
-        self.cache.bootstrap(self.meta.id, recursive=recursive)
+    def bootstrap(self, recursive=False, only=tuple(), skip=tuple()):
+        self.cache.bootstrap(self.meta.id, recursive=recursive, only=only, skip=skip)
 
-    def __new__(cls, *args, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__()
+    def __init__(self, id, cache=None):
+        self.id = id
+        self.cache = cache
+        self.cache._remote = self
 
     @property
     def cache(self):
-        # TODO performance check on these
-        if not hasattr(self, '_cache'):
-            self._cache = self._cache_class(self)
-            self._cache._remote = self
-
         return self._cache
 
+    @cache.setter
+    def cache(self, cache):
+        if cache.meta is None:
+            cache.meta = self.meta  # also easier than bootstrapping ...
+
+        if cache.id is not None and cache.id != self.id:
+            raise exc.MetadataIdMismatchError('Cache id does not match remote id! '
+                                              f'{cache.id} != {self.id}\n{cache.meta}')
+        if not hasattr(self, '_cache') or self._cache is None:
+            self._cache = cache
+        else:
+            raise BaseException('FIXME make a proper error type, cache exists')
+
+            
     @property
     def local(self):
         return self.cache.local
@@ -280,62 +202,6 @@ class RemotePath(PurePosixPath):
 
     @property
     def id(self):
-        # if you remote supports this query then there is a chance we
-        # can pull this off otherwise we have to go via cache
-        # essentially the remote endpoint has to know based on
-        # _something_ how to construct its version of the local
-        # identifier, this will require some additional information
-
-        # assume that there are only 3 things
-        # users (uniquely identified remotely authed)
-        # root file systems (are not 1:1 with machines)
-        # paths (files/folders)
-
-        # we need to add one more, which is the data
-        # located at a path, which can change
-
-        # then to construct the inverse mapping we actually only need
-        # to identify the file system and the path or paths on that
-        # file sytem that are all equivalent resolve() helps with
-        # this, not sure about hardlinks, which are evil
-
-        # multiple users can have the 'same' file but if a user
-        # doesn't have write access to a file on a file system then we
-        # can't put it back for them this happens frequently when
-        # people have the same username on their own systems but
-        # different usernames on a shared system
-
-        # because kernels (of all kinds) are the principle machine
-        # agents that we have to deal with here (including chrooted
-        # agents, jails, vms etc.)  we deal with each of them as if
-        # they are seeing different data, we probably do want to try
-        # to obtain a mapping e.g. via fstab so let's assume ipv6
-        # address of the root?  no? how can we tell who is answering?
-
-        # answer ssh host keys? that seems good enough for me, yes
-        # maybe people will change host keys, but you can't have more
-        # than one at the same time, and you can probably try to
-        # bridge a change like that if the hostname stays the same and
-        # the user stays the same, or even simpler, if the files that
-        # we care about stay the same AND the old/other host cannot be
-        # contacted, more like, we are on the host if someone is crazy
-        # enough to reuse host keys well ...  wow, apparently this
-        # happens quite frequently with vms *headdesk* this requires
-        # a real threat model, which we are just going to say is out
-        # of scope at the moment, /etc/machine-id is another option
-        # but has the same problem as the ssh host key ...
-
-        # windows
-        # HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography
-        # (Get-CimInstance -Class Win32_ComputerSystemProduct).UUID
-
-        # answer inside of a vcs: use the identifier of the first
-        # commit and the last known good commit ... or similar
-
-        #self.querything.id_from_local(self.local.id)
-        #self.remote_thing.id_from_ssh_host_key_and_path(self)
-
-        # remote_thing can get itself the machine id hash plus a constant
         raise NotImplementedError
         self.remote_thing.id_from_machine_id_and_path(self)
 
@@ -367,6 +233,11 @@ class RemotePath(PurePosixPath):
         # uniform interface for retrieving remote hierarchies decoupled from meta
         raise NotImplementedError
 
+    @property
+    def rchildren(self):
+        # uniform interface for retrieving remote hierarchies decoupled from meta
+        raise NotImplementedError
+
     def iterdir(self):
         # I'm guessing most remotes don't support this
         raise NotImplementedError
@@ -378,7 +249,7 @@ class RemotePath(PurePosixPath):
         raise NotImplementedError
 
 
-class CachePath(PosixPath):
+class CachePath(PosixPath):  # this needs to be a real path so that it can navigate the local path sturcture
     """ Local data about remote objects.
         This is where the mapping between the local id (aka path)
         and the remote id lives. In a git-like world this is the
@@ -402,50 +273,128 @@ class CachePath(PosixPath):
         local_class._cache_class = cls
         remote_class_factory._cache_class = cls
 
-    def bootstrap(self, id, *, parents=False, recursive=False):
-        #if id is None and self.cache.id is not None:
-            #id = self.cache.id
-        #else:
-            #raise TypeError(f'No cache so id is a required argument')
+    def bootstrap(self, id, *, parents=False, recursive=False,
+                  fetch_data=False, size_limit_mb=2,
+                  only=tuple(), skip=tuple()):
+        try:
+            self._in_bootstrap = True
+            self._bootstrap(id, parents=parents,
+                            recursive=recursive,
+                            fetch_data=fetch_data,
+                            size_limit_mb=size_limit_mb,
+                            only=only, skip=skip)
+        finally:
+            delattr(self, '_in_bootstrap')
+            if hasattr(self, '_meta'):
+                delattr(self, '_meta')
+
+    def _bootstrap(self, id, *, parents=False, recursive=False,
+                   fetch_data=False, size_limit_mb=2,
+                   only=tuple(), skip=tuple()):
+        """ The actual bootstrap implementation """
+
+        if only or skip:
+            if id.startswith('N:organization:'):  # FIXME :/
+                # since we only go one organization at a time right now
+                # we never want to skip the top level id
+                log.info(f'Bootstrapping {id}')
+            elif id in skip:
+                log.info(f'Skipped       {id} since it is in skip')
+                return
+            elif only and id not in only:
+                log.info(f'Skipped       {id} since it is not in only')
+                return
+            else:
+                # if you pass the only mask so do your children
+                log.info(f'Bootstrapping {id}')
+                only = tuple()
 
         if not self.meta:
             meta = PathMeta(id=id)
 
+        elif self.meta.id is None:
+            log.warning(f'Existing meta for {self} no id so overwriting\n{self.meta}')
+            meta = PathMeta(id=id)
+
         elif self.id != id:
             # TODO overwrite
-            raise exc.MetadataIdMismatchError(f'Existing cache id does not match new id! {meta.id} != {id}')
+            raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
+                                              f'{self.meta.id} != {id}\n{self.meta}')
+        else:
+            meta = self.meta  # HOW DID THIS GET SET AND BY WHO WHEN?!?  FIXME FIXME
 
-        if not self.exists():
-            if self.is_dir():
-                self.mkdir(parents=parents)
-                self.meta = meta  # the bootstrap
+        if not self.is_symlink() and self.exists():
+            if self.meta and self.meta.id:
+                # we have our files, update the metdata while we're at it
                 self.meta = self.remote.meta
 
-            elif self.is_file():
+        elif not self.is_symlink() and (not self.exists() or
+                                        self.exists() and
+                                        not self.meta and
+                                        not list(self.local.children)):
+            if not self.meta:
+                log.debug('problem')
+                self.meta = meta  # memory only bootstrap
+
+            remote_meta = self.remote.meta
+            if self.remote.is_dir():
+                self.mkdir(parents=parents)
+                if not self.meta:
+                    self.meta = meta  # save bootstrap meta to disk
+                self.meta = remote_meta
+
+            # FIXME this is really select remote cache type?
+            elif self.remote.is_file():
                 if not self.parent.exists():
                     self.parent.mkdir(parents=parents)
 
-                if fetch_data:
-                    self.touch()  # do this so we can write our meta before data
-                    self.meta = meta  # the bootstrap
-                    self.meta = self.remote.meta
+                if fetch_data and self.meta.size < size_limit_mb * 1024 ** 2:
+                    # running this first means that we will use xattrs instead of symlinks
+                    # this is a bit opaque, but since meta uses a setter we can't pass a
+                    # param to make it clear (oh look, python being dumb again!)
+                    self.touch()
+
+                if not self.meta:
+                    self.meta = meta  # save bootstrap meta to disk as xattr or symlink
+
+                self.meta = remote_meta
+                if self.meta != remote_meta:
+                    # read back from storage to be sure ... annnd we failed
+                    msg = '\n'.join([f'{k!r} {v!r} {getattr(remote_meta, k)!r}'
+                                     for k, v in self.meta.items()])
+                    raise exc.MetadataCorruptionError(msg)
+
+                if fetch_data and self.meta.size < size_limit_mb * 1024 ** 2:
                     self.local.data = self.remote.data
 
+                if self.meta.checksum:
+                    lc = self.local.meta.checksum 
+                    cc = self.meta.checksum
+                    if lc != cc:
+                        raise exc.ChecksumError('Checksums to not match! {lc} != {cc}')
                 else:
-                    self.local.symlink_to(self.remote.meta.as_path())
+                    log.warning(f'No checksum for {self}! Your data is at risk!')
+
+            else:
+                raise BaseException(f'Remote is not a file or directory {self}')
 
         if recursive:
-            for child in self.remote.rchildren:
-                # use the remote's recursive implementation
-                # not the local implementation, since the
-                # remote may have additional requirements
-                child.bootstrap()
+            if id.startswith('N:organization:'):  # FIXME :/
+                for child in self.remote.children:
+                    child.bootstrap(recursive=True, only=only, skip=skip)
+            else:
+                for child in self.remote.rchildren:
+                    # use the remote's recursive implementation
+                    # not the local implementation, since the
+                    # remote may have additional requirements
+                    child.bootstrap(only=only, skip=skip)
 
     @property
     def remote(self):
         if self._remote_class_factory is not None:
             # we don't have to have a remote configured to check the cache
             if not hasattr(self, '_remote_class'):
+                log.debug('rc')
                 # NOTE there are many possible ways to set the anchor
                 # we need to pick _one_ of them
                 self._remote_class = self._remote_class_factory(self.anchor,
@@ -453,10 +402,31 @@ class CachePath(PosixPath):
                                                                 self.__class__)
 
             if not hasattr(self, '_remote'):
-                self._remote = self._remote_class(self)
-                self._remote._cache = self
+                #log.debug('r')
+                self.remote = self._remote_class(self.id, self)
 
             return self._remote
+
+    @remote.setter
+    def remote(self, remote):
+        if self.meta is not None and self.id is not None and hasattr(self, '_remote'):
+            if self.id != self.remote.id:
+                raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
+                                                  f'{self.meta.id} != {id}\n{self.meta}')
+
+            elif isinstance(remote, RemotePath):
+                self._remote = remote
+                remote._cache = self
+            else:
+                raise TypeError(f'{remote} is not a RemotePath! It is a {type(remote)}')
+
+        else:
+            # make sure no monkey business is going on at least in the local graph
+            if self.parent and self.local.parent.cache.meta.id == self.parent.id:
+                # wow is that a vastly easier bootstrap ...
+                self.meta = remote.meta
+                self._remote = remote
+                remote._cache = self
 
     @property
     def local(self):
@@ -474,12 +444,28 @@ class CachePath(PosixPath):
     # TODO how to toggle fetch from remote to heal?
     @property
     def meta(self):
-        # xattrs failing over to sqlite
-        raise NotImplementedError
+        if hasattr(self, '_meta'):
+            return self._meta  # for bootstrap
 
     @meta.setter
-    def meta(self):
+    def meta(self, pathmeta):
         raise NotImplementedError
+
+    def _meta_setter(self, pathmeta):
+        """ so much for the pythonic way when the language won't even let you """
+        #if hasattr(self, '_in_bootstrap'):
+        #if not hasattr(self, '_meta'):
+        #log.warning(f'!!!!!!!!!!!!!!!!!!!!!!!!1 {self}')
+        if self.meta and self.id != pathmeta.id:
+            raise exc.MetadataIdMismatchError('Cache id does not match meta id! '
+                                              f'{self.id} != {pathmeta.id}\n{pathmeta}')
+
+        self._meta = pathmeta
+        #else:
+            # if you get here you probably forgot to implement @meta.setter for your cache class
+            #msg = 'Trying to set memory only metadata while not in bootstrap.'
+            #log.error(msg)
+            #raise exc.NotBootstrappingError(msg)
 
     @property
     def data(self):
@@ -489,8 +475,271 @@ class CachePath(PosixPath):
 
     def __repr__(self):
         local = repr(self.local) if self.local else str(self)
-        remote = repr(self.remote) if self.remote else self.id
+        remote = (f'{self.remote.__class__.__name__}({self.remote.meta.id!r})'
+                  if self.remote else self.id)
         return local + ' -> ' + remote
+
+
+
+class _PathMetaAsSymlink:
+    empty = '#'
+    fieldsep = '.'  # must match the file extension splitter for Path ...
+    subfieldsep = ';'  # only one level, not going recursive in a filename ...
+    order = ('size',
+             'created',
+             'updated',
+             'checksum',
+             'old_id',
+             'gid',
+             'user_id',
+             'mode',
+             'errors',)
+    extras = 'hrsize',
+    order_all = order + extras
+    pathmetaclass = PathMeta
+
+    def __init__(self):
+        # register functionality on PathMeta
+        def as_symlink(self, _as_symlink=self.as_symlink):
+            return _as_symlink(self)
+
+        @classmethod
+        def from_symlink(cls, symlink_path, _from_symlink=self.from_symlink):
+            return _from_symlink(symlink_path)
+
+        self.pathmetaclass.as_symlink = as_symlink
+        self.pathmetaclass.from_symlink = from_symlink
+
+    def encode(self, field, value):
+        if value is None:
+            return self.empty
+
+        if field in ('errors',):
+            return self.subfieldsep.join(value)
+
+        value = str(value)
+        value = value.replace(self.fieldsep, ',')
+        return value
+
+    def decode(self, field, value):
+        value = value.strip(self.fieldsep)
+
+        if value == self.empty:
+            return None
+
+        if field == 'errors':
+            return [_ for _ in value.split(self.subfieldsep) if _]
+
+        elif field in ('created', 'updated'):
+            return parser.parse(value)
+
+        elif field == 'checksum':  # FIXME checksum encoding ...
+            #return value.encode()
+            return value.encode()
+
+        elif field == 'user_id':
+            try:
+                return int(value)
+            except ValueError:  # FIXME :/ uid vs owner_id etc ...
+                return value.decode()
+
+        elif field in ('id', 'mode'):
+            return value
+
+        else:
+            return int(value)
+
+        return value
+
+    def as_symlink(self, pathmeta):
+        """ encode meta as a relative path """
+
+        gen = (self.encode(field, getattr(pathmeta, field))
+               for field in self.order_all)
+
+        return PosixPath(pathmeta.id + '/.meta.' + self.fieldsep.join(gen))
+
+    def from_symlink(self, symlink_path):
+        parent = symlink_path.parent
+        relative_path = symlink_path.resolve().relative_to(parent.resolve())
+        # this only deals with the relative path
+        kwargs = {field:self.decode(field, value)
+                  for field, value in zip(self.order, relative_path.suffixes)}
+        kwargs['id'] = str(parent)
+        return self.pathmetaclass(**kwargs)
+
+    #@classmethod
+    #def from_symlink(cls, symlink_path):
+        #if not symlink_path.is_symlink():
+            #raise TypeError(f'Not a symlink! {symlink_path}')
+        #return cls.symlink.from_symlink(symlink_path)
+
+
+class SymlinkCache(CachePath):
+
+    pathmeta = _PathMetaAsSymlink()
+
+    @property
+    def meta(self):
+        # FIXME symlink cache!??!
+        if self.is_symlink():
+            if not self.exists():  # if a symlink exists it is something else
+                return pathmeta.from_symlink(self)
+            else:
+                raise exc.PathExistsError(f'Target of symlink exists!\n{self} -> {self.resolve()}')
+
+        else:
+            return super().meta
+
+    @meta.setter
+    def meta(self, pathmeta):
+        if not self.exists():
+            # if the path does not exist write even temporary to disk
+            if self.is_symlink():
+                if self.meta.id != pathmeta.id:
+                    raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
+                                                      f'{self.meta.id} != {id}\n{self.meta}')
+
+                log.debug('existing metadata found, but ids match so will update')
+
+            self.local.symlink_to(pathmeta.as_symlink(pathmeta))
+
+        else:
+            raise exc.PathExistsError(f'Path exists {self}')
+
+
+class _PathMetaAsXattrs:
+    fields = ('size', 'created', 'updated',
+              'checksum', 'id', 'file_id', 'old_id',
+              'gid', 'user_id', 'mode', 'errors')
+
+    encoding = 'utf-8'
+
+    pathmetaclass = PathMeta
+
+    def __init__(self):
+        # register functionality on PathMeta
+        def as_xattrs(self, prefix=None, _as_xattrs=self.as_xattrs):
+            #log.debug(f'{self} {prefix}')
+            return _as_xattrs(self, prefix=prefix)
+
+        @classmethod
+        def from_xattrs(cls, xattrs, prefix=None, path_object=None, _from_xattrs=self.from_xattrs):
+            # FIXME cls(**kwargs) vs calling self.pathmetaclass
+            return _from_xattrs(xattrs, prefix=prefix, path_object=path_object)
+
+        self.pathmetaclass.as_xattrs = as_xattrs
+        self.pathmetaclass.from_xattrs = from_xattrs
+
+    @staticmethod
+    def deprefix(string, prefix):
+        if string.startswith(prefix):
+            string = string[len(prefix):]
+
+        # deal with normalizing old form here until it is all cleaned up
+        if prefix == 'bf.':
+            if string.endswith('_at'):
+                string = string[:-3]
+
+        return string
+
+    def from_xattrs(self, xattrs, prefix=None, path_object=None):
+        """ decoding from bytes """
+        _decode = getattr(path_object, 'decode_value', None)
+        if path_object and _decode is not None:
+            # some classes may need their own encoding rules _FOR NOW_
+            # we will remove them once we standardize the xattrs format
+            def decode(field, value, dv=_decode):
+                out = dv(field, value)
+                if value is not None and out is None:
+                    out = self.decode(field, value)
+
+                return out
+                
+        else:
+            decode = self.decode
+
+
+        if prefix:
+            prefix += '.'
+            kwargs = {k:decode(k, v)
+                      for kraw, v in xattrs.items()
+                      for k in (self.deprefix(kraw.decode(self.encoding), prefix),)}
+        else:  # ah manual optimization
+            kwargs = {k:decode(k, v)
+                      for kraw, v in xattrs.items()
+                      for k in (kraw.decode(self.encoding),)}
+
+        return self.pathmetaclass(**kwargs)
+
+    def as_xattrs(self, pathmeta, prefix=None):
+        """ encoding to bytes """
+        #log.debug(pathmeta)
+        out = {}
+        for field in self.fields:
+            value = getattr(pathmeta, field)
+            if value:
+                value_bytes = self.encode(field, value)
+                if prefix:
+                    key = prefix + '.' + field
+                else:
+                    key = field
+
+                key_bytes = key.encode(self.encoding)
+                out[key_bytes] = self.encode(field, value)
+
+        return out
+
+    def encode(self, field, value):
+        #if field in ('created', 'updated') and not isinstance(value, datetime):
+            #field.replace(cls.path_field_sep, ',')  # FIXME hack around iso8601
+            # turns it 8601 isnt actually standard >_< with . instead of , sigh
+
+        if field == 'errors':
+            value = ';'.join(value)
+            
+        if isinstance(value, datetime):  # FIXME :/ vs iso8601
+            #value = value.isoformat().isoformat().replace('.', ',')
+            value = value.timestamp()  # I hate dealing with time :/
+
+        if isinstance(value, int):
+            # this is local and will pass through here before move?
+            #out = value.to_bytes(value.bit_length() , sys.byteorder)
+            out = str(value).encode(self.encoding)  # better to have human readable
+        elif isinstance(value, float):
+            out = struct.pack('d', value) #= bytes(value.hex())
+        elif isinstance(value, str):
+            out = value.encode(self.encoding)
+        else:
+            raise exc.UnhandledTypeError(f'dont know what to do with {value!r}')
+
+        return out
+
+    def decode(self, field, value):
+        if field in ('created', 'updated'):  # FIXME human readable vs integer :/
+            value, = struct.unpack('d', value)
+            return datetime.fromtimestamp(value)
+        elif field == 'checksum':
+            return value
+        elif field == 'errors':
+            value = value.decode(self.encoding)
+            return tuple(_ for _ in value.split(';') if _)
+        elif field == 'user_id':
+            try:
+                return int(value)
+            except ValueError:  # FIXME :/ uid vs owner_id etc ...
+                return value.decode()
+        elif field in ('id', 'mode'):
+            return value.decode(self.encoding)
+        elif field not in self.fields:
+            log.warning(f'Unhandled field {field}')
+            return value
+        else:
+            try:
+                return int(value)
+            except ValueError as e:
+                print(field, value)
+                raise e
 
 
 class XattrPath(PosixPath):
@@ -522,25 +771,36 @@ class XattrPath(PosixPath):
 
 class XattrCache(CachePath, XattrPath):
     xattr_prefix = None
+    pathmeta = _PathMetaAsXattrs()
 
     @property
     def meta(self):
         # FIXME symlink cache!??!
-        if self.is_symlink() and not self.exists():  # if a symlink exists it is something else
-            return PathMeta.from_path(self)
-        elif self.exists():
+        if self.exists():
             xattrs = self.xattrs()
-            pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
+            pathmeta = self.pathmeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
             return pathmeta
+        else:
+            return super().meta
 
     @meta.setter
     def meta(self, pathmeta):
+        #log.warning(f'!!!!!!!!!!!!!!!!!!!!!!!!2 {self}')
         # TODO cooperatively setting multiple different cache types?
         # do we need to use super() or something?
-        if self.is_symlink():
-            raise TypeError('FIXME TODO can\'t set meta on a symlink itself')  # FIXME
-        else:
+
+        if self.exists():
+            if self.is_symlink():
+                raise TypeError('will not write meta on symlinks! {self}')
             self.setxattrs(pathmeta.as_xattrs(self.xattr_prefix))
+            if hasattr(self, '_meta'):  # prevent reading from in-memory store
+                delattr(self, '_meta')
+
+        else:
+            # the glories of the inconsistencies and irreglarities of python
+            # you can't setattr using super() so yes you _do_ actually have to
+            # implement a setter sometimes >_<
+            super()._meta_setter(pathmeta)
 
 
 class SqliteCache(CachePath):
@@ -554,8 +814,6 @@ class BlackfynnCache(SqliteCache, XattrCache):
     def decode_value(cls, field, value):
         if field in ('created', 'updated'):
             return parser.parse(value.decode())  # FIXME with timezone vs without ...
-        else:
-            return PathMeta.decode_value(field, value)
 
     @property
     def anchor(self):
@@ -572,23 +830,26 @@ class BlackfynnCache(SqliteCache, XattrCache):
         """
 
         # FIXME in reality files can have more than one org ...
-        if self.meta.id is None:
-            parent = self.parent
-            if parent == self:  # we have hit a root
-                return None
+        if self.meta is not None:
+            id = self.id
+            if id is None:
+                parent = self.parent
+                if parent == self:  # we have hit a root
+                    return None
 
-            organization = self.parent.organization
+                organization = parent.organization
 
-            if organization is not None:
-                # TODO repair
-                pass
-            else:
-                raise exc.NotInProjectError()
+                if organization is not None:
+                    # TODO repair
+                    pass
+                else:
+                    raise exc.NotInProjectError()
 
-        if self.meta.id.startswith('N:organization:'):
-            return self
+            elif id.startswith('N:organization:'):
+                return self
 
-        elif self.parent:
+        if self.parent:
+            # we have a case of missing metadata here as well
             return self.parent.organization
 
     @property
@@ -603,7 +864,7 @@ class BlackfynnCache(SqliteCache, XattrCache):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
         # org /datasets/ N:dataset /viewer/ N:package
-        id = self.meta.id
+        id = self.id
         N, type, suffix = id.split(':')
         if id.startswith('N:package:'):
             prefix = '/viewer/'
@@ -619,11 +880,50 @@ class BlackfynnCache(SqliteCache, XattrCache):
 
         return self.dataset.human_uri + prefix + id
 
+    @property
+    def children(self):
+        """ direct children """
+        # if you want the local children go on local
+        # this will give us the remote children in the local context
+        # going in the reverse direction with parents
+        # we don't do because the parents here are already defined
+        # if a file has moved on the remote we can detect that and error for now
+        for child in self.remote.children:
+            child_path = self / child.name
+            child_path.remote = child
+
+            yield child_path
+
+    @property
+    def rchildren(self):
+        # have to express the generator to build the index
+        # otherwise child.parents will not work correctly (annoying)
+        for child in self.remote.rchildren:
+            parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
+            for parent in child.parents:
+                if parent == self.remote:
+                    break
+                else:
+                    parent_names.append(parent.name)
+
+            args = (*reversed(parent_names), child.name)
+            #log.debug(' '.join((str(_) for _ in (self.__class__, self, args))))
+            child_path = self.__class__(self, *args)
+            child_path.remote = child
+
+            yield child_path
+
+        # if organization
+        # if dataset (usually going to be the fastest in most cases)
+        # if collection (can end up very slow)
+        # if package/file
+
 
 class LocalPath(PosixPath):
     # local data about remote objects
 
     _cache_class = None  # must be defined by child classes
+    sysuid = None  # set below
 
     @classmethod
     def setup(cls, cache_class, remote_class_factory):
@@ -633,6 +933,10 @@ class LocalPath(PosixPath):
     @property
     def remote(self):
         return self.cache.remote
+
+    @remote.setter
+    def remote(self, remote):
+        self.cache.remote = remote
 
     @property
     def cache(self):
@@ -665,8 +969,8 @@ class LocalPath(PosixPath):
                         created=None,
                         updated=updated,
                         checksum=self.checksum(),
-                        id=self.path.as_posx(),  # this is ok, assists in mapping/debug ???
-                        uid=st.st_uid,
+                        id=self.sysuid + ':' + self.as_posix(),
+                        user_id=st.st_uid,  # keep in mind that a @meta.setter will require a coverter
                         gid=st.st_gid,
                         mode=mode)
 
@@ -682,9 +986,14 @@ class LocalPath(PosixPath):
 
     @data.setter
     def data(self, generator):
+        meta = self.meta
+        log.debug(f'writing to {self}')
         with open(self, 'wb') as f:
             for chunk in generator:
+                log.debug(chunk)
                 f.write(chunk)
+
+        self.meta = meta  # glories of persisting xattrs :/
 
     @property
     def children(self):
@@ -707,15 +1016,20 @@ class LocalPath(PosixPath):
 
     def data_to_remote(self):
         raise NotImplementedError
+        self.remote.data = self.data
 
     def annotations_to_remote(self):
         raise NotImplementedError
+        self.remote.data = self.data
 
-    def to_remote(self):
+    def to_remote(self):  # push could work ...
         # FIXME in theory we could have an endpoint for each of these
         # The remote will handle that?
         # this can definitely fail
-        self.remote.send(self.data, self.metadata, self.annotations)
+        raise NotImplementedError('need the think about how to do this without causing disasters')
+        self.remote.meta = self.meta
+        self.remote.data = self.data
+        self.remote.annotations = self.annotations
 
     def checksum(self, cypher=hashlib.sha256):
         if self.is_file():
@@ -730,6 +1044,9 @@ class LocalPath(PosixPath):
                         break
 
             return m.digest()
+
+
+LocalPath.sysuid = base64.urlsafe_b64encode(LocalPath('/etc/machine-id').checksum()[:16])[:-2].decode()
 
 
 class Path(LocalPath):  # NOTE this is a hack to keep everything consisten

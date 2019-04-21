@@ -3,7 +3,10 @@ from collections import deque
 import ontquery as oq
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.core import OntId
+from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
+
+log = makeSimpleLogger('sparcur')
 
 
 class JEncode(json.JSONEncoder):

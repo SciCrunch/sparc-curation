@@ -1,0 +1,59 @@
+* Can a remote answer how you have mapped your local resources to its identifiers?
+  Of course, if it has implemented it.
+
+  if you remote supports this query then there is a chance we
+  can pull this off otherwise we have to go via cache
+  essentially the remote endpoint has to know based on
+  _something_ how to construct its version of the local
+  identifier, this will require some additional information
+
+  assume that there are only 3 things
+  users (uniquely identified remotely authed)
+  root file systems (are not 1:1 with machines)
+  paths (files/folders)
+
+  we need to add one more, which is the data
+  located at a path, which can change
+
+  then to construct the inverse mapping we actually only need
+  to identify the file system and the path or paths on that
+  file sytem that are all equivalent resolve() helps with
+  this, not sure about hardlinks, which are evil
+
+  multiple users can have the 'same' file but if a user
+  doesn't have write access to a file on a file system then we
+  can't put it back for them this happens frequently when
+  people have the same username on their own systems but
+  different usernames on a shared system
+
+  because kernels (of all kinds) are the principle machine
+  agents that we have to deal with here (including chrooted
+  agents, jails, vms etc.)  we deal with each of them as if
+  they are seeing different data, we probably do want to try
+  to obtain a mapping e.g. via fstab so let's assume ipv6
+  address of the root?  no? how can we tell who is answering?
+
+  answer ssh host keys? that seems good enough for me, yes
+  maybe people will change host keys, but you can't have more
+  than one at the same time, and you can probably try to
+  bridge a change like that if the hostname stays the same and
+  the user stays the same, or even simpler, if the files that
+  we care about stay the same AND the old/other host cannot be
+  contacted, more like, we are on the host if someone is crazy
+  enough to reuse host keys well ...  wow, apparently this
+  happens quite frequently with vms *headdesk* this requires
+  a real threat model, which we are just going to say is out
+  of scope at the moment, /etc/machine-id is another option
+  but has the same problem as the ssh host key ...
+
+  windows
+  HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography
+  (Get-CimInstance -Class Win32_ComputerSystemProduct).UUID
+
+  answer inside of a vcs: use the identifier of the first
+  commit and the last known good commit ... or similar
+
+  #self.querything.id_from_local(self.local.id)
+  #self.remote_thing.id_from_ssh_host_key_and_path(self)
+
+  remote_thing can get itself the machine id hash plus a constant

@@ -4,12 +4,18 @@ import subprocess
 from datetime import datetime
 import requests
 from pexpect import pxssh
-from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
+from sparcur.core import log
 from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path
 from sparcur.config import local_storage_prefix
-from sparcur.blackfynn_api import HomogenousBF, BFLocal  # FIXME there should be a better way ...
+
+from sparcur.blackfynn_api import BFLocal  # FIXME there should be a better way ...
+from blackfynn import Collection, DataPackage, Organization, File
+from blackfynn import Dataset
+from blackfynn.models import BaseNode
+
 from ast import literal_eval
+
 
 class ReflectiveCachePath(CachePath):
     """ Oh, it's me. """
@@ -25,7 +31,7 @@ class RemoteFactory:
         # NOTE this should NOT be tagged as a classmethod
         # it is accessed at cls time already and tagging it
         # will cause it to bind to the original insource parent
-        return super().__new__(cls, *args, **kwargs)
+        return super().__new__(cls)#, *args, **kwargs)
 
     def __new__(cls, local_class, cache_class, **kwargs):
         # TODO use this call to set the remote of local and cache??
@@ -205,6 +211,9 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 
 
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
+    # FIXME helper index should try to cooperate with the packages index?
+    helper_index = {}  # id mapping to get parents from ids
+
     def __new__(cls, anchor_or_bfl, local_class, cache_class):
         if isinstance(anchor_or_bfl, BFLocal):
             blackfynn_local_instance = BFLocal
@@ -215,132 +224,125 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 blackfynn_local_instance = 'Could not connect to blackfynn'
                 log.critical(blackfynn_local_instance)
 
-        return super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
+        self = super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
+        self.root = self.bfl.organization.id
+        return self
 
-    def _bootstrap_local(self, *, fetch_data=False, id=None, parents=False):
-        if hasattr(self, '_bfobject') and self.is_file():
-            if self.meta.size is not None:
-                fetch_data = self.meta.size <  2 * 1024 ** 2
+    def __init__(self, id_bfobject_or_hbfo, cache=None, helper_index=None):
 
-        super().bootstrap_local(fetch_data=fetch_data, id=id, parents=parents)
+        # set _cache to avoid the id equality check since this is in __init__
+        if cache is not None:
+            self._cache = cache
+
+        if isinstance(id_bfobject_or_hbfo, self.__class__):
+            bfobject = id_bfobject_or_hbfo.bfobject
+        elif isinstance(id_bfobject_or_hbfo, BaseNode):
+            bfobject = id_bfobject_or_hbfo
+        else:
+            bfobject = self.bfl.get(id_bfobject_or_hbfo)
+
+        if bfobject is None:
+            raise TypeError('bfobject cannot be None!')
+
+        elif isinstance(bfobject, str):
+            raise TypeError(f'bfobject cannot be str! {bfobject}')
+
+        self.bfobject = bfobject
+
+        if helper_index is not None:
+            self.helper_index.update(helper_index)
+
+        self.errors = []
 
     @property
-    def root(self):
-        # keep this simple
-        # the local paths know where their root is
-        # the remote paths know theirs
-        # making sure they match requires they both know
-        # their own roots first
+    def name(self):
+        name = self.bfobject.name
+        if '/' in name:
+            bads = ','.join(f'{i}' for i, c in enumerate(name) if c == '/')
+            self.errors.append(f'slashes {bads}')
+            log.critical(f'GO AWAY {self}')
+            name = name.replace('/', '_')
+            self.bfobject.name = name  # AND DON'T BOTHER US AGAIN
 
-        # as long as the root has a mapping to a local path
-        # then it is ok and we can rebuild the entire tree
-        # even if the original path is not absolute
+        if ([t for t in (DataPackage, File) if isinstance(self.bfobject, t)] and
+            self.bfobject.type != 'Unknown'):
+            # NOTE we have to use blackfynns extensions until we retrieve the files
+            name += '.' + self.bfobject.type.lower()  # FIXME ... can we match s3key?
 
-        return self.bfl.organization.id
-
-    def _id(self):
-        raise NotImplementedError('The blackfynn remote cannot answer this question.')
+        return name
 
     @property
     def id(self):
-        if hasattr(self, '_bootstrap') and self._bootstrap:
-            return self._id
+        if isinstance(self.bfobject, File):
+            return self.bfobject.pkg_id
         else:
-            return self._id()
+            return self.bfobject.id
 
-    @id.setter
-    def id(self, value):
-        self._bootstrap = True
-        self._id = value
+    @property
+    def size(self):
+        if isinstance(self.bfobject, File):
+            return self.bfobject.size
+
+    @property
+    def created(self):
+        if not isinstance(self.bfobject, Organization):
+            return self.bfobject.created_at
+
+    @property
+    def updated(self):
+        if not isinstance(self.bfobject, Organization):
+            return self.bfobject.updated_at
+
+    @property
+    def file_id(self):
+        if isinstance(self.bfobject, File):
+            return self.bfobject.id
+
+    @property
+    def old_id(self):
+        return None
 
     def is_dir(self):
-        return not self.is_file()
+        return not isinstance(self, File) and not isinstance(self, DataPackage)
 
     def is_file(self):
-        return self.meta.id.startswith('N:package:')
-
-    @property
-    def data(self):
-        # call on folder does nothing?
-        # or what? I guess we could fetch everything
-        # but that is definitely dangerous default behavior ...
-        #if self.is_file():
-            #self.cache.id
-        yield from self.hbfo.data
-
-    @property
-    def bfobject(self):
-        """ conventional name to retrieve whatever the native remote representation is """
-        # caching makes sense here since local and cache paths create a new instance
-        # every time they reference remote again, if they want to keep a local copy
-        # they can for synchronization purposes, but remote really does got and get
-        # things again when you create a new one
-        return self.hbfo.bfobject
-
-    @property
-    def _bfobject(self):
-        """ catch anything trying to set this sence we are changing the api """
-
-    @property
-    def hbfo(self):
-        if not hasattr(self, '_hbfo'):
-            if hasattr(self, '_bootstrap') and self._bootstrap:
-                id = self.id
-            else:
-                id = self.cache.id
-
-            self._hbfo = HomogenousBF(self.bfl.get(id))
-
-        return self._hbfo
+        return isinstance(self, File) or isinstance(self, DataPackage) and not list(self.children)
 
     @property
     def checksum(self):
-        """ inefficient for this """
-        return NotImplementedError('Inefficient to query directly, use meta.checksum')
+        if hasattr(self.bfobject, 'checksum'):
+            return self.bfobject.checksum
+        elif isinstance(self.bfobject, File):
+            log.warning(f'No checksum for {self}')
 
     @property
-    def stat(self):
-        """ inefficient for this """
-        return NotImplementedError('Inefficient to query directly, use meta')
-
-    @property
-    def meta(self):
-        # if id
-        # if parent id recursive
-        hbfo = self.hbfo  # FIXME files vs packages, they have different updated/created
-        return PathMeta(size=hbfo.size,
-                        created=hbfo.created,
-                        updated=hbfo.updated,
-                        checksum=hbfo.checksum,
-                        id=hbfo.id,
-                        file_id=hbfo.file_id,
-                        old_id=None,
-                        gid=None,  # needed to determine local writability
-                        uid=None,
-                        mode=None,
-                        error=None)
+    def owner_id(self):
+        if not isinstance(self.bfobject, Organization):
+            # This seems like an oversight ...
+            return self.bfobject.owner_id
 
     @property
     def parent(self):
-        parent = self.hbfo.parent
-        if parent is None:
-            return
+        if isinstance(self.bfobject, Organization):
+            return None
 
-        # forget it just treat them all as isolated for now
-        #if parent.name not in self._parts:
-            # unlike other os paths, bfobjects are unambiguous
-            # so we simply update the representation of the local
-            # view whenever we get more information
-            # even though these data are used ephemorally
-            # hbfo provides some persistence
-            # if performance matters we can fix it
-            #self._parts = [parent.name] + self._parts
-            #self._str = self._format_parsed_parts(self._drv, self._root,
-                                                  #self._parts) or '.'
+        elif isinstance(self.bfobject, Dataset):
+            parent = self.bfobject._api._context
 
-        parent_path = self.__class__(parent.id)
-        parent_path._hbfo = parent
-        return parent_path
+        else:
+            parent = self.bfobject.parent
+            if parent is None:
+                parent = self.bfobject.dataset
+
+        if False and isinstance(parent, str):
+            if parent in self.helper_index:
+                return self.helper_index[parent]
+            else:
+                breakpoint()
+                raise TypeError('grrrrrrrrrrrrrrr')
+
+        if parent:
+            return self.__class__(parent, self.cache.parent)
 
     @property
     def parents(self):
@@ -351,47 +353,86 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     @property
     def children(self):
-        """ direct children """
-        for child in self.hbfo.children:
-            child_path = self / child.name
-            child_path._hbfo = child
-            yield child_path
+        if isinstance(self.bfobject, File):
+            return
+        elif isinstance(self.bfobject, DataPackage):
+            return  # we conflate data packages and files
+        elif isinstance(self.bfobject, Organization):
+            for dataset in self.bfobject.datasets:
+                child = self.__class__(dataset)
+                child.cache = self.cache / child.name
+                yield child
+        else:
+            for bfobject in self.bfobject:
+                child = self.__class__(bfobject)
+                cache = self.cache / child.name
+                child.cache = cache
+                yield child
 
     @property
     def rchildren(self):
-        # have to express the generator to build the index
-        # otherwise child.parents will not work correctly (annoying)
-        for child in self.hbfo.rchildren:
-            parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
-            for parent in child.parents:
-                if parent == self.hbfo:
-                    break
-                else:
-                    parent_names.append(parent.name)
-                    
-            args = (*reversed(parent_names), child.name)
-            print(self.__class__, self, args)
-            child_path = self.__class__(self, *args)
-            child_path._hbfo = child
-            yield child_path
-
-        return
-        id = self.cache.id
-        if id:
-            if self.cache:
-                # FIXME make sure org ids match?!
-                #if id != self.bfl.organization.id:
-                    
-                for d in self.bfl.datasets:
-                    yield d
-                    yield from bfl.get_packages()
+        if isinstance(self.bfobject, File):
+            return
+        elif isinstance(self.bfobject, DataPackage):
+            return  # should we return files inside packages? are they 1:1?
+        elif any(isinstance(self.bfobject, t) for t in (Organization, Collection)):
+            for child in self.children:
+                yield child
+                yield from child.rchildren
+        elif isinstance(self.bfobject, Dataset):
+            for bfobject in self.bfobject.packages:
+                child = self.__class__(bfobject)
+                cache = self.cache / child.name
+                child.cache = cache
+                yield child
         else:
-            # NOTE cache manages the robustness layer
-            raise exc.NoRemoteMappingError(f'{self} has no known remote id')
-        # if organization
-        # if dataset (usually going to be the fastest in most cases)
-        # if collection (can end up very slow)
-        # if package/file
+            raise exc.UnhandledTypeError  # TODO
+
+    @property
+    def data(self):
+        if isinstance(self.bfobject, DataPackage):
+            files = list(self.bfobject.files)
+            if len(files) > 1:
+                raise BaseException('TODO too many files')
+
+            file = files[0]
+        elif isinstance(self.bfobject, File):
+            file = self.bfobject
+        else:
+            return
+
+        resp = requests.get(file.url, stream=True)
+        log.debug(f'reading from to {file.url}')
+        for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
+            if chunk:
+                yield chunk
+
+    @property
+    def meta(self):
+        if self.errors:
+            errors = tuple(self.errors)
+        else:
+            errors = tuple()
+
+        return PathMeta(size=self.size,
+                        created=self.created,
+                        updated=self.updated,
+                        checksum=self.checksum,
+                        id=self.id,
+                        file_id=self.file_id,
+                        old_id=None,
+                        gid=None,  # needed to determine local writability
+                        user_id=self.owner_id,
+                        mode=None,
+                        errors=errors)
+
+    def __eq__(self, other):
+        return self.bfobject == other.bfobject
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.id})'
+
+
 
 def main():
     from IPython import embed

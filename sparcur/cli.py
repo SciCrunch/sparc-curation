@@ -50,12 +50,12 @@ from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur.blackfynn_api import BFLocal
-from sparcur.backends import BlackfynnRemoteFactory
+from sparcur.core import JT, log
 from sparcur.paths import Path, BlackfynnCache, PathMeta
+from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import FThing, FTLax, CurationReport, Summary
 from sparcur.curation import get_datasets, JEncode, get_all_errors
-from sparcur.core import JT
+from sparcur.blackfynn_api import BFLocal
 from IPython import embed
 
 
@@ -94,7 +94,8 @@ class Dispatch:
         self.summary = Summary(self.project_path)
 
         # get the datasets to tigger instantiation of the remote
-        self.datasets = self.anchor.remote.children
+        list(self.datasets_remote)
+        list(self.datasets)
         self.BlackfynnRemote = BlackfynnCache._remote_class
         self.bfl = self.BlackfynnRemote.bfl
 
@@ -118,6 +119,18 @@ class Dispatch:
         return self.anchor.id
 
     @property
+    def datasets(self):
+        yield from self.anchor.children  # ok to yield from cache now that it is the bridge
+
+    @property
+    def datasets_remote(self):
+        yield from (d.local for d in self.anchor.remote.children)  # FIXME lo the crossover
+
+    @property
+    def datasets_local(self):
+        yield from (d.local for d in self.datasets if d.local.exists())
+
+    @property
     def debug(self):
         return self.args['--debug']
 
@@ -131,6 +144,19 @@ class Dispatch:
         project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         anchor = BlackfynnCache(project_name)
+        if anchor.exists():
+            if list(anchor.local.children):
+                message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
+                sys.exit(2)
+        try:
+            if anchor.anchor is not None:
+                message = f'fatal: already in project located at {anchor.anchor.resolve()!r}'
+                print(message)
+                sys.exit(3)
+        except exc.NotInProjectError:
+            pass  # exactly what we want
+
+        embed()
         anchor.bootstrap(project_id, recursive=True)
 
     def pull(self):
@@ -139,24 +165,10 @@ class Dispatch:
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
-        self.anchor.remote.bootstrap(recursive=True)
-
-        #anchor = Path(config.local_storage_prefix, self.project_name)
-        #anchor.bootstrap(self.project_id, parents=True, recursive=True)
-        #anchor = self.BlackfynnRemote(config.local_storage_prefix, self.project_name)
-        #anchor.bootstrap_local(id=self.project_id, parents=True)
-        # NOTE when syncing the first time remote always has to write first
-        # because the cache doesn't even exist yet so it can't construct its remote on the fly
-
-        #cs = list(self.anchor.remote.children)
-        #real_children = [c for c in cs if c.meta.id not in skip]
-        #c = real_children[1]
-        #embed()
-        #test_packages = list(c.bfobject.packages)
-        #for dataset in real_children:
-            #dataset.bootstrap()
-            #for child in dataset.rchildren:
-                #child.bootstrap()
+        only = (
+            'N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b',  # howard for / in filename
+                )
+        self.anchor.remote.bootstrap(recursive=True, only=only, skip=skip)
 
     def annos(self):
         args = self.args
@@ -221,9 +233,12 @@ class Dispatch:
 
     def shell(self):
         """ drop into an shell with classes loaded """
-        ds, dsd = get_datasets(self.project_path)  # FIXME deprecate
+        datasets = list(self.datasets)
+        dsd = {d.meta.id:d for d in datasets}
+        ds = datasets
         summary = self.summary
         org = FThing(self.project_path)
+        datasets_local = list(self.datasets_local)
         if self.args['demos']:
             # get the first dataset
             dataset = next(iter(summary))
@@ -245,8 +260,10 @@ class Dispatch:
             n_packages = [len(ps) for ps in packages]
 
             # bootstrap a new local mirror
-            anchor = self.BlackfynnRemote('/tmp/demo-local-storage', self.project_name)
-            anchor.bootstrap_local(id=self.project_id, parents=True)
+            # FIXME at the moment we can only have of these at a time
+            # sigh more factories incoming
+            #anchor = BlackfynnCache('/tmp/demo-local-storage')
+            #anchor.bootstrap()
 
         elif False:
             ### this is the equivalent of export, quite slow to run

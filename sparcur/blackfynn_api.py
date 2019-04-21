@@ -47,15 +47,15 @@ from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset
 from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
-from pyontutils.utils import Async, deferred, async_getter, chunk_list, makeSimpleLogger
+from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
+from sparcur.core import log
 from sparcur.paths import Path
-from sparcur.metastore import MetaStore
 from sparcur.config import local_storage_prefix
+from sparcur.metastore import MetaStore
 from scipy.io import loadmat
 from IPython import embed
 
-log = makeSimpleLogger('bfapi')
 
 @property
 def patch_session(self):
@@ -131,10 +131,7 @@ class FakeBFile(File):
     def __init__(self, package, **kwargs):
         self.package = package
         self.__kwargs = kwargs
-        log.debug(kwargs)
         def move(*tuples):
-            print(sorted(kwargs))
-            print(sorted(a for a, b in tuples))
             for f, t in tuples:
                 kwargs[t] = kwargs.pop(f)
 
@@ -145,13 +142,17 @@ class FakeBFile(File):
         )
 
         if 'size' not in kwargs:
-            kwargs['size'] = -1
+            kwargs['size'] = None  # if we have None on a package we know it is not zero
             
         for k, v in kwargs.items():
             if k == 'size' and v is None:
-                v = -1  # FIXME hack
+                v = None  # FIXME hack
 
             setattr(self, k, v)
+
+    @property
+    def owner_id(self):
+        return self.package.owner_id
 
     @property
     def dataset(self):
@@ -268,7 +269,9 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         else:
                             for i, source in enumerate(bfobject._json['objects']['source']):
                                 # TODO package id?
-                                log.debug(str(sorted(source)))
+                                if len(source) > 1:
+                                    log.info(f'more than one key in source {sorted(source)}')
+
                                 yield FakeBFile(bfobject, **source['content'])
                                 if i == 1:  # only log once
                                     log.critical(f'MORE THAN ONE FILE IN PACKAGE {bfobject.id}')
@@ -330,7 +333,7 @@ def process_package(package, path, doasync=True):
     else:
         for file in package.files:
             file_name = make_filename(file)
-            print(file_name)
+            log.debug(file_name)
             file_path = path / file_name
             yield file, file_path
 
@@ -357,7 +360,7 @@ def asynchelper(chunk):
     import asyncio
     asyncio.set_event_loop(asyncio.new_event_loop())
     wat = async_getter(heh, [(c,) for c in chunk]) 
-    print('chunkdone')
+    log.debug('chunkdone')
     return [e for t in wat for e in t]
 
 def get_packages(package_or_collection, path):
@@ -368,7 +371,7 @@ def get_packages(package_or_collection, path):
         for npc in package_or_collection:
             yield from get_packages(npc, npath)
     else:
-        print(path, package_or_collection)
+        log.debug(f'{path} {package_or_collection}')
         yield package_or_collection, path
 
 
@@ -604,166 +607,6 @@ def get_file_by_id(get, file_path, pid, fid):
         return None, None
 
 
-class HomogenousBF:
-    helper_index = {}  # id mapping to get parents from ids
-
-    def __init__(self, bfobject, helper_index=None):
-
-        if isinstance(bfobject, HomogenousBF):
-            bfobject = bfobject.o
-
-        elif bfobject is None:
-            raise TypeError('bfobject cannot be None!')
-
-        elif isinstance(bfobject, str):
-            raise TypeError(f'bfobject cannot be str! {bfobject}')
-
-        self.bfobject = bfobject
-
-        if helper_index is not None:
-            self.helper_index.update(helper_index)
-
-    @property
-    def name(self):
-        name = self.bfobject.name
-        if isinstance(self.bfobject, DataPackage) and self.bfobject.type != 'Unknown':
-            # NOTE we have to use blackfynns extensions until we retrieve the files
-            name += '.' + self.bfobject.type.lower()  # FIXME ... can we match s3key?
-
-        return name
-
-    @property
-    def id(self):
-        if isinstance(self.bfobject, File):
-            return self.bfobject.pkg_id
-        else:
-            return self.bfobject.id
-
-    @property
-    def size(self):
-        if isinstance(self.bfobject, File):
-            return self.bfobject.size
-
-    @property
-    def created(self):
-        if not isinstance(self.bfobject, Organization):
-            return self.bfobject.created_at
-
-    @property
-    def updated(self):
-        if not isinstance(self.bfobject, Organization):
-            return self.bfobject.updated_at
-
-    @property
-    def file_id(self):
-        if isinstance(self.bfobject, File):
-            return self.bfobject.id
-
-    @property
-    def old_id(self):
-        return None
-
-    @property
-    def checksum(self):
-        return None
-
-    @property
-    def parent(self):
-        if isinstance(self.bfobject, Organization):
-            return None
-
-        elif isinstance(self.bfobject, Dataset):
-            parent = self.bfobject._api._context
-
-        else:
-            parent = self.bfobject.parent
-            if parent is None:
-                parent = self.bfobject.dataset
-
-        #if isinstance(self.bfobject, Collection) or isinstance(self.bfobject, DataPackage):
-        #elif isinstance(self.bfobject, File):
-        #else:
-            #parent = self.bfobject.parent
-
-        if False and isinstance(parent, str):
-            if parent in self.helper_index:
-                return self.helper_index[parent]
-            else:
-                breakpoint()
-                raise TypeError('grrrrrrrrrrrrrrr')
-
-        if parent:
-            return self.__class__(parent)  # FIXME self.bfobject.parent is the id??
-
-    @property
-    def parents(self):
-        parent = self.parent
-        while parent:
-            yield parent
-            parent = parent.parent
-
-    @property
-    def children(self):
-        if isinstance(self.bfobject, File):
-            return
-        elif isinstance(self.bfobject, DataPackage):
-            return  # we conflate data packages and files
-        elif isinstance(self.bfobject, Organization):
-            for dataset in self.bfobject.datasets:
-                yield self.__class__(dataset)
-        else:
-            for bfobject in self.bfobject:
-                yield self.__class__(bfobject)
-
-    @property
-    def rchildren(self):
-        if isinstance(self.bfobject, File):
-            return
-        elif isinstance(self.bfobject, DataPackage):
-            return  # should we return files inside packages? are they 1:1?
-        elif any(isinstance(self.bfobject, t) for t in (Organization, Collection)):
-            for child in self.children:
-                yield child
-                yield from child.rchildren
-        elif isinstance(self.bfobject, Dataset):
-            # have to build the index first so parent ids can be converted to objects
-            # FIXME I am doing this in 3? places now >_<
-            #index = {p.id:p for p in self.bfobject.packages}
-            #index[self.id] = self.bfobject
-            for bfobject in self.bfobject.packages:
-                yield self.__class__(bfobject)
-            #for bfobject in index.values():
-                #if bfobject.parent is not None:
-                    #bfobject.parent = index[bfobject.parent]
-                #yield self.__class__(bfobject)
-        else:
-            raise exc.UnhandledTypeError  # TODO
-
-    @property
-    def data(self):
-        if isinstance(self.bfobject, DataPackage):
-            files = list(self.bfobject.files)
-            if len(files) > 1:
-                raise BaseException('TODO too many files')
-
-            file = files[0]
-        elif isinstance(self.bfobject, File):
-            file = self.bfobject
-        else:
-            return
-
-        resp = requests.get(file.url, stream=True)
-        for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
-            if chunk:
-                yield chunk
-
-    def __eq__(self, other):
-        return self.bfobject == other.bfobject
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}({self.id})'
-
-
 class PackageMeta:
 
     class PackageMetaError(Exception):
@@ -838,7 +681,7 @@ class BFLocal:
                      if '.git' not in path.as_posix()}
         bad = [path for path, attrs in all_attrs.items() if not attrs]
         if bad:
-            print('WARNING:', bad, 'is missing meta, run find_missing_meta')
+            log.warning(f'{bad} is missing meta, run find_missing_meta')
             all_attrs = {p:a for p, a in all_attrs.items() if a}
 
         self.metastore.bulk(all_attrs)
@@ -849,10 +692,10 @@ class BFLocal:
                 continue
             attrs = norm_xattrs(path.xattrs())
             if not attrs:
-                print('Found path with missing metadata', path)
+                log.warning(f'Found path with missing metadata {path}')
                 attrs = self.metastore.xattrs(path)
                 if not attrs:
-                    print('No local metadata was found for', path)
+                    log.error('No local metadata was found for {path}')
                     attrs = self.recover_meta(path)
 
                 path.setxattrs(attrs)
@@ -873,12 +716,12 @@ class BFLocal:
 
         return thing
 
-    def get_homogenous(self, id):
-        return HomogenousBF(self.get(id))
+    #def get_homogenous(self, id):
+        #return HomogenousBF(self.get(id))
 
-    def datasets(self):
-        for d in self.bf.datasets():
-            yield HomogenousBF(d)
+    #def datasets(self):
+        #for d in self.bf.datasets():
+            #yield HomogenousBF(d)
 
     def recover_meta(self, path):
         pattrs = norm_xattrs(path.parent.xattrs())
@@ -927,7 +770,7 @@ class BFLocal:
 
             return file_path, pid, fid
         else:
-            print('WARNING what is going on with', path, attrs)
+            log.warning(f'what is going on with {path} {attrs}')
 
     def fetch_path(self, path, overwrite=False):
         """ Fetch individual big files.
