@@ -128,23 +128,52 @@ class FakeBFile(File):
 
     id = ''  # unforunately these don't seem to have made it through
 
-    def __init__(self, **kwargs):
-        self._kwargs = kwargs
+    def __init__(self, package, **kwargs):
+        self.package = package
+        self.__kwargs = kwargs
+        log.debug(kwargs)
+        def move(*tuples):
+            print(sorted(kwargs))
+            print(sorted(a for a, b in tuples))
+            for f, t in tuples:
+                kwargs[t] = kwargs.pop(f)
+
+        move(('createdAt', 'created_at'),
+             ('updatedAt', 'updated_at'),
+             ('fileType', 'type'),
+             ('packageId', 'pkg_id'),
+        )
+
+        if 'size' not in kwargs:
+            kwargs['size'] = -1
+            
         for k, v in kwargs.items():
             if k == 'size' and v is None:
                 v = -1  # FIXME hack
 
             setattr(self, k, v)
 
+    @property
+    def dataset(self):
+        return self.package.dataset
+
+    @property
+    def parent(self):
+        # cut out the middle man (hopefully)
+        return self.package.parent
+
     def __repr__(self):
-        return self.__class__.__name__ + f'<{self._kwargs}>'
+        return ('<' +
+                self.__class__.__name__ +
+                ' '.join(f'{k}={v}' for k, v in self.__kwargs.items()) +
+                '>')
 
 
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
     """ python implementation to make use of /dataset/{id}/packages """
     remapids = {}
-    index = {}
+    index = {self.id:self}  # make sure that dataset is in the index
     def restructure(j):
         """ restructure package json to match what api needs? """
         # FIXME something's still wonky here
@@ -182,46 +211,68 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
             j = resp.json()
             packages = j['packages']
             if out_of_order:
-                #print('fixing?', out_of_order)
                 packages += out_of_order
                 # if a parent is on the other side of a
                 # pagination boundary put the children
                 # at the end and move on
             out_of_order = [None]
             while out_of_order:
+                log.debug(f'{out_of_order}')
                 if out_of_order[0] is None:
                     out_of_order.remove(None)
+                elif packages == out_of_order:
+                    embed()
+                    raise RuntimeError('We are going nowhere!')
                 else:
-                    #print('fixing?', out_of_order)
                     packages = out_of_order
                     out_of_order = []
                 for count, package in enumerate(packages):
-                    id = package['content']['nodeId']
-                    bftype = id_to_type(id)
-                    try:
-                        rdp = restructure(deepcopy(package))
+                    if isinstance(package, dict):
+                        id = package['content']['nodeId']
+                        bftype = id_to_type(id)
+                        try:
+                            rdp = restructure(deepcopy(package))
+                        except KeyError as e:
+                            out_of_order.append(package)
+                            continue
+                        
                         bfobject = bftype.from_dict(rdp, api=self._api)
                         bfobject._json = package
-                        yield bfobject
+                        bfobject.dataset = index[bfobject.dataset]
+                    else:
+                        bfobject = package
+
+                    if isinstance(bfobject.parent, str) and bfobject.parent in index:
+                        parent = index[bfobject.parent]
+                        if parent._items is None:
+                            parent._items = []
+                        parent.items.append(bfobject)
+                        bfobject.parent = parent
+                        # only put objects in the index when they have a parent
+                        # that is a bfobject, this ensures that you can always
+                        # recurse to base once you get an object from this function
                         index[bfobject.id] = bfobject
-                        if bfobject.parent in index:
-                            p = index[bfobject.parent]
-                            if p._items is None:
-                                p._items = []
-                            p.items.append(bfobject)
-                        if isinstance(bfobject, DataPackage):
-                            for i, source in enumerate(package['objects']['source']):
-                                yield FakeBFile(**source)
+                        yield bfobject  # only yield if we can get a parent
+                    elif bfobject.parent is None:
+                        # both collections and packages can be at the top level
+                        # dataset was set to its bfobject repr above so safe to yield
+                        index[bfobject.id] = bfobject
+                        yield bfobject
+                    else:
+                        out_of_order.append(bfobject)
+                        continue
+
+                    if isinstance(bfobject, DataPackage):
+                        if 'objects' not in bfobject._json:
+                            log.error(f'{bfobject} has no files!??!')
+                        else:
+                            for i, source in enumerate(bfobject._json['objects']['source']):
+                                # TODO package id?
+                                log.debug(str(sorted(source)))
+                                yield FakeBFile(bfobject, **source['content'])
                                 if i == 1:  # only log once
                                     log.critical(f'MORE THAN ONE FILE IN PACKAGE {bfobject.id}')
 
-                    except KeyError as e:
-                        # api returned a child before the parent
-                        # we'll get it on the next pass
-                        out_of_order.append(package)
-                        #print('WE HAVE AND OUT OF ORDER')
-
-            #print(count, j.keys())
             if 'cursor' in j:
                 cursor = j['cursor']
                 cursor_args = f'&cursor={cursor}'
@@ -621,16 +672,26 @@ class HomogenousBF:
         if isinstance(self.bfobject, Organization):
             return None
 
-        if isinstance(self.bfobject, Collection):
+        elif isinstance(self.bfobject, Dataset):
+            parent = self.bfobject._api._context
+
+        else:
             parent = self.bfobject.parent
             if parent is None:
                 parent = self.bfobject.dataset
 
-        elif isinstance(self.bfobject, Dataset):
-            parent = 'AAAAAAAAAAAAAAAAAAAA'
+        #if isinstance(self.bfobject, Collection) or isinstance(self.bfobject, DataPackage):
+        #elif isinstance(self.bfobject, File):
+        #else:
+            #parent = self.bfobject.parent
 
-        if parent in self.helper_index:
-            return self.helper_index[parent]
+        if False and isinstance(parent, str):
+            if parent in self.helper_index:
+                return self.helper_index[parent]
+            else:
+                breakpoint()
+                raise TypeError('grrrrrrrrrrrrrrr')
+
         if parent:
             return self.__class__(parent)  # FIXME self.bfobject.parent is the id??
 
@@ -666,14 +727,17 @@ class HomogenousBF:
                 yield from child.rchildren
         elif isinstance(self.bfobject, Dataset):
             # have to build the index first so parent ids can be converted to objects
-            index = {p.id:p for p in self.bfobject.packages}
-            for bfobject in index.values():
-                if bfobject.parent is not None:
-                    bfobject.parent = index[bfobject.parent]
-
+            # FIXME I am doing this in 3? places now >_<
+            #index = {p.id:p for p in self.bfobject.packages}
+            #index[self.id] = self.bfobject
+            for bfobject in self.bfobject.packages:
                 yield self.__class__(bfobject)
+            #for bfobject in index.values():
+                #if bfobject.parent is not None:
+                    #bfobject.parent = index[bfobject.parent]
+                #yield self.__class__(bfobject)
         else:
-            raise UnhandledTypeError  # TODO
+            raise exc.UnhandledTypeError  # TODO
 
     @property
     def data(self):
@@ -692,6 +756,9 @@ class HomogenousBF:
         for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
             if chunk:
                 yield chunk
+
+    def __eq__(self, other):
+        return self.bfobject == other.bfobject
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.id})'

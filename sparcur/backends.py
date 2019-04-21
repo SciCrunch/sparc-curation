@@ -359,12 +359,20 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     @property
     def rchildren(self):
+        # have to express the generator to build the index
+        # otherwise child.parents will not work correctly (annoying)
         for child in self.hbfo.rchildren:
-            # FIXME need to stop a p.name == self.name
-            args = (*[p.name for p in child.parents], child.name)
+            parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
+            for parent in child.parents:
+                if parent == self.hbfo:
+                    break
+                else:
+                    parent_names.append(parent.name)
+                    
+            args = (*reversed(parent_names), child.name)
             print(self.__class__, self, args)
             child_path = self.__class__(self, *args)
-            child_path._bfobject = child.bfobject
+            child_path._hbfo = child
             yield child_path
 
         return

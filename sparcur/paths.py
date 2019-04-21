@@ -253,7 +253,7 @@ class RemotePath(PurePosixPath):
         cache_class.setup(local_class, cls)
 
     def bootstrap(self, recursive=False):
-        self.cache.bootstrap(self.meta.id, recursive=True)
+        self.cache.bootstrap(self.meta.id, recursive=recursive)
 
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls, *args, **kwargs)
@@ -409,7 +409,7 @@ class CachePath(PosixPath):
             #raise TypeError(f'No cache so id is a required argument')
 
         if not self.meta:
-            self.meta = PathMeta(id=id)
+            meta = PathMeta(id=id)
 
         elif self.id != id:
             # TODO overwrite
@@ -418,6 +418,7 @@ class CachePath(PosixPath):
         if not self.exists():
             if self.is_dir():
                 self.mkdir(parents=parents)
+                self.meta = meta  # the bootstrap
                 self.meta = self.remote.meta
 
             elif self.is_file():
@@ -426,6 +427,7 @@ class CachePath(PosixPath):
 
                 if fetch_data:
                     self.touch()  # do this so we can write our meta before data
+                    self.meta = meta  # the bootstrap
                     self.meta = self.remote.meta
                     self.local.data = self.remote.data
 
@@ -523,9 +525,10 @@ class XattrCache(CachePath, XattrPath):
 
     @property
     def meta(self):
+        # FIXME symlink cache!??!
         if self.is_symlink() and not self.exists():  # if a symlink exists it is something else
             return PathMeta.from_path(self)
-        else:
+        elif self.exists():
             xattrs = self.xattrs()
             pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
             return pathmeta

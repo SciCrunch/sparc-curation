@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.7
 """ SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
     spc clone <project-id>
@@ -92,6 +92,11 @@ class Dispatch:
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
+
+        # get the datasets to tigger instantiation of the remote
+        self.datasets = self.anchor.remote.children
+        self.BlackfynnRemote = BlackfynnCache._remote_class
+        self.bfl = self.BlackfynnRemote.bfl
 
     def __call__(self):
         # FIXME this might fail to run annos -> shell correctly
