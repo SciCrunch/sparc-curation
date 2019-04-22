@@ -7,6 +7,19 @@ from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
 
 log = makeSimpleLogger('sparcur')
+class _log:
+    """ logging prevents ince ipython recurions error printing
+        so rename this class to log when you need fake logging """
+    @staticmethod
+    def debug(nothing): pass
+    @staticmethod
+    def info(nothing): pass
+    @staticmethod
+    def warning(nothing): print(nothing)
+    @staticmethod
+    def error(nothing): pass
+    @staticmethod
+    def critical(nothing): pass
 
 
 class JEncode(json.JSONEncoder):

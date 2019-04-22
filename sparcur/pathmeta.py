@@ -215,7 +215,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
                 return getattr(object, attr)
 
 
-        gen = (self.encode(field, multigetattr(pathmeta, field))
+        gen = (self.encode(field, multigetattr(pathmeta, field, None))
                for field in self.order_all)
 
         return PurePosixPath(pathmeta.id + '/.meta.' + self.fieldsep.join(gen))

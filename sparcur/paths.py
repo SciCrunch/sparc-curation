@@ -268,13 +268,18 @@ class CachePath(AugmentedPath):
                 if path.local is not None:  # this might be the very fist time local is called
                     log.debug('setting local')
                     self._local = path.local
+
                 if hasattr(path, '_remote'):
                     # have to check for private to avoid infinite recursion
                     # when searching for meta (which is what we are doing right now if we get here)
                     # FIXME pretty sure the way we have it now there _always_ has to be a remote
                     # which is not what we want >_<
                     log.debug('setting remote')
-                    #breakpoint()
+                    if 'meta' in kwargs:
+                        self.meta = kwargs.pop('meta')
+                    else:
+                        raise TypeError('you have managed to have a remote but pass no meta ?!')
+
                     self._remote = path.remote
 
             elif isinstance(path, LocalPath):
@@ -581,9 +586,8 @@ class CachePath(AugmentedPath):
         else:
             # make sure no monkey business is going on at least in the local graph
             if self.parent and self.local.parent.cache.meta.id == self.parent.id:
-                # wow is that a vastly easier bootstrap ...
-                self.meta = remote.meta
                 self._remote = remote
+                self.meta = remote.meta
                 remote._cache = self
 
     @property
@@ -782,6 +786,11 @@ class BlackfynnCache(XattrCache):
         if not pathmeta:
             log.warning(f'Trying to setting empty pathmeta on {self}')
             return
+
+        if not hasattr(self, '_remote') or self._remote is None:
+            # if we don't have a remote do not write to disk
+            # because we don't know if it is a file or a folder
+            super()._meta_setter(pathmeta, memory_only=memory_only)
 
         if not self.exists():
             if memory_only:
