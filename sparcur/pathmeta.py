@@ -55,6 +55,13 @@ class PathMeta:
                  mode=None,
                  errors=None,
                  **kwargs):
+
+        if created is not None and not isinstance(created, int) and not isinstance(created, datetime):
+            created = parser.parse(created)
+
+        if updated is not None and not isinstance(updated, int) and not isinstance(updated, datetime):
+            updated = parser.parse(updated)
+
         self.size = size if size is None else FileSize(size)
         self.created = created
         self.updated = updated
@@ -292,16 +299,15 @@ class _PathMetaAsXattrs(_PathMetaConverter):
         else:
             decode = self.decode
 
-
         if prefix:
             prefix += '.'
             kwargs = {k:decode(k, v)
-                      for kraw, v in xattrs.items()
-                      for k in (self.deprefix(kraw.decode(self.encoding), prefix),)}
+                    for kraw, v in xattrs.items()
+                    for k in (self.deprefix(kraw.decode(self.encoding), prefix),)}
         else:  # ah manual optimization
             kwargs = {k:decode(k, v)
-                      for kraw, v in xattrs.items()
-                      for k in (kraw.decode(self.encoding),)}
+                    for kraw, v in xattrs.items()
+                    for k in (kraw.decode(self.encoding),)}
 
         return self.pathmetaclass(**kwargs)
 
@@ -332,8 +338,8 @@ class _PathMetaAsXattrs(_PathMetaConverter):
             value = ';'.join(value)
 
         if isinstance(value, datetime):  # FIXME :/ vs iso8601
-            #value = value.isoformat().isoformat().replace('.', ',')
-            value = value.timestamp()  # I hate dealing with time :/
+            value = value.isoformat().replace('.', ',')
+            #value = value.timestamp()  # I hate dealing with time :/
 
         if isinstance(value, int):
             # this is local and will pass through here before move?

@@ -3,6 +3,7 @@
 Usage:
     spc clone <project-id>
     spc pull
+    spc refresh
     spc annos [export shell]
     spc stats [<directory>...]
     spc report [completeness filetypes keywords subjects] [options]
@@ -170,6 +171,13 @@ class Dispatch:
         meta = PathMeta(id=project_id)
         anchor.bootstrap(meta, recursive=True)
 
+    def refresh(self):
+        for d in self.datasets_local:
+            for child in d.children:
+                if not child.is_dir():
+                    child.remote.refresh(update_cache=True)
+                    #child.cache.meta = child.remote.meta
+
     def pull(self):
         # TODO folder meta -> org
         skip = (
@@ -179,7 +187,7 @@ class Dispatch:
         only = (
             'N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b',  # howard for / in filename
                 )
-        only = tuple()
+        #only = tuple()
         self.anchor.remote.bootstrap(recursive=True, only=only, skip=skip)
 
     def annos(self):
@@ -286,6 +294,8 @@ class Dispatch:
             error_id_messages = [(d['id'], e['message']) for d in dowe['datasets'] for e in d['errors']]
             error_messages = [e['message'] for d in dowe['datasets'] for e in d['errors']]
 
+        rchilds = list(datasets[0].rchildren)
+        package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
         embed()
 
     def tables(self):

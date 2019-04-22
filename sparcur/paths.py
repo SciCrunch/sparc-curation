@@ -112,6 +112,7 @@ class RemotePath:
 
         if cache.id is not None and cache.id != self.id:
             # yay! we are finally to the point of needing to filter files vs packages :D !?!? maybe?
+            #breakpoint()
             raise exc.MetadataIdMismatchError('Cache id does not match remote id!\n'
                                               f'{cache.id} !=\n{self.id}'
                                               f'\n{cache}\n{self.name}')
@@ -206,7 +207,7 @@ class AugmentedPath(PosixPath):
         try:
             return super().is_dir()
         except OSError as e:
-            if os.errno == 40:
+            if e.errno == 40:
                 return False
             else:
                 raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
@@ -231,7 +232,7 @@ class AugmentedPath(PosixPath):
     def readlink(self):
         """ this returns the string of the link only due to cycle issues """
         link = os.readlink(self)
-        log.debug(link)
+        #log.debug(link)
         return PurePosixPath(link)
 
     def access(self, mode='read', follow_symlinks=True):
@@ -279,24 +280,29 @@ class CachePath(AugmentedPath):
             path = args[0]
             if isinstance(path, CachePath):
                 self._cache_parent = path
+                if hasattr(self._cache_parent, '_in_bootstrap'):
+                    # it is ok to do this and not clean up because
+                    # child caches are ephemoral
+                    self._in_bootstrap = self._cache_parent._in_bootstrap
+
                 if path.local is not None:  # this might be the very fist time local is called
-                    log.debug('setting local')
+                    #log.debug('setting local')
                     self._local = path.local
 
-                if hasattr(path, '_remote'):
+                #if hasattr(path, '_remote'):
                     # have to check for private to avoid infinite recursion
                     # when searching for meta (which is what we are doing right now if we get here)
                     # FIXME pretty sure the way we have it now there _always_ has to be a remote
                     # which is not what we want >_<
-                    log.debug('setting remote')
-                    if meta is not None:
-                        self.meta = meta
+                    #log.debug('setting remote')
+                    #if meta is not None:
+                        #self.meta = meta
                     #else:
                         #breakpoint()
                         #raise TypeError('you have managed to have a remote but pass no meta ?!')
 
                     #if not hasattr(path, '_in_bootstrap'):  # FIXME this seems wrong?
-                    self._remote = path.remote
+                    #self._remote = path.remote  # no, use cache parent
 
             elif isinstance(path, LocalPath):
                 self._local = path
@@ -311,16 +317,38 @@ class CachePath(AugmentedPath):
         return self
 
     def __init__(self, *args, **kwargs):
+        # FIXME not really the init for CachePath ... more BlackfynnCache
         if self.id is None:
             if 'meta' not in kwargs or kwargs['meta'] is None:
                 msg = f'No cached meta exists and no meta provided for {self}'
                 raise exc.NoCachedMetadataError(msg)
-            elif hasattr(self, '_remote'):
+
+            if self.exists() and (self.meta and self.meta.id == meta.id
+                                  or not self.meta):
+                # file or folder that exists
                 self.meta = kwargs.pop('meta')
+            elif not self.exists() and self.is_symlink():
+                # symlink that exists so overwrite
+                self.meta = kwargs.pop('meta')
+            elif not self.is_helper_cache:
+                # there is nothing we should bootstrap
+                self.bootstrap(kwargs.pop('meta'))
             else:
-                raise exc.NoRemoteMappingError(f'gonna need a remote here ... {self.local}')
+                log.critical('how did we get here!?')
+
+            if not self.is_helper_cache:
+                if self.id.startswith('N:organization:'):  # FIXME
+                    self._organization = self
+
+            #elif hasattr(self, '_remote'):
+            #else:
+                #raise exc.NoRemoteMappingError(f'gonna need a remote here ... {self.local}')
 
         super().__init__()
+
+    @property
+    def is_helper_cache(self):
+        return hasattr(self, '_cache_parent')
 
     def __truediv__(self, key):
         # basically RemotePaths are like relative CachePaths ... HRM
@@ -347,20 +375,21 @@ class CachePath(AugmentedPath):
         out.meta = key.meta
         return out
 
-    def _make_child(self, args, key):
+    def _make_child(self, args, remote):
         drv, root, parts = self._parse_args(args)
         drv, root, parts = self._flavour.join_parsed_parts(
             self._drv, self._root, self._parts, drv, root, parts)
         child = self._from_parsed_parts(drv, root, parts, init=False)
         child._init()
-        if isinstance(key, RemotePath):
-            log.debug('remoooote')
-            child._remote = key  # have to use _remote since this is construction
-            child._meta = key.meta
+        if isinstance(remote, RemotePath):
+            #log.debug('remoooote')
+            child._remote = remote  # have to use _remote since this is construction
+            child.bootstrap(remote.meta)  # FIXME indicates that maybe we want bootstrap to be meta setter?
+            child.meta = remote.meta
             child.remote
             #child.meta = child.meta
-            if not hasattr(key, '_cache') or key._cache is None:
-                key.cache = child
+            if not hasattr(remote, '_cache') or remote._cache is None:
+                remote.cache = child
             else:
                 log.warning('Trying to set cache when it already exists!')
         else:
@@ -412,12 +441,12 @@ class CachePath(AugmentedPath):
             if meta.id.startswith('N:organization:'):  # FIXME :/
                 # since we only go one organization at a time right now
                 # we never want to skip the top level id
-                log.info(f'Bootstrapping {id} -> {self.local!r}')
+                log.info(f'Bootstrapping {meta.id} -> {self.local!r}')
             elif meta.id in skip:
-                log.info(f'Skipped       {id} since it is in skip')
+                log.info(f'Skipped       {meta.id} since it is in skip')
                 return
             elif only and meta.id not in only:
-                log.info(f'Skipped       {id} since it is not in only')
+                log.info(f'Skipped       {meta.id} since it is not in only')
                 return
             else:
                 # if you pass the only mask so do your children
@@ -464,15 +493,20 @@ class CachePath(AugmentedPath):
             if self.meta.id is None:
                 log.warning(f'Existing meta for {self!r} no id so overwriting\n{self.meta}')
 
+            if self.remote is None:
+                breakpoint()
+                raise AssertionError
+
         elif self.id != meta.id:
             # TODO overwrite
             raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
-                                              f'{self.meta.id} != {id}\n{self.meta}')
+                                              f'{self.meta.id} != {meta.id}\n{self.meta}')
         elif self.exists():
             raise BaseException('should have caught this before we get here')
+        elif self.is_symlink():
+            pass
         else:
-            pass # already exists!??
-            #raise BaseException('should not get here')
+            raise BaseException('should not get here')
 
 
     def _bootstrap_prepare_filesystem(self, parents, fetch_data, size_limit_mb):
@@ -579,8 +613,11 @@ class CachePath(AugmentedPath):
 
     @property
     def remote(self):
-        if hasattr(self, '_parent_cache'):
-            return self._parent_cache.remote
+        if hasattr(self, '_remote'):
+            return self._remote
+
+        if hasattr(self, '_cache_parent'):
+            return self._cache_parent.remote
 
         if not self.id:
             return
@@ -684,7 +721,7 @@ class CachePath(AugmentedPath):
         local = repr(self.local) if self.local else 'No local??' + str(self)
         remote = (f'{self.remote.__class__.__name__}({self.remote.meta.id!r})'
                   if self.remote else str(self.id))
-        return local + ' -> ' + remote
+        return self.__class__.__name__ + ' <' + local + ' -> ' + remote + '>'
 
 
 class XattrPath(AugmentedPath):
@@ -761,14 +798,19 @@ class SqliteCache(CachePath):
         if hasattr(self, '_meta'):
             return self._meta
 
-        log.error('SqliteCache getter not implemented yet.')
+        #log.error('SqliteCache getter not implemented yet.')
 
     @meta.setter
     def meta(self, value):
-        log.error('SqliteCache setter not implemented yet. Should probably be done in bulk anyway ...')
+        """ set meta """
+        #log.error('SqliteCache setter not implemented yet. Should probably be done in bulk anyway ...')
 
 
 class SymlinkCache(CachePath):
+
+    def __init__(self, *args, **kwargs):
+        if 'meta' in kwargs:
+            self.meta = kwargs.pop('meta')
 
     @property
     def meta(self):
@@ -814,15 +856,16 @@ class BlackfynnCache(XattrCache):
 
     @property
     def meta(self):
-        if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
-            return self._meta
+        if hasattr(self, '_in_bootstrap'):
+            if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
+                return self._meta
 
         if self.exists():
             meta = super().meta
             if meta:
                 return meta
 
-        elif self._not_exists_cache and self.is_symlink():
+        elif not self.exists() and self._not_exists_cache and self.is_symlink():
             try:
                 cache = self._not_exists_cache(self)
                 return cache.meta
@@ -853,9 +896,9 @@ class BlackfynnCache(XattrCache):
             # if we don't have a remote do not write to disk
             # because we don't know if it is a file or a folder
             super()._meta_setter(pathmeta, memory_only=memory_only)
-        elif not hasattr(self, '_in_bootstrap'):
+        #elif not hasattr(self, '_in_bootstrap'):
             # mini bootstrap whether you wanted it or not
-            self.bootstrap(pathmeta)
+            #self.bootstrap(pathmeta)
 
         if not self.exists():
             if memory_only:
@@ -868,9 +911,15 @@ class BlackfynnCache(XattrCache):
         if self._backup_cache:
             cache = self._backup_cache(self, meta=pathmeta)
 
+        if hasattr(self, '_meta'):  # FIXME who is setting this how and why!?
+            delattr(self, '_meta')
+
     @classmethod
     def decode_value(cls, field, value):
         if field in ('created', 'updated'):
+            # if you get unicode decode error here it is because
+            # struct packing of timestamp vs isoformat are fighting
+            # in xattrs pathmeta helper
             return parser.parse(value.decode())  # FIXME with timezone vs without ...
 
     @property
@@ -964,12 +1013,12 @@ class BlackfynnCache(XattrCache):
                     parent_names.append(parent_remote.name)
 
             args = (*reversed(parent_names), child_remote.name)
-            cache_child = self._make_child(args, child_remote)
+            child_cache = self._make_child(args, child_remote)
             #child_cache = self
             #child_path = self.__class__(self, *args)
             #child_path.remote = child
 
-            yield child_path
+            yield child_cache
 
         # if organization
         # if dataset (usually going to be the fastest in most cases)
@@ -977,7 +1026,7 @@ class BlackfynnCache(XattrCache):
         # if package/file
 
 
-class LocalPath(PosixPath):
+class LocalPath(AugmentedPath):
     # local data about remote objects
 
     _cache_class = None  # must be defined by child classes

@@ -260,7 +260,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 return
 
         else:
-            raise ValueError(f'why are you doing this {id_bfo_or_bfr}')
+            #raise ValueError(f'why are you doing this {id_bfo_or_bfr}')  # because refresh
             bfobject = self.bfl.get(id_bfo_or_bfr)
 
         if bfobject is None:
@@ -429,17 +429,37 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         else:
             raise exc.UnhandledTypeError  # TODO
 
-    def isinstance_bf(*types):
+    def isinstance_bf(self, *types):
         return [t for t in types if isinstance(self.bfobject, t)]
 
     def refresh(self, update_cache=False):
         old_meta = self.meta
         super().refresh()
         if self.isinstance_bf(File):
-            log.warning('FIXME File refreshing not implemented')
-            #self.bfobject = self.bfl.get(self.id)  # FIXME need the get by file id version
+            file_id = self.meta.file_id
+            if file_id:
+                package = self.bfl.get(self.id)
+                for i, file in enumerate(package.files):
+                    if file.id == file_id:
+                        self.bfobject = file
+
+                if i:
+                    log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+
+            else:
+                log.warning('FIXME File refreshing not implemented')
+                return
+
         elif self.isinstance_bf(DataPackage):
-            self.bfobject = self.bfl.get(self.id)
+            package = self.bfl.get(self.id)
+            self.bfobject = package  # for the time being
+            files = package.files  # this makes me sad :/ all I needed was the file id and the size >_<
+            for i, file in enumerate(files):
+                self.bfobject = file
+
+            if i:
+                log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+
         elif self.isinstance_bf(Collection):
             self.bfobject = self.bfl.get(self.id)
 
@@ -448,24 +468,33 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # alternately it may need to go inbetween or before, becuase
         # after the changes the old cache might not exist anymore
         new_meta = self.meta
+
+        assert new_meta is not old_meta
+
         object_type = self.bfobject.__class__.__name__
         actions = []
         for k, old_v in old_meta.items():
-            if v is None:
+            new_v = getattr(new_meta, k)
+            if old_v is None:
+                action = 'new', object_type, k, new_v
+                actions.append(action)
                 continue  # don't compare missing fields
 
-            new_v = new_meta[k]
             if new_v != old_v:
-                action = object_type, key, old_v, new_v
+                action = 'changed', object_type, k, old_v, new_v
                 actions.append(action)
 
         # in the fancy version of this that runs as a total proveance store
         # well, that is on actually on the other side ... because this is the
         # code that pulls data, not the code that waits for things that want to push
         # but, this is sort of where one would want to log all the transactions
-        log.debug(f'things needing action: {actions}')  # TODO  processing actions move change update delete
+        log.debug(f'things needing action: {self.name: <60} {actions}')  # TODO  processing actions move change update delete
         if update_cache:
-            self.cache.meta = self.meta
+            c, d = new_meta.__reduce__()
+            om = c(**d)
+            log.debug(f'updating cache {om}')
+            assert self.meta is new_meta
+            self.cache.meta = new_meta
 
     @property
     def data(self):
