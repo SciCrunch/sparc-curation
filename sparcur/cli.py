@@ -157,7 +157,8 @@ class Dispatch:
             pass  # exactly what we want
 
         embed()
-        anchor.bootstrap(project_id, recursive=True)
+        meta = PathMeta(id=project_id)
+        anchor.bootstrap(meta, recursive=True)
 
     def pull(self):
         # TODO folder meta -> org

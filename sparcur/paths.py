@@ -81,7 +81,7 @@ class RemotePath:
         # if you forget to tell the cache you exist of course it will go to
         # the internet to look for you, it isn't quite smart enough and
         # we're trying not to throw dicts around willy nilly here ...
-        self.cache.bootstrap(self.meta.id, recursive=recursive, only=only, skip=skip)
+        self.cache.bootstrap(self.meta, recursive=recursive, only=only, skip=skip)
 
     def __init__(self, id, cache=None):
         self.id = id
@@ -400,18 +400,24 @@ class CachePath(AugmentedPath):
                 log.info(f'Bootstrapping {id} -> {self.local!r}')
                 only = tuple()
 
-        # set memory only meta
-        self._bootstrap_meta_memory(meta)
 
-        # directory, file, or fake file as symlink?
-        is_file_and_fetch_data = self._bootstrap_prepare_filesystem(parents, fetch_data, size_limit_mb)
-        self.meta = self.remote.meta
-        self._bootstrap_data(is_file_and_fetch_data)
-        self.validate()
+        if self.exists() and self.meta and self.meta.id == meta.id:
+            self.meta = meta
+
+        else:
+            # set memory only meta
+            self._bootstrap_meta_memory(meta)
+
+            # directory, file, or fake file as symlink?
+            is_file_and_fetch_data = self._bootstrap_prepare_filesystem(parents,
+                                                                        fetch_data,
+                                                                        size_limit_mb)
+            self.meta = self.remote.meta
+            self._bootstrap_data(is_file_and_fetch_data)
 
         # bootstrap the rest if we told it to
         if recursive:  # ah the irony of using loops to do this
-            if id.startswith('N:organization:'):  # FIXME :/
+            if self.id.startswith('N:organization:'):  # FIXME :/
                 for child in self.remote.children:
                     child.bootstrap(recursive=True, only=only, skip=skip)
             else:
@@ -436,6 +442,8 @@ class CachePath(AugmentedPath):
             # TODO overwrite
             raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
                                               f'{self.meta.id} != {id}\n{self.meta}')
+        elif self.exists():
+            raise BaseException('should have caught this before we get here')
         else:
             raise BaseException('should not get here')
 
@@ -470,7 +478,9 @@ class CachePath(AugmentedPath):
             self.local.data = self.remote.data
             # with open -> write should not cause the inode to change
 
-    def validate(self):
+            self.validate_file()
+
+    def validate_file(self):
         if self.meta.checksum:
             lc = self.local.meta.checksum 
             cc = self.meta.checksum
