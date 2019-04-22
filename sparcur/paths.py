@@ -202,11 +202,23 @@ class AugmentedPath(PosixPath):
         except OSError:
             return False
 
+    def is_dir(self):
+        try:
+            return super().is_dir()
+        except OSError as e:
+            if os.errno == 40:
+                return False
+            else:
+                raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
+
     def is_symlink(self):
         try:
             return super().is_symlink()
         except OSError:
-            return True
+            if os.errno == 40:
+                return True
+            else:
+                raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
 
     def resolve(self):
         try:
