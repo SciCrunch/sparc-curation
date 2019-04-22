@@ -172,6 +172,11 @@ class Dispatch:
         anchor.bootstrap(meta, recursive=True)
 
     def refresh(self):
+        Async()(deferred(c.remote.refresh)(update_cache=True)
+                for d in self.datasets_local
+                for c in d.children
+                if not child.is_dir())
+        return
         for d in self.datasets_local:
             for child in d.children:
                 if not child.is_dir():
@@ -187,7 +192,7 @@ class Dispatch:
         only = (
             'N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b',  # howard for / in filename
                 )
-        #only = tuple()
+        only = tuple()
         self.anchor.remote.bootstrap(recursive=True, only=only, skip=skip)
 
     def annos(self):
@@ -214,38 +219,49 @@ class Dispatch:
         for d in dirs:
             path = Path(d).resolve()
             if not path.is_dir():
-                continue
-            paths = list(path.rglob('*'))
+                continue  # helper files at the top level
+            paths = path.children #list(path.rglob('*'))
             path_meta = {p:p.cache.meta for p in paths}
             outstanding = 0
             total = 0
             tf = 0
             ff = 0
+            td = 0
+            uncertain = False  # TODO
             for p, m in path_meta.items():
-                if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
-                    try:
-                        s = m.size
-                    except KeyError as e:
-                        print(repr(p))
-                        raise e
+                #if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
+                if p.is_file() or p.is_symlink() and not p.exists():
+                    s = m.size
+                    if s is None:
+                        uncertain = True
+                        continue
+                    #try:
+                        #s = m.size
+                    #except KeyError as e:
+                        #print(repr(p))
+                        #raise e
                     tf += 1
                     if s:
                         total += s
 
-                    if '.fake' in p.suffixes:
+                    #if '.fake' in p.suffixes:
+                    if p.is_symlink():
                         ff += 1
                         if s:
                             outstanding += s
 
-            data.append((path.name, outstanding / G, total / G, ff, tf))
+                elif p.is_dir():
+                    td += 1
+
+            data.append((path.name, outstanding / G, total / G, ff, tf, td))
 
         maxn = max(len(n) for n, *_ in data)
         align = 4
-        fmt = '\n'.join(f'{n:<{maxn+4}} {(gt - go) * 1024:7.2f}M {go:>8.2f} {gt:>8.2f}G{"":>4}{tf - ff:>{align}} {ff:>{align}} {tf:>{align}}'
-                        for n, go, gt, ff, tf in data)
+        fmt = '\n'.join(f'{n:<{maxn+4}} {(gt - go) * 1024:7.2f}M {go:>8.2f} {gt:>8.2f}G{"":>4}{tf - ff:>{align}} {ff:>{align}} {tf:>{align}} {td:>{align}}'
+                        for n, go, gt, ff, tf, tc in data)
 
-        h = 'Folder', 'Local', 'Remote', 'Total', 'L', 'R', 'T'
-        print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
+        h = 'Folder', 'Local', 'Remote', 'Total', 'L', 'R', 'T', 'TD'
+        print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
         print(fmt)
 
     def demos(self):

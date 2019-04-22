@@ -113,9 +113,16 @@ class RemotePath:
         if cache.id is not None and cache.id != self.id:
             # yay! we are finally to the point of needing to filter files vs packages :D !?!? maybe?
             #breakpoint()
-            raise exc.MetadataIdMismatchError('Cache id does not match remote id!\n'
-                                              f'{cache.id} !=\n{self.id}'
-                                              f'\n{cache}\n{self.name}')
+            if self.meta.created < cache.meta.created:  # same filename different blackfynn id
+                # when they 'delete' files they still show up in the root
+                # but then you have to know which came after which ...  ???
+
+                msg = ('Cache id does not match remote id! '
+                       'And cache file is newer!\n'
+                       f'{cache.id} !=\n{self.id}'
+                       f'\n{cache}\n{self.name}')
+                log.critical(msg)
+                #raise exc.MetadataIdMismatchError
 
         if not hasattr(self, '_cache') or self._cache is None:
             self._cache = cache
@@ -202,6 +209,15 @@ class AugmentedPath(PosixPath):
             return super().exists()
         except OSError:
             return False
+
+    def is_file(self):
+        try:
+            return super().is_file()
+        except OSError as e:
+            if e.errno == 40:
+                return False
+            else:
+                raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
 
     def is_dir(self):
         try:
@@ -498,9 +514,15 @@ class CachePath(AugmentedPath):
                 raise AssertionError
 
         elif self.id != meta.id:
-            # TODO overwrite
-            raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
-                                              f'{self.meta.id} != {meta.id}\n{self.meta}')
+            msg = ('Existing cache id does not match new id! '
+                   f'{self.meta.id} != {meta.id}\n{self.meta}')
+            # TODO overwrite?
+            # also newest wins, how does this happen on bf end?
+            #if self.meta.created < meta.created:  # pretty sure doesn't work because which we got was rando
+            log.critical(msg)
+            #else:
+                #raise exc.MetadataIdMismatchError(msg)
+
         elif self.exists():
             raise BaseException('should have caught this before we get here')
         elif self.is_symlink():
@@ -511,7 +533,14 @@ class CachePath(AugmentedPath):
 
     def _bootstrap_prepare_filesystem(self, parents, fetch_data, size_limit_mb):
         if self.remote.is_dir():
-            self.mkdir(parents=parents)
+            if not self.exists():
+                # the bug where this if statement put in as an and is a really
+                # good example of how case/cond etc help you reasona about what
+                # a block of branches is really doing -- this one was implementing
+                # a covering set which is not obvious if implemented this way
+                # you could do this with a dict or something else in pythong
+                # bit it is awkward (see also my crazy case implementation in interlex)
+                self.mkdir(parents=parents)
         elif self.remote.is_file():
             if not self.parent.exists():
                 self.parent.mkdir(parents=parents)
@@ -642,7 +671,7 @@ class CachePath(AugmentedPath):
     def remote(self, remote):
         if self.meta is not None and self.id is not None:
             if hasattr(self, '_remote'):
-                if remote == self._remote:
+                if remote is self._remote:
                     log.error('Not setting remote. Why are you trying to set the same remote again?')
                     return
                 elif remote.meta == self.remote.meta:
@@ -838,6 +867,10 @@ class SymlinkCache(CachePath):
                     log.critical(msg)
                     return
                     raise exc.MetadataIdMismatchError(msg)
+
+                if self.meta.size is not None and pathmeta.size is None:
+                    log.error('existing metadata found, but new meta has no size so will not')
+                    return
 
                 log.debug('existing metadata found, but ids match so will update')
                 self.unlink()
