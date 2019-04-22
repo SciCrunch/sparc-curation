@@ -44,7 +44,6 @@ from sparcur import exceptions as exc
 from sparcur.core import log
 from sparcur.pathmeta import PathMeta
 from pyontutils.utils import sysidpath
-from IPython import embed
 
 # remote data about remote objects -> remote_meta
 # local data about remote objects -> cache_meta
@@ -93,6 +92,18 @@ class RemotePath:
     def cache(self):
         return self._cache
 
+    @property
+    def _cache(self):
+        """ To catch a bad call to set ... """
+        return self.__cache
+
+    @_cache.setter
+    def _cache(self, cache):
+        if not isinstance(cache, CachePath):
+            raise TypeError(f'cache is a {type(cache)} not a CachePath!')
+
+        self.__cache = cache
+
     @cache.setter
     def cache(self, cache):
         if cache.meta is None:
@@ -110,7 +121,7 @@ class RemotePath:
         else:
             raise BaseException('FIXME make a proper error type, cache exists')
 
-            
+
     @property
     def local(self):
         return self.cache.local
@@ -220,7 +231,7 @@ class AugmentedPath(PosixPath):
             mode = os.X_OK
         else:
             raise TypeError(f'Unknown mode {mode}')
-            
+
         return os.access(self, mode, follow_symlinks=follow_symlinks)
 
 
@@ -230,7 +241,7 @@ class CachePath(AugmentedPath):
         This is where the mapping between the local id (aka path)
         and the remote id lives. In a git-like world this is the
         cache/index/whatever we call it these days 
-    
+
         This is the bridge class that holds the mappings.
         Always start bootstrapping from one of these classes
         since it has both the local and remote identifiers,
@@ -252,19 +263,29 @@ class CachePath(AugmentedPath):
 
         # clone any existing locals and remotes
         if args:
-            cache = args[0]
-            if isinstance(cache, CachePath):
-                if cache.local is not None:  # this might be the very fist time local is called
+            path = args[0]
+            if isinstance(path, CachePath):
+                if path.local is not None:  # this might be the very fist time local is called
                     log.debug('setting local')
-                    self._local = cache.local
-                if hasattr(cache, '_remote'):
+                    self._local = path.local
+                if hasattr(path, '_remote'):
                     # have to check for private to avoid infinite recursion
                     # when searching for meta (which is what we are doing right now if we get here)
                     # FIXME pretty sure the way we have it now there _always_ has to be a remote
                     # which is not what we want >_<
                     log.debug('setting remote')
                     #breakpoint()
-                    self._remote = cache.remote
+                    self._remote = path.remote
+
+            elif isinstance(path, LocalPath):
+                self._local = path
+                path._cache = self
+
+            elif isinstance(path, RemotePath):
+                raise TypeError('Not entirely sure what to do in this case ...')
+
+        #if isinstance(self, SymlinkCache):
+            #breakpoint()
 
         return self
 
@@ -285,12 +306,16 @@ class CachePath(AugmentedPath):
         # does by construction
         if isinstance(key, RemotePath):
             # FIXME not just names but relative paths???
-            child = self._make_child((key.name,), key)
+            try:
+                child = self._make_child((key.name,), key)
+            except AttributeError as e:
+                #breakpoint()
+                raise e
             return child
         else:
             raise TypeError('Cannot construct a new CacheClass from an object '
                             f'without an id and a name! {key}')
-            
+
     def __rtruediv__(self, key):
         """ key is a subclass of self.__class__ """
         out = self._from_parts([key.name] + self._parts, init=False)
@@ -311,7 +336,7 @@ class CachePath(AugmentedPath):
             child.meta = key.meta
 
         return child
-        
+
     @classmethod
     def setup(cls, local_class, remote_class_factory):
         """ call this once to bind everything together """
@@ -439,13 +464,13 @@ class CachePath(AugmentedPath):
             lc = self.local.meta.checksum 
             cc = self.meta.checksum
             if lc != cc:
-                raise exc.ChecksumError('Checksums to not match! {lc} != {cc}')
+                raise exc.ChecksumError('Checksums do not match!\n(!=\n{lc}\n{cc}\n)')
         else:
             log.warning(f'No checksum! Your data is at risk! {self.remote!r} -> {self.local!r}! ')
             ls = self.local.meta.size
             cs = self.meta.size
             if ls != cs:
-                raise exc.SizeError('Sizes do not match!\n(!=\n{ls}\n{cc})')
+                raise exc.SizeError('Sizes do not match!\n(!=\n{ls}\n{cc}\n)')
 
     def __bootstrap_old(self):
 
@@ -708,7 +733,7 @@ class SymlinkCache(CachePath):
             if self.is_symlink():
                 if self.meta.id != pathmeta.id:
                     raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
-                                                      f'{self.meta.id} != {id}\n{self.meta}')
+                                                      f'{self.meta.id} != {pathmeta.id}\n{self.meta}')
 
                 log.debug('existing metadata found, but ids match so will update')
 
@@ -751,7 +776,7 @@ class BlackfynnCache(XattrCache):
     @meta.setter
     def meta(self, pathmeta):
         self._meta_setter(pathmeta)
-    
+
     def _meta_setter(self, pathmeta, memory_only=False):
         """ we need memory_only for bootstrap I think """
         if not pathmeta:
@@ -900,6 +925,11 @@ class LocalPath(PosixPath):
     @property
     def cache(self):
         # local can't make a cache because id doesn't know the remote id
+        # but if there is an existing cache (duh) the it can try to get it
+        # otherwise it will error (correctly)
+        if not hasattr(self, '_cache'):
+            self._cache_class(self)  # we don't have to assign here because cache does it
+
         return self._cache
 
     #@property
@@ -919,12 +949,14 @@ class LocalPath(PosixPath):
                         fs_data_modified_time) = (st.st_ctime,
                                                   st.st_mtime)
 
-        if (hasattr(self, '_meta') and
-            self.__change_tuple == change_tuple):
-            return self._meta
+        if hasattr(self, '_meta'):
+            if self.__change_tuple == change_tuple:
+                return self._meta
+
+            old_meta = self._meta  # TODO log changes?
+
 
         self.__change_tuple = change_tuple  # TODO log or no?
-        old_meta = self._meta  # TODO log changes?
 
         updated = datetime.fromtimestamp(fs_data_modified_time)
         # these use our internal representation of timestamps
@@ -945,6 +977,10 @@ class LocalPath(PosixPath):
                               mode=mode)
 
         return self._meta
+
+    @meta.setter
+    def meta(self):
+        raise TypeError('Cannot set meta on LocalPath, it is a source of metadata.')
 
     @property
     def data(self):
@@ -1071,7 +1107,7 @@ class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
                 print(' '.join(command))
                 break
                 process_window.set_wm_name(new_name)
-                embed()
+                breakpoint()
                 break
             else:
                 sleep(.01)  # spin a bit more slowly

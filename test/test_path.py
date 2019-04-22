@@ -1,5 +1,6 @@
 import unittest
-from sparcur.paths import Path, BlackfynnCache
+from pathlib import PurePosixPath
+from sparcur.paths import Path, SymlinkCache
 from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
 from sparcur.pathmeta import FileSize
 from .common import project_path
@@ -16,6 +17,10 @@ class TestPathMeta(unittest.TestCase):
 
     def setUp(self):
         self.path = Path(project_path)
+
+        self.test_path = Path('/tmp/testpath')  # FIXME random needed ...
+        if self.test_path.is_symlink():
+            self.test_path.unlink()
 
     def _test_getattr_size_hr(self):
         pm = PathMeta(size=1000000000000000)
@@ -50,10 +55,25 @@ class TestPathMeta(unittest.TestCase):
                                         for field in tuple()])  # TODO
 
     def test_symlink_roundtrip(self):
+        meta = PathMeta(id='N:helloworld:123', size=10)
+        path = self.test_path
+        path._cache = SymlinkCache(path, meta=meta)
+        path.cache.meta = meta
+        new_meta = cache.meta
+        path.unlink()
+        msg = '\n'.join([f'{k!r} {v!r} {getattr(new_meta, k)!r}' for k, v in meta.items()])
+        assert meta == new_meta, msg
+
+    def _test_symlink_roundtrip_weird(self):
         path = Path('/tmp/testpath')  # FIXME random needed ...
-        bpm = PathMeta(id='N:helloworld:123', size=10)
+        meta = PathMeta(id='N:helloworld:123', size=10)
+        pure_symlink = PurePosixPath(path.name) / meta.as_symlink()
+        path.symlink_to(pure_symlink)
         try:
-            path.symlink_to()
+            cache = SymlinkCache(path)
+            new_meta = cache.meta
+            msg = '\n'.join([f'{k!r} {v!r} {getattr(new_meta, k)!r}' for k, v in meta.items()])
+            assert meta == new_meta, msg
         finally:
             path.unlink()
 

@@ -248,18 +248,18 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             bfobject = id_bfo_or_bfr
         elif id_bfo_or_bfr.startswith('N:organization:'):
             if hasattr(self.__class__, '_organization'):
-                raise TypeError('You already have a perfectly good organization damnit')
+                raise TypeError('You already have a perfectly good organization')
 
             elif id_bfo_or_bfr == self.root:
                 if self.cache is None:
-                    raise ValueError('fuck fuck fuck where is your cache m8 you are root!')
+                    raise ValueError('where is your cache m8 you are root!')
 
                 self.__class__._organization = self
                 self.bfobject = self.bfl.organization
                 return
 
         else:
-            raise ValueError(f'why the fuck are you doing this {id_bfo_or_bfr}')
+            raise ValueError(f'why are you doing this {id_bfo_or_bfr}')
             bfobject = self.bfl.get(id_bfo_or_bfr)
 
         if bfobject is None:
@@ -269,7 +269,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             raise TypeError(f'bfobject cannot be str! {bfobject}')
 
         elif bfobject.id.startswith('N:organization:') and hasattr(self.__class__, '_organization'):
-            raise TypeError('You already have a perfectly good organization damnit')
+            raise TypeError('You already have a perfectly good organization')
 
         self.bfobject = bfobject
 

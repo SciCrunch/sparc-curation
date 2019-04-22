@@ -54,7 +54,6 @@ from sparcur.paths import Path
 from sparcur.config import local_storage_prefix
 from sparcur.metastore import MetaStore
 from scipy.io import loadmat
-from IPython import embed
 
 
 @property
@@ -143,7 +142,7 @@ class FakeBFile(File):
 
         if 'size' not in kwargs:
             kwargs['size'] = None  # if we have None on a package we know it is not zero
-            
+
         for k, v in kwargs.items():
             if k == 'size' and v is None:
                 v = None  # FIXME hack
@@ -194,7 +193,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
             #else:
                 #c['parent'] = remapids['latest']
         return j
-        
+
     session = self._api.session
     #cursor
     #pageSize
@@ -222,7 +221,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 if out_of_order[0] is None:
                     out_of_order.remove(None)
                 elif packages == out_of_order:
-                    embed()
+                    breakpoint()
                     raise RuntimeError('We are going nowhere!')
                 else:
                     packages = out_of_order
@@ -236,7 +235,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         except KeyError as e:
                             out_of_order.append(package)
                             continue
-                        
+
                         bfobject = bftype.from_dict(rdp, api=self._api)
                         bfobject._json = package
                         bfobject.dataset = index[bfobject.dataset]
@@ -386,7 +385,7 @@ def get_packages_(dataset):
     chunks = chunk_list([c for c in hrm2 if isinstance(c, Collection)], 1000)
     #wat = async_getter(heh, [(c,) for c in hrm2 if isinstance(c, Collection)][:1000]) 
     Parallel(n_jobs=8, backend="threading")(delayed(asynchelper)(chunk) for chunk in chunks)
-    embed()
+    breakpoint()
     return
     if collector is None:
         collector = []
@@ -611,7 +610,7 @@ class PackageMeta:
 
     class PackageMetaError(Exception):
         """ Ya done goofed part 3 """
-        
+
     class NotDataPackage(Exception):
         """ only packages have """
 
@@ -871,6 +870,7 @@ def mvp():
 
 
 def process_files(bf, files):
+    from IPython import embed
     niftis = [nifti1.load(f.as_posix()) for f in files if '.nii' in f.suffixes]
     mats = [loadmat(f.as_posix()) for f in files if '.mat' in f.suffixes]
     dicoms = [dcmread(f.as_posix()) for f in files if '.dcm' in f.suffixes]  # loaded dicom files
@@ -883,6 +883,7 @@ def mvp_main():
 
 
 def main():
+    from IPython import embed
     bfl = BFLocal()
     #bfl.cons()
     #bfl.fetch_errors()

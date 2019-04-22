@@ -36,7 +36,6 @@ from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetDescriptionSchema, SubjectsSchema,
                              SummarySchema, DatasetOutSchema, MetaOutSchema)
 from sparcur import validate as vldt
-from IPython import embed
 
 sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
 a = rdf.type
@@ -2144,7 +2143,7 @@ def get_datasets(project_path, FTC=FThing):
     return ds, dsd
 
 
-def parse_meta(project_path):
+def parse_meta(project_path):  # XXX deprecated
     ds, dsd = get_datasets(project_path)
     dump_all = [{attr: express_or_return(getattr(d, attr))
                  for attr in dir(d) if not attr.startswith('_')}
@@ -2308,6 +2307,7 @@ def main():
            for d in dsl for p in d.meta_paths] 
 
     if __name__ == '__main__':
+        from IPython import embed
         embed()
 
 if __name__ == '__main__':

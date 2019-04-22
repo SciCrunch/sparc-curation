@@ -114,7 +114,7 @@ class PathMeta:
 
 class _PathMetaConverter:
     """ Base class for implementing PathMeta format converts.
-        
+
         I haven't figured out how to properly abstract registering
         as_format_name and from_format_name yet, so look at one of
         the __init__ methods below to see how it is done. """
@@ -226,6 +226,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         pure_symlink = symlink_path.readlink()
         msg = (symlink_path.name, pure_symlink.parts[0])
         assert symlink_path.name == pure_symlink.parts[0], msg
+        #breakpoint()
         return self.from_pure_symlink(pure_symlink)
 
     def from_pure_symlink(self, pure_symlink):
@@ -233,12 +234,6 @@ class _PathMetaAsSymlink(_PathMetaConverter):
                   for field, value in zip(self.order, pure_symlink.suffixes)}
         kwargs['id'] = str(pure_symlink.parent)
         return self.pathmetaclass(**kwargs)
-
-    #@classmethod
-    #def from_symlink(cls, symlink_path):
-        #if not symlink_path.is_symlink():
-            #raise TypeError(f'Not a symlink! {symlink_path}')
-        #return cls.symlink.from_symlink(symlink_path)
 
 
 class _PathMetaAsXattrs(_PathMetaConverter):
@@ -292,7 +287,7 @@ class _PathMetaAsXattrs(_PathMetaConverter):
                     out = self.decode(field, value)
 
                 return out
-                
+
         else:
             decode = self.decode
 
@@ -334,7 +329,7 @@ class _PathMetaAsXattrs(_PathMetaConverter):
 
         if field == 'errors':
             value = ';'.join(value)
-            
+
         if isinstance(value, datetime):  # FIXME :/ vs iso8601
             #value = value.isoformat().isoformat().replace('.', ',')
             value = value.timestamp()  # I hate dealing with time :/
