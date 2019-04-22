@@ -107,6 +107,10 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         atexit.register(lambda:(session.sendeof(), session.close()))
         return super().__new__(cls, local_class, cache_class, host=host, session=session)
 
+    def refresh(self):
+        # TODO probably not the best idea ...
+        raise NotImplementedError('This baby goes to the network every single time!')
+
     @property
     def id(self):
         # this allows a remapping once
@@ -131,6 +135,7 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         p.communicate()
 
     # reuse meta from local
+    # def meta (make it easier to search for this)
     meta = LocalPath.meta  # magic
 
     def _ssh(self, remote_cmd):
@@ -212,7 +217,6 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     # FIXME helper index should try to cooperate with the packages index?
-    helper_index = {}  # id mapping to get parents from ids
 
     def __new__(cls, anchor_or_bfl, local_class, cache_class):
         if isinstance(anchor_or_bfl, BFLocal):
@@ -228,18 +232,35 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         self.root = self.bfl.organization.id
         return self
 
-    def __init__(self, id_bfobject_or_hbfo, cache=None, helper_index=None):
+    def __init__(self, id_bfo_or_bfr, cache=None, helper_index=None):
+
+        self.errors = []
+        if helper_index is not None:
+            self.helper_index.update(helper_index)
 
         # set _cache to avoid the id equality check since this is in __init__
         if cache is not None:
             self._cache = cache
 
-        if isinstance(id_bfobject_or_hbfo, self.__class__):
-            bfobject = id_bfobject_or_hbfo.bfobject
-        elif isinstance(id_bfobject_or_hbfo, BaseNode):
-            bfobject = id_bfobject_or_hbfo
+        if isinstance(id_bfo_or_bfr, self.__class__):
+            bfobject = id_bfo_or_bfr.bfobject
+        elif isinstance(id_bfo_or_bfr, BaseNode):
+            bfobject = id_bfo_or_bfr
+        elif id_bfo_or_bfr.startswith('N:organization:'):
+            if hasattr(self.__class__, '_organization'):
+                raise TypeError('You already have a perfectly good organization damnit')
+
+            elif id_bfo_or_bfr == self.root:
+                if self.cache is None:
+                    raise ValueError('fuck fuck fuck where is your cache m8 you are root!')
+
+                self.__class__._organization = self
+                self.bfobject = self.bfl.organization
+                return
+
         else:
-            bfobject = self.bfl.get(id_bfobject_or_hbfo)
+            raise ValueError(f'why the fuck are you doing this {id_bfo_or_bfr}')
+            bfobject = self.bfl.get(id_bfo_or_bfr)
 
         if bfobject is None:
             raise TypeError('bfobject cannot be None!')
@@ -247,12 +268,26 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         elif isinstance(bfobject, str):
             raise TypeError(f'bfobject cannot be str! {bfobject}')
 
+        elif bfobject.id.startswith('N:organization:') and hasattr(self.__class__, '_organization'):
+            raise TypeError('You already have a perfectly good organization damnit')
+
         self.bfobject = bfobject
 
-        if helper_index is not None:
-            self.helper_index.update(helper_index)
+    def is_anchor(self):
+        return self.anchor == self
 
-        self.errors = []
+    @property
+    def anchor(self):
+        """ NOTE: this is a slight depature from the semantics in pathlib
+            because this returns the path representation NOT the string """
+        return self.organization
+
+    @property
+    def organization(self):
+        if not hasattr(self.__class__, '_organization'):
+            self.__class__._organization = self.__class__(self.bfl.organization)
+
+        return self._organization
 
     @property
     def name(self):
@@ -303,17 +338,20 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         return None
 
     def is_dir(self):
-        return not isinstance(self, File) and not isinstance(self, DataPackage)
+        bfo = self.bfobject
+        return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
 
     def is_file(self):
-        return isinstance(self, File) or isinstance(self, DataPackage) and not list(self.children)
+        bfo = self.bfobject
+        return isinstance(bfo, File) or isinstance(bfo, DataPackage) and not list(self.children)
 
     @property
     def checksum(self):
         if hasattr(self.bfobject, 'checksum'):
             return self.bfobject.checksum
-        elif isinstance(self.bfobject, File):
-            log.warning(f'No checksum for {self}')
+        # log this downstream, since downstream also knows the file affected
+        #elif isinstance(self.bfobject, File):
+            #log.warning(f'No checksum for {self}')
 
     @property
     def owner_id(self):
@@ -360,13 +398,12 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         elif isinstance(self.bfobject, Organization):
             for dataset in self.bfobject.datasets:
                 child = self.__class__(dataset)
-                child.cache = self.cache / child.name
+                self.cache / child  # construction will cause registration without needing to assign
                 yield child
         else:
             for bfobject in self.bfobject:
                 child = self.__class__(bfobject)
-                cache = self.cache / child.name
-                child.cache = cache
+                self.cache / child  # construction will cause registration without needing to assign
                 yield child
 
     @property
@@ -382,11 +419,48 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         elif isinstance(self.bfobject, Dataset):
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
-                cache = self.cache / child.name
-                child.cache = cache
+                self.cache / child  # construction will cause registration without needing to assign
                 yield child
         else:
             raise exc.UnhandledTypeError  # TODO
+
+    def isinstance_bf(*types):
+        return [t for t in types if isinstance(self.bfobject, t)]
+
+    def refresh(self, update_cache=False):
+        old_meta = self.meta
+        super().refresh()
+        if self.isinstance_bf(File):
+            log.warning('FIXME File refreshing not implemented')
+            #self.bfobject = self.bfl.get(self.id)  # FIXME need the get by file id version
+        elif self.isinstance_bf(DataPackage):
+            self.bfobject = self.bfl.get(self.id)
+        elif self.isinstance_bf(Collection):
+            self.bfobject = self.bfl.get(self.id)
+
+        # FIXME all of this needs to go in cache._meta_setter which is where the only
+        # meaningful difference should be detected and managed
+        # alternately it may need to go inbetween or before, becuase
+        # after the changes the old cache might not exist anymore
+        new_meta = self.meta
+        object_type = self.bfobject.__class__.__name__
+        actions = []
+        for k, old_v in old_meta.items():
+            if v is None:
+                continue  # don't compare missing fields
+
+            new_v = new_meta[k]
+            if new_v != old_v:
+                action = object_type, key, old_v, new_v
+                actions.append(action)
+
+        # in the fancy version of this that runs as a total proveance store
+        # well, that is on actually on the other side ... because this is the
+        # code that pulls data, not the code that waits for things that want to push
+        # but, this is sort of where one would want to log all the transactions
+        log.debug(f'things needing action: {actions}')  # TODO  processing actions move change update delete
+        if update_cache:
+            self.cache.meta = self.meta
 
     @property
     def data(self):
@@ -409,22 +483,29 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     @property
     def meta(self):
-        if self.errors:
-            errors = tuple(self.errors)
-        else:
-            errors = tuple()
+        # since BFR is a remote it is OK to memoize the meta
+        # because we will have to go to the net to get the new version
+        # which probably will be implemented as just creating a whole
+        # new one of these and switching it out
+        if not hasattr(self, '_meta'):
+            if self.errors:
+                errors = tuple(self.errors)
+            else:
+                errors = tuple()
 
-        return PathMeta(size=self.size,
-                        created=self.created,
-                        updated=self.updated,
-                        checksum=self.checksum,
-                        id=self.id,
-                        file_id=self.file_id,
-                        old_id=None,
-                        gid=None,  # needed to determine local writability
-                        user_id=self.owner_id,
-                        mode=None,
-                        errors=errors)
+            self._meta = PathMeta(size=self.size,
+                                  created=self.created,
+                                  updated=self.updated,
+                                  checksum=self.checksum,
+                                  id=self.id,
+                                  file_id=self.file_id,
+                                  old_id=None,
+                                  gid=None,  # needed to determine local writability
+                                  user_id=self.owner_id,
+                                  mode=None,
+                                  errors=errors)
+
+        return self._meta
 
     def __eq__(self, other):
         return self.bfobject == other.bfobject

@@ -18,6 +18,10 @@ class MetadataCorruptionError(SparCurError):
     """ there is already cached metadata and id does not match """
 
 
+class NoCachedMetadataError(SparCurError):
+    """ there is no cached metadata """
+
+
 class AlreadyInProjectError(SparCurError):
     """fatal: already in a spc project {}"""
     def __init__(self, message=None):

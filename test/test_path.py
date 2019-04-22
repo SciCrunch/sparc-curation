@@ -1,12 +1,25 @@
 import unittest
-from sparcur.paths import PathMeta, Path, _PathMetaAsSymlink, _PathMetaAsXattrs
+from sparcur.paths import Path, BlackfynnCache
+from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
+from sparcur.pathmeta import FileSize
 from .common import project_path
+
+
+class TestFileSize(unittest.TestCase):
+    def test_getattr(self):
+        s = FileSize(1000000000000000)
+        getattr(s, 'hr')
+
 
 class TestPathMeta(unittest.TestCase):
     prefix = None
 
     def setUp(self):
         self.path = Path(project_path)
+
+    def _test_getattr_size_hr(self):
+        pm = PathMeta(size=1000000000000000)
+        woo = getattr(pm, 'size.hr')
 
     def test_neg__neg__(self):
         pm = PathMeta(id='lol')
@@ -37,19 +50,28 @@ class TestPathMeta(unittest.TestCase):
                                         for field in tuple()])  # TODO
 
     def test_symlink_roundtrip(self):
+        path = Path('/tmp/testpath')  # FIXME random needed ...
+        bpm = PathMeta(id='N:helloworld:123', size=10)
+        try:
+            path.symlink_to()
+        finally:
+            path.unlink()
+
+    def test_pure_symlink_roundtrip(self):
+        pmas = _PathMetaAsSymlink()
         lpm = self.path.meta
         bpm = PathMeta(id='N:helloworld:123', size=10)
         bads = []
         for pm in (lpm, bpm):
             symlink = pm.as_symlink()
             print(symlink)
-            new_pm = PathMeta.from_symlink(symlink)
+            new_pm = pmas.from_pure_symlink(symlink)
             if new_pm != pm:
                 bads += ['\n'.join([str((getattr(pm, field), getattr(new_pm, field)))
-                                    for field in _PathMetaAsSymlink.order])]
+                                    for field in _PathMetaAsSymlink.order]),
+                         f'{pm.__reduce__()}\n{new_pm.__reduce__()}']
 
         assert not bads, '\n===========\n'.join(bads)
-                                        
 
 
 class TestPrefix(TestPathMeta):
