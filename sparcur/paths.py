@@ -779,8 +779,11 @@ class SymlinkCache(CachePath):
             # if the path does not exist write even temporary to disk
             if self.is_symlink():
                 if self.meta.id != pathmeta.id:
-                    raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
-                                                      f'{self.meta.id} != {pathmeta.id}\n{self.meta}')
+                    msg = ('Existing cache id does not match new id! Keeping old id.'
+                           f'{self.meta.id} != {pathmeta.id}\n{self.meta}')
+                    log.critical(msg)
+                    return
+                    raise exc.MetadataIdMismatchError(msg)
 
                 log.debug('existing metadata found, but ids match so will update')
                 self.unlink()

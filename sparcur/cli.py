@@ -179,6 +179,7 @@ class Dispatch:
         only = (
             'N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b',  # howard for / in filename
                 )
+        only = tuple()
         self.anchor.remote.bootstrap(recursive=True, only=only, skip=skip)
 
     def annos(self):
