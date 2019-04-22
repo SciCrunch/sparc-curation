@@ -13,11 +13,11 @@ Usage:
     spc demos
     spc shell [--project]
     spc feedback <feedback-file> <feedback>...
-    spc [options] <file>...
-    spc [options] --name=<PAT>...
+    spc find [options] <file>...
+    spc find [options] --name=<PAT>...
 
 Commands:
-              list and fetch unfetched files
+    find      list and fetch unfetched files
     clone     clone a remote project (creates a new folder in the current directory)
     pull      pull down the remote list of files
     stats     print stats for specified or current directory
@@ -124,11 +124,16 @@ class Dispatch:
 
     @property
     def datasets_remote(self):
-        yield from (d.local for d in self.anchor.remote.children)  # FIXME lo the crossover
+        for d in self.anchor.remote.children:
+            # FIXME lo the crossover (good for testing assumptions ...)
+            #yield d.local
+            yield d
 
     @property
     def datasets_local(self):
-        yield from (d.local for d in self.datasets if d.local.exists())
+        for d in self.datasets:
+            if d.local.exists():
+                yield d.local
 
     @property
     def debug(self):
@@ -139,11 +144,16 @@ class Dispatch:
         return self.args['--overwrite']
 
     def clone(self):
+        print('asdfasdfasdfasdf')
         project_id = self.args['<project-id>']
+        if project_id is None:
+            print('no remote project id listed')
+            sys.exit(4)
         # given that we are cloning it makes sense to _not_ catch a connection error here
         project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        anchor = BlackfynnCache(project_name)
+        meta = PathMeta(id=project_id)
+        anchor = BlackfynnCache(project_name, meta=meta)
         if anchor.exists():
             if list(anchor.local.children):
                 message = f'fatal: destination path {anchor} already exists and is not an empty directory.'

@@ -232,7 +232,8 @@ class _PathMetaAsSymlink(_PathMetaConverter):
     def from_pure_symlink(self, pure_symlink):
         kwargs = {field:self.decode(field, value)
                   for field, value in zip(self.order, pure_symlink.suffixes)}
-        kwargs['id'] = str(pure_symlink.parent)
+        fixed = PurePosixPath(*pure_symlink.parts[1:])
+        kwargs['id'] = str(fixed.parent)
         return self.pathmetaclass(**kwargs)
 
 

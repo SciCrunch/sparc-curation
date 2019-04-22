@@ -95,14 +95,15 @@ class RemotePath:
     @property
     def _cache(self):
         """ To catch a bad call to set ... """
-        return self.__cache
+        if hasattr(self, f'_c_cache'):
+            return self._c_cache
 
     @_cache.setter
     def _cache(self, cache):
         if not isinstance(cache, CachePath):
             raise TypeError(f'cache is a {type(cache)} not a CachePath!')
 
-        self.__cache = cache
+        self._c_cache = cache
 
     @cache.setter
     def cache(self, cache):
@@ -265,6 +266,7 @@ class CachePath(AugmentedPath):
         if args:
             path = args[0]
             if isinstance(path, CachePath):
+                self._cache_parent = path
                 if path.local is not None:  # this might be the very fist time local is called
                     log.debug('setting local')
                     self._local = path.local
@@ -281,8 +283,8 @@ class CachePath(AugmentedPath):
                         #breakpoint()
                         #raise TypeError('you have managed to have a remote but pass no meta ?!')
 
-                    if not hasattr(path, '_in_bootstrap'):  # FIXME this seems wrong?
-                        self._remote = path.remote
+                    #if not hasattr(path, '_in_bootstrap'):  # FIXME this seems wrong?
+                    self._remote = path.remote
 
             elif isinstance(path, LocalPath):
                 self._local = path
@@ -301,8 +303,10 @@ class CachePath(AugmentedPath):
             if 'meta' not in kwargs or kwargs['meta'] is None:
                 msg = f'No cached meta exists and no meta provided for {self}'
                 raise exc.NoCachedMetadataError(msg)
-            else:
+            elif hasattr(self, '_remote'):
                 self.meta = kwargs.pop('meta')
+            else:
+                raise exc.NoRemoteMappingError(f'gonna need a remote here ... {self.local}')
 
         super().__init__()
 
@@ -317,7 +321,8 @@ class CachePath(AugmentedPath):
                 child = self._make_child((key.name,), key)
             except AttributeError as e:
                 #breakpoint()
-                raise e
+                raise exc.SparCurError('aaaaaaaaaaaaaaaaaaaaaa') from e
+
             return child
         else:
             raise TypeError('Cannot construct a new CacheClass from an object '
@@ -336,11 +341,18 @@ class CachePath(AugmentedPath):
             self._drv, self._root, self._parts, drv, root, parts)
         child = self._from_parsed_parts(drv, root, parts, init=False)
         child._init()
-        child.meta
         if isinstance(key, RemotePath):
-            child.remote = key
+            log.debug('remoooote')
+            child._remote = key  # have to use _remote since this is construction
+            child._meta = key.meta
+            child.remote
+            #child.meta = child.meta
+            if not hasattr(key, '_cache') or key._cache is None:
+                key.cache = child
+            else:
+                log.warning('Trying to set cache when it already exists!')
         else:
-            child.meta = key.meta
+            breakpoint()
 
         return child
 
@@ -432,9 +444,11 @@ class CachePath(AugmentedPath):
 
     def _bootstrap_meta_memory(self, meta):
         if meta is None:
-            raise TypeError('what the fuck are you doin')
+            raise TypeError('what are you doin')
+
         if not self.meta or self.meta.id is None:
-            self._meta_setter(meta, memory_only=True)  # FIXME _meta_setter broken for memonly ...
+            #self._meta_setter(meta, memory_only=True)  # FIXME _meta_setter broken for memonly ...
+            self._meta = meta
             if self.meta.id is None:
                 log.warning(f'Existing meta for {self!r} no id so overwriting\n{self.meta}')
 
@@ -445,7 +459,8 @@ class CachePath(AugmentedPath):
         elif self.exists():
             raise BaseException('should have caught this before we get here')
         else:
-            raise BaseException('should not get here')
+            pass # already exists!??
+            #raise BaseException('should not get here')
 
 
     def _bootstrap_prepare_filesystem(self, parents, fetch_data, size_limit_mb):
@@ -552,6 +567,9 @@ class CachePath(AugmentedPath):
 
     @property
     def remote(self):
+        if hasattr(self, '_parent_cache'):
+            return self._parent_cache.remote
+
         if not self.id:
             return
 
@@ -567,9 +585,9 @@ class CachePath(AugmentedPath):
 
             if not hasattr(self, '_remote'):
                 #log.debug('r')
-                self.remote = self._remote_class(self.id, self)
+                self.remote = self._remote_class(self.id, cache=self)
 
-        return self._remote
+            return self._remote
 
     @remote.setter
     def remote(self, remote):
@@ -689,7 +707,9 @@ class XattrCache(CachePath, XattrPath):
 
     @property
     def meta(self):
-        # FIXME symlink cache!??!
+        if hasattr(self, '_meta'):
+            return self._meta
+
         if self.exists():
             xattrs = self.xattrs()
             pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
@@ -726,6 +746,9 @@ class SqliteCache(CachePath):
 
     @property
     def meta(self):
+        if hasattr(self, '_meta'):
+            return self._meta
+
         log.error('SqliteCache getter not implemented yet.')
 
     @meta.setter
@@ -737,7 +760,9 @@ class SymlinkCache(CachePath):
 
     @property
     def meta(self):
-        # FIXME symlink cache!??!
+        if hasattr(self, '_meta'):
+            return self._meta
+
         if self.is_symlink():
             if not self.exists():  # if a symlink exists it is something other than what we want
                 #assert PurePosixPath(self.name) == self.readlink().parent.parent
@@ -758,6 +783,7 @@ class SymlinkCache(CachePath):
                                                       f'{self.meta.id} != {pathmeta.id}\n{self.meta}')
 
                 log.debug('existing metadata found, but ids match so will update')
+                self.unlink()
 
             symlink = PosixPath(self.local.name) / pathmeta.as_symlink()
             self.local.symlink_to(symlink)

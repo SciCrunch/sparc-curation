@@ -252,6 +252,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
             elif id_bfo_or_bfr == self.root:
                 if self.cache is None:
+                    breakpoint()
                     raise ValueError('where is your cache m8 you are root!')
 
                 self.__class__._organization = self
@@ -399,11 +400,14 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             for dataset in self.bfobject.datasets:
                 child = self.__class__(dataset)
                 self.cache / child  # construction will cause registration without needing to assign
+                #breakpoint()
+                assert child.cache
                 yield child
         else:
             for bfobject in self.bfobject:
                 child = self.__class__(bfobject)
                 self.cache / child  # construction will cause registration without needing to assign
+                assert child.cache
                 yield child
 
     @property
@@ -420,6 +424,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
                 self.cache / child  # construction will cause registration without needing to assign
+                assert child.cache is not None
                 yield child
         else:
             raise exc.UnhandledTypeError  # TODO
