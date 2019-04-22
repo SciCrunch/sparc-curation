@@ -7,6 +7,8 @@ from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
 
 log = makeSimpleLogger('sparcur')
+
+
 class _log:
     """ logging prevents ince ipython recurions error printing
         so rename this class to log when you need fake logging """

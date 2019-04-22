@@ -38,6 +38,14 @@ class NotInProjectError(SparCurError):
             self.message = self.__doc__.format(more)
 
 
+class ChecksumError(SparCurError):
+    """ utoh """
+
+
+class SizeError(SparCurError):
+    """ really utoh """
+
+
 class CommandTooLongError(Exception):
     """ not the best solution ... """
 

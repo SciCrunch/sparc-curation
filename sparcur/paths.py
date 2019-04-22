@@ -255,7 +255,7 @@ class CachePath(AugmentedPath):
     _backup_cache = None
     _not_exists_cache = None
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, meta=None, **kwargs):
         # TODO do we need a version of this for the locals
         # and remotes? I don't think we create 'alternate' remotes or locals ...
 
@@ -275,12 +275,14 @@ class CachePath(AugmentedPath):
                     # FIXME pretty sure the way we have it now there _always_ has to be a remote
                     # which is not what we want >_<
                     log.debug('setting remote')
-                    if 'meta' in kwargs:
-                        self.meta = kwargs.pop('meta')
-                    else:
-                        raise TypeError('you have managed to have a remote but pass no meta ?!')
+                    if meta is not None:
+                        self.meta = meta
+                    #else:
+                        #breakpoint()
+                        #raise TypeError('you have managed to have a remote but pass no meta ?!')
 
-                    self._remote = path.remote
+                    if not hasattr(path, '_in_bootstrap'):  # FIXME this seems wrong?
+                        self._remote = path.remote
 
             elif isinstance(path, LocalPath):
                 self._local = path
@@ -296,7 +298,7 @@ class CachePath(AugmentedPath):
 
     def __init__(self, *args, **kwargs):
         if self.id is None:
-            if 'meta' not in kwargs:
+            if 'meta' not in kwargs or kwargs['meta'] is None:
                 msg = f'No cached meta exists and no meta provided for {self}'
                 raise exc.NoCachedMetadataError(msg)
             else:
@@ -405,6 +407,7 @@ class CachePath(AugmentedPath):
         is_file_and_fetch_data = self._bootstrap_prepare_filesystem(parents, fetch_data, size_limit_mb)
         self.meta = self.remote.meta
         self._bootstrap_data(is_file_and_fetch_data)
+        self.validate()
 
         # bootstrap the rest if we told it to
         if recursive:  # ah the irony of using loops to do this
@@ -422,8 +425,10 @@ class CachePath(AugmentedPath):
         return
 
     def _bootstrap_meta_memory(self, meta):
+        if meta is None:
+            raise TypeError('what the fuck are you doin')
         if not self.meta or self.meta.id is None:
-            self._meta_setter(meta, memory_only=True)
+            self._meta_setter(meta, memory_only=True)  # FIXME _meta_setter broken for memonly ...
             if self.meta.id is None:
                 log.warning(f'Existing meta for {self!r} no id so overwriting\n{self.meta}')
 
@@ -464,18 +469,19 @@ class CachePath(AugmentedPath):
 
             self.local.data = self.remote.data
             # with open -> write should not cause the inode to change
+
     def validate(self):
         if self.meta.checksum:
             lc = self.local.meta.checksum 
             cc = self.meta.checksum
             if lc != cc:
-                raise exc.ChecksumError('Checksums do not match!\n(!=\n{lc}\n{cc}\n)')
+                raise exc.ChecksumError(f'Checksums do not match!\n(!=\n{lc}\n{cc}\n)')
         else:
             log.warning(f'No checksum! Your data is at risk! {self.remote!r} -> {self.local!r}! ')
             ls = self.local.meta.size
             cs = self.meta.size
             if ls != cs:
-                raise exc.SizeError('Sizes do not match!\n(!=\n{ls}\n{cc}\n)')
+                raise exc.SizeError(f'Sizes do not match!\n(!=\n{ls}\n{cs}\n)')
 
     def __bootstrap_old(self):
 
@@ -553,7 +559,7 @@ class CachePath(AugmentedPath):
                 #log.debug('r')
                 self.remote = self._remote_class(self.id, self)
 
-            return self._remote
+        return self._remote
 
     @remote.setter
     def remote(self, remote):
@@ -588,6 +594,8 @@ class CachePath(AugmentedPath):
             if self.parent and self.local.parent.cache.meta.id == self.parent.id:
                 self._remote = remote
                 self.meta = remote.meta
+                # meta checks to see whethere there is a remote
+                # if there is a remote it assumes that 
                 remote._cache = self
 
     @property
@@ -755,6 +763,9 @@ class BlackfynnCache(XattrCache):
 
     @property
     def meta(self):
+        if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
+            return self._meta
+
         if self.exists():
             meta = super().meta
             if meta:
@@ -791,6 +802,9 @@ class BlackfynnCache(XattrCache):
             # if we don't have a remote do not write to disk
             # because we don't know if it is a file or a folder
             super()._meta_setter(pathmeta, memory_only=memory_only)
+        elif not hasattr(self, '_in_bootstrap'):
+            # mini bootstrap whether you wanted it or not
+            self.bootstrap(pathmeta)
 
         if not self.exists():
             if memory_only:
