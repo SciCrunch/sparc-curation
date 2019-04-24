@@ -119,11 +119,10 @@ class Dispatch:
         self.args = args
         self.options = Options(args)
 
+        self._setup()  # if this isn't run up here the internal state of the program get's wonky
         if self.args['clone'] or self.args['meta']:
             # short circuit since we don't know where we are yet
             return
-
-        self._setup()
 
     def _setup(self):
         args = self.args
@@ -293,6 +292,11 @@ class Dispatch:
 
     def refresh(self):
         print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
+        Async()(deferred(path.remote.refresh)(update_cache=True,
+                                              update_data=self.options.get_data,
+                                              size_limit_mb=self.options.limit)
+                for path in self._paths)
+        return
         for path in self._paths:
             path.remote.refresh(update_cache=True,
                                 update_data=self.options.get_data,
@@ -301,11 +305,6 @@ class Dispatch:
 
         return
 
-        Async()(deferred(path.remote.refresh)(update_cache=True,
-                                              update_data=self.options.get_data,
-                                              size_limit_mb=self.options.limit)
-                for path in self._paths)
-        return
 
     def annos(self):
         args = self.args
@@ -567,7 +566,6 @@ class Dispatch:
         if not paths:
             paths = Path('.').resolve(),
 
-            
         old_level = log.level
         log.setLevel('ERROR')
         def inner(path):
@@ -581,12 +579,8 @@ class Dispatch:
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}')
 
-        self._setup()  # some metadata was missing
         for path in paths:
-            try:
-                inner(path)
-            except AttributeError:
-                inner(Path(str(path)))
+            inner(path)
 
         log.setLevel(old_level)
 

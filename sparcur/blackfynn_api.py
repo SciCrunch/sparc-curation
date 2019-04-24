@@ -174,9 +174,6 @@ class FakeBFile(File):
 
     
 # monkey patch for PackagesAPI.get
-wheeee = {
-    'includeAncestors': True
-}
 from future.utils import string_types
 def get(self, pkg, include='files,source'):
     """
@@ -187,7 +184,7 @@ def get(self, pkg, include='files,source'):
     """
     pkg_id = self._get_id(pkg)
 
-    params = wheeee
+    params = {'includeAncestors': 'true'}
     if include is not None:
         if isinstance(include, string_types):
             params.update({'include': include})
@@ -733,6 +730,7 @@ class BFLocal:
                 # TODO checksum may no longer match since we changed it
 
     def get(self, id):
+        log.critical('We have gone to the network!')
         if id.startswith('N:dataset:'):
             thing = self.bf.get_dataset(id)  # heterogenity is fun!
         elif id.startswith('N:organization:'):

@@ -206,7 +206,6 @@ class RemotePath:
 
         if cache.id is not None and cache.id != self.id:
             # yay! we are finally to the point of needing to filter files vs packages :D !?!? maybe?
-            #breakpoint()
             if self.meta.created < cache.meta.created:  # same filename different blackfynn id
                 # when they 'delete' files they still show up in the root
                 # but then you have to know which came after which ...  ???
@@ -301,7 +300,7 @@ class RemotePath:
     @property
     def parts(self):
         if not hasattr(self, '_parts'):
-            self._parts = tuple(self.relative_to(self.anchor))
+            self._parts = tuple(self._parts_relative_to(self.anchor))
 
         return self._parts
 
@@ -341,7 +340,7 @@ class RemotePath:
 class AugmentedPath(PosixPath):
     """ extra conveniences, mostly things that are fixed in 3.7 using IGNORE_ERROS """
 
-    __stack = []  # pushd and popd
+    _stack = []  # pushd and popd
 
     def exists(self):
         """ Turns out that python doesn't know how to stat symlinks that point
@@ -507,7 +506,6 @@ class CachePath(AugmentedPath):
                     #if meta is not None:
                         #self.meta = meta
                     #else:
-                        #breakpoint()
                         #raise TypeError('you have managed to have a remote but pass no meta ?!')
 
                     #if not hasattr(path, '_in_bootstrap'):  # FIXME this seems wrong?
@@ -524,9 +522,6 @@ class CachePath(AugmentedPath):
                 # know where the cache should live, which it doesn't
                 # use move instead for cases where the semantics are well defined
                 raise TypeError('Not entirely sure what to do in this case ...')
-
-        #if isinstance(self, SymlinkCache):
-            #breakpoint()
 
         return self
 
@@ -557,7 +552,6 @@ class CachePath(AugmentedPath):
                     self.meta = meta
                 elif not self.is_helper_cache:
                     meta = self.recover_meta()
-                    #breakpoint()
             elif self.is_broken_symlink():
                 # symlink that exists so overwrite
                 self.meta = meta
@@ -566,13 +560,12 @@ class CachePath(AugmentedPath):
                 self.bootstrap(meta)
             else:
                 # ok to hit this
-                msg = 'no meta, no helper cache, no symlink'
+                msg = f'no meta, no helper cache, no symlink {self}'
                 #log.critical(msg)
                 raise exc.NoCachedMetadataError(msg)
 
             if not self.is_helper_cache:
                 if self.meta is not None:
-                    #breakpoint()
                     if self.id.startswith('N:organization:'):  # FIXME
                         self._organization = self
 
@@ -596,7 +589,6 @@ class CachePath(AugmentedPath):
             try:
                 child = self._make_child(key._parts_relative_to(self.remote), key)
             except AttributeError as e:
-                #breakpoint()
                 raise exc.SparCurError('aaaaaaaaaaaaaaaaaaaaaa') from e
 
             return child
@@ -620,16 +612,18 @@ class CachePath(AugmentedPath):
         if isinstance(remote, RemotePath):
             #log.debug('remoooote')
             child._remote = remote  # have to use _remote since this is construction
-            child.bootstrap(remote.meta)  # FIXME indicates that maybe we want bootstrap to be meta setter?
+            #child.bootstrap(remote.meta)  # FIXME indicates that maybe we want bootstrap to be meta setter?
             child.meta = remote.meta
             child.remote
             #child.meta = child.meta
             if not hasattr(remote, '_cache') or remote._cache is None:
                 remote.cache = child
             else:
-                log.warning('Trying to set cache when it already exists!')
+                #log.warning('Trying to set cache when it already exists!')
+                #raise BaseException
+                pass
         else:
-            breakpoint()
+            raise ValueError('should not happen')
 
         return child
 
@@ -730,7 +724,6 @@ class CachePath(AugmentedPath):
                 log.warning(f'Existing meta for {self!r} no id so overwriting\n{self.meta}')
 
             if self.remote is None:
-                #breakpoint()
                 raise AssertionError
 
         elif self.id != meta.id:
@@ -886,9 +879,6 @@ class CachePath(AugmentedPath):
 
             if not hasattr(self, '_remote'):
                 id = self.id
-                if id.startswith('EUf5'):
-                    breakpoint()
-                log.debug(id)
                 self.remote = self._remote_class(id, cache=self)
 
             return self._remote
@@ -925,7 +915,7 @@ class CachePath(AugmentedPath):
             # make sure no monkey business is going on at least in the local graph
             #if self.parent and self.local.parent.cache.meta.id == self.parent.id:  # cache parents are from the file system so dont need
             if remote.parent is None:
-                #breakpoint()
+                self.refresh()
                 log.debug(f'no remote parent -> organization??? {remote}')
                 # Nope, apparently these are deleted files
                 # need to figure out what to do about these
@@ -985,14 +975,11 @@ class CachePath(AugmentedPath):
     def recover_meta(self):
         """ rebuild restore reconnect """
 
-        breakpoint()
         children = list(self.parent.remote.children)  # if this is run from dismatch meta we have issues
         isf = self.is_file()
         isd = self.is_dir()
         candidates = []
-        for child in children:
-            # it looks like if we do fail over to retrieving a package it does go to files
-            # so this is an ok approach and we don't have to deal with that at this level
+        def inner(child):
             if child.is_dir() and isd:
                 if child.name == self.name:
                     self.meta = child.meta
@@ -1012,17 +999,27 @@ class CachePath(AugmentedPath):
                     candidates.append(child)
 
             else:
-                #breakpoint()
                 #log.critical('file type mismatch')
                 pass
 
+        for child in children:
+            inner(child)
+            # it looks like if we do fail over to retrieving a package it does go to files
+            # so this is an ok approach and we don't have to deal with that at this level
         if not candidates:
             wat = '\n'.join(c.name for c in children)
-            #breakpoint()
             message = (f'We seem to have lost {self.parent} -/-> {self.name}'
                        f'\n{self.parent.human_uri}\n{wat}\n{self.name}')
             log.critical(message)
-            self.dataset.bootstrap(recursive=True)
+            dataset = self.dataset
+            maybe = []
+            for c in self.dataset.remote.rchildren:
+                if c.parent and c.parent.id == self.parent.id or c.stem == self.stem:
+                    maybe.append(c)
+
+            [inner(m) for m in maybe]
+            #candidates
+            #dataset.bootstrap(dataset.meta, recursive=True)
             #raise exc.NoRemoteMappingError
 
         elif len(candidates) == 1:
@@ -1032,7 +1029,6 @@ class CachePath(AugmentedPath):
             self.meta = remote.meta  # go ahead and set this even though we change?
             self.move(remote=remote)
         else:
-            breakpoint()
             raise BaseException('multiple candidates!')
 
     @property
@@ -1048,31 +1044,33 @@ class CachePath(AugmentedPath):
             raise TypeError('either remote or meta and target are required arguments')
 
         if remote:
-            target = self.local.parent / remote.name
+            #remote.parts()
+            #remote.anchor
+            target = self.anchor / remote
+            #target = self.local.__class__()
+            #self.local.parent / remote.name
             kwargs = dict(remote=remote)
             meta = remote.meta
         else:
             kwargs = dict(meta=meta)
 
         if target.absolute() == self.absolute():
-            log.warning('trying to move a file onto itself {self.absolute()}')
+            log.warning(f'trying to move a file onto itself {self.absolute()}')
             if remote:  # preserve remote updating semantics even if we do not move
                 # probably a bad design choice here ...
                 self.remote = remote
 
-            return 
+            return
 
         if target.exists() or target.is_symlink():
-            if target.cache.id == remote.id:
+            if target.id == remote.id:
                 if self.is_symlink():
-                    log.error('file was not removed during the previous move! {self} -/-> {target.cache}')
+                    log.error('file was not removed during the previous move!\n{self} -/-> {target.cache}')
             else:
-                breakpoint()
                 raise exc.PathExistsError(f'{target} already exists!')
 
         if self.exists():
             os.rename(self, target)
-            breakpoint()
             # FIXME need a unified interface for checking data ...
             # so don't have to keep reimplementing it
             # FIXME lots of overlap with the calling scope
@@ -1115,7 +1113,7 @@ class CachePath(AugmentedPath):
 
     def __repr__(self):
         local = repr(self.local) if self.local else 'No local??' + str(self)
-        remote = (f'{self.remote.__class__.__name__}({self.remote.meta.id!r})'
+        remote = (f'{self.remote.__class__.__name__}({self.id!r})'
                   if self.remote else str(self.id))
         return self.__class__.__name__ + ' <' + local + ' -> ' + remote + '>'
 
@@ -1204,9 +1202,9 @@ class SqliteCache(CachePath):
 
 class SymlinkCache(CachePath):
 
-    def __init__(self, *args, **kwargs):
-        if 'meta' in kwargs:
-            self.meta = kwargs.pop('meta')
+    def __init__(self, *args, meta=None, **kwargs):
+        if meta is not None:
+            self.meta = meta
 
     @property
     def meta(self):
@@ -1379,10 +1377,7 @@ class BlackfynnCache(XattrCache):
 
     @property
     def dataset(self):
-        if self.id is None:
-            return None
-
-        if self.id.startswith('N:dataset:'):
+        if self.id and self.id.startswith('N:dataset:'):
             return self
 
         elif self.parent and self.parent != self:  # Path('.') issue
@@ -1466,7 +1461,7 @@ class LocalPath(AugmentedPath):
     @classmethod
     def setup(cls, cache_class, remote_class_factory):
         """ call this once to bind everything together """
-        cache_class.setup(cls, remote_class_factory )
+        cache_class.setup(cls, remote_class_factory)
 
     @property
     def remote(self):
@@ -1708,7 +1703,6 @@ class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
                 print(' '.join(command))
                 break
                 process_window.set_wm_name(new_name)
-                breakpoint()
                 break
             else:
                 sleep(.01)  # spin a bit more slowly

@@ -195,11 +195,11 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 log.critical('Could not connect to blackfynn')
                 #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
 
-
         else:
             raise TypeError(f'{type(anchor_or_bfl)} is not BFLocal or BlackfynnCache!')
 
         self = super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
+        self.errors = []
         self.root = self.bfl.organization.id
         return self
 
@@ -214,9 +214,42 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
         else:
             raise FileNotFoundError(f'{package} has no file with id {file_id} but has:\n{files}')
-        
-    def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None, helper_index=None):
 
+    def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None):
+        if isinstance(id_bfo_or_bfr, self.__class__):
+            bfobject = id_bfo_or_bfr.bfobject
+
+        elif isinstance(id_bfo_or_bfr, BaseNode):
+            bfobject = id_bfo_or_bfr
+
+        elif isinstance(id_bfo_or_bfr, str):
+            bfobject = self.bfl.get(id_bfo_or_bfr)
+
+        else:
+            raise TypeError(id_bfo_or_bfr)
+
+        if hasattr(bfobject, '_json'):
+            # constructed from a packages query
+            # which we need in order for things to be fastish
+            self.bfobject = bfobject
+            return
+
+        if isinstance(bfobject, DataPackage):
+            files = bfobject.files
+            parent = bfobject.parent
+            if files:
+                if len(files) > 1:
+                    log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+                else:
+                    bfobject = files[0]
+                    bfobject.parent = parent
+            else:
+                log.warning(f'No files in package {package.id}')
+
+        self.bfobject = bfobject
+
+    def __dead_init__(self):
+        return
         self.errors = []
         if helper_index is not None:
             self.helper_index.update(helper_index)
@@ -253,7 +286,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
             if id_bfo_or_bfr == self.root:
                 if self.cache is None:
-                    #breakpoint()
                     raise ValueError('where is your cache m8 you are root!')
 
                 self.__class__._organization = self
@@ -471,7 +503,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             if parent in self.helper_index:
                 return self.helper_index[parent]
             else:
-                breakpoint()
                 raise TypeError('grrrrrrrrrrrrrrr')
 
         if parent:
@@ -488,7 +519,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             for dataset in self.bfobject.datasets:
                 child = self.__class__(dataset)
                 self.cache / child  # construction will cause registration without needing to assign
-                #breakpoint()
                 assert child.cache
                 yield child
         else:
@@ -522,6 +552,9 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     def refresh(self, update_cache=False, update_data=False, size_limit_mb=2):
         old_meta = self.meta
+        if hasattr(self, '_path'):
+            delattr(self, '_path')
+
         super().refresh()
         if self.isinstance_bf(File):
             file_id = self.meta.file_id
@@ -529,7 +562,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 package = self.bfl.get(self.id)
                 for i, file in enumerate(package.files):
                     if file.id == file_id:
-                        #breakpoint()
                         file.parent = package.parent  # NOTE this means our files are not like the others
                         self.bfobject = file
 
@@ -589,7 +621,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 changed = True
 
             if not self.from_packages and self.cache.name != self.name:
-                #breakpoint()
                 log.debug(f'{self.cache.name} != {self.name}')
                 self.cache.move(remote=self)  # move handles updating all the mappings
             else:
