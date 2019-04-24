@@ -431,9 +431,9 @@ class CachePath(AugmentedPath):
         if isinstance(key, RemotePath):
             # FIXME not just names but relative paths???
             try:
-                child = self._make_child((key.name,), key)
+                child = self._make_child(key._parts_relative_to(self.remote), key)
             except AttributeError as e:
-                #breakpoint()
+                breakpoint()
                 raise exc.SparCurError('aaaaaaaaaaaaaaaaaaaaaa') from e
 
             return child
@@ -1125,15 +1125,7 @@ class BlackfynnCache(XattrCache):
         # have to express the generator to build the index
         # otherwise child.parents will not work correctly (annoying)
         for child_remote in self.remote.rchildren:
-            parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
-            # have a look at how pathlib implements parents
-            for parent_remote in child_remote.parents:
-                if parent_remote == self.remote:
-                    break
-                else:
-                    parent_names.append(parent_remote.name)
-
-            args = (*reversed(parent_names), child_remote.name)
+            args = child_remote._parts_relative_to(self.remote)  # usually this would just be one level
             child_cache = self._make_child(args, child_remote)
             #child_cache = self
             #child_path = self.__class__(self, *args)

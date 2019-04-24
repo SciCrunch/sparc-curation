@@ -32,6 +32,7 @@ blackfynn-mvp-secret: ${apisecret}
 
 import io
 import os
+import json
 import asyncio
 from copy import deepcopy
 from nibabel import nifti1
@@ -173,7 +174,6 @@ class FakeBFile(File):
 def packages(self, pageSize=1000, includeSourceFiles=True):
     """ python implementation to make use of /dataset/{id}/packages """
     remapids = {}
-    index = {self.id:self}  # make sure that dataset is in the index
     def restructure(j):
         """ restructure package json to match what api needs? """
         # FIXME something's still wonky here
@@ -194,6 +194,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 #c['parent'] = remapids['latest']
         return j
 
+    index = {self.id:self}  # make sure that dataset is in the index
     session = self._api.session
     #cursor
     #pageSize
@@ -256,6 +257,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                     elif bfobject.parent is None:
                         # both collections and packages can be at the top level
                         # dataset was set to its bfobject repr above so safe to yield
+                        log.debug(json.dumps(bfobject._json, indent=2))
                         index[bfobject.id] = bfobject
                         yield bfobject
                     else:

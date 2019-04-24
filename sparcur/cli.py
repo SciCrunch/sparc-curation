@@ -164,11 +164,11 @@ class Dispatch:
 
     @property
     def directories(self):
-        return [Path(string_dir) for string_dir in self.args['<directory>']]
+        return [Path(string_dir).absolute() for string_dir in self.args['<directory>']]
 
     @property
     def paths(self):
-        return [Path(string_path) for string_path in self.args['<path>']]
+        return [Path(string_path).absolute() for string_path in self.args['<path>']]
 
     def clone(self):
         print('asdfasdfasdfasdf')
@@ -211,7 +211,6 @@ class Dispatch:
                      for c in (d.rchildren if self.recursive else d.children)
                      if not c.is_dir() or self.include_folders)
 
-        embed()
         #Async()(deferred(path.remote.refresh)(update_cache=True) for path in paths)
         for path in paths:
             path.remote.refresh(update_cache=True)

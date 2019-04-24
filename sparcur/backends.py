@@ -270,7 +270,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
             if id_bfo_or_bfr == self.root:
                 if self.cache is None:
-                    breakpoint()
+                    #breakpoint()
                     raise ValueError('where is your cache m8 you are root!')
 
                 self.__class__._organization = self
@@ -321,16 +321,19 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     @property
     def organization(self):
+        # organization is the root in this system so
+        # we do not want to depend on parent to look this up
+        # nesting organizations is file, but we need to know
+        # what the 'expected' root is independent of the actual root
+        # because if you have multiple virtual trees on top of the
+        # same file system then you need to know the root for
+        # your current tree assuming that the underlying ids
+        # can be reused (as in something like dat)
+
         if not hasattr(self.__class__, '_organization'):
             self.__class__._organization = self.__class__(self.bfl.organization)
 
         return self._organization
-
-        # alternate version ... possibly more consistent
-        if isinstance(self.bfobject, Organization):
-            return self
-        elif self.parent is not None:
-            return self.parent.organization
 
     def is_organization(self):
         return isinstance(self.bfobject, Organization)
@@ -423,7 +426,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             return None
 
         elif isinstance(self.bfobject, Dataset):
-            parent = self.bfobject._api._context
+            return self.organization
+            #parent = self.bfobject._api._context
 
         else:
             parent = self.bfobject.parent
@@ -438,7 +442,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 raise TypeError('grrrrrrrrrrrrrrr')
 
         if parent:
-            return self.__class__(parent, cache=self.cache.parent)
+            parent_cache = self.cache.parent if self.cache is not None else None
+            return self.__class__(parent, cache=parent_cache)
 
     @property
     def parents(self):
@@ -446,6 +451,34 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         while parent:
             yield parent
             parent = parent.parent
+
+    def as_path(self):
+        """ returns the relative path construction for the child so that local can make use of it """
+        return PurePosixPath(*self.parts)
+
+    def _parts_relative_to(self, remote):
+        parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
+        # have a look at how pathlib implements parents
+        for parent in self.parents:
+            if parent == remote:
+                break
+            elif parent is None:
+                continue  # value error incoming
+            else:
+                parent_names.append(parent.name)
+
+        else:
+            raise ValueError(f'{remote} is not one of {self}\'s parents')
+
+        args = (*reversed(parent_names), self.name)
+        return args
+
+    @property
+    def parts(self):
+        if not hasattr(self, '_parts'):
+            self._parts = tuple(self.relative_to(self.organization))
+
+        return self._parts
 
     @property
     def children(self):
@@ -498,6 +531,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 package = self.bfl.get(self.id)
                 for i, file in enumerate(package.files):
                     if file.id == file_id:
+                        #breakpoint()
+                        file.parent = package.parent  # NOTE this means our files are not like the others
                         self.bfobject = file
 
                 if i:
