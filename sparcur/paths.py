@@ -985,7 +985,8 @@ class CachePath(AugmentedPath):
     def recover_meta(self):
         """ rebuild restore reconnect """
 
-        children = list(self.parent.remote.children)
+        breakpoint()
+        children = list(self.parent.remote.children)  # if this is run from dismatch meta we have issues
         isf = self.is_file()
         isd = self.is_dir()
         candidates = []
@@ -1018,8 +1019,11 @@ class CachePath(AugmentedPath):
         if not candidates:
             wat = '\n'.join(c.name for c in children)
             #breakpoint()
-            raise exc.NoRemoteMappingError(f'We seem to have lost {self.parent} -/-> {self.name}'
-                                            f'\n{self.parent.human_uri}\n{wat}\n{self.name}')
+            message = (f'We seem to have lost {self.parent} -/-> {self.name}'
+                       f'\n{self.parent.human_uri}\n{wat}\n{self.name}')
+            log.critical(message)
+            self.dataset.bootstrap(recursive=True)
+            #raise exc.NoRemoteMappingError
 
         elif len(candidates) == 1:
             remote = candidates[0]

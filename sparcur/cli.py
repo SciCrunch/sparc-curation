@@ -12,7 +12,7 @@ Usage:
     spc xattrs
     spc export
     spc demos
-    spc shell
+    spc shell [<path>...]
     spc feedback <feedback-file> <feedback>...
     spc find [options] <file>...
     spc find [options] --name=<PAT>...
@@ -209,7 +209,7 @@ class Dispatch:
             paths = Path('.').resolve(),
         
         if self.options.only_meta:
-            paths = (mp for p in paths for mp in FTLax(p).meta_paths)
+            paths = (mp.resolve() for p in paths for mp in FTLax(p).meta_paths)
             yield from paths
             return
 
@@ -570,7 +570,7 @@ class Dispatch:
             
         old_level = log.level
         log.setLevel('ERROR')
-        for path in paths:
+        def inner(path):
             if self.options.uri:
                 uri = path.cache.human_uri
                 print('+' + '-' * (len(uri) + 2) + '+')
@@ -580,6 +580,13 @@ class Dispatch:
                 print(path.cache.meta.as_pretty())
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}')
+
+        self._setup()  # some metadata was missing
+        for path in paths:
+            try:
+                inner(path)
+            except AttributeError:
+                inner(Path(str(path)))
 
         log.setLevel(old_level)
 
