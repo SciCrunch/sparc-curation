@@ -2,8 +2,8 @@
 """ SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
     spc clone <project-id>
-    spc pull
-    spc refresh
+    spc pull [options] [<directory>...]
+    spc refresh [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
     spc report [completeness filetypes keywords subjects] [options]
@@ -36,8 +36,12 @@ Options:
     -v --verbose            print extra information
     -p --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
-    -d --debug              drop into a shell after running a step
+    -e --empty              only pull empty directories
 
+    -s --single-level       do not perform the operation recursively
+    -i --include-folders    include folders when refreshing remote metadata
+
+    -d --debug              drop into a shell after running a step
 """
 
 import sys
@@ -45,9 +49,11 @@ import csv
 import json
 import pprint
 from datetime import datetime
+from itertools import chain
 from collections import Counter
 import requests
 from terminaltables import AsciiTable
+from pyontutils.utils import Async, deferred
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
@@ -144,6 +150,26 @@ class Dispatch:
     def overwrite(self):
         return self.args['--overwrite']
 
+    @property
+    def empty(self):
+        return self.args['--empty']
+
+    @property
+    def recursive(self):
+        return not self.args['--single-level']
+
+    @property
+    def include_folders(self):
+        return self.args['--include-folders']
+
+    @property
+    def directories(self):
+        return [Path(string_dir) for string_dir in self.args['<directory>']]
+
+    @property
+    def paths(self):
+        return [Path(string_path) for string_path in self.args['<path>']]
+
     def clone(self):
         print('asdfasdfasdfasdf')
         project_id = self.args['<project-id>']
@@ -161,6 +187,7 @@ class Dispatch:
                 sys.exit(2)
         try:
             if anchor.anchor is not None:
+                embed()
                 message = f'fatal: already in project located at {anchor.anchor.resolve()!r}'
                 print(message)
                 sys.exit(3)
@@ -172,10 +199,23 @@ class Dispatch:
         anchor.bootstrap(meta, recursive=True)
 
     def refresh(self):
-        Async()(deferred(c.remote.refresh)(update_cache=True)
-                for d in self.datasets_local
-                for c in d.children
-                if not child.is_dir())
+        paths = self.paths
+        if paths and self.recursive:  # FIXME recursive is weird here
+            paths = (rc for p in paths
+                     for rc in
+                     (chain(p.rchildren, (p,)) if p.is_dir() else (p,))
+                     if not rc.is_dir() or self.include_folders)
+
+        if not paths:
+            paths = (c for d in self.datasets_local
+                     for c in (d.rchildren if self.recursive else d.children)
+                     if not c.is_dir() or self.include_folders)
+
+        embed()
+        #Async()(deferred(path.remote.refresh)(update_cache=True) for path in paths)
+        for path in paths:
+            path.remote.refresh(update_cache=True)
+
         return
         for d in self.datasets_local:
             for child in d.children:
@@ -189,11 +229,23 @@ class Dispatch:
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
-        only = (
-            'N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b',  # howard for / in filename
-                )
         only = tuple()
-        self.anchor.remote.bootstrap(recursive=True, only=only, skip=skip)
+        dirs = self.directories
+        if dirs:
+            for d in dirs:
+                if d.is_dir():
+                    if not d.remote.is_dataset():
+                        log.warning('You are pulling recursively from below dataset level.')
+
+                    d.remote.bootstrap(recursive=self.recursive)
+
+        elif self.empty:
+            for child in self.anchor.local.children:
+                if not list(child.children):
+                    child.remote.bootstrap(recursive=self.recursive)
+
+        else:
+            self.anchor.remote.bootstrap(recursive=self.recursive, only=only, skip=skip)
 
     def annos(self):
         args = self.args
@@ -217,9 +269,9 @@ class Dispatch:
         data = []
 
         for d in dirs:
-            path = Path(d).resolve()
             if not path.is_dir():
-                continue  # helper files at the top level
+                continue  # helper files at the top level, and the symlinks that destory python
+            path = Path(d).resolve()
             paths = path.children #list(path.rglob('*'))
             path_meta = {p:p.cache.meta for p in paths}
             outstanding = 0
@@ -311,7 +363,7 @@ class Dispatch:
             error_messages = [e['message'] for d in dowe['datasets'] for e in d['errors']]
 
         rchilds = list(datasets[0].rchildren)
-        package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
+        #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
         embed()
 
     def tables(self):

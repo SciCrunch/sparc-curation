@@ -129,7 +129,7 @@ class FakeBFile(File):
 
     def __init__(self, package, **kwargs):
         self.package = package
-        self.__kwargs = kwargs
+        self._json = kwargs
         def move(*tuples):
             for f, t in tuples:
                 kwargs[t] = kwargs.pop(f)
@@ -165,7 +165,7 @@ class FakeBFile(File):
     def __repr__(self):
         return ('<' +
                 self.__class__.__name__ +
-                ' '.join(f'{k}={v}' for k, v in self.__kwargs.items()) +
+                ' '.join(f'{k}={v}' for k, v in self._json.items()) +
                 '>')
 
 

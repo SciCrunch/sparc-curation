@@ -232,7 +232,19 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         self.root = self.bfl.organization.id
         return self
 
-    def __init__(self, id_bfo_or_bfr, cache=None, helper_index=None):
+    @staticmethod
+    def get_file(package, file_id):
+        files = package.files
+        if len(files) > 1:
+            log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+        for file in files:
+            if file.id == file_id:
+                return file
+
+        else:
+            raise FileNotFoundError(f'{package} has no file with id {file_id} but has:\n{files}')
+        
+    def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None, helper_index=None):
 
         self.errors = []
         if helper_index is not None:
@@ -247,10 +259,16 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         elif isinstance(id_bfo_or_bfr, BaseNode):
             bfobject = id_bfo_or_bfr
         elif id_bfo_or_bfr.startswith('N:organization:'):
-            if hasattr(self.__class__, '_organization'):
-                raise TypeError('You already have a perfectly good organization')
+            # FIXME right now I require a 1:1 mapping between
+            # each local object, cache object, and remote object
+            # as a part of the _implementation_, so we do have to
+            # be able to duplicate this one, this is OK
+            # this is an optimization which we don't strictly have
+            # to adhere to, and has caused a lot of trouble :/
+            #if hasattr(self.__class__, '_organization'):
+                #raise TypeError('You already have a perfectly good organization')
 
-            elif id_bfo_or_bfr == self.root:
+            if id_bfo_or_bfr == self.root:
                 if self.cache is None:
                     breakpoint()
                     raise ValueError('where is your cache m8 you are root!')
@@ -262,12 +280,30 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         else:
             #raise ValueError(f'why are you doing this {id_bfo_or_bfr}')  # because refresh
             bfobject = self.bfl.get(id_bfo_or_bfr)
+            if isinstance(bfobject, DataPackage):
+                if file_id is not None:
+                    bfobject = self.get_file(self, file_id)
+                else:
+                    files = bfobject.files
+                    if files:
+                        if len(files) > 1:
+                            log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+                        else:
+                            bfobject = files[0]
+                    else:
+                        log.warning(f'No files in package {package.id}')
+
+            elif file_id is not None:
+                raise TypeError(f'trying to get file id for a {bfobject}')
 
         if bfobject is None:
             raise TypeError('bfobject cannot be None!')
 
         elif isinstance(bfobject, str):
             raise TypeError(f'bfobject cannot be str! {bfobject}')
+
+        elif isinstance(bfobject.id, int):
+            pass  # it's a file object so don't check its id as a string
 
         elif bfobject.id.startswith('N:organization:') and hasattr(self.__class__, '_organization'):
             raise TypeError('You already have a perfectly good organization')
@@ -290,6 +326,22 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
         return self._organization
 
+        # alternate version ... possibly more consistent
+        if isinstance(self.bfobject, Organization):
+            return self
+        elif self.parent is not None:
+            return self.parent.organization
+
+    def is_organization(self):
+        return isinstance(self.bfobject, Organization)
+
+    def is_dataset(self):
+        return isinstance(self.bfobject, Dataset)
+
+    @property
+    def from_packages(self):
+        return hasattr(self.bfobject, '_json')
+
     @property
     def name(self):
         name = self.bfobject.name
@@ -300,7 +352,12 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             name = name.replace('/', '_')
             self.bfobject.name = name  # AND DON'T BOTHER US AGAIN
 
-        if ([t for t in (DataPackage, File) if isinstance(self.bfobject, t)] and
+        if isinstance(self.bfobject, File) and not self.from_packages:
+            realname = os.path.basename(self.bfobject.s3_key)
+            if name != realname:  # mega weirdness
+                name = realname
+
+        elif ([t for t in (DataPackage, File) if isinstance(self.bfobject, t)] and
             self.bfobject.type != 'Unknown'):
             # NOTE we have to use blackfynns extensions until we retrieve the files
             name += '.' + self.bfobject.type.lower()  # FIXME ... can we match s3key?
@@ -381,7 +438,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 raise TypeError('grrrrrrrrrrrrrrr')
 
         if parent:
-            return self.__class__(parent, self.cache.parent)
+            return self.__class__(parent, cache=self.cache.parent)
 
     @property
     def parents(self):
@@ -432,7 +489,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     def isinstance_bf(self, *types):
         return [t for t in types if isinstance(self.bfobject, t)]
 
-    def refresh(self, update_cache=False):
+    def refresh(self, update_cache=False, update_data=False, size_limit_mb=2):
         old_meta = self.meta
         super().refresh()
         if self.isinstance_bf(File):
@@ -489,12 +546,23 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # code that pulls data, not the code that waits for things that want to push
         # but, this is sort of where one would want to log all the transactions
         log.debug(f'things needing action: {self.name: <60} {actions}')  # TODO  processing actions move change update delete
+        changed = False
         if update_cache:
             c, d = new_meta.__reduce__()
             om = c(**d)
             log.debug(f'updating cache {om}')
             assert self.meta is new_meta
-            self.cache.meta = new_meta
+            if self.cache.meta != new_meta:
+                changed = True
+            if not self.from_packages and self.cache.name != self.name:
+                #breakpoint()
+                log.debug(f'{self.cache.name} != {self.name}')
+                self.cache = self.cache.move(remote=self)
+            else:
+                self.cache.meta = new_meta
+
+        if changed and update_data and new_meta.size.mb < size_limit_mb:
+            self.cache.local.data = self.data
 
     @property
     def data(self):

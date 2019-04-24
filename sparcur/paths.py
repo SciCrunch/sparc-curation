@@ -31,8 +31,10 @@ import os
 import sys
 import base64
 import hashlib
+import pathlib
 import subprocess
 from time import sleep
+from errno import ELOOP, ENOENT, ENOTDIR, EBADF
 from pathlib import PosixPath, PurePosixPath
 from datetime import datetime
 import xattr
@@ -44,6 +46,43 @@ from sparcur import exceptions as exc
 from sparcur.core import log
 from sparcur.pathmeta import PathMeta
 from pyontutils.utils import sysidpath
+
+# FIXME 3.7 fix only ...
+if sys.version_info >= (3, 7):
+    pathlib._IGNORED_ERROS += (ELOOP,)
+    def _ignore_error(exception):
+        pass
+else:
+    _IGNORED_ERROS = (ENOENT, ENOTDIR, EBADF, ELOOP)
+    def _ignore_error(exception):
+        return (getattr(exception, 'errno', None) in _IGNORED_ERROS)
+
+    def _is_dir(entry):
+        try:
+            return entry.is_dir()
+        except OSError as e:
+            if not _ignore_error(e):
+                raise
+
+            return False
+
+    def _iterate_directories(self, parent_path, is_dir, scandir):
+        """ patched to fix is_dir() erron """
+        yield parent_path
+        try:
+            entries = list(scandir(parent_path))
+            for entry in entries:
+                if _is_dir(entry) and not entry.is_symlink():
+                    path = parent_path._make_child_relpath(entry.name)
+                    for p in self._iterate_directories(path, is_dir, scandir):
+                        yield p
+        except PermissionError:
+            return
+
+    pathlib._RecursiveWildcardSelector._iterate_directories = _iterate_directories
+
+
+
 
 # remote data about remote objects -> remote_meta
 # local data about remote objects -> cache_meta
@@ -85,8 +124,9 @@ class RemotePath:
 
     def __init__(self, id, cache=None):
         self.id = id
-        self.cache = cache
-        self.cache._remote = self
+        if cache is not None:
+            self.cache = cache
+            self.cache._remote = self
 
     @property
     def cache(self):
@@ -107,7 +147,7 @@ class RemotePath:
 
     @cache.setter
     def cache(self, cache):
-        if cache.meta is None:
+        if cache.meta is None:  # FIXME this can't really happen since cache needs the id beforehand
             cache.meta = self.meta  # also easier than bootstrapping ...
 
         if cache.id is not None and cache.id != self.id:
@@ -199,7 +239,7 @@ class RemotePath:
 
 
 class AugmentedPath(PosixPath):
-    """ extra conveniences """
+    """ extra conveniences, mostly things that are fixed in 3.7 using IGNORE_ERROS """
 
     def exists(self):
         """ Turns out that python doesn't know how to stat symlinks that point
@@ -207,43 +247,47 @@ class AugmentedPath(PosixPath):
             so a reasonable way to short circuit the issue """
         try:
             return super().exists()
-        except OSError:
+        except OSError as e:
+            if not _ignore_error(e):
+                raise
+
             return False
 
     def is_file(self):
         try:
             return super().is_file()
         except OSError as e:
-            if e.errno == 40:
-                return False
-            else:
-                raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
+            if not _ignore_error(e):
+                raise
+
+            return False
 
     def is_dir(self):
         try:
             return super().is_dir()
         except OSError as e:
-            if e.errno == 40:
-                return False
-            else:
-                raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
+            if not _ignore_error(e):
+                raise
+
+            return False
 
     def is_symlink(self):
         try:
             return super().is_symlink()
-        except OSError:
-            if os.errno == 40:
-                return True
-            else:
-                raise exc.UnhandledTypeError(f'unknown os errno {e.errno}') from e
+        except OSError as e:
+            if not _ignore_error(e):
+                raise
+
+            return False
 
     def resolve(self):
         try:
             return super().resolve()
         except RuntimeError as e:
-            log.warning('Unless this call to resolve was a mistake you should switch '
-                        'to using readlink instead. Uncomment raise e to get a trace.')
-            raise e
+            msg = ('Unless this call to resolve was a mistake you should switch '
+                   'to using readlink instead. Uncomment raise e to get a trace.\n'
+                   'Alternately you might want to use absolute() in this situation instead?')
+            raise RuntimeError(msg) from e
 
     def readlink(self):
         """ this returns the string of the link only due to cycle issues """
@@ -285,7 +329,7 @@ class CachePath(AugmentedPath):
     _backup_cache = None
     _not_exists_cache = None
 
-    def __new__(cls, *args, meta=None, **kwargs):
+    def __new__(cls, *args, meta=None, remote=None, **kwargs):
         # TODO do we need a version of this for the locals
         # and remotes? I don't think we create 'alternate' remotes or locals ...
 
@@ -325,6 +369,11 @@ class CachePath(AugmentedPath):
                 path._cache = self
 
             elif isinstance(path, RemotePath):
+                #self._remote = path
+                #self.meta = path.meta
+                # in order for this to work the remote has to already
+                # know where the cache should live, which it doesn't
+                # use move instead for cases where the semantics are well defined
                 raise TypeError('Not entirely sure what to do in this case ...')
 
         #if isinstance(self, SymlinkCache):
@@ -332,23 +381,31 @@ class CachePath(AugmentedPath):
 
         return self
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, meta=None, remote=None, **kwargs):
         # FIXME not really the init for CachePath ... more BlackfynnCache
         if self.id is None:
-            if 'meta' not in kwargs or kwargs['meta'] is None:
-                msg = f'No cached meta exists and no meta provided for {self}'
+            if meta is None and remote is None:
+                msg = f'No cached meta exists and no meta and no remote provided for {self}'
                 raise exc.NoCachedMetadataError(msg)
+            elif remote and meta:
+                raise TypeError(f'can only have one remote or one meta')
+            elif remote is not None:
+                if remote.name != self.name:
+                    raise ValueError('remote has a different name {self.name} != {remote.name}')
+                self.remote = remote
+                return
 
+            # we received meta
             if self.exists() and (self.meta and self.meta.id == meta.id
                                   or not self.meta):
                 # file or folder that exists
-                self.meta = kwargs.pop('meta')
+                self.meta = meta
             elif not self.exists() and self.is_symlink():
                 # symlink that exists so overwrite
-                self.meta = kwargs.pop('meta')
+                self.meta = meta
             elif not self.is_helper_cache:
                 # there is nothing we should bootstrap
-                self.bootstrap(kwargs.pop('meta'))
+                self.bootstrap(meta)
             else:
                 log.critical('how did we get here!?')
 
@@ -654,15 +711,15 @@ class CachePath(AugmentedPath):
         if self._remote_class_factory is not None:
             # we don't have to have a remote configured to check the cache
             if not hasattr(self, '_remote_class'):
-                log.debug('rc')
+                #log.debug('rc')
                 # NOTE there are many possible ways to set the anchor
                 # we need to pick _one_ of them
                 self._remote_class = self._remote_class_factory(self.anchor,
                                                                 self._local_class,
                                                                 self.__class__)
 
+
             if not hasattr(self, '_remote'):
-                #log.debug('r')
                 self.remote = self._remote_class(self.id, cache=self)
 
             return self._remote
@@ -697,7 +754,10 @@ class CachePath(AugmentedPath):
             #self._remote = remote
         else:
             # make sure no monkey business is going on at least in the local graph
-            if self.parent and self.local.parent.cache.meta.id == self.parent.id:
+            #if self.parent and self.local.parent.cache.meta.id == self.parent.id:  # cache parents are from the file system so dont need
+            if remote.parent is None:
+                breakpoint()
+            if self.parent and remote.parent.id == self.parent.id:  # we can avoid a net call since we just need the id
                 self._remote = remote
                 self.meta = remote.meta
                 # meta checks to see whethere there is a remote
@@ -745,6 +805,40 @@ class CachePath(AugmentedPath):
         # we don't keep two copies of the local data
         # unless we are doing a git-like thing
         raise NotImplementedError
+
+    def move(self, *, remote=None, target=None, meta=None):
+        """ instantiate a new cache and cleanup self because we are moving """
+        # FIXME what to do if we have data
+        if remote is None and (target is None or meta is None):
+            raise TypeError('either remote or meta and target are required arguments')
+
+        if remote:
+            target = self.local.parent / remote.name
+            kwargs = dict(remote=remote)
+        else:
+            kwargs = dict(meta=meta)
+
+        if target.absolute() == self.absolute():
+            log.warning('trying to move a file onto itself {self.absolute()}')
+            if remote:  # preserve remote updating semantics even if we do not move
+                # probably a bad design choice here ...
+                self.remote = remote
+
+            return 
+
+        if target.exists() or target.is_symlink():
+            raise exc.PathExistsError(f'{target} already exists!')
+
+        if self.exists():
+            os.rename(self, target)
+        elif self.is_symlink():
+            self.unlink()  # don't move the meta since it will break the naming insurance measure
+
+        for other in (self.local, self.remote):
+            if hasattr(self.local, '_cache'):
+                delattr(self.local, '_cache')
+
+        return self.__class__(target, **kwargs)
 
     def __repr__(self):
         local = repr(self.local) if self.local else 'No local??' + str(self)
@@ -889,9 +983,9 @@ class BlackfynnCache(XattrCache):
 
     @property
     def meta(self):
-        if hasattr(self, '_in_bootstrap'):
-            if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
-                return self._meta
+        #if hasattr(self, '_in_bootstrap'):
+        if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
+            return self._meta
 
         if self.exists():
             meta = super().meta
@@ -926,25 +1020,19 @@ class BlackfynnCache(XattrCache):
             return
 
         if not hasattr(self, '_remote') or self._remote is None:
-            # if we don't have a remote do not write to disk
-            # because we don't know if it is a file or a folder
-            super()._meta_setter(pathmeta, memory_only=memory_only)
-        #elif not hasattr(self, '_in_bootstrap'):
-            # mini bootstrap whether you wanted it or not
-            #self.bootstrap(pathmeta)
+            self._bootstrap_meta_memory(pathmeta)
 
-        if not self.exists():
-            if memory_only:
-                super()._meta_setter(pathmeta, memory_only=memory_only)
-            elif self._not_exists_cache:
-                cache = self._not_exists_cache(self, meta=pathmeta)
+        self._bootstrap_prepare_filesystem(parents=False, fetch_data=False, size_limit_mb=0)
+
+        if not self.exists() and self._not_exists_cache:
+            cache = self._not_exists_cache(self, meta=pathmeta)
         else:
             super()._meta_setter(pathmeta)
 
         if self._backup_cache:
             cache = self._backup_cache(self, meta=pathmeta)
 
-        if hasattr(self, '_meta'):  # FIXME who is setting this how and why!?
+        if hasattr(self, '_meta'):
             delattr(self, '_meta')
 
     @classmethod
