@@ -683,7 +683,7 @@ class CachePath(AugmentedPath):
                 return
             else:
                 # if you pass the only mask so do your children
-                log.info(f'Bootstrapping {id} -> {self.local!r}')
+                log.info(f'Bootstrapping {meta.id} -> {self.local!r}')
                 only = tuple()
 
 
@@ -992,7 +992,8 @@ class CachePath(AugmentedPath):
 
             else:
                 #breakpoint()
-                log.critical('file type mismatch')
+                #log.critical('file type mismatch')
+                pass
 
         if not candidates:
             breakpoint()
@@ -1046,6 +1047,7 @@ class CachePath(AugmentedPath):
 
         if self.exists():
             os.rename(self, target)
+            breakpoint()
             # FIXME need a unified interface for checking data ...
             # so don't have to keep reimplementing it
             # FIXME lots of overlap with the calling scope

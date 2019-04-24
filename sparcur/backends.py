@@ -330,6 +330,12 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         name = PurePosixPath(self._name)
         if isinstance(self.bfobject, File) and not self.from_packages:
             return name.suffix
+        elif isinstance(self.bfobject, Collection):
+            return ''
+        elif isinstance(self.bfobject, Dataset):
+            return ''
+        elif isinstance(self.bfobject, Organization):
+            return ''
         else:
             if hasattr(self.bfobject, 'type'):
                 type = self.bfobject.type.lower()  # FIXME ... can we match s3key?

@@ -287,22 +287,21 @@ class Dispatch:
 
         else:
             for path in self._paths:
-                print(path)
-                #path.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+                path.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
             #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
     def refresh(self):
-        for path in self._paths:
-            path.remote.refresh(update_cache=True,
-                                update_data=self.options.get_data,
-                                size_limit_mb=self.options.limit)
-
-        return
         Async()(deferred(path.remote.refresh)(update_cache=True,
                                               update_data=self.options.get_data,
                                               size_limit_mb=self.options.limit)
                 for path in self._paths)
+
+        return
+        for path in self._paths:
+            path.remote.refresh(update_cache=True,
+                                update_data=self.options.get_data,
+                                size_limit_mb=self.options.limit)
 
     def annos(self):
         args = self.args
