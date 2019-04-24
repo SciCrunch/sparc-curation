@@ -177,6 +177,9 @@ class RemotePath:
 
     @property
     def anchor(self):
+        """ the semantics of anchor for remote paths are a bit different
+            RemotePath code expects this function to return a RemotePath
+            NOT a string as is the case for core pathlib. """
         raise NotImplementedError
 
     @property
@@ -216,6 +219,46 @@ class RemotePath:
         # these are models etc in blackfynn
         yield from []
         raise NotImplementedError
+
+    def as_path(self):
+        """ returns the relative path construction for the child so that local can make use of it """
+        return PurePosixPath(*self.parts)
+
+    def _parts_relative_to(self, remote):
+        parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
+        # have a look at how pathlib implements parents
+        for parent in self.parents:
+            if parent == remote:
+                break
+            elif parent is None:
+                continue  # value error incoming
+            else:
+                parent_names.append(parent.name)
+
+        else:
+            raise ValueError(f'{remote} is not one of {self}\'s parents')
+
+        args = (*reversed(parent_names), self.name)
+        return args
+
+    @property
+    def parts(self):
+        if not hasattr(self, '_parts'):
+            self._parts = tuple(self.relative_to(self.anchor))
+
+        return self._parts
+
+    @property
+    def parent(self):
+        """ The atomic parent operation as understood by the remote. """
+        raise NotImplementedError
+
+    @property
+    def parents(self):
+        parent = self.parent
+        while parent:
+            yield parent
+            parent = parent.parent
 
     @property
     def children(self):
@@ -581,7 +624,10 @@ class CachePath(AugmentedPath):
                 #raise exc.MetadataIdMismatchError(msg)
 
         elif self.exists():
-            raise BaseException('should have caught this before we get here')
+            # we don't need to set meta since it is already on disk
+            # but if the id's don't match we are in trouble
+            if self.meta.id != meta.id:
+                raise exc.SparCurError('something has gone wrong')
         elif self.is_symlink():
             pass
         else:
@@ -1055,6 +1101,9 @@ class BlackfynnCache(XattrCache):
             containing folder would have some non-blackfynn notes
             also it seems likely that the same data could appear in
             multiple different orgs, so that would mean linking locally
+        
+            NOTE: unlike RemotePath, CachePath should use the local file
+            structure to search for the local anchor.
         """
 
         # FIXME in reality files can have more than one org ...
@@ -1167,6 +1216,27 @@ class LocalPath(AugmentedPath):
             self._cache_class(self)  # we don't have to assign here because cache does it
 
         return self._cache
+
+    def find_cache_root(self):
+        """ find the root of the cache tree, even if we start with skips """
+        found_cache = None
+        # try all the variants in case some symlinking weirdness is going on
+        # TODO may want to detect and warn on that?
+        for variant in set((self, self.absolute(), self.resolve())):
+            for parent in variant.parents:
+                try:
+                    parent.cache
+                    found_cache = parent
+                except exc.NoCachedMetadataError as e:
+                    # if we had a cache, went to the parent and lost it
+                    # then we are at the root, assuming of course that
+                    # there aren't sparse caches on the way up (down?) the tree
+                    if found_cache is not None:
+                        return found_cache
+
+            else:
+                if found_cache:
+                    return found_cache
 
     #@property
     #def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct

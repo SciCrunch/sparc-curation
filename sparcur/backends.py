@@ -446,41 +446,6 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             return self.__class__(parent, cache=parent_cache)
 
     @property
-    def parents(self):
-        parent = self.parent
-        while parent:
-            yield parent
-            parent = parent.parent
-
-    def as_path(self):
-        """ returns the relative path construction for the child so that local can make use of it """
-        return PurePosixPath(*self.parts)
-
-    def _parts_relative_to(self, remote):
-        parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
-        # have a look at how pathlib implements parents
-        for parent in self.parents:
-            if parent == remote:
-                break
-            elif parent is None:
-                continue  # value error incoming
-            else:
-                parent_names.append(parent.name)
-
-        else:
-            raise ValueError(f'{remote} is not one of {self}\'s parents')
-
-        args = (*reversed(parent_names), self.name)
-        return args
-
-    @property
-    def parts(self):
-        if not hasattr(self, '_parts'):
-            self._parts = tuple(self.relative_to(self.organization))
-
-        return self._parts
-
-    @property
     def children(self):
         if isinstance(self.bfobject, File):
             return

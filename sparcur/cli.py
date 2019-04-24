@@ -171,7 +171,6 @@ class Dispatch:
         return [Path(string_path).absolute() for string_path in self.args['<path>']]
 
     def clone(self):
-        print('asdfasdfasdfasdf')
         project_id = self.args['<project-id>']
         if project_id is None:
             print('no remote project id listed')
@@ -180,21 +179,22 @@ class Dispatch:
         project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         meta = PathMeta(id=project_id)
-        anchor = BlackfynnCache(project_name, meta=meta)
+
+
+        # make sure that we aren't in a project already
+        anchor_local = Path(project_name)
+        root = anchor_local.find_cache_root()
+        if root is not None:
+            message = f'fatal: already in project located at {root.resolve()!r}'
+            print(message)
+            sys.exit(3)
+
+        anchor = BlackfynnCache(project_name, meta=meta).resolve()
         if anchor.exists():
             if list(anchor.local.children):
                 message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
                 sys.exit(2)
-        try:
-            if anchor.anchor is not None:
-                embed()
-                message = f'fatal: already in project located at {anchor.anchor.resolve()!r}'
-                print(message)
-                sys.exit(3)
-        except exc.NotInProjectError:
-            pass  # exactly what we want
 
-        embed()
         meta = PathMeta(id=project_id)
         anchor.bootstrap(meta, recursive=True)
 
