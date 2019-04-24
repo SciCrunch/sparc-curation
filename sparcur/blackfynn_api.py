@@ -45,11 +45,12 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from joblib import Parallel, delayed
 from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
-from blackfynn import Dataset
+from blackfynn import Dataset, BaseNode
 from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
+from sparcur import exceptions as exc
 from sparcur.core import log
 from sparcur.paths import Path
 from sparcur.config import local_storage_prefix
@@ -650,14 +651,16 @@ class BFLocal:
         # no changing local storage prefix in the middle of things
         # if you want to do that create a new class
 
-        self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', project_id, 'key'),
-                            api_secret=devconfig.secrets('blackfynn', project_id, 'secret'))
+        try:
+            self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', project_id, 'key'),
+                                api_secret=devconfig.secrets('blackfynn', project_id, 'secret'))
+        except KeyError as e:
+            raise exc.MissingSecretError from e
         self.organization = self.bf.context
         self.project_name = self.bf.context.name
 
         if anchor is not None:  # FIXME decouple
             self.project_path = anchor.local
-            #self.project_path = local_storage_prefix / self.project_name
             self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
 
     @property
@@ -668,12 +671,6 @@ class BFLocal:
     @property
     def fake_files(self):
         yield from self.project_path.rglob('*.fake.*')
-
-    @property
-    def big_meta(self):
-        for path in self.fake_files:
-            if path.suffix != '.ERROR':
-                yield self.get_file_meta(path)
 
     def populate_metastore(self):
         """ This should be run after find_missing_meta. """
@@ -791,48 +788,40 @@ class BFLocal:
                 Async()(deferred(gfiles)(package, path) for package, path in packages)
                 for file in files}
 
-    def cons(self):
-        ds = self.bf.datasets()
-        useful = {d.id:d for d in ds}  # don't worry, I've made this mistake too
-        small = useful['N:dataset:f3ccf58a-7789-4280-836e-ad9d84ee2082']
-        hrm = useful['N:dataset:be0183e4-a912-465a-bd15-ff36973ee8b3']  # lots of 500 errors
-        readme_bug = useful['N:dataset:6d6818f2-ef75-4be5-9360-8d37661a8463']
-        how=useful['N:dataset:661ecd5a-2482-453e-9fe0-2a9ccbac6b6b']
-        skip = (
-            'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
-            'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
-        )
-        datasets = [d for d in ds if d.id not in skip]
-        #datasets = hrm, readme_bug
-        #datasets = small,
-        #datasets = how,
-        #embed()
-        #return
-        packages = []
-        collections = [(self.bf.context, local_storage_prefix)]  # organization id set here
-        for dataset in datasets:
-            dataset_name = dataset.name
-            ds_path = self.project_path / dataset_name
-            collections.append((dataset, self.project_path))
-            for package_or_collection in dataset:
-                pocs = list(get_packages(package_or_collection, ds_path))
-                packages.extend(((poc, fp) for poc, fp in pocs
-                                 if isinstance(poc, DataPackage)))
-                collections.extend(((poc, fp) for poc, fp in pocs
-                                    if isinstance(poc, BaseCollection) or isinstance(poc, Organization)))
 
-        bfolders = [make_folder_and_meta(parent_path, collection, self.metastore)
-                    for collection, parent_path in collections]  # FIXME duplicates and missing ids
-        # TODO the collection file should hold the mapping from the file names to their blackfynn ids and local hashes
-        #meta = 'subjects', 'submission', 'submission_spreadsheet', 'dataset_description', 'detaset_description_spreadsheet', 'manifest', 'README'
-        #meta_subset = [(package, fp) for package, fp in packages if package.name in meta]
-        bfiles = self.file_fetch_dict(packages)
+class FakeBFLocal(BFLocal):
+    class bf:
+        """ tricksy hobbitses """
 
-        # beware that this will send as many requests as it can as fast as it can
-        # which is not the friendliest thing to do to an api
-        Async()(deferred(fetch_file)(filepath, file, self.metastore, limit=True)
-                for filepath, file in bfiles.items() if not filepath.exists())
-        #embed()
+    def __init__(self, project_id, anchor):
+        self.organization = CacheAsBFObject(anchor)  # heh
+        self.project_name = anchor.name
+        self.project_path = anchor.local
+        self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
+
+
+class CacheAsBFObject(BaseNode):
+    def __init__(self, cache):
+        self.cache = cache
+        self.id = cache.id
+        self.cache.meta
+
+    @property
+    def parent(self):
+        parent_cache = self.cache.parent #.local.parent.cache
+        if parent_cache is not None:
+            return self.__class__(parent_cache)
+
+    @property
+    def parents(self):
+        parent = self.parent
+        while parent:
+            yield parent
+            parent = parent.parent
+
+    def __iter__(self):
+        for c in self.cache.local.children:
+            yield self.__class__(c.cache)
 
 
 def mvp():

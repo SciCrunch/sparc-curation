@@ -6,10 +6,11 @@ import requests
 from pexpect import pxssh
 from sparcur import exceptions as exc
 from sparcur.core import log
-from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path
+from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, BlackfynnCache
+from sparcur.paths import StatResult
 from sparcur.config import local_storage_prefix
 
-from sparcur.blackfynn_api import BFLocal  # FIXME there should be a better way ...
+from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File
 from blackfynn import Dataset
 from blackfynn.models import BaseNode
@@ -52,42 +53,6 @@ class RemoteFactory:
                                  (cls,),
                                  kwargs)
         return classTypeInstance
-
-
-class StatResult:
-    stat_format = f'\"%n  %o  %s  %w  %W  %x  %X  %y  %Y  %z  %Z  %g  %u  %f\"'
-
-    #stat_format = f'\"\'%n\' %o %s \'%w\' %W \'%x\' %X \'%y\' %Y \'%z\' %Z %g %u %f\"'
-
-    def __init__(self, out):
-        out = out.decode()
-        #name, rest = out.rsplit("'", 1)
-        #self.name = name.strip("'")
-        #print(out)
-        wat = out.split('  ')
-        #print(wat)
-        #print(len(wat))
-        name, hint, size, hb, birth, ha, access, hm, modified, hc, changed, gid, uid, raw_mode = wat
-
-        self.name = name
-
-        def ns(hr):
-            date, time, zone = hr.split(' ')
-            time, ns = time.split('.')
-            return '.' + ns
-
-        self.st_blksize = int(hint)
-        self.st_size = int(size)
-        #self.st_birthtime
-        self.st_atime = float(access + ns(ha)) 
-        self.st_mtime = float(modified + ns(hm))
-        self.st_ctime = float(changed + ns(hc))
-        self.st_gid = int(gid)
-        self.st_uid = int(uid)
-        self.st_mode = int.from_bytes(bytes.fromhex(raw_mode), 'big')
-
-        if hb != '-' and birth != '0':
-            self.st_birthtime = float(birth + ns(hb))
 
 
 class SshRemoteFactory(RemoteFactory, RemotePath):
@@ -218,15 +183,19 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     # FIXME helper index should try to cooperate with the packages index?
 
-    def __new__(cls, anchor_or_bfl, local_class, cache_class):
-        if isinstance(anchor_or_bfl, BFLocal):
+    def __new__(cls, anchor, local_class, cache_class):
+        if isinstance(anchor, BFLocal):
+            raise TypeError('please do not do this anymore ...')
             blackfynn_local_instance = BFLocal
-        else:
+        elif isinstance(anchor, BlackfynnCache):
             try:
-                blackfynn_local_instance = BFLocal(anchor_or_bfl.id)
-            except requests.exceptions.ConnectionError:
-                blackfynn_local_instance = 'Could not connect to blackfynn'
-                log.critical(blackfynn_local_instance)
+                blackfynn_local_instance = BFLocal(anchor.id)
+            except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
+                log.critical('Could not connect to blackfynn')
+                blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)
+
+        else:
+            raise TypeError(f'{type(anchor_or_bfl)} is not BFLocal or BlackfynnCache!')
 
         self = super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
         self.root = self.bfl.organization.id
@@ -561,7 +530,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             else:
                 self.cache.meta = new_meta
 
-        if changed and update_data and new_meta.size.mb < size_limit_mb:
+        if changed and update_data and new_meta.size and new_meta.size.mb < size_limit_mb:
             self.cache.local.data = self.data
 
     @property

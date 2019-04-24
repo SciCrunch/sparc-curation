@@ -37,6 +37,7 @@ from time import sleep
 from errno import ELOOP, ENOENT, ENOTDIR, EBADF
 from pathlib import PosixPath, PurePosixPath
 from datetime import datetime
+from functools import wraps
 import xattr
 import psutil
 from dateutil import parser
@@ -47,15 +48,17 @@ from sparcur.core import log
 from sparcur.pathmeta import PathMeta
 from pyontutils.utils import sysidpath
 
-# FIXME 3.7 fix only ...
+_IGNORED_ERROS = (ENOENT, ENOTDIR, EBADF, ELOOP)
+
+
+def _ignore_error(exception):
+    return (getattr(exception, 'errno', None) in _IGNORED_ERROS)
+
+
 if sys.version_info >= (3, 7):
     pathlib._IGNORED_ERROS += (ELOOP,)
-    def _ignore_error(exception):
-        pass
+
 else:
-    _IGNORED_ERROS = (ENOENT, ENOTDIR, EBADF, ELOOP)
-    def _ignore_error(exception):
-        return (getattr(exception, 'errno', None) in _IGNORED_ERROS)
 
     def _is_dir(entry):
         try:
@@ -82,6 +85,57 @@ else:
     pathlib._RecursiveWildcardSelector._iterate_directories = _iterate_directories
 
 
+def _catch_wrapper(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except OSError as e:
+            if not _ignore_error(e):
+                raise
+
+            return False
+
+    return staticmethod(wrapped)
+
+
+#pathlib._NormalAccessor.stat = _catch_wrapper(os.stat)  # can't wrap stat, pathlib needs the errors
+
+
+class StatResult:
+    stat_format = f'\"%n  %o  %s  %w  %W  %x  %X  %y  %Y  %z  %Z  %g  %u  %f\"'
+
+    #stat_format = f'\"\'%n\' %o %s \'%w\' %W \'%x\' %X \'%y\' %Y \'%z\' %Z %g %u %f\"'
+
+    def __init__(self, out):
+        out = out.decode()
+        #name, rest = out.rsplit("'", 1)
+        #self.name = name.strip("'")
+        #print(out)
+        wat = out.split('  ')
+        #print(wat)
+        #print(len(wat))
+        name, hint, size, hb, birth, ha, access, hm, modified, hc, changed, gid, uid, raw_mode = wat
+
+        self.name = name
+
+        def ns(hr):
+            date, time, zone = hr.split(' ')
+            time, ns = time.split('.')
+            return '.' + ns
+
+        self.st_blksize = int(hint)
+        self.st_size = int(size)
+        #self.st_birthtime
+        self.st_atime = float(access + ns(ha)) 
+        self.st_mtime = float(modified + ns(hm))
+        self.st_ctime = float(changed + ns(hc))
+        self.st_gid = int(gid)
+        self.st_uid = int(uid)
+        self.st_mode = int.from_bytes(bytes.fromhex(raw_mode), 'big')
+
+        if hb != '-' and birth != '0':
+            self.st_birthtime = float(birth + ns(hb))
 
 
 # remote data about remote objects -> remote_meta
@@ -293,6 +347,7 @@ class AugmentedPath(PosixPath):
         try:
             return super().exists()
         except OSError as e:
+            log.error(e)
             if not _ignore_error(e):
                 raise
 
@@ -1076,6 +1131,7 @@ class BlackfynnCache(XattrCache):
             return self._meta
 
         if self.exists():
+            log.debug(self)
             meta = super().meta
             if meta:
                 return meta
@@ -1162,7 +1218,7 @@ class BlackfynnCache(XattrCache):
                     # TODO repair
                     pass
                 else:
-                    raise exc.NotInProjectError()
+                    raise exc.NotInProjectError
 
             elif id.startswith('N:organization:'):
                 return self
@@ -1173,8 +1229,12 @@ class BlackfynnCache(XattrCache):
 
     @property
     def dataset(self):
-        if self.meta.id.startswith('N:dataset:'):
+        if self.id is None:
+            return None
+
+        if self.id.startswith('N:dataset:'):
             return self
+
         elif self.parent:
             return self.parent.dataset
 
@@ -1183,6 +1243,7 @@ class BlackfynnCache(XattrCache):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
         # org /datasets/ N:dataset /viewer/ N:package
+
         id = self.id
         N, type, suffix = id.split(':')
         if id.startswith('N:package:'):
@@ -1196,6 +1257,9 @@ class BlackfynnCache(XattrCache):
             return 'https://app.blackfynn.io/' + id
         else:
             raise exc.UnhandledTypeError(type)
+
+        if self.dataset is None:
+            raise exc.NotInProjectError(f'{self}')
 
         return self.dataset.human_uri + prefix + id
 
@@ -1289,8 +1353,26 @@ class LocalPath(AugmentedPath):
     def created(self):
         self.meta.created
 
+    def _stat(self):
+        """ sometimes python just doesn't have what it takes """
+        cmd = ['stat', self.as_posix(), '-c', StatResult.stat_format]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        out, errs = p.communicate()
+        return StatResult(out)
+
+    def stat(self):
+        try:
+            return super().stat()
+        except OSError as e:
+            return self._stat()
+        
     @property
     def meta(self):
+        if not self.exists():
+            return PathMeta(
+                id=self.sysid + ':' + self.as_posix(),
+            )
+
         st = self.stat()
         # FIXME nanos vs millis ??
         change_tuple = (fs_metadata_changed_time,

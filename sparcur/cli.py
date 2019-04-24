@@ -3,7 +3,7 @@
 Usage:
     spc clone <project-id>
     spc pull [options] [<directory>...]
-    spc refresh [<path>...]
+    spc refresh [options] [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
     spc report [completeness filetypes keywords subjects] [options]
@@ -12,11 +12,11 @@ Usage:
     spc xattrs
     spc export
     spc demos
-    spc shell [--project]
+    spc shell
     spc feedback <feedback-file> <feedback>...
     spc find [options] <file>...
     spc find [options] --name=<PAT>...
-    spc meta [<path>...]
+    spc meta [--uri] [<path>...]
 
 Commands:
     clone     clone a remote project (creates a new folder in the current directory)
@@ -33,13 +33,16 @@ Commands:
 
 Options:
     -f --fetch              fetch the files
-    -l --limit=LIMIT        the maximum size to download in megabytes
+    -l --limit=SIZE_MB      the maximum size to download in megabytes [default: 2]
     -L --level=LEVEL        how deep to go in a refresh
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
+    -u --uri                print the human uri for the path in question
     -p --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
+    -m --only-meta          only pull known dataset metadata files
+    -g --get-data          download the actual data in files
 
     -i --include-folders    include folders when refreshing remote metadata
 
@@ -68,11 +71,53 @@ from sparcur.blackfynn_api import BFLocal
 from IPython import embed
 
 
+class Options:
+    def __init__(self, args):
+        self.args = args
+
+    @property
+    def debug(self):
+        return self.args['--debug']
+
+    @property
+    def overwrite(self):
+        return self.args['--overwrite']
+
+    @property
+    def empty(self):
+        return self.args['--empty']
+
+    @property
+    def include_folders(self):
+        return self.args['--include-folders']
+
+    @property
+    def limit(self):
+        return int(self.args['--limit'])
+
+    @property
+    def level(self):
+        return self.args['--level']
+
+    @property
+    def only_meta(self):
+        return self.args['--only-meta']
+
+    @property
+    def get_data(self):
+        return self.args['--get-data']
+
+    @property
+    def uri(self):
+        return self.args['--uri']
+
+
 class Dispatch:
     spcignore = ('.git',
                  '.~lock',)
     def __init__(self, args):
         self.args = args
+        self.options = Options(args)
 
         if self.args['clone'] or self.args['meta']:
             # short circuit since we don't know where we are yet
@@ -144,25 +189,9 @@ class Dispatch:
             if d.local.exists():
                 yield d.local
 
-    @property
-    def debug(self):
-        return self.args['--debug']
-
-    @property
-    def overwrite(self):
-        return self.args['--overwrite']
-
-    @property
-    def empty(self):
-        return self.args['--empty']
-
-    @property
-    def include_folders(self):
-        return self.args['--include-folders']
-
-    @property
-    def level(self):
-        return self.args['--level']
+    ###
+    ## vars
+    ###
 
     @property
     def directories(self):
@@ -179,10 +208,15 @@ class Dispatch:
         if not paths:
             paths = Path('.').resolve(),
         
-        def inner(paths, level=0, stop=self.level):
+        if self.options.only_meta:
+            paths = (mp for p in paths for mp in FTLax(p).meta_paths)
+            yield from paths
+            return
+
+        def inner(paths, level=0, stop=self.options.level):
             """ depth first traversal of children """
             for path in paths:
-                if self.empty:
+                if self.options.empty:
                     if path.is_dir():
                         try:
                             next(path.children)
@@ -208,7 +242,11 @@ class Dispatch:
             print('no remote project id listed')
             sys.exit(4)
         # given that we are cloning it makes sense to _not_ catch a connection error here
-        project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
+        try:
+            project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
+        except exc.MissingSecretError:
+            print(f'missing api secret entry for {project_id}')
+            sys.exit(11)
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         meta = PathMeta(id=project_id)
 
@@ -238,7 +276,7 @@ class Dispatch:
         )
         only = tuple()
         dirs = self.directories
-        recursive = self.level is None  # FIXME we offer levels zero and infinite!
+        recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         if dirs:
             for d in dirs:
                 if d.is_dir():
@@ -255,9 +293,16 @@ class Dispatch:
             #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
     def refresh(self):
-        #Async()(deferred(path.remote.refresh)(update_cache=True) for path in self._paths)
         for path in self._paths:
-            path.remote.refresh(update_cache=True)
+            path.remote.refresh(update_cache=True,
+                                update_data=self.options.get_data,
+                                size_limit_mb=self.options.limit)
+
+        return
+        Async()(deferred(path.remote.refresh)(update_cache=True,
+                                              update_data=self.options.get_data,
+                                              size_limit_mb=self.options.limit)
+                for path in self._paths)
 
     def annos(self):
         args = self.args
@@ -268,7 +313,7 @@ class Dispatch:
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
-        if args['shell'] or self.debug:
+        if args['shell'] or self.options.debug:
             embed()
 
     def stats(self):
@@ -419,7 +464,7 @@ class Dispatch:
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
 
-        if self.debug:
+        if self.options.debug:
             embed()
 
     def default(self):
@@ -439,20 +484,20 @@ class Dispatch:
             path = Path('.').resolve()
             for pattern in patterns:
                 # TODO filesize mismatches on non-fake
-                if '.fake' not in pattern and not self.overwrite:
+                if '.fake' not in pattern and not self.options.overwrite:
                     pattern = pattern + '.fake*'
 
                 for file in path.rglob(pattern):
                     paths.append(file)
 
         if paths:
-            if args['--limit']:
-                limit = int(args['--limit']) * 1024 ** 2
+            if self.options.limit:
+                limit = self.options.limit * 1024 ** 2
                 paths = [p for p in paths if p.cache.meta.size < limit]
 
             if args['--fetch']:
                 from pyontutils.utils import Async, deferred
-                Async()(deferred(self.bfl.fetch_path)(path, self.overwrite) for path in paths)
+                Async()(deferred(self.bfl.fetch_path)(path, self.options.overwrite) for path in paths)
             else:
                 if args['--verbose']:
                     for p in paths:
@@ -496,7 +541,7 @@ class Dispatch:
                     for dataset in self.summary]
             print(AsciiTable(rows).table)
 
-        if self.debug:
+        if self.options.debug:
             embed()
 
     def feedback(self):
@@ -518,9 +563,22 @@ class Dispatch:
         paths = self.paths
         if not paths:
             paths = Path('.'),
+
             
+        old_level = log.level
+        log.setLevel('ERROR')
         for path in paths:
-            print(path.cache.meta.as_pretty())
+            if self.options.uri:
+                uri = path.cache.human_uri
+                print('+' + '-' * (len(uri) + 2) + '+')
+                print(f'| {uri} |')
+            try:
+
+                print(path.cache.meta.as_pretty())
+            except exc.NoCachedMetadataError:
+                print(f'No metadata for {path}')
+
+        log.setLevel(old_level)
 
 
 def main():

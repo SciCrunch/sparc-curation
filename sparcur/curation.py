@@ -965,7 +965,7 @@ class MetaMaker:
 
     @property
     def human_uri(self):
-        return self.f.path.human_uri
+        return self.f.path.cache.human_uri
 
 
 class FakePathHelper:

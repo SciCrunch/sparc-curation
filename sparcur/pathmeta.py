@@ -13,7 +13,7 @@ from sparcur.core import log
 
 class FileSize(int):
     @property
-    def md(self):
+    def mb(self):
         return self / 1024 ** 2
 
     @property
@@ -408,8 +408,8 @@ class _PathMetaAsPretty(_PathMetaConverter):
 
     def __init__(self):
         # register functionality on PathMeta
-        def as_pretty(self, _as_pretty=self.as_pretty):
-            return _as_pretty(self)
+        def as_pretty(self, pathobject=None, title=None, _as_pretty=self.as_pretty):
+            return _as_pretty(self, pathobject=pathobject, title=title)
 
         @classmethod
         def from_pretty(cls, pretty, _from_pretty=self.from_pretty):
@@ -433,8 +433,11 @@ class _PathMetaAsPretty(_PathMetaConverter):
         return value
 
     def as_pretty(self, pathmeta, pathobject=None, title=None):
-        if title is None and pathobject is not None:
-            title = pathobject.name
+        if title is None:
+            if pathobject is not None:
+                title = pathobject.name
+            else:
+                title = ''
             
         def key(kv):
             k, v = kv
@@ -443,7 +446,7 @@ class _PathMetaAsPretty(_PathMetaConverter):
             else:
                 return 1, 0, k, v
 
-        h = [['Key', 'Value']]
+        h = [['Key', f'Value    {title}']]
         rows = h + sorted(([k, self.encode(k, v)] for k, v in pathmeta.items() if v is not None), key=key)
         return AsciiTable(rows, title=title).table
 

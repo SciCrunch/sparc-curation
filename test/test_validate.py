@@ -15,9 +15,9 @@ class TestHierarchy(unittest.TestCase):
         pass
 
     def test_create(self):
-        ppattrs = project_path.xattrs()
+        ppattrs = project_path.cache.xattrs()
         for pthing in project_path.rglob('*'):
-            ptattrs = pthing.xattrs()
+            ptattrs = pthing.cache.xattrs()
 
     def test_paths(self):
         for d in self.ds:
@@ -29,7 +29,7 @@ class TestHierarchy(unittest.TestCase):
     def test_dataset(self):
         for d in self.ds:
             print(d.data)
-            d.validate()
+            d.schema.validate(d.data)
 
         pytest.skip('TODO look at the lists here and figure out where they should go.')
 

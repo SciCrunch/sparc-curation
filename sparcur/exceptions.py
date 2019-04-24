@@ -2,6 +2,10 @@ class SparCurError(Exception):
     """ base class for sparcur errors """
 
 
+class MissingSecretError(SparCurError):
+    """ key not in secrets """
+
+
 class UnhandledTypeError(SparCurError):
     """ haven't dealt with this yet """
 
