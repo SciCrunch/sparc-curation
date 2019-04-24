@@ -290,7 +290,10 @@ class RemotePath:
                 parent_names.append(parent.name)
 
         else:
-            raise ValueError(f'{remote} is not one of {self}\'s parents')
+            self.errors += ['file-deleted']
+            msg = f'{remote} is not one of {self}\'s parents'
+            log.error(msg)
+            #raise ValueError()
 
         args = (*reversed(parent_names), self.name)
         return args
@@ -554,11 +557,11 @@ class CachePath(AugmentedPath):
                     self.meta = meta
                 elif not self.is_helper_cache:
                     meta = self.recover_meta()
-                    breakpoint()
+                    #breakpoint()
             elif self.is_broken_symlink():
                 # symlink that exists so overwrite
                 self.meta = meta
-            elif not self.is_helper_cache:
+            elif not self.is_helper_cache and meta:
                 # there is nothing we should bootstrap
                 self.bootstrap(meta)
             else:
@@ -881,9 +884,12 @@ class CachePath(AugmentedPath):
                                                                 self._local_class,
                                                                 self.__class__)
 
-
             if not hasattr(self, '_remote'):
-                self.remote = self._remote_class(self.id, cache=self)
+                id = self.id
+                if id.startswith('EUf5'):
+                    breakpoint()
+                log.debug(id)
+                self.remote = self._remote_class(id, cache=self)
 
             return self._remote
 
@@ -919,8 +925,20 @@ class CachePath(AugmentedPath):
             # make sure no monkey business is going on at least in the local graph
             #if self.parent and self.local.parent.cache.meta.id == self.parent.id:  # cache parents are from the file system so dont need
             if remote.parent is None:
-                breakpoint()
-            if self.parent and remote.parent.id == self.parent.id:  # we can avoid a net call since we just need the id
+                #breakpoint()
+                log.debug(f'no remote parent -> organization??? {remote}')
+                # Nope, apparently these are deleted files
+                # need to figure out what to do about these
+                meta = remote.meta
+                errors = ['file-deleted'] 
+                if not meta.errors:
+                    meta.errors = errors
+                else:
+                    meta.errors += errors
+
+                self.meta = meta
+
+            elif self.parent and remote.parent.id == self.parent.id:  # we can avoid a net call since we just need the id
                 self._remote = remote
                 self.meta = remote.meta
                 # meta checks to see whethere there is a remote
@@ -965,6 +983,8 @@ class CachePath(AugmentedPath):
 
 
     def recover_meta(self):
+        """ rebuild restore reconnect """
+
         children = list(self.parent.remote.children)
         isf = self.is_file()
         isd = self.is_dir()
@@ -996,14 +1016,15 @@ class CachePath(AugmentedPath):
                 pass
 
         if not candidates:
-            breakpoint()
+            wat = '\n'.join(c.name for c in children)
+            #breakpoint()
             raise exc.NoRemoteMappingError(f'We seem to have lost {self.parent} -/-> {self.name}'
-                                            f'\n{self.parent.human_uri}')
+                                            f'\n{self.parent.human_uri}\n{wat}\n{self.name}')
 
         elif len(candidates) == 1:
             remote = candidates[0]
             log.critical('How did we write this file without moving it beforhand?!?\n'
-                            '{self.local} -/-> {remote.name}')
+                         f'{self.local} -/-> {remote.name}')
             self.meta = remote.meta  # go ahead and set this even though we change?
             self.move(remote=remote)
         else:
@@ -1223,6 +1244,25 @@ class SymlinkCache(CachePath):
         else:
             raise exc.PathExistsError(f'Path exists {self}')
 
+def cleanup(func):
+    @wraps(func)
+    def inner(self):
+        meta = func(self)
+        if meta is not None:
+            if meta.id.startswith('EUf5'):
+                if self.is_broken_symlink():
+                    self.unlink()
+                elif self.exists() and not self.is_symlink():
+                    self.unlink()
+                    self.touch()
+                else:
+                    pass
+
+                self.recover_meta()
+            else:
+                return meta
+            
+    return inner
 
 class BlackfynnCache(XattrCache):
     xattr_prefix = 'bf'
@@ -1230,6 +1270,7 @@ class BlackfynnCache(XattrCache):
     _not_exists_cache = SymlinkCache
 
     @property
+    @cleanup
     def meta(self):
         #if hasattr(self, '_in_bootstrap'):
         if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
@@ -1368,6 +1409,18 @@ class BlackfynnCache(XattrCache):
             raise exc.NotInProjectError(f'{self}')
 
         return self.dataset.human_uri + prefix + id
+
+    def api_uri(self):
+        if self.is_dataset:
+            endpoint = 'datasets/' + self.id
+        elif self.is_organization:
+            endpoint = 'organizations/' + self.id
+        elif isinstance(self.bfobject, File) and self.file_id is not None:
+            endpoint = f'packages/{self.id}/files/{self.file_id}'
+        else:
+            endpoint = 'packages/' + self.id
+
+        return f'https://api.blackfynn.io/' + endpoint
 
     @property
     def children(self):
@@ -1543,8 +1596,9 @@ class LocalPath(AugmentedPath):
                 #log.debug(chunk)
                 f.write(chunk)
 
+        self.cache.meta = meta  # glories of persisting xattrs :/
+        # yep sometimes the xattrs get  blasted >_<
         assert self.cache.meta
-        #self.cache.meta = meta  # glories of persisting xattrs :/
 
     @property
     def children(self):

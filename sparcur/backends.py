@@ -193,7 +193,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 blackfynn_local_instance = BFLocal(anchor.id)
             except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
                 log.critical('Could not connect to blackfynn')
-                blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)
+                #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
+
 
         else:
             raise TypeError(f'{type(anchor_or_bfl)} is not BFLocal or BlackfynnCache!')
@@ -228,6 +229,18 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             bfobject = id_bfo_or_bfr.bfobject
         elif isinstance(id_bfo_or_bfr, BaseNode):
             bfobject = id_bfo_or_bfr
+            if isinstance(bfobject, DataPackage):  # FIXME :/
+                files = bfobject.files
+                parent = bfobject.parent
+                if files:
+                    if len(files) > 1:
+                        log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+                    else:
+                        bfobject = files[0]
+                        bfobject.parent = parent
+                else:
+                    log.warning(f'No files in package {package.id}')
+
         elif id_bfo_or_bfr.startswith('N:organization:'):
             # FIXME right now I require a 1:1 mapping between
             # each local object, cache object, and remote object
@@ -267,7 +280,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 raise TypeError(f'trying to get file id for a {bfobject}')
 
         if bfobject is None:
-            raise TypeError('bfobject cannot be None!')
+            raise TypeError(f'bfobject cannot be None! {id_bfo_or_bfr}')
 
         elif isinstance(bfobject, str):
             raise TypeError(f'bfobject cannot be str! {bfobject}')
@@ -546,6 +559,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # after the changes the old cache might not exist anymore
         new_meta = self.meta
 
+        assert new_meta
         assert new_meta is not old_meta
 
         object_type = self.bfobject.__class__.__name__
@@ -583,12 +597,19 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 self.cache.meta = new_meta
 
         if changed and update_data and new_meta.size and new_meta.size.mb < size_limit_mb:
-            if self.local.is_symlink():
+            if self.local.is_broken_symlink():
                 self.local.unlink()
                 self.local.touch()
                 self.cache.meta = new_meta
-
+            if self.local.exists() and not self.local.is_symlink():
+                self.cache.meta = new_meta  # has to always run apparently ?
+            else:
+                self.cache._meta = new_meta
+            
             self.local.data = self.data
+
+            if hasattr(self.cache, '_meta'):
+                delattr(self.cache, '_meta')
 
     @property
     def data(self):

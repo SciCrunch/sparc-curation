@@ -48,6 +48,7 @@ from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset, BaseNode
 from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
+from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
 from sparcur import exceptions as exc
@@ -170,6 +171,38 @@ class FakeBFile(File):
                 ' '.join(f'{k}={v}' for k, v in self._json.items()) +
                 '>')
 
+
+    
+# monkey patch for PackagesAPI.get
+wheeee = {
+    'includeAncestors': True
+}
+from future.utils import string_types
+def get(self, pkg, include='files,source'):
+    """
+    Get package object
+
+    pkg:     can be DataPackage ID or DataPackage object.
+    include: list of fields to force-include in response (if available)
+    """
+    pkg_id = self._get_id(pkg)
+
+    params = wheeee
+    if include is not None:
+        if isinstance(include, string_types):
+            params.update({'include': include})
+        if hasattr(include, '__iter__'):
+            params.update({'include': ','.join(include)})
+
+    resp = self._get(self._uri('/{id}', id=pkg_id), params=params)
+
+    # TODO: cast to specific DataPackages based on `type`
+    pkg = self._get_package_from_data(resp)
+    pkg._resp = resp
+    #log.critical(str(json.dumps(resp.json(), indent=2)))
+    return pkg
+
+PackagesAPI.get = get
 
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
@@ -711,6 +744,7 @@ class BFLocal:
                 raise BaseException('TODO org does not match need other api keys.')
         else:
             thing = self.bf.get(id)
+            #breakpoint()
 
         return thing
 

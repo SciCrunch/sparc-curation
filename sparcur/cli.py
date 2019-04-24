@@ -97,7 +97,7 @@ class Options:
 
     @property
     def level(self):
-        return self.args['--level']
+        return int(self.args['--level']) if self.args['--level'] else None
 
     @property
     def only_meta(self):
@@ -292,16 +292,20 @@ class Dispatch:
             #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
     def refresh(self):
-        Async()(deferred(path.remote.refresh)(update_cache=True,
-                                              update_data=self.options.get_data,
-                                              size_limit_mb=self.options.limit)
-                for path in self._paths)
-
-        return
+        print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
         for path in self._paths:
             path.remote.refresh(update_cache=True,
                                 update_data=self.options.get_data,
                                 size_limit_mb=self.options.limit)
+
+
+        return
+
+        Async()(deferred(path.remote.refresh)(update_cache=True,
+                                              update_data=self.options.get_data,
+                                              size_limit_mb=self.options.limit)
+                for path in self._paths)
+        return
 
     def annos(self):
         args = self.args
@@ -325,7 +329,7 @@ class Dispatch:
         data = []
 
         for d in dirs:
-            if not path.is_dir():
+            if not Path(d).is_dir():
                 continue  # helper files at the top level, and the symlinks that destory python
             path = Path(d).resolve()
             paths = path.children #list(path.rglob('*'))
