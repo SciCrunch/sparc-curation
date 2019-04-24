@@ -1,6 +1,6 @@
 import unittest
 from pathlib import PurePosixPath
-from sparcur.paths import Path, SymlinkCache
+from sparcur.paths import Path, SymlinkCache, AugmentedPath
 from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
 from sparcur.pathmeta import FileSize
 from .common import project_path
@@ -59,7 +59,7 @@ class TestPathMeta(unittest.TestCase):
         path = self.test_path
         path._cache = SymlinkCache(path, meta=meta)
         path.cache.meta = meta
-        new_meta = cache.meta
+        new_meta = path.cache.meta
         path.unlink()
         msg = '\n'.join([f'{k!r} {v!r} {getattr(new_meta, k)!r}' for k, v in meta.items()])
         assert meta == new_meta, msg
@@ -77,7 +77,7 @@ class TestPathMeta(unittest.TestCase):
         finally:
             path.unlink()
 
-    def test_pure_symlink_roundtrip(self):
+    def test_parts_roundtrip(self):
         pmas = _PathMetaAsSymlink()
         lpm = self.path.meta
         bpm = PathMeta(id='N:helloworld:123', size=10)
@@ -85,10 +85,12 @@ class TestPathMeta(unittest.TestCase):
         for pm in (lpm, bpm):
             symlink = pm.as_symlink()
             print(symlink)
-            new_pm = pmas.from_pure_symlink(symlink)
+            new_pm = pmas.from_parts(symlink.parts)
+            #corrected_new_pm = PurePosixPath()
             if new_pm != pm:
                 bads += ['\n'.join([str((getattr(pm, field), getattr(new_pm, field)))
-                                    for field in _PathMetaAsSymlink.order]),
+                                    for field in ('id',) + _PathMetaAsSymlink.order
+                                    if not (getattr(pm, field) is getattr(new_pm, field) is None)]),
                          f'{pm.__reduce__()}\n{new_pm.__reduce__()}']
 
         assert not bads, '\n===========\n'.join(bads)
@@ -100,3 +102,25 @@ class TestPrefix(TestPathMeta):
 
 class TestPrefixEvil(TestPathMeta):
     prefix = 'prefix.'
+
+
+class TestContext(unittest.TestCase):
+    def test_context(self):
+        start = AugmentedPath.cwd()
+        target = AugmentedPath('/tmp/')
+        distractor = AugmentedPath('/home/')
+        with target:
+            target_cwd = AugmentedPath.cwd()
+            distractor.chdir()
+            distractor_cwd = AugmentedPath.cwd()
+
+        end = AugmentedPath.cwd()
+        eq = (
+            (target, target_cwd),
+            (distractor, distractor_cwd),
+            (start, end),
+        )
+        
+        bads = [(a, b) for a, b in eq if a != b]
+        assert not bads, bads
+        assert start != target != distractor

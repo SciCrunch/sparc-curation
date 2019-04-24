@@ -284,6 +284,8 @@ class RemotePath:
 class AugmentedPath(PosixPath):
     """ extra conveniences, mostly things that are fixed in 3.7 using IGNORE_ERROS """
 
+    __stack = []  # pushd and popd
+
     def exists(self):
         """ Turns out that python doesn't know how to stat symlinks that point
             to their own children, which is fine because that is what we do
@@ -350,6 +352,46 @@ class AugmentedPath(PosixPath):
             raise TypeError(f'Unknown mode {mode}')
 
         return os.access(self, mode, follow_symlinks=follow_symlinks)
+
+    def chdir(self):
+        os.chdir(self)
+
+    def pushd(self):
+        if self.is_dir():
+            AugmentedPath._stack.append(self.cwd())
+            self.chdir()
+            print(*reversed(AugmentedPath._stack), self.cwd())
+        else:
+            raise NotADirectoryError(f'{self} is not a directory')
+
+    @staticmethod
+    def popd(N=0, n=False):
+        """ see popd --help """
+        # note that python lists append in the oppsite direction
+        # so we invert the N dex
+        reversed_index = - (N + 1)
+        if AugmentedPath._stack:
+            path = AugmentedPath._stack.pop(reversed_index)
+            path.chdir()
+            print(*reversed(AugmentedPath._stack), self.cwd())
+            return path
+        else:
+            log.warning('popd: directory stack empty')
+
+    def __enter__(self):
+        if self.is_dir():
+            self._entered_from = self.cwd()
+            self.chdir()
+            return self
+        else:
+            super().__enter__(self)
+
+    def __exit__(self, t, v, tb):
+        if hasattr(self, '_entered_from'):
+            # if is_dir fails because of a change still try to return
+            self._entered_from.chdir()
+        else:
+            super().__exit__(t, v, tb)
 
 
 class CachePath(AugmentedPath):

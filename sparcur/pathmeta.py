@@ -6,6 +6,9 @@ import struct
 from pathlib import PurePosixPath
 from datetime import datetime
 from dateutil import parser
+from terminaltables import AsciiTable
+from sparcur import exceptions as exc
+from sparcur.core import log
 
 
 class FileSize(int):
@@ -231,16 +234,18 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         """ contextual portion to make sure something weird isn't going on
             e.g. that a link got switched to point to another name somehow """
         pure_symlink = symlink_path.readlink()
-        msg = (symlink_path.name, pure_symlink.parts[0])
-        assert symlink_path.name == pure_symlink.parts[0], msg
+        name, *parts = pure_symlink.parts
+        msg = (symlink_path.name, name)
+        assert symlink_path.name == name, msg
         #breakpoint()
-        return self.from_pure_symlink(pure_symlink)
+        return self.from_parts(parts)
 
-    def from_pure_symlink(self, pure_symlink):
+    def from_parts(self, parts):
+        name = PurePosixPath(parts[-1])
         kwargs = {field:self.decode(field, value)
-                  for field, value in zip(self.order, pure_symlink.suffixes)}
-        fixed = PurePosixPath(*pure_symlink.parts[1:])
-        kwargs['id'] = str(fixed.parent)
+                  for field, value in zip(self.order, name.suffixes)}
+        path = PurePosixPath(*parts)
+        kwargs['id'] = str(path.parent)
         return self.pathmetaclass(**kwargs)
 
 
@@ -334,6 +339,11 @@ class _PathMetaAsXattrs(_PathMetaConverter):
             #field.replace(cls.path_field_sep, ',')  # FIXME hack around iso8601
             # turns it 8601 isnt actually standard >_< with . instead of , sigh
 
+        try:
+            return _bytes_encode(field, value)
+        except exc.UnhandledTypeError:
+            log.warning(f'conversion not implemented for field {field}')
+
         if field == 'errors':
             value = ';'.join(value)
 
@@ -356,8 +366,15 @@ class _PathMetaAsXattrs(_PathMetaConverter):
 
     def decode(self, field, value):
         if field in ('created', 'updated'):  # FIXME human readable vs integer :/
-            value, = struct.unpack('d', value)
-            return datetime.fromtimestamp(value)
+            try:
+                # needed for legacy cases
+                value, = struct.unpack('d', value)
+                return datetime.fromtimestamp(value)
+            except struct.error:
+                pass
+
+            return parser.parse(value.decode())  # FIXME with timezone vs without ...
+
         elif field == 'checksum':
             return value
         elif field == 'errors':
@@ -380,6 +397,124 @@ class _PathMetaAsXattrs(_PathMetaConverter):
                 print(field, value)
                 raise e
 
+class _PathMetaAsPretty(_PathMetaConverter):
+    """ Convert to and from unix xattrs. """
+
+    format_name = 'pretty'
+
+    fields = ('size', 'created', 'updated',
+              'checksum', 'id', 'file_id', 'old_id',
+              'gid', 'user_id', 'mode', 'errors')
+
+    def __init__(self):
+        # register functionality on PathMeta
+        def as_pretty(self, _as_pretty=self.as_pretty):
+            return _as_pretty(self)
+
+        @classmethod
+        def from_pretty(cls, pretty, _from_pretty=self.from_pretty):
+            # FIXME cls(**kwargs) vs calling self.pathmetaclass
+            return _from_pretty(pretty)
+
+        self.pathmetaclass.as_pretty = as_pretty
+        self.pathmetaclass.from_pretty = from_pretty
+
+        self.maxf = max([len(f) for f in self.fields])
+
+    def encode(self, field, value):
+        if field == 'errors':
+            return value
+
+        try:
+            return _str_encode(field, value)
+        except exc.UnhandledTypeError:
+            log.warning(f'conversion not implemented for field {field}')
+        
+        return value
+
+    def as_pretty(self, pathmeta, pathobject=None, title=None):
+        if title is None and pathobject is not None:
+            title = pathobject.name
+            
+        def key(kv):
+            k, v = kv
+            if k in self.fields:
+                return 0, self.fields.index(k), k, v
+            else:
+                return 1, 0, k, v
+
+        h = [['Key', 'Value']]
+        rows = h + sorted(([k, self.encode(k, v)] for k, v in pathmeta.items() if v is not None), key=key)
+        return AsciiTable(rows, title=title).table
+
+    def from_pretty(self, pretty):
+        raise NotImplementedError('yeah ... really don\'t want to do this')
+
+
+class _EncodeByField:
+    def __call__(self, field, value):
+        if type(value) == str:
+            return value
+
+        try:
+            return getattr(self, field)(value)
+        except AttributeError as e:
+            raise exc.UnhandledTypeError(field) from e
+        
+    def _datetime(self, value):
+        if not isinstance(value, datetime):
+            raise TypeError(f'{type(value)} is not a datetime for {value}')
+
+        has_tz = value.tzinfo is not None and value.tzinfo.utcoffset(None) is not None
+        value = value.isoformat().replace('.', ',')
+        if has_tz:
+            dt, tz = value.rsplit('+', 1)
+            if tz == '00:00':
+                return dt + 'Z'  # for bf compat
+            else:
+                return value
+        else:
+            log.warning('why do you have a timestamp without a timezone ;_;')
+            return value
+
+
+    def _list(self, value):
+        return ';'.join(value)
+
+    def errors(self, value):
+        return self._list(value)
+
+    def created(self, value):
+        return self._datetime(value)
+
+    def updated(self, value):
+        return self._datetime(value)
+
+    def size(self, value): return str(value)
+    def checksum(self, value): return value
+    def file_id(self, value): return str(value)
+    def gid(self, value): return str(value)
+    def user_id(self, value): return str(value)
+
+
+class _EncodeByFieldBytes(_EncodeByField):
+    def __call__(self, field, value):
+        if isinstance(value, bytes):
+            return value
+
+        out = super().__call__(field, value)
+        if isinstance(out, str):
+            out = out.encode()
+
+        return out
+
+
+# load encoders
+_str_encode = _EncodeByField()
+_bytes_encode = _EncodeByFieldBytes()
+
 # register helpers
 _PathMetaAsSymlink()
 _PathMetaAsXattrs()
+_PathMetaAsPretty()
+

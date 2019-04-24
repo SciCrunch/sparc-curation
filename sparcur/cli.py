@@ -16,9 +16,9 @@ Usage:
     spc feedback <feedback-file> <feedback>...
     spc find [options] <file>...
     spc find [options] --name=<PAT>...
+    spc meta [<path>...]
 
 Commands:
-    find      list and fetch unfetched files
     clone     clone a remote project (creates a new folder in the current directory)
     pull      pull down the remote list of files
     stats     print stats for specified or current directory
@@ -28,17 +28,19 @@ Commands:
     export    export extracted data
     demos     long running example queries
     shell     drop into an ipython shell
+    find      list and fetch unfetched files
+    meta      display the metadata the current folder or list of folders
 
 Options:
     -f --fetch              fetch the files
     -l --limit=LIMIT        the maximum size to download in megabytes
+    -L --level=LEVEL        how deep to go in a refresh
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
     -p --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
 
-    -s --single-level       do not perform the operation recursively
     -i --include-folders    include folders when refreshing remote metadata
 
     -d --debug              drop into a shell after running a step
@@ -72,7 +74,7 @@ class Dispatch:
     def __init__(self, args):
         self.args = args
 
-        if self.args['clone']:
+        if self.args['clone'] or self.args['meta']:
             # short circuit since we don't know where we are yet
             return
 
@@ -155,12 +157,12 @@ class Dispatch:
         return self.args['--empty']
 
     @property
-    def recursive(self):
-        return not self.args['--single-level']
-
-    @property
     def include_folders(self):
         return self.args['--include-folders']
+
+    @property
+    def level(self):
+        return self.args['--level']
 
     @property
     def directories(self):
@@ -169,6 +171,36 @@ class Dispatch:
     @property
     def paths(self):
         return [Path(string_path).absolute() for string_path in self.args['<path>']]
+
+    @property
+    def _paths(self):
+        """ all relevant paths determined by the flags that have been set """
+        paths = self.paths
+        if not paths:
+            paths = Path('.').resolve(),
+        
+        def inner(paths, level=0, stop=self.level):
+            """ depth first traversal of children """
+            for path in paths:
+                if self.empty:
+                    if path.is_dir():
+                        try:
+                            next(path.children)
+                            # if a path has children we still want to
+                            # for empties in them to the level specified
+                        except StopIteration:
+                            yield path
+                    else:
+                        continue
+                else:
+                    yield path
+
+                if stop is None:
+                    yield from path.rchildren
+                elif level <= stop:
+                    yield from inner(path.children, level + 1)
+
+        yield from inner(paths)
 
     def clone(self):
         project_id = self.args['<project-id>']
@@ -195,32 +227,8 @@ class Dispatch:
                 message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
                 sys.exit(2)
 
-        meta = PathMeta(id=project_id)
-        anchor.bootstrap(meta, recursive=True)
-
-    def refresh(self):
-        paths = self.paths
-        if paths and self.recursive:  # FIXME recursive is weird here
-            paths = (rc for p in paths
-                     for rc in
-                     (chain(p.rchildren, (p,)) if p.is_dir() else (p,))
-                     if not rc.is_dir() or self.include_folders)
-
-        if not paths:
-            paths = (c for d in self.datasets_local
-                     for c in (d.rchildren if self.recursive else d.children)
-                     if not c.is_dir() or self.include_folders)
-
-        #Async()(deferred(path.remote.refresh)(update_cache=True) for path in paths)
-        for path in paths:
-            path.remote.refresh(update_cache=True)
-
-        return
-        for d in self.datasets_local:
-            for child in d.children:
-                if not child.is_dir():
-                    child.remote.refresh(update_cache=True)
-                    #child.cache.meta = child.remote.meta
+        with anchor:
+            self.pull()
 
     def pull(self):
         # TODO folder meta -> org
@@ -230,21 +238,26 @@ class Dispatch:
         )
         only = tuple()
         dirs = self.directories
+        recursive = self.level is None  # FIXME we offer levels zero and infinite!
         if dirs:
             for d in dirs:
                 if d.is_dir():
                     if not d.remote.is_dataset():
                         log.warning('You are pulling recursively from below dataset level.')
 
-                    d.remote.bootstrap(recursive=self.recursive)
-
-        elif self.empty:
-            for child in self.anchor.local.children:
-                if not list(child.children):
-                    child.remote.bootstrap(recursive=self.recursive)
+                    d.remote.bootstrap(recursive=recursive)
 
         else:
-            self.anchor.remote.bootstrap(recursive=self.recursive, only=only, skip=skip)
+            for path in self._paths:
+                print(path)
+                #path.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+
+            #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+
+    def refresh(self):
+        #Async()(deferred(path.remote.refresh)(update_cache=True) for path in self._paths)
+        for path in self._paths:
+            path.remote.refresh(update_cache=True)
 
     def annos(self):
         args = self.args
@@ -500,6 +513,14 @@ class Dispatch:
 
     def xattrs(self):
         self.bfl.populate_metastore()
+
+    def meta(self):
+        paths = self.paths
+        if not paths:
+            paths = Path('.'),
+            
+        for path in paths:
+            print(path.cache.meta.as_pretty())
 
 
 def main():
