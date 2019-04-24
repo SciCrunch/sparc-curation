@@ -562,7 +562,7 @@ class Dispatch:
     def meta(self):
         paths = self.paths
         if not paths:
-            paths = Path('.'),
+            paths = Path('.').resolve(),
 
             
         old_level = log.level

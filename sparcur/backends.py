@@ -1,6 +1,7 @@
 import os
 import atexit
 import subprocess
+from pathlib import PurePosixPath
 from datetime import datetime
 import requests
 from pexpect import pxssh
@@ -315,8 +316,45 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         return hasattr(self.bfobject, '_json')
 
     @property
-    def name(self):
+    def stem(self):
+        name = PurePosixPath(self._name)
+        return name.stem
+        #if isinstance(self.bfobject, File) and not self.from_packages:
+            #return name.stem
+        #else:
+            #return name.stem
+
+    @property
+    def suffix(self):
+        # fixme loads of shoddy logic in here
+        name = PurePosixPath(self._name)
+        if isinstance(self.bfobject, File) and not self.from_packages:
+            return name.suffix
+        else:
+            if hasattr(self.bfobject, 'type'):
+                type = self.bfobject.type.lower()  # FIXME ... can we match s3key?
+            else:
+                type = None
+
+            if type not in ('unknown', 'unsupported', 'generic', 'genericdata'):
+                pass
+
+            elif hasattr(self.bfobject, 'properties'):
+                for p in self.bfobject.properties:
+                    if p.key == 'subtype':
+                        type = p.value.replace(' ', '').lower()
+                        break
+
+            return ('.' + type) if type is not None else ''
+
+    @property
+    def _name(self):
         name = self.bfobject.name
+        if isinstance(self.bfobject, File) and not self.from_packages:
+            realname = os.path.basename(self.bfobject.s3_key)
+            if name != realname:  # mega weirdness
+                name = realname
+
         if '/' in name:
             bads = ','.join(f'{i}' for i, c in enumerate(name) if c == '/')
             self.errors.append(f'slashes {bads}')
@@ -324,15 +362,22 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             name = name.replace('/', '_')
             self.bfobject.name = name  # AND DON'T BOTHER US AGAIN
 
-        if isinstance(self.bfobject, File) and not self.from_packages:
-            realname = os.path.basename(self.bfobject.s3_key)
-            if name != realname:  # mega weirdness
-                name = realname
+        return name
 
-        elif ([t for t in (DataPackage, File) if isinstance(self.bfobject, t)] and
+    @property
+    def name(self):
+        return self.stem + self.suffix
+
+    def __old_name(self):
+        if isinstance(self.bfobject, File) and not self.from_packages:
+            return PurePosixPath(File.name).stem
+        else:
+            return 
+
+        if ([t for t in (DataPackage, File) if isinstance(self.bfobject, t)] and
             self.bfobject.type != 'Unknown'):
             # NOTE we have to use blackfynns extensions until we retrieve the files
-            name += '.' + self.bfobject.type.lower()  # FIXME ... can we match s3key?
+            name += suffix
 
         return name
 
@@ -519,19 +564,25 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         if update_cache:
             c, d = new_meta.__reduce__()
             om = c(**d)
-            log.debug(f'updating cache {om}')
             assert self.meta is new_meta
             if self.cache.meta != new_meta:
                 changed = True
+
             if not self.from_packages and self.cache.name != self.name:
                 #breakpoint()
                 log.debug(f'{self.cache.name} != {self.name}')
-                self.cache = self.cache.move(remote=self)
+                self.cache.move(remote=self)  # move handles updating all the mappings
             else:
+                log.debug(f'updating cache {om}')
                 self.cache.meta = new_meta
 
         if changed and update_data and new_meta.size and new_meta.size.mb < size_limit_mb:
-            self.cache.local.data = self.data
+            if self.local.is_symlink():
+                self.local.unlink()
+                self.local.touch()
+                self.cache.meta = new_meta
+
+            self.local.data = self.data
 
     @property
     def data(self):
