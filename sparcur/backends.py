@@ -33,7 +33,9 @@ class RemoteFactory:
         # NOTE this should NOT be tagged as a classmethod
         # it is accessed at cls time already and tagging it
         # will cause it to bind to the original insource parent
-        return super().__new__(cls)#, *args, **kwargs)
+        self = super().__new__(cls)#, *args, **kwargs)
+        self.errors = []
+        return self
 
     def __new__(cls, local_class, cache_class, **kwargs):
         # TODO use this call to set the remote of local and cache??
@@ -215,6 +217,19 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         else:
             raise FileNotFoundError(f'{package} has no file with id {file_id} but has:\n{files}')
 
+    @classmethod
+    def get_file_by_id(cls, id, file_id):
+        url = cls.bfl.get_file_url(id, file_id)
+        yield from cls.get_file_by_url(url)
+
+    @classmethod
+    def get_file_by_url(cls, url):
+        resp = requests.get(url, stream=True)
+        log.debug(f'reading from {url}')
+        for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
+            if chunk:
+                yield chunk
+
     def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None):
         if isinstance(id_bfo_or_bfr, self.__class__):
             bfobject = id_bfo_or_bfr.bfobject
@@ -238,15 +253,30 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             files = bfobject.files
             parent = bfobject.parent
             if files:
-                if len(files) > 1:
+                if file_id is not None:
+                    for file in files:
+                        if file.id == file_id:
+                            file.parent = bfobject.parent
+                            file.dataset = bfobject.dataset
+                            file.package = bfobject
+                            bfobject = file
+                            
+                elif len(files) > 1:
                     log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
                 else:
-                    bfobject = files[0]
-                    bfobject.parent = parent
+                    file = files[0]
+                    file.parent = bfobject.parent
+                    file.dataset = bfobject.dataset
+                    file.package = bfobject
+                    bfobject = file
+
+                bfobject.parent = parent  # sometimes we will just reset a parent to itself
             else:
                 log.warning(f'No files in package {package.id}')
 
         self.bfobject = bfobject
+        if cache is not None:
+            self._cache_setter(cache)
 
     def __dead_init__(self):
         return
@@ -469,7 +499,35 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     def is_file(self):
         bfo = self.bfobject
-        return isinstance(bfo, File) or isinstance(bfo, DataPackage) and not list(self.children)
+        return (isinstance(bfo, File) or
+                isinstance(bfo, DataPackage) and
+                (hasattr(bfo, 'fake_files') and bfo.fake_files
+                    or
+                 not hasattr(bfo, '_json') and
+                 not (not log.warning('going to network for files') and self._has_remote_files())
+                 # massively inefficient but probably shouldn't get here?
+                ))
+
+    def _has_remote_files(self):
+        """ this will fetch """
+        bfobject = self.bfobject
+        if not isinstance(bfobject, DataPackage):
+            return False
+
+        files = bfobject.files
+        if not files:
+            return False
+
+        if len(files) > 1:
+            log.critical(f'{self} has more than one file! Not switching bfobject!')
+            return True
+
+        file, = files
+        file.parent = bfobject.parent
+        file.dataset = bfobject.dataset
+        file.package = bfobject
+        self.bfobject = file
+        return True
 
     @property
     def checksum(self):
@@ -541,9 +599,13 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         elif isinstance(self.bfobject, Dataset):
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
-                self.cache / child  # construction will cause registration without needing to assign
-                assert child.cache is not None
-                yield child
+                if child.is_dir() or child.is_file():
+                    self.cache / child  # construction will cause registration without needing to assign
+                    assert child.cache is not None
+                    yield child
+                else:
+                    # probably a package that has files
+                    log.warning(f'skipping {child} becuase it is neither a directory nor a file')
         else:
             raise exc.UnhandledTypeError  # TODO
 
@@ -552,6 +614,24 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     def refresh(self, update_cache=False, update_data=False, size_limit_mb=2):
         old_meta = self.meta
+        if self.is_file():  # this will tigger a fetch
+            pass
+        else:
+            self.bfobject = self.bfl.get(self.id)
+
+        if update_cache:
+            #cmeta = self.cache.meta
+            log.info(self.name)
+            if self.cache.name != self.name:
+                self.cache.move(remote=self)
+
+            else:
+                self.cache._meta_setter(self.meta)
+
+            if update_data and self.is_file():
+                self.cache.fetch(size_limit_mb=size_limit_mb)
+
+    def __old_refresh(self):
         if hasattr(self, '_path'):
             delattr(self, '_path')
 
@@ -616,7 +696,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         if update_cache:
             c, d = new_meta.__reduce__()
             om = c(**d)
-            assert self.meta is new_meta
+            assert self.meta == new_meta  # we don't cache this anymore so have to use ==
             if self.cache.meta != new_meta:
                 changed = True
 
@@ -656,42 +736,31 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             return
 
         resp = requests.get(file.url, stream=True)
-        log.debug(f'reading from to {file.url}')
+        log.debug(f'reading from {file.url}')
         for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
             if chunk:
                 yield chunk
 
     @property
     def meta(self):
-        # since BFR is a remote it is OK to memoize the meta
-        # because we will have to go to the net to get the new version
-        # which probably will be implemented as just creating a whole
-        # new one of these and switching it out
-        if not hasattr(self, '_meta'):
-            if self.errors:
-                errors = tuple(self.errors)
-            else:
-                errors = tuple()
-
-            self._meta = PathMeta(size=self.size,
-                                  created=self.created,
-                                  updated=self.updated,
-                                  checksum=self.checksum,
-                                  id=self.id,
-                                  file_id=self.file_id,
-                                  old_id=None,
-                                  gid=None,  # needed to determine local writability
-                                  user_id=self.owner_id,
-                                  mode=None,
-                                  errors=errors)
-
-        return self._meta
+        return PathMeta(size=self.size,
+                        created=self.created,
+                        updated=self.updated,
+                        checksum=self.checksum,
+                        id=self.id,
+                        file_id=self.file_id,
+                        old_id=None,
+                        gid=None,  # needed to determine local writability
+                        user_id=self.owner_id,
+                        mode=None,
+                        errors=tuple(self.errors))
 
     def __eq__(self, other):
         return self.bfobject == other.bfobject
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.id})'
+        file_id = f', file_id={self.file_id}' if self.file_id else ''
+        return f'{self.__class__.__name__}({self.id!r}{file_id})'
 
 
 

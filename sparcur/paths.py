@@ -170,7 +170,7 @@ class RemotePath:
         cache_class.setup(local_class, cls)
 
     def bootstrap(self, recursive=False, only=tuple(), skip=tuple()):
-        self.cache.remote = self  # duh
+        #self.cache.remote = self  # duh
         # if you forget to tell the cache you exist of course it will go to
         # the internet to look for you, it isn't quite smart enough and
         # we're trying not to throw dicts around willy nilly here ...
@@ -199,8 +199,11 @@ class RemotePath:
 
         self._c_cache = cache
 
-    @cache.setter
-    def cache(self, cache):
+    def _cache_setter(self, cache):
+        cache._remote = self
+        cache._meta_setter(self.meta)
+        self._cache = cache
+        return
         if cache.meta is None:  # FIXME this can't really happen since cache needs the id beforehand
             cache.meta = self.meta  # also easier than bootstrapping ...
 
@@ -240,10 +243,15 @@ class RemotePath:
         raise NotImplementedError
         self.remote_thing.id_from_machine_id_and_path(self)
 
+    @property
+    def _meta(self):  # catch stragglers
+        raise NotImplementedError
+
     def refresh(self):
         """ Refresh the local in memory metadata for this remote.
             Implement actual functionality in your subclass. """
 
+        raise NotImplementedError
         # could be fetch or pull, but there are really multiple pulls as we know
 
         # clear the cached value for _meta
@@ -260,12 +268,11 @@ class RemotePath:
     def meta(self):
         # on blackfynn this is the package id or object id
         # this will error if there is no implementaiton if self.id
-        return PathMeta(id=self.id)
-
-    @meta.setter
-    def meta(self, value):
         raise NotImplementedError
-        return 'yes?'
+        #return PathMeta(id=self.id)
+
+    def _meta_setter(self, value):
+        raise NotImplementedError
 
     @property
     def annotations(self):
@@ -388,6 +395,9 @@ class AugmentedPath(PosixPath):
             want to implement a special checker that exploits errno.ELOOP 40. """
         return self.is_symlink() and not self.exists()
 
+    def exists_not_symlink(self):
+        return self.exists() and not self.is_symlink()
+
     def resolve(self):
         try:
             return super().resolve()
@@ -476,6 +486,21 @@ class CachePath(AugmentedPath):
 
     _backup_cache = None
     _not_exists_cache = None
+
+    @classmethod
+    def setup(cls, local_class, remote_class_factory):
+        """ call this once to bind everything together """
+        cls._local_class = local_class
+        cls._remote_class_factory = remote_class_factory
+        local_class._cache_class = cls
+        remote_class_factory._cache_class = cls
+
+    @property
+    def local_class(self):
+        if self.is_helper_cache:
+            return self._cache_parent.local_class
+
+        return self._local_class
 
     def __new__(cls, *args, meta=None, remote=None, **kwargs):
         # TODO do we need a version of this for the locals
@@ -586,8 +611,9 @@ class CachePath(AugmentedPath):
         # does by construction
         if isinstance(key, RemotePath):
             # FIXME not just names but relative paths???
+            remote = key
             try:
-                child = self._make_child(key._parts_relative_to(self.remote), key)
+                child = self._make_child(remote._parts_relative_to(self.remote), remote)
             except AttributeError as e:
                 raise exc.SparCurError('aaaaaaaaaaaaaaaaaaaaaa') from e
 
@@ -596,28 +622,33 @@ class CachePath(AugmentedPath):
             raise TypeError('Cannot construct a new CacheClass from an object '
                             f'without an id and a name! {key}')
 
-    def __rtruediv__(self, key):
+    def __rtruediv__(self, cache):
         """ key is a subclass of self.__class__ """
-        out = self._from_parts([key.name] + self._parts, init=False)
+        # I assume that this happens when a cache is constructed from
+        # an relative cache?
+        out = self._from_parts([cache.name] + self._parts, init=False)
         out._init()
-        out.meta = key.meta
+        cache.remote._cache_setter(out)  # this seems more correct?
+        #out._meta_setter(cache.meta)
         return out
 
     def _make_child(self, args, remote):
         drv, root, parts = self._parse_args(args)
         drv, root, parts = self._flavour.join_parsed_parts(
             self._drv, self._root, self._parts, drv, root, parts)
-        child = self._from_parsed_parts(drv, root, parts, init=False)
+        child = self._from_parsed_parts(drv, root, parts, init=False)  # short circuits
         child._init()
         if isinstance(remote, RemotePath):
+            remote._cache_setter(child)
+        elif False:  # old
             #log.debug('remoooote')
             child._remote = remote  # have to use _remote since this is construction
             #child.bootstrap(remote.meta)  # FIXME indicates that maybe we want bootstrap to be meta setter?
-            child.meta = remote.meta
+            child._meta_setter(remote.meta)
             child.remote
             #child.meta = child.meta
             if not hasattr(remote, '_cache') or remote._cache is None:
-                remote.cache = child
+                remote._cache = child
             else:
                 #log.warning('Trying to set cache when it already exists!')
                 #raise BaseException
@@ -626,14 +657,6 @@ class CachePath(AugmentedPath):
             raise ValueError('should not happen')
 
         return child
-
-    @classmethod
-    def setup(cls, local_class, remote_class_factory):
-        """ call this once to bind everything together """
-        cls._local_class = local_class
-        cls._remote_class_factory = remote_class_factory
-        local_class._cache_class = cls
-        remote_class_factory._cache_class = cls
 
     def bootstrap(self, meta, *,
                   parents=False,
@@ -683,37 +706,48 @@ class CachePath(AugmentedPath):
                 log.info(f'Bootstrapping {meta.id} -> {self.local!r}')
                 only = tuple()
 
+        if self.meta is not None:
+            if recursive:
+                self._bootstrap_recursive(only, skip)
+            else:
+                raise exc.BootstrappingError(f'{self} already has meta!\n{self.meta.as_pretty()}')
 
         if self.exists() and self.meta and self.meta.id == meta.id:
-            self.meta = meta
+            self._meta_setter(meta)
 
         else:
-            # set memory only meta
-            self._bootstrap_meta_memory(meta)
+            # set single use bootstrapping id
+            self._bootstrapping_id = meta.id
 
             # directory, file, or fake file as symlink?
             is_file_and_fetch_data = self._bootstrap_prepare_filesystem(parents,
                                                                         fetch_data,
                                                                         size_limit_mb)
-            self.meta = self.remote.meta
+
+            #self.meta = self.remote.meta
             self._bootstrap_data(is_file_and_fetch_data)
 
-        # bootstrap the rest if we told it to
         if recursive:  # ah the irony of using loops to do this
-            if self.id.startswith('N:organization:'):  # FIXME :/
-                for child in self.remote.children:
-                    child.bootstrap(recursive=True, only=only, skip=skip)
-            else:
-                for child in self.remote.rchildren:
-                    # use the remote's recursive implementation
-                    # not the local implementation, since the
-                    # remote may have additional requirements
-                    child.bootstrap(only=only, skip=skip)
+            self._bootstrap_recursive(only, skip)
 
+    def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
+        # bootstrap the rest if we told it to
+        if self.id.startswith('N:organization:'):  # FIXME :/
+            for child in self.remote.children:
+                child.bootstrap(recursive=True, only=only, skip=skip)
+        else:
+            # TODO if rchildren looks like it could be bad
+            # go back up to dataset level?
+            for child in self.remote.rchildren:
+                # use the remote's recursive implementation
+                # not the local implementation, since the
+                # remote may have additional requirements
+                #child.bootstrap(only=only, skip=skip)
+                # because of how remote works now we don't even have to
+                # bootstrap this
+                child
 
-        return
-
-    def _bootstrap_meta_memory(self, meta):
+    def __bootstrap_meta_memory(self, meta):
         if meta is None:
             raise TypeError('what are you doin')
 
@@ -799,63 +833,6 @@ class CachePath(AugmentedPath):
             if ls != cs:
                 raise exc.SizeError(f'Sizes do not match!\n(!=\n{ls}\n{cs}\n)')
 
-    def __bootstrap_old(self):
-
-        if not self.is_symlink() and self.exists():
-            if self.meta and self.meta.id:
-                # we have our files, update the metdata while we're at it
-                self.meta = self.remote.meta
-
-        elif not self.is_symlink() and (not self.exists() or
-                                        self.exists() and
-                                        not self.meta and
-                                        not list(self.local.children)):
-            if not self.meta:
-                log.debug('problem')
-                self.meta = meta  # memory only bootstrap
-
-            remote_meta = self.remote.meta
-            if self.remote.is_dir():
-                self.mkdir(parents=parents)
-                if not self.meta:
-                    self.meta = meta  # save bootstrap meta to disk
-                self.meta = remote_meta
-
-            # FIXME this is really select remote cache type?
-            elif self.remote.is_file():
-                if not self.parent.exists():
-                    self.parent.mkdir(parents=parents)
-
-                if fetch_data and self.meta.size < size_limit_mb * 1024 ** 2:
-                    # running this first means that we will use xattrs instead of symlinks
-                    # this is a bit opaque, but since meta uses a setter we can't pass a
-                    # param to make it clear (oh look, python being dumb again!)
-                    self.touch()
-
-                if not self.meta:
-                    self.meta = meta  # save bootstrap meta to disk as xattr or symlink
-
-                self.meta = remote_meta
-                if self.meta != remote_meta:
-                    # read back from storage to be sure ... annnd we failed
-                    msg = '\n'.join([f'{k!r} {v!r} {getattr(remote_meta, k)!r}'
-                                     for k, v in self.meta.items()])
-                    raise exc.MetadataCorruptionError(msg)
-
-                if fetch_data and self.meta.size < size_limit_mb * 1024 ** 2:
-                    self.local.data = self.remote.data
-
-                if self.meta.checksum:
-                    lc = self.local.meta.checksum 
-                    cc = self.meta.checksum
-                    if lc != cc:
-                        raise exc.ChecksumError('Checksums to not match! {lc} != {cc}')
-                else:
-                    log.warning(f'No checksum! Your data is at risk! {self.remote!r} -> {self.local!r}! ')
-
-            else:
-                raise BaseException(f'Remote is not a file or directory {self}')
-
     @property
     def remote(self):
         if hasattr(self, '_remote'):
@@ -864,7 +841,8 @@ class CachePath(AugmentedPath):
         if hasattr(self, '_cache_parent'):
             return self._cache_parent.remote
 
-        if not self.id:
+        id = self.id  # bootstrapping id is a one time use so keep it safe
+        if not id:
             return
 
         if self._remote_class_factory is not None:
@@ -874,17 +852,16 @@ class CachePath(AugmentedPath):
                 # NOTE there are many possible ways to set the anchor
                 # we need to pick _one_ of them
                 self._remote_class = self._remote_class_factory(self.anchor,
-                                                                self._local_class,
+                                                                self.local_class,
                                                                 self.__class__)
 
             if not hasattr(self, '_remote'):
-                id = self.id
-                self.remote = self._remote_class(id, cache=self)
+                self._remote = self._remote_class(id, cache=self)
 
             return self._remote
 
-    @remote.setter
-    def remote(self, remote):
+    #@remote.setter
+    def __remote(self, remote):
         if self.meta is not None and self.id is not None:
             if hasattr(self, '_remote'):
                 if remote is self._remote:
@@ -937,27 +914,35 @@ class CachePath(AugmentedPath):
 
     @property
     def local(self):
-        if self._local_class is not None or hasattr(self, '_local'):
-            if not hasattr(self, '_local'):
-                self._local = self._local_class(self)
-                self._local._cache = self
+        local = self.local_class(self)
+        if self.is_helper_cache:
+            cache = self._cache_parent 
+        else:
+            cache = self
 
-            return self._local
+        local._cache = cache
+        return local
 
     @property
     def id(self):
         if self.meta:
             return self.meta.id
+        elif hasattr(self, '_bootstrapping_id'):
+            id = self._bootstrapping_id
+            delattr(self, '_bootstrapping_id')  # single use only
+            return id
 
     # TODO how to toggle fetch from remote to heal?
     @property
     def meta(self):
+        raise NotImplementedError
+
         if hasattr(self, '_meta'):
             return self._meta  # for bootstrap
 
-    @meta.setter
-    def meta(self, pathmeta):
-        self._meta_setter(pathmeta)  # will automatically error
+    #@meta.setter
+    #def meta(self, pathmeta):
+        #self._meta_setter(pathmeta)  # will automatically error
 
     def _meta_setter(self, pathmeta, memory_only=False):
         """ so much for the pythonic way when the language won't even let you """
@@ -1031,11 +1016,39 @@ class CachePath(AugmentedPath):
         else:
             raise BaseException('multiple candidates!')
 
+    def fetch(self, size_limit_mb=2):
+        """ bypass remote to fetch directly based on stored meta """
+        meta = self.meta
+        if self.is_dir():
+            raise NotImplementedError('not going to fetch all data in a dir at the moment')
+        if meta.file_id is None:
+            self.remote.refresh(update_cache=True, update_data=True)
+            # the file name could be different so we have to return here
+            return
+
+        size_ok = size_limit_mb is not None and meta.size is not None and meta.size.mb < size_limit_mb
+        size_not_ok = size_limit_mb is not None and meta.size is not None and meta.size.mb > size_limit_mb
+
+        if size_ok or size_limit_mb is None:
+            if self.is_broken_symlink():
+                self.unlink()
+                self.touch()
+                self._meta_setter(meta)
+
+            self.local.data = self.data
+
+        if size_not_ok:
+            log.warning(f'File is over the size limit {meta.size.mb} > {size_limit_mb}')
+
     @property
     def data(self):
         # we don't keep two copies of the local data
         # unless we are doing a git-like thing
-        raise NotImplementedError
+        meta = self.meta
+        if meta.file_id is None:
+            raise NotImplementedError('can\'t fetch data without a file id')
+
+        yield from self._remote_class.get_file_by_id(meta.id, meta.file_id)
 
     def move(self, *, remote=None, target=None, meta=None):
         """ instantiate a new cache and cleanup self because we are moving """
@@ -1044,72 +1057,35 @@ class CachePath(AugmentedPath):
             raise TypeError('either remote or meta and target are required arguments')
 
         if remote:
-            #remote.parts()
-            #remote.anchor
-            target = self.anchor / remote
-            #target = self.local.__class__()
-            #self.local.parent / remote.name
-            kwargs = dict(remote=remote)
-            meta = remote.meta
+            target = self.anchor / remote  # the magic of division!
+            # this also updates the cache for remote
+            assert target.name != self.name
         else:
-            kwargs = dict(meta=meta)
+            if target.exists():
+                raise exc.PathExistsError(f'Target {target} already exists!')
+
+            target = self.__class__(target, meta=meta)
 
         if target.absolute() == self.absolute():
             log.warning(f'trying to move a file onto itself {self.absolute()}')
-            if remote:  # preserve remote updating semantics even if we do not move
-                # probably a bad design choice here ...
-                self.remote = remote
+            return target
 
-            return
-
-        if target.exists() or target.is_symlink():
+        if target.exists() or target.is_broken_symlink():
             if target.id == remote.id:
                 if self.is_symlink():
-                    log.error('file was not removed during the previous move!\n{self} -/-> {target.cache}')
+                    log.error(f'file was not removed during the previous move!'
+                              f'\n{self} -/-> {target}')
             else:
-                raise exc.PathExistsError(f'{target} already exists!')
+                raise exc.PathExistsError(f'Target {target} already exists!')
 
         if self.exists():
             os.rename(self, target)
-            # FIXME need a unified interface for checking data ...
-            # so don't have to keep reimplementing it
-            # FIXME lots of overlap with the calling scope
-            # but we don't return a bunch of the data and logic
-            # need from here to there ...
-            #slm = self.local.meta
-            #tm = target.meta
-            #if tm == meta or tm.updated == meta.updated:
-                #pass  # nofetch  TODO
-            ##if remote.meta.checksum and remote.meta.checksum !=  # too fancy for now
-            #if target.is_broken_symlink():
-                #target.unlink()
-            #elif target.exists():
-                # TODO metas are great inputs for a state machine ...
-                #if tm.checksum != slm.checksum:
-                    #log.warning('mismatched files!'
-                                #'{self.local} -> {target.name}'
-                                #'\n{tm.checksum.hex}'
-                                #'\n{slm.checksum.hex}'
-                    #)
-                    #target.cache.meta.updated
-                    #remote.meta.updated
-                    #slm.updated > target.
-                #else:
-                    #log.info('two of the same file, sigh we messed up somehwere\n'
-                             #'{self.local} -> {target.name}')
-
-            #else:
-                #log.warning('should not have gotten here')
-                #pass  # target some how doesn't exist at all, how did that happend
 
         elif self.is_broken_symlink():
             self.unlink()  # don't move the meta since it will break the naming insurance measure
 
-        for other in (self.local,):  # self.remote):  # remote._cache is a property
-            if hasattr(other, '_cache'):
-                delattr(other, '_cache')
+        return target
 
-        return self.__class__(target, **kwargs)
 
     def __repr__(self):
         local = repr(self.local) if self.local else 'No local??' + str(self)
@@ -1150,20 +1126,20 @@ class XattrCache(CachePath, XattrPath):
 
     @property
     def meta(self):
-        if hasattr(self, '_meta'):
-            return self._meta
+        #if hasattr(self, '_meta'):
+            #return self._meta
 
         if self.exists():
             xattrs = self.xattrs()
             pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
             return pathmeta
-        else:
-            return super().meta
+        #else:
+            #return super().meta
 
-    @meta.setter
-    def meta(self, pathmeta):
+    #@meta.setter
+    #def meta(self, pathmeta):
         # sigh
-        self._meta_setter(pathmeta)
+        #self._meta_setter(pathmeta)
 
     def _meta_setter(self, pathmeta, memory_only=False):
         #log.warning(f'!!!!!!!!!!!!!!!!!!!!!!!!2 {self}')
@@ -1234,7 +1210,7 @@ class SymlinkCache(CachePath):
                     raise exc.MetadataIdMismatchError(msg)
 
                 if self.meta.size is not None and pathmeta.size is None:
-                    log.error('existing metadata found, but new meta has no size so will not')
+                    log.error('new meta has no size so will not overwrite')
                     return
 
                 log.debug('existing metadata found, but ids match so will update')
@@ -1275,13 +1251,13 @@ class BlackfynnCache(XattrCache):
     @cleanup
     def meta(self):
         #if hasattr(self, '_in_bootstrap'):
-        if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
-            return self._meta
+        #if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
+            #return self._meta
 
         if self.exists():
             #log.debug(self)
             meta = super().meta
-            if meta:
+            if meta:  # implicit else failover to backup cache
                 return meta
 
         elif not self.exists() and self._not_exists_cache and self.is_symlink():
@@ -1295,31 +1271,38 @@ class BlackfynnCache(XattrCache):
             try:
                 cache = self._backup_cache(self)
                 meta = cache.meta
-                self.meta = meta  # repopulate primary cache from backup
-                return meta
+                log.info(f'restoring from backup {meta}')
+                if meta:
+                    self._meta_setter(meta)  # repopulate primary cache from backup
+                    return meta
 
             except exc.NoCachedMetadataError as e:
                 log.warning(e)
 
-    @meta.setter
-    def meta(self, pathmeta):
-        self._meta_setter(pathmeta)
+    #@meta.setter
+    #def meta(self, pathmeta):
+        #self._meta_setter(pathmeta)
 
     def _meta_setter(self, pathmeta, memory_only=False):
         """ we need memory_only for bootstrap I think """
         if not pathmeta:
-            log.warning(f'Trying to setting empty pathmeta on {self}')
+            log.warning(f'Trying to set empty pathmeta on {self}')
             return
 
-        if not hasattr(self, '_remote') or self._remote is None:
-            self._bootstrap_meta_memory(pathmeta)
-
-        self._bootstrap_prepare_filesystem(parents=False, fetch_data=False, size_limit_mb=0)
-
-        if not self.exists() and self._not_exists_cache:
-            cache = self._not_exists_cache(self, meta=pathmeta)
-        else:
+        if self.exists_not_symlink():  # if a file already exists just follow instructions
             super()._meta_setter(pathmeta)
+        else:
+            if not hasattr(self, '_remote') or self._remote is None:
+                self._bootstrapping_id = pathmeta.id
+
+            # need to run this to create directories
+            self._bootstrap_prepare_filesystem(parents=False, fetch_data=False, size_limit_mb=0)
+
+            if self.exists():  # we a directory now
+                super()._meta_setter(pathmeta)
+
+            elif self._not_exists_cache:
+                cache = self._not_exists_cache(self, meta=pathmeta)
 
         if self._backup_cache:
             cache = self._backup_cache(self, meta=pathmeta)
@@ -1467,10 +1450,6 @@ class LocalPath(AugmentedPath):
     def remote(self):
         return self.cache.remote
 
-    @remote.setter
-    def remote(self, remote):
-        self.cache.remote = remote
-
     @property
     def cache(self):
         # local can't make a cache because id doesn't know the remote id
@@ -1595,7 +1574,8 @@ class LocalPath(AugmentedPath):
                 #log.debug(chunk)
                 f.write(chunk)
 
-        self.cache.meta = meta  # glories of persisting xattrs :/
+        if not self.cache.meta:
+            self.cache.meta = meta  # glories of persisting xattrs :/
         # yep sometimes the xattrs get  blasted >_<
         assert self.cache.meta
 

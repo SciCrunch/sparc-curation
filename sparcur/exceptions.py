@@ -22,6 +22,10 @@ class MetadataCorruptionError(SparCurError):
     """ there is already cached metadata and id does not match """
 
 
+class NoFileIdError(SparCurError):
+    """ no file_id """
+
+
 class NoCachedMetadataError(SparCurError):
     """ there is no cached metadata """
 

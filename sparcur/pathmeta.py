@@ -59,6 +59,8 @@ class PathMeta:
                  errors=None,
                  **kwargs):
 
+        if not file_id and file_id is not None:
+            raise TypeError('wat')
         if created is not None and not isinstance(created, int) and not isinstance(created, datetime):
             created = parser.parse(created)
 
@@ -141,7 +143,8 @@ class _PathMetaAsSymlink(_PathMetaConverter):
     empty = '#'
     fieldsep = '.'  # must match the file extension splitter for Path ...
     subfieldsep = ';'  # only one level, not going recursive in a filename ...
-    order = ('size',
+    order = ('file_id',
+             'size',
              'created',
              'updated',
              'checksum',
@@ -166,6 +169,11 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         self.pathmetaclass.from_symlink = from_symlink
 
     def encode(self, field, value):
+        if field == 'file_id':
+            if not value:
+                if value is not None:
+                    log.critical(f'{value!r} for file_id empty but not None!')
+                value = None
         if value is None:
             return self.empty
 
@@ -338,6 +346,8 @@ class _PathMetaAsXattrs(_PathMetaConverter):
         #if field in ('created', 'updated') and not isinstance(value, datetime):
             #field.replace(cls.path_field_sep, ',')  # FIXME hack around iso8601
             # turns it 8601 isnt actually standard >_< with . instead of , sigh
+        if not value:
+            raise TypeError('cannot encode an empty value')
 
         try:
             return _bytes_encode(field, value)
@@ -447,7 +457,9 @@ class _PathMetaAsPretty(_PathMetaConverter):
                 return 1, 0, k, v
 
         h = [['Key', f'Value    {title}']]
-        rows = h + sorted(([k, self.encode(k, v)] for k, v in pathmeta.items() if v is not None), key=key)
+        rows = h + sorted(([k, self.encode(k, v)] for k, v in pathmeta.items()
+                           if v is not None and (isinstance(v, list) and v or not isinstance(v, list))),
+                          key=key)
         return AsciiTable(rows, title=title).table
 
     def from_pretty(self, pretty):

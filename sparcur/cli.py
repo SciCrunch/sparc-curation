@@ -4,6 +4,7 @@ Usage:
     spc clone <project-id>
     spc pull [options] [<directory>...]
     spc refresh [options] [<path>...]
+    spc fetch [options] [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
     spc report [completeness filetypes keywords subjects] [options]
@@ -21,6 +22,8 @@ Usage:
 Commands:
     clone     clone a remote project (creates a new folder in the current directory)
     pull      pull down the remote list of files
+    refresh   refresh to get file sizes and data
+    fetch     fetch based on the metadata that we have
     stats     print stats for specified or current directory
     report    print a report on all datasets
     missing   find and fix missing metadata
@@ -119,10 +122,11 @@ class Dispatch:
         self.args = args
         self.options = Options(args)
 
-        self._setup()  # if this isn't run up here the internal state of the program get's wonky
         if self.args['clone'] or self.args['meta']:
             # short circuit since we don't know where we are yet
             return
+
+        self._setup()  # if this isn't run up here the internal state of the program get's wonky
 
     def _setup(self):
         args = self.args
@@ -203,6 +207,10 @@ class Dispatch:
     @property
     def _paths(self):
         """ all relevant paths determined by the flags that have been set """
+        # but if you use the generator version of _paths
+        # then if you add a folder to the previous path
+        # then it will yeild that folder! which is SUPER COOL
+        # but breaks lots of asusmptions elsehwere
         paths = self.paths
         if not paths:
             paths = Path('.').resolve(),
@@ -249,7 +257,6 @@ class Dispatch:
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         meta = PathMeta(id=project_id)
 
-
         # make sure that we aren't in a project already
         anchor_local = Path(project_name)
         root = anchor_local.find_cache_root()
@@ -274,8 +281,8 @@ class Dispatch:
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
         )
         only = tuple()
-        dirs = self.directories
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
+        dirs = self.directories
         if dirs:
             for d in dirs:
                 if d.is_dir():
@@ -285,8 +292,7 @@ class Dispatch:
                     d.remote.bootstrap(recursive=recursive)
 
         else:
-            for path in self._paths:
-                path.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+            Path.cwd().remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
             #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
@@ -295,7 +301,7 @@ class Dispatch:
         Async()(deferred(path.remote.refresh)(update_cache=True,
                                               update_data=self.options.get_data,
                                               size_limit_mb=self.options.limit)
-                for path in self._paths)
+                for path in list(self._paths))
         return
         for path in self._paths:
             path.remote.refresh(update_cache=True,
@@ -305,7 +311,11 @@ class Dispatch:
 
         return
 
-
+    def fetch(self):
+        print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
+        Async()(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
+                for path in list(self._paths))
+        
     def annos(self):
         args = self.args
         from protcur.analysis import protc, Hybrid
@@ -562,6 +572,7 @@ class Dispatch:
         self.bfl.populate_metastore()
 
     def meta(self):
+        BlackfynnCache._local_class = Path  # since we skipped _setup
         paths = self.paths
         if not paths:
             paths = Path('.').resolve(),
@@ -574,10 +585,11 @@ class Dispatch:
                 print('+' + '-' * (len(uri) + 2) + '+')
                 print(f'| {uri} |')
             try:
-
-                print(path.cache.meta.as_pretty())
+                meta = path.cache.meta
+                if meta is not None:
+                    print(path.cache.meta.as_pretty())
             except exc.NoCachedMetadataError:
-                print(f'No metadata for {path}')
+                print(f'No metadata for {path}. Run `spc refresh {path}`')
 
         for path in paths:
             inner(path)

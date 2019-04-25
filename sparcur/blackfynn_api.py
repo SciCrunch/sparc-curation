@@ -128,7 +128,7 @@ def id_to_type(id):
 class FakeBFile(File):
     """ Fake file to simplify working with package metadata """
 
-    id = ''  # unforunately these don't seem to have made it through
+    id = None  # unforunately these don't seem to have made it through
 
     def __init__(self, package, **kwargs):
         self.package = package
@@ -147,9 +147,6 @@ class FakeBFile(File):
             kwargs['size'] = None  # if we have None on a package we know it is not zero
 
         for k, v in kwargs.items():
-            if k == 'size' and v is None:
-                v = None  # FIXME hack
-
             setattr(self, k, v)
 
     @property
@@ -296,6 +293,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         continue
 
                     if isinstance(bfobject, DataPackage):
+                        bfobject.fake_files = []
                         if 'objects' not in bfobject._json:
                             log.error(f'{bfobject} has no files!??!')
                         else:
@@ -304,7 +302,10 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                                 if len(source) > 1:
                                     log.info(f'more than one key in source {sorted(source)}')
 
-                                yield FakeBFile(bfobject, **source['content'])
+                                ff = FakeBFile(bfobject, **source['content'])
+                                bfobject.fake_files.append(ff)
+                                yield ff
+
                                 if i == 1:  # only log once
                                     log.critical(f'MORE THAN ONE FILE IN PACKAGE {bfobject.id}')
 
@@ -745,6 +746,11 @@ class BFLocal:
             #breakpoint()
 
         return thing
+
+    def get_file_url(self, id, file_id):
+        resp = self.bf._api.session.get(f'https://api.blackfynn.io/packages/{id}/files/{file_id}')
+        file_url = resp.json()
+        return file_url['url']
 
     #def get_homogenous(self, id):
         #return HomogenousBF(self.get(id))
