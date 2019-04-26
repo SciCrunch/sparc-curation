@@ -5,6 +5,7 @@ from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
 from sparcur.pathmeta import FileSize
 from .common import project_path
 
+SymlinkCache._local_class = AugmentedPath  # have to set a default
 
 class TestFileSize(unittest.TestCase):
     def test_getattr(self):
@@ -55,7 +56,7 @@ class TestPathMeta(unittest.TestCase):
                                         for field in tuple()])  # TODO
 
     def test_symlink_roundtrip(self):
-        meta = PathMeta(id='N:helloworld:123', size=10)
+        meta = PathMeta(id='N:helloworld:123', size=10, checksum=b'1;o2j\x9912\xffo3ij\x01123,asdf.')
         path = self.test_path
         path._cache = SymlinkCache(path, meta=meta)
         path.cache.meta = meta
@@ -66,7 +67,7 @@ class TestPathMeta(unittest.TestCase):
 
     def _test_symlink_roundtrip_weird(self):
         path = Path('/tmp/testpath')  # FIXME random needed ...
-        meta = PathMeta(id='N:helloworld:123', size=10)
+        meta = PathMeta(id='N:helloworld:123', size=10, checksum=b'1;o2j\x9912\xffo3ij\x01123,asdf.')
         pure_symlink = PurePosixPath(path.name) / meta.as_symlink()
         path.symlink_to(pure_symlink)
         try:
@@ -80,7 +81,7 @@ class TestPathMeta(unittest.TestCase):
     def test_parts_roundtrip(self):
         pmas = _PathMetaAsSymlink()
         lpm = self.path.meta
-        bpm = PathMeta(id='N:helloworld:123', size=10)
+        bpm = PathMeta(id='N:helloworld:123', size=10, checksum=b'1;o2j\x9912\xffo3ij\x01123,asdf.')
         bads = []
         for pm in (lpm, bpm):
             symlink = pm.as_symlink()

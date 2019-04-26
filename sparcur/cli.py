@@ -37,6 +37,7 @@ Commands:
 Options:
     -f --fetch              fetch the files
     -l --limit=SIZE_MB      the maximum size to download in megabytes [default: 2]
+                            use negative numbers to indicate no limit
     -L --level=LEVEL        how deep to go in a refresh
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
@@ -61,7 +62,6 @@ from itertools import chain
 from collections import Counter
 import requests
 from terminaltables import AsciiTable
-from pyontutils.utils import Async, deferred
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
@@ -96,7 +96,9 @@ class Options:
 
     @property
     def limit(self):
-        return int(self.args['--limit'])
+        l = int(self.args['--limit'])
+        if l >= 0:
+            return l
 
     @property
     def level(self):
@@ -216,7 +218,7 @@ class Dispatch:
             paths = Path('.').resolve(),
         
         if self.options.only_meta:
-            paths = (mp.resolve() for p in paths for mp in FTLax(p).meta_paths)
+            paths = (mp.absolute() for p in paths for mp in FTLax(p).meta_paths)
             yield from paths
             return
 
@@ -279,6 +281,8 @@ class Dispatch:
         skip = (
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
+            'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
+            #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
         )
         only = tuple()
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
@@ -297,6 +301,7 @@ class Dispatch:
             #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
     def refresh(self):
+        from pyontutils.utils import Async, deferred
         print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
         Async()(deferred(path.remote.refresh)(update_cache=True,
                                               update_data=self.options.get_data,
@@ -312,9 +317,10 @@ class Dispatch:
         return
 
     def fetch(self):
+        from pyontutils.utils import Async, deferred
         print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
-        Async()(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
-                for path in list(self._paths))
+        Async(10)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
+                  for path in list(self._paths))
         
     def annos(self):
         args = self.args
@@ -431,8 +437,9 @@ class Dispatch:
             error_id_messages = [(d['id'], e['message']) for d in dowe['datasets'] for e in d['errors']]
             error_messages = [e['message'] for d in dowe['datasets'] for e in d['errors']]
 
-        rchilds = list(datasets[0].rchildren)
+        #rchilds = list(datasets[0].rchildren)
         #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
+        p, *rest = self._paths
         embed()
 
     def tables(self):
@@ -479,7 +486,7 @@ class Dispatch:
         if self.options.debug:
             embed()
 
-    def default(self):
+    def find(self):
         args = self.args
         paths = []
         if args['<file>']:
@@ -496,26 +503,33 @@ class Dispatch:
             path = Path('.').resolve()
             for pattern in patterns:
                 # TODO filesize mismatches on non-fake
-                if '.fake' not in pattern and not self.options.overwrite:
-                    pattern = pattern + '.fake*'
+                # no longer needed due to switching to symlinks
+                #if '.fake' not in pattern and not self.options.overwrite:
+                    #pattern = pattern + '.fake*'
 
                 for file in path.rglob(pattern):
                     paths.append(file)
 
         if paths:
             if self.options.limit:
-                limit = self.options.limit * 1024 ** 2
-                paths = [p for p in paths if p.cache.meta.size < limit]
+                paths = [p for p in paths
+                         if p.cache.meta.size is None or  # if we have no known size don't limit it
+                         not p.exists() and p.cache.meta.size.mb < self.options.limit
+                         or p.exists() and p.meta.size != p.cache.meta.size and
+                         (not log.info(f'Truncated transfer detected for {p}\n'
+                                       f'{p.meta.size} != {p.cache.meta.size}'))
+                         and p.cache.meta.size.mb < self.options.limit]
+
+            if args['--verbose']:
+                for p in paths:
+                    print(p.cache.meta.as_pretty(pathobject=p))
 
             if args['--fetch']:
                 from pyontutils.utils import Async, deferred
-                Async()(deferred(self.bfl.fetch_path)(path, self.options.overwrite) for path in paths)
+                #Async()(deferred(self.bfl.fetch_path)(path, self.options.overwrite) for path in paths)
+                Async(rate=30)(deferred(path.cache.fetch)() for path in paths)
             else:
-                if args['--verbose']:
-                    for p in paths:
-                        print(p, p.xattrs())
-                else:
-                    [print(p) for p in paths]
+                [print(p) for p in paths]
 
     def report(self):
         if self.args['filetypes']:
@@ -587,7 +601,7 @@ class Dispatch:
             try:
                 meta = path.cache.meta
                 if meta is not None:
-                    print(path.cache.meta.as_pretty())
+                    print(path.cache.meta.as_pretty(pathobject=path))
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
 
@@ -599,7 +613,7 @@ class Dispatch:
 
 def main():
     from docopt import docopt, parse_defaults
-    args = docopt(__doc__, version='bfc 0.0.0')
+    args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
     dispatch = Dispatch(args)
     dispatch()

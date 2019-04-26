@@ -56,7 +56,7 @@ class PathMeta:
                  gid=None,  # needed to determine local writability
                  user_id=None,
                  mode=None,
-                 errors=None,
+                 errors=tuple(),
                  **kwargs):
 
         if not file_id and file_id is not None:
@@ -77,7 +77,7 @@ class PathMeta:
         self.gid = gid
         self.user_id = user_id
         self.mode = mode
-        self.errors = errors
+        self.errors = tuple(errors)
         if kwargs:
             log.warning(f'Unexpected meta values! {kwargs}')
             self.__kwargs = kwargs  # roundtrip values we don't explicitly handle
@@ -117,8 +117,11 @@ class PathMeta:
                   return True
 
     def __bool__(self):
-        for v in self.__dict__.values():
+        for k, v in self.__dict__.items():
             if v is not None:
+                if k == 'errors' and not v:  # empty tuple ok
+                    continue
+
                 return True
         else:
             return False
@@ -180,9 +183,13 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         if field in ('errors',):
             return self.subfieldsep.join(value)
 
-        value = str(value)
-        value = value.replace(self.fieldsep, ',')
-        return value
+        if field == 'checksum':
+            return value.hex()  # raw hex may contain field separators :/
+
+        return _str_encode(field, value)
+
+        #value = str(value)
+        #return value
 
     def decode(self, field, value):
         value = value.strip(self.fieldsep)
@@ -198,7 +205,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
 
         elif field == 'checksum':  # FIXME checksum encoding ...
             #return value.encode()
-            return value.encode()
+            return bytes.fromhex(value)
 
         elif field == 'user_id':
             try:
@@ -210,7 +217,11 @@ class _PathMetaAsSymlink(_PathMetaConverter):
             return value
 
         else:
-            return int(value)
+            try:
+                return int(value)
+            except ValueError as e:
+                breakpoint()
+                raise e
 
         return value
 
@@ -433,7 +444,11 @@ class _PathMetaAsPretty(_PathMetaConverter):
 
     def encode(self, field, value):
         if field == 'errors':
-            return value
+            return list(value)
+
+        if field == 'checksum':
+            if isinstance(value, bytes):
+                value = value.hex()
 
         try:
             return _str_encode(field, value)
@@ -458,9 +473,18 @@ class _PathMetaAsPretty(_PathMetaConverter):
 
         h = [['Key', f'Value    {title}']]
         rows = h + sorted(([k, self.encode(k, v)] for k, v in pathmeta.items()
-                           if v is not None and (isinstance(v, list) and v or not isinstance(v, list))),
+                           if (v is not None and
+                               (isinstance(v, tuple) and
+                                v or not isinstance(v, tuple)))),
                           key=key)
-        return AsciiTable(rows, title=title).table
+
+        try:
+            table = AsciiTable(rows, title=title).table
+        except TypeError as e:
+            breakpoint()
+            raise e
+
+        return table
 
     def from_pretty(self, pretty):
         raise NotImplementedError('yeah ... really don\'t want to do this')

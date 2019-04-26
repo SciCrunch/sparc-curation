@@ -183,6 +183,10 @@ class RemotePath:
             self.cache._remote = self
 
     @property
+    def errors(self):
+        raise NotImplementedError
+
+    @property
     def cache(self):
         return self._cache
 
@@ -296,7 +300,7 @@ class RemotePath:
                 parent_names.append(parent.name)
 
         else:
-            self.errors += ['file-deleted']
+            self._errors += ['file-deleted']
             msg = f'{remote} is not one of {self}\'s parents'
             log.error(msg)
             #raise ValueError()
@@ -640,6 +644,7 @@ class CachePath(AugmentedPath):
         child._init()
         if isinstance(remote, RemotePath):
             remote._cache_setter(child)
+
         elif False:  # old
             #log.debug('remoooote')
             child._remote = remote  # have to use _remote since this is construction
@@ -825,13 +830,19 @@ class CachePath(AugmentedPath):
             lc = self.local.meta.checksum 
             cc = self.meta.checksum
             if lc != cc:
-                raise exc.ChecksumError(f'Checksums do not match!\n(!=\n{lc}\n{cc}\n)')
-        else:
-            log.warning(f'No checksum! Your data is at risk! {self.remote!r} -> {self.local!r}! ')
+                msg = f'Checksums do not match!\n(!=\n{lc}\n{cc}\n)'
+                log.critical(msg)  # haven't figured out how to comput the bf checksums yet
+                #raise exc.ChecksumError(msg)
+        elif self.meta.size is not None:
+            log.warning(f'No checksum! Your data is at risk!\n'
+                        '{self.remote!r} -> {self.local!r}! ')
             ls = self.local.meta.size
             cs = self.meta.size
             if ls != cs:
                 raise exc.SizeError(f'Sizes do not match!\n(!=\n{ls}\n{cs}\n)')
+        else:
+            log.warning(f'No checksum and no size! Your data is at risk!\n'
+                        '{self.remote!r} -> {self.local!r}! ')
 
     @property
     def remote(self):
@@ -1048,7 +1059,9 @@ class CachePath(AugmentedPath):
         if meta.file_id is None:
             raise NotImplementedError('can\'t fetch data without a file id')
 
-        yield from self._remote_class.get_file_by_id(meta.id, meta.file_id)
+        gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
+        self.data_headers = next(gen)
+        yield from gen
 
     def move(self, *, remote=None, target=None, meta=None):
         """ instantiate a new cache and cleanup self because we are moving """
@@ -1202,18 +1215,53 @@ class SymlinkCache(CachePath):
         if not self.exists():
             # if the path does not exist write even temporary to disk
             if self.is_symlink():
-                if self.meta.id != pathmeta.id:
-                    msg = ('Existing cache id does not match new id! Keeping old id.'
-                           f'{self.meta.id} != {pathmeta.id}\n{self.meta}')
-                    log.critical(msg)
+                meta = self.meta
+                if meta == pathmeta:
+                    log.debug(f'Metadata unchanged for {meta.id}. Not updating.')
                     return
-                    raise exc.MetadataIdMismatchError(msg)
 
-                if self.meta.size is not None and pathmeta.size is None:
+                if meta.id != pathmeta.id:
+                    msg = ('Existing cache id does not match new id! {}.\n'
+                           f'{meta.id} != {pathmeta.id}\n'
+                           f'{meta.as_pretty()}\n'
+                           f'{pathmeta.as_pretty()}')
+                    log.critical(msg)
+                    meta_newer = 'Meta newer. Not updating.'
+                    pathmeta_newer = 'Other meta newer.'
+                    if meta.updated > pathmeta.updated:
+                        log.info(msg.format(meta_newer))
+                        return
+                    elif meta.updated < pathmeta.updated:
+                        log.info(msg.format(pathmeta_newer))
+                    else:  # they are equal
+                        extra = 'Both updated at the same time ' 
+                        if meta.created is not None and pathmeta.created is not None:
+                            if meta.created > pathmeta.created:
+                                log.info(msg.format(extra + meta_newer))
+                                return
+                            elif meta.created < pathmeta.created:
+                                log.info(msg.format(extra + pathmeta_newer))
+                            else:  # same created
+                                log.info(msg.format('Identical timestamps. Not updating.'))
+                                return
+                        elif meta.created is not None:
+                            log.info(msg.format(extra + 'Meta has datetime other does not. Not updating.'))
+                            return
+                        elif pathmeta.created is not None:
+                            log.info(msg.format(extra + 'Meta has no datetime other does.'))
+                        else:  # both none
+                            log.info(msg.format(extra + ('Identical update time both missing created time. '
+                                                         'Not updating.')))
+                            return
+                    #raise exc.MetadataIdMismatchError(msg)
+                    return
+
+                if meta.size is not None and pathmeta.size is None:
                     log.error('new meta has no size so will not overwrite')
                     return
 
-                log.debug('existing metadata found, but ids match so will update')
+                # FIXME do the timestamp dance above here
+                log.debug('Metadata exists, but ids match so will update')
                 self.unlink()
 
             symlink = PosixPath(self.local.name) / pathmeta.as_symlink()
@@ -1368,6 +1416,16 @@ class BlackfynnCache(XattrCache):
             return self.parent.dataset
 
     @property
+    def dataset_id(self):
+        dataset = self.dataset
+        if dataset:
+            return dataset.id
+
+    @property
+    def file_id(self):
+        return self.meta.file_id
+
+    @property
     def human_uri(self):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
@@ -1387,22 +1445,23 @@ class BlackfynnCache(XattrCache):
         else:
             raise exc.UnhandledTypeError(type)
 
-        if self.dataset is None:
+        if self.dataset_id is None:
             raise exc.NotInProjectError(f'{self}')
 
         return self.dataset.human_uri + prefix + id
 
+    @property
     def api_uri(self):
         if self.is_dataset:
             endpoint = 'datasets/' + self.id
         elif self.is_organization:
             endpoint = 'organizations/' + self.id
-        elif isinstance(self.bfobject, File) and self.file_id is not None:
+        elif self.file_id is not None:
             endpoint = f'packages/{self.id}/files/{self.file_id}'
         else:
             endpoint = 'packages/' + self.id
 
-        return f'https://api.blackfynn.io/' + endpoint
+        return 'https://api.blackfynn.io/' + endpoint
 
     @property
     def children(self):

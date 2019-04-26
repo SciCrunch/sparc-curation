@@ -9,6 +9,7 @@ from sparcur import exceptions as exc
 log = makeSimpleLogger('sparcur')
 
 
+
 class _log:
     """ logging prevents ince ipython recurions error printing
         so rename this class to log when you need fake logging """
@@ -60,6 +61,10 @@ class OrcidId(OntId):
 
     @property
     def checksumValid(self):
+        """ see
+        https://support.orcid.org/hc/en-us/articles/360006897674-Structure-of-the-ORCID-Identifier
+        """
+
         try:
             *digits, check_string = self.suffix.replace('-', '')
             check = 10 if check_string == 'X' else int(check_string)

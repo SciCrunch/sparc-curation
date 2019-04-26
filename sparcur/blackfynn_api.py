@@ -146,8 +146,19 @@ class FakeBFile(File):
         if 'size' not in kwargs:
             kwargs['size'] = None  # if we have None on a package we know it is not zero
 
+        if 'checksum' in kwargs:
+            cs = kwargs['checksum']
+            kwargs['size'] = cs['chunkSize']
+            kwargs['checksum'] = cs['checksum']  # overwrites but ok
+        else:
+            kwargs['checksum'] = None
+
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+    @property
+    def state(self):
+        return self.package.state
 
     @property
     def owner_id(self):
@@ -246,7 +257,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 # at the end and move on
             out_of_order = [None]
             while out_of_order:
-                log.debug(f'{out_of_order}')
+                #log.debug(f'{out_of_order}')
                 if out_of_order[0] is None:
                     out_of_order.remove(None)
                 elif packages == out_of_order:
@@ -258,14 +269,19 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 for count, package in enumerate(packages):
                     if isinstance(package, dict):
                         id = package['content']['nodeId']
+                        name = package['content']['name']
                         bftype = id_to_type(id)
                         try:
+                            #if id.startswith('N:package:'):
+                                #print(json.dumps(package, indent=2))
                             rdp = restructure(deepcopy(package))
                         except KeyError as e:
                             out_of_order.append(package)
                             continue
 
                         bfobject = bftype.from_dict(rdp, api=self._api)
+                        if name != bfobject.name:
+                            log.critical(f'{name} != {bfobject.name}')
                         bfobject._json = package
                         bfobject.dataset = index[bfobject.dataset]
                     else:
@@ -285,7 +301,9 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                     elif bfobject.parent is None:
                         # both collections and packages can be at the top level
                         # dataset was set to its bfobject repr above so safe to yield
-                        log.debug(json.dumps(bfobject._json, indent=2))
+                        if bfobject.dataset is None:
+                            log.debug('No parent no dataset\n'
+                                      + json.dumps(bfobject._json, indent=2))
                         index[bfobject.id] = bfobject
                         yield bfobject
                     else:
@@ -731,7 +749,7 @@ class BFLocal:
                 # TODO checksum may no longer match since we changed it
 
     def get(self, id):
-        log.critical('We have gone to the network!')
+        log.debug('We have gone to the network!')
         if id.startswith('N:dataset:'):
             thing = self.bf.get_dataset(id)  # heterogenity is fun!
         elif id.startswith('N:organization:'):
@@ -749,8 +767,12 @@ class BFLocal:
 
     def get_file_url(self, id, file_id):
         resp = self.bf._api.session.get(f'https://api.blackfynn.io/packages/{id}/files/{file_id}')
-        file_url = resp.json()
-        return file_url['url']
+        resp_json = resp.json()
+        try:
+            return resp_json['url']
+        except KeyError as e:
+            log.critical(json.dumps(resp_json))
+            raise e
 
     #def get_homogenous(self, id):
         #return HomogenousBF(self.get(id))

@@ -34,7 +34,7 @@ class RemoteFactory:
         # it is accessed at cls time already and tagging it
         # will cause it to bind to the original insource parent
         self = super().__new__(cls)#, *args, **kwargs)
-        self.errors = []
+        self._errors = []
         return self
 
     def __new__(cls, local_class, cache_class, **kwargs):
@@ -186,6 +186,9 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     # FIXME helper index should try to cooperate with the packages index?
 
+    human_uri = BlackfynnCache.human_uri
+    api_uri = BlackfynnCache.api_uri
+
     def __new__(cls, anchor, local_class, cache_class):
         if isinstance(anchor, BFLocal):
             raise TypeError('please do not do this anymore ...')
@@ -201,9 +204,24 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             raise TypeError(f'{type(anchor_or_bfl)} is not BFLocal or BlackfynnCache!')
 
         self = super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
-        self.errors = []
+        self._errors = []
         self.root = self.bfl.organization.id
         return self
+
+    @property
+    def errors(self):
+        yield from self._errors
+        if self.remote_in_error:
+            yield 'remote-error'
+
+    @property
+    def remote_in_error(self):
+        return self.state == 'ERROR'
+
+    @property
+    def state(self):
+        if not self.is_dir():
+            return self.bfobject.state
 
     @staticmethod
     def get_file(package, file_id):
@@ -218,13 +236,21 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             raise FileNotFoundError(f'{package} has no file with id {file_id} but has:\n{files}')
 
     @classmethod
+    def get_file_url(cls, id, file_id):
+        if file_id is not None:
+            return cls.bfl.get_file_url(id, file_id)
+
+    @classmethod
     def get_file_by_id(cls, id, file_id):
-        url = cls.bfl.get_file_url(id, file_id)
+        url = cls.get_file_url(id, file_id)
         yield from cls.get_file_by_url(url)
 
     @classmethod
     def get_file_by_url(cls, url):
+        """ NOTE THAT THE FIRST YIELD IS HEADERS """
         resp = requests.get(url, stream=True)
+        headers = resp.headers
+        yield headers
         log.debug(f'reading from {url}')
         for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
             if chunk:
@@ -250,25 +276,26 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             return
 
         if isinstance(bfobject, DataPackage):
+            def transfer(file, bfobject):
+                file.parent = bfobject.parent
+                file.dataset = bfobject.dataset
+                file.state = bfobject.state
+                file.package = bfobject
+                return file
+
             files = bfobject.files
             parent = bfobject.parent
             if files:
                 if file_id is not None:
                     for file in files:
                         if file.id == file_id:
-                            file.parent = bfobject.parent
-                            file.dataset = bfobject.dataset
-                            file.package = bfobject
-                            bfobject = file
+                            bfobject = transfer(file, bfobject)
                             
                 elif len(files) > 1:
                     log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
                 else:
                     file = files[0]
-                    file.parent = bfobject.parent
-                    file.dataset = bfobject.dataset
-                    file.package = bfobject
-                    bfobject = file
+                    bfobject = transfer(file, bfobject)
 
                 bfobject.parent = parent  # sometimes we will just reset a parent to itself
             else:
@@ -387,6 +414,31 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         return isinstance(self.bfobject, Dataset)
 
     @property
+    def dataset_id(self):
+        """ save a network transit if we don't need it """
+        dataset = self.bfobject.dataset
+        if isinstance(dataset, str):
+            return dataset
+        else:
+            return dataset.id
+
+    @property
+    def dataset(self):
+        dataset = self.bfobject.dataset
+        if isinstance(dataset, str):
+            dataset = self.organization.get_child_by_id(dataset)
+            self.bfobject.dataset = dataset.bfobject
+        else:
+            dataset = self.__class__(dataset)
+
+        return dataset
+
+    def get_child_by_id(self, id):
+        for c in self.children:
+            if c.id == id:
+                return c
+
+    @property
     def from_packages(self):
         return hasattr(self.bfobject, '_json')
 
@@ -438,7 +490,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
         if '/' in name:
             bads = ','.join(f'{i}' for i, c in enumerate(name) if c == '/')
-            self.errors.append(f'slashes {bads}')
+            self._errors.append(f'slashes {bads}')
             log.critical(f'GO AWAY {self}')
             name = name.replace('/', '_')
             self.bfobject.name = name  # AND DON'T BOTHER US AGAIN
@@ -532,10 +584,14 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     @property
     def checksum(self):
         if hasattr(self.bfobject, 'checksum'):
-            return self.bfobject.checksum
-        # log this downstream, since downstream also knows the file affected
-        #elif isinstance(self.bfobject, File):
-            #log.warning(f'No checksum for {self}')
+            checksum = self.bfobject.checksum
+            if checksum:
+                log.debug(checksum)
+                if isinstance(checksum, str):
+                    checksum, hrm = checksum.rsplit('-', 1)
+                    #if checksum[-2] == '-':  # these are 34 long, i assume the -1 is a check byte?
+                        #return bytes.fromhex(checksum[:-2])
+                    return bytes.fromhex(checksum)
 
     @property
     def owner_id(self):
@@ -605,16 +661,17 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                     yield child
                 else:
                     # probably a package that has files
-                    log.warning(f'skipping {child} becuase it is neither a directory nor a file')
+                    log.debug(f'skipping {child} becuase it is neither a directory nor a file')
         else:
             raise exc.UnhandledTypeError  # TODO
 
     def isinstance_bf(self, *types):
         return [t for t in types if isinstance(self.bfobject, t)]
 
-    def refresh(self, update_cache=False, update_data=False, size_limit_mb=2):
+    def refresh(self, update_cache=False, update_data=False, size_limit_mb=2, force=False):
+        """ use force if you have a file from packages """
         old_meta = self.meta
-        if self.is_file():  # this will tigger a fetch
+        if self.is_file() and not force:  # this will tigger a fetch
             pass
         else:
             self.bfobject = self.bfl.get(self.id)
@@ -734,12 +791,9 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             file = self.bfobject
         else:
             return
-
-        resp = requests.get(file.url, stream=True)
-        log.debug(f'reading from {file.url}')
-        for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
-            if chunk:
-                yield chunk
+        gen = self.get_file_by_url(file.url)
+        self.data_headers = next(gen)
+        yield from gen
 
     @property
     def meta(self):
@@ -753,7 +807,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                         gid=None,  # needed to determine local writability
                         user_id=self.owner_id,
                         mode=None,
-                        errors=tuple(self.errors))
+                        errors=self.errors)
 
     def __eq__(self, other):
         return self.bfobject == other.bfobject
