@@ -7,6 +7,7 @@ import math
 import hashlib
 import mimetypes
 from types import GeneratorType
+from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 from itertools import chain
 from collections import defaultdict, deque
@@ -30,7 +31,7 @@ from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import exceptions as exc
 from sparcur.core import JEncode, OrcidId, log, lj
 from sparcur.paths import Path
-from sparcur.config import local_storage_prefix
+from sparcur.config import local_storage_prefix, organ_html_path
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur import schemas as sc
 from sparcur.schemas import (JSONSchema, ValidationError,
@@ -106,18 +107,27 @@ class NormAward(str):
     def normalize(cls, value):
         if 'OT2' in value and 'OD' not in value:
             # one is missing the OD >_<
+            log.warning(value)
             value = value.replace('-', '-OD')  # hack
 
         n = (value
+             .strip()
+             .replace('-', '-')  # can you spot the difference?
              .replace('(', '')
              .replace(')', '')
-             .rstrip('-01')
+             .replace('-01S1', '')
+             .replace('-01', '')
+             .replace('-02S2', '')
+             .replace('-02', '')
              .replace('SPARC', '')
-             .strip('NIH-1')
-             .strip('NIH-')
+             .replace('NIH-1', '')
+             .replace('NIH-', '')
              .replace('-', '')
-             .replace(' ', '')
-             .strip('NIH '))
+             .replace('NIH ', '')
+             .replace(' ', ''))
+        if n[0] in ('1', '3', '5'):
+            n = n[1:]
+
         return n
 
 
@@ -809,6 +819,8 @@ class SubjectsFile(Version1Header):
 
 
 class TripleConverter:
+    # TODO consider putting mappings in a dict hierarchy
+    # that reflects where they are in the schema??
     mapping = tuple()
 
     @classmethod
@@ -824,20 +836,63 @@ class TripleConverter:
     def l(self, value):
         if isinstance(value, OntId):
             return value.u
+        elif isinstance(value, str) and value.startswith('http'):
+            return OntId(value).u
         else:
             return rdflib.Literal(value)
+
+    def triples_gen(self, subject):
+        if not isinstance(subject, rdflib.URIRef):
+            subject = rdflib.URIRef(subject)
+
+        for field, value in self._source.items():
+            log.debug(f'{field} {value}')
+            convert = getattr(self, field, None)
+            if convert is not None:
+                if isinstance(value, tuple) or isinstance(value, list):
+                    values = value
+                else:
+                    values = value,
+                
+                for v in values:
+                    yield (subject, *convert(v))
+
+            else:
+                log.warning(f'Unhandled subject field: {field}')
+
 
 
 class ContributorConverter(TripleConverter):
     mapping = (
             ('first_name', sparc.firstName),
             ('last_name', sparc.lastName),
-            ('contributor_role', sparc.hasRole),
+            #('contributor_role', TEMP.hasRole),
             ('contributor_affiliation', TEMP.hasAffiliation),
             ('is_contact_person', sparc.isContactPerson),
             ('is_responsible_pi', sparc.isContactPerson),
         )
  
+    def contributor_role(self, value):
+        return TEMP.hasRole, TEMP[value]
+
+class MetaConverter(TripleConverter):
+    mapping = [
+        ['principal_investigator', TEMP.hasResponsiblePrincialInvestigator],
+        ['protocol_url_or_doi', TEMP.hasProtocol],
+        ['award_number', TEMP.hasAwardNumber],
+        ['species', isAbout],
+        ['organ', isAbout],
+        ['subject_count', TEMP.hasNumberOfSubjects],
+        ['keywords', isAbout],
+    ]
+
+
+class DatasetConverter(TripleConverter):
+    mapping = [
+        ['error_index', TEMP.errorIndex],
+        ['submission_completeness_index', TEMP.submissionCompletenessIndex],
+        ]
+
 
 class SubjectConverter(TripleConverter):
     mapping = [
@@ -856,6 +911,7 @@ class SubjectConverter(TripleConverter):
 
 
 ContributorConverter.setup()
+MetaConverter.setup()
 SubjectConverter.setup()
 
 
@@ -1004,9 +1060,113 @@ class CurationStatusLax(CurationStatusStrict):
                 yield path
 
 
+class OrganData:
+    organ_lookup = {'bladder': OntId('FMA:15900'),
+                    'brain': OntId('UBERON:0000955'),
+                    #'computer': OntId(''),
+                    'heart': OntId('FMA:7088'),
+                    'kidneys': OntId('FMA:7203'),
+                    'largeintestine': OntId('FMA:7201'),
+                    'liver': OntId('FMA:7197'),
+                    'lung': OntId('FMA:7195'),
+                    'malerepro': OntId('UBERON:0000079'),
+                    #'othertargets': OntId(''),
+                    'pancreas': OntId('FMA:7198'),
+                    'smallintestine': OntId('FMA:7200'),
+                    'spleen': OntId('FMA:7196'),
+                    'stomach': OntId('FMA:7148'),
+                    #'uterus': OntId('')
+    }
+    cache = Path('/tmp/sparc-award-by-organ.json')
+    old_cache = Path('/tmp/award-mappings-old-to-new.json')
+
+    def __init__(self, path=organ_html_path):
+        from bs4 import BeautifulSoup
+        self.path = path
+        self.BeautifulSoup = BeautifulSoup
+        if not self.cache.exists():
+            self.overview()
+            with open(self.cache, 'wt') as f:
+                json.dump(self.normalized, f)
+
+            with open(self.old_cache, 'wt') as f:
+                json.dump(self.former_to_current, f)
+        else:
+            with open(self.cache, 'rt') as f:
+                self.normalized = json.load(f)
+
+            with open(self.old_cache, 'rt') as f:
+                self.former_to_current = json.load(f)
+
+    def overview(self):
+        with open(self.path, 'rb') as f:
+            soup = self.BeautifulSoup(f.read(), 'lxml')
+
+        self.raw = {}
+        self.former_to_current = {}
+        for bsoup in soup.find_all('div', {'id':lambda v: v and v.endswith('-bubble')}):
+            organ, _ = bsoup['id'].split('-')
+            award_list = self.raw[organ] = []
+            for asoup in bsoup.find_all('a'):
+                href = asoup['href']
+                log.debug(href)
+                parts = urlparse(href)
+                query = parse_qs(parts.query)
+                if 'projectnumber' in query:
+                    award_list.extend(query['projectnumber'])
+                elif 'aid' in query:
+                    #aid = [int(a) for a in query['aid']]
+                    #json = self.reporter(aid)
+                    award, former = self.reporter(href)
+                    award_list.append(award)
+                    if former is not None:
+                        award_list.append(former)  # for this usecase this is ok
+                        self.former_to_current[former] = award
+                elif query:
+                    log.debug(lj(query))
+            
+        self.former_to_current = {NormAward(NormAward(k)):NormAward(NormAward(v))
+                                  for k, v in self.former_to_current.items()}
+        self._normalized = {}
+        self.normalized = {}
+        for frm, to in ((self.raw, self._normalized), (self._normalized, self.normalized)):
+            for organ, awards in frm.items():
+                if organ in self.organ_lookup:
+                    organ = self.organ_lookup[organ].iri
+
+                to[organ] = [NormAward(a) for a in awards]
+
+    def _reporter(self, aids):
+        # can't seem to get this to cooperate
+        base = ('https://api.federalreporter.nih.gov'
+                '/v1/projects/FetchBySmApplIds')
+        resp = requests.post(base, json=aids, headers={'Accept': 'application/json',
+                                                       'Content-Type': 'application/json'})
+        breakpoint()
+        return resp.json()
+
+    def reporter(self, href):
+        resp = requests.get(href)
+        soup = self.BeautifulSoup(resp.content, 'lxml')
+        #id = soup.find_all('span', {'id': 'spnPNUMB'})
+        table = soup.find_all('table', {'summary': 'Details'})
+        text = table[0].find_all('td')[1].text.strip()
+        if 'Former' in text:
+            award, rest = text.split(' ', 1)
+            rest, former = text.rsplit(' ', 1)
+            return [award, former]
+        else:
+            return [text, None]
+
+
 class MetaMaker:
     """ FIXME this is a bad pattern :/ """
     schema_class = MetaOutSchema
+    organ_to_award = OrganData().normalized
+    award_to_organ = {}
+    for k, vs in organ_to_award.items():
+        for v in vs:
+            award_to_organ[v] = k
 
     def __new__(cls, fthing):
         cls.schema = cls.schema_class()
@@ -1037,7 +1197,18 @@ class MetaMaker:
 
     @property
     def organ(self):
-        return self._generic(self.f.organ)
+        org = self._generic(self.f.organ)
+        if org:
+            return org
+        else:
+            ans = self.award_number
+            for an in self.f.award:
+                if an not in self.award_to_organ:
+                    log.critical(f'Award number {an} not in known set!')
+                    #breakpoint()
+                    return
+
+                return self.award_to_organ[an]
 
     @property
     def modality(self):
@@ -1287,7 +1458,7 @@ class FThing(FakePathHelper):
     @property
     def award(self):
         for award in self._award_raw:
-            yield NormAward(award)
+            yield NormAward(NormAward(award))
 
     @property
     def _award_raw(self):
@@ -1315,10 +1486,15 @@ class FThing(FakePathHelper):
                     if mp in contributor:
                         for role in contributor[mp]:
                             normrole = NormContributorRole(role)
-                            if normrole in os:
-                                #print(contributor)
-                                yield contributor['name']  # TODO orcid etc
-                                break
+                            if 'name' in contributor:
+                                fn, ln = vldt.Derives.contributor_name(contributor['name'])
+                                contributor['first_name'] = fn
+                                contributor['last_name'] = ln
+                                if normrole in os:
+                                    #print(contributor)
+                                    for s, p, o in self.triples_contributors(contributor):
+                                        if p == a and o == owl.NamedIndividual:
+                                            yield s
 
     @property
     def species(self):
@@ -2153,6 +2329,16 @@ class FThing(FakePathHelper):
         except BaseException as e:  # FIXME ...
             raise e
             return
+
+        if 'meta' in data:
+            meta_converter = MetaConverter(data['meta'])
+            yield from meta_converter.triples_gen(dsid)
+        else:
+            raise ValueError('wat')
+
+        converter = DatasetConverter(data)
+        yield from converter.triples_gen(dsid)
+
         def id_(v):
             yield rdflib.URIRef(dsid), a, owl.NamedIndividual
             yield rdflib.URIRef(dsid), a, sparc.Resource
