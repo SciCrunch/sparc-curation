@@ -2639,139 +2639,6 @@ def express_or_return(thing):
     return list(thing) if isinstance(thing, GeneratorType) else thing
 
 
-def get_datasets(project_path, FTC=FThing):
-    ds = [FTC(p) for p in project_path.iterdir() if p.is_dir()]
-    dsd = {d.id:d for d in ds}
-    return ds, dsd
-
-
-def parse_meta(project_path):  # XXX deprecated
-    ds, dsd = get_datasets(project_path)
-    dump_all = [{attr: express_or_return(getattr(d, attr))
-                 for attr in dir(d) if not attr.startswith('_')}
-                for d in ds]
-    dad = {d['id']:d for d in dump_all}
-
-    def get_diversity(field_name):
-        # FIXME recurse
-        return sorted(set(value
-                          for d in dump_all
-                          for dict_ in d['dataset_description']
-                          for _key, _value in dict_.items()
-                          if _key == field_name or isinstance(_value, tuple)
-                          for value in
-                          ((_value,)
-                           if _key == field_name else
-                           (v for thing in _value
-                            if isinstance(thing, dict)
-                            for key, value in thing.items()
-                            if key == field_name
-                            for v in (value if isinstance(value, tuple) else (value,))
-                           ))))
-
-    deep = dsd['N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3']
-    awards = sorted(set(n for d in dump_all for n in d['award']))
-    n_awards = len(awards)
-
-    # TODO filtering of all of these by value ...
-    by_award = defaultdict(set)
-    for d in ds:
-        awards = list(d.award)
-        for a in awards:
-            by_award[a].add(d)
-
-        if not awards:
-            by_award[None].add(d)
-
-    by_award = dict(by_award)
-    award_report = {a:(len(f), [(d.dataset_name_proper, d.name, d.id) for d in f]) for a, f in by_award.items()}
-
-    #exts = sorted(set(''.join(p.suffixes).split('.fake.')[0] for p in project_path.rglob('*') if p.is_file() and p.suffixes))
-    exts = sorted(set(NormFileSuffix(FThing(p).suffix.strip('.') if '.gz' not in p.suffixes else ''.join(FThing(p).suffixes).strip('.'))
-                      for p in project_path.rglob('*') if p.is_file()))  # TODO gz
-    n_exts = len(exts)
-
-    fts = [FThing(p) for p in project_path.rglob('*') if p.is_file()]
-    mimes = sorted(t for t in set(f.mimetype for f in fts if f.mimetype is not None))
-    all_type_info = sorted(set((f.suffix, f.mimetype, f._magic_mimetype)
-                               for f in fts), key = lambda v: [e if e else '' for e in v])
-    type_report = '\n'.join(['extension\tfilename mime\tmagic mime'] +
-                            ['\t'.join([str(s) for s in _]) for _ in all_type_info])
-    # and this is why manual data entry without immediate feedback is a bad idea
-    cr = get_diversity('contributor_role')
-    fun = get_diversity('funding')
-    orcid = get_diversity('contributor_orcid_id')
-
-    zero = [d for d in ds if not d.status.overall[-1]] 
-    n_zero = len(zero)
-
-    #report = ''.join(sorted(d.name + '\n' + d.report + '\nlax\n' + d.lax.report + '\n\n' for d in ds))
-    report = '\n\n'.join([d.report for d in sorted(ds, key = lambda d: d.lax.overall[-1])])
-    protocol_state = sorted([d.status.has_protocol_uri, d.status.has_protocol, d.status.has_protocol_annotations, d] for d in ds)
-    embed()
-
-
-def schema_check(ds, dsd):
-    dds = [dd for d in ds for dd in d.dataset_description]
-
-    # TODO nest the schemas conditionally
-    dsvr = {d.id:d.validate() for d in ds}
-    ddvr = {d.id:dd.validate() for d in ds for dd in d.dataset_description}
-    missvr = {d.id:miss.validate() for d in ds for miss in d.submission}
-    jectvr = {d.id:ject.validate() for d in ds for ject in d.subjects}
-
-    dsve = {k:e for k, e in dsvr.items() if not isinstance(e, dict)}
-    ddve = {k:e for k, e in ddvr.items() if not isinstance(e, dict)}
-    missve = {k:e for k, e in missvr.items() if not isinstance(e, dict)}
-    jectve = {k:e for k, e in jectvr.items() if not isinstance(e, dict)}
-
-    subjects_header_diversity = sorted(set(f for d in ds for s in d.subjects for f in s.bc.header._fields))
-    subjects_wat = [(s,c) for d in ds for s in d.subjects for c in s.bc.cols if c[0].startswith('TEMP_')] 
-    unique_wat = sorted(set(a for a, b in subjects_wat), key = lambda a: a.path)
-    encoding_errors = [e for d in ds for dd in chain(d.dataset_description, d.submission, d.subjects) for e in dd.errors]
-    #embed()
-    return [dsvr, ddvr, missvr, jectvr], [dsve, ddve, missve, jectve]
-
-
-class CurationReport:
-    def __init__(self, project_path):
-        self.ds, self.dsd = get_datasets(project_path)
-        self.dsl, self.dsdl = get_datasets(project_path, FTC=FTLax)
-
-    def gen(self):
-        ds, dsl = self.ds, self.dsl
-
-        # total
-        n_ds = len(ds)
-
-        # validated
-        validated = [d for d in ds if d.validate()]
-        n_val = len(validated)
-        validated_l = [d for d in dsl if d.validate()]
-        n_val_l = len(validated_l)
-
-        # award
-        award = [d for d in ds if list(d.award)]
-        n_award = len(award)
-        award_l = [d for d in dsl if list(d.award)]
-        n_award_l = len(award_l)
-
-        # submission
-        sub_l = [FThing(s) for s in ds[0].parent.path.rglob('[Ss]ubmission*.*')]
-        n_sub_l = len(sub_l)
-        subd_l = [s for f in sub_l for s in f.submission]
-        n_subd_l = len(subd_l)
-
-        # oof
-        bads = [f for f in sub_l if not list(f.submission)]
-        n_bads = len(bads)
-
-        h = ('Total', 'Structure', 'Lax structure', 'Award', 'Lax award',
-             'Lax submission files', 'Lax submission data')
-        r = n_ds, n_val, n_val_l, n_award, n_award_l, n_sub_l, n_subd_l
-
-        return h, r
-
 def populate_annos(group_name='sparc-curation'):
     group = devconfig.secrets('hypothesis', 'group', group_name)
     get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group),
@@ -2781,36 +2648,10 @@ def populate_annos(group_name='sparc-curation'):
     [protc(a, annos) for a in annos]
     [Hybrid(a, annos) for a in annos]
 
+
 def main():
-    #populate_annos()
-    #parse_meta()
-    project_path = local_storage_prefix / 'SPARC Consortium'
+    pass
 
-    ds, dsd = get_datasets(project_path)
-    nr, ne = schema_check(ds, dsd)
-
-    dsl, dsdl = get_datasets(project_path, FTLax)
-    lr, le = schema_check(dsl, dsdl)
-    compare = lambda i: (ne[i], le[i])
-
-    total_paths = list(map(lambda d_: len([p for d in d_ for p in d.meta_paths]), (ds, dsl)))
-    total_metas = list(map(lambda d_: len([p for d in d_ for p in d.meta_sections]), (ds, dsl)))
-    total_valid = list(map(lambda d_: len([p for d in d_ for p in d.meta_sections if isinstance(p.validate(), dict)]), (ds, dsl)))
-    dst = [p for d in ds for p in d.meta_sections if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
-    dstl = [p for d in dsl for p in d.meta_sections if isinstance(p, FThing) and not isinstance(p.validate(), dict)]  # n bad
-
-    # review paths in lax vs real
-    dp = [(d, p) for d in ds for p in d.meta_paths]
-    dpl = [(d, p) for d in dsl for p in d.meta_paths]
-
-    dr = [(d.dataset_name_proper, p.name, FThing(p).parent.is_dataset)
-           for d in ds for p in d.meta_paths] 
-    drl = [(d.dataset_name_proper, p.name, FThing(p).parent.is_dataset)
-           for d in dsl for p in d.meta_paths] 
-
-    if __name__ == '__main__':
-        from IPython import embed
-        embed()
 
 if __name__ == '__main__':
     main()

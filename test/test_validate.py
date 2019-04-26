@@ -2,14 +2,14 @@ import unittest
 import pytest
 from .common import project_path
 
-from sparcur.curation import get_datasets, FTLax
-
 from sparcur import validate as vldt
+from sparcur.paths import Path
+from sparcur.curation import FTLax, FThing
 
 
 class TestHierarchy(unittest.TestCase):
     def setUp(self):
-        self.ds, self.dsd = get_datasets(project_path)
+        self.ds =  [FThing(p) for p in Path(project_path).children]
 
     def tearDown(self):
         pass
@@ -58,7 +58,7 @@ class TestHierarchy(unittest.TestCase):
 
 class TestLax(TestHierarchy):
     def setUp(self):
-        self.ds, self.dsd = get_datasets(project_path, FTC=FTLax)
+        self.ds =  [FTLax(p) for p in Path(project_path).children]
 
 
 class TestStage(unittest.TestCase):
