@@ -28,6 +28,13 @@ cypherResources:
                     "http://purl.org/sig/ont/fma/fma45659",
                     "http://purl.org/sig/ont/fma/fma7647"]
             RETURN n
+  - path: /dynamic/prod/sparc/speciesList
+    query: |
+            MATCH (n)
+            WHERE n.iri IN [
+                    "http://purl.obolibrary.org/obo/NCBITaxon_10090",
+                    "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
+            RETURN n
     operations:
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
 
