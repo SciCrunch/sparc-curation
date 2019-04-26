@@ -559,11 +559,15 @@ class CachePath(AugmentedPath):
         if self.id is None:
             if meta is None and remote is None:
                 if not self.is_helper_cache:
-                    if self.exists():
+                    root = self.local.find_cache_root()
+                    if root is not None:
+                        log.debug(root)
                         self.recover_meta()
-                    else:
-                        msg = f'No cached meta exists and no meta and no remote provided for {self}'
-                        raise exc.NoCachedMetadataError(msg)
+                    #if self.exists():
+                        #self.recover_meta()
+                    #else:
+                        #msg = f'No cached meta exists and no meta and no remote provided for {self}'
+                        #raise exc.NoCachedMetadataError(msg)
             elif remote and meta:
                 raise TypeError(f'can only have one remote or one meta')
             elif remote is not None:
@@ -971,6 +975,11 @@ class CachePath(AugmentedPath):
     def recover_meta(self):
         """ rebuild restore reconnect """
 
+        root = self.parent.local.find_cache_root()
+        if root is None:
+            #breakpoint()
+            raise exc.NotInProjectError(f'{self.parent.local} is not in a project!')
+        breakpoint()
         children = list(self.parent.remote.children)  # if this is run from dismatch meta we have issues
         isf = self.is_file()
         isd = self.is_dir()
@@ -1176,6 +1185,10 @@ class XattrCache(CachePath, XattrPath):
 class SqliteCache(CachePath):
     """ a persistent store to back up the xattrs if they get wiped """
 
+    def __init__(self, *args, meta=None, **kwargs):
+        if meta is not None:
+            self.meta = meta
+
     @property
     def meta(self):
         if hasattr(self, '_meta'):
@@ -1319,8 +1332,8 @@ class BlackfynnCache(XattrCache):
             try:
                 cache = self._backup_cache(self)
                 meta = cache.meta
-                log.info(f'restoring from backup {meta}')
                 if meta:
+                    log.info(f'restoring from backup {meta}')
                     self._meta_setter(meta)  # repopulate primary cache from backup
                     return meta
 
@@ -1406,9 +1419,12 @@ class BlackfynnCache(XattrCache):
             # we have a case of missing metadata here as well
             return self.parent.organization
 
+    def is_dataset(self):
+        return self.id and self.id.startswith('N:dataset:')
+
     @property
     def dataset(self):
-        if self.id and self.id.startswith('N:dataset:'):
+        if self.is_dataset():
             return self
 
         elif self.parent and self.parent != self:  # Path('.') issue
@@ -1438,10 +1454,10 @@ class BlackfynnCache(XattrCache):
         elif id.startswith('N:collection:'):
             prefix = '/files/'
         elif id.startswith('N:dataset:'):
-            prefix = '/datasets/'
+            prefix = '/'  # apparently organization needs /datasets after it
             return self.parent.human_uri + prefix + id
         elif id.startswith('N:organization:'):
-            return 'https://app.blackfynn.io/' + id
+            return f'https://app.blackfynn.io/{id}/datasets'
         else:
             raise exc.UnhandledTypeError(type)
 
@@ -1452,7 +1468,7 @@ class BlackfynnCache(XattrCache):
 
     @property
     def api_uri(self):
-        if self.is_dataset:
+        if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
             endpoint = 'datasets/' + self.id
         elif self.is_organization:
             endpoint = 'organizations/' + self.id
@@ -1494,7 +1510,7 @@ class BlackfynnCache(XattrCache):
         # if package/file
 
 
-class LocalPath(AugmentedPath):
+class LocalPath(XattrPath):
     # local data about remote objects
 
     _cache_class = None  # must be defined by child classes
@@ -1515,7 +1531,11 @@ class LocalPath(AugmentedPath):
         # but if there is an existing cache (duh) the it can try to get it
         # otherwise it will error (correctly)
         if not hasattr(self, '_cache'):
-            self._cache_class(self)  # we don't have to assign here because cache does it
+            try:
+                self._cache_class(self)  # we don't have to assign here because cache does it
+            except exc.NotInProjectError as e:
+                log.error(e)
+                return None
 
         return self._cache
 
@@ -1529,15 +1549,15 @@ class LocalPath(AugmentedPath):
                 try:
                     parent.cache
                     found_cache = parent
-                except exc.NoCachedMetadataError as e:
+                except (exc.NoCachedMetadataError, exc.NotInProjectError) as e:
                     # if we had a cache, went to the parent and lost it
                     # then we are at the root, assuming of course that
                     # there aren't sparse caches on the way up (down?) the tree
-                    if found_cache is not None:
+                    if found_cache is not None and found_cache != Path('/'):
                         return found_cache
 
             else:
-                if found_cache:
+                if found_cache and found_cache != Path('/'):
                     return found_cache
 
     #@property

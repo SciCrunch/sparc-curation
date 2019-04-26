@@ -9,6 +9,10 @@ from sparcur import exceptions as exc
 log = makeSimpleLogger('sparcur')
 
 
+def lj(j):
+    """ use with log to format json """
+    return '\n' + json.dumps(j, indent=2)
+
 
 class _log:
     """ logging prevents ince ipython recurions error printing

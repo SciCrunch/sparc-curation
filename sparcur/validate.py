@@ -127,6 +127,7 @@ class Header(Stage):
                      .replace('#', 'number')
                      .replace('-', '_')
                      .replace(':', '_')
+                     .replace('\x83', '')
                      .lower()  # sigh
                 )
                 if any(c.startswith(str(n)) for n in range(10)):
@@ -142,3 +143,16 @@ class Header(Stage):
 
         return header
 
+
+class Derives:
+    @staticmethod
+    def contributor_name(name):
+        if ',' in name:
+            last, first = name.split(', ', 1)
+        elif ' ' in name:
+            first, last = name.split(' ', 1)
+        else:
+            first = 'ERROR IN NAME see lastName for content'
+            last = name
+
+        return first, last

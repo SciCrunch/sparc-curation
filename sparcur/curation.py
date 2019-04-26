@@ -7,6 +7,7 @@ import math
 import hashlib
 import mimetypes
 from types import GeneratorType
+from datetime import datetime
 from itertools import chain
 from collections import defaultdict, deque
 import magic  # from sys-apps/file consider python-magic ?
@@ -15,9 +16,9 @@ import requests
 import dicttoxml
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
-from pyontutils.utils import makeSimpleLogger, byCol
+from pyontutils.utils import byCol
 from pyontutils.config import devconfig
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
@@ -26,7 +27,8 @@ from pysercomb.pyr.units import ProtcParameter
 from scibot.utils import resolution_chain
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
-from sparcur.core import JEncode, OrcidId
+from sparcur import exceptions as exc
+from sparcur.core import JEncode, OrcidId, log, lj
 from sparcur.paths import Path
 from sparcur.config import local_storage_prefix
 from sparcur.protocols_io_api import get_protocols_io_auth
@@ -40,10 +42,12 @@ from sparcur import validate as vldt
 sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
 a = rdf.type
 
-logger = makeSimpleLogger('dsload')
-logger.setLevel('CRITICAL')
 OntCuries({'orcid':'https://orcid.org/',
-           'ORCID':'https://orcid.org/',})
+           'ORCID':'https://orcid.org/',
+           'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
+           'package':'https://api.blackfynn.io/packages/N:package:',
+           'user':'https://api.blackfynn.io/users/N:user:',
+           'sparc':str(sparc),})
 
 # FIXME this is an awful way to do this ...
 if False:  # TODO create a protocols.io class for dealing with fetching that can be initialized with auth stuff
@@ -229,7 +233,7 @@ class Tabular:
                     yield from csv.reader(f, delimiter=delimiter)
                 if encoding != 'utf-8':
                     message = f"encoding bad '{encoding}' '{self.path}'"
-                    logger.error(message)
+                    log.error(message)
                     self._errors.append(EncodingError(message))
                 return
             except UnicodeDecodeError:
@@ -253,8 +257,8 @@ class Tabular:
             next(gen)
             yield from gen
         except SheetNotFoundException as e:
-            logger.warning(f'Sheet weirdness in{self.path}')
-            logger.warning(str(e))
+            log.warning(f'Sheet weirdness in{self.path}')
+            log.warning(str(e))
 
     def normalize(self, rows):
         # FIXME need to detect changes
@@ -275,7 +279,7 @@ class Tabular:
         try:
             yield from self.normalize(getattr(self, self.file_extension)())
         except UnicodeDecodeError as e:
-            logger.error(f'\'{self.path}\' {e}')
+            log.error(f'\'{self.path}\' {e}')
 
     def __repr__(self):
         limit = 30
@@ -318,7 +322,7 @@ class Version1Header:
         if self.to_index:
             for head in self.to_index:
                 if head not in header:
-                    logger.error(f'\'{self.t.path}\' malformed header!')
+                    log.error(f'\'{self.t.path}\' malformed header!')
                     self.fail = True
 
         if self.fail:
@@ -392,7 +396,7 @@ class Version1Header:
         v = value.replace('\ufeff', '')  # FIXME utf-16 issue
         if v != value:  # TODO can we decouple encoding from value normalization?
             message = f"encoding feff error in '{self.path}'"
-            logger.error(message)
+            log.error(message)
             self._errors.append(EncodingError(message))
 
         if v.lower().strip() not in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
@@ -416,7 +420,7 @@ class Version1Header:
         index_col, *_ = self.to_index
         out = {}
         if not hasattr(self.bc, index_col):
-            logger.error(f'\'{self.t.path}\' malformed header!')
+            log.error(f'\'{self.t.path}\' malformed header!')
             return out
 
         ic = list(getattr(self.bc, index_col))
@@ -434,13 +438,13 @@ class Version1Header:
                     value = tuple(set(_value))
                     if len(value) != len(_value):
                         # TODO counter to show the duplicate values
-                        logger.warning(f"duplicate values in {normk} TODO '{self.t.path}'")
+                        log.warning(f"duplicate values in {normk} TODO '{self.t.path}'")
 
                     if normk in self.max_one:
                         if not value:
-                            logger.warning(f"missing value for {normk} '{self.t.path}'")
+                            log.warning(f"missing value for {normk} '{self.t.path}'")
                         elif len(value) > 1:
-                            logger.warning(f"too many values for {normk} {value} '{self.t.path}'")
+                            log.warning(f"too many values for {normk} {value} '{self.t.path}'")
                             # FIXME not selecting the zeroth element here breaks the schema assumptions
                             #value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
                             #value = 'ERROR>>>' + ','.join(value)
@@ -601,7 +605,7 @@ class DatasetDescription(Version1Header):
         if not (v.startswith('ORCID:') or v.startswith('https:')):
             v = v.strip()
             if len(v) != 19:
-                logger.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                log.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
             v = 'ORCID:' + v
 
@@ -612,21 +616,21 @@ class DatasetDescription(Version1Header):
                 _, numeric = v.rsplit(':', 1)
 
             if len(numeric) != 19:
-                logger.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                log.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
 
         try:
-            #logger.debug(f"{v} '{self.t.path}'")
+            #log.debug(f"{v} '{self.t.path}'")
             orcid = OrcidId(v)
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
-                logger.error(f"orcid failed checksum '{value}' '{self.t.path}'")
+                log.error(f"orcid failed checksum '{value}' '{self.t.path}'")
                 return
 
             yield orcid
 
         except (OntId.BadCurieError, OrcidId.MalformedOrcidError) as e:
-            logger.error(f"orcid malformed '{value}' '{self.t.path}'")
+            log.error(f"orcid malformed '{value}' '{self.t.path}'")
             yield value
 
     def contributor_role(self, value):
@@ -754,6 +758,58 @@ class SubjectsFile(Version1Header):
                                        and k not in self.skip_cols
                                        for nv in self.normalize(k, v) if nv})
                     for r in self.bc.rows)
+
+    @property
+    def triples_local(self):
+        """ NOTE the subject is LOCAL """
+        for i, subject in enumerate(self):
+            converter = SubjectConverter(subject)
+            if 'subject_id' in subject:
+                s_local = subject['subject_id']
+            else:
+                s_local = f'local-{i + 1}'  # sigh
+
+            yield s_local, a, owl.NamedIndividual
+            yield s_local, a, sparc.Subject
+            for field, value in subject.items():
+                convert = getattr(converter, field, None)
+                if convert is not None:
+                    yield (s_local, *convert(value))
+
+
+class SubjectConverter:
+    mapping = [
+        ['age_cateogry', TEMP.hasAgeCategory],
+        ['species', sparc.animalSubjectIsOfSpecies],
+    ]
+
+    @classmethod
+    def setup(cls):
+        for attr, predicate in cls.mapping:
+            def _func(self, value, p=predicate): return p, self.l(value)
+            setattr(cls, attr, _func)
+
+    def __init__(self, subject):
+        """ in case we want to do contextual things here """
+        self.subject = subject
+
+    def l(self, value):
+        if isinstance(value, OntId):
+            return value.u
+        else:
+            return rdflib.Literal(value)
+
+    def genus(self, value): return sparc.animalSubjectIsOfGenus, self.l(value)
+    def species(self, value): return sparc.animalSubjectIsOfSpecies, self.l(value)
+    def strain(self, value): return sparc.animalSubjectIsOfStrain, self.l(value)
+    def weight(self, value): return sparc.animalSubjectHasWeight, self.l(value)
+    def mass(self, value): return self.weight(value)
+    def sex(self, value): return TEMP.hasBiologicalSex, self.l(value)
+    def gender(self, value): return sparc.hasGender, self.l(value)
+    def age(self, value): return TEMP.hasAge, self.l(value)
+
+
+SubjectConverter.setup()
 
 
 class CurationStatusStrict:
@@ -1033,9 +1089,11 @@ class FThing(FakePathHelper):
         #self._pio_header = _pio_header  # FIXME ick
 
     @property
-    def meta(self):
+    def _meta(self):
         """ pathmeta NOT json meta (confusingly) """
-        return self.path.cache.meta
+        cache = self.path.cache
+        if cache is not None:
+            return self.path.cache.meta
 
     def rglob(self, pattern):
         # TODO
@@ -1049,11 +1107,11 @@ class FThing(FakePathHelper):
         if self.is_dataset:
             dd_paths = list(self.path.rglob('dataset_description*.*'))  # FIXME possibly slow?
             if not dd_paths:
-                #logger.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
+                #log.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
                 return
 
             elif len(dd_paths) > 1:
-                #logger.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
+                #log.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
                 pass
 
             return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
@@ -1063,9 +1121,13 @@ class FThing(FakePathHelper):
 
     @property
     def parent(self):
-        pp = FThing(self.path.parent)
-        if pp.id is not None:
-            return pp
+        if self.is_organization:
+            return None
+
+        if self.path.parent.cache:
+            pp = FThing(self.path.parent)
+            if pp.id is not None:
+                return pp
 
     @property
     def parents(self):
@@ -1084,6 +1146,10 @@ class FThing(FakePathHelper):
 
     @property
     def is_organization(self):
+        if hasattr(self, 'anchor'):
+            if self == self.anchor:
+                return True
+
         return self.id.startswith('N:organization:')
 
     @property
@@ -1115,7 +1181,8 @@ class FThing(FakePathHelper):
 
     @property
     def id(self):
-        return self.meta.id
+        if self._meta is not None:
+            return self._meta.id
 
     @property
     def name(self):
@@ -1141,7 +1208,7 @@ class FThing(FakePathHelper):
 
     @property
     def bf_size(self):
-        size = self.meta.size
+        size = self._meta.size
         if size:
             return size
         elif self.path.is_dir():
@@ -1151,7 +1218,7 @@ class FThing(FakePathHelper):
                     try:
                         size += path.cache.meta.size
                     except OSError as e:
-                        logger.warning(f'No cached file size. Assuming it is not tracked. {path}')
+                        log.warning(f'No cached file size. Assuming it is not tracked. {path}')
 
             return size
 
@@ -1160,7 +1227,7 @@ class FThing(FakePathHelper):
 
     @property
     def bf_checksum(self):
-        return self.meta.checksum
+        return self._meta.checksum
 
     def checksum(self):
         if self.path.is_file() and not self.fake:
@@ -1267,7 +1334,7 @@ class FThing(FakePathHelper):
                         # TODO normalize
                         yield uri
                     else:
-                        logger.warning(f"protocol not uri {uri} '{self.id}'")
+                        log.warning(f"protocol not uri {uri} '{self.id}'")
 
     @property
     def protocol_uris_resolved(self):
@@ -1315,12 +1382,12 @@ class FThing(FakePathHelper):
         #'https://www.protocols.io/api/v3/filemanager/folders?top'
         #print(apiuri, header)
         resp = requests.get(apiuri, headers=self._pio_header)
-        #logger.info(str(resp.request.headers))
+        #log.info(str(resp.request.headers))
         j = resp.json()  # the api is reasonably consistent
         if resp.ok:
             return j
         else:
-            logger.error(f"protocol no access {uri} '{self.dataset.id}'")
+            log.error(f"protocol no access {uri} '{self.dataset.id}'")
 
     @property
     def _meta_file(self):
@@ -1349,22 +1416,23 @@ class FThing(FakePathHelper):
 
         try:
             path = next(gen)
-            if '.fake' not in path.suffixes:
+            if not path.is_broken_symlink():
                 if path.name[0].isupper():
-                    logger.warning(f"filename bad case '{path}'")
+                    log.warning(f"path bad case '{path}'")
                 yield path
 
             else:
-                logger.warning(f"filename not retrieved '{path}'")
+                log.error(f"path has not been retrieved '{path}'")
+
             for path in gen:
-                if '.fake' not in path.suffixes:
+                if not path.is_broken_symlink():
                     if path.name[0].isupper():
-                        logger.warning(f"filename bad case '{path}'")
+                        log.warning(f"path bad case '{path}'")
 
                     yield path
 
                 else:
-                    logger.warning(f"filename not retrieved '{path}'")
+                    log.warning(f"path has not been retrieved '{path}'")
 
         except StopIteration:
             if self.parent is not None:
@@ -1599,12 +1667,63 @@ class FThing(FakePathHelper):
         for source_path, target_path in moves:
             self.move(data, source_path, target_path)
 
-    def transform(self, data, lifts, copies, moves):
+    def _derive(self, data, derives):
+        for source_path, function, target_paths, source_key_optional in derives:
+            source_prefixes = source_path[:-1]
+            source_key = source_path[-1]
+            source = data
+            failed = False
+            for i, node_key in enumerate(source_prefixes):
+                if node_key in source:
+                    source = source[node_key]
+                else:
+                    msg = f'did not find {node_key} in {source.keys()} {self.path}'
+                    if not i:
+                        log.error(msg)
+                        failed = True
+                        break
+                    raise exc.NoSourcePathError(msg)
+                if isinstance(source, list) or isinstance(source, tuple):
+                    new_source_path = source_prefixes[i + 1:] + [source_key]
+                    new_target_paths = [tp[i + 1:] for tp in target_paths]
+                    new_derives = [(new_source_path, function, new_target_paths, source_key_optional)]
+                    for sub_source in source:
+                        self._derive(sub_source, new_derives)
+
+                    return  # no more to do here
+
+            if failed:
+                continue  # sometimes things are missing we continue to others
+
+            if source_key not in source:
+                msg = f'did not find {source_key} in {source.keys()} {self.path}'
+                if source_key_optional:
+                    return log.info(msg)
+                else:
+                    raise exc.NoSourcePathError(msg)
+
+            source_value = source[source_key]
+            new_values = function(source_value)
+            if len(new_values) != len(target_paths):
+                raise TypeError('wrong number of values returned for {function}\n'
+                                'was {len(new_values)} expect {len(targets)}')
+            temp = b'__temporary'
+            data[temp] = {}  # bytes ensure no collisions
+            for target_path, value in zip(target_paths, new_values):
+                heh = str(target_path)
+                data[temp][heh] = value
+                source_path = temp, heh  # hah
+                self.move(data, source_path, target_path)
+
+            data.pop(temp)
+
+    def transform(self, data, lifts, copies, moves, derives):
         """ lift sections using a python representation """
         self._add(data)
         self._lift(data, lifts)
         self._copy(data, copies)
         self._move(data, moves)
+        self._derive(data, derives)
 
     def copy(self, data, source_path, target_path):
         self._copy_or_move(data, source_path, target_path)
@@ -1612,30 +1731,44 @@ class FThing(FakePathHelper):
     def move(self, data, source_path, target_path):
         self._copy_or_move(data, source_path, target_path, True)
 
-    def _copy_or_move(self, data, source_path, target_path, move=False):
-        """ if exists ... """
+    def _get_source(self, data, source_path):
         #print(source_path, target_path)
         source_prefixes = source_path[:-1]
         source_key = source_path[-1]
+        yield source_key  # yield this because we don't know if move or copy
         source = data
         for node_key in source_prefixes:
             if node_key in source:
                 source = source[node_key]
             else:
                 # don't move if no source
-                logger.warning(f'did not find {node_key} in {source.keys()} {self.path}')
-                return
+                msg = f'did not find {node_key} in {source.keys()} {self.path}'
+                raise exc.NoSourcePathError(msg)
 
-        # FIXME there is a more elegant way to do this
         if source_key not in source:
-            logger.warning(f'did not find {source_key} in {source.keys()} {self.path}')
+            msg = f'did not find {source_key} in {source.keys()} {self.path}'
+            raise exc.NoSourcePathError(msg)
+
+        yield source
+
+    def _get_source_value(self, data, source_path):
+        source_key, source = self._get_source(data, source_path)
+        return source[source_key]
+
+    def _copy_or_move(self, data, source_path, target_path, move=False):
+        """ if exists ... """
+        # FIXME there is a more elegant way to do this
+        try:
+            source_key, source = self._get_source(data, source_path)
+        except exc.NoSourcePathError as e:
+            log.warning(e)
             return
+
+        if move:
+            _parent = source  # incase something goes wrong
+            source = source.pop(source_key)
         else:
-            if move:
-                _parent = source  # incase something goes wrong
-                source = source.pop(source_key)
-            else:
-                source = source[source_key]
+            source = source[source_key]
 
         if copy and source != data:
             # copy first then modify means we need to deepcopy these
@@ -1686,7 +1819,13 @@ class FThing(FakePathHelper):
                  [['subjects', 'software'], ['resources']],  # FIXME update vs replace
                  [['subjects', 'subjects'], ['subjects']],
                  [['submission',], ['inputs', 'submission']],)
-        self.transform(data, lift_out, copies, moves)
+        # contributor derives
+        derives = ([['contributors', 'name'],
+                    vldt.Derives.contributor_name,
+                    [['contributors', 'first_name'],
+                     ['contributors', 'last_name']],
+                    True],)
+        self.transform(data, lift_out, copies, moves, derives)
         self.add_meta(data)
 
         return data
@@ -1780,11 +1919,7 @@ class FThing(FakePathHelper):
 
     @property
     def bf_uri(self):
-        # FIXME vs the api endpoint?
-        # TODO get this right
-        return 'https://api.blackfynn.io/thing/' + self.id
-        #return ('https://app.blackfynn.io/'
-                #f'{self.organization.id}/datasets/{self.dataset.id}')
+        return self.path.cache.api_uri
 
     def ddt(self, data):
         dsid = self.bf_uri
@@ -1831,27 +1966,108 @@ class FThing(FakePathHelper):
                     print('wtf error', k)
         if 'contributors' in data:
             for c in data['contributors']:
-                yield from self.cont(c)
+                yield from self.triples_contributors(c)
 
-    def cont(self, c):
+    @property
+    def members(self):
+        if not hasattr(self.__class__, '_members'):
+            log.debug('going to network for members')
+            # there are other ways to get here but this one caches
+            # e.g. self.organization.path.remote.bfobject
+            # self.path.remote.oranization.bfobject
+            # self.path.remote.bfl.organization.members
+            self.__class__._members = self.path.remote.bfl.organization.members
+
+        return self._members
+
+    @property
+    def member_index_f(self):
+        if not hasattr(self.__class__, '_member_index_f'):
+            mems = defaultdict(lambda:defaultdict(list))
+            for member in self.members:
+                fn = member.first_name.lower()
+                ln = member.last_name.lower()
+                current = mems[fn][ln].append(member)
+
+            self.__class__._member_index_f = {fn:dict(lnd) for fn, lnd in mems.items()}
+
+        return self._member_index_f
+
+    @property
+    def member_index_l(self):
+        if not hasattr(self.__class__, '_member_index_l'):
+            mems = defaultdict(dict)
+            for fn, lnd in self.member_index_f.items():
+                for ln, member_list in lnd.items():
+                    mems[ln][fn] = member_list
+
+            self.__class__._member_index_l = dict(mems)
+
+        return self._member_index_l
+
+    def get_member_by_name(self, first, last):
+        def lookup(d, one, two):
+            if one in d:
+                ind = d[one]
+                if two in ind:
+                    member_list = ind[two]
+                    if member_list:
+                        member = member_list[0]
+                        if len(member_list) > 1:
+                            log.critical(f'WE NEED ORCIDS! {one} {two} -> {member_list}')
+                            # organization maybe?
+                            # or better, check by dataset?
+                            
+                        return member
+
+        fnd = self.member_index_f
+        lnd = self.member_index_l
+        fn = first.lower()
+        ln = last.lower()
+        m = lookup(fnd, fn, ln)
+        if not m:
+            m = lookup(lnd, ln, fn)
+
+        return m
+
+    def triples_contributors(self, c):
         try:
             dsid = self.bf_uri
-        except:  # FIXME ...
+        except BaseException as e:  # FIXME ...
+            log.error(e)
             return
+
+        # get member if we can find them
+        fn = c['first_name']
+        ln = c['last_name']
+        if ' ' in fn:
+            fn, mn = fn.split(' ', 1)
+
+        member = self.get_member_by_name(fn, ln)
+
+        if member is not None:
+            userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
 
         if 'contributor_orcid_id' in c:
             s = rdflib.URIRef(c['contributor_orcid_id' ])
+            if member is not None:
+                yield s, TEMP.hasBlackfynnUserId, userid
         else:
-            s = rdflib.URIRef(dsid + '/contributors/' + 'no-orcid' )
+            if member is not None:
+                s = userid
+            else:
+                log.debug(lj(c))
+                s = rdflib.URIRef(dsid + '/contributors/' + f'{fn}-{ln}')
 
         yield s, a, owl.NamedIndividual
         yield s, a, sparc.Researcher
         yield s, sparc.contributorTo, rdflib.URIRef(dsid)
         #sparc.hasORCId
         kps = (
-            ('name', sparc.firstName),
+            ('first_name', sparc.firstName),
+            ('last_name', sparc.lastName),
             ('contributor_role', sparc.hasRole),
-            ('contributor_affiliation', sparc.hasAffiliation),
+            ('contributor_affiliation', TEMP.hasAffiliation),
             ('is_contact_person', sparc.isContactPerson),
             ('is_responsible_pi', sparc.isContactPerson),
         )
@@ -1870,7 +2086,8 @@ class FThing(FakePathHelper):
         data = self.data_out_with_errors
         try:
             dsid = self.bf_uri
-        except:  # FIXME ...
+        except BaseException as e:  # FIXME ...
+            raise e
             return
         def id_(v):
             yield rdflib.URIRef(dsid), a, owl.NamedIndividual
@@ -1879,16 +2096,55 @@ class FThing(FakePathHelper):
         def subject_id(v, species=None):  # TODO species for human/animal
             v = v.replace(' ', '%20')  # FIXME use quote urlencode
             s = rdflib.URIRef(dsid + '/subjects/' + v)
-            yield s, a, owl.NamedIndividual
-            yield s, a, sparc.Subject
+            return s
 
         yield from id_(self.id)
         for subjects in self.subjects:
-            for subject in subjects:
-                if 'subject_id' in subject:
-                    yield from subject_id(subject['subject_id'])
+            for s_local, p, o in subjects.triples_local:
+                yield subject_id(s_local), p, o
 
         yield from self.ddt(data)
+
+    @property
+    def ontid(self):
+        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/{self.id}')
+
+    @property
+    def header_graph_description(self):
+        return rdflib.Literal(f'SPARC single dataset graph for {self.id}')
+    @property
+    def triples_header(self):
+        ontid = self.ontid
+        nowish = datetime.utcnow()  # request doesn't have this
+        epoch = nowish.timestamp()
+        iso = nowish.isoformat().replace('.', ',')  # sakes fist at iso for non standard
+        ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
+        sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
+                                      'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
+
+        pos = (
+            (a, owl.Ontology),
+            (owl.versionIRI, ver_ontid),
+            (owl.versionInfo, rdflib.Literal(iso)),
+            (isAbout, rdflib.URIRef(self.path.cache.api_uri)),
+            (TEMP.hasHumanUri, rdflib.URIRef(self.path.cache.human_uri)),
+            (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
+            (rdfs.comment, self.header_graph_description),
+            (owl.imports, sparc_methods),
+        )
+        for p, o in pos:
+            yield ontid, p, o
+
+    @property
+    def ttl(self):
+        g = makeGraph('', prefixes=OntCuries._dict)
+        graph = g.g
+        #graph = rdflib.Graph()
+        [graph.add(t) for t in self.triples_header]
+        [graph.add(t) for t in self.triples]
+        #g = cull_prefixes(_graph, prefixes=OntCuries)
+
+        return graph.serialize(format='nifttl')
 
 
 class Summary(FThing):
@@ -1962,21 +2218,13 @@ class Summary(FThing):
         pass
 
     @property
-    def triples(self):
-        s = rdflib.URIRef('https://sparc.olympiangods.org/sparc/exports/curation-export.ttl')
-        yield s, a, owl.Ontology
-        for d in self:
-            yield from d.triples
+    def header_graph_description(self):
+        return rdflib.Literal(f'SPARC organization graph for {self.id}')
 
     @property
-    def ttl(self):
-        g = makeGraph('', prefixes=OntCuries._dict)
-        graph = g.g
-        #graph = rdflib.Graph()
-        [graph.add(t) for t in self.triples]
-        #g = cull_prefixes(_graph, prefixes=OntCuries)
-
-        return graph.serialize(format='nifttl')
+    def triples(self):
+        for d in self:
+            yield from d.triples
 
     @property
     def xml(self):

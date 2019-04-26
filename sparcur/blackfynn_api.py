@@ -52,7 +52,7 @@ from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
 from sparcur import exceptions as exc
-from sparcur.core import log
+from sparcur.core import log, lj
 from sparcur.paths import Path
 from sparcur.config import local_storage_prefix
 from sparcur.metastore import MetaStore
@@ -204,7 +204,7 @@ def get(self, pkg, include='files,source'):
     # TODO: cast to specific DataPackages based on `type`
     pkg = self._get_package_from_data(resp)
     pkg._resp = resp
-    #log.critical(str(json.dumps(resp.json(), indent=2)))
+    #log.debug(lj(resp.json()))
     return pkg
 
 PackagesAPI.get = get
@@ -273,7 +273,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         bftype = id_to_type(id)
                         try:
                             #if id.startswith('N:package:'):
-                                #print(json.dumps(package, indent=2))
+                                #log.debug(lj(package))
                             rdp = restructure(deepcopy(package))
                         except KeyError as e:
                             out_of_order.append(package)
@@ -771,7 +771,7 @@ class BFLocal:
         try:
             return resp_json['url']
         except KeyError as e:
-            log.critical(json.dumps(resp_json))
+            log.debug(lj(resp_json))
             raise e
 
     #def get_homogenous(self, id):

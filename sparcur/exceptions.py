@@ -72,3 +72,7 @@ class BootstrappingError(SparCurError):
 
 class NotBootstrappingError(SparCurError):
     """ Trying to run bootstrapping only code outside of a bootstrap """
+
+
+class NoSourcePathError(SparCurError):
+    """ dictionary at some level is missing the expected key """

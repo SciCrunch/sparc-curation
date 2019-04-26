@@ -113,6 +113,8 @@ class ContributorSchema(JSONSchema):
     schema = {'type': 'object',
               'properties': {
                   'name': {'type': 'string'},
+                  'first_name': {'type': 'string'},
+                  'last_name': {'type': 'string'},
                   'contributor_orcid_id': {'type': 'string',
                                            'pattern': ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
                                                        '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')},
@@ -384,7 +386,7 @@ class MISSpecimenSchema(JSONSchema):
         'properties': {
             'TEMP:hasAge': {},
             'TEMP:hasAgeCategory': {},  # hasDevelopmentalStage
-            'TEMP:hasBiologicalSex': {},
+            'TEMP:hasBiologicalSex': {},  # TEMP because sparc:hasPhenotypicSex
             'TEMP:hasWeight': {},
             'TEMP:hasGenus': {},
             'TEMP:hasSpecies': {},

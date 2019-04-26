@@ -148,6 +148,7 @@ class Dispatch:
 
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         self.project_path = self.anchor.local
+        FThing.anchor = FThing(self.project_path)
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
@@ -440,6 +441,8 @@ class Dispatch:
         #rchilds = list(datasets[0].rchildren)
         #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
         p, *rest = self._paths
+        f = FThing(p)
+        triples = list(f.triples)
         embed()
 
     def tables(self):
@@ -462,8 +465,16 @@ class Dispatch:
         # obviously not transactional ...
         filename = 'curation-export'
         dump_path = summary.path.parent / 'export' / summary.id / timestamp
+        latest_path = dump_path.parent / 'LATEST'
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
+            if latest_path.exists():
+                if not latest_path.is_symlink():
+                    raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+
+                latest_path.unlink()
+
+            latest_path.symlink_to(dump_path)
 
         filepath = dump_path / filename
 
