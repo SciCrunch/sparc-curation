@@ -41,7 +41,7 @@ from sparcur.schemas import (JSONSchema, ValidationError,
 from sparcur import validate as vldt
 from ttlser import CustomTurtleSerializer
 
-sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
+sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/uris/readable/sparc/')
 a = rdf.type
 
 po = CustomTurtleSerializer.predicateOrder
