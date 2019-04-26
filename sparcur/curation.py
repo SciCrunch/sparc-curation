@@ -23,7 +23,7 @@ from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
-from pysercomb.pyr.units import ProtcParameter
+from pysercomb.pyr.units import ProtcParameterParser
 from scibot.utils import resolution_chain
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
@@ -422,10 +422,14 @@ class Version1Header:
 
     @property
     def data(self):
+        if hasattr(self, '_data_cache'):
+            return self._data_cache
+
         index_col, *_ = self.to_index
         out = {}
         if not hasattr(self.bc, index_col):
             log.error(f'\'{self.t.path}\' malformed header!')
+            self._data_cache = out
             return out
 
         ic = list(getattr(self.bc, index_col))
@@ -445,9 +449,10 @@ class Version1Header:
                         # TODO counter to show the duplicate values
                         log.warning(f"duplicate values in {normk} TODO '{self.t.path}'")
 
-                    if normk in self.max_one:
+                    if normk in self.max_one:  # schema will handle this ..
                         if not value:
-                            log.warning(f"missing value for {normk} '{self.t.path}'")
+                            #log.warning(f"missing value for {normk} '{self.t.path}'")
+                            pass
                         elif len(value) > 1:
                             log.warning(f"too many values for {normk} {value} '{self.t.path}'")
                             # FIXME not selecting the zeroth element here breaks the schema assumptions
@@ -470,6 +475,7 @@ class Version1Header:
                 else:
                     out[a] += b,
 
+            self._data_cache = out
             return out
 
         for key, keys in self.verticals.items():
@@ -484,13 +490,14 @@ class Version1Header:
             if value:
                 out[key] = value
 
+        self._data_cache = out
         return out
 
     @property
     def data_with_errors(self):
         """ data with errors added under the 'errors' key """
         # FIXME TODO regularize this with the FThing version
-        ok, valid, data = self.schema.validate(self.data)
+        ok, valid, data = self.schema.validate(copy.deepcopy(self.data))
         if not ok:
             # FIXME this will dump the whole schema, go smaller
             error = valid
@@ -556,7 +563,8 @@ class SubmissionFile(Version1Header):
     @property
     def data(self):
         """ lift list with single element to object """
-        d = super().data
+
+        d = copy.deepcopy(super().data)
         if d:
             if d['submission']:
                 d['submission'] = d['submission'][0]
@@ -609,9 +617,14 @@ class DatasetDescription(Version1Header):
 
         if not (v.startswith('ORCID:') or v.startswith('https:')):
             v = v.strip()
-            if len(v) != 19:
+            if not len(v):
+                return
+            elif v == '0':  # FIXME ? someone using strange conventions ...
+                return
+            elif len(v) != 19:
                 log.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
+
             v = 'ORCID:' + v
 
         else:
@@ -620,7 +633,9 @@ class DatasetDescription(Version1Header):
             elif v.startswith('ORCID:'):
                 _, numeric = v.rsplit(':', 1)
 
-            if len(numeric) != 19:
+            if not len(numeric):
+                return
+            elif len(numeric) != 19:
                 log.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
 
@@ -709,14 +724,23 @@ class SubjectsFile(Version1Header):
         # FIXME gender -> sex for animals, requires two pass normalization ...
         yield from self.sex(value)
 
-    def age(self, value):
-        _, v, rest = parameter_expression(value)
-        if not v[0] == 'param:parse-failure':
-            yield str(ProtcParameter(v))
+    def _param(self, value):
+        pv = ProtcParameterParser(value)
+        if not pv._tuple[0] == 'param:parse-failure':
+            yield str(pv.for_text)
         else:
             # TODO warn
             yield value
 
+    def age(self, value):
+        yield from self._param(value)
+
+    def mass(self, value):
+        yield from self._param(value)
+        
+    def weight(self, value):
+        yield from self._param(value)
+        
     def rrid_for_strain(self, value):
         yield value
 
@@ -728,8 +752,8 @@ class SubjectsFile(Version1Header):
         out = {k:v for k, v in dict_.items() if k not in self.skip}
         for h_unit, h_value in zip(self.h_unit, self.h_value):
             compose = dict_[h_value] + dict_[h_unit]
-            _, v, rest = parameter_expression(compose)
-            out[h_value] = str(ProtcParameter(v))  # FIXME sparc repr
+            #_, v, rest = parameter_expression(compose)
+            out[h_value] = str(ProtcParameterParser(compose).for_text)  # FIXME sparc repr
 
         if 'gender' in out and 'species' in out:
             if out['species'] != OntTerm('NCBITaxon:9606'):
@@ -1880,10 +1904,13 @@ class FThing(FakePathHelper):
     def data_with_errors(self):
         # FIXME remove this
         # this still ok, dwe is very simple for this case
-        return self._with_errors(self.schema.validate(self.data), self.schema)
+        return self._with_errors(self.schema.validate(copy.deepcopy(self.data)), self.schema)
 
     @property
     def data_out_with_errors(self):
+        if hasattr(self, '_dowe'):
+            return self._dowe
+
         data = self.data_out
         ok, val, data = self.schema_out.validate(data)
         if not ok:
@@ -1901,6 +1928,7 @@ class FThing(FakePathHelper):
         data['error_index'] = ei
         data['submission_completeness_index'] = sci
 
+        self._dowe = data
         return data
 
     def submission_completeness_index(self, inputs):
@@ -1986,7 +2014,7 @@ class FThing(FakePathHelper):
                             yield s, p, o
 
                 else:
-                    print('wtf error', k)
+                    log.error('wtf error {k}')
         if 'contributors' in data:
             for c in data['contributors']:
                 yield from self.triples_contributors(c)
@@ -2092,15 +2120,6 @@ class FThing(FakePathHelper):
         yield s, a, owl.NamedIndividual
         yield s, a, sparc.Researcher
         yield s, TEMP.contributorTo, rdflib.URIRef(dsid)
-        kps = (
-            ('first_name', sparc.firstName),
-            ('last_name', sparc.lastName),
-            ('contributor_role', sparc.hasRole),
-            ('contributor_affiliation', TEMP.hasAffiliation),
-            ('is_contact_person', sparc.isContactPerson),
-            ('is_responsible_pi', sparc.isContactPerson),
-        )
-            
         converter = ContributorConverter(contributor)
         for field, value in contributor.items():
 
@@ -2108,6 +2127,8 @@ class FThing(FakePathHelper):
             for v in (value if isinstance(value, tuple) or isinstance(value, list) else (value,)):
                 if convert is not None:
                     yield (s, *convert(v))
+                elif field == 'name':  # skip because we do first/last
+                    pass
                 else:
                     log.warning(f'Unhandled contributor field: {field}')
 
@@ -2245,15 +2266,19 @@ class Summary(FThing):
 
     @property
     def data(self):
-        # FIXME validating in vs out ...
-        # return self.make_json(d.validate_out() for d in self)
-        return self.make_json(d.data_out_with_errors for d in self)
+        if not hasattr(self, '_data_cache'):
+            # FIXME validating in vs out ...
+            # return self.make_json(d.validate_out() for d in self)
+            self._data_cache = self.make_json(d.data_out_with_errors for d in self)
+
+        return self._data_cache
 
     @property
     def data_out(self):
         data = self.data_with_errors
         #return self.make_json(d.data_out_with_errors for d in self)
         # TODO transform
+
         return data
 
     @property
@@ -2281,7 +2306,7 @@ class Summary(FThing):
             if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
                 return OntId(v).curie
             else:
-                print(repr(v))
+                #log.debug(repr(v))
                 return v
 
         for dataset in self:

@@ -11,7 +11,7 @@ Usage:
     spc tables [<directory>...]
     spc missing
     spc xattrs
-    spc export
+    spc export [ttl]
     spc demos
     spc shell [<path>...]
     spc feedback <feedback-file> <feedback>...
@@ -116,6 +116,9 @@ class Options:
     def uri(self):
         return self.args['--uri']
 
+    @property
+    def ttl(self):
+        return self.args['ttl']
 
 class Dispatch:
     spcignore = ('.git',
@@ -459,8 +462,36 @@ class Dispatch:
         #from sparcur.curation import get_datasets
         #ds, dsd = get_datasets(self.project_path)
         #org_id = FThing(self.project_path).organization.id
+        cwd = Path.cwd()
+        timestamp = datetime.now().isoformat().replace('.', ',')
+        if self.options.ttl and cwd != cwd.cache.anchor:
+            if not cwd.cache.is_dataset:
+                print(f'{cwd.cache} is not at dataset level!')
+                sys.exit(123)
+
+            ft = FThing(cwd)
+            dump_path = cwd.cache.anchor.local.parent / 'export/datasets' / ft.id / timestamp
+            latest_path = dump_path.parent / 'LATEST'
+            if not dump_path.exists():
+                dump_path.mkdir(parents=True)
+                if latest_path.exists():
+                    if not latest_path.is_symlink():
+                        raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+
+                    latest_path.unlink()
+
+                latest_path.symlink_to(dump_path)
+
+            filename = 'curation-export'
+            filepath = dump_path / filename
+
+            with open(filepath.with_suffix('.ttl'), 'wb') as f:
+                f.write(ft.ttl)
+
+            print(f'dataset graph exported to {filepath.with_suffix(".ttl")}')
+            return
+        
         summary = self.summary
-        timestamp = datetime.now().isoformat()
         # start time not end time ...
         # obviously not transactional ...
         filename = 'curation-export'
