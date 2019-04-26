@@ -38,9 +38,14 @@ from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetDescriptionSchema, SubjectsSchema,
                              SummarySchema, DatasetOutSchema, MetaOutSchema)
 from sparcur import validate as vldt
+from ttlser import CustomTurtleSerializer
 
 sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/readable/sparc/')
 a = rdf.type
+
+po = CustomTurtleSerializer.predicateOrder
+po.extend((sparc.firstName,
+           sparc.lastName))
 
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
@@ -775,13 +780,12 @@ class SubjectsFile(Version1Header):
                 convert = getattr(converter, field, None)
                 if convert is not None:
                     yield (s_local, *convert(value))
+                else:
+                    log.warning(f'Unhandled subject field: {field}')
 
 
-class SubjectConverter:
-    mapping = [
-        ['age_cateogry', TEMP.hasAgeCategory],
-        ['species', sparc.animalSubjectIsOfSpecies],
-    ]
+class TripleConverter:
+    mapping = tuple()
 
     @classmethod
     def setup(cls):
@@ -789,15 +793,33 @@ class SubjectConverter:
             def _func(self, value, p=predicate): return p, self.l(value)
             setattr(cls, attr, _func)
 
-    def __init__(self, subject):
+    def __init__(self, json_source):
         """ in case we want to do contextual things here """
-        self.subject = subject
+        self._source = json_source
 
     def l(self, value):
         if isinstance(value, OntId):
             return value.u
         else:
             return rdflib.Literal(value)
+
+
+class ContributorConverter(TripleConverter):
+    mapping = (
+            ('first_name', sparc.firstName),
+            ('last_name', sparc.lastName),
+            ('contributor_role', sparc.hasRole),
+            ('contributor_affiliation', TEMP.hasAffiliation),
+            ('is_contact_person', sparc.isContactPerson),
+            ('is_responsible_pi', sparc.isContactPerson),
+        )
+ 
+
+class SubjectConverter(TripleConverter):
+    mapping = [
+        ['age_cateogry', TEMP.hasAgeCategory],
+        ['species', sparc.animalSubjectIsOfSpecies],
+    ]
 
     def genus(self, value): return sparc.animalSubjectIsOfGenus, self.l(value)
     def species(self, value): return sparc.animalSubjectIsOfSpecies, self.l(value)
@@ -809,6 +831,7 @@ class SubjectConverter:
     def age(self, value): return TEMP.hasAge, self.l(value)
 
 
+ContributorConverter.setup()
 SubjectConverter.setup()
 
 
@@ -2030,7 +2053,7 @@ class FThing(FakePathHelper):
 
         return m
 
-    def triples_contributors(self, c):
+    def triples_contributors(self, contributor):
         try:
             dsid = self.bf_uri
         except BaseException as e:  # FIXME ...
@@ -2038,31 +2061,37 @@ class FThing(FakePathHelper):
             return
 
         # get member if we can find them
-        fn = c['first_name']
-        ln = c['last_name']
-        if ' ' in fn:
-            fn, mn = fn.split(' ', 1)
+        if 'name' in contributor:
+            fn = contributor['first_name']
+            ln = contributor['last_name']
+            if ' ' in fn:
+                fn, mn = fn.split(' ', 1)
 
-        member = self.get_member_by_name(fn, ln)
+            failover = f'{fn}-{ln}'
+            member = self.get_member_by_name(fn, ln)
 
-        if member is not None:
-            userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
+            if member is not None:
+                userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
 
-        if 'contributor_orcid_id' in c:
-            s = rdflib.URIRef(c['contributor_orcid_id' ])
+        else:
+            member = None
+            failover = 'no-orcid-no-name'
+            log.warning(f'No name!' + lj(contributor))
+
+        if 'contributor_orcid_id' in contributor:
+            s = rdflib.URIRef(contributor['contributor_orcid_id' ])
             if member is not None:
                 yield s, TEMP.hasBlackfynnUserId, userid
         else:
             if member is not None:
                 s = userid
             else:
-                log.debug(lj(c))
-                s = rdflib.URIRef(dsid + '/contributors/' + f'{fn}-{ln}')
+                log.debug(lj(contributor))
+                s = rdflib.URIRef(dsid + '/contributors/' + failover)
 
         yield s, a, owl.NamedIndividual
         yield s, a, sparc.Researcher
-        yield s, sparc.contributorTo, rdflib.URIRef(dsid)
-        #sparc.hasORCId
+        yield s, TEMP.contributorTo, rdflib.URIRef(dsid)
         kps = (
             ('first_name', sparc.firstName),
             ('last_name', sparc.lastName),
@@ -2072,10 +2101,24 @@ class FThing(FakePathHelper):
             ('is_responsible_pi', sparc.isContactPerson),
         )
             
+        converter = ContributorConverter(contributor)
+        for field, value in contributor.items():
+
+            convert = getattr(converter, field, None)
+            for v in (value if isinstance(value, tuple) or isinstance(value, list) else (value,)):
+                if convert is not None:
+                    yield (s, *convert(v))
+                else:
+                    log.warning(f'Unhandled contributor field: {field}')
+
+        return
+
         for k, p in kps:  # FIXME backwards
             try:
-                _v = c[k]
+                _v = contributor[k]
                 for v in (_v if isinstance(_v, tuple) or isinstance(_v, list) else (_v,)):
+
+                    convert = getattr(converter, field, None)
                     yield s, p, rdflib.Literal(v)
             except KeyError:
                 continue

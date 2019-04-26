@@ -1419,6 +1419,9 @@ class BlackfynnCache(XattrCache):
             # we have a case of missing metadata here as well
             return self.parent.organization
 
+    def is_organization(self):  # FIXME ?
+        return self.id and self.id.startswith('N:organization:')
+
     def is_dataset(self):
         return self.id and self.id.startswith('N:dataset:')
 
