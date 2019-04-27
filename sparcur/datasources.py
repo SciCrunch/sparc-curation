@@ -3,6 +3,8 @@ from pyontutils.core import OntId
 from sparcur.core import log
 from sparcur.paths import Path
 from sparcur.config import organ_html_path
+from bs4 import BeautifulSoup
+
 
 class OrganData:
     """ retrieve SPARC investigator data """
@@ -26,9 +28,7 @@ class OrganData:
     old_cache = Path('/tmp/award-mappings-old-to-new.json')
 
     def __init__(self, path=organ_html_path):
-        from bs4 import BeautifulSoup
         self.path = path
-        self.BeautifulSoup = BeautifulSoup
         if not self.cache.exists():
             self.overview()
             with open(self.cache, 'wt') as f:
@@ -45,7 +45,7 @@ class OrganData:
 
     def overview(self):
         with open(self.path, 'rb') as f:
-            soup = self.BeautifulSoup(f.read(), 'lxml')
+            soup = BeautifulSoup(f.read(), 'lxml')
 
         self.raw = {}
         self.former_to_current = {}
@@ -92,7 +92,7 @@ class OrganData:
 
     def reporter(self, href):
         resp = requests.get(href)
-        soup = self.BeautifulSoup(resp.content, 'lxml')
+        soup = BeautifulSoup(resp.content, 'lxml')
         #id = soup.find_all('span', {'id': 'spnPNUMB'})
         table = soup.find_all('table', {'summary': 'Details'})
         text = table[0].find_all('td')[1].text.strip()

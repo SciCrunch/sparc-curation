@@ -1260,8 +1260,9 @@ class FThing(FakePathHelper):
     def protocol_uris(self):
         p = 'protocol_url_or_doi'
         for dd in self.dataset_description:
-            if p in dd:
-                for uri in dd[p]:
+            dwe = dd.data_with_errors
+            if p in dwe:
+                for uri in dwe[p]:
                     if uri.startswith('http'):
                         # TODO normalize
                         yield uri
@@ -1291,6 +1292,7 @@ class FThing(FakePathHelper):
 
     @property
     def protocol_jsons(self):
+        if hasattr(self.dataset, )
         return
         # FIXME need a single place to get these from ...
         for uri in self.protocol_uris_resolved:
@@ -1320,14 +1322,6 @@ class FThing(FakePathHelper):
             return j
         else:
             log.error(f"protocol no access {uri} '{self.dataset.id}'")
-
-    @property
-    def _meta_file(self):
-        """ DEPRECATED """
-        try:
-            return next(self.path.glob('N:*:*'))
-        except StopIteration:
-            return None
 
     def _abstracted_paths(self, name_prefix, glob_type='glob'):
         """ A bottom up search for the closest file in the parent directory.
@@ -2355,16 +2349,6 @@ class FTLax(FThing):
 
 def express_or_return(thing):
     return list(thing) if isinstance(thing, GeneratorType) else thing
-
-
-def populate_annos(group_name='sparc-curation'):
-    group = devconfig.secrets('hypothesis', 'group', group_name)
-    get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group),
-                                                          helpers=(HypothesisHelper, Hybrid, protc),
-                                                          group=group)
-
-    [protc(a, annos) for a in annos]
-    [Hybrid(a, annos) for a in annos]
 
 
 def main():
