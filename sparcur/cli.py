@@ -11,7 +11,7 @@ Usage:
     spc tables [<directory>...]
     spc missing
     spc xattrs
-    spc export [ttl]
+    spc export [ttl json]
     spc demos
     spc shell [<path>...]
     spc feedback <feedback-file> <feedback>...
@@ -120,8 +120,16 @@ class Options:
         return int(self.args['--rate']) if self.args['--rate'] else None
 
     @property
+    def json(self):
+        return self.args['json']
+
+    @property
     def ttl(self):
         return self.args['ttl']
+
+    @property
+    def keywords(self):
+        return self.args['keywords']
 
 
 class Dispatch:
@@ -285,12 +293,6 @@ class Dispatch:
 
     def pull(self):
         # TODO folder meta -> org
-        skip = (
-            'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
-            'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
-            'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
-            #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
-        )
         only = tuple()
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         dirs = self.directories
@@ -307,9 +309,16 @@ class Dispatch:
                     d.remote.bootstrap(recursive=recursive)
 
         else:
-            Path.cwd().remote.bootstrap(recursive=recursive, only=only, skip=skip)
+            Path.cwd().remote.bootstrap(recursive=recursive, only=only, skip=self.skip)
 
-            #self.anchor.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+    ###
+    skip = (
+            'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
+            'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
+            'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
+            #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
+        )
+    ###
 
     def refresh(self):
         from pyontutils.utils import Async, deferred
@@ -340,6 +349,82 @@ class Dispatch:
         Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
                        for path in paths)
         
+    def export(self):
+        """ export output of curation workflows to file """
+        #org_id = FThing(self.project_path).organization.id
+        cwd = Path.cwd()
+        timestamp = datetime.now().isoformat().replace('.', ',')
+        format_specified = self.options.ttl or self.options.json
+        if cwd != cwd.cache.anchor and format_specified:
+            suffix = '.ttl' if self.options.ttl else '.json'
+            mode = 'wb' if self.options.ttl else 'wt'
+            if not cwd.cache.is_dataset:
+                print(f'{cwd.cache} is not at dataset level!')
+                sys.exit(123)
+
+            ft = FThing(cwd)
+            dump_path = cwd.cache.anchor.local.parent / 'export/datasets' / ft.id / timestamp
+            latest_path = dump_path.parent / 'LATEST'
+            if not dump_path.exists():
+                dump_path.mkdir(parents=True)
+                if latest_path.exists():
+                    if not latest_path.is_symlink():
+                        raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+
+                    latest_path.unlink()
+
+                latest_path.symlink_to(dump_path)
+
+            filename = 'curation-export'
+            filepath = dump_path / filename
+            out = filepath.with_suffix(suffix)
+            with open(out, mode) as f:
+                if self.options.json:
+                    json.dump(ft.data_out_with_errors, f, sort_keys=True, indent=2, cls=JEncode)
+                elif self.options.ttl:
+                    f.write(ft.ttl)
+
+            print(f'dataset graph exported to {out}')
+            return
+        
+        summary = self.summary
+        # start time not end time ...
+        # obviously not transactional ...
+        filename = 'curation-export'
+        dump_path = summary.path.parent / 'export' / summary.id / timestamp
+        latest_path = dump_path.parent / 'LATEST'
+        if not dump_path.exists():
+            dump_path.mkdir(parents=True)
+            if latest_path.exists():
+                if not latest_path.is_symlink():
+                    raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+
+                latest_path.unlink()
+
+            latest_path.symlink_to(dump_path)
+
+        filepath = dump_path / filename
+
+        for xml_name, xml in summary.xml:
+            with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
+                f.write(xml)
+
+        # FIXME skip the big fellows how?
+        with open(filepath.with_suffix('.json'), 'wt') as f:
+            json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=JEncode)
+
+        with open(filepath.with_suffix('.ttl'), 'wb') as f:
+            f.write(summary.ttl)
+
+        # datasets, contributors, subjects, samples, resources
+        for table_name, tabular in summary.disco:
+            with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
+                writer = csv.writer(f, delimiter='\t', lineterminator='\n')
+                writer.writerows(tabular)
+
+        if self.options.debug:
+            embed()
+
     def annos(self):
         args = self.args
         from protcur.analysis import protc, Hybrid
@@ -471,75 +556,6 @@ class Dispatch:
                                 if 'dataset_description' in d.data]
         print(repr(tabular_view_demo))
 
-    def export(self):
-        """ export output of curation workflows to file """
-        #org_id = FThing(self.project_path).organization.id
-        cwd = Path.cwd()
-        timestamp = datetime.now().isoformat().replace('.', ',')
-        if self.options.ttl and cwd != cwd.cache.anchor:
-            if not cwd.cache.is_dataset:
-                print(f'{cwd.cache} is not at dataset level!')
-                sys.exit(123)
-
-            ft = FThing(cwd)
-            dump_path = cwd.cache.anchor.local.parent / 'export/datasets' / ft.id / timestamp
-            latest_path = dump_path.parent / 'LATEST'
-            if not dump_path.exists():
-                dump_path.mkdir(parents=True)
-                if latest_path.exists():
-                    if not latest_path.is_symlink():
-                        raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
-
-                    latest_path.unlink()
-
-                latest_path.symlink_to(dump_path)
-
-            filename = 'curation-export'
-            filepath = dump_path / filename
-
-            with open(filepath.with_suffix('.ttl'), 'wb') as f:
-                f.write(ft.ttl)
-
-            print(f'dataset graph exported to {filepath.with_suffix(".ttl")}')
-            return
-        
-        summary = self.summary
-        # start time not end time ...
-        # obviously not transactional ...
-        filename = 'curation-export'
-        dump_path = summary.path.parent / 'export' / summary.id / timestamp
-        latest_path = dump_path.parent / 'LATEST'
-        if not dump_path.exists():
-            dump_path.mkdir(parents=True)
-            if latest_path.exists():
-                if not latest_path.is_symlink():
-                    raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
-
-                latest_path.unlink()
-
-            latest_path.symlink_to(dump_path)
-
-        filepath = dump_path / filename
-
-        for xml_name, xml in summary.xml:
-            with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
-                f.write(xml)
-
-        with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=JEncode)
-
-        with open(filepath.with_suffix('.ttl'), 'wb') as f:
-            f.write(summary.ttl)
-
-        # datasets, contributors, subjects, samples, resources
-        for table_name, tabular in summary.disco:
-            with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
-                writer = csv.writer(f, delimiter='\t', lineterminator='\n')
-                writer.writerows(tabular)
-
-        if self.options.debug:
-            embed()
-
     def find(self):
         args = self.args
         paths = []
@@ -622,7 +638,7 @@ class Dispatch:
                      enumerate(sorted(self.summary.completeness, key=lambda t:(t[0], -t[1], *t[2:])))]
             print(AsciiTable(rows).table)
 
-        elif self.args['keywords']:
+        elif self.options.keywords:
             rows = [sorted(dataset.keywords, key=lambda v: -len(v))
                     for dataset in self.summary]
             print(AsciiTable(rows).table)

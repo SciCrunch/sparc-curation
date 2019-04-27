@@ -1371,7 +1371,7 @@ class FThing(FakePathHelper):
                 yield from self.parent.submission_paths
 
     @property
-    def _submission_tables(self):
+    def _submission_tables(self):  # FIXME this bad backwards design I think
         for path in self.submission_paths:
             yield Tabular(path)
 
@@ -1384,6 +1384,9 @@ class FThing(FakePathHelper):
                     yield miss
             except SubmissionFile.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
+            except AttributeError as e:
+                log.warning(f'unhandled metadata type {e!r}')
+                self._errors.append(e)
 
     @property
     def dataset_description_paths(self):
@@ -1411,6 +1414,9 @@ class FThing(FakePathHelper):
                     yield dd
             except DatasetDescription.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
+            except AttributeError as e:
+                log.warning(f'unhandled metadata type {e!r}')
+                self._errors.append(e)
 
     @property
     def subjects_paths(self):
@@ -1431,6 +1437,9 @@ class FThing(FakePathHelper):
                     yield sf
             except DatasetDescription.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
+            except AttributeError as e:
+                log.warning(f'unhandled metadata type {e!r}')
+                self._errors.append(e)
 
     @property
     def data(self):
@@ -1985,7 +1994,6 @@ class FThing(FakePathHelper):
         yield s, TEMP.contributorTo, rdflib.URIRef(dsid)
         converter = conv.ContributorConverter(contributor)
         for field, value in contributor.items():
-
             convert = getattr(converter, field, None)
             for v in (value if isinstance(value, tuple) or isinstance(value, list) else (value,)):
                 if convert is not None:
@@ -2021,7 +2029,7 @@ class FThing(FakePathHelper):
             meta_converter = conv.MetaConverter(data['meta'])
             yield from meta_converter.triples_gen(dsid)
         else:
-            raise ValueError('wat')
+            log.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
 
         converter = conv.DatasetConverter(data)
         yield from converter.triples_gen(dsid)

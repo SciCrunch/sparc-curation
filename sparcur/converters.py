@@ -7,6 +7,7 @@ from pyontutils.namespaces import TEMP, isAbout
 class TripleConverter:
     # TODO consider putting mappings in a dict hierarchy
     # that reflects where they are in the schema??
+    known_skipped = tuple()
     mapping = tuple()
 
     @classmethod
@@ -43,18 +44,21 @@ class TripleConverter:
                 for v in values:
                     yield (subject, *convert(v))
 
+            elif field in self.known_skipped:
+                pass
+
             else:
                 log.warning(f'Unhandled subject field: {field}')
 
 
 class ContributorConverter(TripleConverter):
+    known_skipped = 'contributor_orcid_id', 'name'
     mapping = (
-            ('first_name', sparc.firstName),
-            ('last_name', sparc.lastName),
-            #('contributor_role', TEMP.hasRole),
-            ('contributor_affiliation', TEMP.hasAffiliation),
-            ('is_contact_person', sparc.isContactPerson),
-            ('is_responsible_pi', sparc.isContactPerson),
+        ('first_name', sparc.firstName),
+        ('last_name', sparc.lastName),
+        ('contributor_affiliation', TEMP.hasAffiliation),
+        ('is_contact_person', sparc.isContactPerson),
+        ('is_responsible_pi', sparc.isContactPerson),
         )
  
     def contributor_role(self, value):
@@ -75,6 +79,7 @@ class MetaConverter(TripleConverter):
 
 class DatasetConverter(TripleConverter):
     mapping = [
+        #['name']
         ['error_index', TEMP.errorIndex],
         ['submission_completeness_index', TEMP.submissionCompletenessIndex],
         ]
@@ -84,6 +89,7 @@ class SubjectConverter(TripleConverter):
     mapping = [
         ['age_cateogry', TEMP.hasAgeCategory],
         ['species', sparc.animalSubjectIsOfSpecies],
+        ['group', TEMP.hasAssignedGroup],
     ]
 
     def genus(self, value): return sparc.animalSubjectIsOfGenus, self.l(value)
