@@ -354,10 +354,8 @@ class Dispatch:
         #org_id = FThing(self.project_path).organization.id
         cwd = Path.cwd()
         timestamp = datetime.now().isoformat().replace('.', ',')
-        format_specified = self.options.ttl or self.options.json
+        format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
         if cwd != cwd.cache.anchor and format_specified:
-            suffix = '.ttl' if self.options.ttl else '.json'
-            mode = 'wb' if self.options.ttl else 'wt'
             if not cwd.cache.is_dataset:
                 print(f'{cwd.cache} is not at dataset level!')
                 sys.exit(123)
@@ -375,16 +373,31 @@ class Dispatch:
 
                 latest_path.symlink_to(dump_path)
 
+            suffixes = []
+            modes = []
+            if self.options.json:  # json first since we can cache dowe
+                j = lambda f: json.dump(ft.data_out_with_errors,
+                                        f, sort_keys=True, indent=2, cls=JEncode)
+                functions.append(j)
+                suffixes.append('.json')
+                modes.append('wt')
+
+            if self.options.ttl:
+                t = lambda f: f.write(ft.ttl)
+                functions.append(t)
+                suffixes.append('.ttl')
+                modes.append('wb')
+
             filename = 'curation-export'
             filepath = dump_path / filename
-            out = filepath.with_suffix(suffix)
-            with open(out, mode) as f:
-                if self.options.json:
-                    json.dump(ft.data_out_with_errors, f, sort_keys=True, indent=2, cls=JEncode)
-                elif self.options.ttl:
-                    f.write(ft.ttl)
 
-            print(f'dataset graph exported to {out}')
+            for suffix, mode in zip(function, suffixes, modes):
+                out = filepath.with_suffix(suffix)
+                with open(out, mode) as f:
+                    function(f)
+
+                print(f'dataset graph exported to {out}')
+
             return
         
         summary = self.summary
@@ -428,13 +441,18 @@ class Dispatch:
     def annos(self):
         args = self.args
         from protcur.analysis import protc, Hybrid
-        from sparcur.curation import populate_annos
-        populate_annos()
+        from sparcur.protocols import ProtcurSource
+        ProtcurSource.populate_annos()
         if args['export']:
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
+        all_blackfynn_uris = set(u for d in self.summary for u in d.protocol_uris_resolved)
+        all_hypotehsis_uris = set(a.uri for a in protc)
         if args['shell'] or self.options.debug:
+            p, *rest = self._paths
+            f = FThing(p)
+            all_annos = [list(protc.byIri(uri)) for uri in f.protocol_uris_resolved]
             embed()
 
     def stats(self):
