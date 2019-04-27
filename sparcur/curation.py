@@ -1292,7 +1292,6 @@ class FThing(FakePathHelper):
 
     @property
     def protocol_jsons(self):
-        if hasattr(self.dataset, )
         return
         # FIXME need a single place to get these from ...
         for uri in self.protocol_uris_resolved:
