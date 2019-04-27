@@ -96,16 +96,13 @@ class SubjectConverter(TripleConverter):
         ['group', TEMP.hasAssignedGroup],
         #['rrid_for_strain', rdf.type],  # if only
         ['rrid_for_strain', sparc.specimenHasIdentifier],  # really subClassOf strain
+        ['genus', sparc.animalSubjectIsOfGenus],
+        ['species', sparc.animalSubjectIsOfSpecies],
+        ['strain', sparc.animalSubjectIsOfStrain],
+        ['weight', sparc.animalSubjectHasWeight],
+        ['mass', sparc.animalSubjectHasWeight],
+        ['sex', TEMP.hasBiologicalSex],
+        ['gender', sparc.hasGender],
+        ['age', TEMP.hasAge],
     ]
-
-    def genus(self, value): return sparc.animalSubjectIsOfGenus, self.l(value)
-    def species(self, value): return sparc.animalSubjectIsOfSpecies, self.l(value)
-    def strain(self, value): return sparc.animalSubjectIsOfStrain, self.l(value)
-    def weight(self, value): return sparc.animalSubjectHasWeight, self.l(value)
-    def mass(self, value): return self.weight(value)
-    def sex(self, value): return TEMP.hasBiologicalSex, self.l(value)
-    def gender(self, value): return sparc.hasGender, self.l(value)
-    def age(self, value): return TEMP.hasAge, self.l(value)
 SubjectConverter.setup()
-
-

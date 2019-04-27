@@ -1,9 +1,80 @@
 import json
 from pyontutils.core import OntId
+from pyontutils.sheets import Sheet
 from sparcur.core import log
 from sparcur.paths import Path
-from sparcur.config import organ_html_path
+from sparcur.config import config
 from bs4 import BeautifulSoup
+
+# ontology files
+
+class OntologyData:
+    def _mis_graph(self):
+        """ for now easier to just get a fresh one, they are small """
+        olr = Path(devconfig.git_local_base) / 'duplicates' / 'sparc-NIF-Ontology'
+        graph = (rdflib.ConjunctiveGraph()
+            .parse((olr / 'ttl/sparc-methods.ttl').as_posix(), format='turtle')
+            #.parse((olr / 'ttl/methods-core.ttl').as_posix(), format='turtle')
+            #.parse((olr / 'ttl/methods-helper.ttl').as_posix(), format='turtle')
+            #.parse((olr / 'ttl/methods.ttl').as_posix(), format='turtle')
+        )
+        return graph
+
+    def run_reasoner(self):
+        graph = self._mis_graph()
+        expanded_graph = self._mis_graph()
+        [(graph.add(t), expanded_graph.add(t))
+         for t in self.triples()]
+        closure = rdfc.OWLRL_Semantics
+        rdfc.DeductiveClosure(closure).expand(expanded_graph)
+        with open('/tmp/serialized-')
+
+
+# google sheets
+
+# master
+class Master(Sheet):
+    name = 'sparc-master'
+
+
+class Progress(Master):
+    sheet_name = 'Curation Progess (OT Only)'
+
+
+class Grants(Master):
+    sheet_name = 'Grant to Blackfynn to Protocols.io CLEAN'
+
+
+class ISAN(Master):
+    sheet_name = 'ISAN Demo July 2019'
+
+
+class Participants(Master):
+    sheet_name = 'Participan Notes'
+
+
+class Protocols(Master):
+    sheet_name = 'Protocol URL--> Blackfynn URL'
+
+
+# field alignment
+class FieldAlignment(Sheet):
+    name = 'sparc-field-alignment'
+
+
+class Subjects(FieldAlignment):
+    sheet_name = 'Subjects'
+
+
+class Keywords(FieldAlignment):
+    sheet_name = 'All Keywords'
+
+
+class KeywordSets(FieldAlignment):
+    sheet_name = 'Keyword sets'
+
+
+# other
 
 
 class OrganData:
@@ -27,7 +98,7 @@ class OrganData:
     cache = Path('/tmp/sparc-award-by-organ.json')
     old_cache = Path('/tmp/award-mappings-old-to-new.json')
 
-    def __init__(self, path=organ_html_path):
+    def __init__(self, path=config.organ_html_path):
         self.path = path
         if not self.cache.exists():
             self.overview()

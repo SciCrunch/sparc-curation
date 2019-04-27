@@ -27,23 +27,23 @@ ds_roots = (
 )
 
 def mk_fldr_meta(fldr_path, ftype='collection'):
-    st = fldr_path.stat()
+    meta = fldr_path.meta
     # NOTE st_mtime -> modified time of the file contents (data)
     # NOTE st_ctime -> changed time of the file status (metadata)
     # linux does not have a unified way to bet st_btime aka st_crtime which is birth time or created time
     return {'bf.id': f'N:{ftype}:' + fldr_path.as_posix(),
-            'bf.created_at': datetime.fromtimestamp(st.st_mtime).isoformat(),
-            'bf.updated_at': datetime.fromtimestamp(st.st_mtime).isoformat()}
+            'bf.created': meta.created.isoformat().replace('.', ','),
+            'bf.updated': meta.updated.isoformat().replace('.', ',')}
 
 
 def mk_file_meta(fp):
-    st = fp.stat()
+    meta = fp.meta
     return {'bf.id': 'N:package:' + fp.as_posix(),
             'bf.file_id': 0,
-            'bf.size': st.st_size,
+            'bf.size': meta.size,
             # FIXME timezone
-            'bf.created_at': datetime.fromtimestamp(st.st_mtime).isoformat(),
-            'bf.updated_at': datetime.fromtimestamp(st.st_mtime).isoformat(),
+            'bf.created': meta.created.isoformat().replace('.', ','),
+            'bf.updated': meta.updated.isoformat().replace('.', ','),
             'bf.checksum': fp.checksum(),
             # 'bf.old_id': None  # TODO
     }

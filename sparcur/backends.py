@@ -23,8 +23,8 @@ class ReflectiveCachePath(CachePath):
     """ Oh, it's me. """
 
     @property
-    def id(self):
-        return self.resolve().as_posix()
+    def meta(self):
+        return self.local.meta
 
 
 class RemoteFactory:

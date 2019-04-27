@@ -26,14 +26,15 @@ from pysercomb.pyr.units import ProtcParameterParser
 from scibot.utils import resolution_chain
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
+from sparcur import config
 from sparcur import exceptions as exc
-from sparcur.core import JT, JEncode, OrcidId, log, lj, sparc
+from sparcur.core import JT, JEncode, OrcidId, log, lj, sparc, memory
 from sparcur.paths import Path
-from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur import schemas as sc
 from sparcur import converters as conv
 from sparcur import normalization as nml
-from sparcur.datasources import OrganData
+from sparcur.datasources import OrganData, OntologyData
+from sparcur.protocls import ProtocolData
 from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetSchema, SubmissionSchema,
                              DatasetDescriptionSchema, SubjectsSchema,
@@ -41,6 +42,7 @@ from sparcur.schemas import (JSONSchema, ValidationError,
 from sparcur import validate as vldt
 from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
+import RDFClosure as rdfc
 
 a = rdf.type
 
@@ -54,13 +56,6 @@ OntCuries({'orcid':'https://orcid.org/',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
            'sparc':str(sparc),})
-
-# FIXME this is an awful way to do this ...
-if False:  # TODO create a protocols.io class for dealing with fetching that can be initialized with auth stuff
-    creds_file = devconfig.secrets('protocols-io', 'api', 'creds-file')
-    _pio_creds = get_protocols_io_auth(creds_file)
-    _pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
-    protocol_jsons = {}
 
 
 class EncodingError(Exception):
@@ -304,7 +299,7 @@ class Version1Header:
         # align any data from horizontals -> additional overlapping rows
 
     @property
-    def data(self):
+    def data(self):  # TODO candidate for memory.cache
         if hasattr(self, '_data_cache'):
             return self._data_cache
 
@@ -316,7 +311,8 @@ class Version1Header:
             return out
 
         ic = list(getattr(self.bc, index_col))
-        nme = Version1Header.normalize_header(ic)  # TODO make sure we can recover the original values for these
+        nme = vldt.Header(ic).output
+        #nme = Version1Header.normalize_header(ic)  # TODO make sure we can recover the original values for these
         nmed = {v:normk for normk, v in zip(nme, ic)}
 
         for v, nt in self.bc._byCol__indexes[index_col].items():
@@ -1165,16 +1161,20 @@ class FThing:
 
     @property
     def species(self):
-        out = set()
-        for subject_file in self.subjects:
-            data = subject_file.data_with_errors
-            if 'subjects' in data:
-                subjects = data['subjects']
-                for subject in subjects:
-                    if 'species' in subject:
-                        out.add(subject['species'])
+        """ generate this value from the underlying data """
+        if not hasattr(self, '_species'):
+            out = set()
+            for subject_file in self.subjects:
+                data = subject_file.data_with_errors
+                if 'subjects' in data:
+                    subjects = data['subjects']
+                    for subject in subjects:
+                        if 'species' in subject:
+                            out.add(subject['species'])
 
-        return tuple(out)
+            self.species = tuple(out)
+
+        return self._species
 
     @property
     def organ(self):
@@ -1200,9 +1200,7 @@ class FThing:
 
     @property
     def modality(self):
-        # yield 'Unknown'  # TODO
         return
-        yield
 
     @property
     def keywords(self):
@@ -1214,8 +1212,14 @@ class FThing:
             if 'keywords' in data:  # already logged error ...
                 yield from data['keywords']
 
+    def __out_keywords(self):
+        dowe = self.data_out_with_errors
+        accessor = JT(dowe)
+        return accessor.query('meta', 'keywords')
+
     @property
     def protocol_uris(self):
+        """ property needed for protocol helper to help us """
         p = 'protocol_url_or_doi'
         for dd in self.dataset_description:
             dwe = dd.data_with_errors
@@ -1226,59 +1230,6 @@ class FThing:
                         yield uri
                     else:
                         log.warning(f"protocol not uri {uri} '{self.id}'")
-
-    @property
-    def protocol_uris_resolved(self):
-        if not hasattr(self, '_c_protocol_uris_resolved'):
-            self._c_protocol_uris_resolved = list(self._protocol_uris_resolved)
-
-        return self._c_protocol_uris_resolved
-
-    @property
-    def _protocol_uris_resolved(self):
-        # FIXME quite slow ...
-        for start_uri in self.protocol_uris:
-            for end_uri in resolution_chain(start_uri):
-                pass
-            else:
-                yield end_uri
-
-    @property
-    def protocol_annotations(self):
-        for uri in self.protocol_uris_resolved:
-            yield from protc.byIri(uri, prefix=True)
-
-    @property
-    def protocol_jsons(self):
-        return
-        # FIXME need a single place to get these from ...
-        for uri in self.protocol_uris_resolved:
-            if uri not in protocol_jsons:  # FIXME yay global variables
-                j = self._get_protocol_json(uri)
-                if j:
-                    protocol_jsons[uri] = j
-                else:
-                    protocol_jsons[uri] = {}  # TODO try again later
-
-                yield j
-
-            else:
-                yield protocol_jsons[uri]
-
-    def _get_protocol_json(self, uri):
-        #juri = uri + '.json'
-        uri_path = uri.rsplit('/', 1)[-1]
-        apiuri = 'https://protocols.io/api/v3/protocols/' + uri_path
-        #'https://www.protocols.io/api/v3/groups/sparc/protocols'
-        #'https://www.protocols.io/api/v3/filemanager/folders?top'
-        #print(apiuri, header)
-        resp = requests.get(apiuri, headers=self._pio_header)
-        #log.info(str(resp.request.headers))
-        j = resp.json()  # the api is reasonably consistent
-        if resp.ok:
-            return j
-        else:
-            log.error(f"protocol no access {uri} '{self.dataset.id}'")
 
     def _abstracted_paths(self, name_prefix, glob_type='glob'):
         """ A bottom up search for the closest file in the parent directory.
@@ -1301,7 +1252,8 @@ class FThing:
             path = next(gen)
             if not path.is_broken_symlink():
                 if path.name[0].isupper():
-                    log.warning(f"path bad case '{path}'")
+                    #breakpoint()
+                    log.warning(f"path has bad casing '{path}'")
                 yield path
 
             else:
@@ -1310,7 +1262,7 @@ class FThing:
             for path in gen:
                 if not path.is_broken_symlink():
                     if path.name[0].isupper():
-                        log.warning(f"path bad case '{path}'")
+                        log.warning(f"path has bad casing '{path}'")
 
                     yield path
 
@@ -1318,7 +1270,7 @@ class FThing:
                     log.warning(f"path has not been retrieved '{path}'")
 
         except StopIteration:
-            if self.parent is not None:
+            if self.parent is not None and self.parent != self:
                 yield from getattr(self.parent, name_prefix + '_paths')
 
     @property
@@ -1349,7 +1301,7 @@ class FThing:
             yield Tabular(path)
 
     @property
-    def submission(self):
+    def _submission_objects(self):
         for t in self._submission_tables:
             try:
                 miss = SubmissionFile(t)
@@ -1360,6 +1312,13 @@ class FThing:
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
                 self._errors.append(e)
+
+    @property
+    def submission(self):
+        if not hasattr(self, '_subm_cache'):
+            self._subm_cache = list(self._submission_objects)
+
+        yield from self._subm_cache
 
     @property
     def dataset_description_paths(self):
@@ -1377,7 +1336,7 @@ class FThing:
             yield DatasetDescription(t)
 
     @property
-    def dataset_description(self):
+    def _dataset_description_objects(self):
         for t in self._dataset_description_tables:
             #yield from DatasetDescription(t)
             # TODO export adapters for this ... how to recombine and reuse ...
@@ -1392,6 +1351,13 @@ class FThing:
                 self._errors.append(e)
 
     @property
+    def dataset_description(self):
+        if not hasattr(self, '_dd_cache'):
+            self._dd_cache = list(self._dataset_description_objects)
+
+        yield from self._dd_cache
+
+    @property
     def subjects_paths(self):
         yield from self._abstracted_paths('subjects')
         #yield from self.path.glob('subjects*.*')
@@ -1402,7 +1368,8 @@ class FThing:
             yield Tabular(path)
 
     @property
-    def subjects(self):
+    def _subjects_objects(self):
+        """ really subjects_file """
         for table in self._subjects_tables:
             try:
                 sf = SubjectsFile(table)
@@ -1413,6 +1380,13 @@ class FThing:
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
                 self._errors.append(e)
+
+    @property
+    def subjects(self):
+        if not hasattr(self, '_subj_cache'):
+            self._subj_cache = list(self._subjects_objects)
+
+        yield from self._subj_cache
 
     @property
     def data(self):
@@ -1799,13 +1773,13 @@ class FThing:
 
     def __eq__(self, other):
         # TODO order by status
-        return self.name == other.name
+        self.path == other.path
 
     def __gt__(self, other):
-        return self.name > other.name
+        return self.path > other.path
 
     def __lt__(self, other):
-        return self.name < other.name
+        return self.path < other.path
 
     def __hash__(self):
         return hash((hash(self.__class__), self.id))  # FIXME checksum? (expensive!)
@@ -2304,6 +2278,19 @@ class LThing:
 class FTLax(FThing):
     def _abstracted_paths(self, name_prefix, glob_type='rglob'):
         yield from super()._abstracted_paths(name_prefix, glob_type)
+
+
+class Integrator(ProtocolData, OntologyData, FThing):
+    @classmethod
+    def setup(cls):
+        """ make sure we have all datasources """
+        for _cls in cls.mro():
+            if hasattr(_cls, 'setup'):
+                _cls.setup()
+
+    @property
+    def keywords(self):
+        keywords = super().keywords
 
 
 def express_or_return(thing):

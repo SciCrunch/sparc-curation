@@ -1665,6 +1665,7 @@ class LocalPath(XattrPath):
                               updated=updated,
                               checksum=self.checksum(),
                               id=self.sysid + ':' + self.as_posix(),
+                              file_id=st.st_ino,  # pretend inode number is file_id ... oh wait ...
                               user_id=st.st_uid,
                               # keep in mind that a @meta.setter
                               # will require a coverter for non-unix uids :/

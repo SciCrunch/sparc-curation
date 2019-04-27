@@ -7,7 +7,7 @@ Usage:
     spc fetch [options] [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [completeness filetypes keywords subjects] [--for-copy --debug]
+    spc report [completeness filetypes keywords subjects] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -26,6 +26,7 @@ Commands:
     fetch     fetch based on the metadata that we have
     stats     print stats for specified or current directory
     report    print a report on all datasets
+              [--tab-table --sort-count-desc --debug]
     missing   find and fix missing metadata
     xattrs    populate metastore / backup xattrs
     export    export extracted data
@@ -48,9 +49,11 @@ Options:
     -m --only-meta          only pull known dataset metadata files
     -r --rate=HZ            sometimes we can go too fast when fetching
     -p --pretend            if the defult is to act, dont, opposite of fetch
-    -c --for-copy           when printing reports use tabs for copy paste
+
+    -t --tab-table          print simple table using tabs for copying
 
     -S --sort-size-desc     sort by file size, largest first
+    -C --sort-count-desc    sort by count, largest first
 
     -U --upload             update remote target (e.g. a google sheet) if one exists
 
@@ -97,50 +100,51 @@ class Options:
         return int(self.args['--level']) if self.args['--level'] else None
 
     @property
-    def only_meta(self):
-        return self.args['--only-meta']
-
-    @property
-    def uri(self):
-        return self.args['--uri']
-
-    @property
     def rate(self):
         return int(self.args['--rate']) if self.args['--rate'] else None
 
-    @property
-    def json(self):
-        return self.args['json']
-
-    @property
-    def ttl(self):
-        return self.args['ttl']
-
-    @property
-    def keywords(self):
-        return self.args['keywords']
-
-    @property
-    def completeness(self):
-        return self.args['completeness']
-
-    @property
-    def subjects(self):
-        return self.args['subjects']
-
-    @property
-    def filetypes(self):
-        return self.args['filetypes']
-
-
-
-class Dispatch:
+class Dispatcher:
     spcignore = ('.git',
                  '.~lock',)
-    def __init__(self, args):
-        self.args = args
-        self.options = Options(args)
+    port_attrs = tuple()
+    parent = None
+    def __init__(self, args, port_attrs=tuple()):
+        if isinstance(args, Dispatcher):
+            parent = args
+            self.args = parent.args
+            self.parent = parent
+            self.options = parent.options
+            if not port_attrs:
+                port_attrs = self.port_attrs
+            for attr in port_attrs:
+                setattr(self, attr, getattr(parent, attr))
 
+        else:
+            self.args = args
+            self.options = Options(args)
+
+    def __call__(self):
+        # FIXME this might fail to run annos -> shell correctly
+        first = self.parent is not None
+        for k, v in self.args.items():
+            if first and v:
+                # FIXME this only works for 1 level
+                continue  # skip the parent argument which we know will be true
+
+            if v and not any(k.startswith(c) for c in ('-', '<')):
+                getattr(self, k)()
+                return
+
+        else:
+            self.default()
+
+    def default(self):
+        raise NotImplementedError('docopt I can\'t believe you\'ve done this')
+
+
+class Main(Dispatcher):
+    def __init__(self, args):
+        super().__init__(args)
         if self.args['clone'] or self.args['meta']:
             # short circuit since we don't know where we are yet
             return
@@ -172,17 +176,8 @@ class Dispatch:
         # get the datasets to tigger instantiation of the remote
         list(self.datasets_remote)
         list(self.datasets)
-        self.BlackfynnRemote = BlackfynnCache._remote_class
-        self.bfl = self.BlackfynnRemote.bfl
-
-    def __call__(self):
-        # FIXME this might fail to run annos -> shell correctly
-        for k, v in self.args.items():
-            if v and not any(k.startswith(c) for c in ('-', '<')):
-                getattr(self, k)()
-                return
-        else:
-            self.default()
+        BlackfynnRemote = BlackfynnCache._remote_class
+        self.bfl = BlackfynnRemote.bfl
 
     @property
     def project_name(self):
@@ -326,10 +321,10 @@ class Dispatch:
         if self.options.sort_size_desc:
             key = lambda ps: -ps[-1]
         else:
-            key = lambda ps: p
+            key = lambda ps: ps
 
-        rows = [['Path', 'size'],
-                *((p, s.hr if s else s)
+        rows = [['Path', 'size', '?'],
+                *((p, s.hr if s else s, 'x' if p.exists() else '')
                   for p, s in
                   sorted(([p, ('' if p.is_dir() else
                                (p.cache.meta.size if p.cache.meta.size else '??'))]
@@ -530,43 +525,32 @@ class Dispatch:
         print(fmt)
 
     def demos(self):
-        return self.shell()
+        # get the first dataset
+        dataset = next(iter(summary))
 
-    def shell(self):
-        """ drop into an shell with classes loaded """
-        datasets = list(self.datasets)
-        dsd = {d.meta.id:d for d in datasets}
-        ds = datasets
-        summary = self.summary
-        org = FThing(self.project_path)
-        datasets_local = list(self.datasets_local)
-        if self.args['demos']:
-            # get the first dataset
-            dataset = next(iter(summary))
+        # another way to get the first dataset
+        dataset_alt = next(org.children)
 
-            # another way to get the first dataset
-            dataset_alt = next(org.children)
+        # view all dataset descriptions call repr(tabular_view_demo)
+        tabular_view_demo = [next(d.dataset_description).t
+                                for d in ds[:1]
+                                if 'dataset_description' in d.data]
 
-            # view all dataset descriptions call repr(tabular_view_demo)
-            tabular_view_demo = [next(d.dataset_description).t
-                                 for d in ds[:1]
-                                 if 'dataset_description' in d.data]
+        # get package testing
+        bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
+                    'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
+        bfds = self.bfl.bf.datasets()
+        packages = [list(d.packages) for d in bfds[:3]
+                    if d.id not in bigskip]
+        n_packages = [len(ps) for ps in packages]
 
-            # get package testing
-            bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
-                       'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
-            bfds = self.bfl.bf.datasets()
-            packages = [list(d.packages) for d in bfds[:3]
-                        if d.id not in bigskip]
-            n_packages = [len(ps) for ps in packages]
+        # bootstrap a new local mirror
+        # FIXME at the moment we can only have of these at a time
+        # sigh more factories incoming
+        #anchor = BlackfynnCache('/tmp/demo-local-storage')
+        #anchor.bootstrap()
 
-            # bootstrap a new local mirror
-            # FIXME at the moment we can only have of these at a time
-            # sigh more factories incoming
-            #anchor = BlackfynnCache('/tmp/demo-local-storage')
-            #anchor.bootstrap()
-
-        elif False:
+        if False:
             ### this is the equivalent of export, quite slow to run
             # export everything
             dowe = summary.data_out_with_errors
@@ -577,12 +561,12 @@ class Dispatch:
 
         #rchilds = list(datasets[0].rchildren)
         #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
-        p, *rest = self._paths
-        f = FThing(p)
-        dowe = f.data_out_with_errors
-        j = JT(dowe)
-        triples = list(f.triples)
-        embed()
+
+        return self.shell()
+
+    def shell(self):
+        """ drop into an shell with classes loaded """
+        shell = Shell(self)
 
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """
@@ -645,7 +629,7 @@ class Dispatch:
                 self._print_paths(paths)
 
     def _print_table(self, rows, title=None):
-        if self.options.for_copy:
+        if self.options.tab_table:
             if title:
                 print(title)
             print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
@@ -653,6 +637,11 @@ class Dispatch:
             print(AsciiTable(rows, title=title).table)
 
     def report(self):
+        if self.options.sort_count_desc:
+            key = lambda kv: -kv[-1]
+        else:
+            key = lambda kv: kv
+
         if self.options.filetypes:
             #root = FThing(self.project_path)
             #fts = [FThing(p) for p in self.project_path.rglob('*') if p.is_file()]
@@ -661,18 +650,17 @@ class Dispatch:
             paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
 
             def count(thing):
-                return sorted([(k, v) for k, v in
+                return sorted([(k if k else '', v) for k, v in
                                Counter([getattr(f, thing)
-                                        for f in paths]).items()], key=lambda r:-r[-1])
+                                        for f in paths]).items()], key=key)
             each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
 
             for title, rows in each.items():
                 self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
-                #print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
                 
-            all_counts = sorted([(*k, v) for k, v in
+            all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
                                  Counter([(f.suffix, f.mimetype, f._magic_mimetype)
-                                          for f in paths]).items()], key=lambda r:-r[-1])
+                                          for f in paths]).items()], key=key)
 
             header = ['suffix', 'mimetype', 'magic mimetype', 'count']
             self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
@@ -682,7 +670,7 @@ class Dispatch:
                                      for sf in ft.subjects
                                      for h in sf.bc.header)
             counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
-                                               key=lambda kv:-kv[-1]))
+                                               key=key))
 
             rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
             self._print_table(rows, title='Subjects Report')
@@ -697,8 +685,9 @@ class Dispatch:
             self._print_table(rows, title='Completeness Report')
 
         elif self.options.keywords:
-            rows = [sorted(dataset.keywords, key=lambda v: -len(v))
-                    for dataset in self.summary]
+            _rows = [sorted(set(dataset.keywords), key=lambda v: -len(v))
+                     for dataset in self.summary]
+            rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
             self._print_table(rows, title='Keywords Report')
 
         if self.options.debug:
@@ -744,6 +733,32 @@ class Dispatch:
 
         log.setLevel(old_level)
 
+
+class Shell(Dispatcher):
+    # property ports
+    _paths = Main._paths
+    datasets = Main.datasets
+    datasets_local = Main.datasets_local
+    port_attrs = 'anchor', 'project_path', 'bfl'
+
+    def default(self):
+        datasets = list(self.datasets)
+        datasets_local = list(self.datasets_local)
+        dsd = {d.meta.id:d for d in datasets}
+        ds = datasets
+        summary = self.summary
+        org = FThing(self.project_path)
+
+        p, *rest = self._paths
+        f = FThing(p)
+        dowe = f.data_out_with_errors
+        j = JT(dowe)
+        triples = list(f.triples)
+        embed()
+
+    def integration(self):
+        from sparcur.datasources import Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
+        embed()
 
 def main():
     from docopt import docopt, parse_defaults

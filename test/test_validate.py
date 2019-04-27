@@ -25,6 +25,7 @@ class TestHierarchy(unittest.TestCase):
                 print(mp)
 
         pytest.skip('TODO look at the lists here and figure out where they should go.')
+        # for example if they are buried many levels too low how do we deal with that?
 
     def test_dataset(self):
         for d in self.ds:

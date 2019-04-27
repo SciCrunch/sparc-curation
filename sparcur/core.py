@@ -2,13 +2,18 @@ import json
 from collections import deque
 import rdflib
 import ontquery as oq
+from joblib import Memory
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.core import OntId
 from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
+from sparcur.config import config
 
 log = makeSimpleLogger('sparcur')
 sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/uris/readable/sparc/')
+
+# disk cache decorator
+memory = Memory(config.cache_dir, verbose=0)
 
 
 def lj(j):
