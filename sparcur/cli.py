@@ -332,12 +332,13 @@ class Dispatch:
 
     def fetch(self):
         from pyontutils.utils import Async, deferred
-        print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
+        paths = [p for p in self._paths if not p.is_dir()]
+        print(AsciiTable([['Path']] + sorted([p] for p in paths)).table)
         if self.options.pretend:
             return
         hz = self.options.rate
         Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
-                       for path in list(self._paths))
+                       for path in paths)
         
     def annos(self):
         args = self.args

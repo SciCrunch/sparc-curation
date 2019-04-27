@@ -1,5 +1,7 @@
 """ string normalizers, strings that change their content to match a standard """
 
+from sparcur.core import log
+
 
 class NormAward(str):
     def __new__(cls, value):
