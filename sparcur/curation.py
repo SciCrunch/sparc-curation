@@ -166,7 +166,7 @@ class Tabular:
 
     def __repr__(self):
         limit = 30
-        ft = FThing(self.path)
+        ft = DatasetData(self.path)
         title = f'{self.path.name:>40}' + ft.dataset.id + ' ' + ft.dataset.name
         return AsciiTable([[c[:limit] + ' ...' if isinstance(c, str)
                             and len(c) > limit else c
@@ -375,7 +375,7 @@ class Version1Header:
     @property
     def data_with_errors(self):
         """ data with errors added under the 'errors' key """
-        # FIXME TODO regularize this with the FThing version
+        # FIXME TODO regularize this with the DatasetData version
         ok, valid, data = self.schema.validate(copy.deepcopy(self.data))
         if not ok:
             # FIXME this will dump the whole schema, go smaller
@@ -699,7 +699,7 @@ class CurationStatusStrict:
         if self.fthing.is_dataset:
             return self.fthing
         else:
-            return FThing(self.bids_root)
+            return DatasetData(self.bids_root)
 
     @property
     def miss_paths(self):
@@ -915,7 +915,7 @@ class MetaMaker:
         return self.f.path.cache.human_uri
 
 
-class FThing:
+class DatasetData:
     """ a homogenous representation """
     schema_class = DatasetSchema
     schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
@@ -998,7 +998,7 @@ class FThing:
             return None
 
         if self.path.parent.cache:
-            pp = FThing(self.path.parent)
+            pp = DatasetData(self.path.parent)
             if pp.id is not None:
                 return pp
 
@@ -2040,7 +2040,7 @@ class FThing:
         return graph.serialize(format='nifttl')
 
 
-class Summary(FThing):
+class Summary(DatasetData):
     """ A class that summarizes members of its __base__ class """
     #schema_class = MetaOutSchema  # FIXME clearly incorrect
     schema_class = SummarySchema
@@ -2058,8 +2058,8 @@ class Summary(FThing):
  
     def __iter__(self):
         """ Return the list of datasets for the organization
-            of the current FThing regardless of whether that
-            FThing is itself an organization node """
+            of the current DatasetData regardless of whether that
+            DatasetData is itself an organization node """
 
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth
@@ -2275,12 +2275,12 @@ class LThing:
         self._lst = lst
 
 
-class FTLax(FThing):
+class FTLax(DatasetData):
     def _abstracted_paths(self, name_prefix, glob_type='rglob'):
         yield from super()._abstracted_paths(name_prefix, glob_type)
 
 
-class Integrator(ProtocolData, OntologyData, FThing):
+class Integrator(ProtocolData, OntologyData, DatasetData):
     @classmethod
     def setup(cls):
         """ make sure we have all datasources """

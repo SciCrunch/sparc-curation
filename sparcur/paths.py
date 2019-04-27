@@ -22,7 +22,7 @@ Remote paths are only intended to provide a 1:1 mapping, so list(local.data) == 
 should always be true if everything is in sync.
 
 If there is additional metadata that is associated with a local path then that is
-represented in the layer above this one (currently FThing, in the future a validation Stage).
+represented in the layer above this one (currently DatasetData, in the future a validation Stage).
 That said, it does seem like we need a more formal place that can map between all these
 things rather than always trying to derive the mappings from data embedded (bound) to
 the derefereced path object. """

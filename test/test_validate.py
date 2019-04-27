@@ -4,12 +4,12 @@ from .common import project_path
 
 from sparcur import validate as vldt
 from sparcur.paths import Path
-from sparcur.curation import FTLax, FThing
+from sparcur.curation import FTLax, DatasetData
 
 
 class TestHierarchy(unittest.TestCase):
     def setUp(self):
-        self.ds =  [FThing(p) for p in Path(project_path).children]
+        self.ds =  [DatasetData(p) for p in Path(project_path).children]
 
     def tearDown(self):
         pass

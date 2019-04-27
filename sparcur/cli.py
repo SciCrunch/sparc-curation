@@ -75,7 +75,7 @@ from sparcur import exceptions as exc
 from sparcur.core import JT, log, python_identifier
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import FThing, FTLax, Summary
+from sparcur.curation import DatasetData, FTLax, Summary
 from sparcur.curation import JEncode, get_all_errors
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
@@ -168,7 +168,7 @@ class Main(Dispatcher):
 
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         self.project_path = self.anchor.local
-        FThing.anchor = FThing(self.project_path)
+        DatasetData.anchor = DatasetData(self.project_path)
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
@@ -363,7 +363,7 @@ class Main(Dispatcher):
         
     def export(self):
         """ export output of curation workflows to file """
-        #org_id = FThing(self.project_path).organization.id
+        #org_id = DatasetData(self.project_path).organization.id
         cwd = Path.cwd()
         timestamp = datetime.now().isoformat().replace('.', ',')
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
@@ -372,7 +372,7 @@ class Main(Dispatcher):
                 print(f'{cwd.cache} is not at dataset level!')
                 sys.exit(123)
 
-            ft = FThing(cwd)
+            ft = DatasetData(cwd)
             dump_path = cwd.cache.anchor.local.parent / 'export/datasets' / ft.id / timestamp
             latest_path = dump_path.parent / 'LATEST'
             if not dump_path.exists():
@@ -463,7 +463,7 @@ class Main(Dispatcher):
         all_hypotehsis_uris = set(a.uri for a in protc)
         if args['shell'] or self.options.debug:
             p, *rest = self._paths
-            f = FThing(p)
+            f = DatasetData(p)
             all_annos = [list(protc.byIri(uri)) for uri in f.protocol_uris_resolved]
             embed()
 
@@ -643,8 +643,8 @@ class Main(Dispatcher):
             key = lambda kv: kv
 
         if self.options.filetypes:
-            #root = FThing(self.project_path)
-            #fts = [FThing(p) for p in self.project_path.rglob('*') if p.is_file()]
+            #root = DatasetData(self.project_path)
+            #fts = [DatasetData(p) for p in self.project_path.rglob('*') if p.is_file()]
 
             paths = self.paths if self.paths else (Path('.').resolve(),)
             paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
@@ -698,7 +698,7 @@ class Main(Dispatcher):
         file = args['<feedback-file>']
         feedback = ' '.join(args['<feedback>'])
         path = Path(file).resolve()
-        eff = FThing(path)
+        eff = DatasetData(path)
         # TODO pagenote and/or database
         print(eff, feedback)
 
@@ -747,10 +747,10 @@ class Shell(Dispatcher):
         dsd = {d.meta.id:d for d in datasets}
         ds = datasets
         summary = self.summary
-        org = FThing(self.project_path)
+        org = DatasetData(self.project_path)
 
         p, *rest = self._paths
-        f = FThing(p)
+        f = DatasetData(p)
         dowe = f.data_out_with_errors
         j = JT(dowe)
         triples = list(f.triples)
