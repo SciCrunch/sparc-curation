@@ -297,13 +297,14 @@ class RemotePath:
             # FIXME can this go stale? if so how?
             print(cache_parent)
             if cache_parent is not None and parent.id == cache_parent.id:
-                    for cache_parent in cache_parent.parents:
-                        if cache_parent.name == remote.parent.name:  # FIXME trick to avoid calling id
-                            break
-                        elif parent is None:
+                    for c_parent in cache_parent.parents:
+                        if c_parent is None:
                             continue
+                        elif c_parent.name == remote.name:  # FIXME trick to avoid calling id
+                            parent_names.append(c_parent.name)  # since be compare one earlier we add here
+                            break
                         else:
-                            parent_names.append(cache_parent.name)
+                            parent_names.append(c_parent.name)
 
             else:
                 for parent in parent.parents:
@@ -326,7 +327,12 @@ class RemotePath:
     @property
     def parts(self):
         if not hasattr(self, '_parts'):
-            self._parts = tuple(self._parts_relative_to(self.anchor))
+            if self.cache:
+                cache_parent = self.cache.parent
+            else:
+                cache_parent = None
+
+            self._parts = tuple(self._parts_relative_to(self.anchor, cache_parent))
 
         return self._parts
 

@@ -1003,6 +1003,9 @@ class FThing(FakePathHelper):
         """ Sometimes there is an intervening folder. """
         if self.is_dataset:
             def check_fordd(paths, level=0, stop=3):
+                if not paths:  # apparently the empty case recurses forever
+                    return
+
                 if len(paths) > 20:
                     log.warning('Not globing in a folder with > 20 children!')
                     return
@@ -1013,7 +1016,7 @@ class FThing(FakePathHelper):
                     if dd_paths:
                         dd_paths_all.extend(dd_paths)
                     elif not dd_paths_all:
-                        children.extend(p for p in path.children if p.is_dir())
+                        children.extend([p for p in path.children if p.is_dir()])
 
                 if dd_paths_all:
                     return dd_paths_all
