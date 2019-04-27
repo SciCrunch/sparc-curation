@@ -3,12 +3,28 @@
 from sparcur.core import log
 
 
-class NormAward(str):
+class NormSimple(str):
     def __new__(cls, value):
         return str.__new__(cls, cls.normalize(value))
 
     @classmethod
+    def normalize(cls, value, preserve_case=False):
+        v = value if preserve_case else value.lower()
+        if v in cls.data:
+            return cls.data[v]
+        elif preserve_case:
+            return value
+        else:
+            return v
+
+class NormAward(NormSimple):
+    data = {
+        '1 OT2 OD23853': 'OT2OD023853',  # someone's university database stripped a leading zero
+        #'grantOT2OD02387101S2': '',
+    }
+    @classmethod
     def normalize(cls, value):
+        value = super().normalize(value, preserve_case=True)
         if 'OT2' in value and 'OD' not in value:
             # one is missing the OD >_<
             log.warning(value)
@@ -53,18 +69,6 @@ class NormFileSuffix(str):
         else:
             return v
 
-
-class NormSimple(str):
-    def __new__(cls, value):
-        return str.__new__(cls, cls.normalize(value))
-
-    @classmethod
-    def normalize(cls, value):
-        v = value.lower()
-        if v in cls.data:
-            return cls.data[v]
-        else:
-            return v
 
 class NormSpecies(NormSimple):
     data = {

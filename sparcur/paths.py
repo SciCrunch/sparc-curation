@@ -32,12 +32,14 @@ import sys
 import base64
 import hashlib
 import pathlib
+import mimetypes
 import subprocess
 from time import sleep
 from errno import ELOOP, ENOENT, ENOTDIR, EBADF
 from pathlib import PosixPath, PurePosixPath
 from datetime import datetime
 from functools import wraps
+import magic  # from sys-apps/file consider python-magic ?
 import xattr
 import psutil
 from dateutil import parser
@@ -492,6 +494,24 @@ class AugmentedPath(PosixPath):
             self._entered_from.chdir()
         else:
             super().__exit__(t, v, tb)
+
+    @property
+    def mimetype(self):
+        mime, encoding = mimetypes.guess_type(self.as_uri())
+        if mime:
+            return mime
+
+    @property
+    def encoding(self):
+        mime, encoding = mimetypes.guess_type(self.as_uri())
+        if encoding:
+            return encoding
+
+    @property
+    def _magic_mimetype(self):
+        """ This can be slow because it has to open the files. """
+        if self.exists():
+            return magic.detect_from_filename(self).mime_type
 
 
 class CachePath(AugmentedPath):

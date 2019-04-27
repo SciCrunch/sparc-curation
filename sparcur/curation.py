@@ -5,13 +5,11 @@ import copy
 import json
 import math
 import hashlib
-import mimetypes
 from types import GeneratorType
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 from itertools import chain
 from collections import defaultdict, deque
-import magic  # from sys-apps/file consider python-magic ?
 import rdflib
 import requests
 import dicttoxml
@@ -29,7 +27,7 @@ from scibot.utils import resolution_chain
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import exceptions as exc
-from sparcur.core import JEncode, OrcidId, log, lj, sparc
+from sparcur.core import JT, JEncode, OrcidId, log, lj, sparc
 from sparcur.paths import Path
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur import schemas as sc
@@ -921,47 +919,7 @@ class MetaMaker:
         return self.f.path.cache.human_uri
 
 
-class FakePathHelper:
-
-    # it is not possible to attach extended attributes to a symlink
-    # while we could come up with a convention to embed the information
-    # we need in the link path it seems ... annoying?
-    @property
-    def real_path(self):
-        path = self.path
-        while '.fake' in path.suffixes:
-            path = path.with_suffix('')
-
-        return path
-
-    @property
-    def suffix(self):
-        return self.real_path.suffix
-
-    @property
-    def suffixes(self):
-        return self.real_path.suffixes
-
-    @property
-    def mimetype(self):
-        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
-        if mime:
-            return mime
-
-    @property
-    def encoding(self):
-        mime, encoding = mimetypes.guess_type(self.real_path.as_uri())
-        if encoding:
-            return encoding
-
-    @property
-    def _magic_mimetype(self):
-        """ This can be slow because it has to open the files. """
-        if self.real_path.exists():
-            return magic.detect_from_filename(self.real_path).mime_type
-
-
-class FThing(FakePathHelper):
+class FThing:
     """ a homogenous representation """
     schema_class = DatasetSchema
     schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
@@ -2142,10 +2100,12 @@ class Summary(FThing):
         for dataset in self:
             # FIXME metamaker was a bad, bad idea
             dowe = dataset.data_out_with_errors
-            yield (dowe['error_index'],
-                   dowe['submission_completeness_index'],
-                   dataset.name,
-                   dataset.id)
+            accessor = JT(dowe)  # can go direct if elements are always present
+            yield (accessor.error_index,
+                   accessor.submission_completeness_index,
+                   dataset.name,  # from filename (do we not have that in meta!?)
+                   accessor.id,
+                   accessor.query('meta', 'award_number'))
 
     def make_json(self, gen):
         # FIXME this and the datasets is kind of confusing ...

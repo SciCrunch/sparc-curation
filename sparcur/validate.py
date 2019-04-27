@@ -1,6 +1,7 @@
 import re
 from functools import wraps
 from sparcur import schemas as sc
+from sparcur.core import python_identifier
 
 class HasSchema:
     """ decorator for classes with methods whose output can be validated by jsonschema """
@@ -114,25 +115,7 @@ class Header(Stage):
         header = []
         for i, c in enumerate(orig_header):
             if c:
-                c = (c.strip()
-                     .replace('(', '')
-                     .replace(')', '')
-                     .replace(' ', '_')
-                     .replace('+', '')
-                     .replace('…','')
-                     .replace('.','_')
-                     .replace(',','_')
-                     .replace('/', '_')
-                     .replace('?', '_')
-                     .replace('#', 'number')
-                     .replace('-', '_')
-                     .replace(':', '_')
-                     .replace('\x83', '')
-                     .lower()  # sigh
-                )
-                if any(c.startswith(str(n)) for n in range(10)):
-                    c = 'n_' + c
-
+                c = python_identifier(c)
             if not c:
                 c = f'TEMP_{i}'
 

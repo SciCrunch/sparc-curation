@@ -2,6 +2,7 @@ import rdflib
 from sparcur.core import log, sparc
 from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
+from pyontutils.closed_namespaces import rdf, rdfs, owl
 
 
 class TripleConverter:
@@ -93,6 +94,8 @@ class SubjectConverter(TripleConverter):
         ['age_cateogry', TEMP.hasAgeCategory],
         ['species', sparc.animalSubjectIsOfSpecies],
         ['group', TEMP.hasAssignedGroup],
+        #['rrid_for_strain', rdf.type],  # if only
+        ['rrid_for_strain', sparc.specimenHasIdentifier],  # really subClassOf strain
     ]
 
     def genus(self, value): return sparc.animalSubjectIsOfGenus, self.l(value)

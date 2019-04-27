@@ -7,7 +7,7 @@ Usage:
     spc fetch [options] [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [completeness filetypes keywords subjects] [options]
+    spc report [completeness filetypes keywords subjects] [--for-copy --debug]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -48,6 +48,11 @@ Options:
     -m --only-meta          only pull known dataset metadata files
     -r --rate=HZ            sometimes we can go too fast when fetching
     -p --pretend            if the defult is to act, dont, opposite of fetch
+    -c --for-copy           when printing reports use tabs for copy paste
+
+    -S --sort-size-desc     sort by file size, largest first
+
+    -U --upload             update remote target (e.g. a google sheet) if one exists
 
     -d --debug              drop into a shell after running a step
 """
@@ -64,7 +69,7 @@ from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur.core import JT, log
+from sparcur.core import JT, log, python_identifier
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import FThing, FTLax, Summary
@@ -76,26 +81,10 @@ from IPython import embed
 class Options:
     def __init__(self, args):
         self.args = args
-
-    @property
-    def debug(self):
-        return self.args['--debug']
-
-    @property
-    def overwrite(self):
-        return self.args['--overwrite']
-
-    @property
-    def empty(self):
-        return self.args['--empty']
-
-    @property
-    def fetch(self):
-        return self.args['--fetch']
-
-    @property
-    def pretend(self):
-        return self.args['--pretend']
+        for arg, value in self.args.items():
+            ident = python_identifier(arg.strip('-'))
+            if not hasattr(self, ident):  # complex logic in properties
+                setattr(self, ident, value)
 
     @property
     def limit(self):
@@ -130,6 +119,19 @@ class Options:
     @property
     def keywords(self):
         return self.args['keywords']
+
+    @property
+    def completeness(self):
+        return self.args['completeness']
+
+    @property
+    def subjects(self):
+        return self.args['subjects']
+
+    @property
+    def filetypes(self):
+        return self.args['filetypes']
+
 
 
 class Dispatch:
@@ -320,9 +322,23 @@ class Dispatch:
         )
     ###
 
+    def _print_paths(self, paths):
+        if self.options.sort_size_desc:
+            key = lambda ps: -ps[-1]
+        else:
+            key = lambda ps: p
+
+        rows = [['Path', 'size'],
+                *((p, s.hr if s else s)
+                  for p, s in
+                  sorted(([p, ('' if p.is_dir() else
+                               (p.cache.meta.size if p.cache.meta.size else '??'))]
+                          for p in paths), key=key))]
+        self._print_table(rows)
+
     def refresh(self):
         from pyontutils.utils import Async, deferred
-        print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
+        self._print_paths(self._paths)
         if self.options.pretend:
             return
         hz = self.options.rate
@@ -340,11 +356,12 @@ class Dispatch:
         return
 
     def fetch(self):
-        from pyontutils.utils import Async, deferred
         paths = [p for p in self._paths if not p.is_dir()]
-        print(AsciiTable([['Path']] + sorted([p] for p in paths)).table)
+        self._print_paths(paths)
         if self.options.pretend:
             return
+
+        from pyontutils.utils import Async, deferred
         hz = self.options.rate
         Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
                        for path in paths)
@@ -562,6 +579,8 @@ class Dispatch:
         #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
         p, *rest = self._paths
         f = FThing(p)
+        dowe = f.data_out_with_errors
+        j = JT(dowe)
         triples = list(f.triples)
         embed()
 
@@ -609,11 +628,11 @@ class Dispatch:
                          and p.cache.meta.size.mb < self.options.limit]
 
             if self.options.pretend:
-                print(AsciiTable([['Path']] + sorted([p] for p in paths)).table)
-                print(self.options.rate)
+                self._print_paths(paths)
+                print('rate =', self.options.rate)
                 return
 
-            if args['--verbose']:
+            if self.options.verbose:
                 for p in paths:
                     print(p.cache.meta.as_pretty(pathobject=p))
 
@@ -623,43 +642,64 @@ class Dispatch:
                 hz = self.options.rate  # was 30
                 Async(rate=hz)(deferred(path.cache.fetch)() for path in paths)
             else:
-                [print(p) for p in paths]
+                self._print_paths(paths)
+
+    def _print_table(self, rows, title=None):
+        if self.options.for_copy:
+            if title:
+                print(title)
+            print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
+        else:
+            print(AsciiTable(rows, title=title).table)
 
     def report(self):
-        if self.args['filetypes']:
+        if self.options.filetypes:
             #root = FThing(self.project_path)
-            fts = [FThing(p) for p in self.project_path.rglob('*') if p.is_file()]
-            #all_counts = sorted([(*k, v) for k, v in Counter([(f.suffix, f.mimetype, f._magic_mimetype)
-                                                              #for f in fts]).items()], key=lambda r:r[-1])
+            #fts = [FThing(p) for p in self.project_path.rglob('*') if p.is_file()]
+
+            paths = self.paths if self.paths else (Path('.').resolve(),)
+            paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
 
             def count(thing):
-                return sorted([(k, v) for k, v in Counter([getattr(f, thing)
-                                                            for f in fts]).items()], key=lambda r:-r[-1])
-            #each = {t:count(t) for t in ('suffix', 'mimetype', )}
-            each = {t:count(t) for t in ('_magic_mimetype', )}
+                return sorted([(k, v) for k, v in
+                               Counter([getattr(f, thing)
+                                        for f in paths]).items()], key=lambda r:-r[-1])
+            each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
 
-            for head, tups in each.items():
-                print(head)
-                print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
+            for title, rows in each.items():
+                self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
+                #print('\n'.join(['\t'.join(str(e).strip('.') for e in t) for t in tups]))
+                
+            all_counts = sorted([(*k, v) for k, v in
+                                 Counter([(f.suffix, f.mimetype, f._magic_mimetype)
+                                          for f in paths]).items()], key=lambda r:-r[-1])
 
-        elif self.args['subjects']:
+            header = ['suffix', 'mimetype', 'magic mimetype', 'count']
+            self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
+
+        elif self.options.subjects:
             subjects_headers = tuple(h for ft in self.summary
                                      for sf in ft.subjects
                                      for h in sf.bc.header)
             counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
                                                key=lambda kv:-kv[-1]))
-            print(AsciiTable(((f'Column Name unique = {len(counts)}', '#'), *counts)).table)
 
-        elif self.args['completeness']:
-            rows = [('', 'EI', 'DSCI', 'name', 'id')]
-            rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0, *rest) for i, (ei, index, *rest) in
-                     enumerate(sorted(self.summary.completeness, key=lambda t:(t[0], -t[1], *t[2:])))]
-            print(AsciiTable(rows).table)
+            rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
+            self._print_table(rows, title='Subjects Report')
+
+        elif self.options.completeness:
+            rows = [('', 'EI', 'DSCI', 'name', 'id', 'award')]
+            rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0,
+                      *rest,
+                      an if an else '') for i, (ei, index, *rest, an) in
+                     enumerate(sorted(self.summary.completeness,
+                                      key=lambda t:(t[0], -t[1], *t[2:], t[-1])))]
+            self._print_table(rows, title='Completeness Report')
 
         elif self.options.keywords:
             rows = [sorted(dataset.keywords, key=lambda v: -len(v))
                     for dataset in self.summary]
-            print(AsciiTable(rows).table)
+            self._print_table(rows, title='Keywords Report')
 
         if self.options.debug:
             embed()

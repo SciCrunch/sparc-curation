@@ -46,6 +46,30 @@ class JEncode(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+def python_identifier(string):
+    """ pythonify a string for use as an identifier """
+    ident = (string.strip()
+             .replace('(', '')
+             .replace(')', '')
+             .replace(' ', '_')
+             .replace('+', '')
+             .replace('…','')
+             .replace('.','_')
+             .replace(',','_')
+             .replace('/', '_')
+             .replace('?', '_')
+             .replace('#', 'number')
+             .replace('-', '_')
+             .replace(':', '_')
+             .replace('\x83', '')
+             .lower()  # sigh
+                )
+    if ident[0].isdigit():
+        ident = 'n_' + ident
+
+    return ident
+
+
 class OrcidPrefixes(oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
@@ -86,6 +110,7 @@ class OrcidId(OntId):
 
 
 def JT(blob):
+    """ this is not a class but is a function hacked to work like one """
     def _populate(blob, top=False):
         if isinstance(blob, list) or isinstance(blob, tuple):
             # TODO alternatively if the schema is uniform, could use bc here ...
@@ -178,11 +203,22 @@ def JT(blob):
     def _repr(self, b=blob):  # because why not
         return 'JT(\n' + repr(b) + '\n)'
 
+    def query(self, *path):
+        """ returns None at first failure """
+        j = self
+        for key in path:
+            j = getattr(j, key, None)
+            if j is None:
+                return
+
+        return j
+
     #cd = {k:v for k, v in _populate(blob, True)}
 
     # populate the top level
     cd = {k:v for k, v in ((a, b) for t in _populate(blob, True)
                            for a, b in (t if isinstance(t, list) else (t,)))}
     cd['__repr__'] = _repr
+    cd['query'] = query
     nc = type('JT' + str(type(blob)), (object,), cd)
     return nc()
