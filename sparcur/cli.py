@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3.6
 """ SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
     spc clone <project-id>
@@ -42,13 +42,12 @@ Options:
     -n --name=<PAT>         filename pattern to match (like find -name)
     -v --verbose            print extra information
     -u --uri                print the human uri for the path in question
-    -p --project-path=<PTH> set the project path manually
+    -a --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
     -m --only-meta          only pull known dataset metadata files
-    -g --get-data          download the actual data in files
-
-    -i --include-folders    include folders when refreshing remote metadata
+    -r --rate=HZ            sometimes we can go too fast when fetching
+    -p --pretend            if the defult is to act, dont, opposite of fetch
 
     -d --debug              drop into a shell after running a step
 """
@@ -68,8 +67,8 @@ from sparcur import exceptions as exc
 from sparcur.core import JT, log
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import FThing, FTLax, CurationReport, Summary
-from sparcur.curation import get_datasets, JEncode, get_all_errors
+from sparcur.curation import FThing, FTLax, Summary
+from sparcur.curation import JEncode, get_all_errors
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
 
@@ -91,8 +90,12 @@ class Options:
         return self.args['--empty']
 
     @property
-    def include_folders(self):
-        return self.args['--include-folders']
+    def fetch(self):
+        return self.args['--fetch']
+
+    @property
+    def pretend(self):
+        return self.args['--pretend']
 
     @property
     def limit(self):
@@ -109,16 +112,17 @@ class Options:
         return self.args['--only-meta']
 
     @property
-    def get_data(self):
-        return self.args['--get-data']
-
-    @property
     def uri(self):
         return self.args['--uri']
 
     @property
+    def rate(self):
+        return int(self.args['--rate']) if self.args['--rate'] else None
+
+    @property
     def ttl(self):
         return self.args['ttl']
+
 
 class Dispatch:
     spcignore = ('.git',
@@ -137,8 +141,7 @@ class Dispatch:
         args = self.args
         if args['--project-path']:
             path_string = args['--project-path']
-        else:
-            path_string = '.'
+        path_string = '.'
 
         # we have to start from the cache class so that
         # we can configure
@@ -264,7 +267,7 @@ class Dispatch:
         meta = PathMeta(id=project_id)
 
         # make sure that we aren't in a project already
-        anchor_local = Path(project_name)
+        anchor_local = Path(project_name).absolute()
         root = anchor_local.find_cache_root()
         if root is not None:
             message = f'fatal: already in project located at {root.resolve()!r}'
@@ -293,6 +296,10 @@ class Dispatch:
         dirs = self.directories
         if dirs:
             for d in dirs:
+                if self.options.empty:
+                    if list(d.children):
+                        continue
+
                 if d.is_dir():
                     if not d.remote.is_dataset():
                         log.warning('You are pulling recursively from below dataset level.')
@@ -307,14 +314,17 @@ class Dispatch:
     def refresh(self):
         from pyontutils.utils import Async, deferred
         print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
-        Async()(deferred(path.remote.refresh)(update_cache=True,
-                                              update_data=self.options.get_data,
-                                              size_limit_mb=self.options.limit)
-                for path in list(self._paths))
+        if self.options.pretend:
+            return
+        hz = self.options.rate
+        Async(rate=hz)(deferred(path.remote.refresh)(update_cache=True,
+                                                     update_data=self.options.fetch,
+                                                     size_limit_mb=self.options.limit)
+                       for path in list(self._paths))
         return
         for path in self._paths:
             path.remote.refresh(update_cache=True,
-                                update_data=self.options.get_data,
+                                update_data=self.options.fetch,
                                 size_limit_mb=self.options.limit)
 
 
@@ -323,8 +333,11 @@ class Dispatch:
     def fetch(self):
         from pyontutils.utils import Async, deferred
         print(AsciiTable([['Path']] + sorted([p] for p in self._paths)).table)
-        Async(10)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
-                  for path in list(self._paths))
+        if self.options.pretend:
+            return
+        hz = self.options.rate
+        Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
+                       for path in list(self._paths))
         
     def annos(self):
         args = self.args
@@ -459,8 +472,6 @@ class Dispatch:
 
     def export(self):
         """ export output of curation workflows to file """
-        #from sparcur.curation import get_datasets
-        #ds, dsd = get_datasets(self.project_path)
         #org_id = FThing(self.project_path).organization.id
         cwd = Path.cwd()
         timestamp = datetime.now().isoformat().replace('.', ',')
@@ -562,14 +573,20 @@ class Dispatch:
                                        f'{p.meta.size} != {p.cache.meta.size}'))
                          and p.cache.meta.size.mb < self.options.limit]
 
+            if self.options.pretend:
+                print(AsciiTable([['Path']] + sorted([p] for p in paths)).table)
+                print(self.options.rate)
+                return
+
             if args['--verbose']:
                 for p in paths:
                     print(p.cache.meta.as_pretty(pathobject=p))
 
-            if args['--fetch']:
+            if self.options.fetch:
                 from pyontutils.utils import Async, deferred
                 #Async()(deferred(self.bfl.fetch_path)(path, self.options.overwrite) for path in paths)
-                Async(rate=30)(deferred(path.cache.fetch)() for path in paths)
+                hz = self.options.rate  # was 30
+                Async(rate=hz)(deferred(path.cache.fetch)() for path in paths)
             else:
                 [print(p) for p in paths]
 

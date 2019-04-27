@@ -189,21 +189,20 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     human_uri = BlackfynnCache.human_uri
     api_uri = BlackfynnCache.api_uri
 
-    def __new__(cls, anchor, local_class, cache_class):
-        if isinstance(anchor, BFLocal):
-            raise TypeError('please do not do this anymore ...')
-            blackfynn_local_instance = BFLocal
-        elif isinstance(anchor, BlackfynnCache):
+    def __new__(cls, cache_anchor, local_class):
+        if isinstance(cache_anchor, BlackfynnCache):
             try:
-                blackfynn_local_instance = BFLocal(anchor.id)
+                blackfynn_local_instance = BFLocal(cache_anchor.id)
             except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
-                log.critical('Could not connect to blackfynn')
+                log.critical(f'Could not connect to blackfynn {e!r}')
                 #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
 
         else:
-            raise TypeError(f'{type(anchor_or_bfl)} is not BFLocal or BlackfynnCache!')
+            raise TypeError(f'{type(cache_anchor)} is not BFLocal or BlackfynnCache!')
 
+        cache_class = cache_anchor.__class__
         self = super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
+        cls._cache_anchor = cache_anchor
         self._errors = []
         self.root = self.bfl.organization.id
         return self

@@ -1,5 +1,6 @@
 import json
 from collections import deque
+import rdflib
 import ontquery as oq
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.core import OntId
@@ -7,6 +8,7 @@ from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
 
 log = makeSimpleLogger('sparcur')
+sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/uris/readable/sparc/')
 
 
 def lj(j):
@@ -15,7 +17,7 @@ def lj(j):
 
 
 class _log:
-    """ logging prevents ince ipython recurions error printing
+    """ logging prevents nice ipython recurions error printing
         so rename this class to log when you need fake logging """
     @staticmethod
     def debug(nothing): pass

@@ -500,7 +500,13 @@
     If you have never retrieved the data before run.
     #+CAPTION: first time per local network
     #+BEGIN_SRC bash :results none
-      spc pull
+      pushd ~/files/blackfynn_local/
+      spc clone  # initialize a new repo and pull existing structure
+      scp refresh -g
+      spc fetch  # actually download files
+      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv'  # see what to fetch
+      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -f  # fetch
+      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -f -r 10  # slow down you are seeing errors!
     #+END_SRC
 
     Pull local copy of data to a new computer. Note the double escape needed for the space.

@@ -348,10 +348,12 @@ class RemotePath:
         raise NotImplementedError
 
 
+from IPython import embed
 class AugmentedPath(PosixPath):
     """ extra conveniences, mostly things that are fixed in 3.7 using IGNORE_ERROS """
 
     _stack = []  # pushd and popd
+    count = 0
 
     def exists(self):
         """ Turns out that python doesn't know how to stat symlinks that point
@@ -360,7 +362,7 @@ class AugmentedPath(PosixPath):
         try:
             return super().exists()
         except OSError as e:
-            log.error(e)
+            log.error(e)   # too noisy ... though it reaveals we call exists a lot
             if not _ignore_error(e):
                 raise
 
@@ -491,6 +493,14 @@ class CachePath(AugmentedPath):
     _backup_cache = None
     _not_exists_cache = None
 
+    def __enter__(self):
+        if self.is_dir():
+            self._entered_from = self.local.cwd()  # caches can't exist outside their anchor anymore
+            self.chdir()
+            return self
+        else:
+            super().__enter__(self)
+
     @classmethod
     def setup(cls, local_class, remote_class_factory):
         """ call this once to bind everything together """
@@ -555,19 +565,29 @@ class CachePath(AugmentedPath):
         return self
 
     def __init__(self, *args, meta=None, remote=None, **kwargs):
+        if remote:
+            self._remote = remote
+            self._meta_setter(remote.meta)
+        elif meta:
+            self._meta_setter(meta)
+        else:
+            if self.meta is None:
+                raise exc.NoCachedMetadataError
+
+        return
         # FIXME not really the init for CachePath ... more BlackfynnCache
         if self.id is None:
             if meta is None and remote is None:
                 if not self.is_helper_cache:
-                    root = self.local.find_cache_root()
-                    if root is not None:
-                        log.debug(root)
-                        self.recover_meta()
+                    msg = f'No cached meta exists and no meta and no remote provided for {self.local}'
+                    raise exc.NoCachedMetadataError(msg)
+                    #root = self.local.find_cache_root()
+                    #if root is not None:
+                        #log.debug(root)
+                        #self.recover_meta()
                     #if self.exists():
                         #self.recover_meta()
                     #else:
-                        #msg = f'No cached meta exists and no meta and no remote provided for {self}'
-                        #raise exc.NoCachedMetadataError(msg)
             elif remote and meta:
                 raise TypeError(f'can only have one remote or one meta')
             elif remote is not None:
@@ -584,7 +604,9 @@ class CachePath(AugmentedPath):
                 if meta is not None:
                     self.meta = meta
                 elif not self.is_helper_cache:
-                    meta = self.recover_meta()
+                    msg = 'exist but no meta {self.local}'
+                    raise exc.NoCachedMetadataError(msg)
+                    #meta = self.recover_meta()
             elif self.is_broken_symlink():
                 # symlink that exists so overwrite
                 self.meta = meta
@@ -593,7 +615,7 @@ class CachePath(AugmentedPath):
                 self.bootstrap(meta)
             else:
                 # ok to hit this
-                msg = f'no meta, no helper cache, no symlink {self}'
+                msg = f'no meta, no helper cache, no symlink {self.local}'
                 #log.critical(msg)
                 raise exc.NoCachedMetadataError(msg)
 
@@ -756,41 +778,8 @@ class CachePath(AugmentedPath):
                 # bootstrap this
                 child
 
-    def __bootstrap_meta_memory(self, meta):
-        if meta is None:
-            raise TypeError('what are you doin')
-
-        if not self.meta or self.meta.id is None:
-            #self._meta_setter(meta, memory_only=True)  # FIXME _meta_setter broken for memonly ...
-            self._meta = meta
-            if self.meta.id is None:
-                log.warning(f'Existing meta for {self!r} no id so overwriting\n{self.meta}')
-
-            if self.remote is None:
-                raise AssertionError
-
-        elif self.id != meta.id:
-            msg = ('Existing cache id does not match new id! '
-                   f'{self.meta.id} != {meta.id}\n{self.meta}')
-            # TODO overwrite?
-            # also newest wins, how does this happen on bf end?
-            #if self.meta.created < meta.created:  # pretty sure doesn't work because which we got was rando
-            log.critical(msg)
-            #else:
-                #raise exc.MetadataIdMismatchError(msg)
-
-        elif self.exists():
-            # we don't need to set meta since it is already on disk
-            # but if the id's don't match we are in trouble
-            if self.meta.id != meta.id:
-                raise exc.SparCurError('something has gone wrong')
-        elif self.is_symlink():
-            pass
-        else:
-            raise BaseException('should not get here')
-
-
     def _bootstrap_prepare_filesystem(self, parents, fetch_data, size_limit_mb):
+        # we could use bootstrapping id here and introspect the id, but that is cheating
         if self.remote.is_dir():
             if not self.exists():
                 # the bug where this if statement put in as an and is a really
@@ -860,15 +849,20 @@ class CachePath(AugmentedPath):
         if not id:
             return
 
+        anchor = self.anchor
+        if anchor is None:  # the very first ...
+            # in which case we need the id for factory AND class
+            self._bootstrapping_id = id  # so we set it again
+            anchor = self  # could double check if the id has the info too ...
+
         if self._remote_class_factory is not None:
             # we don't have to have a remote configured to check the cache
             if not hasattr(self, '_remote_class'):
                 #log.debug('rc')
                 # NOTE there are many possible ways to set the anchor
                 # we need to pick _one_ of them
-                self._remote_class = self._remote_class_factory(self.anchor,
-                                                                self.local_class,
-                                                                self.__class__)
+                self._remote_class = self._remote_class_factory(anchor,
+                                                                self.local_class)
 
             if not hasattr(self, '_remote'):
                 self._remote = self._remote_class(id, cache=self)
@@ -940,12 +934,17 @@ class CachePath(AugmentedPath):
 
     @property
     def id(self):
-        if self.meta:
-            return self.meta.id
-        elif hasattr(self, '_bootstrapping_id'):
-            id = self._bootstrapping_id
-            delattr(self, '_bootstrapping_id')  # single use only
-            return id
+        if not hasattr(self, '_id'):  # calls to self.exists() are too expensive for this nonsense
+            if self.meta:
+                self._id = self.meta.id
+                return self._id
+
+            elif hasattr(self, '_bootstrapping_id'):
+                id = self._bootstrapping_id
+                delattr(self, '_bootstrapping_id')  # single use only
+                return id
+
+        return self._id
 
     # TODO how to toggle fetch from remote to heal?
     @property
@@ -1297,7 +1296,7 @@ def cleanup(func):
                 else:
                     pass
 
-                self.recover_meta()
+                #self.recover_meta()
             else:
                 return meta
             
@@ -1309,19 +1308,19 @@ class BlackfynnCache(XattrCache):
     _not_exists_cache = SymlinkCache
 
     @property
-    @cleanup
     def meta(self):
         #if hasattr(self, '_in_bootstrap'):
         #if hasattr(self, '_meta'):  # if we have in memory we are bootstrapping so don't fiddle about
             #return self._meta
 
-        if self.exists():
-            #log.debug(self)
+        exists = self.exists()
+        if exists:
+            #log.debug(self)  # TODO this still gets hit a lot in threes
             meta = super().meta
             if meta:  # implicit else failover to backup cache
                 return meta
 
-        elif not self.exists() and self._not_exists_cache and self.is_symlink():
+        elif not exists and self._not_exists_cache and self.is_symlink():
             try:
                 cache = self._not_exists_cache(self)
                 return cache.meta
@@ -1339,10 +1338,6 @@ class BlackfynnCache(XattrCache):
 
             except exc.NoCachedMetadataError as e:
                 log.warning(e)
-
-    #@meta.setter
-    #def meta(self, pathmeta):
-        #self._meta_setter(pathmeta)
 
     def _meta_setter(self, pathmeta, memory_only=False):
         """ we need memory_only for bootstrap I think """
@@ -1370,6 +1365,9 @@ class BlackfynnCache(XattrCache):
 
         if hasattr(self, '_meta'):
             delattr(self, '_meta')
+
+        if hasattr(self, '_id'):
+            delattr(self, '_id')
 
     @classmethod
     def decode_value(cls, field, value):
@@ -1415,7 +1413,7 @@ class BlackfynnCache(XattrCache):
             elif id.startswith('N:organization:'):
                 return self
 
-        if self.parent:
+        if self.parent and self.parent != self:
             # we have a case of missing metadata here as well
             return self.parent.organization
 
@@ -1663,7 +1661,8 @@ class LocalPath(XattrPath):
 
     @property
     def children(self):
-        yield from self.iterdir()
+        if self.is_dir():
+            yield from self.iterdir()
 
     @property
     def rchildren(self):
