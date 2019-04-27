@@ -48,7 +48,7 @@ class TripleConverter:
                 pass
 
             else:
-                log.warning(f'Unhandled subject field: {field}')
+                log.warning(f'Unhandled {self.__class__.__name__} field: {field}')
 
 
 class ContributorConverter(TripleConverter):
@@ -64,6 +64,8 @@ class ContributorConverter(TripleConverter):
     def contributor_role(self, value):
         return TEMP.hasRole, TEMP[value]
 
+ContributorConverter.setup()
+
 
 class MetaConverter(TripleConverter):
     mapping = [
@@ -75,14 +77,15 @@ class MetaConverter(TripleConverter):
         ['subject_count', TEMP.hasNumberOfSubjects],
         ['keywords', isAbout],
     ]
+MetaConverter.setup()  # box in so we don't forget
 
 
 class DatasetConverter(TripleConverter):
     mapping = [
-        #['name']
         ['error_index', TEMP.errorIndex],
         ['submission_completeness_index', TEMP.submissionCompletenessIndex],
         ]
+DatasetConverter.setup()
 
 
 class SubjectConverter(TripleConverter):
@@ -100,8 +103,6 @@ class SubjectConverter(TripleConverter):
     def sex(self, value): return TEMP.hasBiologicalSex, self.l(value)
     def gender(self, value): return sparc.hasGender, self.l(value)
     def age(self, value): return TEMP.hasAge, self.l(value)
-
-
-ContributorConverter.setup()
-MetaConverter.setup()
 SubjectConverter.setup()
+
+

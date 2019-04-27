@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3.7
 """ SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
     spc clone <project-id>

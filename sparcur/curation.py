@@ -1002,7 +1002,26 @@ class FThing(FakePathHelper):
         # this is incorrect behavior!
         """ Sometimes there is an intervening folder. """
         if self.is_dataset:
-            dd_paths = list(self.path.rglob('dataset_description*.*'))  # FIXME possibly slow?
+            def check_fordd(paths, level=0, stop=3):
+                if len(paths) > 20:
+                    log.warning('Not globing in a folder with > 20 children!')
+                    return
+                dd_paths_all = []
+                children = []
+                for path in paths:
+                    dd_paths = list(path.glob('[Dd]ataset_description*.*'))
+                    if dd_paths:
+                        dd_paths_all.extend(dd_paths)
+                    elif not dd_paths_all:
+                        children.extend(p for p in path.children if p.is_dir())
+
+                if dd_paths_all:
+                    return dd_paths_all
+                else:
+                    return check_fordd(children, level + 1)
+
+            dd_paths = check_fordd((self.path,))
+
             if not dd_paths:
                 #log.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
                 return

@@ -288,22 +288,37 @@ class RemotePath:
         """ returns the relative path construction for the child so that local can make use of it """
         return PurePosixPath(*self.parts)
 
-    def _parts_relative_to(self, remote):
+    def _parts_relative_to(self, remote, cache_parent=None):
         parent_names = []  # FIXME massive inefficient due to retreading subpaths :/
         # have a look at how pathlib implements parents
-        for parent in self.parents:
-            if parent == remote:
-                break
-            elif parent is None:
-                continue  # value error incoming
-            else:
-                parent_names.append(parent.name)
+        parent = self.parent
+        if parent != remote:
+            parent_names.append(parent.name)
+            # FIXME can this go stale? if so how?
+            print(cache_parent)
+            if cache_parent is not None and parent.id == cache_parent.id:
+                    for cache_parent in cache_parent.parents:
+                        if cache_parent.name == remote.parent.name:  # FIXME trick to avoid calling id
+                            break
+                        elif parent is None:
+                            continue
+                        else:
+                            parent_names.append(cache_parent.name)
 
-        else:
-            self._errors += ['file-deleted']
-            msg = f'{remote} is not one of {self}\'s parents'
-            log.error(msg)
-            #raise ValueError()
+            else:
+                for parent in parent.parents:
+                    if parent == remote:
+                        break
+                    elif parent is None:
+                        continue  # value error incoming
+                    else:
+                        parent_names.append(parent.name)
+
+                else:
+                    self._errors += ['file-deleted']
+                    msg = f'{remote} is not one of {self}\'s parents'
+                    log.error(msg)
+                    #raise ValueError()
 
         args = (*reversed(parent_names), self.name)
         return args
@@ -643,7 +658,7 @@ class CachePath(AugmentedPath):
             # FIXME not just names but relative paths???
             remote = key
             try:
-                child = self._make_child(remote._parts_relative_to(self.remote), remote)
+                child = self._make_child(remote._parts_relative_to(self.remote, self.parent), remote)
             except AttributeError as e:
                 raise exc.SparCurError('aaaaaaaaaaaaaaaaaaaaaa') from e
 
@@ -943,6 +958,8 @@ class CachePath(AugmentedPath):
                 id = self._bootstrapping_id
                 delattr(self, '_bootstrapping_id')  # single use only
                 return id
+            else:
+                return
 
         return self._id
 
