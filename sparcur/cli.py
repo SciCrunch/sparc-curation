@@ -126,11 +126,12 @@ class Dispatcher:
         # FIXME this might fail to run annos -> shell correctly
         first = self.parent is not None
         for k, v in self.args.items():
-            if first and v:
-                # FIXME this only works for 1 level
-                continue  # skip the parent argument which we know will be true
-
             if v and not any(k.startswith(c) for c in ('-', '<')):
+                if first and v:
+                    first = False
+                    # FIXME this only works for 1 level
+                    continue  # skip the parent argument which we know will be true
+
                 getattr(self, k)()
                 return
 
@@ -186,7 +187,7 @@ class Main(Dispatcher):
             sys.exit(1)
         """
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        DatasetData.anchor = DatasetData(self.project_path)
+        DatasetData.project_path = self.project_path
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
@@ -196,6 +197,7 @@ class Main(Dispatcher):
         list(self.datasets)
         BlackfynnRemote = BlackfynnCache._remote_class
         self.bfl = BlackfynnRemote.bfl
+        Integrator.setup()
 
     @property
     def project_name(self):
@@ -775,7 +777,9 @@ class Shell(Dispatcher):
     def integration(self):
         from sparcur.datasources import Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
         p, *rest = self._paths
-        i = Integrator(p)
+        intr = Integrator(p)
+        pj = list(intr.protocol_jsons)
+        apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         embed()
 
 

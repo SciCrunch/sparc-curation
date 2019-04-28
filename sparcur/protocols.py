@@ -1,11 +1,14 @@
+import requests
+from scibot.utils import resolution_chain
 from pyontutils.config import devconfig
 from hyputils.hypothesis import HypothesisHelper, group_to_memfile
 from protcur import namespace_mappings as nm
-from sparcur.core import memory
 from protcur.core import annoSync
 from protcur.analysis import Hybrid, protc
 from sparcur.protocols_io_api import get_protocols_io_auth
-
+from sparcur.core import log, cache
+from sparcur.paths import Path
+from sparcur.config import config
 
 class ProtcurSource:
 
@@ -25,11 +28,11 @@ class ProtcurSource:
 
 class ProtocolData:
 
+    @classmethod
     def setup(cls):
         creds_file = devconfig.secrets('protocols-io', 'api', 'creds-file')
         _pio_creds = get_protocols_io_auth(creds_file)
-        _pio_header = {'Authentication': 'Bearer ' + _pio_creds.access_token}
-        protocol_jsons = {}
+        cls._pio_header = {'Authorization': 'Bearer ' + _pio_creds.access_token}
 
     @classmethod
     def cache_path(cls):
@@ -66,14 +69,15 @@ class ProtocolData:
         for uri in self.protocol_uris_resolved:
             yield self._get_protocol_json(uri)
 
-    @memory.cache  # note that you can only get the json back from this function (across sessions)
+    @cache(Path(config.cache_dir, 'protocol_json'))
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
         uri_path = uri.rsplit('/', 1)[-1]
         apiuri = 'https://protocols.io/api/v3/protocols/' + uri_path
         #'https://www.protocols.io/api/v3/groups/sparc/protocols'
-        #'https://www.protocols.io/api/v3/filemanager/folders?top'
+        #apiuri = 'https://www.protocols.io/api/v3/filemanager/folders?top'
         #print(apiuri, header)
+        log.debug('going to network for protocols')
         resp = requests.get(apiuri, headers=self._pio_header)
         #log.info(str(resp.request.headers))
         j = resp.json()  # the api is reasonably consistent

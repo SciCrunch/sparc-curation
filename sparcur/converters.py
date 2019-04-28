@@ -34,7 +34,7 @@ class TripleConverter:
             subject = rdflib.URIRef(subject)
 
         for field, value in self._source.items():
-            log.debug(f'{field} {value}')
+            log.debug(f'{field}: {value}')
             convert = getattr(self, field, None)
             if convert is not None:
                 if isinstance(value, tuple) or isinstance(value, list):

@@ -11,7 +11,6 @@ from datetime import datetime
 from itertools import chain
 from collections import defaultdict, deque
 import rdflib
-import requests
 import dicttoxml
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
@@ -23,7 +22,6 @@ from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
 from pysercomb.pyr.units import ProtcParameterParser
-from scibot.utils import resolution_chain
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
@@ -931,7 +929,6 @@ class DatasetData:
             path = Path(path)
 
         self.path = path
-        self.fake = '.fake' in self.path.suffixes
         self.status = CurationStatusStrict(self)
         self.lax = CurationStatusLax(self)
 
@@ -994,11 +991,12 @@ class DatasetData:
 
     @property
     def parent(self):
-        if self.is_organization:
+        if self == self.anchor:
             return None
 
+        log.debug(f'{self} {self.anchor}')
         if self.path.parent.cache:
-            pp = DatasetData(self.path.parent)
+            pp = self.__class__(self.path.parent)
             if pp.id is not None:
                 return pp
 
@@ -1018,12 +1016,20 @@ class DatasetData:
             yield self.__class__(child)
 
     @property
+    def anchor(self):
+        if hasattr(self, 'project_path'):
+            if self.path == self.project_path:
+                return self
+
+            return self.__class__(self.project_path)
+
+    @property
     def is_organization(self):
-        if hasattr(self, 'anchor'):
+        if self.anchor is not None:
             if self == self.anchor:
                 return True
 
-        return self.id.startswith('N:organization:')
+            return self.id.startswith('N:organization:')
 
     @property
     def organization(self):
@@ -1111,7 +1117,7 @@ class DatasetData:
         return self._meta.checksum
 
     def checksum(self):
-        if self.path.is_file() and not self.fake:
+        if self.path.is_file():
             return self.path.checksum(cypher=self.cypher)
 
         elif self.path.is_dir():
@@ -1221,6 +1227,7 @@ class DatasetData:
     @property
     def protocol_uris(self):
         """ property needed for protocol helper to help us """
+        if not hasattr(self, '_puri_cache'):
         p = 'protocol_url_or_doi'
         for dd in self.dataset_description:
             dwe = dd.data_with_errors
@@ -1774,7 +1781,7 @@ class DatasetData:
 
     def __eq__(self, other):
         # TODO order by status
-        self.path == other.path
+        return self.path == other.path
 
     def __gt__(self, other):
         return self.path > other.path
@@ -1941,6 +1948,8 @@ class DatasetData:
         yield s, a, sparc.Researcher
         yield s, TEMP.contributorTo, rdflib.URIRef(dsid)
         converter = conv.ContributorConverter(contributor)
+        yield from converter.triples_gen(s)
+        return
         for field, value in contributor.items():
             convert = getattr(converter, field, None)
             for v in (value if isinstance(value, tuple) or isinstance(value, list) else (value,)):
@@ -2055,7 +2064,7 @@ class Summary(DatasetData):
     def __init__(self, path, cypher=hashlib.sha256):
         super().__init__(path, cypher)
         # not sure if this is kosher ... but it works
-        super().__init__(self.organization.path, self.cypher)
+        super().__init__(self.anchor.path, self.cypher)
  
     def __iter__(self):
         """ Return the list of datasets for the organization
@@ -2281,14 +2290,20 @@ class FTLax(DatasetData):
         yield from super()._abstracted_paths(name_prefix, glob_type)
 
 
-class Integrator(ProtocolData, OntologyData, DatasetData):
+class Integrator(DatasetData, OntologyData, ProtocolData):
     """ pull everything together anchored to the DatasetData """
+    # note that mro means that we have to run methods backwards
+    # so any class that uses something produced by a function
+    # of an earlier class needs to be further down the mro so
+    # that the producer masks its NotImplementedErrors
+
     @classmethod
     def setup(cls):
         """ make sure we have all datasources """
         for _cls in cls.mro():
-            if hasattr(_cls, 'setup'):
-                _cls.setup()
+            if _cls != cls:
+                if hasattr(_cls, 'setup'):
+                    _cls.setup()
 
     @property
     def keywords(self):
