@@ -46,7 +46,8 @@ def run_flow(flow, storage):
     return credential
 
 
-def get_protocols_io_auth(creds_file, store_file='protocols-io-api-token-rw.json'):
+def get_protocols_io_auth(creds_file,
+                          store_file=devconfig.secrets('protocols-io', 'api', 'store-file')):
     flags = Namespace(noauth_local_webserver=True,
                       logging_level='INFO')
     spath = Path(devconfig.secrets_file).parent
