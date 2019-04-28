@@ -61,6 +61,8 @@ class JEncode(json.JSONEncoder):
 def python_identifier(string):
     """ pythonify a string for use as an identifier """
     ident = (string.strip()
+             .replace('<', '')
+             .replace('>', '')
              .replace('(', '')
              .replace(')', '')
              .replace(' ', '_')

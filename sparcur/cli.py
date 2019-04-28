@@ -295,11 +295,11 @@ class Main(Dispatcher):
 
     @property
     def directories(self):
-        return [Path(string_dir).absolute() for string_dir in self.args['<directory>']]
+        return [Path(string_dir).absolute() for string_dir in self.options.directory]
 
     @property
     def paths(self):
-        return [Path(string_path).absolute() for string_path in self.args['<path>']]
+        return [Path(string_path).absolute() for string_path in self.options.path]
 
     @property
     def _paths(self):

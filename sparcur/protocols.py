@@ -1,6 +1,6 @@
 import requests
 from scibot.utils import resolution_chain
-from pyontutils.config import devconfig
+from pyontutils.config import devconfig, QuietDict
 from hyputils.hypothesis import HypothesisHelper, group_to_memfile
 from protcur import namespace_mappings as nm
 from protcur.core import annoSync
@@ -29,10 +29,15 @@ class ProtcurSource:
 class ProtocolData:
 
     @classmethod
-    def setup(cls):
-        creds_file = devconfig.secrets('protocols-io', 'api', 'creds-file')
+    def setup(cls, creds_file=None):
+        if creds_file is None:
+            try:
+                creds_file = devconfig.secrets('protocols-io', 'api', 'creds-file')
+            except KeyError as e:
+                raise TypeError('creds_file is a required argument'
+                                ' unless you have it in secrets') from e
         _pio_creds = get_protocols_io_auth(creds_file)
-        cls._pio_header = {'Authorization': 'Bearer ' + _pio_creds.access_token}
+        cls._pio_header = QuietDict({'Authorization': 'Bearer ' + _pio_creds.access_token})
 
     @classmethod
     def cache_path(cls):
@@ -84,5 +89,5 @@ class ProtocolData:
         if resp.ok:
             return j
         else:
-            log.error(f"protocol no access {uri} '{self.dataset.id}'")
+            log.error(f"protocol no access {uri} '{self.dataset.id if self.dataset else self.id}'")
 
