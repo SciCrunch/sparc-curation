@@ -26,7 +26,7 @@ from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
 from sparcur import exceptions as exc
-from sparcur.core import JT, JEncode, OrcidId, log, lj, sparc, memory
+from sparcur.core import JT, JEncode, OrcidId, log, lj, sparc, memory, DictTransformer
 from sparcur.paths import Path
 from sparcur import schemas as sc
 from sparcur import converters as conv
@@ -843,8 +843,9 @@ class MetaMaker:
         cls.schema = cls.schema_class()
         return super().__new__(cls)
 
-    def __init__(self, fthing):
-        self.f = fthing
+    def __init__(self, datasetdata):
+        self.f = datasetdata
+        self.j = JT(datasetdata.data_lifted)  # oh look here are our phases
 
     @staticmethod
     def _generic(gen):
@@ -933,7 +934,6 @@ class DatasetData:
         self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
-        self.metamaker = metamaker(self)
         #self._pio_header = _pio_header  # FIXME ick
 
     @property
@@ -1227,7 +1227,7 @@ class DatasetData:
     @property
     def protocol_uris(self):
         """ property needed for protocol helper to help us """
-        if not hasattr(self, '_puri_cache'):
+        #if not hasattr(self, '_puri_cache'):
         p = 'protocol_url_or_doi'
         for dd in self.dataset_description:
             dwe = dd.data_with_errors
@@ -1511,195 +1511,79 @@ class DatasetData:
 
         return out
 
-    def _add(self, data):
-        # additions
-        data['id'] = self.id
 
-    def _lift(self, data, lifts):
-        # TODO lifts, copies, etc can all go in a single structure
-        # TODO proper mapping
-        for section_name in lifts:
-            try:
-                section = next(getattr(self, section_name))  # FIXME multiple when require 1
-                if section_name in data:
-                    # just skip stuff that doesn't exist
-                    data[section_name] = section.data_with_errors
-            except StopIteration:
-                #data[section_name] = {'errors':[{'message':'Nothing to see here?'}]}
-                # these errors were redundant with the missing key that
-                # the higher level schema will detect for us
-                continue
+    @property
+    def data_lifted(self):
+        """ doing this pipelines this way for now :/ """
 
-    def _copy(self, data, copies):
-        for source_path, target_path in copies:
-            # don't need a base case for thing?
-            # can't lift a dict outside of itself
-            # in this context
-            self.copy(data, source_path, target_path)
+        lifts = [[[key], lambda path: next(getattr(self, key))]
+                    for key in ['submission', 'dataset_description', 'subjects']]
 
-    def _move(self, data, moves):
-        for source_path, target_path in moves:
-            self.move(data, source_path, target_path)
 
-    def _derive(self, data, derives):
-        for source_path, function, target_paths, source_key_optional in derives:
-            source_prefixes = source_path[:-1]
-            source_key = source_path[-1]
-            source = data
-            failed = False
-            for i, node_key in enumerate(source_prefixes):
-                if node_key in source:
-                    source = source[node_key]
-                else:
-                    msg = f'did not find {node_key} in {source.keys()} {self.path}'
-                    if not i:
-                        log.error(msg)
-                        failed = True
-                        break
-                    raise exc.NoSourcePathError(msg)
-                if isinstance(source, list) or isinstance(source, tuple):
-                    new_source_path = source_prefixes[i + 1:] + [source_key]
-                    new_target_paths = [tp[i + 1:] for tp in target_paths]
-                    new_derives = [(new_source_path, function, new_target_paths, source_key_optional)]
-                    for sub_source in source:
-                        self._derive(sub_source, new_derives)
+        data = self.data_with_errors  # FIXME without errors how?
+        return DictTransformer.lift(data, lifts)
 
-                    return  # no more to do here
-
-            if failed:
-                continue  # sometimes things are missing we continue to others
-
-            if source_key not in source:
-                msg = f'did not find {source_key} in {source.keys()} {self.path}'
-                if source_key_optional:
-                    return log.info(msg)
-                else:
-                    raise exc.NoSourcePathError(msg)
-
-            source_value = source[source_key]
-            new_values = function(source_value)
-            if len(new_values) != len(target_paths):
-                raise TypeError('wrong number of values returned for {function}\n'
-                                'was {len(new_values)} expect {len(targets)}')
-            temp = b'__temporary'
-            data[temp] = {}  # bytes ensure no collisions
-            for target_path, value in zip(target_paths, new_values):
-                heh = str(target_path)
-                data[temp][heh] = value
-                source_path = temp, heh  # hah
-                self.move(data, source_path, target_path)
-
-            data.pop(temp)
-
-    def transform(self, data, lifts, copies, moves, derives):
-        """ lift sections using a python representation """
-        self._add(data)
-        self._lift(data, lifts)
-        self._copy(data, copies)
-        self._move(data, moves)
+    @property
+    def data_derived_pre(self):
+        derives = ([['subjects', 'sparc_award_number'],
+                    lambda award: nml.NormAward(nml.NormAward(award)),
+                    [['meta', 'award_number']],
+                    True],)
+        data = self.data_lifted
         self._derive(data, derives)
 
-    def copy(self, data, source_path, target_path):
-        self._copy_or_move(data, source_path, target_path)
+    @property
+    def data_copied(self):
+        copies = ([['dataset_description', 'contributors'], ['contributors']],
+                  [['subjects',], ['inputs', 'subjects']],)
+        # meta copies
+        copies += tuple([['dataset_description', source], ['meta', target]]
+                        for source, target in
+                        [[[direct, direct] for direct in
+                          ['principal_investigator',
+                           'species',
+                           'organ',
+                           'modality',
+                           'protocol_url_or_doi',
+                          ]]])
 
-    def move(self, data, source_path, target_path):
-        self._copy_or_move(data, source_path, target_path, True)
+        data = self.data_derived_pre
+        return copy(data, copies)
 
-    def _get_source(self, data, source_path):
-        #print(source_path, target_path)
-        source_prefixes = source_path[:-1]
-        source_key = source_path[-1]
-        yield source_key  # yield this because we don't know if move or copy
-        source = data
-        for node_key in source_prefixes:
-            if node_key in source:
-                source = source[node_key]
-            else:
-                # don't move if no source
-                msg = f'did not find {node_key} in {source.keys()} {self.path}'
-                raise exc.NoSourcePathError(msg)
+    @property
+    def data_moved(self):
+        moves = ([['dataset_description',], ['inputs', 'dataset_description']],
+                 [['subjects', 'software'], ['resources']],  # FIXME update vs replace
+                 [['subjects', 'subjects'], ['subjects']],
+                 [['submission',], ['inputs', 'submission']],)
+        # contributor derives
+        data = self.data_copied
+        self._move(data, moves)
 
-        if source_key not in source:
-            msg = f'did not find {source_key} in {source.keys()} {self.path}'
-            raise exc.NoSourcePathError(msg)
+    @property
+    def data_derived_post(self):
+        derives = ([['contributors', 'name'],
+                    Derives.contributor_name,
+                    [['contributors', 'first_name'],
+                     ['contributors', 'last_name']],
+                    True],)
+        data = self.data_moved
+        self._derive(data, derives)
 
-        yield source
+    @property
+    def data_added(self):
+        data = self.data_derived_post
+        adds = [[['id'], self.id]]
+        data['id'] = self.id
+        return data
 
-    def _get_source_value(self, data, source_path):
-        source_key, source = self._get_source(data, source_path)
-        return source[source_key]
-
-    def _copy_or_move(self, data, source_path, target_path, move=False):
-        """ if exists ... """
-        # FIXME there is a more elegant way to do this
-        try:
-            source_key, source = self._get_source(data, source_path)
-        except exc.NoSourcePathError as e:
-            log.warning(e)
-            return
-
-        if move:
-            _parent = source  # incase something goes wrong
-            source = source.pop(source_key)
-        else:
-            source = source[source_key]
-
-        if copy and source != data:
-            # copy first then modify means we need to deepcopy these
-            # otherwise we would delete original forms that were being
-            # saved elsewhere in the schema for later
-            source = copy.deepcopy(source)
-
-        target_prefixes = target_path[:-1]
-        target_key = target_path[-1]
-        target = data
-        try:
-            for target_name in target_prefixes:
-                if target_name not in target:  # TODO list indicies
-                    target[target_name] = {}
-
-                target = target[target_name]
-
-            target[target_key] = source
-        except TypeError as e:  # e.g. you try to go to a string
-            if move:
-                # this will change key ordering but
-                # that is expected, and if you were relying
-                # on dict key ordering HAH
-                _parent[node_key] = source
-
-            raise e
-
-        return
-        if hasattr(self, section_name):
-            section = next(getattr(self, section_name))  # FIXME non-homogenous
-            # we can safely call next here because missing or multi
-            # sections will be kicked out
-            # TODO n-ary cases may need to be handled separately
-            sec_data = section.data_with_errors
-            #out.update(sec_data)  # the magic of being self describing
-            out[section_name] = sec_data  # FIXME
 
     @property
     def data_out(self):
         """ this part adds the meta bits we need after _with_errors
             and rearranges anything that needs to be moved about """
 
-        data = self.data_with_errors  # FIXME without errors how?
-        lift_out = 'submission', 'dataset_description', 'subjects'
-        copies = ([['dataset_description', 'contributors'], ['contributors']],
-                  [['subjects',], ['inputs', 'subjects']],)
-        moves = ([['dataset_description',], ['inputs', 'dataset_description']],
-                 [['subjects', 'software'], ['resources']],  # FIXME update vs replace
-                 [['subjects', 'subjects'], ['subjects']],
-                 [['submission',], ['inputs', 'submission']],)
-        # contributor derives
-        derives = ([['contributors', 'name'],
-                    Derives.contributor_name,
-                    [['contributors', 'first_name'],
-                     ['contributors', 'last_name']],
-                    True],)
-        self.transform(data, lift_out, copies, moves, derives)
+        data = self.data_added
         self.add_meta(data)
 
         return data

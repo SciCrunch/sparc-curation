@@ -1,3 +1,4 @@
+import copy
 import json
 import shutil
 import hashlib
@@ -354,4 +355,242 @@ def cache(folder, ser='json', clear_cache=False, create=False):
 
     return inner
 
-# load existing ontology
+
+class AtomicDictOperations:
+    """ functions that modify dicts in place """
+
+    # note: no delete is implemented at the moment ...
+    # in place modifications means that delete can loose data ...
+
+    class __empty_node_key: pass
+
+    @staticmethod
+    def add(data, target_path, value, fail_on_exists=True):
+        # type errors can occur here ...
+        # e.g. you try to go to a string
+        if not [_ for _ in (list, tuple) if isinstance(target_path, _)]:
+            raise TypeError(f'target_path is not a list or tuple! {type(target_path)}')
+        target_prefixes = target_path[:-1]
+        target_key = target_path[-1]
+        target = data
+        for target_name in target_prefixes:
+            if target_name not in target:  # TODO list indicies
+                target[target_name] = {}
+
+            target = target[target_name]
+
+        if fail_on_exists and target_key in target:
+            raise exc.TargetPathExistsError(f'A value already exists at path {target_path}')
+
+        target[target_key] = value
+
+    @classmethod
+    def get(cls, data, source_path):
+        source_key, node_key, source = cls._get_source(data, source_path)
+        return source[source_key]
+
+    @classmethod
+    def copy(cls, data, source_path, target_path):
+        cls._copy_or_move(data, source_path, target_path)
+
+    @classmethod
+    def move(cls, data, source_path, target_path):
+        cls._copy_or_move(data, source_path, target_path, True)
+
+    @staticmethod
+    def _get_source(data, source_path):
+        #print(source_path, target_path)
+        source_prefixes = source_path[:-1]
+        source_key = source_path[-1]
+        yield source_key  # yield this because we don't know if move or copy
+        source = data
+        for node_key in source_prefixes:
+            if node_key in source:
+                source = source[node_key]
+            else:
+                # don't move if no source
+                msg = f'did not find {node_key} in {source.keys()} {self.path}'
+                raise exc.NoSourcePathError(msg)
+
+        # for move
+        yield (node_key if source_prefixes else
+               AtomicDictOperations.__empty_node_key)
+
+        if source_key not in source:
+            msg = f'did not find {source_key} in {source.keys()} {self.path}'
+            raise exc.NoSourcePathError(msg)
+
+        yield source
+
+    @classmethod
+    def _copy_or_move(cls, data, source_path, target_path, move=False):
+        """ if exists ... """
+        # FIXME there is a more elegant way to do this
+        try:
+            source_key, node_key, source = cls._get_source(data, source_path)
+        except exc.NoSourcePathError as e:
+            log.warning(e)
+            return
+
+        if move:
+            _parent = source  # incase something goes wrong
+            source = source.pop(source_key)
+        else:
+            source = source[source_key]
+
+            if source != data:  # this should .. always happen ???
+                source = copy.deepcopy(source)
+                # copy first then modify means we need to deepcopy these
+                # otherwise we would delete original forms that were being
+                # saved elsewhere in the schema for later
+            else:
+                raise BaseException('should not happen?')
+
+        try:
+            cls.add(data, target_path, source)
+        finally:
+            # this will change key ordering but
+            # that is expected, and if you were relying
+            # on dict key ordering HAH
+            if move and  node_key is not AtomicDictOperations.__empty_node_key:
+                _parent[node_key] = source
+
+
+adops = AtomicDictOperations()
+
+
+class _DictTransformer:
+    """ transformations from rules """
+
+    @staticmethod
+    def add(data, adds):
+        """ adds is a list (or tuples) with the following structure
+            [[target-path, value], ...]
+        """
+        for target_path, value in adds:
+            adops.add(data, target_path, value)
+
+    @staticmethod
+    def copy(data, copies):  # put this first to clarify functionality
+        """ copies is a list wth the following structure
+            [[source-path, target-path] ...]
+        """
+        for source_path, target_path in copies:
+            # don't need a base case for thing?
+            # can't lift a dict outside of itself
+            # in this context
+            adops.copy(data, source_path, target_path)
+
+    @staticmethod
+    def move(data, moves):
+        """ moves is a list with the following structure
+            [[source-path, target-path] ...]
+        """
+        for source_path, target_path in moves:
+            adops.move(data, source_path, target_path)
+
+    @staticmethod
+    def derive(data, derives):
+        """ derives is a list with the following structure
+            [[[source-path, ...], derive-function, [target-path, ...], source-key-optional], ...]
+
+        """
+        # TODO this is an implementaiton of copy that has semantics for handling lists
+        for source_path, function, target_paths, source_key_optional in derives:
+            source_prefixes = source_path[:-1]
+            source_key = source_path[-1]
+            source = data
+            failed = False
+            for i, node_key in enumerate(source_prefixes):
+                if node_key in source:
+                    source = source[node_key]
+                else:
+                    msg = f'did not find {node_key} in {source.keys()} {self.path}'
+                    if not i:
+                        log.error(msg)
+                        failed = True
+                        break
+                    raise exc.NoSourcePathError(msg)
+                if isinstance(source, list) or isinstance(source, tuple):
+                    new_source_path = source_prefixes[i + 1:] + [source_key]
+                    new_target_paths = [tp[i + 1:] for tp in target_paths]
+                    new_derives = [(new_source_path, function, new_target_paths, source_key_optional)]
+                    for sub_source in source:
+                        derive(sub_source, new_derives)
+
+                    return  # no more to do here
+
+            if failed:
+                continue  # sometimes things are missing we continue to others
+
+            if source_key not in source:
+                msg = f'did not find {source_key} in {source.keys()} {self.path}'
+                if source_key_optional:
+                    return log.info(msg)
+                else:
+                    raise exc.NoSourcePathError(msg)
+
+            source_value = source[source_key]
+
+            new_values = function(source_value)
+            if len(new_values) != len(target_paths):
+                raise TypeError('wrong number of values returned for {function}\n'
+                                'was {len(new_values)} expect {len(targets)}')
+            #temp = b'__temporary'
+            #data[temp] = {}  # bytes ensure no collisions
+            for target_path, value in zip(target_paths, new_values):
+                adops.add(data, target_path, value, fail_on_exists=True)
+                #heh = str(target_path)
+                #data[temp][heh] = value
+                #source_path = temp, heh  # hah
+                #self.move(data, source_path, target_path)
+
+            #data.pop(temp)
+
+    @staticmethod
+    def lift(data, lifts):
+        """ 
+        lifts are lists with the following structure
+        [[path, function], ...]
+
+        the only difference from derives is that lift
+        overwrites the underlying data (e.g. a filepath
+        would be replaced by the contents of the file)
+
+        old version:
+        given a source object and a list of property names
+            get the values at those property names and add them
+            to the dict at those same names, this is essentially
+            a deferred add ... really it should be a function
+            that takes the value at the path and uses that information
+            to transform that value into its replacement which is
+            sort of what many of these classes actually do ...
+            just in a rather indirect way
+        this is half way between an add an a derive, it is a replace
+        with derived data, so ... yes, lift is a reasonable word
+        """
+
+        for path, function in lifts:
+            old_value = adops.get(data, path)
+            new_value = function(value)
+            adops.add(data, path, value)
+
+        return
+        # TODO lifts, copies, etc can all go in a single structure
+        # TODO proper mapping
+        for section_name in lifts:
+            try:
+                section = next(getattr(self, section_name))  # FIXME multiple when require 1
+                if section_name in data:
+                    # just skip stuff that doesn't exist
+                    data[section_name] = section.data_with_errors
+            except StopIteration:
+                #data[section_name] = {'errors':[{'message':'Nothing to see here?'}]}
+                # these errors were redundant with the missing key that
+                # the higher level schema will detect for us
+                continue
+
+        return data
+
+
+DictTransformer = _DictTransformer()
