@@ -116,6 +116,11 @@ class OrganData:
             with open(self.old_cache, 'rt') as f:
                 self.former_to_current = json.load(f)
 
+        self.award_to_organ = {v:k for k, vs in self.normalized.items() for v in vs}
+
+    def organ(self, award_number):
+        return self.award_to_organ[award_number]
+
     def overview(self):
         with open(self.path, 'rb') as f:
             soup = BeautifulSoup(f.read(), 'lxml')

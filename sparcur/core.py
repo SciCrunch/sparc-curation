@@ -16,6 +16,7 @@ from sparcur.config import config
 from functools import wraps
 
 log = makeSimpleLogger('sparcur')
+logd = makeSimpleLogger('sparcur-data')
 sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/uris/readable/sparc/')
 
 # disk cache decorator
@@ -24,7 +25,7 @@ memory = Memory(config.cache_dir, verbose=0)
 
 def lj(j):
     """ use with log to format json """
-    return '\n' + json.dumps(j, indent=2)
+    return '\n' + json.dumps(j, indent=2, cls=JEncode)
 
 
 class _log:
@@ -380,7 +381,8 @@ class AtomicDictOperations:
             target = target[target_name]
 
         if fail_on_exists and target_key in target:
-            raise exc.TargetPathExistsError(f'A value already exists at path {target_path}')
+            raise exc.TargetPathExistsError(f'A value already exists at path {target_path}\n'
+                                            f'{lj(data)}')
 
         target[target_key] = value
 
@@ -409,7 +411,7 @@ class AtomicDictOperations:
                 source = source[node_key]
             else:
                 # don't move if no source
-                msg = f'did not find {node_key} in {source.keys()} {self.path}'
+                msg = f'did not find {node_key!r} in {tuple(source.keys())}'
                 raise exc.NoSourcePathError(msg)
 
         # for move
@@ -417,7 +419,8 @@ class AtomicDictOperations:
                AtomicDictOperations.__empty_node_key)
 
         if source_key not in source:
-            msg = f'did not find {source_key} in {source.keys()} {self.path}'
+            log.critical(f'{source_path}')
+            msg = f'did not find {source_key!r} in {tuple(source.keys())}'
             raise exc.NoSourcePathError(msg)
 
         yield source
@@ -490,22 +493,23 @@ class _DictTransformer:
             adops.move(data, source_path, target_path)
 
     @staticmethod
-    def derive(data, derives):
+    def derive(data, derives, source_key_optional=True):
         """ derives is a list with the following structure
-            [[[source-path, ...], derive-function, [target-path, ...], source-key-optional], ...]
+            [[[source-path, ...], derive-function, [target-path, ...]], ...]
 
         """
         # TODO this is an implementaiton of copy that has semantics for handling lists
-        for source_path, function, target_paths, source_key_optional in derives:
+        for source_path, function, target_paths in derives:
             source_prefixes = source_path[:-1]
             source_key = source_path[-1]
             source = data
             failed = False
             for i, node_key in enumerate(source_prefixes):
+                log.debug(lj(source))
                 if node_key in source:
                     source = source[node_key]
                 else:
-                    msg = f'did not find {node_key} in {source.keys()} {self.path}'
+                    msg = f'did not find {node_key} in {source.keys()}'
                     if not i:
                         log.error(msg)
                         failed = True
@@ -514,9 +518,10 @@ class _DictTransformer:
                 if isinstance(source, list) or isinstance(source, tuple):
                     new_source_path = source_prefixes[i + 1:] + [source_key]
                     new_target_paths = [tp[i + 1:] for tp in target_paths]
-                    new_derives = [(new_source_path, function, new_target_paths, source_key_optional)]
+                    new_derives = [(new_source_path, function, new_target_paths)]
                     for sub_source in source:
-                        derive(sub_source, new_derives)
+                        _DictTransformer.derive(sub_source, new_derives,
+                                                source_key_optional=source_key_optional)
 
                     return  # no more to do here
 
@@ -524,7 +529,7 @@ class _DictTransformer:
                 continue  # sometimes things are missing we continue to others
 
             if source_key not in source:
-                msg = f'did not find {source_key} in {source.keys()} {self.path}'
+                msg = f'did not find {source_key} in {source.keys()}'
                 if source_key_optional:
                     return log.info(msg)
                 else:
@@ -548,7 +553,7 @@ class _DictTransformer:
             #data.pop(temp)
 
     @staticmethod
-    def lift(data, lifts):
+    def lift(data, lifts, source_key_optional=True):
         """ 
         lifts are lists with the following structure
         [[path, function], ...]
@@ -571,9 +576,17 @@ class _DictTransformer:
         """
 
         for path, function in lifts:
-            old_value = adops.get(data, path)
-            new_value = function(value)
-            adops.add(data, path, value)
+            try:
+                old_value = adops.get(data, path)
+            except exc.NoSourcePathError as e:
+                if source_key_optional:
+                    msg = str(e)
+                    logd.error(msg)
+                    continue
+                else:
+                    raise e
+            new_value = function(old_value)
+            adops.add(data, path, new_value, fail_on_exists=False)
 
         return
         # TODO lifts, copies, etc can all go in a single structure

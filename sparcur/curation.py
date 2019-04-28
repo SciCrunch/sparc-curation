@@ -832,21 +832,6 @@ class CurationStatusLax(CurationStatusStrict):
 
 class MetaMaker:
     """ FIXME this is a bad pattern :/ """
-    schema_class = MetaOutSchema
-    organ_to_award = OrganData().normalized
-    award_to_organ = {}
-    for k, vs in organ_to_award.items():
-        for v in vs:
-            award_to_organ[v] = k
-
-    def __new__(cls, fthing):
-        cls.schema = cls.schema_class()
-        return super().__new__(cls)
-
-    def __init__(self, datasetdata):
-        self.f = datasetdata
-        self.j = JT(datasetdata.data_lifted)  # oh look here are our phases
-
     @staticmethod
     def _generic(gen):
         l = list(gen)
@@ -855,76 +840,17 @@ class MetaMaker:
         else:
             return l
 
-    @property
-    def award_number(self):
-        return self._generic(self.f.award)
-      
-    @property
-    def principal_investigator(self):
-        return self._generic(self.f.PI)
-
-    @property
-    def species(self):
-        return self._generic(self.f.species)
-
-    @property
-    def organ(self):
-        org = self._generic(self.f.organ)
-        if org:
-            return org
-        else:
-            ans = self.award_number
-            for an in self.f.award:
-                if an not in self.award_to_organ:
-                    log.critical(f'Award number {an} not in known set!')
-                    #breakpoint()
-                    return
-
-                return self.award_to_organ[an]
-
-    @property
-    def modality(self):
-        return self._generic(self.f.modality)
-
-    @property
-    def contributor_count(self):
-        # FIXME slow reads from disk every time ...
-        t = self._generic(self.f.dataset_description)
-        if isinstance(t, list):  # FIXME ick
-            return
-        elif t:
-            # FIXME this rereads so it could change
-            # after the original schema was validated ...
-            return len(t.data['contributors'])
-
-    @property
-    def subject_count(self):
-        t = self._generic(self.f.subjects)
-        if isinstance(t, list):  # FIXME ick
-            return
-        if t:
-            return len(t.data['subjects'])
-
-    @property
-    def sample_count(self):
-        pass
-
-    @property
-    def human_uri(self):
-        return self.f.path.cache.human_uri
-
-
 class DatasetData:
     """ a homogenous representation """
     schema_class = DatasetSchema
     schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
 
-    def __new__(cls, path, cypher=hashlib.sha256, metamaker=MetaMaker):
+    def __new__(cls, path, cypher=hashlib.sha256):
         cls.schema = cls.schema_class()
         cls.schema_out = cls.schema_out_class()
         return super().__new__(cls)
 
-    def __init__(self, path, cypher=hashlib.sha256, metamaker=MetaMaker):
+    def __init__(self, path, cypher=hashlib.sha256):
         self._errors = []
         if isinstance(path, str):
             path = Path(path)
@@ -934,7 +860,6 @@ class DatasetData:
         self.lax = CurationStatusLax(self)
 
         self.cypher = cypher
-        #self._pio_header = _pio_header  # FIXME ick
 
     @property
     def _meta(self):
@@ -994,7 +919,7 @@ class DatasetData:
         if self == self.anchor:
             return None
 
-        log.debug(f'{self} {self.anchor}')
+        #log.debug(f'{self} {self.anchor}')
         if self.path.parent.cache:
             pp = self.__class__(self.path.parent)
             if pp.id is not None:
@@ -1125,26 +1050,7 @@ class DatasetData:
             pass
 
     @property
-    def award(self):
-        for award in self._award_raw:
-            yield nml.NormAward(nml.NormAward(award))
-
-    @property
-    def _award_raw(self):
-        for s in self.submission:
-            dict_ = s.data
-            if 'sparc_award_number' in dict_:
-                yield dict_['sparc_award_number']
-            #if 'SPARC Award number' in dict_:
-                #yield dict_['SPARC Award number']
-
-        for d in self.dataset_description:
-            dict_ = d.data
-            if 'funding' in dict_:
-                yield dict_['funding']
-
-    @property
-    def PI(self):
+    def __PI(self):
         mp = 'contributor_role'
         os = ('PrincipalInvestigator',)
         p = 'contributors'
@@ -1166,7 +1072,7 @@ class DatasetData:
                                             yield s
 
     @property
-    def species(self):
+    def __species(self):
         """ generate this value from the underlying data """
         if not hasattr(self, '_species'):
             out = set()
@@ -1183,7 +1089,7 @@ class DatasetData:
         return self._species
 
     @property
-    def organ(self):
+    def __organ(self):
         # yield 'Unknown'
         return
         organs = ('Lung',
@@ -1516,21 +1422,42 @@ class DatasetData:
     def data_lifted(self):
         """ doing this pipelines this way for now :/ """
 
-        lifts = [[[key], lambda path: next(getattr(self, key))]
-                    for key in ['submission', 'dataset_description', 'subjects']]
+        def key_binder(key):
+            def lift_function(_, key=key):
+                # throw 'em in a list and let the schema sort 'em out!
+                dwe = [section.data_with_errors
+                       for section in getattr(self, key)]
+                if len(dwe) == 1:
+                    dwe, = dwe  # the only correct form, all other should error in validation
+
+                return dwe
+
+            return lift_function
+
+        lifts = [[[key], func]
+                 for key in ['submission', 'dataset_description', 'subjects']
+                 for func in (key_binder(key),) if func]
 
 
         data = self.data_with_errors  # FIXME without errors how?
-        return DictTransformer.lift(data, lifts)
+        DictTransformer.lift(data, lifts)
+        return data
 
     @property
     def data_derived_pre(self):
+        # FIXME do we really need this ??
+        # which copy steps actually depend on it??
+        # in this case it is just easier to get some values
+        # before moving everything around, provides
+        # a way to operate on either side of an impenance mismatch
+        # so if something changes, you just added another layer
         derives = ([['subjects', 'sparc_award_number'],
-                    lambda award: nml.NormAward(nml.NormAward(award)),
-                    [['meta', 'award_number']],
-                    True],)
+                    Derives.award_number,
+                    [['meta', 'award_number']]],
+        )
         data = self.data_lifted
-        self._derive(data, derives)
+        DictTransformer.derive(data, derives)
+        return data
 
     @property
     def data_copied(self):
@@ -1539,44 +1466,66 @@ class DatasetData:
         # meta copies
         copies += tuple([['dataset_description', source], ['meta', target]]
                         for source, target in
-                        [[[direct, direct] for direct in
+                        [[direct, direct] for direct in
                           ['principal_investigator',
                            'species',
                            'organ',
                            'modality',
                            'protocol_url_or_doi',
-                          ]]])
+                          ]] + [])
 
         data = self.data_derived_pre
-        return copy(data, copies)
+        DictTransformer.copy(data, copies)
+        return data
 
     @property
     def data_moved(self):
         moves = ([['dataset_description',], ['inputs', 'dataset_description']],
                  [['subjects', 'software'], ['resources']],  # FIXME update vs replace
-                 [['subjects', 'subjects'], ['subjects']],
+                 [['subjects'], ['subjects_file']],  # first step in ending the confusion
+                 [['subjects_file', 'subjects'], ['subjects']],
                  [['submission',], ['inputs', 'submission']],)
         # contributor derives
         data = self.data_copied
-        self._move(data, moves)
+        DictTransformer.move(data, moves)
+        return data
 
     @property
     def data_derived_post(self):
         derives = ([['contributors', 'name'],
                     Derives.contributor_name,
                     [['contributors', 'first_name'],
-                     ['contributors', 'last_name']],
-                    True],)
+                     ['contributors', 'last_name']]],
+                   [['contributors'],
+                    Derives.principal_investigator,
+                    [['meta', 'principal_investigator']]],
+                   [['contributors'],
+                    len,  # LOL
+                    ['meta', 'contributor_count']],
+                   [['subjects'],
+                    Derives.dataset_species,
+                    ['meta', 'species']],
+                   [['subjects'],
+                    len,
+                    ['meta', 'subject_count']],
+                   )
+        todo = [[['samples'],
+                 len,
+                 ['meta', 'sample_count']]]
+
         data = self.data_moved
-        self._derive(data, derives)
+        DictTransformer.derive(data, derives)
+        return data
 
     @property
     def data_added(self):
+        # FIXME this would seem to be where the Integration class comes in?
+        # the schemas make it a bit of a dance
+        adds = [[['id'], self.id],
+                [['meta', 'human_uri'], self.path.cache.human_uri]]
         data = self.data_derived_post
-        adds = [[['id'], self.id]]
-        data['id'] = self.id
+        DictTransformer.add(data, adds)
         return data
-
 
     @property
     def data_out(self):
@@ -1584,32 +1533,7 @@ class DatasetData:
             and rearranges anything that needs to be moved about """
 
         data = self.data_added
-        self.add_meta(data)
-
         return data
-
-    def add_meta(self, data):
-        # lifted or computed
-        # FIXME use copy/move for this
-        want_fields = MetaOutSchema.extra_required
-        meta_extra = {name:getattr(self.metamaker, name)
-                      for name in want_fields}
-        t = self.metamaker._generic(self.dataset_description)
-        if t and not isinstance(t, list):
-            d = t.data
-            d.pop('contributors', None)  # FIXME FIXME FIXME
-            _meta = {**d, **meta_extra}
-            meta = {k:v for k, v in _meta.items() if v}
-            # this is validated later in DataOutSchema ...
-            #ok, valid, meta = self.metamaker.schema.validate(meta)
-            #if not ok:
-                #meta['errors'] = valid.json()
-
-            data['meta'] = {k:v for k, v in meta.items() if v}
-        else:
-            if 'errors' not in data:
-                data['errors'] = []
-            data['errors'] += [{'message': 'Too many dataset_descriptions!'}]
 
     @property
     def data_with_errors(self):
@@ -1934,7 +1858,55 @@ class DatasetData:
         return graph.serialize(format='nifttl')
 
 
-class Summary(DatasetData):
+class LThing:
+    def __init__(self, lst):
+        self._lst = lst
+
+
+class FTLax(DatasetData):
+    def _abstracted_paths(self, name_prefix, glob_type='rglob'):
+        yield from super()._abstracted_paths(name_prefix, glob_type)
+
+
+class Integrator(DatasetData, OntologyData, ProtocolData, OrganData):
+    """ pull everything together anchored to the DatasetData """
+    # note that mro means that we have to run methods backwards
+    # so any class that uses something produced by a function
+    # of an earlier class needs to be further down the mro so
+    # that the producer masks its NotImplementedErrors
+
+    @classmethod
+    def setup(cls):
+        """ make sure we have all datasources """
+        for _cls in cls.mro():
+            if _cls != cls:
+                if hasattr(_cls, 'setup'):
+                    _cls.setup()
+
+    @property
+    def keywords(self):
+        keywords = super().keywords
+
+
+    @property
+    def data_derived_post(self):
+        derives = [[['meta', 'award_number'],
+                    self.organ,
+                    ['meta', 'organ']]]
+        data = super().data_derived_post
+        DictTransformer.derive(data, derives)
+        return data
+        
+    @property
+    def data_added(self):
+        adds = []
+        todo = [[['meta', 'modality'], 'TODO should come from sheets maybe?']]
+        data = super().data_added
+        DictTransformer.add(data, adds)
+        return data
+
+
+class Summary(Integrator):
     """ A class that summarizes members of its __base__ class """
     #schema_class = MetaOutSchema  # FIXME clearly incorrect
     schema_class = SummarySchema
@@ -2163,35 +2135,6 @@ class Summary(DatasetData):
                 ('resources', resources),
                 ('errors', errors))
 
-
-class LThing:
-    def __init__(self, lst):
-        self._lst = lst
-
-
-class FTLax(DatasetData):
-    def _abstracted_paths(self, name_prefix, glob_type='rglob'):
-        yield from super()._abstracted_paths(name_prefix, glob_type)
-
-
-class Integrator(DatasetData, OntologyData, ProtocolData):
-    """ pull everything together anchored to the DatasetData """
-    # note that mro means that we have to run methods backwards
-    # so any class that uses something produced by a function
-    # of an earlier class needs to be further down the mro so
-    # that the producer masks its NotImplementedErrors
-
-    @classmethod
-    def setup(cls):
-        """ make sure we have all datasources """
-        for _cls in cls.mro():
-            if _cls != cls:
-                if hasattr(_cls, 'setup'):
-                    _cls.setup()
-
-    @property
-    def keywords(self):
-        keywords = super().keywords
 
 
 def express_or_return(thing):
