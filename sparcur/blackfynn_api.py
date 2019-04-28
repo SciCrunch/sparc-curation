@@ -54,7 +54,6 @@ from pyontutils.config import devconfig
 from sparcur import exceptions as exc
 from sparcur.core import log, lj
 from sparcur.paths import Path
-from sparcur.config import local_storage_prefix
 from sparcur.metastore import MetaStore
 from scipy.io import loadmat
 
@@ -694,9 +693,6 @@ class BFLocal:
         """ There is not bf id for this file. """
 
     def __init__(self, project_id, anchor=None):
-        #if not isinstance(local_storage_prefix, Path):
-            #local_storage_prefix = Path(local_storage_prefix)
-
         # no changing local storage prefix in the middle of things
         # if you want to do that create a new class
 
@@ -888,8 +884,10 @@ def mvp():
     """ In order to be performant for large numbers of packages we have
         to get all the packages first and then async retrieve all the files
     """
+    local_storage_prefix = Path('~/files/blackfynn_local/').expanduser()
     bf = Blackfynn(api_token=devconfig.secrets('blackfynn-mvp-key'),
                     api_secret=devconfig.secrets('blackfynn-mvp-secret'))
+
 
     ds = bf.datasets()
     useful = {d.id:d for d in ds}  # don't worry, I've made this mistake too
@@ -932,14 +930,3 @@ def mvp_main():
     bf, files = mvp()
     process_files(bf, files)
 
-
-def main():
-    from IPython import embed
-    bfl = BFLocal()
-    #bfl.cons()
-    #bfl.fetch_errors()
-    ff = list(bfl.fake_files)
-    embed()
-
-if __name__ == '__main__':
-    main()

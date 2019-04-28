@@ -613,7 +613,7 @@ class CachePath(AugmentedPath):
             self._meta_setter(meta)
         else:
             if self.meta is None:
-                raise exc.NoCachedMetadataError
+                raise exc.NoCachedMetadataError(self.local)
 
         return
         # FIXME not really the init for CachePath ... more BlackfynnCache
@@ -1627,6 +1627,17 @@ class LocalPath(XattrPath):
             raise OSError
 
         return StatResult(out)
+
+    @property
+    def size(self):
+        """ don't use this to populate meta, but meta computes a checksum 
+            so if you need anything less than the checksum don't get meta """
+        try:
+            st = self.stat()
+        except OSError as e:
+            st = self._stat()
+
+        return st.st_size
 
     @property
     def meta(self):

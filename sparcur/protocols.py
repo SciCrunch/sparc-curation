@@ -64,17 +64,7 @@ class ProtocolData:
     @property
     def protocol_jsons(self):
         for uri in self.protocol_uris_resolved:
-            if uri not in protocol_jsons:  # FIXME yay global variables
-                j = self._get_protocol_json(uri)
-                if j:
-                    protocol_jsons[uri] = j
-                else:
-                    protocol_jsons[uri] = {}  # TODO try again later
-
-                yield j
-
-            else:
-                yield protocol_jsons[uri]
+            yield self._get_protocol_json(uri)
 
     @memory.cache  # note that you can only get the json back from this function (across sessions)
     def _get_protocol_json(self, uri):

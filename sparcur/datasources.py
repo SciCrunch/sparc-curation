@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 # ontology files
 
 class OntologyData:
+
     def _mis_graph(self):
         """ for now easier to just get a fresh one, they are small """
         olr = Path(devconfig.git_local_base) / 'duplicates' / 'sparc-NIF-Ontology'
@@ -27,7 +28,8 @@ class OntologyData:
          for t in self.triples()]
         closure = rdfc.OWLRL_Semantics
         rdfc.DeductiveClosure(closure).expand(expanded_graph)
-        with open('/tmp/serialized-')
+        with open('/tmp/reasoned-curation-export.ttl', 'wb') as f:
+            f.write(expanded_graph.serialize(format='nifttl'))
 
 
 # google sheets

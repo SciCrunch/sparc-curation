@@ -34,7 +34,7 @@ from sparcur import schemas as sc
 from sparcur import converters as conv
 from sparcur import normalization as nml
 from sparcur.datasources import OrganData, OntologyData
-from sparcur.protocls import ProtocolData
+from sparcur.protocols import ProtocolData
 from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetSchema, SubmissionSchema,
                              DatasetDescriptionSchema, SubjectsSchema,
@@ -1172,7 +1172,7 @@ class DatasetData:
                         if 'species' in subject:
                             out.add(subject['species'])
 
-            self.species = tuple(out)
+            self._species = tuple(out)
 
         return self._species
 
@@ -1201,6 +1201,7 @@ class DatasetData:
     @property
     def modality(self):
         return
+        yield
 
     @property
     def keywords(self):
@@ -2281,6 +2282,7 @@ class FTLax(DatasetData):
 
 
 class Integrator(ProtocolData, OntologyData, DatasetData):
+    """ pull everything together anchored to the DatasetData """
     @classmethod
     def setup(cls):
         """ make sure we have all datasources """

@@ -13,9 +13,8 @@ Usage:
     spc xattrs
     spc export [ttl json]
     spc demos
-    spc shell [<path>...]
+    spc shell [integration]
     spc feedback <feedback-file> <feedback>...
-    spc find [options] <file>...
     spc find [options] --name=<PAT>...
     spc meta [--uri] [<path>...]
 
@@ -32,7 +31,7 @@ Commands:
     export    export extracted data
     demos     long running example queries
     shell     drop into an ipython shell
-    find      list and fetch unfetched files
+    find      list unfetched files with option to fetch
     meta      display the metadata the current folder or list of folders
 
 Options:
@@ -72,10 +71,10 @@ from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, python_identifier
+from sparcur.core import JT, log, python_identifier, FileSize
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import DatasetData, FTLax, Summary
+from sparcur.curation import DatasetData, FTLax, Summary, Integrator
 from sparcur.curation import JEncode, get_all_errors
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
@@ -152,22 +151,41 @@ class Main(Dispatcher):
         self._setup()  # if this isn't run up here the internal state of the program get's wonky
 
     def _setup(self):
-        args = self.args
-        if args['--project-path']:
-            path_string = args['--project-path']
+        # set our local class TODO probably ok to do this by default
+        # but needs testing to make sure there aren't things that only
+        # work correctly because they encounter _local_class = None ...
+        BlackfynnCache._local_class = Path
+
+        if self.options.project_path:
+            path_string = self.options.project_path
         path_string = '.'
 
         # we have to start from the cache class so that
         # we can configure
-        path = BlackfynnCache(path_string).resolve()  # avoid infinite recursion from '.'
+        local = Path(path_string).resolve()
         try:
+            path = local.cache  # FIXME project vs subfolder
+            self.anchor = path.anchor
+        except exc.NoCachedMetadataError as e:
+            root = local.find_cache_root()
+            if root is not None:
+                self.anchor = root.anchor
+                raise NotImplementedError('TODO recover meta?')
+            else:
+                print(f'{local} is not in a project!')
+                sys.exit(111)
+
+        self.project_path = self.anchor.local
+
+        """
+        try:
+            path = BlackfynnCache(path_string).resolve()  # avoid infinite recursion from '.'
             self.anchor = path.anchor
         except exc.NotInProjectError as e:
             print(e.message)
             sys.exit(1)
-
+        """
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        self.project_path = self.anchor.local
         DatasetData.anchor = DatasetData(self.project_path)
 
         # the way this works now the project should always exist
@@ -324,9 +342,9 @@ class Main(Dispatcher):
             key = lambda ps: ps
 
         rows = [['Path', 'size', '?'],
-                *((p, s.hr if s else s, 'x' if p.exists() else '')
+                *((p, s.hr if isinstance(s, FileSize) else s, 'x' if p.exists() else '')
                   for p, s in
-                  sorted(([p, ('' if p.is_dir() else
+                  sorted(([p, ('/' if p.is_dir() else
                                (p.cache.meta.size if p.cache.meta.size else '??'))]
                           for p in paths), key=key))]
         self._print_table(rows)
@@ -567,6 +585,7 @@ class Main(Dispatcher):
     def shell(self):
         """ drop into an shell with classes loaded """
         shell = Shell(self)
+        shell()
 
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """
@@ -580,17 +599,8 @@ class Main(Dispatcher):
     def find(self):
         args = self.args
         paths = []
-        if args['<file>']:
-            files = args['<file>']
-            for file in files:
-                path = Path(file).resolve()
-                if path.is_dir():
-                    paths.extend(path.rglob('*.fake.*'))
-                else:
-                    paths.append(path)
-
-        elif args['--name']:
-            patterns = args['--name']
+        if self.options.name: #args['--name']:
+            patterns = self.options.name #args['--name']
             path = Path('.').resolve()
             for pattern in patterns:
                 # TODO filesize mismatches on non-fake
@@ -602,18 +612,22 @@ class Main(Dispatcher):
                     paths.append(file)
 
         if paths:
+            paths = [p for p in paths if not p.is_dir()]
             if self.options.limit:
+                old_paths = paths
                 paths = [p for p in paths
                          if p.cache.meta.size is None or  # if we have no known size don't limit it
                          not p.exists() and p.cache.meta.size.mb < self.options.limit
-                         or p.exists() and p.meta.size != p.cache.meta.size and
+                         or p.exists() and p.size != p.cache.meta.size and
                          (not log.info(f'Truncated transfer detected for {p}\n'
-                                       f'{p.meta.size} != {p.cache.meta.size}'))
+                                       f'{p.size} != {p.cache.meta.size}'))
                          and p.cache.meta.size.mb < self.options.limit]
+
+                n_skipped = len(set(p for p in old_paths if p.is_broken_symlink()) - set(paths))
 
             if self.options.pretend:
                 self._print_paths(paths)
-                print('rate =', self.options.rate)
+                print(f'skipped = {n_skipped:<10}rate = {self.options.rate}')
                 return
 
             if self.options.verbose:
@@ -627,6 +641,7 @@ class Main(Dispatcher):
                 Async(rate=hz)(deferred(path.cache.fetch)() for path in paths)
             else:
                 self._print_paths(paths)
+                print(f'skipped = {n_skipped:<10}rate = {self.options.rate}')
 
     def _print_table(self, rows, title=None):
         if self.options.tab_table:
@@ -736,10 +751,11 @@ class Main(Dispatcher):
 
 class Shell(Dispatcher):
     # property ports
+    paths = Main.paths
     _paths = Main._paths
     datasets = Main.datasets
     datasets_local = Main.datasets_local
-    port_attrs = 'anchor', 'project_path', 'bfl'
+    port_attrs = 'anchor', 'project_path', 'bfl', 'summary'
 
     def default(self):
         datasets = list(self.datasets)
@@ -758,14 +774,17 @@ class Shell(Dispatcher):
 
     def integration(self):
         from sparcur.datasources import Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
+        p, *rest = self._paths
+        i = Integrator(p)
         embed()
+
 
 def main():
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
-    dispatch = Dispatch(args)
-    dispatch()
+    main = Main(args)
+    main()
 
 
 if __name__ == '__main__':

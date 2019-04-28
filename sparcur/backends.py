@@ -9,7 +9,6 @@ from sparcur import exceptions as exc
 from sparcur.core import log
 from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, BlackfynnCache
 from sparcur.paths import StatResult
-from sparcur.config import local_storage_prefix
 
 from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File

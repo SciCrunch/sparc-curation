@@ -8,29 +8,7 @@ from datetime import datetime
 from dateutil import parser
 from terminaltables import AsciiTable
 from sparcur import exceptions as exc
-from sparcur.core import log
-
-
-class FileSize(int):
-    @property
-    def mb(self):
-        return self / 1024 ** 2
-
-    @property
-    def hr(self):
-        """ human readable file size """
-
-        def sizeof_fmt(num, suffix=''):
-            for unit in ['','K','M','G','T','P','E','Z']:
-                if abs(num) < 1024.0:
-                    return "%0.0f%s%s" % (num, unit, suffix)
-                num /= 1024.0
-            return "%.1f%s%s" % (num, 'Yi', suffix)
-
-        if self is not None and self >= 0:
-            return sizeof_fmt(self)
-        else:
-            return '??'  # sigh
+from sparcur.core import log, FileSize
 
 
 class PathMeta:
