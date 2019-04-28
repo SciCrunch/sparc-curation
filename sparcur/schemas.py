@@ -164,6 +164,18 @@ class ContributorsSchema(JSONSchema):
             }
 
 
+class CreatorSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorSchema.schema)
+    schema['properties'].pop('contributor_role')
+    schema['properties'].pop('is_contact_person')
+
+
+class CreatorsSchema(JSONSchema):
+    schema = {'type': 'array',
+              'minItems': 1,
+              'items': CreatorSchema.schema}
+
+
 class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -297,39 +309,6 @@ class MetaOutSchema(JSONSchema):
         'sample_count': {'type': 'integer'},
         'contributor_count': {'type': 'integer'},})
 
-    mis_mapping = []
-    _schema = {'type': 'object',
-              'required': [
-                  'award_number',
-                  'principal_investigator'
-                  'species',
-                  'organ',
-                  'contributor_count',
-                  'subject_count',
-                  'sample_count',
-              ],
-              'properties': {
-                  'award_number': {'type': 'string',
-                                   'pattern': '^OT|^U18',},
-                  'name': {'type': 'string'},
-                  'description': {'type': 'string'},
-                  'keywords': {'type': 'array',
-                               'minItems': 1,
-                               'items': {'type': 'string'}},
-                  'acknowledgements': {'type': 'string'},
-                  'originating_articles': {'type': 'array',
-                                           'items': {'type': 'string'}},
-                  'principal_investigator': {'type': 'string'},
-                  'species': {'type': 'string'},
-                  'organ': {'type': 'string'},
-
-                  # TODO $ref these w/ pointer?
-                  # in contributor etc?
-
-                  'subject_count': {'type': 'int'},
-                  'sample_count': {'type': 'int'},
-                  'contributor_count': {'type': 'int'},},}
-
 
 class DatasetOutSchema(JSONSchema):
     """ Schema that adds the id field since investigators shouldn't need to know
@@ -348,6 +327,7 @@ class DatasetOutSchema(JSONSchema):
                                                               'minimum': 0,
                                                               'maximum': 1,},
                             'contributors': ContributorsSchema.schema,
+                            'creators': CreatorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer
                             'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
                             'resources': {'type':'array',

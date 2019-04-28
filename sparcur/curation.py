@@ -1494,7 +1494,10 @@ class DatasetData:
 
     @property
     def data_derived_post(self):
-        derives = ([['contributors', 'name'],
+        derives = ([['contributors'],
+                    Derives.creators
+                    [['creators']]],
+                   [['contributors', 'name'],
                     Derives.contributor_name,
                     [['contributors', 'first_name'],
                      ['contributors', 'last_name']]],
@@ -1528,6 +1531,8 @@ class DatasetData:
         data = self.data_derived_post
         DictTransformer.add(data, adds)
         return data
+
+    def data_deleted(self)
 
     @property
     def data_out(self):

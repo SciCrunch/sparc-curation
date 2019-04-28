@@ -1,9 +1,32 @@
+from functools import wraps
 from sparcur import normalization as nml
+from typing import Tuple
+
+
+def collect(*oops, upacked=False):
+    def decorator(generator_function):
+        @wraps(generator_function)
+        def inner(*args, **kwargs):
+            out = tuple(generator_function())
+            if unpacked:
+                return out
+            else:
+                return out,
+
+        return inner
+
+    if oops:
+        generator_function, = oops
+        return decorator(generator_function)
+    else:
+        return decorator
 
 
 class Derives:
+    """ all derives must return as a tuple, even if they are length 1 """
+
     @staticmethod
-    def contributor_name(name):
+    def contributor_name(name) -> Tuple[str, str]: 
         if ',' in name:
             last, first = name.split(', ', 1)
         elif ' ' in name:
@@ -15,9 +38,19 @@ class Derives:
         return first, last
 
     @staticmethod
-    def award_number(raw_award_number):
-        nml.NormAward(nml.NormAward(raw_award_number)),
+    @collect
+    def creators(contributors):
+        for c in contributors:
+            if 'contributor_role' in c and 'Creator' in c['contributor_role']:
+                # FIXME diry diry mutation here that should happen in a documente way
+                cont = copy.deepcopy(c)
+                cont.pop('contributor_role', None)
 
+    @staticmethod
+    def award_number(raw_award_number) -> Tuple[str]:
+        return nml.NormAward(nml.NormAward(raw_award_number)),
+
+    def _old_an():
         # old ... # but these do show that we need multi-source derives
         @property
         def award(self):
@@ -39,6 +72,7 @@ class Derives:
                     yield dict_['funding']
 
     @staticmethod
+    @collect
     def principal_investigator(contributors):
         mp = 'contributor_role'
         os = ('PrincipalInvestigator',)
@@ -56,13 +90,15 @@ class Derives:
                             #print(contributor)
                             for s, p, o in self.triples_contributors(contributor):
                                 if p == a and o == owl.NamedIndividual:
+                                    pis.appned(s)
                                     yield s
 
+
     @staticmethod
-    def dataset_species(subjects):
+    def dataset_species(subjects) -> Tuple[tuple]:
         out = set()
         for subject in subjects:
             if 'species' in subject:
                 out.add(subject['species'])
 
-        return tuple(out)
+        return tuple(out),

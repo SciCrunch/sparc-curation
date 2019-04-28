@@ -215,7 +215,7 @@ def JT(blob):
                 return prop
 
     def _repr(self, b=blob):  # because why not
-        return 'JT(\n' + repr(b) + '\n)'
+        return 'JT(\n' + lj(b) + '\n)'
 
     def query(self, *path):
         """ returns None at first failure """
@@ -399,6 +399,12 @@ class AtomicDictOperations:
         return source[source_key]
 
     @classmethod
+    def pop(cls, data, source_path):
+        """ allows us to document removals """
+        source_key, node_key, source = cls._get_source(data, source_path)
+        return source.pop(source_key)
+
+    @classmethod
     def copy(cls, data, source_path, target_path):
         cls._copy_or_move(data, source_path, target_path)
 
@@ -481,6 +487,34 @@ class _DictTransformer:
             adops.add(data, target_path, value)
 
     @staticmethod
+    def get(data, gets):
+        """ gets is a list with the following structure
+            [source-path ...] """
+
+        for source_path in adds:
+            yield adops.get(data, source_path)
+
+    @staticmethod
+    def pop(data, pops):
+        """ pops is a list with the following structure
+            [source-path ...] """
+
+        for source_path in adds:
+            yield adops.pop(data, source_path)
+
+    @staticmethod
+    def delete(data, deletes):
+        """ delets is a list with the following structure
+            [source-path ...]
+            THIS IS SILENT YOU SHOULD USE pop instead!
+            The tradeoff is that if you forget to express
+            the pop generator it will also be silent until
+            until schema catches it """
+
+        for source_path in adds:
+            adops.pop(data, source_path)
+
+    @staticmethod
     def copy(data, copies):  # put this first to clarify functionality
         """ copies is a list wth the following structure
             [[source-path, target-path] ...]
@@ -500,7 +534,7 @@ class _DictTransformer:
             adops.move(data, source_path, target_path)
 
     @staticmethod
-    def derive(data, derives, source_key_optional=True):
+    def derive(data, derives, source_key_optional=True, allow_empty=False):
         """ derives is a list with the following structure
             [[[source-path, ...], derive-function, [target-path, ...]], ...]
 
@@ -546,11 +580,16 @@ class _DictTransformer:
 
             new_values = function(source_value)
             if len(new_values) != len(target_paths):
-                raise TypeError('wrong number of values returned for {function}\n'
-                                'was {len(new_values)} expect {len(targets)}')
+                log.debug(f'{source_paths} {target_paths}')
+                raise TypeError(f'wrong number of values returned for {function}\n'
+                                f'was {len(new_values)} expect {len(target_paths)}')
             #temp = b'__temporary'
             #data[temp] = {}  # bytes ensure no collisions
             for target_path, value in zip(target_paths, new_values):
+                if (not allow_empty and
+                    (value is None or
+                     hasattr(value, '__iter__') and not len(value))):
+                    raise ValueError(f'value to add to {target_path} may not be empty!')
                 adops.add(data, target_path, value, fail_on_exists=True)
                 #heh = str(target_path)
                 #data[temp][heh] = value

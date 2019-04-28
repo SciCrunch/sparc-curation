@@ -824,7 +824,7 @@ class Shell(Dispatcher):
         p, *rest = self._paths
         intr = Integrator(p)
         pj = list(intr.protocol_jsons)
-        apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
+        #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         embed()
 
 
@@ -833,6 +833,9 @@ def main():
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
     main = Main(args, defaults)
+    if main.options.debug:
+        print(main.options)
+
     main()
 
 
