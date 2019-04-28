@@ -1453,7 +1453,7 @@ class DatasetData:
         # before moving everything around, provides
         # a way to operate on either side of an impenance mismatch
         # so if something changes, you just added another layer
-        derives = ([['subjects', 'sparc_award_number'],
+        derives = ([['submission', 'sparc_award_number'],  # FIXME need a way to warn more loudly on things like that ...
                     Derives.award_number,
                     [['meta', 'award_number']]],
         )
