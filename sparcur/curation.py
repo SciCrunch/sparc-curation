@@ -26,7 +26,8 @@ from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
 from sparcur import exceptions as exc
-from sparcur.core import JT, JEncode, OrcidId, log, lj, sparc, memory, DictTransformer
+from sparcur.core import JT, JEncode, OrcidId, log, logd, lj
+from sparcur.core import sparc, memory, DictTransformer
 from sparcur.paths import Path
 from sparcur import schemas as sc
 from sparcur import converters as conv
@@ -1422,21 +1423,22 @@ class DatasetData:
     def data_lifted(self):
         """ doing this pipelines this way for now :/ """
 
-        def key_binder(key):
-            def lift_function(_, key=key):
+        def section_binder(section):
+            def lift_function(_, section=section):
                 # throw 'em in a list and let the schema sort 'em out!
                 dwe = [section.data_with_errors
-                       for section in getattr(self, key)]
-                if len(dwe) == 1:
-                    dwe, = dwe  # the only correct form, all other should error in validation
-
-                return dwe
+                       for section in getattr(self, section)]
+                if dwe:
+                    dwe, *oops = dwe
+                    if oops:
+                        logd.error(f'{self.path} hass too may {section} files!')
+                    return dwe
 
             return lift_function
 
-        lifts = [[[key], func]
-                 for key in ['submission', 'dataset_description', 'subjects']
-                 for func in (key_binder(key),) if func]
+        lifts = [[[section], func]
+                 for section in ['submission', 'dataset_description', 'subjects']
+                 for func in (key_binder(section),) if func]
 
 
         data = self.data_with_errors  # FIXME without errors how?
