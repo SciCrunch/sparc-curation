@@ -3,11 +3,11 @@ from sparcur import normalization as nml
 from typing import Tuple
 
 
-def collect(*oops, upacked=False):
+def collect(*oops, unpacked=False):
     def decorator(generator_function):
         @wraps(generator_function)
         def inner(*args, **kwargs):
-            out = tuple(generator_function())
+            out = tuple(generator_function(*args, **kwargs))
             if unpacked:
                 return out
             else:
@@ -43,11 +43,13 @@ class Derives:
         for c in contributors:
             if 'contributor_role' in c and 'Creator' in c['contributor_role']:
                 # FIXME diry diry mutation here that should happen in a documente way
-                cont = copy.deepcopy(c)
+                cont = {**c}  # instead of importing copy since this is a one deep
                 cont.pop('contributor_role', None)
+                cont.pop('is_contact_person', None)
+                yield cont
 
     @staticmethod
-    def award_number(raw_award_number) -> Tuple[str]:
+    def award_number(raw_award_number, funding) -> Tuple[str]:
         return nml.NormAward(nml.NormAward(raw_award_number)),
 
     def _old_an():

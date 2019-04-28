@@ -384,6 +384,17 @@ class AtomicDictOperations:
     class __empty_node_key: pass
 
     @staticmethod
+    def apply_source_optional(function, *args, source_key_optional=False):
+        try:
+            return function(*args)
+        except exc.NoSourcePathError as e:
+            if not source_key_optional:
+                raise e
+            else:
+                logd.error(e)
+
+
+    @staticmethod
     def add(data, target_path, value, fail_on_exists=True):
         # type errors can occur here ...
         # e.g. you try to go to a string
@@ -449,23 +460,20 @@ class AtomicDictOperations:
                AtomicDictOperations.__empty_node_key)
 
         if source_key not in source:
-            #log.debug(f'{source_path}')
-            msg = f'did not find {source_key!r} in {tuple(source.keys())}'
-            raise exc.NoSourcePathError(msg)
+            try:
+                msg = f'did not find {source_key!r} in {tuple(source.keys())}'
+                raise exc.NoSourcePathError(msg)
+            except AttributeError as e:
+                raise TypeError(f'value at {source_path} has wrong type!{lj(source)}') from e
+                #log.debug(f'{source_path}')
 
         yield source
 
     @classmethod
     def _copy_or_move(cls, data, source_path, target_path, move=False):
         """ if exists ... """
-        # FIXME there is a more elegant way to do this
-        try:
-            source_key, node_key, source = cls._get_source(data, source_path)
-        except exc.NoSourcePathError as e:
-            raise e
-            #log.warning(e)
-            #return
-
+        source_key, node_key, source = cls._get_source(data, source_path)
+        # do not catch errors here, deal with that in the callers that people use directly
         if move:
             _parent = source  # incase something goes wrong
             source = source.pop(source_key)
@@ -505,12 +513,13 @@ class _DictTransformer:
             adops.add(data, target_path, value)
 
     @staticmethod
-    def get(data, gets):
+    def get(data, gets, source_key_optional=False):
         """ gets is a list with the following structure
             [source-path ...] """
 
         for source_path in gets:
-            yield adops.get(data, source_path)
+            yield adops.apply_source_optional(adops.get, data, source_path,
+                                              source_key_optional=source_key_optional)
 
     @staticmethod
     def pop(data, pops):
@@ -533,7 +542,7 @@ class _DictTransformer:
             adops.pop(data, source_path)
 
     @staticmethod
-    def copy(data, copies):  # put this first to clarify functionality
+    def copy(data, copies, source_key_optional=False):  # put this first to clarify functionality
         """ copies is a list wth the following structure
             [[source-path, target-path] ...]
         """
@@ -541,18 +550,21 @@ class _DictTransformer:
             # don't need a base case for thing?
             # can't lift a dict outside of itself
             # in this context
-            adops.copy(data, source_path, target_path)
+            adops.apply_source_optional(adops.copy, data, source_path, target_path,
+                                        source_key_optional=source_key_optional)
 
     @staticmethod
-    def move(data, moves):
+    def move(data, moves, source_key_optional=False):
         """ moves is a list with the following structure
             [[source-path, target-path] ...]
         """
         for source_path, target_path in moves:
-            adops.move(data, source_path, target_path)
+            adops.apply_source_optional(adops.move, data, source_path, target_path,
+                                        source_key_optional=source_key_optional)
 
     @classmethod
-    def derive(cls, data, derives, source_key_optional=True, empty='CULL'):
+    def derive(cls, data, derives, source_key_optional=True, empty='CULL', cheaty_face=None):
+        # if you have source key option True and empty='OK' you will get loads of junk
         allow_empty = empty == 'OK' and not empty == 'CULL'
         error_empty = empty == 'ERROR'
         def empty(value):
@@ -566,10 +578,17 @@ class _DictTransformer:
         for source_paths, derive_function, target_paths in derives:
             # FIXME zipeq may cause adds to modify in place in error?
             # except that this is really a type checking thing on the function
+            def defer(*get_args):
+                """ if we fail to get args then we can't gurantee that
+                    derive_function will work at all so we wrap the lot """
+                args = cls.get(*get_args)
+                return derive_function(*args)
+                
             cls.add(data,
                     ((tp, v) for tp, v in
                      zipeq(target_paths,
-                           derive_function(*cls.get(data, source_paths)))
+                           adops.apply_source_optional(defer, data, source_paths,
+                                                       source_key_optional=source_key_optional))
                      if not empty(v)))
 
     @staticmethod

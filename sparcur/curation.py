@@ -1440,7 +1440,6 @@ class DatasetData:
                  for section in ['submission', 'dataset_description', 'subjects']
                  for func in (section_binder(section),) if func]
 
-
         data = self.data_with_errors  # FIXME without errors how?
         DictTransformer.lift(data, lifts)
         return data
@@ -1453,12 +1452,20 @@ class DatasetData:
         # before moving everything around, provides
         # a way to operate on either side of an impenance mismatch
         # so if something changes, you just added another layer
-        derives = ([['submission', 'sparc_award_number'],  # FIXME need a way to warn more loudly on things like that ...
+        derives = [[[['submission', 'submission', 'sparc_award_number'],
+                     ['dataset_description', 'funding']],
                     Derives.award_number,
                     [['meta', 'award_number']]],
-        )
+
+                   [[['dataset_description', 'contributors']],
+                    lambda cs: [DT.derive(c, [[['name'],
+                                               De.contributor_name,
+                                               [['first_name'], ['last_name']]]])
+                                for c in cs],
+                    []],
+        ]
         data = self.data_lifted
-        DictTransformer.derive(data, derives)
+        DictTransformer.derive(data, derives, source_key_optional=True)
         return data
 
     @property
@@ -1477,7 +1484,7 @@ class DatasetData:
                           ]] + [])
 
         data = self.data_derived_pre
-        DictTransformer.copy(data, copies)
+        DictTransformer.copy(data, copies, source_key_optional=True)
         return data
 
     @property
@@ -1489,37 +1496,62 @@ class DatasetData:
                  [['submission',], ['inputs', 'submission']],)
         # contributor derives
         data = self.data_copied
-        DictTransformer.move(data, moves)
+        DictTransformer.move(data, moves, source_key_optional=True)
+        return data
+
+    @property
+    def data_lifted_post(self):
+        # essentially stateful injection of new data
+        # In theory we could include ALL the prior data
+        # in one big blob at the start and then never use lifts
+        lifts = []
+        data = self.data_moved
+        DictTransformer.lift(data, lifts, source_key_optional=True)
         return data
 
     @property
     def data_derived_post(self):
-        derives = ([['contributors'],
-                    Derives.creators
+        DT = DictTransformer
+        De = Derives
+        derives = ([[['contributors']],
+                    Derives.creators,
                     [['creators']]],
-                   [['contributors', 'name'],
-                    Derives.contributor_name,
-                    [['contributors', 'first_name'],
-                     ['contributors', 'last_name']]],
-                   [['contributors'],
-                    Derives.principal_investigator,
-                    [['meta', 'principal_investigator']]],
-                   [['contributors'],
-                    len,  # LOL
+
+                   [[['contributors']],
+                    len,
                     ['meta', 'contributor_count']],
-                   [['subjects'],
+
+                   [[['subjects']],
                     Derives.dataset_species,
                     ['meta', 'species']],
-                   [['subjects'],
+
+                   [[['subjects']],
                     len,
                     ['meta', 'subject_count']],
-                   )
-        todo = [[['samples'],
-                 len,
-                 ['meta', 'sample_count']]]
 
-        data = self.data_moved
+                   [[['contributors']],
+                    Derives.principal_investigator,
+                    [['meta', 'principal_investigator']]],
+
+                   )
+
+        todo = [[[['samples']],
+                 len,
+                 [['meta', 'sample_count']]] ,
+        ]
+
+        data = self.data_lifted_post
         DictTransformer.derive(data, derives)
+        return data
+
+    @property
+    def data_cleaned(self):
+        """ clean up any cruft left over from transformations """
+        pops = [['subjects_file'],
+        ]
+        data = self.data_derived_post
+        removed = list(DictTransformer.pop(data, pops))
+        log.debug(f'cleaned the following values from {self}' + lj(removed))
         return data
 
     @property
@@ -1528,11 +1560,9 @@ class DatasetData:
         # the schemas make it a bit of a dance
         adds = [[['id'], self.id],
                 [['meta', 'human_uri'], self.path.cache.human_uri]]
-        data = self.data_derived_post
+        data = self.data_cleaned
         DictTransformer.add(data, adds)
         return data
-
-    def data_deleted(self)
 
     @property
     def data_out(self):
@@ -1540,10 +1570,6 @@ class DatasetData:
             and rearranges anything that needs to be moved about """
 
         data = self.data_added
-
-        # cleanup junk  TODO
-        if 'subjects_file' in data:
-            data.pop('subjects_file')
 
         return data
 
