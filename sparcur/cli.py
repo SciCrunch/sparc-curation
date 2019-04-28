@@ -81,12 +81,51 @@ from IPython import embed
 
 
 class Options:
-    def __init__(self, args):
-        self.args = args
-        for arg, value in self.args.items():
+    # there is only ever one of these because of how docopt works
+    def __new__(cls, args, defaults):
+        cls.args = args
+        cls.defaults = defaults
+        for arg, value in cls.args.items():
             ident = python_identifier(arg.strip('-'))
-            if not hasattr(self, ident):  # complex logic in properties
-                setattr(self, ident, value)
+
+            @property
+            def options_property(self, value=value):
+                f""" {arg} {value} """
+                return value
+
+            if hasattr(cls, ident):  # complex logic in properties
+                ident = '_default_' + ident
+
+            setattr(cls, ident, options_property)
+
+        return super().__new__(cls)
+
+    @property
+    def commands(self):
+        for k, v in self.args.items():
+            if v and not any(k.startswith(c) for c in ('-', '<')):
+                yield k
+
+    def __repr__(self):
+        def key(kv, counter=[0]):
+            k, v = kv
+            counter[0] += 1
+            return (not bool(v),
+                    k.startswith('-'),
+                    k.startswith('<'),
+                    counter[0] if not any(k.startswith(c) for c in ('-', '<')) else 0,
+                    k)
+
+        rows = [[k, '' if v is None or v is False
+                 else ('x' if v is True
+                       else ('_' if isinstance(v, list) else v))]
+                for k, v in sorted([(k, v) for k, v in self.args.items()
+                                    if v or k.startswith('-')
+                ], key=key)
+        ]
+        atable = AsciiTable([['arg', '']] + rows, title='spc args')
+        atable.justify_columns[1] = 'center'
+        return atable.table
 
     @property
     def limit(self):
@@ -105,35 +144,35 @@ class Options:
 class Dispatcher:
     spcignore = ('.git',
                  '.~lock',)
-    port_attrs = tuple()
+    port_attrs = tuple()  # request from above
+    child_port_attrs = tuple()  # force on below
     parent = None
-    def __init__(self, args, port_attrs=tuple()):
+    def __init__(self, args, defaults=None, port_attrs=tuple()):
         if isinstance(args, Dispatcher):
             parent = args
-            self.args = parent.args
             self.parent = parent
             self.options = parent.options
             if not port_attrs:
                 port_attrs = self.port_attrs
-            for attr in port_attrs:
-                setattr(self, attr, getattr(parent, attr))
+
+            all_attrs = set(parent.child_port_attrs) | set(port_attrs)
+            for attr in all_attrs:
+                setattr(self, attr, getattr(parent, attr))  # fail if any are missing
 
         else:
-            self.args = args
-            self.options = Options(args)
+            self.options = Options(args, defaults)
 
     def __call__(self):
         # FIXME this might fail to run annos -> shell correctly
         first = self.parent is not None
-        for k, v in self.args.items():
-            if v and not any(k.startswith(c) for c in ('-', '<')):
-                if first and v:
-                    first = False
-                    # FIXME this only works for 1 level
-                    continue  # skip the parent argument which we know will be true
+        for command in self.options.commands:
+            if first:
+                first = False
+                # FIXME this only works for 1 level
+                continue  # skip the parent argument which we know will be true
 
-                getattr(self, k)()
-                return
+            getattr(self, command)()
+            return
 
         else:
             self.default()
@@ -141,11 +180,35 @@ class Dispatcher:
     def default(self):
         raise NotImplementedError('docopt I can\'t believe you\'ve done this')
 
+    def _print_table(self, rows, title=None):
+        if self.options.tab_table:
+            if title:
+                print(title)
+            print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
+        else:
+            print(AsciiTable(rows, title=title).table)
+
+    def _print_paths(self, paths):
+        if self.options.sort_size_desc:
+            key = lambda ps: -ps[-1]
+        else:
+            key = lambda ps: ps
+
+        rows = [['Path', 'size', '?'],
+                *((p, s.hr if isinstance(s, FileSize) else s, 'x' if p.exists() else '')
+                  for p, s in
+                  sorted(([p, ('/' if p.is_dir() else
+                               (p.cache.meta.size if p.cache.meta.size else '??'))]
+                          for p in paths), key=key))]
+        self._print_table(rows)
+
 
 class Main(Dispatcher):
-    def __init__(self, args):
-        super().__init__(args)
-        if self.args['clone'] or self.args['meta']:
+    child_port_attrs = 'anchor', 'project_path', 'bfl', 'summary'  # things all children should have
+    # kind of like a non optional provides you WILL have these in your namespace
+    def __init__(self, args, defaults):
+        super().__init__(args, defaults)
+        if self.options.clone or self.options.meta:
             # short circuit since we don't know where we are yet
             return
 
@@ -336,20 +399,6 @@ class Main(Dispatcher):
             #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
         )
     ###
-
-    def _print_paths(self, paths):
-        if self.options.sort_size_desc:
-            key = lambda ps: -ps[-1]
-        else:
-            key = lambda ps: ps
-
-        rows = [['Path', 'size', '?'],
-                *((p, s.hr if isinstance(s, FileSize) else s, 'x' if p.exists() else '')
-                  for p, s in
-                  sorted(([p, ('/' if p.is_dir() else
-                               (p.cache.meta.size if p.cache.meta.size else '??'))]
-                          for p in paths), key=key))]
-        self._print_table(rows)
 
     def refresh(self):
         from pyontutils.utils import Async, deferred
@@ -584,11 +633,6 @@ class Main(Dispatcher):
 
         return self.shell()
 
-    def shell(self):
-        """ drop into an shell with classes loaded """
-        shell = Shell(self)
-        shell()
-
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """
         # TODO per dataset
@@ -645,71 +689,6 @@ class Main(Dispatcher):
                 self._print_paths(paths)
                 print(f'skipped = {n_skipped:<10}rate = {self.options.rate}')
 
-    def _print_table(self, rows, title=None):
-        if self.options.tab_table:
-            if title:
-                print(title)
-            print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
-        else:
-            print(AsciiTable(rows, title=title).table)
-
-    def report(self):
-        if self.options.sort_count_desc:
-            key = lambda kv: -kv[-1]
-        else:
-            key = lambda kv: kv
-
-        if self.options.filetypes:
-            #root = DatasetData(self.project_path)
-            #fts = [DatasetData(p) for p in self.project_path.rglob('*') if p.is_file()]
-
-            paths = self.paths if self.paths else (Path('.').resolve(),)
-            paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
-
-            def count(thing):
-                return sorted([(k if k else '', v) for k, v in
-                               Counter([getattr(f, thing)
-                                        for f in paths]).items()], key=key)
-            each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
-
-            for title, rows in each.items():
-                self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
-                
-            all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
-                                 Counter([(f.suffix, f.mimetype, f._magic_mimetype)
-                                          for f in paths]).items()], key=key)
-
-            header = ['suffix', 'mimetype', 'magic mimetype', 'count']
-            self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
-
-        elif self.options.subjects:
-            subjects_headers = tuple(h for ft in self.summary
-                                     for sf in ft.subjects
-                                     for h in sf.bc.header)
-            counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
-                                               key=key))
-
-            rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-            self._print_table(rows, title='Subjects Report')
-
-        elif self.options.completeness:
-            rows = [('', 'EI', 'DSCI', 'name', 'id', 'award')]
-            rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0,
-                      *rest,
-                      an if an else '') for i, (ei, index, *rest, an) in
-                     enumerate(sorted(self.summary.completeness,
-                                      key=lambda t:(t[0], -t[1], *t[2:], t[-1])))]
-            self._print_table(rows, title='Completeness Report')
-
-        elif self.options.keywords:
-            _rows = [sorted(set(dataset.keywords), key=lambda v: -len(v))
-                     for dataset in self.summary]
-            rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
-            self._print_table(rows, title='Keywords Report')
-
-        if self.options.debug:
-            embed()
-
     def feedback(self):
         args = self.args
         file = args['<feedback-file>']
@@ -750,6 +729,73 @@ class Main(Dispatcher):
 
         log.setLevel(old_level)
 
+    ### sub dispatchers
+
+    def report(self):
+        report = Report(self)
+        report()
+
+    def shell(self):
+        """ drop into an shell with classes loaded """
+        shell = Shell(self)
+        shell()
+
+
+class Report(Dispatcher):
+
+    @property
+    def _sort_key(self):
+        return (lambda kv: -kv[-1]
+                if self.options.sort_count_desc else
+                lambda kv: kv)
+
+    def filetypes(self):
+        key = self._sort_key
+        paths = self.paths if self.paths else (Path('.').resolve(),)
+        paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
+
+        def count(thing):
+            return sorted([(k if k else '', v) for k, v in
+                            Counter([getattr(f, thing)
+                                    for f in paths]).items()], key=key)
+        each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
+
+        for title, rows in each.items():
+            self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
+
+        all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
+                                Counter([(f.suffix, f.mimetype, f._magic_mimetype)
+                                        for f in paths]).items()], key=key)
+
+        header = ['suffix', 'mimetype', 'magic mimetype', 'count']
+        self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
+
+    def subjects(self):
+        key = self._sort_key
+        subjects_headers = tuple(h for ft in self.summary
+                                    for sf in ft.subjects
+                                    for h in sf.bc.header)
+        counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
+                                            key=key))
+
+        rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
+        self._print_table(rows, title='Subjects Report')
+
+    def completeness(self):
+        rows = [('', 'EI', 'DSCI', 'name', 'id', 'award')]
+        rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0,
+                    *rest,
+                    an if an else '') for i, (ei, index, *rest, an) in
+                    enumerate(sorted(self.summary.completeness,
+                                    key=lambda t:(t[0], -t[1], *t[2:], t[-1])))]
+        self._print_table(rows, title='Completeness Report')
+
+    def keywords(self):
+        _rows = [sorted(set(dataset.keywords), key=lambda v: -len(v))
+                    for dataset in self.summary]
+        rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
+        self._print_table(rows, title='Keywords Report')
+
 
 class Shell(Dispatcher):
     # property ports
@@ -757,7 +803,6 @@ class Shell(Dispatcher):
     _paths = Main._paths
     datasets = Main.datasets
     datasets_local = Main.datasets_local
-    port_attrs = 'anchor', 'project_path', 'bfl', 'summary'
 
     def default(self):
         datasets = list(self.datasets)
@@ -787,7 +832,7 @@ def main():
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
-    main = Main(args)
+    main = Main(args, defaults)
     main()
 
 
