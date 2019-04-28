@@ -225,6 +225,11 @@ def JT(blob):
 
         return j
 
+    # additional thought required for how to integrate these into this
+    # shameling abomination
+    #adopts
+    #dt = DictTransformer
+
     #cd = {k:v for k, v in _populate(blob, True)}
 
     # populate the top level
@@ -419,7 +424,7 @@ class AtomicDictOperations:
                AtomicDictOperations.__empty_node_key)
 
         if source_key not in source:
-            log.critical(f'{source_path}')
+            #log.debug(f'{source_path}')
             msg = f'did not find {source_key!r} in {tuple(source.keys())}'
             raise exc.NoSourcePathError(msg)
 
@@ -531,7 +536,7 @@ class _DictTransformer:
             if source_key not in source:
                 msg = f'did not find {source_key} in {source.keys()}'
                 if source_key_optional:
-                    return log.info(msg)
+                    return logd.info(msg)
                 else:
                     raise exc.NoSourcePathError(msg)
 

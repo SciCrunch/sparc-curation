@@ -1112,11 +1112,6 @@ class DatasetData:
                 yield kw
 
     @property
-    def modality(self):
-        return
-        yield
-
-    @property
     def keywords(self):
         for dd in self.dataset_description:
             # FIXME this pattern leads to continually recomputing values
@@ -1126,10 +1121,15 @@ class DatasetData:
             if 'keywords' in data:  # already logged error ...
                 yield from data['keywords']
 
-    def __out_keywords(self):
+    @property
+    def keywords(self):
         dowe = self.data_out_with_errors
         accessor = JT(dowe)
-        return accessor.query('meta', 'keywords')
+        keywords = accessor.query('meta', 'keywords')
+        if keywords is None:
+            return
+
+        yield from keywords
 
     @property
     def protocol_uris(self):
@@ -1438,7 +1438,7 @@ class DatasetData:
 
         lifts = [[[section], func]
                  for section in ['submission', 'dataset_description', 'subjects']
-                 for func in (key_binder(section),) if func]
+                 for func in (section_binder(section),) if func]
 
 
         data = self.data_with_errors  # FIXME without errors how?
@@ -1535,6 +1535,11 @@ class DatasetData:
             and rearranges anything that needs to be moved about """
 
         data = self.data_added
+
+        # cleanup junk  TODO
+        if 'subjects_file' in data:
+            data.pop('subjects_file')
+
         return data
 
     @property
@@ -1888,7 +1893,9 @@ class Integrator(DatasetData, OntologyData, ProtocolData, OrganData):
     @property
     def keywords(self):
         keywords = super().keywords
-
+        # TODO sheets integration
+        for keyword in keywords:
+            yield keyword
 
     @property
     def data_derived_post(self):
