@@ -72,6 +72,17 @@ class Examples:
         yield {'hello': 'world'}, {'hello','world'}, (['another'],)
 
     @property
+    def delete(self):
+        yield {}, {'hello','world'}, (['hello'],)
+        yield ({'hello': {'there': {'keep': 'MEEE'}}},
+               {'hello': {'there': {'general': 'world', 'keep': 'MEEE'}}},
+               (['hello', 'there', 'general'],))
+
+    @property
+    def delete_error(self):
+        yield {'hello': 'world'}, {'hello','world'}, (['hello', 'world'],)
+
+    @property
     def copy(self):
         yield {'another':'world', 'hello': 'world'}, {'hello': 'world'}, (['hello'], ['another'])
 
@@ -93,9 +104,21 @@ class Examples:
 
 
 class ExamplesDT:
+
+    @property
+    def derive(self):
+        yield ({'a': 2, 'b': 3, 'c': 5, 'd': 6, 'e': 1},
+               {'a': 2, 'b': 3}, [[[['a'], ['b']],
+                                   lambda a, b: (a + b, a * b),
+                                   [['c'], ['d']]],
+                                  # look you can chain them!
+                                  [[['c'], ['d']],
+                                   lambda c, d: (d - c,),
+                                   [['e']]]])
+
     @property
     def lift(self):
-        yield {'hello':'there'}, {'hello', 'world'}, (['hello'], lambda v: 'there')
+        yield {'hello':'there'}, {'hello': 'world'}, [[['hello'], lambda v: 'there']]
 
 
 def failed_to_error(function, data, args):
@@ -107,9 +130,8 @@ def failed_to_error(function, data, args):
         return False
 
 
-class TestAdops(Examples, unittest.TestCase):
-    functions = 'add', 'copy', 'move'
-    to_test = adops
+class Populator:
+    apply = True
     @classmethod
     def populate(cls):
         for name in cls.functions:
@@ -121,7 +143,7 @@ class TestAdops(Examples, unittest.TestCase):
             def fun(self, name=name, function=function_to_test):
                 bads = [(expect, data, args)
                         for expect, data, args in getattr(self, name)
-                        if not function(data, *args) and data != expect]
+                        if not function(data, *(args if cls.apply else (args,))) and data != expect]
                 assert not bads, bads
 
             setattr(cls, test_name, fun)
@@ -131,7 +153,7 @@ class TestAdops(Examples, unittest.TestCase):
                 def efun(self, name=name_error, function=function_to_test):
                     bads = [(expect, data, args)
                             for expect, data, args in getattr(self, name)
-                            if failed_to_error(function, data, args)]
+                            if failed_to_error(function, data, (args if cls.apply else (args,)))]
                     assert not bads, bads
 
                 setattr(cls, test_name_error, efun)
@@ -141,14 +163,20 @@ class TestAdops(Examples, unittest.TestCase):
                 def nfun(self, name=name_negative, function=function_to_test):
                     bads = [(expect, data, args)
                             for expect, data, args in getattr(self, name)
-                            if not function(data, *args) and data == expect]
+                            if not function(data, *(args if cls.apply else (args,))) and data == expect]
                     assert not bads, bads
 
                 setattr(cls, test_name_negative, nfun)
 
 
+class TestAdops(Examples, Populator, unittest.TestCase):
+    functions = 'add', 'copy', 'move'
+    to_test = adops
 TestAdops.populate()
 
 
-class TestDictTransformer(Examples, unittest.TestCase):
-    pass
+class TestDictTransformer(ExamplesDT, Populator, unittest.TestCase):
+    functions = 'lift', 'derive'
+    to_test = DictTransformer
+    apply = False
+TestDictTransformer.populate()

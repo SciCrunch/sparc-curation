@@ -14,6 +14,7 @@ from pyontutils.utils import makeSimpleLogger
 from sparcur import exceptions as exc
 from sparcur.config import config
 from functools import wraps
+import itertools
 
 log = makeSimpleLogger('sparcur')
 logd = makeSimpleLogger('sparcur-data')
@@ -82,6 +83,16 @@ def python_identifier(string):
         ident = 'n_' + ident
 
     return ident
+
+def zipeq(*iterables):
+    """ zip or fail if lengths do not match """
+
+    sentinel = object()
+    for zipped in itertools.zip_longest(*iterables, fillvalue=sentinel):
+        if sentinel in zipped:
+            raise TypeError('Lengths do not match!')
+
+        yield zipped
 
 
 class OrcidPrefixes(oq.OntCuries):
@@ -395,6 +406,12 @@ class AtomicDictOperations:
 
     @classmethod
     def get(cls, data, source_path):
+        """ get stops at lists because the number of possible issues explodes
+            and we don't hand those here, if you encounter that, use this
+            primitive to get the list, then use it again on the members in
+            the function making the call where you have the information needed
+            to figure out how to handle the error """
+
         source_key, node_key, source = cls._get_source(data, source_path)
         return source[source_key]
 
@@ -410,7 +427,7 @@ class AtomicDictOperations:
 
     @classmethod
     def move(cls, data, source_path, target_path):
-        cls._copy_or_move(data, source_path, target_path, True)
+        cls._copy_or_move(data, source_path, target_path, move=True)
 
     @staticmethod
     def _get_source(data, source_path):
@@ -445,8 +462,9 @@ class AtomicDictOperations:
         try:
             source_key, node_key, source = cls._get_source(data, source_path)
         except exc.NoSourcePathError as e:
-            log.warning(e)
-            return
+            raise e
+            #log.warning(e)
+            #return
 
         if move:
             _parent = source  # incase something goes wrong
@@ -491,7 +509,7 @@ class _DictTransformer:
         """ gets is a list with the following structure
             [source-path ...] """
 
-        for source_path in adds:
+        for source_path in gets:
             yield adops.get(data, source_path)
 
     @staticmethod
@@ -499,7 +517,7 @@ class _DictTransformer:
         """ pops is a list with the following structure
             [source-path ...] """
 
-        for source_path in adds:
+        for source_path in pops:
             yield adops.pop(data, source_path)
 
     @staticmethod
@@ -511,7 +529,7 @@ class _DictTransformer:
             the pop generator it will also be silent until
             until schema catches it """
 
-        for source_path in adds:
+        for source_path in deletes:
             adops.pop(data, source_path)
 
     @staticmethod
@@ -533,8 +551,30 @@ class _DictTransformer:
         for source_path, target_path in moves:
             adops.move(data, source_path, target_path)
 
+    @classmethod
+    def derive(cls, data, derives, source_key_optional=True, empty='CULL'):
+        allow_empty = empty == 'OK' and not empty == 'CULL'
+        error_empty = empty == 'ERROR'
+        def empty(value):
+            empty = (value is None or
+                     hasattr(value, '__iter__')
+                     and not len(value))
+            if empty and error_empty:
+                raise ValueError(f'value to add may not be empty!')
+            return empty or allow_empty and not empty
+
+        for source_paths, derive_function, target_paths in derives:
+            # FIXME zipeq may cause adds to modify in place in error?
+            # except that this is really a type checking thing on the function
+            cls.add(data,
+                    ((tp, v) for tp, v in
+                     zipeq(target_paths,
+                           derive_function(*cls.get(data, source_paths)))
+                     if not empty(v)))
+
     @staticmethod
-    def derive(data, derives, source_key_optional=True, allow_empty=False):
+    def _derive(data, derives, source_key_optional=True, allow_empty=False):
+        # OLD
         """ derives is a list with the following structure
             [[[source-path, ...], derive-function, [target-path, ...]], ...]
 
@@ -608,17 +648,6 @@ class _DictTransformer:
         overwrites the underlying data (e.g. a filepath
         would be replaced by the contents of the file)
 
-        old version:
-        given a source object and a list of property names
-            get the values at those property names and add them
-            to the dict at those same names, this is essentially
-            a deferred add ... really it should be a function
-            that takes the value at the path and uses that information
-            to transform that value into its replacement which is
-            sort of what many of these classes actually do ...
-            just in a rather indirect way
-        this is half way between an add an a derive, it is a replace
-        with derived data, so ... yes, lift is a reasonable word
         """
 
         for path, function in lifts:
@@ -633,23 +662,5 @@ class _DictTransformer:
                     raise e
             new_value = function(old_value)
             adops.add(data, path, new_value, fail_on_exists=False)
-
-        return
-        # TODO lifts, copies, etc can all go in a single structure
-        # TODO proper mapping
-        for section_name in lifts:
-            try:
-                section = next(getattr(self, section_name))  # FIXME multiple when require 1
-                if section_name in data:
-                    # just skip stuff that doesn't exist
-                    data[section_name] = section.data_with_errors
-            except StopIteration:
-                #data[section_name] = {'errors':[{'message':'Nothing to see here?'}]}
-                # these errors were redundant with the missing key that
-                # the higher level schema will detect for us
-                continue
-
-        return data
-
 
 DictTransformer = _DictTransformer()
