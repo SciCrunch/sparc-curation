@@ -1,7 +1,9 @@
+import pprint
+from typing import Tuple
 from functools import wraps
 from sparcur import schemas as sc
 from sparcur import normalization as nml
-from typing import Tuple
+from sparcur.core import log, logd
 
 
 def collect(*oops, unpacked=False):
@@ -111,8 +113,17 @@ class Derives:
         return tuple(out),
 
     @staticmethod
-    def submission_completeness_index(schema, inputs):
-        schema = sc.DatasetOutSchema()
+    def submission_completeness_index(schema, subschemas, inputs):
+        log.debug(pprint.pformat(inputs))
+        def section_dsci(schema, section):
+            if 'errors' not in section:
+                return 1
+
+            total_possible_errors = schema.total_possible_errors
+            number_of_errors = len(section['errors'])
+            return (total_possible_errors - number_of_errors) / total_possible_errors
+
+        #schema = sc.DatasetOutSchema()
         total_possible_errors = schema.total_possible_errors
         data = inputs
         if not data:
@@ -127,6 +138,7 @@ class Derives:
                     required_value = data[required_field]
                     if jtype['type'] == 'object':
                         if isinstance(required_value, dict):
-                            actual_errors -= required_value['submission_completeness_index']
+                            subschema = subshcemas[required_field]
+                            actual_errors -= section_dsci(required_value)
 
             return (total_possible_errors - actual_errors) / total_possible_errors

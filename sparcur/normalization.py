@@ -49,8 +49,15 @@ class NormAward(NormSimple):
         if n[0] in ('1', '3', '5'):
             n = n[1:]
 
+        if n.endswith('S2'):
+            n = n[:-2]
+
+        if n.endswith('D23864'):  # FIXME another trailing zero
+            log.critical(_ovalue)
+            n = n.replace('D23864', 'D023864')
+
         if n != _ovalue:
-            log.critical(f'\n{_ovalue}\n{n}')
+            log.info(f'\n{_ovalue}\n{n}')
         return n
 
 

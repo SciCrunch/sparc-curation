@@ -787,7 +787,7 @@ class Report(Dispatcher):
         self._print_table(rows, title='Subjects Report')
 
     def completeness(self):
-        rows = [('', 'EI', 'DSCI', 'name', 'id', 'award')]
+        rows = [('', 'EI', 'DSCI', 'name', 'id', 'award', 'organ')]
         rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0,
                     *rest,
                     an if an else '') for i, (ei, index, *rest, an) in
@@ -829,6 +829,7 @@ class Shell(Dispatcher):
 
     def integration(self):
         from sparcur.datasources import Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
+        from sparcur.datasources import Organs
         p, *rest = self._paths
         intr = Integrator(p)
         pj = list(intr.protocol_jsons)

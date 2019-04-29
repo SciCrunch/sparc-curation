@@ -1,6 +1,8 @@
 import json
+import itertools
 from collections import defaultdict
 from pyontutils.core import OntId
+from pyontutils.utils import byCol
 from pyontutils.sheets import Sheet
 from sparcur.core import log, logd
 from sparcur.paths import Path
@@ -77,6 +79,10 @@ class KeywordSets(FieldAlignment):
     sheet_name = 'Keyword sets'
 
 
+class Organs(FieldAlignment):
+    sheet_name = 'Organs'
+
+
 # other
 
 
@@ -84,6 +90,8 @@ class OrganData:
     """ retrieve SPARC investigator data """
 
     def organ(self, award_number):
+        if award_number in self.manual and award_number not in self.sourced:
+            log.warning(f'used manual organ mapping for {award_number}')
         try:
             return self.award_to_organ[award_number]
         except KeyError as e:
@@ -105,7 +113,19 @@ class OrganData:
                     'smallintestine': OntId('FMA:7200'),
                     'spleen': OntId('FMA:7196'),
                     'stomach': OntId('FMA:7148'),
+                    'vagus nerve': OntId('FMA:5731'),
                     #'uterus': OntId('')
+                    '': None,
+    }
+
+    manual = {
+        'OT2OD025307': organ_lookup['vagus nerve'],
+        'OT2OD023853': organ_lookup[''],
+        '': organ_lookup[''],
+        '': organ_lookup[''],
+        '': organ_lookup[''],
+        '': organ_lookup[''],
+        '': organ_lookup[''],
     }
     cache = Path('/tmp/sparc-award-by-organ.json')
     old_cache = Path('/tmp/award-mappings-old-to-new.json')
@@ -126,7 +146,13 @@ class OrganData:
             with open(self.old_cache, 'rt') as f:
                 self.former_to_current = json.load(f)
 
-        self.award_to_organ = {v:k for k, vs in self.normalized.items() for v in vs}
+        self._org = Organs()
+        values = self._org.values
+        bc = byCol(values)
+        manual  = {award:organ for award, organ in zip(bc.award, bc.organ)}
+
+        self.sourced = {v:k for k, vs in self.normalized.items() for v in vs}
+        self.award_to_organ = {**self.manual, **self.sourced}
 
     def overview(self):
         with open(self.path, 'rb') as f:

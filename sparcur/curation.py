@@ -1029,6 +1029,12 @@ class Pipeline:
             data = self.data_added
         except self.SkipPipelineError as e:
             data = e.data
+            data['id'] = self.lifters.id
+            data['meta'] = {}
+            data['meta']['uri_human'] = self.lifters.uri_human
+            data['meta']['uri_api'] = self.lifters.uri_api
+            data['error_index'] = 9999
+            data['submission_completeness_index'] = 0
             log.debug('pipeline skipped to end due to errors')
 
         return data
@@ -1038,16 +1044,21 @@ class Pipeline:
         # FIXME a bit of a hack
         data = self.data_out
 
-        ei = len(get_all_errors(data))
-        if 'inputs' in data:
-            schema = self.__class__.data_out.schema
-            sci = Derives.submission_completeness_index(schema, data['inputs'])
-        else:
-            ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
-            sci = 0
+        if 'error_index' not in data:
+            ei = len(get_all_errors(data))
+            if 'inputs' in data:
+                #schema = self.__class__.data_out.schema
+                schema = sc.DatasetSchema()
+                subschemas = {'dataset_description':sc.DatasetDescriptionSchema(),
+                            'submission':sc.SubmissionSchema(),
+                            'subjects':sc.SubjectsSchema(),}
+                sci = Derives.submission_completeness_index(schema, subschemas, data['inputs'])
+            else:
+                ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
+                sci = 0
 
-        data['error_index'] = ei
-        data['submission_completeness_index'] = sci
+            data['error_index'] = ei
+            data['submission_completeness_index'] = sci
 
         return data
 
@@ -1429,7 +1440,9 @@ class Summary(Integrator):
                    accessor.submission_completeness_index,
                    dataset.name,  # from filename (do we not have that in meta!?)
                    accessor.id if 'id' in dowe else None,
-                   accessor.query('meta', 'award_number'))
+                   accessor.query('meta', 'award_number'),
+                   accessor.query('meta', 'organ'),
+            )
 
     def make_json(self, gen):
         # FIXME this and the datasets is kind of confusing ...
