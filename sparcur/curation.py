@@ -38,6 +38,7 @@ from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
 import RDFClosure as rdfc
 
+
 DT = DictTransformer
 De = Derives
 a = rdf.type
@@ -875,7 +876,7 @@ class Pipeline:
                     []],
         ]
         data = self.data_lifted
-        DictTransformer.derive(data, derives, source_key_optional=True)
+        DictTransformer.derive(data, derives, source_key_optional=False)
         return data
 
     @property
@@ -914,7 +915,33 @@ class Pipeline:
         # essentially stateful injection of new data
         # In theory we could include ALL the prior data
         # in one big blob at the start and then never use lifts
-        lifts = []
+        def pi(contributor):
+            if 'contributor_orcid_id' in contributor:
+                return contributor['contributor_orcid_id']
+
+            # get member if we can find them
+            elif 'name' in contributor and 'first_name' in contributor:
+                fn = contributor['first_name']
+                ln = contributor['last_name']
+                if ' ' in fn:
+                    fn, mn = fn.split(' ', 1)
+
+                failover = f'{fn}-{ln}'
+                member = self.lifters.member(fn, ln)
+
+                if member is not None:
+                    userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
+
+                return userid
+
+            else:
+                member = None
+                failover = 'no-orcid-no-name'
+                log.warning(f'No name!' + lj(contributor))
+                return rdflib.URIRef(dsid + '/contributors/' + failover)
+
+            
+        lifts = [[['meta', 'principal_investigator'], pi],]
         data = self.data_moved
         DictTransformer.lift(data, lifts, source_key_optional=True)
         return data
@@ -938,10 +965,6 @@ class Pipeline:
                    [[['subjects']],
                     len,
                     ['meta', 'subject_count']],
-
-                   [[['contributors']],
-                    Derives.principal_investigator,
-                    [['meta', 'principal_investigator']]],
 
                    )
 
@@ -1129,7 +1152,7 @@ class TriplesExport:
             return
 
         # get member if we can find them
-        if 'name' in contributor:
+        if 'name' in contributor and 'first_name' in contributor:
             fn = contributor['first_name']
             ln = contributor['last_name']
             if ' ' in fn:
@@ -1147,7 +1170,7 @@ class TriplesExport:
             log.warning(f'No name!' + lj(contributor))
 
         if 'contributor_orcid_id' in contributor:
-            s = rdflib.URIRef(contributor['contributor_orcid_id' ])
+            s = rdflib.URIRef(contributor['contributor_orcid_id'])
             if member is not None:
                 yield s, TEMP.hasBlackfynnUserId, userid
         else:
@@ -1215,8 +1238,10 @@ class TriplesExport:
 
         yield from id_(self.id)
         for subjects in self.subjects:
-            for s_local, p, o in subjects.triples_local:
-                yield subject_id(s_local), p, o
+            for s, p, o in subjects.triples_gen(subject_id):
+                if type(s) == str:
+                    breakpoint()
+                yield s, p, o
 
         yield from self.ddt(data)
 

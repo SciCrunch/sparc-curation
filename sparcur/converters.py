@@ -86,6 +86,7 @@ MetaConverter.setup()  # box in so we don't forget
 
 
 class DatasetConverter(TripleConverter):
+    known_skipped = 'id', 'errors', 'inputs', 'subjects', 'meta'
     mapping = [
         ['error_index', TEMP.errorIndex],
         ['submission_completeness_index', TEMP.submissionCompletenessIndex],
@@ -94,6 +95,7 @@ DatasetConverter.setup()
 
 
 class SubjectConverter(TripleConverter):
+    known_skipped = 'subject_id',
     mapping = [
         ['age_cateogry', TEMP.hasAgeCategory],
         ['species', sparc.animalSubjectIsOfSpecies],

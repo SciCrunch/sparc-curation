@@ -611,8 +611,7 @@ class SubjectsFile(Version1Header):
                                        for nv in self.normalize(k, v) if nv})
                     for r in self.bc.rows)
 
-    @property
-    def triples_local(self):
+    def triples_gen(self, prefix_func):
         """ NOTE the subject is LOCAL """
         for i, subject in enumerate(self):
             converter = conv.SubjectConverter(subject)
@@ -621,11 +620,12 @@ class SubjectsFile(Version1Header):
             else:
                 s_local = f'local-{i + 1}'  # sigh
 
-            yield s_local, a, owl.NamedIndividual
-            yield s_local, a, sparc.Subject
+            s = prefix_func(s_local)
+            yield s, a, owl.NamedIndividual
+            yield s, a, sparc.Subject
             for field, value in subject.items():
                 convert = getattr(converter, field, None)
                 if convert is not None:
-                    yield (s_local, *convert(value))
-                else:
+                    yield (s, *convert(value))
+                elif field not in converter.known_skipped:
                     log.warning(f'Unhandled subject field: {field}')

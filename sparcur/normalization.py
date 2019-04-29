@@ -24,6 +24,7 @@ class NormAward(NormSimple):
     }
     @classmethod
     def normalize(cls, value):
+        _ovalue = value
         value = super().normalize(value, preserve_case=True)
         if 'OT2' in value and 'OD' not in value:
             # one is missing the OD >_<
@@ -48,6 +49,8 @@ class NormAward(NormSimple):
         if n[0] in ('1', '3', '5'):
             n = n[1:]
 
+        if n != _ovalue:
+            log.critical(f'\n{_ovalue}\n{n}')
         return n
 
 

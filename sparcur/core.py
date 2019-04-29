@@ -601,6 +601,12 @@ class _DictTransformer:
                 return tuple(zipeq(*zip_args))
 
             try:
+                if not target_paths:
+                    # allows nesting
+                    adops.apply(defer_get, data, source_paths,
+                                source_key_optional=source_key_optional)
+                    return
+
                 cls.add(data,
                         ((tp, v) for tp, v in
                          adops.apply(express_zip, target_paths,
