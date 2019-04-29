@@ -10,7 +10,11 @@ from sparcur.core import log, cache
 from sparcur.paths import Path
 from sparcur.config import config
 
-class ProtcurSource:
+class ProtcurData:
+
+    def __call__(self, protocol_uri):
+        protc_as_python = []  # TODO
+        return protc_as_python  # downstream will deal with it
 
     @staticmethod
     def populate_annos(group_name='sparc-curation'):
@@ -27,6 +31,12 @@ class ProtcurSource:
 
 
 class ProtocolData:
+    # this class is best used as a helper class not as a __call__ class
+
+    def protocol(self, uri):
+        return self._get_protocol_json(uri)
+
+    __call__ = protocol
 
     @classmethod
     def setup(cls, creds_file=None):
@@ -90,4 +100,3 @@ class ProtocolData:
             return j
         else:
             log.error(f"protocol no access {uri} '{self.dataset.id if self.dataset else self.id}'")
-

@@ -74,7 +74,7 @@ from sparcur import exceptions as exc
 from sparcur.core import JT, log, python_identifier, FileSize
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import DatasetData, FTLax, Summary, Integrator
+from sparcur.curation import PathData, FTLax, Summary, Integrator
 from sparcur.curation import JEncode, get_all_errors
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
@@ -250,7 +250,7 @@ class Main(Dispatcher):
             sys.exit(1)
         """
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        DatasetData.project_path = self.project_path
+        PathData.project_path = self.project_path
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
@@ -260,7 +260,7 @@ class Main(Dispatcher):
         list(self.datasets)
         BlackfynnRemote = BlackfynnCache._remote_class
         self.bfl = BlackfynnRemote.bfl
-        Integrator.setup()
+        Integrator.setup(self.bfl)
 
     @property
     def project_name(self):
@@ -432,7 +432,7 @@ class Main(Dispatcher):
         
     def export(self):
         """ export output of curation workflows to file """
-        #org_id = DatasetData(self.project_path).organization.id
+        #org_id = Integrator(self.project_path).organization.id
         cwd = Path.cwd()
         timestamp = datetime.now().isoformat().replace('.', ',')
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
@@ -441,7 +441,7 @@ class Main(Dispatcher):
                 print(f'{cwd.cache} is not at dataset level!')
                 sys.exit(123)
 
-            ft = DatasetData(cwd)
+            ft = Integrator(cwd)
             dump_path = cwd.cache.anchor.local.parent / 'export/datasets' / ft.id / timestamp
             latest_path = dump_path.parent / 'LATEST'
             if not dump_path.exists():
@@ -532,7 +532,7 @@ class Main(Dispatcher):
         all_hypotehsis_uris = set(a.uri for a in protc)
         if args['shell'] or self.options.debug:
             p, *rest = self._paths
-            f = DatasetData(p)
+            f = Integrator(p)
             all_annos = [list(protc.byIri(uri)) for uri in f.protocol_uris_resolved]
             embed()
 
@@ -694,7 +694,7 @@ class Main(Dispatcher):
         file = args['<feedback-file>']
         feedback = ' '.join(args['<feedback>'])
         path = Path(file).resolve()
-        eff = DatasetData(path)
+        eff = Integrator(path)
         # TODO pagenote and/or database
         print(eff, feedback)
 
@@ -810,10 +810,10 @@ class Shell(Dispatcher):
         dsd = {d.meta.id:d for d in datasets}
         ds = datasets
         summary = self.summary
-        org = DatasetData(self.project_path)
+        org = Integrator(self.project_path)
 
         p, *rest = self._paths
-        f = DatasetData(p)
+        f = Integrator(p)
         dowe = f.data_out_with_errors
         j = JT(dowe)
         triples = list(f.triples)

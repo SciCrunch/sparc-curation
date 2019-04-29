@@ -27,17 +27,18 @@ from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
 from sparcur import exceptions as exc
 from sparcur.core import JT, JEncode, OrcidId, log, logd, lj
-from sparcur.core import sparc, memory, DictTransformer
+from sparcur.core import sparc, memory, DictTransformer, adops
 from sparcur.paths import Path
 from sparcur import schemas as sc
 from sparcur import converters as conv
 from sparcur import normalization as nml
-from sparcur.datasources import OrganData, OntologyData
-from sparcur.protocols import ProtocolData
+from sparcur.datasources import OrganData, OntologyData, MembersData
+from sparcur.protocols import ProtocolData, ProtcurData
 from sparcur.schemas import (JSONSchema, ValidationError,
                              DatasetSchema, SubmissionSchema,
                              DatasetDescriptionSchema, SubjectsSchema,
                              SummarySchema, DatasetOutSchema, MetaOutSchema)
+from sparcur import schemas as sc
 from sparcur import validate as vldt
 from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
@@ -841,11 +842,7 @@ class MetaMaker:
         else:
             return l
 
-class DatasetData:
-    """ a homogenous representation """
-    schema_class = DatasetSchema
-    schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
-
+class PathData:
     def __new__(cls, path, cypher=hashlib.sha256):
         cls.schema = cls.schema_class()
         cls.schema_out = cls.schema_out_class()
@@ -868,52 +865,6 @@ class DatasetData:
         cache = self.path.cache
         if cache is not None:
             return self.path.cache.meta
-
-    def rglob(self, pattern):
-        # TODO
-        pass 
-
-    @property
-    def bids_root(self):
-        # FIXME this will find the first dataset description file at any depth!
-        # this is incorrect behavior!
-        """ Sometimes there is an intervening folder. """
-        if self.is_dataset:
-            def check_fordd(paths, level=0, stop=3):
-                if not paths:  # apparently the empty case recurses forever
-                    return
-
-                if len(paths) > 20:
-                    log.warning('Not globing in a folder with > 20 children!')
-                    return
-                dd_paths_all = []
-                children = []
-                for path in paths:
-                    dd_paths = list(path.glob('[Dd]ataset_description*.*'))
-                    if dd_paths:
-                        dd_paths_all.extend(dd_paths)
-                    elif not dd_paths_all:
-                        children.extend([p for p in path.children if p.is_dir()])
-
-                if dd_paths_all:
-                    return dd_paths_all
-                else:
-                    return check_fordd(children, level + 1)
-
-            dd_paths = check_fordd((self.path,))
-
-            if not dd_paths:
-                #log.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
-                return
-
-            elif len(dd_paths) > 1:
-                #log.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
-                pass
-
-            return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
-
-        elif self.parent:  # organization has no parent
-            return self.parent.bids_root
 
     @property
     def parent(self):
@@ -948,6 +899,16 @@ class DatasetData:
                 return self
 
             return self.__class__(self.project_path)
+
+    @property
+    def name(self):
+        return self.path.name
+
+
+class DatasetData(PathData):
+    """ a homogenous representation """
+    schema_class = DatasetSchema
+    schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
 
     @property
     def is_organization(self):
@@ -998,8 +959,46 @@ class DatasetData:
         return self._id
 
     @property
-    def name(self):
-        return self.path.name
+    def bids_root(self):
+        # FIXME this will find the first dataset description file at any depth!
+        # this is incorrect behavior!
+        """ Sometimes there is an intervening folder. """
+        if self.is_dataset:
+            def check_fordd(paths, level=0, stop=3):
+                if not paths:  # apparently the empty case recurses forever
+                    return
+
+                if len(paths) > 20:
+                    log.warning('Not globing in a folder with > 20 children!')
+                    return
+                dd_paths_all = []
+                children = []
+                for path in paths:
+                    dd_paths = list(path.glob('[Dd]ataset_description*.*'))
+                    if dd_paths:
+                        dd_paths_all.extend(dd_paths)
+                    elif not dd_paths_all:
+                        children.extend([p for p in path.children if p.is_dir()])
+
+                if dd_paths_all:
+                    return dd_paths_all
+                else:
+                    return check_fordd(children, level + 1)
+
+            dd_paths = check_fordd((self.path,))
+
+            if not dd_paths:
+                #log.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
+                return
+
+            elif len(dd_paths) > 1:
+                #log.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
+                pass
+
+            return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
+
+        elif self.parent:  # organization has no parent
+            return self.parent.bids_root
 
     @property
     def dataset_name_proper(self):
@@ -1051,77 +1050,6 @@ class DatasetData:
             pass
 
     @property
-    def __PI(self):
-        mp = 'contributor_role'
-        os = ('PrincipalInvestigator',)
-        p = 'contributors'
-        for dd in self.dataset_description:
-            dict_ = dd.data_with_errors
-            if p in dict_:
-                for contributor in dict_[p]:
-                    if mp in contributor:
-                        for role in contributor[mp]:
-                            normrole = nml.NormContributorRole(role)
-                            if 'name' in contributor:
-                                fn, ln = Derives.contributor_name(contributor['name'])
-                                contributor['first_name'] = fn
-                                contributor['last_name'] = ln
-                                if normrole in os:
-                                    #print(contributor)
-                                    for s, p, o in self.triples_contributors(contributor):
-                                        if p == a and o == owl.NamedIndividual:
-                                            yield s
-
-    @property
-    def __species(self):
-        """ generate this value from the underlying data """
-        if not hasattr(self, '_species'):
-            out = set()
-            for subject_file in self.subjects:
-                data = subject_file.data_with_errors
-                if 'subjects' in data:
-                    subjects = data['subjects']
-                    for subject in subjects:
-                        if 'species' in subject:
-                            out.add(subject['species'])
-
-            self._species = tuple(out)
-
-        return self._species
-
-    @property
-    def __organ(self):
-        # yield 'Unknown'
-        return
-        organs = ('Lung',
-                  'Heart',
-                  'Liver',
-                  'Pancreas',
-                  'Kidney',
-                  'Stomach',
-                  'Spleen',
-                  'Colon',
-                  'Large intestine',
-                  'Small intestine',
-                  'Urinary bladder',
-                  'Lower urinary tract',
-                  'Spinal cord',)
-        org_lower = (o.lower() for o in organs)
-        for kw in self.keywords:
-            if kw.lower() in organs:
-                yield kw
-
-    @property
-    def keywords(self):
-        for dd in self.dataset_description:
-            # FIXME this pattern leads to continually recomputing values
-            # we need to be deriving all of this from a checkpoint on the fully
-            # normalized and transformed data
-            data = dd.data_with_errors
-            if 'keywords' in data:  # already logged error ...
-                yield from data['keywords']
-
-    @property
     def keywords(self):
         dowe = self.data_out_with_errors
         accessor = JT(dowe)
@@ -1130,21 +1058,6 @@ class DatasetData:
             return
 
         yield from keywords
-
-    @property
-    def protocol_uris(self):
-        """ property needed for protocol helper to help us """
-        #if not hasattr(self, '_puri_cache'):
-        p = 'protocol_url_or_doi'
-        for dd in self.dataset_description:
-            dwe = dd.data_with_errors
-            if p in dwe:
-                for uri in dwe[p]:
-                    if uri.startswith('http'):
-                        # TODO normalize
-                        yield uri
-                    else:
-                        log.warning(f"protocol not uri {uri} '{self.id}'")
 
     def _abstracted_paths(self, name_prefix, glob_type='glob'):
         """ A bottom up search for the closest file in the parent directory.
@@ -1419,6 +1332,165 @@ class DatasetData:
         return out
 
 
+
+    @property
+    def data_with_errors(self):
+        # FIXME remove this
+        # this still ok, dwe is very simple for this case
+        return self._with_errors(self.schema.validate(copy.deepcopy(self.data)), self.schema)
+
+    def submission_completeness_index(self, inputs):
+        total_possible_errors = self.schema.total_possible_errors
+        data = inputs
+        if not data:
+            return 0
+        else:
+            actual_errors = 0
+            for required in self.schema.schema['required']:
+                actual_errors += 1
+                if required in data:
+                    r = list(getattr(self, required))
+                    if len(r) == 1:
+                        r = r[0]
+                        actual_errors -= r.submission_completeness_index
+
+            return (total_possible_errors - actual_errors) / total_possible_errors
+
+    def dump_all(self):
+        return {attr: express_or_return(getattr(self, attr))
+                for attr in dir(self) if not attr.startswith('_')}
+
+    def __eq__(self, other):
+        # TODO order by status
+        return self.path == other.path
+
+    def __gt__(self, other):
+        return self.path > other.path
+
+    def __lt__(self, other):
+        return self.path < other.path
+
+    def __hash__(self):
+        return hash((hash(self.__class__), self.id))  # FIXME checksum? (expensive!)
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(\'{self.path}\')'
+
+
+class __Old:
+
+    @property
+    def __protocol_uris(self):
+        """ property needed for protocol helper to help us """
+        #if not hasattr(self, '_puri_cache'):
+        p = 'protocol_url_or_doi'
+        for dd in self.dataset_description:
+            dwe = dd.data_with_errors
+            if p in dwe:
+                for uri in dwe[p]:
+                    if uri.startswith('http'):
+                        # TODO normalize
+                        yield uri
+                    else:
+                        log.warning(f"protocol not uri {uri} '{self.id}'")
+
+    @property
+    def __keywords(self):
+        for dd in self.dataset_description:
+            # FIXME this pattern leads to continually recomputing values
+            # we need to be deriving all of this from a checkpoint on the fully
+            # normalized and transformed data
+            data = dd.data_with_errors
+            if 'keywords' in data:  # already logged error ...
+                yield from data['keywords']
+
+    @property
+    def __PI(self):
+        mp = 'contributor_role'
+        os = ('PrincipalInvestigator',)
+        p = 'contributors'
+        for dd in self.dataset_description:
+            dict_ = dd.data_with_errors
+            if p in dict_:
+                for contributor in dict_[p]:
+                    if mp in contributor:
+                        for role in contributor[mp]:
+                            normrole = nml.NormContributorRole(role)
+                            if 'name' in contributor:
+                                fn, ln = Derives.contributor_name(contributor['name'])
+                                contributor['first_name'] = fn
+                                contributor['last_name'] = ln
+                                if normrole in os:
+                                    #print(contributor)
+                                    for s, p, o in self.triples_contributors(contributor):
+                                        if p == a and o == owl.NamedIndividual:
+                                            yield s
+
+    @property
+    def __species(self):
+        """ generate this value from the underlying data """
+        if not hasattr(self, '_species'):
+            out = set()
+            for subject_file in self.subjects:
+                data = subject_file.data_with_errors
+                if 'subjects' in data:
+                    subjects = data['subjects']
+                    for subject in subjects:
+                        if 'species' in subject:
+                            out.add(subject['species'])
+
+            self._species = tuple(out)
+
+        return self._species
+
+    @property
+    def __organ(self):
+        # yield 'Unknown'
+        return
+        organs = ('Lung',
+                  'Heart',
+                  'Liver',
+                  'Pancreas',
+                  'Kidney',
+                  'Stomach',
+                  'Spleen',
+                  'Colon',
+                  'Large intestine',
+                  'Small intestine',
+                  'Urinary bladder',
+                  'Lower urinary tract',
+                  'Spinal cord',)
+        org_lower = (o.lower() for o in organs)
+        for kw in self.keywords:
+            if kw.lower() in organs:
+                yield kw
+
+
+class LThing:
+    def __init__(self, lst):
+        self._lst = lst
+
+
+class FTLax(DatasetData):
+    def _abstracted_paths(self, name_prefix, glob_type='rglob'):
+        yield from super()._abstracted_paths(name_prefix, glob_type)
+
+
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
+class Pipeline:
+    # we can't quite do this yet, but these pipelines are best composed
+    # by subclassing and then using super().previous_step to insert another
+    # step along the way
+
+    def __init__(self, sources, lifters, helpers, helper_key):
+        """ sources stay, helpers are tracked for prov and then disappear """
+        log.debug(lj(sources))
+        self._hk = helper_key
+        sources[helper_key] = helpers
+        self.lifters = lifters
+        self.pipeline_start = sources
+
     @property
     def data_lifted(self):
         """ doing this pipelines this way for now :/ """
@@ -1427,7 +1499,7 @@ class DatasetData:
             def lift_function(_, section=section):
                 # throw 'em in a list and let the schema sort 'em out!
                 dwe = [section.data_with_errors
-                       for section in getattr(self, section)]
+                       for section in getattr(lifters, section)]
                 if dwe:
                     dwe, *oops = dwe
                     if oops:
@@ -1440,7 +1512,8 @@ class DatasetData:
                  for section in ['submission', 'dataset_description', 'subjects']
                  for func in (section_binder(section),) if func]
 
-        data = self.data_with_errors  # FIXME without errors how?
+        self.pipeline_start
+        #data = self.data_with_errors  # FIXME without errors how?
         DictTransformer.lift(data, lifts)
         return data
 
@@ -1558,13 +1631,14 @@ class DatasetData:
     def data_added(self):
         # FIXME this would seem to be where the Integration class comes in?
         # the schemas make it a bit of a dance
-        adds = [[['id'], self.id],
-                [['meta', 'human_uri'], self.path.cache.human_uri]]
+        adds = [[['id'], self.lifters.id],
+                [['meta', 'human_uri'], self.lifters.human_uri]]
         data = self.data_cleaned
         DictTransformer.add(data, adds)
         return data
 
     @property
+    @hasSchema(sc.DatasetOutSchema)
     def data_out(self):
         """ this part adds the meta bits we need after _with_errors
             and rearranges anything that needs to be moved about """
@@ -1574,13 +1648,24 @@ class DatasetData:
         return data
 
     @property
-    def data_with_errors(self):
-        # FIXME remove this
-        # this still ok, dwe is very simple for this case
-        return self._with_errors(self.schema.validate(copy.deepcopy(self.data)), self.schema)
+    def data_post(self):
+        # FIXME a bit of a hack
+        data = self.data_out
+
+        ei = len(get_all_errors(data))
+        if 'inputs' in data:
+            sci = self.submission_completeness_index(data['inputs'])
+        else:
+            ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
+            sci = 0
+
+        data['error_index'] = ei
+        data['submission_completeness_index'] = sci
+
+        return data
 
     @property
-    def data_out_with_errors(self):
+    def __data_out_with_errors(self):
         if hasattr(self, '_dowe'):
             return self._dowe
 
@@ -1604,49 +1689,39 @@ class DatasetData:
         self._dowe = data
         return data
 
-    def submission_completeness_index(self, inputs):
-        total_possible_errors = self.schema.total_possible_errors
-        data = inputs
-        if not data:
-            return 0
-        else:
-            actual_errors = 0
-            for required in self.schema.schema['required']:
-                actual_errors += 1
-                if required in data:
-                    r = list(getattr(self, required))
-                    if len(r) == 1:
-                        r = r[0]
-                        actual_errors -= r.submission_completeness_index
+    @property
+    def data(self):
+        return self.data_post
 
-            return (total_possible_errors - actual_errors) / total_possible_errors
 
-    def dump_all(self):
-        return {attr: express_or_return(getattr(self, attr))
-                for attr in dir(self) if not attr.startswith('_')}
 
-    def __eq__(self, other):
-        # TODO order by status
-        return self.path == other.path
-
-    def __gt__(self, other):
-        return self.path > other.path
-
-    def __lt__(self, other):
-        return self.path < other.path
-
-    def __hash__(self):
-        return hash((hash(self.__class__), self.id))  # FIXME checksum? (expensive!)
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}(\'{self.path}\')'
+class PipelineExtras(Pipeline):
 
     @property
-    def bf_uri(self):
-        return self.path.cache.api_uri
+    def data_derived_post(self):
+        derives = [[['meta', 'award_number'],
+                    self.organ,
+                    ['meta', 'organ']]]
+        data = super().data_derived_post
+        DictTransformer.derive(data, derives)
+        return data
+
+    @property
+    def data_added(self):
+        adds = []
+        todo = [[['meta', 'modality'], 'TODO should come from sheets maybe?']]
+        data = super().data_added
+        DictTransformer.add(data, adds)
+        return data
+
+   
+class TriplesExport:
+
+    def __init__(self, path, *args, **kwargs):
+        super().__init__(path, *args, **kwargs)
 
     def ddt(self, data):
-        dsid = self.bf_uri
+        dsid = self.uri_api
         s = rdflib.URIRef(dsid)
         if 'meta' in data:
             dmap = {'acknowledgements': '',
@@ -1692,71 +1767,9 @@ class DatasetData:
             for c in data['contributors']:
                 yield from self.triples_contributors(c)
 
-    @property
-    def members(self):
-        if not hasattr(self.__class__, '_members'):
-            log.debug('going to network for members')
-            # there are other ways to get here but this one caches
-            # e.g. self.organization.path.remote.bfobject
-            # self.path.remote.oranization.bfobject
-            # self.path.remote.bfl.organization.members
-            self.__class__._members = self.path.remote.bfl.organization.members
-
-        return self._members
-
-    @property
-    def member_index_f(self):
-        if not hasattr(self.__class__, '_member_index_f'):
-            mems = defaultdict(lambda:defaultdict(list))
-            for member in self.members:
-                fn = member.first_name.lower()
-                ln = member.last_name.lower()
-                current = mems[fn][ln].append(member)
-
-            self.__class__._member_index_f = {fn:dict(lnd) for fn, lnd in mems.items()}
-
-        return self._member_index_f
-
-    @property
-    def member_index_l(self):
-        if not hasattr(self.__class__, '_member_index_l'):
-            mems = defaultdict(dict)
-            for fn, lnd in self.member_index_f.items():
-                for ln, member_list in lnd.items():
-                    mems[ln][fn] = member_list
-
-            self.__class__._member_index_l = dict(mems)
-
-        return self._member_index_l
-
-    def get_member_by_name(self, first, last):
-        def lookup(d, one, two):
-            if one in d:
-                ind = d[one]
-                if two in ind:
-                    member_list = ind[two]
-                    if member_list:
-                        member = member_list[0]
-                        if len(member_list) > 1:
-                            log.critical(f'WE NEED ORCIDS! {one} {two} -> {member_list}')
-                            # organization maybe?
-                            # or better, check by dataset?
-                            
-                        return member
-
-        fnd = self.member_index_f
-        lnd = self.member_index_l
-        fn = first.lower()
-        ln = last.lower()
-        m = lookup(fnd, fn, ln)
-        if not m:
-            m = lookup(lnd, ln, fn)
-
-        return m
-
     def triples_contributors(self, contributor):
         try:
-            dsid = self.bf_uri
+            dsid = self.uri_api
         except BaseException as e:  # FIXME ...
             log.error(e)
             return
@@ -1769,7 +1782,7 @@ class DatasetData:
                 fn, mn = fn.split(' ', 1)
 
             failover = f'{fn}-{ln}'
-            member = self.get_member_by_name(fn, ln)
+            member = self.members(fn, ln)
 
             if member is not None:
                 userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
@@ -1823,7 +1836,7 @@ class DatasetData:
         # FIXME ick
         data = self.data_out_with_errors
         try:
-            dsid = self.bf_uri
+            dsid = self.uri_api
         except BaseException as e:  # FIXME ...
             raise e
             return
@@ -1875,7 +1888,7 @@ class DatasetData:
             (a, owl.Ontology),
             (owl.versionIRI, ver_ontid),
             (owl.versionInfo, rdflib.Literal(iso)),
-            (isAbout, rdflib.URIRef(self.path.cache.api_uri)),
+            (isAbout, rdflib.URIRef(self.path.cache.uri_api)),
             (TEMP.hasHumanUri, rdflib.URIRef(self.path.cache.human_uri)),
             (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
@@ -1896,30 +1909,86 @@ class DatasetData:
         return graph.serialize(format='nifttl')
 
 
-class LThing:
-    def __init__(self, lst):
-        self._lst = lst
-
-
-class FTLax(DatasetData):
-    def _abstracted_paths(self, name_prefix, glob_type='rglob'):
-        yield from super()._abstracted_paths(name_prefix, glob_type)
-
-
-class Integrator(DatasetData, OntologyData, ProtocolData, OrganData):
+class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
     """ pull everything together anchored to the DatasetData """
     # note that mro means that we have to run methods backwards
     # so any class that uses something produced by a function
     # of an earlier class needs to be further down the mro so
     # that the producer masks its NotImplementedErrors
 
+    # FIXME remove??
+    schema_class = DatasetSchema
+    schema_out_class = DatasetOutSchema  # FIXME not sure if good idea ...
+
+    # class level helpers, instance level helpers go as mixins
+    helpers = (
+        ('protcur', ProtcurData),
+        # TODO sheets
+    )
+
+
     @classmethod
-    def setup(cls):
-        """ make sure we have all datasources """
+    def setup(cls, blackfynn_local_instance):
+        """ make sure we have all datasources
+            calling this again will refresh helpers
+        """
         for _cls in cls.mro():
             if _cls != cls:
                 if hasattr(_cls, 'setup'):
                     _cls.setup()
+
+        # unanchored helpers
+        cls.organ = OrganData()
+        cls.member = MembersData(blackfynn_local_instance)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset = DatasetData(self.path)
+
+    @property
+    def uri_human(self):
+        return self.path.cache.uri_human
+
+    @property
+    def uri_api(self):
+        return self.path.cache.uri_api
+
+    @property
+    def data(self):
+        if hasattr(self, '_data'):
+            return self._data
+
+        sources = self.dataset.data_with_errors
+        helpers = {}
+        helper_key = object()
+        class lifters:  # do this to prevent accidental data leaks
+            # context
+            id = dataset.id
+            human_uri = dataset.human_uri
+            # dataset metadata
+            submission = lambda : (_ for _ in self.dataset.submission)
+            dataset_description = lambda : (_ for _ in self.dataset.dataset_description)
+            subjects = lambda : (_ for _ in self.dataset.subjects)
+
+            # protocols
+            protocol = self.protocol
+            #protcur = self.protcur
+
+            # aux
+            organ = self.organ
+            member = self.member
+
+            #sheets
+
+        pipeline = PipelineExtras(sources, lifters, helpers, helper_key)
+
+        self._data = pipeline.data
+        return self._data
+
+    @property
+    def protocol_uris(self):
+        adops.get(self.data, 'meta', 'protocol_url_or_doi')
+        yield uri
 
     @property
     def keywords(self):
@@ -1927,23 +1996,6 @@ class Integrator(DatasetData, OntologyData, ProtocolData, OrganData):
         # TODO sheets integration
         for keyword in keywords:
             yield keyword
-
-    @property
-    def data_derived_post(self):
-        derives = [[['meta', 'award_number'],
-                    self.organ,
-                    ['meta', 'organ']]]
-        data = super().data_derived_post
-        DictTransformer.derive(data, derives)
-        return data
-        
-    @property
-    def data_added(self):
-        adds = []
-        todo = [[['meta', 'modality'], 'TODO should come from sheets maybe?']]
-        data = super().data_added
-        DictTransformer.add(data, adds)
-        return data
 
 
 class Summary(Integrator):

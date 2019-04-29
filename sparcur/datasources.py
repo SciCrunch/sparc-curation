@@ -81,6 +81,12 @@ class KeywordSets(FieldAlignment):
 
 class OrganData:
     """ retrieve SPARC investigator data """
+
+    def organ(self, award_number):
+        return self.award_to_organ[award_number]
+
+    __call__ = organ
+
     organ_lookup = {'bladder': OntId('FMA:15900'),
                     'brain': OntId('UBERON:0000955'),
                     #'computer': OntId(''),
@@ -117,9 +123,6 @@ class OrganData:
                 self.former_to_current = json.load(f)
 
         self.award_to_organ = {v:k for k, vs in self.normalized.items() for v in vs}
-
-    def organ(self, award_number):
-        return self.award_to_organ[award_number]
 
     def overview(self):
         with open(self.path, 'rb') as f:
@@ -180,3 +183,83 @@ class OrganData:
             return [award, former]
         else:
             return [text, None]
+
+
+class MembersData:
+    """ blackfynn members data """
+    def __init__(self, blackfynn_local_instance):
+        log.debug('going to network for members')
+        # there are other ways to get here but this one caches
+        # e.g. self.organization.path.remote.bfobject
+        # self.path.remote.oranization.bfobject
+        # self.path.remote.bfl.organization.members
+        self.__class__._members = blackfynn_local_instance.organization.members
+
+    def __call__(self, first_name, last_name):
+        return self.get_member_by_name(first_name, last_name)
+
+    @property
+    def members(self):
+        return self._members
+
+    @property
+    def __members(self):
+        if not hasattr(self.__class__, '_members'):
+            log.debug('going to network for members')
+            # there are other ways to get here but this one caches
+            # e.g. self.organization.path.remote.bfobject
+            # self.path.remote.oranization.bfobject
+            # self.path.remote.bfl.organization.members
+            self.__class__._members = self.path.remote.bfl.organization.members
+
+        return self._members
+
+    @property
+    def member_index_f(self):
+        if not hasattr(self.__class__, '_member_index_f'):
+            mems = defaultdict(lambda:defaultdict(list))
+            for member in self.members:
+                fn = member.first_name.lower()
+                ln = member.last_name.lower()
+                current = mems[fn][ln].append(member)
+
+            self.__class__._member_index_f = {fn:dict(lnd) for fn, lnd in mems.items()}
+
+        return self._member_index_f
+
+    @property
+    def member_index_l(self):
+        if not hasattr(self.__class__, '_member_index_l'):
+            mems = defaultdict(dict)
+            for fn, lnd in self.member_index_f.items():
+                for ln, member_list in lnd.items():
+                    mems[ln][fn] = member_list
+
+            self.__class__._member_index_l = dict(mems)
+
+        return self._member_index_l
+
+    def get_member_by_name(self, first, last):
+        def lookup(d, one, two):
+            if one in d:
+                ind = d[one]
+                if two in ind:
+                    member_list = ind[two]
+                    if member_list:
+                        member = member_list[0]
+                        if len(member_list) > 1:
+                            log.critical(f'WE NEED ORCIDS! {one} {two} -> {member_list}')
+                            # organization maybe?
+                            # or better, check by dataset?
+
+                        return member
+
+        fnd = self.member_index_f
+        lnd = self.member_index_l
+        fn = first.lower()
+        ln = last.lower()
+        m = lookup(fnd, fn, ln)
+        if not m:
+            m = lookup(lnd, ln, fn)
+
+        return m
