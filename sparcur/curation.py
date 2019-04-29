@@ -893,6 +893,14 @@ class Pipeline:
                            'organ',
                            'modality',
                            'protocol_url_or_doi',
+
+                           'completeness_of_dataset',
+                           'funding',
+                           'description',
+                           'additional_links',
+                           'keywords',
+                           'acknowledgements',
+                           'originating_article_doi',
                           ]] + [])
 
         data = self.data_derived_pre
@@ -1369,12 +1377,11 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
 
     @property
     def protocol_uris(self):
-        adops.get(self.data, 'meta', 'protocol_url_or_doi')
-        yield uri
+        yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
 
     @property
     def keywords(self):
-        yield from adops.get(self.data, 'meta', 'keywords')
+        yield from adops.get(self.data, ['meta', 'keywords'])
 
     ## sandboxed for triple export
 
