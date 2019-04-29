@@ -117,6 +117,12 @@ class ExamplesDT:
                                    [['e']]]])
 
     @property
+    def derive_error(self):
+        yield ({'a': 1}, {'a': 1}, [[[['a']],
+                                     lambda _: None,  # TODO is there any way to catch this information early ?
+                                     [['b']]]])
+
+    @property
     def lift(self):
         yield {'hello':'there'}, {'hello': 'world'}, [[['hello'], lambda v: 'there']]
 

@@ -879,6 +879,10 @@ class CacheAsBFObject(BaseNode):
         for c in self.cache.local.children:
             yield self.__class__(c.cache)
 
+    @property
+    def members(self):
+        return []
+
 
 def mvp():
     """ In order to be performant for large numbers of packages we have

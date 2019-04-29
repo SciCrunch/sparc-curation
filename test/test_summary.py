@@ -12,3 +12,6 @@ class TestSummary(unittest.TestCase):
 
     def test_disco(self):
         self.s.disco
+
+    def test_ttl(self):
+        self.s.ttl

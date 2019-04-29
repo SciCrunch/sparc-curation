@@ -1822,3 +1822,6 @@ class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
                 break
             else:
                 sleep(.01)  # spin a bit more slowly
+
+
+BlackfynnCache._local_class = Path

@@ -8,6 +8,8 @@ import rdflib
 import ontquery as oq
 from joblib import Memory
 from pathlib import Path
+from xlsx2csv import Xlsx2csv, SheetNotFoundException
+from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.core import OntId
 from pyontutils.utils import makeSimpleLogger
@@ -88,7 +90,12 @@ def zipeq(*iterables):
     """ zip or fail if lengths do not match """
 
     sentinel = object()
-    for zipped in itertools.zip_longest(*iterables, fillvalue=sentinel):
+    try:
+        gen = itertools.zip_longest(*iterables, fillvalue=sentinel)
+    except TypeError as e:
+        raise TypeError(f'One of these is not iterable {iterables}') from e
+
+    for zipped in gen:
         if sentinel in zipped:
             raise TypeError('Lengths do not match!')
 
@@ -384,14 +391,19 @@ class AtomicDictOperations:
     class __empty_node_key: pass
 
     @staticmethod
-    def apply_source_optional(function, *args, source_key_optional=False):
+    def apply(function, *args,
+              source_key_optional=False,
+              extra_error_types=tuple(),
+              failure_value=None):
+        error_types = (exc.NoSourcePathError,) + extra_error_types
         try:
             return function(*args)
-        except exc.NoSourcePathError as e:
+        except error_types as e:
             if not source_key_optional:
                 raise e
             else:
                 logd.error(e)
+                return failure_value
 
 
     @staticmethod
@@ -518,7 +530,7 @@ class _DictTransformer:
             [source-path ...] """
 
         for source_path in gets:
-            yield adops.apply_source_optional(adops.get, data, source_path,
+            yield adops.apply(adops.get, data, source_path,
                                               source_key_optional=source_key_optional)
 
     @staticmethod
@@ -550,7 +562,7 @@ class _DictTransformer:
             # don't need a base case for thing?
             # can't lift a dict outside of itself
             # in this context
-            adops.apply_source_optional(adops.copy, data, source_path, target_path,
+            adops.apply(adops.copy, data, source_path, target_path,
                                         source_key_optional=source_key_optional)
 
     @staticmethod
@@ -559,7 +571,7 @@ class _DictTransformer:
             [[source-path, target-path] ...]
         """
         for source_path, target_path in moves:
-            adops.apply_source_optional(adops.move, data, source_path, target_path,
+            adops.apply(adops.move, data, source_path, target_path,
                                         source_key_optional=source_key_optional)
 
     @classmethod
@@ -575,21 +587,31 @@ class _DictTransformer:
                 raise ValueError(f'value to add may not be empty!')
             return empty or allow_empty and not empty
 
+        failure_value = tuple()
         for source_paths, derive_function, target_paths in derives:
             # FIXME zipeq may cause adds to modify in place in error?
             # except that this is really a type checking thing on the function
-            def defer(*get_args):
+            def defer_get(*get_args):
                 """ if we fail to get args then we can't gurantee that
                     derive_function will work at all so we wrap the lot """
                 args = cls.get(*get_args)
                 return derive_function(*args)
-                
-            cls.add(data,
-                    ((tp, v) for tp, v in
-                     zipeq(target_paths,
-                           adops.apply_source_optional(defer, data, source_paths,
-                                                       source_key_optional=source_key_optional))
-                     if not empty(v)))
+            def express_zip(*zip_args):
+                return tuple(zipeq(*zip_args))
+
+            try:
+                cls.add(data,
+                        ((tp, v) for tp, v in
+                         adops.apply(express_zip, target_paths,
+                                     adops.apply(defer_get, data, source_paths,
+                                                 source_key_optional=source_key_optional),
+                                     source_key_optional=source_key_optional,
+                                     extra_error_types=(TypeError,),
+                                     failure_value=tuple())
+                        if not empty(v)))
+            except TypeError as e:
+                raise TypeError(f'derive failed\n{source_paths}\n'
+                                f'{derive_function}\n{target_paths}\n') from e
 
     @staticmethod
     def _derive(data, derives, source_key_optional=True, allow_empty=False):
@@ -683,3 +705,22 @@ class _DictTransformer:
             adops.add(data, path, new_value, fail_on_exists=False)
 
 DictTransformer = _DictTransformer()
+
+
+def normalize_tabular_format(project_path):
+    kwargs = {
+        'delimiter' : '\t',
+        'skip_empty_lines' : True,
+        'outputencoding': 'utf-8',
+    }
+    sheetid = 0
+    for xf in project_path.rglob('*.xlsx'):
+        xlsx2csv = Xlsx2csv(xf, **kwargs)
+        with open(xf.with_suffix('.tsv'), 'wt') as f:
+            try:
+                xlsx2csv.convert(f, sheetid)
+            except SheetNotFoundException as e:
+                print('Sheet weirdness in', xf)
+                print(e)
+
+

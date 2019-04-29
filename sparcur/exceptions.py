@@ -77,5 +77,10 @@ class NotBootstrappingError(SparCurError):
 class NoSourcePathError(SparCurError):
     """ dictionary at some level is missing the expected key """
 
+
 class TargetPathExistsError(SparCurError):
     """ when adding to a path if fail_on_exists is set raise this """
+
+
+class EncodingError(Exception):
+    """ Some encoding error has occured in a file """

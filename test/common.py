@@ -2,13 +2,15 @@ import shutil
 from datetime import datetime
 from sparcur import config
 from sparcur.paths import Path
-from sparcur.curation import Version1Header
+from sparcur.datasets import Version1Header
+from sparcur.curation import PathData, Integrator
+from sparcur.blackfynn_api import FakeBFLocal
 this_file = Path(__file__)
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
 project_path = this_file.parent / 'test_local/test_project'
 
-config.local_storage_prefix = project_path.parent
+PathData.project_path = project_path
 
 osk = Version1Header.skip_cols  # save original skips
 Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')  # use the example values for tests
@@ -90,3 +92,4 @@ if not project_path.exists() or not list(project_path.iterdir()):
         mk_required_files(rp)  # TODO all variants of missing files
 
 
+Integrator.setup(FakeBFLocal(project_path.cache.id, project_path.cache))
