@@ -869,8 +869,8 @@ class Pipeline:
                     [['meta', 'award_number']]],
 
                    [[['dataset_description', 'contributors']],
-                    lambda cs: [DT.derive(c, [[['name'],
-                                               De.contributor_name,
+                    lambda cs: [DT.derive(c, [[[['name']],  # FIXME [['name]] as missing a nesting level
+                                               De.contributor_name,  # and we got no warning ... :/
                                                [['first_name'], ['last_name']]]])
                                 for c in cs],
                     []],

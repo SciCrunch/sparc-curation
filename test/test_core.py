@@ -2,6 +2,7 @@ import unittest
 from sparcur.core import OrcidId
 from sparcur.core import cache_hash, argspector
 from sparcur.core import adops, DictTransformer
+from sparcur.derives import Derives as De
 
 
 class TestOrcidId(unittest.TestCase):
@@ -103,6 +104,11 @@ class Examples:
         yield {'another':'2'}, {'another':0, 'hello':'world'}, (['hello'], ['another'])
 
 
+class TestDer(unittest.TestCase):
+    def test_der(self):
+        assert De.contributor_name('b, a') == ('a', 'b')
+
+
 class ExamplesDT:
 
     @property
@@ -115,6 +121,10 @@ class ExamplesDT:
                                   [[['c'], ['d']],
                                    lambda c, d: (d - c,),
                                    [['e']]]])
+        yield ({'name': 'b, a', 'first_name': 'a', 'last_name': 'b'},
+               {'name': 'b, a'}, [[[['name']],
+                                   De.contributor_name,
+                                   [['first_name'], ['last_name']]]])
 
     @property
     def derive_error(self):
