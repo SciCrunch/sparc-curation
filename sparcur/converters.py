@@ -1,9 +1,11 @@
 import rdflib
+from types import GeneratorType
 from sparcur.core import log, sparc
 from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 
+a = rdf.type
 
 class TripleConverter:
     # TODO consider putting mappings in a dict hierarchy
@@ -11,8 +13,12 @@ class TripleConverter:
     known_skipped = tuple()
     mapping = tuple()
 
+    class Extra: pass
+
     @classmethod
     def setup(cls):
+        cls.extra = cls.Extra()
+
         for attr, predicate in cls.mapping:
             def _func(self, value, p=predicate): return p, self.l(value)
             setattr(cls, attr, _func)
@@ -38,6 +44,7 @@ class TripleConverter:
             if type(field) is object:
                 continue  # the magic helper key for Pipeline
             convert = getattr(self, field, None)
+            extra = getattr(self.extra, field, None)
             if convert is not None:
                 if isinstance(value, tuple) or isinstance(value, list):
                     values = value
@@ -46,6 +53,8 @@ class TripleConverter:
                 
                 for v in values:
                     yield (subject, *convert(v))
+                    if extra is not None:
+                        yield from extra(v)
 
             elif field in self.known_skipped:
                 pass
@@ -74,7 +83,7 @@ class MetaConverter(TripleConverter):
     mapping = [
         ['principal_investigator', TEMP.hasResponsiblePrincialInvestigator],
         ['protocol_url_or_doi', TEMP.hasProtocol],
-        ['award_number', TEMP.hasAwardNumber],
+        #['award_number', TEMP.hasAwardNumber],
         ['species', isAbout],
         ['organ', isAbout],
         ['subject_count', TEMP.hasNumberOfSubjects],
@@ -82,6 +91,21 @@ class MetaConverter(TripleConverter):
         ['keywords', isAbout],
         ['keywords', isAbout],
     ]
+    def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']
+    class Extra:
+        def __init__(self):
+            self.c = MetaConverter({})
+
+        def award_number(self, value):
+            _, s = self.c.award_number(value)
+            yield s, a, owl.NamedIndividual
+            yield s, a, TEMP.FundedResearchProject
+
+        def protocol_url_or_doi(self, value):
+            _, s = self.c.protocol_url_or_doi(value)
+            yield s, a, owl.NamedIndividual
+            yield s, a, sparc.Protocol
+
 MetaConverter.setup()  # box in so we don't forget
 
 

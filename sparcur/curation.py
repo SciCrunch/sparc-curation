@@ -52,6 +52,7 @@ OntCuries({'orcid':'https://orcid.org/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
+           'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})
 
 
@@ -876,7 +877,7 @@ class Pipeline:
                     []],
         ]
         data = self.data_lifted
-        DictTransformer.derive(data, derives, source_key_optional=False)
+        DictTransformer.derive(data, derives, source_key_optional=True)
         return data
 
     @property
@@ -1159,7 +1160,7 @@ class TriplesExport:
                 fn, mn = fn.split(' ', 1)
 
             failover = f'{fn}-{ln}'
-            member = self.members(fn, ln)
+            member = self.member(fn, ln)
 
             if member is not None:
                 userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)

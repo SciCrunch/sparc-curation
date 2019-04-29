@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from pyontutils.core import OntId
 from pyontutils.sheets import Sheet
 from sparcur.core import log, logd
