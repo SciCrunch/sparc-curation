@@ -811,6 +811,11 @@ class Pipeline:
     # by subclassing and then using super().previous_step to insert another
     # step along the way
 
+    class SkipPipelineError(Exception):
+        """ go directly to the end we are done here """
+        def __init__(self, data):
+            self.data = data
+
     def __init__(self, sources, lifters, helper_key,
                  runtime_context):
         """ sources stay, helpers are tracked for prov and then disappear """
@@ -843,6 +848,9 @@ class Pipeline:
                  for func in (section_binder(section),) if func]
 
         data = self.pipeline_start
+        if 'errors' in data and len(data) == 1:
+            raise self.SkipPipelineError(data)
+
         DictTransformer.lift(data, lifts)
         return data
 
@@ -949,11 +957,25 @@ class Pipeline:
     @property
     def data_cleaned(self):
         """ clean up any cruft left over from transformations """
+
+
         pops = [['subjects_file'],
         ]
         data = self.data_derived_post
         removed = list(DictTransformer.pop(data, pops, source_key_optional=True))
         log.debug(f'cleaned the following values from {self}' + lj(removed))
+
+        # FIXME post manual fixes ...
+
+        # remote Creator since we lift it out
+        if 'contributors' in data:
+            for c in data['contributors']:
+                if 'contributor_role' in c:
+                    cr = c['contributor_role']
+                    if 'Creator' in cr:
+                        c['contributor_role'] = tuple(r for r in cr if cr != 'Creator')
+                        
+
         return data
 
     @property
@@ -971,7 +993,11 @@ class Pipeline:
         """ this part adds the meta bits we need after _with_errors
             and rearranges anything that needs to be moved about """
 
-        data = self.data_added
+        try:
+            data = self.data_added
+        except self.SkipPipelineError as e:
+            data = e.data
+            log.debug('pipeline skipped to end due to errors')
 
         return data
 

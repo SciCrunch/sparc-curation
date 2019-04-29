@@ -7,7 +7,7 @@ Usage:
     spc fetch [options] [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [completeness filetypes keywords subjects] [options]
+    spc report [completeness filetypes keywords subjects errors] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -40,7 +40,6 @@ Options:
                             use negative numbers to indicate no limit
     -L --level=LEVEL        how deep to go in a refresh
     -n --name=<PAT>         filename pattern to match (like find -name)
-    -v --verbose            print extra information
     -u --uri                print the human uri for the path in question
     -a --project-path=<PTH> set the project path manually
     -o --overwrite          fetch even if the file exists
@@ -57,6 +56,7 @@ Options:
     -U --upload             update remote target (e.g. a google sheet) if one exists
 
     -d --debug              drop into a shell after running a step
+    -v --verbose            print extra information
 """
 
 import sys
@@ -71,7 +71,7 @@ from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, python_identifier, FileSize
+from sparcur.core import JT, log, logd, python_identifier, FileSize
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, FTLax, Summary, Integrator
@@ -208,6 +208,10 @@ class Main(Dispatcher):
     # kind of like a non optional provides you WILL have these in your namespace
     def __init__(self, args, defaults):
         super().__init__(args, defaults)
+        if not self.options.verbose:
+            log.setLevel('INFO')
+            logd.setLevel('INFO')
+
         if self.options.clone or self.options.meta:
             # short circuit since we don't know where we are yet
             return
@@ -506,7 +510,7 @@ class Main(Dispatcher):
 
         # FIXME skip the big fellows how?
         with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(summary.data_out_with_errors, f, sort_keys=True, indent=2, cls=JEncode)
+            json.dump(summary.data, f, sort_keys=True, indent=2, cls=JEncode)
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
             f.write(summary.ttl)
@@ -623,7 +627,7 @@ class Main(Dispatcher):
         if False:
             ### this is the equivalent of export, quite slow to run
             # export everything
-            dowe = summary.data_out_with_errors
+            dowe = summary.data
 
             # show all the errors from export everything
             error_id_messages = [(d['id'], e['message']) for d in dowe['datasets'] for e in d['errors']]
@@ -797,6 +801,9 @@ class Report(Dispatcher):
         rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
         self._print_table(rows, title='Keywords Report')
 
+    def errors(self):
+        pprint.pprint([get_all_errors(d) for d in self.summary.data['datasets']])
+        embed()
 
 class Shell(Dispatcher):
     # property ports
@@ -815,7 +822,7 @@ class Shell(Dispatcher):
 
         p, *rest = self._paths
         f = Integrator(p)
-        dowe = f.data_out_with_errors
+        dowe = f.data
         j = JT(dowe)
         triples = list(f.triples)
         embed()

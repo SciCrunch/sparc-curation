@@ -3,12 +3,17 @@ import csv
 import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.utils import byCol
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
+from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from pysercomb.pyr.units import ProtcParameterParser
 from sparcur import schemas as sc
 from sparcur import validate as vldt
 from sparcur import exceptions as exc
+from sparcur import converters as conv
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, sparc
+
+a = rdf.type
 
 
 class Tabular:
@@ -435,7 +440,7 @@ class DatasetDescriptionFile(Version1Header):
             elif v == '0':  # FIXME ? someone using strange conventions ...
                 return
             elif len(v) != 19:
-                log.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                logd.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
 
             v = 'ORCID:' + v
@@ -449,7 +454,7 @@ class DatasetDescriptionFile(Version1Header):
             if not len(numeric):
                 return
             elif len(numeric) != 19:
-                log.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                logd.error(f"orcid wrong length '{value}' '{self.t.path}'")
                 return
 
         try:
@@ -457,13 +462,13 @@ class DatasetDescriptionFile(Version1Header):
             orcid = OrcidId(v)
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
-                log.error(f"orcid failed checksum '{value}' '{self.t.path}'")
+                logd.error(f"orcid failed checksum '{value}' '{self.t.path}'")
                 return
 
             yield orcid
 
         except (OntId.BadCurieError, OrcidId.MalformedOrcidError) as e:
-            log.error(f"orcid malformed '{value}' '{self.t.path}'")
+            logd.error(f"orcid malformed '{value}' '{self.t.path}'")
             yield value
 
     def contributor_role(self, value):

@@ -388,7 +388,7 @@ class AtomicDictOperations:
     # note: no delete is implemented at the moment ...
     # in place modifications means that delete can loose data ...
 
-    class __empty_node_key: pass
+    __empty_node_key = object()
 
     @staticmethod
     def apply(function, *args,
@@ -402,7 +402,7 @@ class AtomicDictOperations:
             if not source_key_optional:
                 raise e
             else:
-                logd.error(e)
+                logd.debug(e)
                 return failure_value
 
 

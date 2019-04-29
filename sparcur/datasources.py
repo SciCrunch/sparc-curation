@@ -1,7 +1,7 @@
 import json
 from pyontutils.core import OntId
 from pyontutils.sheets import Sheet
-from sparcur.core import log
+from sparcur.core import log, logd
 from sparcur.paths import Path
 from sparcur.config import config
 from bs4 import BeautifulSoup
@@ -83,7 +83,10 @@ class OrganData:
     """ retrieve SPARC investigator data """
 
     def organ(self, award_number):
-        return self.award_to_organ[award_number]
+        try:
+            return self.award_to_organ[award_number]
+        except KeyError as e:
+            logd.error(f'bad award_number {award_number}')
 
     __call__ = organ
 
