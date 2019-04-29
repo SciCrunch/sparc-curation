@@ -714,7 +714,7 @@ class Main(Dispatcher):
         log.setLevel('ERROR')
         def inner(path):
             if self.options.uri:
-                uri = path.cache.human_uri
+                uri = path.cache.uri_human
                 print('+' + '-' * (len(uri) + 2) + '+')
                 print(f'| {uri} |')
             try:

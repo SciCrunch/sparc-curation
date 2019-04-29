@@ -1056,7 +1056,7 @@ class CachePath(AugmentedPath):
         if not candidates:
             wat = '\n'.join(c.name for c in children)
             message = (f'We seem to have lost {self.parent} -/-> {self.name}'
-                       f'\n{self.parent.human_uri}\n{wat}\n{self.name}')
+                       f'\n{self.parent.uri_human}\n{wat}\n{self.name}')
             log.critical(message)
             dataset = self.dataset
             maybe = []
@@ -1486,7 +1486,7 @@ class BlackfynnCache(XattrCache):
         return self.meta.file_id
 
     @property
-    def human_uri(self):
+    def uri_human(self):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
         # org /datasets/ N:dataset /viewer/ N:package
@@ -1499,7 +1499,7 @@ class BlackfynnCache(XattrCache):
             prefix = '/files/'
         elif id.startswith('N:dataset:'):
             prefix = '/'  # apparently organization needs /datasets after it
-            return self.parent.human_uri + prefix + id
+            return self.parent.uri_human + prefix + id
         elif id.startswith('N:organization:'):
             return f'https://app.blackfynn.io/{id}/datasets'
         else:
@@ -1508,10 +1508,10 @@ class BlackfynnCache(XattrCache):
         if self.dataset_id is None:
             raise exc.NotInProjectError(f'{self}')
 
-        return self.dataset.human_uri + prefix + id
+        return self.dataset.uri_human + prefix + id
 
     @property
-    def api_uri(self):
+    def uri_api(self):
         if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
             endpoint = 'datasets/' + self.id
         elif self.is_organization:

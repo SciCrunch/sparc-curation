@@ -1632,7 +1632,7 @@ class Pipeline:
         # FIXME this would seem to be where the Integration class comes in?
         # the schemas make it a bit of a dance
         adds = [[['id'], self.lifters.id],
-                [['meta', 'human_uri'], self.lifters.human_uri]]
+                [['meta', 'uri_human'], self.lifters.uri_human]]
         data = self.data_cleaned
         DictTransformer.add(data, adds)
         return data
@@ -1734,7 +1734,7 @@ class TriplesExport:
                     'errors': '',
                     'examples': '',
                     'funding': '',
-                    'human_uri': '',
+                    'uri_human': '',
                     'keywords': '',
                     'links': '',
                     'modality': '',
@@ -1889,7 +1889,7 @@ class TriplesExport:
             (owl.versionIRI, ver_ontid),
             (owl.versionInfo, rdflib.Literal(iso)),
             (isAbout, rdflib.URIRef(self.path.cache.uri_api)),
-            (TEMP.hasHumanUri, rdflib.URIRef(self.path.cache.human_uri)),
+            (TEMP.hasHumanUri, rdflib.URIRef(self.path.cache.uri_human)),
             (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
@@ -1964,7 +1964,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
         class lifters:  # do this to prevent accidental data leaks
             # context
             id = dataset.id
-            human_uri = dataset.human_uri
+            uri_human = dataset.uri_human
             # dataset metadata
             submission = lambda : (_ for _ in self.dataset.submission)
             dataset_description = lambda : (_ for _ in self.dataset.dataset_description)

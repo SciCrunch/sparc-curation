@@ -278,7 +278,7 @@ class MetaOutSchema(JSONSchema):
                       'modality',
                       'contributor_count',
                       'subject_count',
-                      'human_uri'
+                      'uri_human'
                       #'sample_count',
     ]
     schema['required'].remove('contributors')
@@ -286,7 +286,7 @@ class MetaOutSchema(JSONSchema):
     schema['properties'].pop('contributors')
     schema['properties'].update({
         'errors': ErrorSchema.schema,
-        'human_uri': {'type': 'string',
+        'uri_human': {'type': 'string',
                       'pattern': '^https://',  # FIXME proper regex
         },
         'award_number': {'type': 'string',

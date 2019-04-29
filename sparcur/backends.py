@@ -185,8 +185,8 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     # FIXME helper index should try to cooperate with the packages index?
 
-    human_uri = BlackfynnCache.human_uri
-    api_uri = BlackfynnCache.api_uri
+    uri_human = BlackfynnCache.uri_human
+    uri_api = BlackfynnCache.uri_api
 
     def __new__(cls, cache_anchor, local_class):
         if isinstance(cache_anchor, BlackfynnCache):
