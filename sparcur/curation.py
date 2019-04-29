@@ -34,6 +34,7 @@ from sparcur.schemas import (JSONSchema, ValidationError,
                              SummarySchema, DatasetOutSchema, MetaOutSchema)
 from sparcur import schemas as sc
 from sparcur import validate as vldt
+from sparcur import sheets
 from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
 import RDFClosure as rdfc
@@ -1337,7 +1338,8 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
                     _cls.setup()
 
         # unanchored helpers
-        cls.organ = OrganData()
+        cls.organs_sheet = sheets.Organs()
+        cls.organ = OrganData(organs_sheet=cls.organs_sheet)
         cls.member = MembersData(blackfynn_local_instance)
 
     def __init__(self, *args, **kwargs):
@@ -1368,6 +1370,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
             # aux
             organ = self.organ
             member = self.member
+            modality = self.organs_sheet.modality
 
             #sheets
 

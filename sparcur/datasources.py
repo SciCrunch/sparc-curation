@@ -3,7 +3,6 @@ import itertools
 from collections import defaultdict
 from pyontutils.core import OntId
 from pyontutils.utils import byCol
-from pyontutils.sheets import Sheet
 from sparcur.core import log, logd
 from sparcur.paths import Path
 from sparcur.config import config
@@ -35,56 +34,7 @@ class OntologyData:
             f.write(expanded_graph.serialize(format='nifttl'))
 
 
-# google sheets
-
-# master
-class Master(Sheet):
-    name = 'sparc-master'
-
-
-class Progress(Master):
-    sheet_name = 'Curation Progess (OT Only)'
-
-
-class Grants(Master):
-    sheet_name = 'Grant to Blackfynn to Protocols.io CLEAN'
-
-
-class ISAN(Master):
-    sheet_name = 'ISAN Demo July 2019'
-
-
-class Participants(Master):
-    sheet_name = 'Participan Notes'
-
-
-class Protocols(Master):
-    sheet_name = 'Protocol URL--> Blackfynn URL'
-
-
-# field alignment
-class FieldAlignment(Sheet):
-    name = 'sparc-field-alignment'
-
-
-class Subjects(FieldAlignment):
-    sheet_name = 'Subjects'
-
-
-class Keywords(FieldAlignment):
-    sheet_name = 'All Keywords'
-
-
-class KeywordSets(FieldAlignment):
-    sheet_name = 'Keyword sets'
-
-
-class Organs(FieldAlignment):
-    sheet_name = 'Organs'
-
-
 # other
-
 
 class OrganData:
     """ retrieve SPARC investigator data """
@@ -118,19 +68,10 @@ class OrganData:
                     '': None,
     }
 
-    manual = {
-        'OT2OD025307': organ_lookup['vagus nerve'],
-        'OT2OD023853': organ_lookup[''],
-        '': organ_lookup[''],
-        '': organ_lookup[''],
-        '': organ_lookup[''],
-        '': organ_lookup[''],
-        '': organ_lookup[''],
-    }
     cache = Path('/tmp/sparc-award-by-organ.json')
     old_cache = Path('/tmp/award-mappings-old-to-new.json')
 
-    def __init__(self, path=config.organ_html_path):
+    def __init__(self, path=config.organ_html_path, organs_sheet=None):  # FIXME bad passing in organs
         self.path = path
         if not self.cache.exists():
             self.overview()
@@ -146,10 +87,15 @@ class OrganData:
             with open(self.old_cache, 'rt') as f:
                 self.former_to_current = json.load(f)
 
-        self._org = Organs()
-        values = self._org.values
-        bc = byCol(values)
-        manual  = {award:organ for award, organ in zip(bc.award, bc.organ)}
+        if organs_sheet is not None:
+            self._org = organs_sheet
+            bc = self._org.byCol
+            self.manual  = {award if award else (award_manual if award_manual else None):[OntId(t) for t in organ_term.split(' ') if t]
+                            for award, award_manual, organ_term
+                            in zip(bc.award, bc.award_manual, bc.organ_term)
+                            if organ_term}
+        else:
+            self.manual = {}
 
         self.sourced = {v:k for k, vs in self.normalized.items() for v in vs}
         self.award_to_organ = {**self.manual, **self.sourced}

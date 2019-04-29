@@ -828,8 +828,10 @@ class Shell(Dispatcher):
         embed()
 
     def integration(self):
-        from sparcur.datasources import Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
-        from sparcur.datasources import Organs
+        from protcur.analysis import protc, Hybrid
+        from sparcur import sheets
+        #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
+        from sparcur.protocols import ProtocolData, ProtcurData
         p, *rest = self._paths
         intr = Integrator(p)
         pj = list(intr.protocol_jsons)
