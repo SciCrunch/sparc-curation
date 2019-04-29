@@ -3,11 +3,12 @@ import csv
 import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.utils import byCol
+from pysercomb.pyr.units import ProtcParameterParser
 from sparcur import schemas as sc
 from sparcur import validate as vldt
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
-from sparcur.core import log, logd
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId
 
 
 class Tabular:
@@ -358,7 +359,6 @@ class SubmissionFile(Version1Header):
     verticals = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
     schema_class = sc.SubmissionSchema
 
-    @property
     @hasSchema(sc.SubmissionSchema)
     def data_test(self):
         return self.data
@@ -412,7 +412,6 @@ class DatasetDescriptionFile(Version1Header):
     }
     schema_class = sc.DatasetDescriptionSchema
 
-    @property
     @hasSchema(sc.DatasetDescriptionSchema)
     def data_test(self):
         return super().data

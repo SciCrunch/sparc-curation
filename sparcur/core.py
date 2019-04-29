@@ -534,12 +534,13 @@ class _DictTransformer:
                                               source_key_optional=source_key_optional)
 
     @staticmethod
-    def pop(data, pops):
+    def pop(data, pops, source_key_optional=False):
         """ pops is a list with the following structure
             [source-path ...] """
 
         for source_path in pops:
-            yield adops.pop(data, source_path)
+            yield adops.apply(adops.pop, data, source_path,
+                              source_key_optional=source_key_optional)
 
     @staticmethod
     def delete(data, deletes):

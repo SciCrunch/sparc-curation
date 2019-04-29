@@ -35,6 +35,8 @@ class TripleConverter:
 
         for field, value in self._source.items():
             log.debug(f'{field}: {value}')
+            if type(field) is object:
+                continue  # the magic helper key for Pipeline
             convert = getattr(self, field, None)
             if convert is not None:
                 if isinstance(value, tuple) or isinstance(value, list):
@@ -76,6 +78,8 @@ class MetaConverter(TripleConverter):
         ['species', isAbout],
         ['organ', isAbout],
         ['subject_count', TEMP.hasNumberOfSubjects],
+        ['uri_human', TEMP.hasHumanUri],
+        ['keywords', isAbout],
         ['keywords', isAbout],
     ]
 MetaConverter.setup()  # box in so we don't forget

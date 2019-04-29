@@ -16,13 +16,12 @@ from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
-from pysercomb.pyr.units import ProtcParameterParser
 from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
 from sparcur import exceptions as exc
-from sparcur.core import JT, JEncode, OrcidId, log, logd, lj
-from sparcur.core import sparc, memory, DictTransformer, adops
+from sparcur.core import JT, JEncode, log, logd, lj
+from sparcur.core import sparc, memory, DictTransformer, adops, OntId, OntTerm
 from sparcur.paths import Path
 from sparcur import schemas as sc
 from sparcur import converters as conv
@@ -39,6 +38,8 @@ from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
 import RDFClosure as rdfc
 
+DT = DictTransformer
+De = Derives
 a = rdf.type
 
 po = CustomTurtleSerializer.predicateOrder
@@ -705,23 +706,6 @@ class DatasetData(PathData):
         # this still ok, dwe is very simple for this case
         return self._with_errors(self.schema.validate(copy.deepcopy(self.data)), self.schema)
 
-    def submission_completeness_index(self, inputs):
-        total_possible_errors = self.schema.total_possible_errors
-        data = inputs
-        if not data:
-            return 0
-        else:
-            actual_errors = 0
-            for required in self.schema.schema['required']:
-                actual_errors += 1
-                if required in data:
-                    r = list(getattr(self, required))
-                    if len(r) == 1:
-                        r = r[0]
-                        actual_errors -= r.submission_completeness_index
-
-            return (total_possible_errors - actual_errors) / total_possible_errors
-
     def dump_all(self):
         return {attr: express_or_return(getattr(self, attr))
                 for attr in dir(self) if not attr.startswith('_')}
@@ -827,13 +811,14 @@ class Pipeline:
     # by subclassing and then using super().previous_step to insert another
     # step along the way
 
-    def __init__(self, sources, lifters, helpers, helper_key):
+    def __init__(self, sources, lifters, helper_key,
+                 runtime_context):
         """ sources stay, helpers are tracked for prov and then disappear """
         #log.debug(lj(sources))
-        self._hk = helper_key
-        sources[helper_key] = helpers
+        self.helper_key = helper_key
         self.lifters = lifters
         self.pipeline_start = sources
+        self.runtime_context = runtime_context
 
     @property
     def data_lifted(self):
@@ -847,7 +832,8 @@ class Pipeline:
                 if dwe:
                     dwe, *oops = dwe
                     if oops:
-                        logd.error(f'{self.path} hass too may {section} files!')
+                        logd.error(f'{self.runtime_context.path} '
+                                   f'has too may {section} files!')
                     return dwe
 
             return lift_function
@@ -966,7 +952,7 @@ class Pipeline:
         pops = [['subjects_file'],
         ]
         data = self.data_derived_post
-        removed = list(DictTransformer.pop(data, pops))
+        removed = list(DictTransformer.pop(data, pops, source_key_optional=True))
         log.debug(f'cleaned the following values from {self}' + lj(removed))
         return data
 
@@ -980,7 +966,6 @@ class Pipeline:
         DictTransformer.add(data, adds)
         return data
 
-    @property
     @hasSchema(sc.DatasetOutSchema)
     def data_out(self):
         """ this part adds the meta bits we need after _with_errors
@@ -997,7 +982,8 @@ class Pipeline:
 
         ei = len(get_all_errors(data))
         if 'inputs' in data:
-            sci = self.submission_completeness_index(data['inputs'])
+            schema = self.__class__.data_out.schema
+            sci = Derives.submission_completeness_index(schema, data['inputs'])
         else:
             ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
             sci = 0
@@ -1294,9 +1280,6 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
 
         datasetdata = self.datasetdata
         dataset = datasetdata.dataset
-        sources = dataset.data_with_errors
-        helpers = {}
-        helper_key = object()
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dataset.id  # in case we are somewhere else
@@ -1317,8 +1300,17 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
 
             #sheets
 
+        class RuntimeContext:
+            """ utility for logging etc. """
+            path = self.path
+
+        helpers = {}
+        helper_key = object()
         lifters = Lifters()
-        pipeline = PipelineExtras(sources, lifters, helpers, helper_key)
+        sources = dataset.data_with_errors
+        sources[helper_key] = helpers
+        pipeline = PipelineExtras(sources, lifters, helper_key, RuntimeContext())
+        sources.pop(helper_key)
 
         self._data = pipeline.data
         return self._data
@@ -1331,6 +1323,12 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
     @property
     def keywords(self):
         yield from adops.get(self.data, 'meta', 'keywords')
+
+    ## sandboxed for triple export
+
+    @property
+    def subjects(self):  # XXX
+        yield from self.datasetdata.subjects
 
 
 class Summary(Integrator):
@@ -1435,7 +1433,7 @@ class Summary(Integrator):
 
         for dataset in self:
             id = dataset.id
-            dowe = dataset.data_out_with_errors
+            dowe = dataset.data
             if 'subjects' in dowe:
                 for subject in dowe['subjects']:
                     subject['dataset_id'] = id

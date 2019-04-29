@@ -454,10 +454,11 @@ class Main(Dispatcher):
 
                 latest_path.symlink_to(dump_path)
 
+            functions = []
             suffixes = []
             modes = []
             if self.options.json:  # json first since we can cache dowe
-                j = lambda f: json.dump(ft.data_out_with_errors,
+                j = lambda f: json.dump(ft.data,
                                         f, sort_keys=True, indent=2, cls=JEncode)
                 functions.append(j)
                 suffixes.append('.json')
@@ -472,7 +473,7 @@ class Main(Dispatcher):
             filename = 'curation-export'
             filepath = dump_path / filename
 
-            for suffix, mode in zip(function, suffixes, modes):
+            for function, suffix, mode in zip(functions, suffixes, modes):
                 out = filepath.with_suffix(suffix)
                 with open(out, mode) as f:
                     function(f)

@@ -2,6 +2,7 @@ import re
 from functools import wraps
 from sparcur import schemas as sc
 from sparcur.core import python_identifier
+from scibot.utils import mproperty
 
 class HasSchema:
     """ decorator for classes with methods whose output can be validated by jsonschema """
@@ -25,6 +26,7 @@ class HasSchema:
         # TODO switch for normalized output if value passes?
         schema = schema_class()
         def decorator(function):
+            @mproperty
             @wraps(function)
             def schema_wrapped_property(_self):
                 data = function(_self)
@@ -35,6 +37,9 @@ class HasSchema:
                     return norm_or_error
 
                 return data
+
+            #breakpoint()
+            schema_wrapped_property.schema = schema
             return schema_wrapped_property
         return decorator
 
@@ -95,7 +100,6 @@ class Stage:
         aug = rest
         return aug
 
-    @property
     @hasSchema(sc.JSONSchema)
     def output(self):
         aug = self.augmented

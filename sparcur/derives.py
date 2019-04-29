@@ -1,4 +1,5 @@
 from functools import wraps
+from sparcur import schemas as sc
 from sparcur import normalization as nml
 from typing import Tuple
 
@@ -82,6 +83,10 @@ class Derives:
             if mp in contributor:
                 for role in contributor[mp]:
                     normrole = nml.NormContributorRole(role)
+                    if normrole in os:
+                        yield contributor
+
+                    continue
                     if 'name' in contributor:
                         # when you look at this in confusion, realize that it is exactly
                         # as silly as you think it is
@@ -104,3 +109,24 @@ class Derives:
                 out.add(subject['species'])
 
         return tuple(out),
+
+    @staticmethod
+    def submission_completeness_index(schema, inputs):
+        schema = sc.DatasetOutSchema()
+        total_possible_errors = schema.total_possible_errors
+        data = inputs
+        if not data:
+            return 0
+
+        else:
+            actual_errors = 0
+            for required_field in schema.schema['required']:
+                jtype = schema.schema['properties'][required_field]
+                actual_errors += 1
+                if required_field in data:
+                    required_value = data[required_field]
+                    if jtype['type'] == 'object':
+                        if isinstance(required_value, dict):
+                            actual_errors -= required_value['submission_completeness_index']
+
+            return (total_possible_errors - actual_errors) / total_possible_errors
