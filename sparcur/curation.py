@@ -1428,7 +1428,7 @@ class Summary(Integrator):
             yield (accessor.error_index,
                    accessor.submission_completeness_index,
                    dataset.name,  # from filename (do we not have that in meta!?)
-                   accessor.id,
+                   accessor.id if 'id' in dowe else None,
                    accessor.query('meta', 'award_number'))
 
     def make_json(self, gen):
