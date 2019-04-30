@@ -4,6 +4,8 @@ from sparcur.core import log, sparc
 from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl
+from scibot.extract import normalizeDoi
+from pysercomb.pyr.units import ProtcParameterParser
 
 a = rdf.type
 
@@ -13,23 +15,28 @@ class TripleConverter:
     known_skipped = tuple()
     mapping = tuple()
 
-    class Extra: pass
+    class Extra:
+        def __init__(self, converter):
+            self.c = converter
+            self.integrator = converter.integrator
 
     @classmethod
     def setup(cls):
-        cls.extra = cls.Extra()
-
         for attr, predicate in cls.mapping:
             def _func(self, value, p=predicate): return p, self.l(value)
             setattr(cls, attr, _func)
 
-    def __init__(self, json_source):
+    def __init__(self, json_source, integrator=None):
         """ in case we want to do contextual things here """
         self._source = json_source
+        self.integrator = integrator
+        self.extra = self.Extra(self)
 
     def l(self, value):
         if isinstance(value, OntId):
             return value.u
+        if isinstance(value, ProtcParameterParser):
+            return value
         elif isinstance(value, str) and value.startswith('http'):
             return OntId(value).u
         else:
@@ -52,7 +59,18 @@ class TripleConverter:
                     values = value,
                 
                 for v in values:
-                    yield (subject, *convert(v))
+                    p, o = convert(v)
+                    log.debug(o)
+                    if isinstance(o, ProtcParameterParser):
+                        s = rdflib.BNode()
+                        text = o.for_text
+                        value, unit = text.split(' ')
+                        yield subject, p, s
+                        yield s, TEMP.hasValue, rdflib.Literal(value)
+                        yield s, TEMP.hasUnit, rdflib.Literal(unit)
+                    else:
+                        yield subject, p, o
+
                     if extra is not None:
                         yield from extra(v)
 
@@ -91,10 +109,26 @@ class MetaConverter(TripleConverter):
         ['keywords', isAbout],
         ['keywords', isAbout],
     ]
+
+    def protocol_url_or_doi(self, value):
+        if 'doi' in value:
+            doi = True
+        elif value.startswith('10.'):
+            value = 'doi:' + value
+            doi = True
+            
+        if doi:
+            value = OntId(normalizeDoi(value))
+        else:
+            value = rdflib.URIRef(value)
+
+        return TEMP.hasProtocol, value
+
     def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']
     class Extra:
-        def __init__(self):
-            self.c = MetaConverter({})
+        def __init__(self, converter):
+            self.c = converter
+            self.integrator = converter.integrator
 
         def award_number(self, value):
             _, s = self.c.award_number(value)
@@ -105,12 +139,20 @@ class MetaConverter(TripleConverter):
             _, s = self.c.protocol_url_or_doi(value)
             yield s, a, owl.NamedIndividual
             yield s, a, sparc.Protocol
+            pj = self.integrator.protocol(value)
+            if pj:
+                label = pj['protocol']['title']
+                yield s, rdfs.label, rdflib.Literal(label)
+                nsteps = len(pj['protocol']['steps'])
+                yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
+
+            yield from self.integrator.protcur.triples(s)
 
 MetaConverter.setup()  # box in so we don't forget
 
 
 class DatasetConverter(TripleConverter):
-    known_skipped = 'id', 'errors', 'inputs', 'subjects', 'meta'
+    known_skipped = 'id', 'errors', 'inputs', 'subjects', 'meta', 'creators'
     mapping = [
         ['error_index', TEMP.errorIndex],
         ['submission_completeness_index', TEMP.submissionCompletenessIndex],

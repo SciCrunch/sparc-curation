@@ -1,4 +1,5 @@
 import requests
+import rdflib
 from scibot.utils import resolution_chain
 from pyontutils.config import devconfig, QuietDict
 from hyputils.hypothesis import HypothesisHelper, group_to_memfile
@@ -10,11 +11,29 @@ from sparcur.core import log, cache
 from sparcur.paths import Path
 from sparcur.config import config
 
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
+from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
+
 class ProtcurData:
+
+    def __init__(self, integrator=None):
+        self.integrator = integrator
 
     def __call__(self, protocol_uri):
         protc_as_python = []  # TODO
         return protc_as_python  # downstream will deal with it
+
+    def triples(self, protocol_subject):
+        protocol_uri = str(protocol_subject)
+        #asts = list(protc.byIri(protocol_uri))  # prefix issue
+        asts = [p for p in protc if p.uri.startswith(protocol_uri)]
+        yield protocol_subject, TEMP.hasNumberOfProtcurAnnotations, rdflib.Literal(len(asts))
+
+    @classmethod
+    def setup(cls):
+        if not cls._setup_ok:
+            cls.populate_annos()
+            cls._setup_ok = True
 
     @staticmethod
     def populate_annos(group_name='sparc-curation'):

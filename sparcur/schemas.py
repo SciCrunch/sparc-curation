@@ -1,6 +1,9 @@
 import copy
 import jsonschema
 
+# FIXME these imports should not be here types rules should be set in another way
+import rdflib
+from pyontutils.core import OntId, OntTerm
 
 class ValidationError(Exception):
     def __init__(self, errors):
@@ -29,7 +32,8 @@ class JSONSchema(object):
 
     def __init__(self):
         format_checker = jsonschema.FormatChecker()
-        types = dict(array=(list, tuple))
+        types = dict(array=(list, tuple),
+                     string=(str, rdflib.URIRef, rdflib.Literal, OntId, OntTerm))
         self.validator = jsonschema.Draft6Validator(self.schema,
                                                     format_checker=format_checker,
                                                     types=types)

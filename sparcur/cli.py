@@ -11,12 +11,12 @@ Usage:
     spc tables [<directory>...]
     spc missing
     spc xattrs
-    spc export [ttl json]
+    spc export [ttl json datasets] [options]
     spc demos
     spc shell [integration]
     spc feedback <feedback-file> <feedback>...
     spc find [options] --name=<PAT>...
-    spc meta [--uri] [<path>...]
+    spc meta [--uri] [--browser] [<path>...]
 
 Commands:
     clone     clone a remote project (creates a new folder in the current directory)
@@ -41,7 +41,10 @@ Options:
     -L --level=LEVEL        how deep to go in a refresh
     -n --name=<PAT>         filename pattern to match (like find -name)
     -u --uri                print the human uri for the path in question
-    -a --project-path=<PTH> set the project path manually
+    -a --uri-api            print the api uri for the path in question
+    -h --uri-human          print the human uri for the path in question
+    -b --browser            open the uri in default browser
+    --project-path=<PTH>    set the project path manually
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
     -m --only-meta          only pull known dataset metadata files
@@ -54,6 +57,7 @@ Options:
     -C --sort-count-desc    sort by count, largest first
 
     -U --upload             update remote target (e.g. a google sheet) if one exists
+    -N --no-google          hack for ipv6 issues
 
     -d --debug              drop into a shell after running a step
     -v --verbose            print extra information
@@ -211,6 +215,8 @@ class Main(Dispatcher):
         if not self.options.verbose:
             log.setLevel('INFO')
             logd.setLevel('INFO')
+
+        Integrator.no_google = self.options.no_google
 
         if self.options.clone or self.options.meta:
             # short circuit since we don't know where we are yet
@@ -437,6 +443,7 @@ class Main(Dispatcher):
     def export(self):
         """ export output of curation workflows to file """
         #org_id = Integrator(self.project_path).organization.id
+
         cwd = Path.cwd()
         timestamp = datetime.now().isoformat().replace('.', ',')
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
@@ -521,6 +528,21 @@ class Main(Dispatcher):
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
 
+        if self.options.datasets:
+            dataset_dump_path = dump_path / 'datasets'
+            dataset_dump_path.mkdir()
+            suffix = '.ttl'
+            mode = 'wb'
+            for d in summary:
+                filepath = dataset_dump_path / d.id
+                out = filepath.with_suffix(suffix)
+                with open(out, 'wb') as f:
+                    f.write(d.ttl)
+
+                print(f'dataset graph exported to {out}')
+
+            return
+
         if self.options.debug:
             embed()
 
@@ -542,8 +564,7 @@ class Main(Dispatcher):
             embed()
 
     def stats(self):
-        args = self.args
-        dirs = args['<directory>']
+        dirs = self.options.directory
         if not dirs:
             dirs.append('.')
 
@@ -648,10 +669,9 @@ class Main(Dispatcher):
         print(repr(tabular_view_demo))
 
     def find(self):
-        args = self.args
         paths = []
-        if self.options.name: #args['--name']:
-            patterns = self.options.name #args['--name']
+        if self.options.name:
+            patterns = self.options.name
             path = Path('.').resolve()
             for pattern in patterns:
                 # TODO filesize mismatches on non-fake
@@ -695,9 +715,8 @@ class Main(Dispatcher):
                 print(f'skipped = {n_skipped:<10}rate = {self.options.rate}')
 
     def feedback(self):
-        args = self.args
-        file = args['<feedback-file>']
-        feedback = ' '.join(args['<feedback>'])
+        file = self.options.feedback_file
+        feedback = ' '.join(self.options.feedback)
         path = Path(file).resolve()
         eff = Integrator(path)
         # TODO pagenote and/or database
@@ -710,6 +729,9 @@ class Main(Dispatcher):
         self.bfl.populate_metastore()
 
     def meta(self):
+        if self.options.browser:
+            import webbrowser
+
         BlackfynnCache._local_class = Path  # since we skipped _setup
         paths = self.paths
         if not paths:
@@ -718,10 +740,15 @@ class Main(Dispatcher):
         old_level = log.level
         log.setLevel('ERROR')
         def inner(path):
-            if self.options.uri:
+            if self.options.uri or self.options.uri_human:
                 uri = path.cache.uri_human
-                print('+' + '-' * (len(uri) + 2) + '+')
-                print(f'| {uri} |')
+                if self.options.browser:
+                    webbrowser.open(uri)
+                else:
+                    print('+' + '-' * (len(uri) + 2) + '+')
+                    print(f'| {uri} |')
+                 
+                
             try:
                 meta = path.cache.meta
                 if meta is not None:

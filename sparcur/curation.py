@@ -38,6 +38,8 @@ from sparcur import sheets
 from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
 import RDFClosure as rdfc
+from pysercomb.pyr.units import ProtcParameter
+from pyontutils.utils import byCol as _byCol
 
 
 DT = DictTransformer
@@ -46,7 +48,9 @@ a = rdf.type
 
 po = CustomTurtleSerializer.predicateOrder
 po.extend((sparc.firstName,
-           sparc.lastName))
+           sparc.lastName,
+           TEMP.hasValue,
+           TEMP.hasUnit,))
 
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
@@ -1133,6 +1137,7 @@ class TriplesExport:
                     'examples': '',
                     'funding': '',
                     'uri_human': '',
+                    'uri_api': '',
                     'keywords': '',
                     'links': '',
                     'modality': '',
@@ -1160,12 +1165,18 @@ class TriplesExport:
                             yield s, p, o
 
                 else:
-                    log.error('wtf error {k}')
+                    log.error(f'wtf error {k}')
         if 'contributors' in data:
+            if 'creators' in data:
+                creators = data['creators']
+            else:
+                creators = []
             for c in data['contributors']:
-                yield from self.triples_contributors(c)
+                creator = ('name' in c and
+                           [cr for cr in creators if 'name' in cr and cr['name'] == c['name']])
+                yield from self.triples_contributors(c, creator=creator)
 
-    def triples_contributors(self, contributor):
+    def triples_contributors(self, contributor, creator=False):
         try:
             dsid = self.uri_api
         except BaseException as e:  # FIXME ...
@@ -1206,6 +1217,9 @@ class TriplesExport:
         yield s, TEMP.contributorTo, rdflib.URIRef(dsid)
         converter = conv.ContributorConverter(contributor)
         yield from converter.triples_gen(s)
+        if creator:
+            yield s, TEMP.creatorOf, rdflib.URIRef(dsid)
+
         return
         for field, value in contributor.items():
             convert = getattr(converter, field, None)
@@ -1216,18 +1230,6 @@ class TriplesExport:
                     pass
                 else:
                     log.warning(f'Unhandled contributor field: {field}')
-
-        return
-
-        for k, p in kps:  # FIXME backwards
-            try:
-                _v = contributor[k]
-                for v in (_v if isinstance(_v, tuple) or isinstance(_v, list) else (_v,)):
-
-                    convert = getattr(converter, field, None)
-                    yield s, p, rdflib.Literal(v)
-            except KeyError:
-                continue
 
     @property
     def triples(self):
@@ -1240,7 +1242,7 @@ class TriplesExport:
             return
 
         if 'meta' in data:
-            meta_converter = conv.MetaConverter(data['meta'])
+            meta_converter = conv.MetaConverter(data['meta'], self)
             yield from meta_converter.triples_gen(dsid)
         else:
             log.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
@@ -1249,8 +1251,10 @@ class TriplesExport:
         yield from converter.triples_gen(dsid)
 
         def id_(v):
-            yield rdflib.URIRef(dsid), a, owl.NamedIndividual
-            yield rdflib.URIRef(dsid), a, sparc.Resource
+            s = rdflib.URIRef(dsid)
+            yield s, a, owl.NamedIndividual
+            yield s, a, sparc.Resource
+            yield s, rdfs.label, rdflib.Literal(self.name)
 
         def subject_id(v, species=None):  # TODO species for human/animal
             v = v.replace(' ', '%20')  # FIXME use quote urlencode
@@ -1260,8 +1264,8 @@ class TriplesExport:
         yield from id_(self.id)
         for subjects in self.subjects:
             for s, p, o in subjects.triples_gen(subject_id):
-                if type(s) == str:
-                    breakpoint()
+                #if type(s) == str:
+                    #breakpoint()
                 yield s, p, o
 
         yield from self.ddt(data)
@@ -1306,7 +1310,12 @@ class TriplesExport:
     def populate(self, graph):
         OntCuries.populate(graph)  # ah smalltalk thinking
         [graph.add(t) for t in self.triples_header]
-        [graph.add(t) for t in self.triples]
+        [graph.add(t) for t in self.triples
+         if not (lambda: (log.error(t)
+                          if any(isinstance(_, ProtcParameter)
+                                 or (hasattr(_, '_value') and isinstance(_._value, ProtcParameter))
+                                 for _ in t)
+                          else None))()]
 
 
 class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
@@ -1326,6 +1335,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
         # TODO sheets
     )
 
+    no_google = None
 
     @classmethod
     def setup(cls, blackfynn_local_instance):
@@ -1338,13 +1348,23 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
                     _cls.setup()
 
         # unanchored helpers
-        cls.organs_sheet = sheets.Organs()
+        if not cls.no_google:
+            class asdf:
+                modality = lambda v: None
+                organ_term = lambda v: None
+                byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
+            cls.organs_sheet = asdf
+        else:
+            cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
+
         cls.organ = OrganData(organs_sheet=cls.organs_sheet)
+        cls.organ = OrganData()
         cls.member = MembersData(blackfynn_local_instance)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasetdata = DatasetData(self.path)
+        self.protcur = ProtcurData(self)
 
     @property
     def data(self):
@@ -1502,6 +1522,8 @@ class Summary(Integrator):
         def normv(v):
             if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
                 return OntId(v).curie
+            if isinstance(v, ProtcParameter):
+                return v.for_text
             else:
                 #log.debug(repr(v))
                 return v

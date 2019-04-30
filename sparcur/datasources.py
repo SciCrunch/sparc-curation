@@ -98,7 +98,7 @@ class OrganData:
             self.manual = {}
 
         self.sourced = {v:k for k, vs in self.normalized.items() for v in vs}
-        self.award_to_organ = {**self.manual, **self.sourced}
+        self.award_to_organ = {**self.sourced, **self.manual}  # manual override
 
     def overview(self):
         with open(self.path, 'rb') as f:
