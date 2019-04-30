@@ -550,7 +550,7 @@ class Main(Dispatcher):
         from protcur.analysis import protc, Hybrid
         from sparcur.protocols import ProtcurSource
         ProtcurSource.populate_annos()
-        if self.options.export
+        if self.options.export:
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
