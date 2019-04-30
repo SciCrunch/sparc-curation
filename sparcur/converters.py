@@ -146,7 +146,7 @@ class MetaConverter(TripleConverter):
                 nsteps = len(pj['protocol']['steps'])
                 yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
 
-            yield from self.integrator.protcur.triples(s)
+            yield from self.integrator.triples_protcur(s)
 
 MetaConverter.setup()  # box in so we don't forget
 

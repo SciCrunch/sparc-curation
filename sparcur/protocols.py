@@ -1,6 +1,7 @@
 import requests
 import rdflib
 from scibot.utils import resolution_chain
+from pyontutils import combinators as cmb
 from pyontutils.config import devconfig, QuietDict
 from hyputils.hypothesis import HypothesisHelper, group_to_memfile
 from protcur import namespace_mappings as nm
@@ -10,33 +11,65 @@ from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur.core import log, cache
 from sparcur.paths import Path
 from sparcur.config import config
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, sparc
 
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 
 class ProtcurData:
 
-    def __init__(self, integrator=None):
-        self.integrator = integrator
+    def __init__(self, *args, **kwargs):
+        super().__init__()  # this is the last in the chain atm
 
     def __call__(self, protocol_uri):
         protc_as_python = []  # TODO
         return protc_as_python  # downstream will deal with it
 
-    def triples(self, protocol_subject):
+    def triples_protcur(self, protocol_subject):
         protocol_uri = str(protocol_subject)
         #asts = list(protc.byIri(protocol_uri))  # prefix issue
-        asts = [p for p in protc if p.uri.startswith(protocol_uri)]
-        yield protocol_subject, TEMP.hasNumberOfProtcurAnnotations, rdflib.Literal(len(asts))
+        ps = [p for p in protc if p.uri.startswith(protocol_uri)]
+        if not ps:
+            log.error(f'could not find annotations for {protocol_uri}')
+            return
+        p = ps[0]
+        if p.document.otherVersionUri:  # FIXME also maybe check /abstract?
+            other_uri = p.document.otherVersionUri
+            ps += [p for p in protc if p.uri.startswith(other_uri)]
+
+        anatomy = [(p, OntId('UBERON:' + str(p).split('UBERON:', 1)[-1].split(' ', 1)[0])) for p in ps
+                   if p.astType == 'protc:input' and '(protc:input (term UBERON' in str(p)]
+        #breakpoint()
+        dataset_subject = rdflib.URIRef(self.uri_api)
+        yield protocol_subject, TEMP.hasNumberOfProtcurAnnotations, rdflib.Literal(len(ps))
+        done = set()
+        for anno, term in anatomy:
+            if term in done:
+                continue
+
+            done.add(term)
+            o = term.u
+            t = dataset_subject, TEMP.involvesAnatomicalRegion, o
+            sl = rdflib.URIRef(anno.shareLink)
+            av = (((ilxtr.annotationValue, rdflib.Literal(anno.value)),)
+                  if anno.value != o else tuple())
+            notes = [(ilxtr.curatorNote, rdflib.Literal(n)) for n in anno.curatorNotes]
+            prov = [(ilxtr.hasAnnotation, sl)]
+            yield t
+            yield from cmb.annotation(t, *av, *notes, *prov)()
 
     @classmethod
     def setup(cls):
-        if not cls._setup_ok:
+        if not hasattr(cls, '_setup_ok'):
             cls.populate_annos()
             cls._setup_ok = True
 
     @staticmethod
     def populate_annos(group_name='sparc-curation'):
+        from hyputils import hypothesis as hyp
+        if hyp.api_token == 'TOKEN':  # FIXME does not work
+            hyp.api_token = devconfig.secrets('hypothesis', 'api', devconfig.hypothesis_api_user)
+
         group = devconfig.secrets('hypothesis', 'group', group_name)
         get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group + 'sparcur'),
                                                               helpers=(HypothesisHelper, Hybrid, protc),
@@ -118,4 +151,4 @@ class ProtocolData:
         if resp.ok:
             return j
         else:
-            log.error(f"protocol no access {uri} '{self.dataset.id if self.dataset else self.id}'")
+            log.error(f"protocol no access {uri} '{self.datasetdata.dataset.id if self.datasetdata else self.id}'")

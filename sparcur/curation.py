@@ -1042,6 +1042,15 @@ class Pipeline:
             data['submission_completeness_index'] = 0
             log.debug('pipeline skipped to end due to errors')
 
+        if 'award_number' not in data['meta']:
+            am = self.lifters.award_manual
+            if am:
+                data['meta']['award_number'] = am
+        if 'modality' not in data['meta']:
+            m = self.lifters.modality
+            if m:
+                data['meta']['modality'] = m
+
         return data
 
     @property
@@ -1318,7 +1327,7 @@ class TriplesExport:
                           else None))()]
 
 
-class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
+class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurData):
     """ pull everything together anchored to the DatasetData """
     # note that mro means that we have to run methods backwards
     # so any class that uses something produced by a function
@@ -1348,10 +1357,11 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
                     _cls.setup()
 
         # unanchored helpers
-        if not cls.no_google:
+        if cls.no_google:
             class asdf:
                 modality = lambda v: None
                 organ_term = lambda v: None
+                award_manual = lambda v: None
                 byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
             cls.organs_sheet = asdf
         else:
@@ -1364,7 +1374,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasetdata = DatasetData(self.path)
-        self.protcur = ProtcurData(self)
+        #self.protcur = ProtcurData(self)
 
     @property
     def data(self):
@@ -1390,7 +1400,8 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData):
             # aux
             organ = self.organ
             member = self.member
-            modality = self.organs_sheet.modality
+            modality = self.organs_sheet.modality(id)
+            award_manual = self.organs_sheet.award_manual(id)
 
             #sheets
 
