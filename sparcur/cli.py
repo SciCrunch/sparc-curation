@@ -351,7 +351,7 @@ class Main(Dispatcher):
         yield from inner(paths)
 
     def clone(self):
-        project_id = self.args['<project-id>']
+        project_id = self.options.project_id
         if project_id is None:
             print('no remote project id listed')
             sys.exit(4)
@@ -547,17 +547,16 @@ class Main(Dispatcher):
             embed()
 
     def annos(self):
-        args = self.args
         from protcur.analysis import protc, Hybrid
         from sparcur.protocols import ProtcurSource
         ProtcurSource.populate_annos()
-        if args['export']:
+        if self.options.export
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
         all_blackfynn_uris = set(u for d in self.summary for u in d.protocol_uris_resolved)
         all_hypotehsis_uris = set(a.uri for a in protc)
-        if args['shell'] or self.options.debug:
+        if self.options.shell or self.options.debug:
             p, *rest = self._paths
             f = Integrator(p)
             all_annos = [list(protc.byIri(uri)) for uri in f.protocol_uris_resolved]
