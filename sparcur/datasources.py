@@ -1,8 +1,11 @@
 import json
 import itertools
 from collections import defaultdict
+from urllib.parse import urlparse, parse_qs
+import requests
 from pyontutils.core import OntId
 from pyontutils.utils import byCol
+from sparcur import normalization as nml
 from sparcur.core import log, logd
 from sparcur.paths import Path
 from sparcur.config import config
@@ -30,7 +33,7 @@ class OntologyData:
          for t in self.triples()]
         closure = rdfc.OWLRL_Semantics
         rdfc.DeductiveClosure(closure).expand(expanded_graph)
-        with open('/tmp/reasoned-curation-export.ttl', 'wb') as f:
+        with open(Path(config.cache_dir, 'reasoned-curation-export.ttl'), 'wb') as f:
             f.write(expanded_graph.serialize(format='nifttl'))
 
 
@@ -38,6 +41,9 @@ class OntologyData:
 
 class OrganData:
     """ retrieve SPARC investigator data """
+
+    url = ('https://commonfund.nih.gov/sites/default/'
+           'files/sparc_nervous_system_graphic/main.html')
 
     def organ(self, award_number):
         if award_number in self.manual and award_number not in self.sourced:
@@ -68,8 +74,8 @@ class OrganData:
                     '': None,
     }
 
-    cache = Path('/tmp/sparc-award-by-organ.json')
-    old_cache = Path('/tmp/award-mappings-old-to-new.json')
+    cache = Path(config.cache_dir, 'sparc-award-by-organ.json')
+    old_cache = Path(config.cache_dir, 'award-mappings-old-to-new.json')
 
     def __init__(self, path=config.organ_html_path, organs_sheet=None):  # FIXME bad passing in organs
         self.path = path
@@ -101,8 +107,12 @@ class OrganData:
         self.award_to_organ = {**self.sourced, **self.manual}  # manual override
 
     def overview(self):
-        with open(self.path, 'rb') as f:
-            soup = BeautifulSoup(f.read(), 'lxml')
+        if self.path.exists():
+            with open(self.path, 'rb') as f:
+                soup = BeautifulSoup(f.read(), 'lxml')
+        else:
+            resp = requests.get(self.url)
+            soup = BeautifulSoup(requests.content, 'lxml')
 
         self.raw = {}
         self.former_to_current = {}

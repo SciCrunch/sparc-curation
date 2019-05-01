@@ -4,7 +4,6 @@ import json
 import math
 import hashlib
 from types import GeneratorType
-from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 from itertools import chain
 from collections import defaultdict, deque
