@@ -7,7 +7,7 @@ Usage:
     spc fetch [options] [<path>...]
     spc annos [export shell]
     spc stats [<directory>...]
-    spc report [completeness filetypes keywords subjects errors] [options]
+    spc report [completeness filetypes keywords subjects errors test] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -695,11 +695,15 @@ class Main(Dispatcher):
 
 class Report(Dispatcher):
 
+    paths = Main.paths
+    _paths = Main._paths
+
     @property
     def _sort_key(self):
-        return (lambda kv: -kv[-1]
-                if self.options.sort_count_desc else
-                lambda kv: kv)
+        if self.options.sort_count_desc:
+            return lambda kv: -kv[-1]
+        else:
+            return lambda kv: kv
 
     def filetypes(self):
         key = self._sort_key
@@ -709,7 +713,8 @@ class Report(Dispatcher):
         def count(thing):
             return sorted([(k if k else '', v) for k, v in
                             Counter([getattr(f, thing)
-                                    for f in paths]).items()], key=key)
+                                     for f in paths]).items()], key=key)
+
         each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
 
         for title, rows in each.items():
@@ -747,6 +752,10 @@ class Report(Dispatcher):
                     for dataset in self.summary]
         rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
         self._print_table(rows, title='Keywords Report')
+
+    def test(self):
+        rows = [['hello', 'world'], [1, 2]]
+        self._print_table(rows, title='Report Test')
 
     def errors(self):
         pprint.pprint([get_all_errors(d) for d in self.summary.data['datasets']])
