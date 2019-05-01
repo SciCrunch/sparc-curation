@@ -12,7 +12,10 @@ def get_auth_code(url):
     br = robobrowser.RoboBrowser()
     br.open(url)
     form = br.get_form(id=0)
+    if form is None:
+        raise ValueError('No form! Do you have the right client id?')
     print(form)
+    print('protocols.io OAuth form')
     form['email'].value = input('Email: ')
     form['password'].value = getpass()
     br.submit_form(form)
