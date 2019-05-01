@@ -13,7 +13,7 @@ def get_auth_code(url):
     br.open(url)
     form = br.get_form(id=0)
     if form is None:
-        raise ValueError('No form! Do you have the right client id?')
+        raise ValueError('No form! Do you have the right client id?\n{url}')
     print(form)
     print('protocols.io OAuth form')
     form['email'].value = input('Email: ')
