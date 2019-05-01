@@ -449,9 +449,15 @@
       =(-> google api creds-file)=
       https://developers.google.com/identity/protocols/OAuth2
       https://developers.google.com/api-client-library/python/guide/aaa_oauth
-      You will need to get API access for a services account using the create services account key option.
+
+      You will need to get API access for a OAuth client.
+      https://console.developers.google.com/apis/credentials
+      create credentials -> OAuth client ID
+      Fill in the consent screen, you only need the Application name field.
+      Download JSON
       Get the document ids for =(-> google sheets sparc-master)= and =(-> google sheets sparc-consistency)=.
       Document id matches this pattern https://docs.google.com/spreadsheets/d/{document_id}/edit.
+
 **** Protocol annotation set up
 ***** Hypothes.is
       #+CAPTION: as your user Install the hypothesis client in chrome.
@@ -463,6 +469,9 @@
 ***** protocols.io
       To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
       login, and go to your [[https://www.protocols.io/developers][developer page]].
+      You will need to set the redirect uri on that page to match the redirect uri
+      in the json below.
+
       Use the information from that page to fill in a json file with the structure below.
       Add the full path to that json file to =(-> protocols-io api creds-file)= in secrets.yaml
       like you did for the google json file.
@@ -481,6 +490,8 @@
         }
       #+END_SRC
 
+      You will be prompted for your protocols.io email and password the first
+      time you run.
 * Workflows
 ** General
 *** Staying up to date
@@ -502,11 +513,16 @@
     #+BEGIN_SRC bash :results none
       pushd ~/files/blackfynn_local/
       spc clone  # initialize a new repo and pull existing structure
-      scp refresh -g
+      scp refresh -f
       spc fetch  # actually download files
-      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv'  # see what to fetch
-      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -f  # fetch
-      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -f -r 10  # slow down you are seeing errors!
+      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'  # see what to fetch
+      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f  # fetch
+      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f -r 10  # slow down you are seeing errors!
+    #+END_SRC
+
+    #+CAPTION:
+    #+BEGIN_SRC bash :results none
+
     #+END_SRC
 
     Pull local copy of data to a new computer. Note the double escape needed for the space.
