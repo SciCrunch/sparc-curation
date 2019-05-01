@@ -36,7 +36,6 @@ from sparcur import validate as vldt
 from sparcur import sheets
 from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
-import RDFClosure as rdfc
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.utils import byCol as _byCol
 
