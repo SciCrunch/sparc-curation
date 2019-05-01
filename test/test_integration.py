@@ -68,7 +68,7 @@ def populate_tests(only=tuple(), do_mains=True):
              'curation':None,
             }
 
-    mains['cli'] = [args + ['-p', project_path.as_posix()] for args in mains['cli']]
+    mains['cli'] = [args + ['-p', project_path.as_posix(), '-N'] for args in mains['cli']]
     if 'CI' not in os.environ:
         pass
 
