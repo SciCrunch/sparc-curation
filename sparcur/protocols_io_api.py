@@ -1,3 +1,4 @@
+import sys
 import json
 from urllib import parse
 from pathlib import Path
@@ -13,13 +14,30 @@ def get_auth_code(url):
     br.open(url)
     form = br.get_form(id=0)
     if form is None:
-        raise ValueError('No form! Do you have the right client id?\n{url}')
+        raise ValueError('No form! Do you have the right client id?')
+    print('If you registered using google please navigate to\n'
+          'the url below and leave email and password blank.')
+    print()
+    print(url)
+    print()
     print(form)
+    print()
     print('protocols.io OAuth form')
-    form['email'].value = input('Email: ')
-    form['password'].value = getpass()
-    br.submit_form(form)
-    params = dict(parse.parse_qsl(parse.urlsplit(br.url).query))
+    e = form['email'].value = input('Email: ')
+    p = form['password'].value = getpass()
+    if e and p:
+        br.submit_form(form)
+        params = dict(parse.parse_qsl(parse.urlsplit(br.url).query))
+
+    elif (not e or not p) or 'code' not in params:
+        print('If you are logging in via a 3rd party services\n'
+              'please paste the redirect url in the prompt')
+        manual_url = input('redirect url: ')
+        params = dict(parse.parse_qsl(parse.urlsplit(manual_url).query))
+        if 'code' not in params:
+            print('No auth code provided. Exiting ...')
+            sys.exit(10)
+
     code = params['code']
     return code
 
