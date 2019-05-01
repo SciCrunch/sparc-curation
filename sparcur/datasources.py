@@ -12,7 +12,6 @@ from sparcur.config import config
 from bs4 import BeautifulSoup
 
 # ontology files
-
 class OntologyData:
 
     def _mis_graph(self):

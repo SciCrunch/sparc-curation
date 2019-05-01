@@ -28,6 +28,15 @@ class Protocols(Master):
     sheet_name = 'Protocol URL--> Blackfynn URL'
 
 
+# reports
+class CurationReports(Sheet):
+    name = 'sparc-curation-reports'
+
+
+class Completeness(Sheet):
+    sheet_name = 'Completeness'
+
+
 # field alignment
 class FieldAlignment(Sheet):
     name = 'sparc-field-alignment'
@@ -72,4 +81,3 @@ class Organs(FieldAlignment):
     def award_manual(self, dataset_id):
         row = self.byCol.searchIndex('id', dataset_id)
         return row.award_manual if row.award else None
-
