@@ -179,10 +179,14 @@ class RemotePath:
         self.cache.bootstrap(self.meta, recursive=recursive, only=only, skip=skip)
 
     def __init__(self, id, cache=None):
-        self.id = id
+        self._id = id
         if cache is not None:
-            self.cache = cache
+            self._cache = cache
             self.cache._remote = self
+
+    @property
+    def id(self):
+        return self._id
 
     @property
     def errors(self):
@@ -243,11 +247,6 @@ class RemotePath:
             RemotePath code expects this function to return a RemotePath
             NOT a string as is the case for core pathlib. """
         raise NotImplementedError
-
-    @property
-    def id(self):
-        raise NotImplementedError
-        self.remote_thing.id_from_machine_id_and_path(self)
 
     @property
     def _meta(self):  # catch stragglers
@@ -577,22 +576,7 @@ class CachePath(AugmentedPath):
                     self._in_bootstrap = self._cache_parent._in_bootstrap
 
                 if path.local is not None:  # this might be the very fist time local is called
-                    #log.debug('setting local')
                     self._local = path.local
-
-                #if hasattr(path, '_remote'):
-                    # have to check for private to avoid infinite recursion
-                    # when searching for meta (which is what we are doing right now if we get here)
-                    # FIXME pretty sure the way we have it now there _always_ has to be a remote
-                    # which is not what we want >_<
-                    #log.debug('setting remote')
-                    #if meta is not None:
-                        #self.meta = meta
-                    #else:
-                        #raise TypeError('you have managed to have a remote but pass no meta ?!')
-
-                    #if not hasattr(path, '_in_bootstrap'):  # FIXME this seems wrong?
-                    #self._remote = path.remote  # no, use cache parent
 
             elif isinstance(path, LocalPath):
                 self._local = path
@@ -619,6 +603,12 @@ class CachePath(AugmentedPath):
                 raise exc.NoCachedMetadataError(self.local)
 
         super().__init__()
+
+    @property
+    def anchor(self):
+        raise NotImplementedError('You need to define the rule for determining '
+                                  'the root for \'remote\' paths. These are sort '
+                                  'of like pseudo mount points.')
 
     @property
     def is_helper_cache(self):
@@ -845,7 +835,8 @@ class CachePath(AugmentedPath):
             self._bootstrapping_id = id  # so we set it again
             anchor = self  # could double check if the id has the info too ...
 
-        if self._remote_class_factory is not None:
+        if self._remote_class_factory is not None or (hasattr(self, '_remote_class') and
+                                                      self._remote_class is not None):
             # we don't have to have a remote configured to check the cache
             if not hasattr(self, '_remote_class'):
                 #log.debug('rc')
@@ -905,7 +896,6 @@ class CachePath(AugmentedPath):
                                               f'{self.id} != {pathmeta.id}\n{pathmeta}')
 
         self._meta = pathmeta
-
 
     def recover_meta(self):
         """ rebuild restore reconnect """
@@ -1014,6 +1004,22 @@ class CachePath(AugmentedPath):
         if remote is None and (target is None or meta is None):
             raise TypeError('either remote or meta and target are required arguments')
 
+        # deal with moving to a different directory that might not even exist yet
+        if target is None:
+            _target = self.anchor / remote
+        else:
+            _target = target
+
+        common = self.commonpath(_target).absolute()
+        parent = self.parent.absolute()
+        if common != parent:
+            _id = remote.id if remote else meta.id
+            log.warning('A parent of current file has changed location!\n'
+                        f'{common}\n{self.relative_to(common)}\n'
+                        f'{target.relative_to(common)}\n{_id}')
+
+            raise NotImplementedError('Need to finish this.')
+
         if remote:
             target = self.anchor / remote  # the magic of division!
             # this also updates the cache for remote
@@ -1027,13 +1033,6 @@ class CachePath(AugmentedPath):
         if target.absolute() == self.absolute():
             log.warning(f'trying to move a file onto itself {self.absolute()}')
             return target
-
-        common = self.commonpath(target)
-        if common != self.parent:
-            log.warning('A parent of current file has changed location!\n'
-                        f'{common}\n{self.relative_to(common)}\n{target.relative_to(common)}')
-
-            breakpoint()
 
         if target.exists() or target.is_broken_symlink():
             if target.id == remote.id:
@@ -1091,20 +1090,10 @@ class XattrCache(CachePath, XattrPath):
 
     @property
     def meta(self):
-        #if hasattr(self, '_meta'):
-            #return self._meta
-
         if self.exists():
             xattrs = self.xattrs()
-            pathmeta = PathMeta.from_xattrs(self.xattrs(), self.xattr_prefix, self)
+            pathmeta = PathMeta.from_xattrs(xattrs, self.xattr_prefix, self)
             return pathmeta
-        #else:
-            #return super().meta
-
-    #@meta.setter
-    #def meta(self, pathmeta):
-        # sigh
-        #self._meta_setter(pathmeta)
 
     def _meta_setter(self, pathmeta, memory_only=False):
         #log.warning(f'!!!!!!!!!!!!!!!!!!!!!!!!2 {self}')
@@ -1226,6 +1215,7 @@ class SymlinkCache(CachePath):
         else:
             raise exc.PathExistsError(f'Path exists {self}')
 
+
 def cleanup(func):
     @wraps(func)
     def inner(self):
@@ -1240,17 +1230,13 @@ def cleanup(func):
                 else:
                     pass
 
-                #self.recover_meta()
             else:
                 return meta
             
     return inner
 
-class BlackfynnCache(XattrCache):
-    xattr_prefix = 'bf'
-    _backup_cache = SqliteCache
-    _not_exists_cache = SymlinkCache
 
+class PrimaryCache(CachePath):
     @property
     def meta(self):
         #if hasattr(self, '_in_bootstrap'):
@@ -1312,6 +1298,42 @@ class BlackfynnCache(XattrCache):
 
         if hasattr(self, '_id'):
             delattr(self, '_id')
+
+    @property
+    def children(self):
+        """ direct children """
+        # if you want the local children go on local
+        # this will give us the remote children in the local context
+        # going in the reverse direction with parents
+        # we don't do because the parents here are already defined
+        # if a file has moved on the remote we can detect that and error for now
+        for child_remote in self.remote.children:
+            child_cache = self / child_remote
+            yield child_cache
+
+    @property
+    def rchildren(self):
+        # have to express the generator to build the index
+        # otherwise child.parents will not work correctly (annoying)
+        for child_remote in self.remote.rchildren:
+            args = child_remote._parts_relative_to(self.remote)  # usually this would just be one level
+            child_cache = self._make_child(args, child_remote)
+            #child_cache = self
+            #child_path = self.__class__(self, *args)
+            #child_path.remote = child
+
+            yield child_cache
+
+        # if organization
+        # if dataset (usually going to be the fastest in most cases)
+        # if collection (can end up very slow)
+        # if package/file
+
+
+class BlackfynnCache(XattrCache, PrimaryCache):
+    xattr_prefix = 'bf'
+    _backup_cache = SqliteCache
+    _not_exists_cache = SymlinkCache
 
     @classmethod
     def decode_value(cls, field, value):
@@ -1424,36 +1446,6 @@ class BlackfynnCache(XattrCache):
 
         return 'https://api.blackfynn.io/' + endpoint
 
-    @property
-    def children(self):
-        """ direct children """
-        # if you want the local children go on local
-        # this will give us the remote children in the local context
-        # going in the reverse direction with parents
-        # we don't do because the parents here are already defined
-        # if a file has moved on the remote we can detect that and error for now
-        for child_remote in self.remote.children:
-            child_cache = self / child_remote
-            yield child_cache
-
-    @property
-    def rchildren(self):
-        # have to express the generator to build the index
-        # otherwise child.parents will not work correctly (annoying)
-        for child_remote in self.remote.rchildren:
-            args = child_remote._parts_relative_to(self.remote)  # usually this would just be one level
-            child_cache = self._make_child(args, child_remote)
-            #child_cache = self
-            #child_path = self.__class__(self, *args)
-            #child_path.remote = child
-
-            yield child_cache
-
-        # if organization
-        # if dataset (usually going to be the fastest in most cases)
-        # if collection (can end up very slow)
-        # if package/file
-
 
 class LocalPath(XattrPath):
     # local data about remote objects
@@ -1486,8 +1478,9 @@ class LocalPath(XattrPath):
 
     def cache_init(self, id_or_meta):
         """ wow it took way too long to realize this was the way to do it >_< """
-        if self.cache:
-            raise ValueError('Cache already exists! {self.cache}')
+        if self.cache.meta:
+            raise ValueError(f'Cache already exists! {self.cache}\n'
+                             f'{self.cache.meta}')
 
         if not isinstance(id_or_meta, PathMeta):
             id_or_meta = PathMeta(id=id_or_meta)

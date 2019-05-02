@@ -26,6 +26,7 @@ class ProtcurData:
         return protc_as_python  # downstream will deal with it
 
     def triples_protcur(self, protocol_subject):
+        self.lazy_setup()
         protocol_uri = str(protocol_subject)
         #asts = list(protc.byIri(protocol_uri))  # prefix issue
         ps = [p for p in protc if p.uri.startswith(protocol_uri)]
@@ -59,7 +60,10 @@ class ProtcurData:
             yield from cmb.annotation(t, *av, *notes, *prov)()
 
     @classmethod
-    def setup(cls):
+    def lazy_setup(cls):
+        """ Do not use setup since it is always run by Integrator
+            We want lazy loading, and should probably conver all
+            setup style things that hit the network to be lazy. """
         if not hasattr(cls, '_setup_ok'):
             cls.populate_annos()
             cls._setup_ok = True

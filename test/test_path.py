@@ -1,9 +1,10 @@
 import shutil
 import unittest
 from pathlib import PurePosixPath
-from sparcur.paths import Path, SymlinkCache, AugmentedPath, CachePath
+from sparcur.core import FileSize
+from sparcur.paths import AugmentedPath, LocalPath, PrimaryCache, RemotePath
+from sparcur.paths import XattrCache, SymlinkCache
 from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
-from sparcur.pathmeta import FileSize
 from .common import project_path
 
 SymlinkCache._local_class = AugmentedPath  # have to set a default
@@ -18,9 +19,9 @@ class TestPathMeta(unittest.TestCase):
     prefix = None
 
     def setUp(self):
-        self.path = Path(project_path)
+        self.path = TestLocalPath(project_path)
 
-        self.test_path = Path('/tmp/testpath')  # FIXME random needed ...
+        self.test_path = TestLocalPath('/tmp/testpath')  # FIXME random needed ...
         if self.test_path.is_symlink():
             self.test_path.unlink()
 
@@ -67,7 +68,7 @@ class TestPathMeta(unittest.TestCase):
         assert meta == new_meta, msg
 
     def _test_symlink_roundtrip_weird(self):
-        path = Path('/tmp/testpath')  # FIXME random needed ...
+        path = TestLocalPath('/tmp/testpath')  # FIXME random needed ...
         meta = PathMeta(id='N:helloworld:123', size=10, checksum=b'1;o2j\x9912\xffo3ij\x01123,asdf.')
         pure_symlink = PurePosixPath(path.name) / meta.as_symlink()
         path.symlink_to(pure_symlink)
@@ -128,47 +129,131 @@ class TestContext(unittest.TestCase):
         assert start != target != distractor
 
 
+
+class TestLocalPath(LocalPath):
+    def metaAtTime(self, time):
+        # we are cheating in order to do this
+        return PathMeta(id=self._cache_class._remote_class.invAtTime(self, time))
+
+
+test_base = TestLocalPath(__file__).parent / 'test-moves'
+test_path = test_base / 'test-container'
+
+
+class TestCachePath(XattrCache, PrimaryCache):
+    xattr_prefix = 'test'
+    #_backup_cache = SqliteCache
+    _not_exists_cache = SymlinkCache
+    anchor = test_path
+
+    @property
+    def _anchor(self):
+        """ a folder based anchor that turns all child folders
+            into their own anchor, appropriately throws an error
+            if there is no common path """
+
+        # cool but not useful atm
+        this_folder = TestLocalPath(__file__).absolute().parent
+        return this_folder / self.relative_to(this_folder).parts[0]
+
+
+class TestRemotePath(RemotePath):
+    anchor = test_path
+    ids = {0: anchor}  # time invariant
+    index_at_time = {1: {1: anchor / 'a',
+
+                         2: anchor / 'c',
+
+                         3: anchor / 'e',
+                         4: anchor / 'e/f',
+                         5: anchor / 'e/f/g',
+
+                         8: anchor / 'i',
+                         9: anchor / 'i/j',
+                         10: anchor / 'i/j/k',
+
+                         13: anchor / 'n',
+                         14: anchor / 'n/o',
+                         15: anchor / 'n/o/p',},
+                     2: {1: anchor / 'b',
+
+                         2: anchor / 'd',
+
+                         3: anchor / 'h/',
+                         4: anchor / 'h/f',
+                         5: anchor / 'h/f/g',
+
+                         11: anchor / 'l',
+                         12: anchor / 'l/m',
+                         10: anchor / 'l/m/k',
+
+                         16: anchor / 'q',
+                         17: anchor / 'q/r',
+                         18: anchor / 'q/r/s',}}
+
+    def __init__(self, id, cache=None, is_dir=True):
+        super().__init__(id, cache)
+        self._is_dir = is_dir
+
+    def is_dir(self):
+        return self._is_dir
+
+    @classmethod
+    def invAtTime(cls, path, index):
+        return {p:i for i, p in cls.index_at_time[index].items()}[path]
+
+
+TestLocalPath._cache_class = TestCachePath
+TestCachePath._local_class = TestLocalPath
+TestCachePath._remote_class = TestRemotePath
+TestRemotePath._cache_class = TestCachePath
+
+
 class TestMoveBase(unittest.TestCase):
-    test_base = Path(__file__).parent / 'test-moves'
-    test_path = test_base / 'test-container'
     @classmethod
     def setUpClass(cls):
         if cls.test_base.exists():
             shutil.rmtree(cls.test_base)
 
         cls.test_base.mkdir()
+
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.test_base)
+
     def setUp(self):
         self.test_path.mkdir()
+
     def tearDown(self):
         shutil.rmtree(self.test_path)
 
 
+TestMoveBase.test_base = test_base
+TestMoveBase.test_path = test_path
+
+
 class TestMove(TestMoveBase):
-    def _mkpath(self, path, ids, is_dir):
-        id = ids[-1]
+    def _mkpath(self, path, time, is_dir):
         if not path.parent.exists():
-            yield from self._mkpath(path.parent, ids[:-1], True)
+            yield from self._mkpath(path.parent, time, True)
 
         if is_dir:
             path.mkdir()
         else:
             path.touch()
 
-        yield path.cache_init(id)
+        yield path.cache_init(path.metaAtTime(time))
 
     def _test_move(self, source, target, is_dir=False, target_exists=False):
         s = self.test_path / source
         t = self.test_path / target
-        ids = [i for i, _ in enumerate(source.split('/'))]
-        caches = list(self._mkpath(s, ids, is_dir))
+        caches = list(self._mkpath(s, 1, is_dir))
         if target_exists:  # FIXME and same id vs and different id
             target_caches = list(self._mkpath(t, is_dir))
 
         cache = caches[-1]
-        meta = cache.meta
+        meta = t.metaAtTime(2)
+        print(f'{source} -> {target} {cache.meta} {meta}')
         cache.move(target=t, meta=meta)
 
     def test_dir_moved(self):

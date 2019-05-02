@@ -178,13 +178,16 @@ class MembersData:
         # e.g. self.organization.path.remote.bfobject
         # self.path.remote.oranization.bfobject
         # self.path.remote.bfl.organization.members
-        self.__class__._members = blackfynn_local_instance.organization.members
+        self.__class__._blfi = blackfynn_local_instance
 
     def __call__(self, first_name, last_name):
         return self.get_member_by_name(first_name, last_name)
 
     @property
     def members(self):
+        if not hasattr(self.__class__, '_members'):
+            self.__class__._members = self._bfli.organization.members
+
         return self._members
 
     @property
