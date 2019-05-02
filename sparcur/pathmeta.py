@@ -507,6 +507,7 @@ class _EncodeByField:
     def updated(self, value):
         return self._datetime(value)
 
+    def id(self, value): return str(value)
     def size(self, value): return str(value)
     def checksum(self, value): return value
     def file_id(self, value): return str(value)

@@ -618,60 +618,6 @@ class CachePath(AugmentedPath):
             if self.meta is None:
                 raise exc.NoCachedMetadataError(self.local)
 
-        return
-        # FIXME not really the init for CachePath ... more BlackfynnCache
-        if self.id is None:
-            if meta is None and remote is None:
-                if not self.is_helper_cache:
-                    msg = f'No cached meta exists and no meta and no remote provided for {self.local}'
-                    raise exc.NoCachedMetadataError(msg)
-                    #root = self.local.find_cache_root()
-                    #if root is not None:
-                        #log.debug(root)
-                        #self.recover_meta()
-                    #if self.exists():
-                        #self.recover_meta()
-                    #else:
-            elif remote and meta:
-                raise TypeError(f'can only have one remote or one meta')
-            elif remote is not None:
-                if remote.name != self.name:
-                    raise ValueError('remote has a different name {self.name} != {remote.name}')
-                self.remote = remote
-                return
-
-            # we received meta
-            if self.exists() and (self.meta and meta and self.meta.id == meta.id
-                                  # FIXME meta might actually b different?!
-                                  or not self.meta):
-                # file or folder that exists
-                if meta is not None:
-                    self.meta = meta
-                elif not self.is_helper_cache:
-                    msg = 'exist but no meta {self.local}'
-                    raise exc.NoCachedMetadataError(msg)
-                    #meta = self.recover_meta()
-            elif self.is_broken_symlink():
-                # symlink that exists so overwrite
-                self.meta = meta
-            elif not self.is_helper_cache and meta:
-                # there is nothing we should bootstrap
-                self.bootstrap(meta)
-            else:
-                # ok to hit this
-                msg = f'no meta, no helper cache, no symlink {self.local}'
-                #log.critical(msg)
-                raise exc.NoCachedMetadataError(msg)
-
-            if not self.is_helper_cache:
-                if self.meta is not None:
-                    if self.id.startswith('N:organization:'):  # FIXME
-                        self._organization = self
-
-            #elif hasattr(self, '_remote'):
-            #else:
-                #raise exc.NoRemoteMappingError(f'gonna need a remote here ... {self.local}')
-
         super().__init__()
 
     @property
@@ -1532,7 +1478,7 @@ class LocalPath(XattrPath):
         if not hasattr(self, '_cache'):
             try:
                 self._cache_class(self)  # we don't have to assign here because cache does it
-            except exc.NotInProjectError as e:
+            except exc.NoCachedMetadataError as e:
                 log.error(e)
                 return None
 
@@ -1544,7 +1490,7 @@ class LocalPath(XattrPath):
             raise ValueError('Cache already exists! {self.cache}')
 
         if not isinstance(id_or_meta, PathMeta):
-            id_or_meta = PathMeta(id=id)
+            id_or_meta = PathMeta(id=id_or_meta)
 
         return self._cache_class(self, meta=id_or_meta)
 
