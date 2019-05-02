@@ -307,20 +307,21 @@ class Main(Dispatcher):
         only = tuple()
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         dirs = self.directories
-        if dirs:
-            for d in dirs:
-                if self.options.empty:
-                    if list(d.children):
-                        continue
+        # FIXME folder moves!
+        if not dirs:
+            dirs = Path.cwd(),
 
-                if d.is_dir():
-                    if not d.remote.is_dataset():
-                        log.warning('You are pulling recursively from below dataset level.')
+        for d in dirs:
+            if self.options.empty:
+                if list(d.children):
+                    continue
 
-                    d.remote.bootstrap(recursive=recursive)
+            if d.is_dir():
+                if not d.remote.is_dataset():
+                    log.warning('You are pulling recursively from below dataset level.')
 
-        else:
-            Path.cwd().remote.bootstrap(recursive=recursive, only=only, skip=self.skip)
+                d.remote.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
+                d.remote.bootstrap(recursive=recursive, only=only, skip=self.skip)
 
     ###
     skip = (
