@@ -1538,6 +1538,16 @@ class LocalPath(XattrPath):
 
         return self._cache
 
+    def cache_init(self, id_or_meta):
+        """ wow it took way too long to realize this was the way to do it >_< """
+        if self.cache:
+            raise ValueError('Cache already exists! {self.cache}')
+
+        if not isinstance(id_or_meta, PathMeta):
+            id_or_meta = PathMeta(id=id)
+
+        return self._cache_class(self, meta=id_or_meta)
+
     def find_cache_root(self):
         """ find the root of the cache tree, even if we start with skips """
         found_cache = None
@@ -1562,7 +1572,7 @@ class LocalPath(XattrPath):
     #@property
     #def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct
         #""" THERE CAN BE ONLY ONE """
-        # return self.checksum()  # duh
+        # return self.checksum()  # doesn't quite work for folders ...
 
     @property
     def created(self):
