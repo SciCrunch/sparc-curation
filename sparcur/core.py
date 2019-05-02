@@ -12,7 +12,7 @@ from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.core import OntId
-from pyontutils.utils import makeSimpleLogger
+from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
 from sparcur import exceptions as exc
 from sparcur.config import config
 from functools import wraps
@@ -60,31 +60,6 @@ class JEncode(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
-
-def python_identifier(string):
-    """ pythonify a string for use as an identifier """
-    ident = (string.strip()
-             .replace('<', '')
-             .replace('>', '')
-             .replace('(', '')
-             .replace(')', '')
-             .replace(' ', '_')
-             .replace('+', '')
-             .replace('…','')
-             .replace('.','_')
-             .replace(',','_')
-             .replace('/', '_')
-             .replace('?', '_')
-             .replace('#', 'number')
-             .replace('-', '_')
-             .replace(':', '_')
-             .replace('\x83', '')  # FIXME should be stripped beforehand during format norm?
-             .lower()  # sigh
-                )
-    if ident[0].isdigit():
-        ident = 'n_' + ident
-
-    return ident
 
 def zipeq(*iterables):
     """ zip or fail if lengths do not match """
