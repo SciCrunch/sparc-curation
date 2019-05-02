@@ -680,8 +680,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             if self.cache.name != self.name:
                 self.cache.move(remote=self)
 
-            else:
-                self.cache._meta_setter(self.meta)
+            self.cache._meta_setter(self.meta)
 
             if update_data and self.is_file():
                 self.cache.fetch(size_limit_mb=size_limit_mb)
