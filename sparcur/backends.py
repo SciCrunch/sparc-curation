@@ -264,6 +264,9 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         elif isinstance(id_bfo_or_bfr, str):
             bfobject = self.bfl.get(id_bfo_or_bfr)
 
+        elif isinstance(id_bfo_or_bfr, PathMeta):
+            bfobject = self.bfl.get(id_bfo_or_bfr.id)
+
         else:
             raise TypeError(id_bfo_or_bfr)
 

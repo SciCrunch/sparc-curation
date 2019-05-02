@@ -178,7 +178,16 @@ class RemotePath:
         # we're trying not to throw dicts around willy nilly here ...
         self.cache.bootstrap(self.meta, recursive=recursive, only=only, skip=skip)
 
-    def __init__(self, id, cache=None):
+    def __init__(self, thing_with_id, cache=None):
+        if [type_ for type_ in (str, int) if isinstance(thing_with_id, type_)]:
+            id = thing_with_id
+        elif isinstance(thing_with_id, PathMeta):
+            id = thing_with_id.id
+        elif isinstance(thing_with_id, RemotePath):
+            id = thing_with_id.id
+        else:
+            raise TypeError(f'Don\'t know how to initialize a remote from {thing_with_id}')
+
         self._id = id
         if cache is not None:
             self._cache = cache
@@ -1025,9 +1034,15 @@ class CachePath(AugmentedPath):
                 # use
                 pass
 
-            if not _target.parent.exists():
+            if _target.exists():
+                raise exc.PathExistsError(f'Target {_target} already exists!')
+            elif not _target.parent.exists():
+                if remote is None:  # we have to have a remote to pull parent structure
+                    remote = self._remote_class(meta)
+
+                _target.parent.mkdir_cache(remote)
+                log.debug('yes we get here')
                 # make target parents and populate cache ...
-                pass
             # a rename of a folder vs a move of content to a different folder
 
             # remote id same local name different *
@@ -1047,7 +1062,7 @@ class CachePath(AugmentedPath):
             #reltar = _target.relative_to(common)
             #reltar
             #target_paths = target
-            raise NotImplementedError('Need to finish this.')
+            #raise NotImplementedError('Need to finish this.')
 
         if remote:
             target = self.anchor / remote  # the magic of division!
@@ -1507,7 +1522,7 @@ class LocalPath(XattrPath):
 
     def cache_init(self, id_or_meta):
         """ wow it took way too long to realize this was the way to do it >_< """
-        if self.cache.meta:
+        if self.cache and self.cache.meta:
             raise ValueError(f'Cache already exists! {self.cache}\n'
                              f'{self.cache.meta}')
 
@@ -1515,6 +1530,14 @@ class LocalPath(XattrPath):
             id_or_meta = PathMeta(id=id_or_meta)
 
         return self._cache_class(self, meta=id_or_meta)
+
+    def mkdir_cache(self, remote):
+        """ wow side effects everywhere """
+        cc = self._cache_class
+        rc = cc._remote_class
+        for parent in reversed(tuple(remote.parents)):
+            local_path = parent.as_path()
+            rc(parent, cache=cc(local_path, remote=parent, meta=parent.meta))
 
     def find_cache_root(self):
         """ find the root of the cache tree, even if we start with skips """

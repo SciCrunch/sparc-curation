@@ -140,11 +140,14 @@ test_base = TestLocalPath(__file__).parent / 'test-moves'
 test_path = test_base / 'test-container'
 
 
-class TestCachePath(XattrCache, PrimaryCache):
+class TestCachePath(PrimaryCache, XattrCache):
     xattr_prefix = 'test'
     #_backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
-    anchor = test_path
+
+    @property
+    def anchor(self):
+        return self.__class__(test_path, meta=PathMeta(id=0))
 
     @property
     def _anchor(self):
@@ -191,16 +194,48 @@ class TestRemotePath(RemotePath):
                          17: anchor / 'q/r',
                          18: anchor / 'q/r/s',}}
 
+    for ind in index_at_time:
+        index_at_time[ind].update(ids)
+
+    test_time = 2
+
     def __init__(self, id, cache=None, is_dir=True):
         super().__init__(id, cache)
         self._is_dir = is_dir
+        self._errors = []
 
     def is_dir(self):
         return self._is_dir
 
+    @property
+    def cache(self):
+        if self.id == 0:
+            return self._cache_class(self.as_path(), meta=self.meta)
+
+        return super().cache
+        
+    def as_path(self):
+        return self.index_at_time[self.test_time][self.id]
+
     @classmethod
     def invAtTime(cls, path, index):
         return {p:i for i, p in cls.index_at_time[index].items()}[path]
+
+    @property
+    def name(self):
+        return self.as_path().name
+
+    @property
+    def parent(self):
+        if self.id == 0:
+            return None
+
+        rlu = self.as_path().parent
+        return self.__class__(self.invAtTime(rlu, self.test_time))
+
+    @property
+    def meta(self):
+        return PathMeta(id=self.id)
 
 
 TestLocalPath._cache_class = TestCachePath
@@ -255,6 +290,7 @@ class TestMove(TestMoveBase):
         meta = t.metaAtTime(2)
         print(f'{source} -> {target} {cache.meta} {meta}')
         cache.move(target=t, meta=meta)
+        assert t.cache.id == TestRemotePath.invAtTime(t, 2)
 
     def test_dir_moved(self):
         source = 'a'
