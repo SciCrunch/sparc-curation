@@ -1018,6 +1018,35 @@ class CachePath(AugmentedPath):
                         f'{common}\n{self.relative_to(common)}\n'
                         f'{target.relative_to(common)}\n{_id}')
 
+            if remote is None:
+                # use common to build the new path
+                pass
+            else:
+                # use
+                pass
+
+            if not _target.parent.exists():
+                # make target parents and populate cache ...
+                pass
+            # a rename of a folder vs a move of content to a different folder
+
+            # remote id same local name different *
+            # remote id same local name same      *
+            # remote id different local name same
+            # remote id different local id different
+
+            # parent id same             -> rename file
+            # parent id different        -> move file
+            # parent parent id same      -> parent folder rename
+            # parent parent id different -> parent parent folder move
+
+            # actually the parent folder business doesn't matter at all
+            # we just need to make sure that we construct the new parent
+            # folders with the correct ids ... which I think we already have
+
+            #reltar = _target.relative_to(common)
+            #reltar
+            #target_paths = target
             raise NotImplementedError('Need to finish this.')
 
         if remote:
