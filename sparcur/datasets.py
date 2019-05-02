@@ -150,38 +150,6 @@ class Version1Header:
         yield from self._errors
 
     @staticmethod
-    def normalize_header(orig_header):
-        header = []
-        for i, c in enumerate(orig_header):
-            if c:
-                c = (c.strip()
-                     .replace('(', '')
-                     .replace(')', '')
-                     .replace(' ', '_')
-                     .replace('+', '')
-                     .replace('…','')
-                     .replace('.','_')
-                     .replace(',','_')
-                     .replace('/', '_')
-                     .replace('?', '_')
-                     .replace('#', 'number')
-                     .replace('-', '_')
-                     .lower()  # sigh
-                )
-                if any(c.startswith(str(n)) for n in range(10)):
-                    c = 'n_' + c
-
-            if not c:
-                c = f'TEMP_{i}'
-
-            if c in header:
-                c = c + f'_TEMP_{i}'
-
-            header.append(c)
-
-        return header
-
-    @staticmethod
     def query(value, prefix):
         for query_type in ('term', 'search'):
             terms = [q.OntTerm for q in OntTerm.query(prefix=prefix, **{query_type:value})]
@@ -235,7 +203,6 @@ class Version1Header:
 
         ic = list(getattr(self.bc, index_col))
         nme = vldt.Header(ic).output
-        #nme = Version1Header.normalize_header(ic)  # TODO make sure we can recover the original values for these
         nmed = {v:normk for normk, v in zip(nme, ic)}
 
         for v, nt in self.bc._byCol__indexes[index_col].items():

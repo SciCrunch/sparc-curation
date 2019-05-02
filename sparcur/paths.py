@@ -910,58 +910,6 @@ class CachePath(AugmentedPath):
 
             return self._remote
 
-    #@remote.setter
-    def __remote(self, remote):
-        if self.meta is not None and self.id is not None:
-            if hasattr(self, '_remote'):
-                if remote is self._remote:
-                    log.error('Not setting remote. Why are you trying to set the same remote again?')
-                    return
-                elif remote.meta == self.remote.meta:
-                    log.error('Not setting remote. Remotes are different but meta is the same?')
-                    return
-                else:
-                    diff = 'TODO'
-                    log.info('Updating since remotes are different. {diff}')
-
-            if self.id != remote.id:
-                raise exc.MetadataIdMismatchError('Existing cache id does not match new id! '
-                                                  f'{self.id} != {remote.id}\n{self.meta}')
-
-            elif isinstance(remote, RemotePath):
-                self._remote = remote
-                remote._cache = self
-
-            else:
-                raise TypeError(f'{remote} is not a RemotePath! It is a {type(remote)}')
-
-        #elif self.is_anchor() and not hasattr(self, '_remote'):
-            #self.meta = remote.meta
-            #self._remote = remote
-        else:
-            # make sure no monkey business is going on at least in the local graph
-            #if self.parent and self.local.parent.cache.meta.id == self.parent.id:  # cache parents are from the file system so dont need
-            if remote.parent is None:
-                self.refresh()
-                log.debug(f'no remote parent -> organization??? {remote}')
-                # Nope, apparently these are deleted files
-                # need to figure out what to do about these
-                meta = remote.meta
-                errors = ['file-deleted'] 
-                if not meta.errors:
-                    meta.errors = errors
-                else:
-                    meta.errors += errors
-
-                self.meta = meta
-
-            elif self.parent and remote.parent.id == self.parent.id:  # we can avoid a net call since we just need the id
-                self._remote = remote
-                self.meta = remote.meta
-                # meta checks to see whethere there is a remote
-                # if there is a remote it assumes that 
-                remote._cache = self
-
     @property
     def local(self):
         local = self.local_class(self)
@@ -996,10 +944,6 @@ class CachePath(AugmentedPath):
 
         if hasattr(self, '_meta'):
             return self._meta  # for bootstrap
-
-    #@meta.setter
-    #def meta(self, pathmeta):
-        #self._meta_setter(pathmeta)  # will automatically error
 
     def _meta_setter(self, pathmeta, memory_only=False):
         """ so much for the pythonic way when the language won't even let you """
@@ -1097,6 +1041,7 @@ class CachePath(AugmentedPath):
                 self.touch()
                 self._meta_setter(meta)
 
+            log.info(f'Fetching from cache id {self.id} -> {self.local}')
             self.local.data = self.data
 
         if size_not_ok:
@@ -1607,7 +1552,7 @@ class LocalPath(XattrPath):
     #@property
     #def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct
         #""" THERE CAN BE ONLY ONE """
-        #return self.resolve().as_posix()
+        # return self.checksum()  # duh
 
     @property
     def created(self):
