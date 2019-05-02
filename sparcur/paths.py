@@ -455,6 +455,9 @@ class AugmentedPath(PosixPath):
 
         return os.access(self, mode, follow_symlinks=follow_symlinks)
 
+    def commonpath(self, other):
+        return self.__class__(os.path.commonpath((self, other)))
+
     def chdir(self):
         os.chdir(self)
 
@@ -1078,6 +1081,13 @@ class CachePath(AugmentedPath):
         if target.absolute() == self.absolute():
             log.warning(f'trying to move a file onto itself {self.absolute()}')
             return target
+
+        common = self.commonpath(target)
+        if common != self.parent:
+            log.warning('A parent of current file has changed location!\n'
+                        f'{common}\n{self.relative_to(common)}\n{target.relative_to(common)}')
+
+            breakpoint()
 
         if target.exists() or target.is_broken_symlink():
             if target.id == remote.id:

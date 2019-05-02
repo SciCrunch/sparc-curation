@@ -1,6 +1,6 @@
 import unittest
 from pathlib import PurePosixPath
-from sparcur.paths import Path, SymlinkCache, AugmentedPath
+from sparcur.paths import Path, SymlinkCache, AugmentedPath, CachePath
 from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
 from sparcur.pathmeta import FileSize
 from .common import project_path
@@ -125,3 +125,65 @@ class TestContext(unittest.TestCase):
         bads = [(a, b) for a, b in eq if a != b]
         assert not bads, bads
         assert start != target != distractor
+
+class TestMoveBase(unittest.TestCase):
+    test_base = Path('/tmp/test-moves')
+    test_path = test_base / 'test-container'
+    @classmethod
+    def setUpClass(cls):
+        cls.test_base.mkdir()
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.test_base)
+    def setUp(self)
+        self.test_path.mkdir()
+    def tearDown(self)
+        shutil.rmtree(self.test_path)
+
+class TestMove(TestMoveBase):
+    def _mkpath(self, path, is_dir):
+        if is_dir:
+            path.mkdir(parents=True)
+        else:
+            path.parent.mkdir()
+            path.touch()
+
+    def _test_move(self, source, target, is_dir=False, target_exists=False):
+        s = self.test_path / source
+        t = self.test_path / target
+        self._mkpath(s, is_dir)
+        if target_exists:
+            self._mkpath(t, is_dir)
+        
+    def test_dir_moved(self):
+        source = 'a'
+        target = 'b'
+        self._test_move(source, target, is_dir=True)
+
+    def test_file_moved(self):
+        source = 'c'
+        target = 'd'
+        self._test_move(source, target)
+
+    def test_parent_moved(self):
+        source = 'e/f/g'
+        target = 'h/f/g'
+        self._test_move(source, target)
+
+    def test_parents_moved(self):
+        source = 'i/j/k'
+        target = 'l/m/k'
+        self._test_move(source, target)
+
+    def test_all_moved(self):
+        source = 'n/o/p'
+        target = 'q/r/s'
+        self._test_move(source, target)
+
+
+class TestMoveTargetExists(TestMoveBase):
+    def _test_move(self, source, target, is_dir=False):
+        super()._test_move(self, source, target, is_dir, target_exists=True)
+            
+
+
