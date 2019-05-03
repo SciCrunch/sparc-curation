@@ -1,4 +1,5 @@
 import shutil
+from pathlib import PurePosixPath
 from datetime import datetime
 from sparcur import config
 from sparcur import exceptions as exc
@@ -114,33 +115,11 @@ class TestCachePath(PrimaryCache, XattrCache):
     #_backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
 
-    anchor = test_path
-
-    @property
-    def _anchor(self):
-        if self.id == 0:
-            return self
-
-        elif self.parent == self:
-            raise exc.NotInProjectError('hrm')
-            
-        return self.parent.anchor
-
-    @property
-    def __anchor(self):
-        """ a folder based anchor that turns all child folders
-            into their own anchor, appropriately throws an error
-            if there is no common path """
-
-        # cool but not useful atm
-        this_folder = TestLocalPath(__file__).absolute().parent
-        return this_folder / self.relative_to(this_folder).parts[0]
-
 
 class TestRemotePath(RemotePath):
     anchor = test_path
     ids = {0: anchor}  # time invariant
-    dirs = {2, 3, 4, 8, 9, 11, 12, 13, 14, 16, 17}
+    dirs = {2, 3, 4, 8, 9, 11, 12, 13, 14, 16, 17, 18}
     index_at_time = {1: {1: anchor / 'a',
 
                          2: anchor / 'c',
@@ -155,7 +134,9 @@ class TestRemotePath(RemotePath):
 
                          13: anchor / 'n',
                          14: anchor / 'n/o',
-                         15: anchor / 'n/o/p',},
+                         15: anchor / 'n/o/p',
+
+                         18: anchor / 't',},
                      2: {1: anchor / 'b',
 
                          2: anchor / 'd',
@@ -170,7 +151,11 @@ class TestRemotePath(RemotePath):
 
                          16: anchor / 'q',
                          17: anchor / 'q/r',
-                         18: anchor / 'q/r/s',}}
+                         15: anchor / 'q/r/s',
+
+                         18: anchor / 't',
+
+                         19: anchor / 'u',}}
 
     for ind in index_at_time:
         index_at_time[ind].update(ids)
@@ -185,16 +170,17 @@ class TestRemotePath(RemotePath):
         self._errors = []
 
     def is_dir(self):
-        return self.id in self.dirs
+        return int(self.id) in self.dirs
 
     def is_file(self):
         return not self.is_dir()
 
     def as_path(self):
-        return self.index_at_time[self.test_time][int(self.id)]
+        return PurePosixPath(self.index_at_time[self.test_time][int(self.id)].relative_to(self.anchor))
 
     @classmethod
     def invAtTime(cls, path, index):
+        path = cls.anchor / path
         return str({p:i for i, p in cls.index_at_time[index].items()}[path])
 
     @property
@@ -213,11 +199,19 @@ class TestRemotePath(RemotePath):
     def meta(self):
         return PathMeta(id=self.id)
 
+    def __repr__(self):
+        p = self.as_path()
+        return f'{self.__class__.__name__} <{self.id!r} {p!r}>'
 
+# set up cache hierarchy
 TestLocalPath._cache_class = TestCachePath
 TestCachePath._local_class = TestLocalPath
 TestCachePath._remote_class = TestRemotePath
 TestRemotePath._cache_class = TestCachePath
+
+# set up testing anchor (must come after the hierarchy)
+TestCachePath.anchor = test_path
+TestCachePath.anchor = TestCachePath(test_path, meta=PathMeta(id='0'))
 
 
 class TestPathHelper:

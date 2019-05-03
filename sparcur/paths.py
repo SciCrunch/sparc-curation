@@ -378,8 +378,13 @@ class RemotePath:
     def rglob(self, pattern):
         raise NotImplementedError
 
+    def __eq__(self, other):
+        return self.id == other.id
 
-from IPython import embed
+    def __ne__(self, other):
+        return not self == other
+
+
 class AugmentedPath(PosixPath):
     """ extra conveniences, mostly things that are fixed in 3.7 using IGNORE_ERROS """
 
@@ -393,7 +398,7 @@ class AugmentedPath(PosixPath):
         try:
             return super().exists()
         except OSError as e:
-            log.error(e)   # too noisy ... though it reaveals we call exists a lot
+            #log.error(e)   # too noisy ... though it reaveals we call exists a lot
             if not _ignore_error(e):
                 raise
 
@@ -1015,71 +1020,38 @@ class CachePath(AugmentedPath):
 
         # deal with moving to a different directory that might not even exist yet
         if target is None:
-            _target = self.anchor / remote
-        else:
-            _target = target
+            if not isinstance(self.anchor, self.__class__):
+                raise TypeError('mismatched anchor types {self!r} {self.anchor!r}')
 
-        common = self.commonpath(_target).absolute()
+            target = self.anchor / remote  # FIXME why does this not try to instantiate the caches? or does it?
+
+        if target.absolute() == self.absolute():
+            log.warning(f'trying to move a file onto itself {self.absolute()}')
+            return target
+
+        common = self.commonpath(target).absolute()
         parent = self.parent.absolute()
+
+        assert target.name != self.name or common != parent
+
         if common != parent:
             _id = remote.id if remote else meta.id
             log.warning('A parent of current file has changed location!\n'
                         f'{common}\n{self.relative_to(common)}\n'
                         f'{target.relative_to(common)}\n{_id}')
 
-            if remote is None:
-                # use common to build the new path
-                pass
-            else:
-                # use
-                pass
 
-            if _target.exists():
-                raise exc.PathExistsError(f'Target {_target} already exists!')
-            elif not _target.parent.exists():
-                if remote is None:  # we have to have a remote to pull parent structure
-                    remote = self._remote_class(meta)
+        if not target.parent.exists():
+            if remote is None:  # we have to have a remote to pull parent structure
+                remote = self._remote_class(meta)
 
-                _target.parent.mkdir_cache(remote)
-                log.debug('yes we get here')
-                # make target parents and populate cache ...
-            # a rename of a folder vs a move of content to a different folder
+            target.parent.mkdir_cache(remote)
 
-            # remote id same local name different *
-            # remote id same local name same      *
-            # remote id different local name same
-            # remote id different local id different
-
-            # parent id same             -> rename file
-            # parent id different        -> move file
-            # parent parent id same      -> parent folder rename
-            # parent parent id different -> parent parent folder move
-
-            # actually the parent folder business doesn't matter at all
-            # we just need to make sure that we construct the new parent
-            # folders with the correct ids ... which I think we already have
-
-            #reltar = _target.relative_to(common)
-            #reltar
-            #target_paths = target
-            #raise NotImplementedError('Need to finish this.')
-
-        if remote:
-            target = self.anchor / remote  # the magic of division!
-            # this also updates the cache for remote
-            assert target.name != self.name
-        else:
-            if target.exists():
-                raise exc.PathExistsError(f'Target {target} already exists!')
-
+        if not isinstance(target, self.__class__):
             target = self.__class__(target, meta=meta)
 
-        if target.absolute() == self.absolute():
-            log.warning(f'trying to move a file onto itself {self.absolute()}')
-            return target
-
         if target.exists() or target.is_broken_symlink():
-            if target.id == remote.id:
+            if target.id == self.id: #(remote.id if remote else meta.id):
                 if self.is_symlink():
                     log.error(f'file was not removed during the previous move!'
                               f'\n{self} -/-> {target}')
@@ -1093,6 +1065,15 @@ class CachePath(AugmentedPath):
             self.unlink()  # don't move the meta since it will break the naming insurance measure
 
         return target
+
+        if remote:
+            target = self.anchor / remote  # the magic of division!
+            # this also updates the cache for remote
+        else:
+            if target.exists():
+                raise exc.PathExistsError(f'Target {target} already exists!')
+
+            target = self.__class__(target, meta=meta)
 
 
     def __repr__(self):
@@ -1515,7 +1496,7 @@ class LocalPath(XattrPath):
             try:
                 self._cache_class(self)  # we don't have to assign here because cache does it
             except exc.NoCachedMetadataError as e:
-                log.error(e)
+                #log.error(e)
                 return None
 
         return self._cache
@@ -1541,8 +1522,12 @@ class LocalPath(XattrPath):
         cc = self._cache_class
         rc = cc._remote_class
         for parent in reversed(tuple(remote.parents)):
-            local_path = parent.as_path()
-            rc(parent, cache=cc(local_path, remote=parent, meta=parent.meta))
+            # remote as_path is always a PurePosixPath relative to the
+            # anchor and does not include the anchor
+            local_path = cc.anchor.local / parent.as_path()
+            if not local_path.exists():
+                local_path.mkdir()
+                rc(parent, cache=cc(local_path, remote=parent, meta=parent.meta))
 
     def find_cache_root(self):
         """ find the root of the cache tree, even if we start with skips """

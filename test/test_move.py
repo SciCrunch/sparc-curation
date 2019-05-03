@@ -7,6 +7,9 @@ from .common import TestLocalPath, TestCachePath, TestRemotePath
 
 class TestMove(TestPathHelper, unittest.TestCase):
     def _mkpath(self, path, time, is_dir):
+        if path.exists():
+            return
+
         if not path.parent.exists():
             yield from self._mkpath(path.parent, time, True)
 
@@ -17,12 +20,13 @@ class TestMove(TestPathHelper, unittest.TestCase):
 
         yield path.cache_init(path.metaAtTime(time))
 
-    def _test_move(self, source, target, is_dir=False, target_exists=False):
+    def _test_move(self, source, target, target_exists=False):
         s = self.test_path / source
         t = self.test_path / target
-        caches = list(self._mkpath(s, 1, is_dir))
+        #remote = TestRemotePath.invAtTime(1)
+        caches = list(self._mkpath(s, 1, int(s.metaAtTime(1).id) in TestRemotePath.dirs))
         if target_exists:  # FIXME and same id vs and different id
-            target_caches = list(self._mkpath(t, 2, is_dir))
+            target_caches = list(self._mkpath(t, 2, int(t.metaAtTime(2).id) in TestRemotePath.dirs))
 
         cache = caches[-1]
         meta = t.metaAtTime(2)
@@ -33,7 +37,7 @@ class TestMove(TestPathHelper, unittest.TestCase):
     def test_0_dir_moved(self):
         source = 'a'
         target = 'b'
-        self._test_move(source, target, is_dir=True)
+        self._test_move(source, target)
 
     def test_1_file_moved(self):
         source = 'c'
@@ -55,11 +59,26 @@ class TestMove(TestPathHelper, unittest.TestCase):
         target = 'q/r/s'
         self._test_move(source, target)
 
+    def test_5_onto_self(self):
+        source = 't'
+        target = 't'
+        self._test_move(source, target)
 
-class TestMoveTargetExists(TestMove):
-    def _test_move(self, source, target, is_dir=False):
+    def test_6_onto_different(self):
+        source = 'a'
+        target = 't'
         try:
-            super()._test_move(source, target, is_dir, target_exists=True)
+            self._test_move(source, target)
             raise AssertionError('should have failed')
         except exc.PathExistsError:
             pass
+
+
+class TestMoveTargetExists(TestMove):
+    def _test_move(self, source, target):
+        super()._test_move(source, target, target_exists=True)
+        # since all the ids match this should work ...
+        #try:
+            #raise AssertionError('should have failed')
+        #except exc.PathExistsError:
+            #pass
