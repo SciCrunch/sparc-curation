@@ -179,7 +179,7 @@ class RemotePath:
         self.cache.bootstrap(self.meta, recursive=recursive, only=only, skip=skip)
 
     def __init__(self, thing_with_id, cache=None):
-        if [type_ for type_ in (str, int) if isinstance(thing_with_id, type_)]:
+        if isinstance(thing_with_id, str):
             id = thing_with_id
         elif isinstance(thing_with_id, PathMeta):
             id = thing_with_id.id
@@ -835,7 +835,7 @@ class CachePath(AugmentedPath):
             return self._cache_parent.remote
 
         id = self.id  # bootstrapping id is a one time use so keep it safe
-        if not id:
+        if id is None:  # zero is a legitimate identifier
             return
 
         anchor = self.anchor
@@ -1107,7 +1107,7 @@ class XattrPath(AugmentedPath):
 
     def setxattr(self, key, value, namespace=xattr.NS_USER):
         if not isinstance(value, bytes):  # checksums
-            bytes_value = str(value).encode()  # too smart? force pre encoded?
+            raise TypeError(f'setxattr only accepts values already encoded to bytes!\n{value!r}')
         else:
             bytes_value = value
 
@@ -1525,6 +1525,11 @@ class LocalPath(XattrPath):
         if self.cache and self.cache.meta:
             raise ValueError(f'Cache already exists! {self.cache}\n'
                              f'{self.cache.meta}')
+
+        elif not self.exists():
+            raise ValueError(f'Cannot init a cache on a non-existent path!\n{self}')
+        #elif not self.is_dir():
+            #raise ValueError(f'Can only init a cache on a directory!\n{self}')
 
         if not isinstance(id_or_meta, PathMeta):
             id_or_meta = PathMeta(id=id_or_meta)

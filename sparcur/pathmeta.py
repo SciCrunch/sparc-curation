@@ -45,6 +45,12 @@ class PathMeta:
         if updated is not None and not isinstance(updated, int) and not isinstance(updated, datetime):
             updated = parser.parse(updated)
 
+        if id is not None and not isinstance(id, str):
+            # no implicit type mutation, the system providing the ids
+            # is where the information about how to do the converstion lives
+            # we don't handle it here
+            raise TypeError(f'id must be a string! {id!r}')
+
         self.size = size if size is None else FileSize(size)
         self.created = created
         self.updated = updated
@@ -166,9 +172,6 @@ class _PathMetaAsSymlink(_PathMetaConverter):
 
         return _str_encode(field, value)
 
-        #value = str(value)
-        #return value
-
     def decode(self, field, value):
         value = value.strip(self.fieldsep)
 
@@ -206,9 +209,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
     def as_symlink(self, pathmeta):
         """ encode meta as a relative path to be appended as a child, not a sibbling """
 
-        class __ignoreme:
-            """ I don't exist I swear. HAHA! You can never accidentally pass me in! """
-            # lol what a hack
+        __ignoreme = object()
 
         def multigetattr(object, attr, default=__ignoreme):
             rest = None
@@ -225,7 +226,9 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         gen = (self.encode(field, multigetattr(pathmeta, field, None))
                for field in self.order_all)
 
-        return PurePosixPath(pathmeta.id + '/.meta.' + self.fieldsep.join(gen))
+        id = self.encode('id', pathmeta.id)
+
+        return PurePosixPath(id + '/.meta.' + self.fieldsep.join(gen))
 
     def from_symlink(self, symlink_path):
         """ contextual portion to make sure something weird isn't going on
@@ -234,7 +237,6 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         name, *parts = pure_symlink.parts
         msg = (symlink_path.name, name)
         assert symlink_path.name == name, msg
-        #breakpoint()
         return self.from_parts(parts)
 
     def from_parts(self, parts):
@@ -319,7 +321,8 @@ class _PathMetaAsXattrs(_PathMetaConverter):
         out = {}
         for field in self.fields:
             value = getattr(pathmeta, field)
-            if value:
+            empty_iterable = hasattr(value, '__iter__') and not value
+            if value is not None and not empty_iterable:  # xattrs discard type
                 value_bytes = self.encode(field, value)
                 if prefix:
                     key = prefix + '.' + field
@@ -335,7 +338,9 @@ class _PathMetaAsXattrs(_PathMetaConverter):
         #if field in ('created', 'updated') and not isinstance(value, datetime):
             #field.replace(cls.path_field_sep, ',')  # FIXME hack around iso8601
             # turns it 8601 isnt actually standard >_< with . instead of , sigh
-        if not value:
+
+        empty_iterable = hasattr(value, '__iter__') and not value
+        if value is None or empty_iterable:
             raise TypeError('cannot encode an empty value')
 
         try:
@@ -507,7 +512,12 @@ class _EncodeByField:
     def updated(self, value):
         return self._datetime(value)
 
-    def id(self, value): return str(value)
+    def id(self, value):
+        if not isinstance(value, str):
+            raise TypeError('ids must always be strings!')
+
+        return value
+
     def size(self, value): return str(value)
     def checksum(self, value): return value
     def file_id(self, value): return str(value)

@@ -1,0 +1,65 @@
+import shutil
+import unittest
+from sparcur import exceptions as exc
+from .common import TestPathHelper
+from .common import TestLocalPath, TestCachePath, TestRemotePath
+
+
+class TestMove(TestPathHelper, unittest.TestCase):
+    def _mkpath(self, path, time, is_dir):
+        if not path.parent.exists():
+            yield from self._mkpath(path.parent, time, True)
+
+        if is_dir:
+            path.mkdir()
+        else:
+            path.touch()
+
+        yield path.cache_init(path.metaAtTime(time))
+
+    def _test_move(self, source, target, is_dir=False, target_exists=False):
+        s = self.test_path / source
+        t = self.test_path / target
+        caches = list(self._mkpath(s, 1, is_dir))
+        if target_exists:  # FIXME and same id vs and different id
+            target_caches = list(self._mkpath(t, 2, is_dir))
+
+        cache = caches[-1]
+        meta = t.metaAtTime(2)
+        print(f'{source} -> {target} {cache.meta} {meta}')
+        cache.move(target=t, meta=meta)
+        assert t.cache.id == TestRemotePath.invAtTime(t, 2)
+
+    def test_0_dir_moved(self):
+        source = 'a'
+        target = 'b'
+        self._test_move(source, target, is_dir=True)
+
+    def test_1_file_moved(self):
+        source = 'c'
+        target = 'd'
+        self._test_move(source, target)
+
+    def test_2_parent_moved(self):
+        source = 'e/f/g'
+        target = 'h/f/g'
+        self._test_move(source, target)
+
+    def test_3_parents_moved(self):
+        source = 'i/j/k'
+        target = 'l/m/k'
+        self._test_move(source, target)
+
+    def test_4_all_moved(self):
+        source = 'n/o/p'
+        target = 'q/r/s'
+        self._test_move(source, target)
+
+
+class TestMoveTargetExists(TestMove):
+    def _test_move(self, source, target, is_dir=False):
+        try:
+            super()._test_move(source, target, is_dir, target_exists=True)
+            raise AssertionError('should have failed')
+        except exc.PathExistsError:
+            pass
