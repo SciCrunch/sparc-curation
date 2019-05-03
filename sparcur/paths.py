@@ -305,7 +305,7 @@ class RemotePath:
         if parent != remote:
             parent_names.append(parent.name)
             # FIXME can this go stale? if so how?
-            print(cache_parent)
+            log.debug(cache_parent)
             if cache_parent is not None and parent.id == cache_parent.id:
                     for c_parent in cache_parent.parents:
                         if c_parent is None:
@@ -664,20 +664,6 @@ class CachePath(AugmentedPath):
         child._init()
         if isinstance(remote, RemotePath):
             remote._cache_setter(child)
-
-        elif False:  # old
-            #log.debug('remoooote')
-            child._remote = remote  # have to use _remote since this is construction
-            #child.bootstrap(remote.meta)  # FIXME indicates that maybe we want bootstrap to be meta setter?
-            child._meta_setter(remote.meta)
-            child.remote
-            #child.meta = child.meta
-            if not hasattr(remote, '_cache') or remote._cache is None:
-                remote._cache = child
-            else:
-                #log.warning('Trying to set cache when it already exists!')
-                #raise BaseException
-                pass
         else:
             raise ValueError('should not happen')
 
@@ -1355,7 +1341,7 @@ class PrimaryCache(CachePath):
         # if package/file
 
 
-class BlackfynnCache(XattrCache, PrimaryCache):
+class BlackfynnCache(PrimaryCache, XattrCache):
     xattr_prefix = 'bf'
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
