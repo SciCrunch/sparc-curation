@@ -178,7 +178,7 @@ class MembersData:
         # e.g. self.organization.path.remote.bfobject
         # self.path.remote.oranization.bfobject
         # self.path.remote.bfl.organization.members
-        self.__class__._blfi = blackfynn_local_instance
+        self.__class__._bfli = blackfynn_local_instance
 
     def __call__(self, first_name, last_name):
         return self.get_member_by_name(first_name, last_name)

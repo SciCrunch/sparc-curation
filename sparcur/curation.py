@@ -28,20 +28,17 @@ from sparcur.datasources import OrganData, OntologyData, MembersData
 from sparcur.protocols import ProtocolData, ProtcurData
 from sparcur.datasets import SubmissionFile, DatasetDescriptionFile, SubjectsFile
 from sparcur.schemas import (JSONSchema, ValidationError,
-                             DatasetSchema, SubmissionSchema,
-                             DatasetDescriptionSchema, SubjectsSchema,
-                             SummarySchema, DatasetOutSchema, MetaOutSchema)
+                             DatasetSchema,
+                             SummarySchema, MetaOutSchema)
 from sparcur import schemas as sc
 from sparcur import validate as vldt
+from sparcur import pipelines as pipes
 from sparcur import sheets
-from sparcur.derives import Derives
 from ttlser import CustomTurtleSerializer
 from pysercomb.pyr.units import ProtcParameter
 from pyontutils.utils import byCol as _byCol
 
 
-DT = DictTransformer
-De = Derives
 a = rdf.type
 
 po = CustomTurtleSerializer.predicateOrder
@@ -57,21 +54,6 @@ OntCuries({'orcid':'https://orcid.org/',
            'user':'https://api.blackfynn.io/users/N:user:',
            'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})
-
-
-def extract_errors(dict_):
-    for k, v in dict_.items():
-        if k == 'errors':
-            yield from v
-        elif isinstance(v, dict):
-            yield from extract_errors(v)
-
-
-def get_all_errors(_with_errors):
-    """ A better and easier to interpret measure of completeness. """
-    # TODO deduplicate by tracing causes
-    # TODO if due to a missing required report expected value of missing steps
-    return list(extract_errors(_with_errors))
 
 
 class CurationStatusStrict:
@@ -1095,9 +1077,9 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         helpers = {}
         helper_key = object()
         lifters = Lifters()
-        sources = dataset.data_with_errors
+        sources = dataset.data
         sources[helper_key] = helpers
-        pipeline = PipelineExtras(sources, lifters, helper_key, RuntimeContext())
+        pipeline = pipes.PipelineExtras(sources, lifters, helper_key, RuntimeContext())
         sources.pop(helper_key)
 
         self._data = pipeline.data
@@ -1176,7 +1158,7 @@ class Summary(Integrator):
                 'datasets': ds}
 
     @property
-    def data(self):
+    def data_lift(self):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
@@ -1184,12 +1166,9 @@ class Summary(Integrator):
 
         return self._data_cache
 
-    @property
-    def data_out(self):
-        data = self.data_with_errors
-        #return self.make_json(d.data_out_with_errors for d in self)
-        # TODO transform
-
+    @hasSchema(sc.SummarySchema)
+    def data(self):
+        data = self.data_lift
         return data
 
     @property

@@ -706,3 +706,16 @@ def normalize_tabular_format(project_path):
                 print(e)
 
 
+def extract_errors(dict_):
+    for k, v in dict_.items():
+        if k == 'errors':
+            yield from v
+        elif isinstance(v, dict):
+            yield from extract_errors(v)
+
+
+def get_all_errors(_with_errors):
+    """ A better and easier to interpret measure of completeness. """
+    # TODO deduplicate by tracing causes
+    # TODO if due to a missing required report expected value of missing steps
+    return list(extract_errors(_with_errors))

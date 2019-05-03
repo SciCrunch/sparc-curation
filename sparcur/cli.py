@@ -76,11 +76,11 @@ from pyontutils import clifun as clif
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, python_identifier, FileSize
+from sparcur.core import JT, log, logd, python_identifier, FileSize, get_all_errors
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, FTLax, Summary, Integrator
-from sparcur.curation import JEncode, get_all_errors
+from sparcur.curation import JEncode
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
 

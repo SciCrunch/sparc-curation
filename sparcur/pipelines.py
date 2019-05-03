@@ -1,5 +1,11 @@
+from sparcur import schemas as sc
 from sparcur import validate as vldt
+from sparcur.derives import Derives
+from sparcur.core import DictTransformer, get_all_errors
+from sparcur.core import JT, JEncode, log, logd, lj
 
+DT = DictTransformer
+De = Derives
 
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
@@ -264,31 +270,6 @@ class Pipeline:
             data['error_index'] = ei
             data['submission_completeness_index'] = sci
 
-        return data
-
-    @property
-    def __data_out_with_errors(self):
-        if hasattr(self, '_dowe'):
-            return self._dowe
-
-        data = self.data_out
-        ok, val, data = self.schema_out.validate(data)
-        if not ok:
-            if 'errors' not in data:
-                data['errors'] = []
-            data['errors'] += val.json()
-
-        ei = len(get_all_errors(data))
-        if 'inputs' in data:
-            sci = self.submission_completeness_index(data['inputs'])
-        else:
-            ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
-            sci = 0
-
-        data['error_index'] = ei
-        data['submission_completeness_index'] = sci
-
-        self._dowe = data
         return data
 
     @property
