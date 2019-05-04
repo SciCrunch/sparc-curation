@@ -8,7 +8,7 @@ class TestDerives(unittest.TestCase):
         subschemas = {'dataset_description':sc.DatasetDescriptionSchema.schema,
                         'submission':sc.SubmissionSchema.schema,
                         'subjects':sc.SubjectsSchema.schema,}
-        {'inputs':
-         {'errors': [1, 2, 3],
-         }}
+        inputs = {'inputs':
+                  {'errors': [1, 2, 3],}}
+
         De.submission_completeness_index(schema, subschemas, inputs)

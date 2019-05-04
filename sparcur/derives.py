@@ -110,6 +110,9 @@ class Derives:
             if 'species' in subject:
                 out.add(subject['species'])
 
+        if len(out) == 1:
+            return next(iter(out)),
+
         return tuple(out),
 
     @staticmethod

@@ -1047,7 +1047,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dataset.id  # in case we are somewhere else
-            uri_api = dataset.uri_uri
+            uri_api = dataset.uri_api
             uri_human = dataset.uri_human
             # dataset metadata
             submission = property(lambda s: (_ for _ in dataset.submission))

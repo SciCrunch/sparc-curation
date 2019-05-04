@@ -4,6 +4,7 @@ import jsonschema
 # FIXME these imports should not be here types rules should be set in another way
 import rdflib
 from pyontutils.core import OntId, OntTerm
+from pysercomb.pyr.units import ProtcParameter
 
 class ValidationError(Exception):
     def __init__(self, errors):
@@ -33,7 +34,12 @@ class JSONSchema(object):
     def __init__(self):
         format_checker = jsonschema.FormatChecker()
         types = dict(array=(list, tuple),
-                     string=(str, rdflib.URIRef, rdflib.Literal, OntId, OntTerm))
+                     string=(str,
+                             rdflib.URIRef,
+                             rdflib.Literal,
+                             OntId,
+                             OntTerm,
+                             ProtcParameter,))
         self.validator = jsonschema.Draft6Validator(self.schema,
                                                     format_checker=format_checker,
                                                     types=types)
@@ -129,6 +135,7 @@ class ContributorSchema(JSONSchema):
                       'items': {
                           'type': 'string',
                           'enum': ['ContactPerson',
+                                   'Creator',  # allowed here, moved later
                                    'DataCollector',
                                    'DataCurator',
                                    'DataManager',
@@ -164,8 +171,18 @@ class ContributorsSchema(JSONSchema):
                       'is_contact_person': {'type': 'boolean', 'enum': [True]},
                   },
               },
-              'items': ContributorSchema.schema
+              'items': ContributorSchema.schema,
             }
+
+
+class ContributorOutSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorSchema.schema)
+    schema['properties']['contributor_role']['items']['enum'].remove('Creator')
+
+
+class ContributorsOutSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorsSchema.schema)
+    schema['items'] = ContributorOutSchema.schema
 
 
 class CreatorSchema(JSONSchema):
@@ -184,7 +201,12 @@ class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
-        'required': ['name', 'description', 'funding', 'protocol_url_or_doi', 'contributors', 'completeness_of_data_set'],
+        'required': ['name',
+                     'description',
+                     'funding',
+                     'protocol_url_or_doi',
+                     'contributors',
+                     'completeness_of_data_set'],
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
             'errors': ErrorSchema.schema,
@@ -282,7 +304,8 @@ class MetaOutSchema(JSONSchema):
                       'modality',
                       'contributor_count',
                       'subject_count',
-                      'uri_human'
+                      'uri_human',
+                      'uri_api',
                       #'sample_count',
     ]
     schema['required'].remove('contributors')
@@ -292,6 +315,9 @@ class MetaOutSchema(JSONSchema):
         'errors': ErrorSchema.schema,
         'uri_human': {'type': 'string',
                       'pattern': '^https://',  # FIXME proper regex
+        },
+        'uri_api': {'type': 'string',
+                    'pattern': '^https://',  # FIXME proper regex
         },
         'award_number': {'type': 'string',
                          'pattern': '^OT|^U18',},
@@ -304,7 +330,12 @@ class MetaOutSchema(JSONSchema):
                              'items': {'type': 'string'}},
         'species': {'type': 'string'},
         'organ': {'type': 'string'},
-        'modality': {'type': 'string'},  # FIXME array?
+        'modality': {'type': 'array',
+                     'minItems': 1,
+                     'items': {
+                         'type': 'string',
+                     },
+        },  # FIXME array?
 
         # TODO $ref these w/ pointer?
         # in contributor etc?
@@ -330,7 +361,7 @@ class DatasetOutSchema(JSONSchema):
                             'submission_completeness_index': {'type': 'number',
                                                               'minimum': 0,
                                                               'maximum': 1,},
-                            'contributors': ContributorsSchema.schema,
+                            'contributors': ContributorsOutSchema.schema,
                             'creators': CreatorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer
                             'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema

@@ -116,6 +116,14 @@ class OrcidId(OntId):
             raise self.MalformedOrcidError(self) from e
 
 
+class JTList:
+    pass
+
+
+class JTDict:
+    pass
+
+
 def JT(blob):
     """ this is not a class but is a function hacked to work like one """
     def _populate(blob, top=False):
@@ -232,7 +240,16 @@ def JT(blob):
                            for a, b in (t if isinstance(t, list) else (t,)))}
     cd['__repr__'] = _repr
     cd['query'] = query
-    nc = type('JT' + str(type(blob)), (object,), cd)
+
+    if isinstance(blob, dict):
+        type_ = JTDict
+    elif isinstance(blob, list):
+        type_ = JTList
+    else:
+        type_ = object
+
+    nc = type('JT' + str(type(blob)), (type_,), cd)  # use object to prevent polution of ns
+    #nc = type('JT' + str(type(blob)), (type(blob),), cd)
     return nc()
 
 
@@ -518,7 +535,7 @@ class _DictTransformer:
                               source_key_optional=source_key_optional)
 
     @staticmethod
-    def delete(data, deletes):
+    def delete(data, deletes, source_key_optional=False):
         """ delets is a list with the following structure
             [source-path ...]
             THIS IS SILENT YOU SHOULD USE pop instead!
@@ -552,6 +569,7 @@ class _DictTransformer:
 
     @classmethod
     def derive(cls, data, derives, source_key_optional=True, empty='CULL', cheaty_face=None):
+        """ [[[source-path, ...], function, [target-path, ...]], ...] """
         # if you have source key option True and empty='OK' you will get loads of junk
         allow_empty = empty == 'OK' and not empty == 'CULL'
         error_empty = empty == 'ERROR'
@@ -572,6 +590,7 @@ class _DictTransformer:
                     derive_function will work at all so we wrap the lot """
                 args = cls.get(*get_args)
                 return derive_function(*args)
+
             def express_zip(*zip_args):
                 return tuple(zipeq(*zip_args))
 
@@ -580,7 +599,7 @@ class _DictTransformer:
                     # allows nesting
                     adops.apply(defer_get, data, source_paths,
                                 source_key_optional=source_key_optional)
-                    return
+                    continue
 
                 cls.add(data,
                         ((tp, v) for tp, v in
@@ -592,6 +611,7 @@ class _DictTransformer:
                                      failure_value=tuple())
                         if not empty(v)))
             except TypeError as e:
+                log.error('wat')
                 raise TypeError(f'derive failed\n{source_paths}\n'
                                 f'{derive_function}\n{target_paths}\n') from e
 

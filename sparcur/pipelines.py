@@ -22,6 +22,12 @@ class JSONPipeline(Pipeline):
     # by subclassing and then using super().previous_step to insert another
     # step along the way
 
+    previous_pipeline_class = None
+    # If previous_pipeline_class is set then this pipeline is run on the previous_pipeline given
+    # to this class at init. It might be more accurate to call this the previous pipeline processor.
+    # basically this is the 'intervening' pipeline between the previous pipeline and this pipeline
+    # need a better name for it ...
+
     adds = []
     lifts = []
     copies = []
@@ -34,9 +40,19 @@ class JSONPipeline(Pipeline):
         def __init__(self, data):
             self.data = data
 
+
+    @classmethod
+    def check(cls):
+        assert not [d for d in cls.derives if len(d) != 3]
+
     def __init__(self, previous_pipeline, lifters, runtime_context):
         """ sources stay, helpers are tracked for prov and then disappear """
         #log.debug(lj(sources))
+        if self.previous_pipeline_class is not None:
+            previous_pipeline = self.previous_pipeline_class(previous_pipeline,
+                                                             lifters,
+                                                             runtime_context)
+
         self.previous_pipeline = previous_pipeline
         self.lifters = lifters
         self.runtime_context = runtime_context
@@ -73,7 +89,8 @@ class JSONPipeline(Pipeline):
     @property
     def cleaned(self):
         data = self.moved
-        DictTransformer.delete(data, self.cleans, source_key_optional=True)
+        removed = list(DictTransformer.pop(data, self.cleans, source_key_optional=True))
+        log.debug(f'cleaned the following values from {self}' + lj(removed))
         return data
 
     @property
@@ -118,7 +135,7 @@ def section_pipelines(*sections):
             def lift_function(__unused_path):
                 # throw 'em in a list and let the schema sort 'em out!
                 dwe = [section.data_with_errors
-                        for section in getattr(lifters, section)]
+                       for section in getattr(lifters, section)]
                 if dwe:
                     dwe, *oops = dwe
                     if oops:
@@ -140,14 +157,15 @@ class SPARCBIDSPipeline(JSONPipeline):
     lifts = section_pipelines('submission', 'dataset_description', 'subjects')
 
     copies = ([['dataset_description', 'contributors'], ['contributors']],
-                [['subjects',], ['inputs', 'subjects']],
-                *copy_all(['dataset_description'], ['meta'],
+              [['subjects',], ['inputs', 'subjects']],
+              *copy_all(['dataset_description'], ['meta'],
                         'species',  # TODO validate all source paths against schema
                         'organ',
                         'modality',
                         'protocol_url_or_doi',
 
                         'completeness_of_dataset',
+                        'completeness_of_data_set',
                         'funding',
                         'description',
                         'additional_links',
@@ -156,10 +174,10 @@ class SPARCBIDSPipeline(JSONPipeline):
                         'originating_article_doi',))
 
     moves = ([['dataset_description',], ['inputs', 'dataset_description']],
-                [['subjects', 'software'], ['resources']],  # FIXME update vs replace
-                [['subjects'], ['subjects_file']],  # first step in ending the confusion
-                [['subjects_file', 'subjects'], ['subjects']],
-                [['submission',], ['inputs', 'submission']],)
+             [['subjects', 'software'], ['resources']],  # FIXME update vs replace
+             [['subjects'], ['subjects_file']],  # first step in ending the confusion
+             [['subjects_file', 'subjects'], ['subjects']],
+             [['submission',], ['inputs', 'submission']],)
 
     derives = ([[['inputs', 'submission', 'submission', 'sparc_award_number'],
                  ['inputs', 'dataset_description', 'funding']],
@@ -167,35 +185,38 @@ class SPARCBIDSPipeline(JSONPipeline):
                 [['meta', 'award_number']]],
 
                [[['contributors']],
-                lambda cs: [DT.derive(c, [[[['name']],  # FIXME [['name]] as missing a nesting level
+                (lambda cs: [DT.derive(c, [[[['name']],  # FIXME [['name]] as missing a nesting level
                                            De.contributor_name,  # and we got no warning ... :/
                                            [['first_name'], ['last_name']]]])
-                            for c in cs],
+                            for c in cs]),
                 []],
 
                [[['contributors']],
-                lambda cs: [JPointer('/contributors/{i}') for i, c in enumerate(cs)
-                            if 'PrincipalInvestigator' in
-                            [r for t in list(DT.get(c, [['contributor_role']],
-                                                    source_key_optional=True))
-                             for r in t]]
-                ['meta', 'principal_investigator']],
+                (lambda cs: [JPointer('/contributors/{i}') for i, c in enumerate(cs)
+                            if ('PrincipalInvestigator' in c['contributor_role']
+                                if 'contributor_role' in c else False)]),  # ah lambda and commas ...
+                [['meta', 'principal_investigator']]],
 
                [[['contributors']],
                 Derives.creators,
                 [['creators']]],
 
                [[['contributors']],
-                len,
-                ['meta', 'contributor_count']],
+                lambda v: (len(v),),
+                [['meta', 'contributor_count']]],
 
                [[['subjects']],
                 Derives.dataset_species,
-                ['meta', 'species']],
+                [['meta', 'species']]],
 
                [[['subjects']],
-                len,
-                ['meta', 'subject_count']],
+                lambda v: (len(v),),
+                [['meta', 'subject_count']]],
+
+               [[['samples']],
+                 lambda v: (len(v),),
+                [['meta', 'sample_count']]],
+
     )
 
     cleans = [['subjects_file'],]
@@ -284,24 +305,7 @@ class SPARCBIDSPipeline(JSONPipeline):
         return data
 
     @property
-    def _derived_pre(self):
-        # FIXME do we really need this ??
-        # which copy steps actually depend on it??
-        # in this case it is just easier to get some values
-        # before moving everything around, provides
-        # a way to operate on either side of an impenance mismatch
-        # so if something changes, you just added another layer
-        data = self.lifted
-        DictTransformer.derive(data, derives, source_key_optional=True)
-        return data
-
-    @property
     def _data_derived_post(self):
-        todo = [[[['samples']],
-                 len,
-                 [['meta', 'sample_count']]] ,
-        ]
-
         data = self.data_lifted_post
         DictTransformer.derive(data, derives)
         return data
@@ -310,20 +314,19 @@ class SPARCBIDSPipeline(JSONPipeline):
     def cleaned(self):
         """ clean up any cruft left over from transformations """
 
-        data = self.moved
-        removed = list(DictTransformer.pop(data, self.cleans, source_key_optional=True))
-        log.debug(f'cleaned the following values from {self}' + lj(removed))
+        data = super().cleaned
 
         # FIXME post manual fixes ...
-
         # remote Creator since we lift it out
         if 'contributors' in data:
             for c in data['contributors']:
                 if 'contributor_role' in c:
                     cr = c['contributor_role']
                     if 'Creator' in cr:
-                        c['contributor_role'] = tuple(r for r in cr if cr != 'Creator')
-                        
+                        c['contributor_role'] = tuple(r for r in cr if r != 'Creator')
+
+                    assert 'Creator' not in c['contributor_role']
+
         return data
 
     @property
@@ -343,6 +346,28 @@ class SPARCBIDSPipeline(JSONPipeline):
             data['submission_completeness_index'] = 0
             log.debug('pipeline skipped to end due to errors')
 
+        return data
+
+    @property
+    def data_post(self):
+        # FIXME a bit of a hack
+        data = self.data_out
+    @hasSchema(sc.DatasetOutSchema)
+    def data(self):
+        return super().data
+        #return self.data_post
+
+
+class PipelineExtras(JSONPipeline):
+    # subclassing allows us to pop additional steps
+    # before or after their super()'s name
+
+    previous_pipeline_class = SPARCBIDSPipeline
+
+    @property
+    def lifted(self):
+        data = super().lifted
+        # FIXME conditional lifts ...
         if 'award_number' not in data['meta']:
             am = self.lifters.award_manual
             if am:
@@ -353,22 +378,7 @@ class SPARCBIDSPipeline(JSONPipeline):
             if m:
                 data['meta']['modality'] = m
 
-        return data
-
-    @property
-    def _data_added(self):
-        # FIXME this would seem to be where the Integration class comes in?
-        # the schemas make it a bit of a dance
-        data = self.data_cleaned
-        DictTransformer.add(data, adds)
-        return data
-
-    @property
-    def data_post(self):
-        # FIXME a bit of a hack
-        data = self.data_out
-
-        if 'error_index' not in data:
+        if 'error_index' not in data:  # a failure will fill this in
             ei = len(get_all_errors(data))
             if 'inputs' in data:
                 #schema = self.__class__.data_out.schema
@@ -384,17 +394,12 @@ class SPARCBIDSPipeline(JSONPipeline):
             data['error_index'] = ei
             data['submission_completeness_index'] = sci
 
+        #data['old_errors'] = data.pop('errors')  # FIXME
         return data
 
     @hasSchema(sc.DatasetOutSchema)
     def data(self):
         return super().data
-        #return self.data_post
-
-
-class PipelineExtras(SPARCBIDSPipeline):
-    # subclassing allows us to pop additional steps
-    # before or after their super()'s name
 
     @property
     def data_derived_post(self):
@@ -406,9 +411,5 @@ class PipelineExtras(SPARCBIDSPipeline):
         DictTransformer.derive(data, derives)
         return data
 
-    @property
-    def _added(self):
-        adds = []
-        data = super().added
-        DictTransformer.add(data, adds)
-        return data
+SPARCBIDSPipeline.check()
+PipelineExtras.check()

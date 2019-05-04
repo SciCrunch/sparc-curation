@@ -13,7 +13,7 @@ Usage:
     spc xattrs
     spc export [ttl json datasets] [options]
     spc demos
-    spc shell [integration]
+    spc shell [integration] [options]
     spc feedback <feedback-file> <feedback>...
     spc find [options] --name=<PAT>...
     spc meta [--uri] [--browser] [<path>...]
@@ -77,8 +77,9 @@ from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur.core import JT, log, logd, python_identifier, FileSize
-from sparcur.core import OntTerm, get_all_errors
+from sparcur.core import OntTerm, get_all_errors, DictTransformer as DT
 from sparcur.paths import Path, BlackfynnCache, PathMeta
+from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, FTLax, Summary, Integrator
 from sparcur.curation import JEncode
@@ -794,6 +795,7 @@ class Shell(Dispatcher):
         intr = Integrator(p)
         pj = list(intr.protocol_jsons)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
+        j = JT(intr.data)
         embed()
 
 
