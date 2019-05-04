@@ -1,5 +1,7 @@
+from pathlib import Path
 from sparcur import schemas as sc
 from sparcur import validate as vldt
+from sparcur import datasets as dat
 from sparcur.derives import Derives
 from sparcur.core import DictTransformer, copy_all, get_all_errors
 from sparcur.core import JT, JEncode, log, logd, lj, JPointer
@@ -7,12 +9,64 @@ from sparcur.core import JT, JEncode, log, logd, lj, JPointer
 DT = DictTransformer
 De = Derives
 
+
 class Pipeline:
     """ base pipeline """
 
 
 class PrePipeline(Pipeline):
     """ base for pre-json pipelines """
+
+
+class FilePipeline(PrePipeline):
+    # FIXME this is a temporary solution to reuse the conversion existing
+    data_transformer_class = None
+    def __init__(self, previous_pipeline, lifters, runtime_context):
+        log.debug(lj(previous_pipeline.data))
+        self.path = Path(previous_pipeline.data['path'])
+
+    @property
+    def transformed(self):
+        dt = self.data_transformer_class(self.path)
+        return dt.data
+
+    # @hasSchema(sc.TransformerSchema)
+    @property  # transformer out schema goes here
+    def data(self):
+        return self.transformed
+
+
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
+class SubmissionFilePipeline(FilePipeline):
+
+    data_transformer_class = dat.SubmissionFile
+
+    @hasSchema(sc.SubmissionSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
+class DatasetDescriptionFilePipeline(FilePipeline):
+
+    data_transformer_class = dat.DatasetDescriptionFile
+
+    @hasSchema(sc.DatasetSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
+class SubjectsFilePipeline(FilePipeline):
+
+    data_transformer_class = dat.DatasetDescriptionFile
+
+    @hasSchema(sc.SubjectsSchema)
+    def data(self):
+        return super().data
 
 
 hasSchema = vldt.HasSchema()
@@ -30,6 +84,7 @@ class JSONPipeline(Pipeline):
 
     adds = []
     lifts = []
+    subpipelines = []
     copies = []
     moves = []
     derives = []
@@ -75,8 +130,14 @@ class JSONPipeline(Pipeline):
         return data
 
     @property
-    def copied(self):
+    def subpipelined(self):
         data = self.lifted
+        DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines)
+        return data
+
+    @property
+    def copied(self):
+        data = self.subpipelined
         DictTransformer.copy(data, self.copies, source_key_optional=True)
         return data
 
@@ -154,7 +215,13 @@ def section_pipelines(*sections):
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
 class SPARCBIDSPipeline(JSONPipeline):
-    lifts = section_pipelines('submission', 'dataset_description', 'subjects')
+    #lifts = section_pipelines('submission', 'dataset_description', 'subjects')
+
+    subpipelines = [
+        [[[['submission'], ['path']]], SubmissionFilePipeline, ['submission']],
+        [[[['dataset_description'], ['path']]], DatasetDescriptionFilePipeline, ['dataset_description']],
+        [[[['subjects'], ['path']]], SubjectsFilePipeline, ['subjects']],
+    ]
 
     copies = ([['dataset_description', 'contributors'], ['contributors']],
               [['subjects',], ['inputs', 'subjects']],

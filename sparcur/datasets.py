@@ -470,6 +470,7 @@ class DatasetDescriptionFile(Version1Header):
 
         return key
 
+
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
 class SubjectsFile(Version1Header):
@@ -503,8 +504,8 @@ class SubjectsFile(Version1Header):
 
         return out
 
-    def __init__(self, tabular):
-        super().__init__(tabular)
+    def __init__(self, path):
+        super().__init__(path)
 
         # units merging
         # TODO pull the units in the parens out

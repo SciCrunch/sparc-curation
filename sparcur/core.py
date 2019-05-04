@@ -679,7 +679,44 @@ class _DictTransformer:
                 #source_path = temp, heh  # hah
                 #self.move(data, source_path, target_path)
 
-            #data.pop(temp)
+                #data.pop(temp)
+
+
+    @staticmethod
+    def subpipeline(data, runtime_context, subpipelines):
+        """
+            [[[[[get-path], [add-path]], ...], pipeline-class, target-path], ...]
+        """
+
+        class DataWrapper:
+            def __init__(self, data):
+                self.data = data
+
+        prepared = []
+        for get_adds, pipeline_class, target_path in subpipelines:
+            selected_data = {}
+            ok = True
+            for get_path, add_path in get_adds:
+                try:
+                    value = adops.get(data, get_path)
+                    adops.add(selected_data, add_path, value)
+                except exc.NoSourcePathError as e:
+                    if source_key_optional:
+                        logd.exception(str(type(e)))
+                        ok = False
+                        break  # breaks the inner loop
+                    else:
+                        raise e
+
+            if not ok:
+                continue
+
+            log.debug(lj(selected_data))
+            prepared.append((pipeline_class, DataWrapper(selected_data), None, runtime_context))
+
+        for pc, *args in prepared:
+            p = pc(*args)
+            adops.add(data, target_path, p.data)
 
     @staticmethod
     def lift(data, lifts, source_key_optional=True):
@@ -702,6 +739,7 @@ class _DictTransformer:
                     continue
                 else:
                     raise e
+
             new_value = function(old_value)
             adops.add(data, path, new_value, fail_on_exists=False)
 
