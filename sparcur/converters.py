@@ -63,11 +63,12 @@ class TripleConverter:
                     log.debug(o)
                     if isinstance(o, ProtcParameter):
                         s = rdflib.BNode()
-                        text = o.for_text
+                        text = o.for_triples
                         value, unit = text.split(' ')
                         yield subject, p, s
                         yield s, TEMP.hasValue, rdflib.Literal(value)
                         yield s, TEMP.hasUnit, rdflib.Literal(unit)
+
                     else:
                         yield subject, p, o
 

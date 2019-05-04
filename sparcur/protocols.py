@@ -22,21 +22,37 @@ class ProtcurData:
         super().__init__()  # this is the last in the chain atm
 
     def __call__(self, protocol_uri):
-        protc_as_python = []  # TODO
-        return protc_as_python  # downstream will deal with it
+        """ can't use __call__ in subclasses where it is overwritten ... """
+        yield from self.protcur_nodes(protocol_uri)
 
-    def triples_protcur(self, protocol_subject):
+    def _protcur(self, protocol_uri):
         self.lazy_setup()
-        protocol_uri = str(protocol_subject)
-        #asts = list(protc.byIri(protocol_uri))  # prefix issue
-        ps = [p for p in protc if p.uri.startswith(protocol_uri)]
-        if not ps:
+        gen = (p for p in protc if p.uri.startswith(protocol_uri) and p is not None and not p.hasAstParent)
+
+        try:
+            p = next(gen)
+            yield p
+            yield from gen
+        except StopIteration:
             log.error(f'could not find annotations for {protocol_uri}')
             return
-        p = ps[0]
+
         if p.document.otherVersionUri:  # FIXME also maybe check /abstract?
             other_uri = p.document.otherVersionUri
-            ps += [p for p in protc if p.uri.startswith(other_uri)]
+            yield from (p for p in protc if p.uri.startswith(other_uri) and p is not None
+                        and not p.hasAstParent)
+
+    @property
+    def protcur(self):
+        meta = self.data['meta']
+        if 'protocol_url_or_doi' in meta:
+            for uri in meta['protocol_url_or_doi']:
+                yield from self._protcur(uri)
+
+    def triples_protcur(self, protocol_subject):
+        protocol_uri = str(protocol_subject)
+        #asts = list(protc.byIri(protocol_uri))  # prefix issue
+        ps = list(self(protocol_uri))
 
         anatomy = [(p, OntId('UBERON:' + str(p).split('UBERON:', 1)[-1].split(' ', 1)[0])) for p in ps
                    if p.astType == 'protc:input' and '(protc:input (term UBERON' in str(p)]
