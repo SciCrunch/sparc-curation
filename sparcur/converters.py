@@ -105,9 +105,9 @@ class MetaConverter(TripleConverter):
         #['award_number', TEMP.hasAwardNumber],
         ['species', isAbout],
         ['organ', isAbout],
+        ['modality', TEMP.hasExperimentalModality],
         ['subject_count', TEMP.hasNumberOfSubjects],
         ['uri_human', TEMP.hasHumanUri],
-        ['keywords', isAbout],
         ['keywords', isAbout],
     ]
 
@@ -148,7 +148,6 @@ class MetaConverter(TripleConverter):
                 yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
 
             yield from self.integrator.triples_protcur(s)
-
 MetaConverter.setup()  # box in so we don't forget
 
 

@@ -6,12 +6,34 @@ from scibot.utils import mproperty
 
 class HasSchema:
     """ decorator for classes with methods whose output can be validated by jsonschema """
-    def __init__(self, schema=None, normalize=False):
-        self.schema = schema
+    def __init__(self, input_schema_class=None, fail=True, normalize=False):
+        self.input_schema = input_schema_class() if input_schema_class is not None else None
+        self.fail = fail
         self.normalize = normalize
+        self.schema = None  # deprecated output schema ...
 
     def mark(self, cls):
         """ note that this runs AFTER all the methods """
+
+        if self.input_schema is not None:
+            # FIXME probably better to do this as types
+            # and check that schemas match at class time
+            cls._pipeline_start = cls.pipeline_start
+            @mproperty
+            def pipeline_start(self, schema=self.input_schema, fail=self.fail):
+                data = self._pipeline_start
+                ok, norm_or_error, data = schema.validate(data)
+                if not ok and fail:
+                    raise norm_or_error
+
+                return data
+
+            pipeline_start.schema = self.input_schema
+            cls.pipeline_start = pipeline_start
+
+        return cls
+
+        # pretty sure this functionality is no longer used
         if self.schema is not None:
             cls._output = cls.output
             @property
@@ -38,7 +60,6 @@ class HasSchema:
 
                 return data
 
-            #breakpoint()
             schema_wrapped_property.schema = schema
             return schema_wrapped_property
         return decorator

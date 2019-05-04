@@ -1004,10 +1004,6 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
     # that the producer masks its NotImplementedErrors
 
     # class level helpers, instance level helpers go as mixins
-    helpers = (
-        ('protcur', ProtcurData),
-        # TODO sheets
-    )
 
     no_google = None
 
@@ -1051,7 +1047,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dataset.id  # in case we are somewhere else
-            uri_api = dataset.uri_human
+            uri_api = dataset.uri_uri
             uri_human = dataset.uri_human
             # dataset metadata
             submission = property(lambda s: (_ for _ in dataset.submission))
@@ -1078,9 +1074,15 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         helper_key = object()
         lifters = Lifters()
         sources = dataset.data
-        sources[helper_key] = helpers
-        pipeline = pipes.PipelineExtras(sources, lifters, helper_key, RuntimeContext())
-        sources.pop(helper_key)
+        # helper key was bad because it means that pipelines have to
+        # know the structure of their helper pipelines and maintain them
+        # across changes, better to use the lifters as other pipelines that
+        # can start from a single piece of data and return a formatted result
+        # and track their own provenance, the concept of a helper that holds
+        # all the prior existing data is not a bad one, it just just that it
+        # is better to create objects that can take the information already
+        # in the data for the current pipeline and return an expanded verion
+        pipeline = pipes.PipelineExtras(dataset, lifters, RuntimeContext())
 
         self._data = pipeline.data
         return self._data

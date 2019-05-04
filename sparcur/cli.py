@@ -76,7 +76,8 @@ from pyontutils import clifun as clif
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, python_identifier, FileSize, get_all_errors
+from sparcur.core import JT, log, logd, python_identifier, FileSize
+from sparcur.core import OntTerm, get_all_errors
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, FTLax, Summary, Integrator
@@ -333,23 +334,23 @@ class Main(Dispatcher):
     ###
 
     def refresh(self):
-        from pyontutils.utils import Async, deferred
         self._print_paths(self._paths)
         if self.options.pretend:
-            return
-        hz = self.options.rate
-        Async(rate=hz)(deferred(path.remote.refresh)(update_cache=True,
-                                                     update_data=self.options.fetch,
-                                                     size_limit_mb=self.options.limit)
-                       for path in list(self._paths))
-        return
-        for path in self._paths:
-            path.remote.refresh(update_cache=True,
-                                update_data=self.options.fetch,
-                                size_limit_mb=self.options.limit)
+            pass
 
+        elif not self.options.debug:
+            hz = self.options.rate
+            from pyontutils.utils import Async, deferred
+            Async(rate=hz)(deferred(path.remote.refresh)(update_cache=True,
+                                                         update_data=self.options.fetch,
+                                                         size_limit_mb=self.options.limit)
+                           for path in list(self._paths))
 
-        return
+        else:
+            for path in self._paths:
+                path.remote.refresh(update_cache=True,
+                                    update_data=self.options.fetch,
+                                    size_limit_mb=self.options.limit)
 
     def fetch(self):
         paths = [p for p in self._paths if not p.is_dir()]

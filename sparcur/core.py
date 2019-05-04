@@ -678,8 +678,7 @@ class _DictTransformer:
                 old_value = adops.get(data, path)
             except exc.NoSourcePathError as e:
                 if source_key_optional:
-                    msg = str(e)
-                    logd.error(msg)
+                    logd.exception(str(type(e)))
                     continue
                 else:
                     raise e
@@ -688,6 +687,10 @@ class _DictTransformer:
 
 DictTransformer = _DictTransformer()
 
+
+def copy_all(source_parent, target_parent, *fields):
+    return [[source_parent + [field], target_parent + [field]]
+            for field in fields]
 
 def normalize_tabular_format(project_path):
     kwargs = {
@@ -719,3 +722,7 @@ def get_all_errors(_with_errors):
     # TODO deduplicate by tracing causes
     # TODO if due to a missing required report expected value of missing steps
     return list(extract_errors(_with_errors))
+
+
+class JPointer(str):
+    """ a class to mark json pointers for resolution """

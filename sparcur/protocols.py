@@ -25,9 +25,9 @@ class ProtcurData:
         """ can't use __call__ in subclasses where it is overwritten ... """
         yield from self.protcur_nodes(protocol_uri)
 
-    def _protcur(self, protocol_uri):
+    def _protcur(self, protocol_uri, filter=lambda p: True):
         self.lazy_setup()
-        gen = (p for p in protc if p.uri.startswith(protocol_uri) and p is not None and not p.hasAstParent)
+        gen = (p for p in protc if p.uri.startswith(protocol_uri) and filter(p))
 
         try:
             p = next(gen)
@@ -39,21 +39,21 @@ class ProtcurData:
 
         if p.document.otherVersionUri:  # FIXME also maybe check /abstract?
             other_uri = p.document.otherVersionUri
-            yield from (p for p in protc if p.uri.startswith(other_uri) and p is not None
-                        and not p.hasAstParent)
+            yield from (p for p in protc if p.uri.startswith(other_uri) and filter(p))
 
     @property
     def protcur(self):
-        meta = self.data['meta']
-        if 'protocol_url_or_doi' in meta:
-            for uri in meta['protocol_url_or_doi']:
-                yield from self._protcur(uri)
+        """ protcur nodes without parents """
+        for protocol_uri in self.protocol_uris:
+            yield from self._protcur(uri, filter=lambda p: not p.hasAstParent)
+
+    @property
+    def protcur_all(self):
+        for protocol_uri in self.protocol_uris:
+            yield from self._protcur(uri)
 
     def triples_protcur(self, protocol_subject):
-        protocol_uri = str(protocol_subject)
-        #asts = list(protc.byIri(protocol_uri))  # prefix issue
-        ps = list(self(protocol_uri))
-
+        ps = list(self._protcur(str(protocol_subject)))
         anatomy = [(p, OntId('UBERON:' + str(p).split('UBERON:', 1)[-1].split(' ', 1)[0])) for p in ps
                    if p.astType == 'protc:input' and '(protc:input (term UBERON' in str(p)]
         #breakpoint()
