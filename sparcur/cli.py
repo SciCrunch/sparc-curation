@@ -793,9 +793,10 @@ class Shell(Dispatcher):
         from sparcur.protocols import ProtocolData, ProtcurData
         p, *rest = self._paths
         intr = Integrator(p)
-        pj = list(intr.protocol_jsons)
-        #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         j = JT(intr.data)
+        pj = list(intr.protocol_jsons)
+        pc = list(intr.protcur)
+        #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         embed()
 
 
