@@ -70,7 +70,7 @@ class JSONPipeline(Pipeline):
         # lifters are really 'run other pipelines'
         # or run_subpipelines
         data = self.pipeline_start
-        DictTransformer.lift(data, [[path, function(self.lifters)]
+        DictTransformer.lift(data, [[path, function(self.lifters, self.runtime_context)]
                                     for path, function in self.lifts])
         return data
 
@@ -131,7 +131,7 @@ class JSONPipeline(Pipeline):
 def section_pipelines(*sections):
     # FIXME deprecate this ...
     def section_binder(section):
-        def lift_wrapper(lifters):
+        def lift_wrapper(lifters, runtime_context):
             def lift_function(__unused_path):
                 # throw 'em in a list and let the schema sort 'em out!
                 dwe = [section.data_with_errors
@@ -139,7 +139,7 @@ def section_pipelines(*sections):
                 if dwe:
                     dwe, *oops = dwe
                     if oops:
-                        logd.error(f'{self.runtime_context.path} '
+                        logd.error(f'{runtime_context.path} '
                                     f'has too may {section} files!')
                     return dwe
 
@@ -363,6 +363,9 @@ class PipelineExtras(JSONPipeline):
     # before or after their super()'s name
 
     previous_pipeline_class = SPARCBIDSPipeline
+
+    lifts = [
+    ]
 
     @property
     def lifted(self):

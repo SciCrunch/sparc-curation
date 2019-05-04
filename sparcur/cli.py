@@ -745,9 +745,10 @@ class Report(Dispatcher):
         rows = [('', 'EI', 'DSCI', 'name', 'id', 'award', 'organ')]
         rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0,
                     *rest,
-                    an if an else '') for i, (ei, index, *rest, an) in
-                    enumerate(sorted(self.summary.completeness,
-                                    key=lambda t:(t[0], -t[1], *t[2:], t[-1])))]
+                    an if an else '', organ if organ else '')
+                 for i, (ei, index, *rest, an, organ) in
+                 enumerate(sorted(self.summary.completeness,
+                                  key=lambda t:(t[0], -t[1], *t[2:], t[-1])))]
         self._print_table(rows, title='Completeness Report')
 
     def keywords(self):
