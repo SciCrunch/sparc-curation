@@ -6,7 +6,7 @@ Usage:
     spc refresh [options] [<path>...]
     spc fetch [options] [<path>...]
     spc annos [export shell]
-    spc stats [<directory>...]
+    spc report size [options] [<directory>...]
     spc report [completeness filetypes keywords subjects errors test] [options]
     spc tables [<directory>...]
     spc missing
@@ -16,23 +16,31 @@ Usage:
     spc shell [integration] [options]
     spc feedback <feedback-file> <feedback>...
     spc find [options] --name=<PAT>...
-    spc meta [--uri] [--browser] [<path>...]
+    spc meta [--uri] [--browser] [--human] [<path>...]
 
 Commands:
-    clone     clone a remote project (creates a new folder in the current directory)
-    pull      pull down the remote list of files
-    refresh   refresh to get file sizes and data
-    fetch     fetch based on the metadata that we have
-    stats     print stats for specified or current directory
-    report    print a report on all datasets
-              [--tab-table --sort-count-desc --debug]
-    missing   find and fix missing metadata
-    xattrs    populate metastore / backup xattrs
-    export    export extracted data
-    demos     long running example queries
-    shell     drop into an ipython shell
-    find      list unfetched files with option to fetch
-    meta      display the metadata the current folder or list of folders
+    clone       clone a remote project (creates a new folder in the current directory)
+    pull        pull the remote files
+    refresh     refresh to get file sizes and data
+    fetch       fetch based on the metadata that we have
+
+    report      print a report on all datasets
+                size            dataset sizes and file counts
+                completeness    submission and curation completeness
+                filetypes       filetypes used across datasets
+                keywords        keywords used per dataset
+                subjects        all headings from subjects files
+                errors          list of all errors per dataset
+
+                options: [--tab-table --sort-count-desc --debug]
+
+    missing     find and fix missing metadata
+    xattrs      populate metastore / backup xattrs
+    export      export extracted data
+    demos       long running example queries
+    shell       drop into an ipython shell
+    find        list unfetched files with option to fetch
+    meta        display the metadata the current folder or list of folders
 
 Options:
     -f --fetch              fetch the files
@@ -42,13 +50,13 @@ Options:
     -n --name=<PAT>         filename pattern to match (like find -name)
     -u --uri                print the human uri for the path in question
     -a --uri-api            print the api uri for the path in question
-    -h --uri-human          print the human uri for the path in question
+    -h --human              print human readable values
     -b --browser            open the uri in default browser
     --project-path=<PTH>    set the project path manually
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
     -m --only-meta          only pull known dataset metadata files
-    -z --only-size          only operate on files where there is no cached size
+    -z --only-no-file-id    only pull files missing file_id
     -r --rate=HZ            sometimes we can go too fast when fetching
     -p --pretend            if the defult is to act, dont, opposite of fetch
 
@@ -146,7 +154,10 @@ class Main(Dispatcher):
 
         Integrator.no_google = self.options.no_google
 
-        if self.options.clone or self.options.meta or self.options.stats:
+        if (self.options.clone or
+            self.options.meta or
+            self.options.size or
+            self.options.pretend):
             # short circuit since we don't know where we are yet
             return
 
@@ -160,7 +171,8 @@ class Main(Dispatcher):
 
         if self.options.project_path:
             path_string = self.options.project_path
-        path_string = '.'
+        else:
+            path_string = '.'
 
         # we have to start from the cache class so that
         # we can configure
@@ -261,9 +273,9 @@ class Main(Dispatcher):
         def inner(paths, level=0, stop=self.options.level):
             """ depth first traversal of children """
             for path in paths:
-                if self.options.only_size:
+                if self.options.only_no_file_id:
                     if (path.is_broken_symlink() and
-                        path.cache.meta.size is None):
+                        (path.cache.meta.file_id is None)):
                         yield path
                         continue
 
@@ -281,9 +293,10 @@ class Main(Dispatcher):
                     yield path
 
                 if stop is None:
-                    if self.options.only_size:
+                    if self.options.only_no_file_id:
                         for rc in path.rchildren:
-                            if (rc.is_broken_symlink() and rc.cache.meta.size is None):
+                            if (rc.is_broken_symlink() and
+                                rc.cache.meta.file_id is None):
                                 yield rc
                     else:
                         yield from path.rchildren
@@ -588,75 +601,6 @@ class Main(Dispatcher):
             all_annos = [list(protc.byIri(uri)) for uri in f.protocol_uris_resolved]
             embed()
 
-    def stats(self):
-        dirs = self.options.directory
-        if not dirs:
-            dirs.append('.')
-
-        G = 1024 ** 3
-        data = []
-
-        for d in dirs:
-            if not Path(d).is_dir():
-                continue  # helper files at the top level, and the symlinks that destory python
-            path = Path(d).resolve()
-            paths = path.rchildren #list(path.rglob('*'))
-            path_meta = {p:p.cache.meta for p in paths}
-            outstanding = 0
-            total = 0
-            tf = 0
-            ff = 0
-            td = 0
-            uncertain = False  # TODO
-            for p, m in path_meta.items():
-                #if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
-                if p.is_file() or p.is_broken_symlink():
-                    s = m.size
-                    if s is None:
-                        uncertain = True
-                        continue
-
-                    tf += 1
-                    if s:
-                        total += s
-
-                    #if '.fake' in p.suffixes:
-                    if p.is_broken_symlink():
-                        ff += 1
-                        if s:
-                            outstanding += s
-
-                elif p.is_dir():
-                    td += 1
-
-            data.append([path.name,
-                         FileSize(total - outstanding),
-                         FileSize(outstanding),
-                         FileSize(total),
-                         uncertain,
-                         (tf - ff),
-                         ff,
-                         tf,
-                         td])
-
-        formatted = [[n, l.hr, o.hr, t.hr if not u else '??', lf, ff, tf, td]
-                     for n, l, o, t, u, lf, ff, tf, td in
-                     sorted(data, key=lambda r: (r[4], -r[3]))]
-        rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
-                *formatted]
-
-        self._print_table(rows, title='File size counts')
-
-        return
-        maxn = max(len(n) for n, *_ in data)
-        align = 4
-        fmt = '\n'.join(f'{n:<{maxn+4}} {(gt - go) * 1024:7.2f}M {go:>8.2f} {gt:>8.2f}G{"":>4}{tf - ff:>{align}} {ff:>{align}} {tf:>{align}} {td:>{align}}'
-                        for n, go, gt, ff, tf, tc in data)
-
-        h = 'Folder', 'Local', 'Remote', 'Total', 'L', 'R', 'T', 'TD'
-        print(f'{{:<{maxn+4}}} {{:>8}} {{:>8}} {{:>9}}{"":>4}{{:>{align}}} {{:>{align}}} {{:>{align}}} {{:>{align}}}'.format(*h))
-        print(fmt)
-
     def demos(self):
         # get the first dataset
         dataset = next(iter(summary))
@@ -778,19 +722,17 @@ class Main(Dispatcher):
         old_level = log.level
         log.setLevel('ERROR')
         def inner(path):
-            if self.options.uri or self.options.uri_human:
+            if self.options.uri or self.options.browser:
                 uri = path.cache.uri_human
+                print('+' + '-' * (len(uri) + 2) + '+')
+                print(f'| {uri} |')
                 if self.options.browser:
                     webbrowser.open(uri)
-                else:
-                    print('+' + '-' * (len(uri) + 2) + '+')
-                    print(f'| {uri} |')
-                 
                 
             try:
                 meta = path.cache.meta
                 if meta is not None:
-                    print(path.cache.meta.as_pretty(pathobject=path))
+                    print(path.cache.meta.as_pretty(pathobject=path, human=self.options.human))
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
 
@@ -826,6 +768,64 @@ class Report(Dispatcher):
             return lambda kv: -kv[-1]
         else:
             return lambda kv: kv
+
+    def size(self):
+        dirs = self.options.directory
+        if not dirs:
+            dirs.append('.')
+
+        data = []
+
+        for d in dirs:
+            if not Path(d).is_dir():
+                continue  # helper files at the top level, and the symlinks that destory python
+            path = Path(d).resolve()
+            paths = path.rchildren #list(path.rglob('*'))
+            path_meta = {p:p.cache.meta for p in paths}
+            outstanding = 0
+            total = 0
+            tf = 0
+            ff = 0
+            td = 0
+            uncertain = False  # TODO
+            for p, m in path_meta.items():
+                #if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
+                if p.is_file() or p.is_broken_symlink():
+                    s = m.size
+                    if s is None:
+                        uncertain = True
+                        continue
+
+                    tf += 1
+                    if s:
+                        total += s
+
+                    #if '.fake' in p.suffixes:
+                    if p.is_broken_symlink():
+                        ff += 1
+                        if s:
+                            outstanding += s
+
+                elif p.is_dir():
+                    td += 1
+
+            data.append([path.name,
+                         FileSize(total - outstanding),
+                         FileSize(outstanding),
+                         FileSize(total),
+                         uncertain,
+                         (tf - ff),
+                         ff,
+                         tf,
+                         td])
+
+        formatted = [[n, l.hr, o.hr, t.hr if not u else '??', lf, ff, tf, td]
+                     for n, l, o, t, u, lf, ff, tf, td in
+                     sorted(data, key=lambda r: (r[4], -r[3]))]
+        rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
+                *formatted]
+
+        self._print_table(rows, title='File size counts')
 
     def filetypes(self):
         key = self._sort_key

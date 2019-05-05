@@ -412,8 +412,8 @@ class _PathMetaAsPretty(_PathMetaConverter):
 
     def __init__(self):
         # register functionality on PathMeta
-        def as_pretty(self, pathobject=None, title=None, _as_pretty=self.as_pretty):
-            return _as_pretty(self, pathobject=pathobject, title=title)
+        def as_pretty(self, pathobject=None, title=None, human=False, _as_pretty=self.as_pretty):
+            return _as_pretty(self, pathobject=pathobject, title=title, human=human)
 
         @classmethod
         def from_pretty(cls, pretty, _from_pretty=self.from_pretty):
@@ -440,7 +440,7 @@ class _PathMetaAsPretty(_PathMetaConverter):
         
         return value
 
-    def as_pretty(self, pathmeta, pathobject=None, title=None):
+    def as_pretty(self, pathmeta, pathobject=None, title=None, human=False):
         if title is None:
             if pathobject is not None:
                 title = pathobject.name
@@ -455,7 +455,10 @@ class _PathMetaAsPretty(_PathMetaConverter):
                 return 1, 0, k, v
 
         h = [['Key', f'Value    {title}']]
-        rows = h + sorted(([k, self.encode(k, v)] for k, v in pathmeta.items()
+        rows = h + sorted(([k, v.hr
+                            if human and isinstance(v, FileSize)
+                            else self.encode(k, v)]
+                           for k, v in pathmeta.items()
                            if (v is not None and
                                (isinstance(v, tuple) and
                                 v or not isinstance(v, tuple)))),
