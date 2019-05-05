@@ -48,6 +48,7 @@ Options:
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
     -m --only-meta          only pull known dataset metadata files
+    -z --only-size          only operate on files where there is no cached size
     -r --rate=HZ            sometimes we can go too fast when fetching
     -p --pretend            if the defult is to act, dont, opposite of fetch
 
@@ -67,6 +68,7 @@ Options:
 import sys
 import csv
 import json
+import errno
 import pprint
 from datetime import datetime
 from itertools import chain
@@ -259,7 +261,13 @@ class Main(Dispatcher):
         def inner(paths, level=0, stop=self.options.level):
             """ depth first traversal of children """
             for path in paths:
-                if self.options.empty:
+                if self.options.only_size:
+                    if (path.is_broken_symlink() and
+                        path.cache.meta.size is None):
+                        yield path
+                        continue
+
+                elif self.options.empty:
                     if path.is_dir():
                         try:
                             next(path.children)
@@ -273,7 +281,13 @@ class Main(Dispatcher):
                     yield path
 
                 if stop is None:
-                    yield from path.rchildren
+                    if self.options.only_size:
+                        for rc in path.rchildren:
+                            if (rc.is_broken_symlink() and rc.cache.meta.size is None):
+                                yield rc
+                    else:
+                        yield from path.rchildren
+
                 elif level <= stop:
                     yield from inner(path.children, level + 1)
 
@@ -366,9 +380,13 @@ class Main(Dispatcher):
                              if parent.cache is not None),
                          key=lambda p: len(p.parts))
 
-        self._print_paths(chain(to_root, self._paths))
         if self.options.pretend:
+            ap = list(chain(to_root, self._paths))
+            self._print_paths(ap)
+            print(f'total = {len(ap):<10}rate = {self.options.rate}')
             return
+
+        self._print_paths(chain(to_root, self._paths))
 
         from pyontutils.utils import Async, deferred
         hz = self.options.rate
@@ -391,6 +409,13 @@ class Main(Dispatcher):
             except FileNotFoundError as e:
                 parent_moved.append(oldl)
                 continue
+            except OSError as e:
+                if e.errno == errno.ENOTEMPTY:
+                    log.error(f'{e}')
+                    continue
+                else:
+                    raise e
+
             newl = r.local
             if oldl != newl:
                 moved.append([oldl, newl])

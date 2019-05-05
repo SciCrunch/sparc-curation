@@ -1024,22 +1024,12 @@ class CachePath(AugmentedPath):
                 raise exc.PathExistsError(f'Target {target} already exists!')
 
         if self.exists():
-            os.rename(self, target)
+            os.rename(self, target)  # if target is_dir then this will fail, which is ok
 
         elif self.is_broken_symlink():
             self.unlink()  # don't move the meta since it will break the naming insurance measure
 
         return target
-
-        if remote:
-            target = self.anchor / remote  # the magic of division!
-            # this also updates the cache for remote
-        else:
-            if target.exists():
-                raise exc.PathExistsError(f'Target {target} already exists!')
-
-            target = self.__class__(target, meta=meta)
-
 
     def __repr__(self):
         local = repr(self.local) if self.local else 'No local??' + str(self)

@@ -635,7 +635,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             self.cache.fetch(size_limit_mb=size_limit_mb)
 
     def update_cache(self):
-        log.info(f'updating cache for {self.name}')
+        log.debug(f'updating cache for {self.name}')
         if self.cache.name != self.name:  # this is localy correct
             # the issue is that move is now smarter
             # and will detect if a parent path has changed
