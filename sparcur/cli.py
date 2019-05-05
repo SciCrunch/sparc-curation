@@ -610,22 +610,18 @@ class Main(Dispatcher):
             uncertain = False  # TODO
             for p, m in path_meta.items():
                 #if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
-                if p.is_file() or p.is_symlink() and not p.exists():
+                if p.is_file() or p.is_broken_symlink():
                     s = m.size
                     if s is None:
                         uncertain = True
                         continue
-                    #try:
-                        #s = m.size
-                    #except KeyError as e:
-                        #print(repr(p))
-                        #raise e
+
                     tf += 1
                     if s:
                         total += s
 
                     #if '.fake' in p.suffixes:
-                    if p.is_symlink():
+                    if p.is_broken_symlink():
                         ff += 1
                         if s:
                             outstanding += s
@@ -638,10 +634,13 @@ class Main(Dispatcher):
                          FileSize(outstanding),
                          FileSize(total),
                          uncertain,
-                         ff, tf, td])
+                         (tf - ff),
+                         ff,
+                         tf,
+                         td])
 
-        formatted = [[n, l.hr, o.hr, t.hr if not u else '??', ff, tf, td]
-                     for n, l, o, t, u, ff, tf, td in
+        formatted = [[n, l.hr, o.hr, t.hr if not u else '??', lf, ff, tf, td]
+                     for n, l, o, t, u, lf, ff, tf, td in
                      sorted(data, key=lambda r: (r[4], -r[3]))]
         rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
                 *formatted]
@@ -902,6 +901,7 @@ class Shell(Dispatcher):
     # property ports
     paths = Main.paths
     _paths = Main._paths
+    _build_paths = Main._build_paths
     datasets = Main.datasets
     datasets_local = Main.datasets_local
     export_base = Main.export_base

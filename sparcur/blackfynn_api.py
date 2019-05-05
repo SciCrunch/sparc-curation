@@ -744,7 +744,7 @@ class BFLocal:
                 path.setxattrs(attrs)
                 # TODO checksum may no longer match since we changed it
 
-    def get(self, id):
+    def get(self, id, attempt=1, retry_limit=3):
         log.debug('We have gone to the network!')
         if id.startswith('N:dataset:'):
             thing = self.bf.get_dataset(id)  # heterogenity is fun!
@@ -759,7 +759,10 @@ class BFLocal:
             thing = self.bf.get(id)
 
         if thing is None:
-            raise ValueError(f'No data retrieve for {id}')
+            if attempt > retry_limit:
+                raise ValueError(f'No data retrieve for {id}')
+            else:
+                thing = self.get(id, attempt + 1)
 
         return thing
 
