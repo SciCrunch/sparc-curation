@@ -448,13 +448,14 @@ class DatasetDescriptionFile(Version1Header):
     def keywords(self, value):
         if ';' in value:
             # FIXME error for this
-            values = [v.strip() for v in value.split(';')]
+            values = [v.strip() for v in value.split(';') if v]
         elif ',' in value:
             # FIXME error for this
-            values = [v.strip() for v in value.split(',')]
+            values = [v.strip() for v in value.split(',') if v]
         else:
             values = value,
 
+        #log.debug(f'{values}')
         for value in values:
             match = self.query(value, prefix=None)
             if match and False:  # this is incredibly broken at the moment

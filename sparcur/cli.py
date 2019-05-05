@@ -17,6 +17,7 @@ Usage:
     spc feedback <feedback-file> <feedback>...
     spc find [options] --name=<PAT>...
     spc meta [--uri] [--browser] [--human] [<path>...]
+    spc server [options]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -71,6 +72,8 @@ Options:
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
 
+    --port=PORT             server port [default: 7250]
+
     -d --debug              drop into a shell after running a step
     -v --verbose            print extra information
 """
@@ -84,6 +87,7 @@ from datetime import datetime
 from itertools import chain
 from collections import Counter
 import requests
+from htmlfn import render_table
 from pyontutils import clifun as clif
 from terminaltables import AsciiTable
 from sparcur import config
@@ -125,6 +129,8 @@ class Dispatcher(clif.Dispatcher):
             if title:
                 print(title)
             print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
+        elif self.options.server:
+            return render_table(rows[1:], *rows[0]), title
         else:
             print(AsciiTable(rows, title=title).table)
 
@@ -754,6 +760,14 @@ class Main(Dispatcher):
 
         log.setLevel(old_level)
 
+    def server(self):
+        from sparcur.server import make_app
+        self.report = Report(self)
+        self.dataset_index = {d.meta.id:d for d in self.datasets}
+        app, *_ = make_app(self)
+        app.debug = False
+        app.run(host='localhost', port=self.options.port, threaded=True)
+
     ### sub dispatchers
 
     def report(self):
@@ -782,10 +796,11 @@ class Report(Dispatcher):
         else:
             return lambda kv: kv
 
-    def size(self):
-        dirs = self.options.directory
-        if not dirs:
-            dirs.append('.')
+    def size(self, dirs=None):
+        if dirs is None:
+            dirs = self.options.directory
+            if not dirs:
+                dirs.append('.')
 
         data = []
 
@@ -838,7 +853,7 @@ class Report(Dispatcher):
         rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
                 *formatted]
 
-        self._print_table(rows, title='File size counts')
+        return self._print_table(rows, title='File size counts')
 
     def filetypes(self):
         key = self._sort_key
@@ -853,14 +868,14 @@ class Report(Dispatcher):
         each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
 
         for title, rows in each.items():
-            self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
+            yield self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
 
         all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
                                 Counter([(f.suffix, f.mimetype, f._magic_mimetype)
                                         for f in paths]).items()], key=key)
 
         header = ['suffix', 'mimetype', 'magic mimetype', 'count']
-        self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
+        return self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
 
     def subjects(self):
         key = self._sort_key
@@ -871,7 +886,7 @@ class Report(Dispatcher):
                                             key=key))
 
         rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-        self._print_table(rows, title='Subjects Report')
+        return self._print_table(rows, title='Subjects Report')
 
     def completeness(self):
         if self.options.latest:
@@ -887,17 +902,17 @@ class Report(Dispatcher):
                  for i, (ei, *rest, an, organ) in
                  enumerate(sorted(raw, key=lambda t: (t[0], t[1])))]
 
-        self._print_table(rows, title='Completeness Report')
+        return self._print_table(rows, title='Completeness Report')
 
     def keywords(self):
         _rows = [sorted(set(dataset.keywords), key=lambda v: -len(v))
                     for dataset in self.summary]
         rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
-        self._print_table(rows, title='Keywords Report')
+        return self._print_table(rows, title='Keywords Report')
 
     def test(self):
         rows = [['hello', 'world'], [1, 2]]
-        self._print_table(rows, title='Report Test')
+        return self._print_table(rows, title='Report Test')
 
     def errors(self):
         if self.options.latest:
@@ -935,7 +950,6 @@ class Shell(Dispatcher):
             dowe = f.data
             j = JT(dowe)
             triples = list(f.triples)
-
 
         latest_datasets = self.latest_export['datasets']
 
