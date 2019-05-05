@@ -218,33 +218,12 @@ class RemotePath:
 
         self._c_cache = cache
 
-    def _cache_setter(self, cache):
+    def _cache_setter(self, cache, update_meta=True):
         cache._remote = self
-        cache._meta_setter(self.meta)
+        if update_meta:
+            cache._meta_setter(self.meta)
+
         self._cache = cache
-        return
-        if cache.meta is None:  # FIXME this can't really happen since cache needs the id beforehand
-            cache.meta = self.meta  # also easier than bootstrapping ...
-
-        if cache.id is not None and cache.id != self.id:
-            # yay! we are finally to the point of needing to filter files vs packages :D !?!? maybe?
-            if self.meta.created < cache.meta.created:  # same filename different blackfynn id
-                # when they 'delete' files they still show up in the root
-                # but then you have to know which came after which ...  ???
-
-                msg = ('Cache id does not match remote id! '
-                       'And cache file is newer!\n'
-                       f'{cache.id} !=\n{self.id}'
-                       f'\n{cache}\n{self.name}')
-                log.critical(msg)
-                #raise exc.MetadataIdMismatchError
-
-        if not hasattr(self, '_cache') or self._cache is None:
-            self._cache = cache
-
-        else:
-            raise BaseException('FIXME make a proper error type, cache exists')
-
 
     @property
     def local(self):
@@ -305,7 +284,7 @@ class RemotePath:
         if parent != remote:
             parent_names.append(parent.name)
             # FIXME can this go stale? if so how?
-            log.debug(cache_parent)
+            #log.debug(cache_parent)
             if cache_parent is not None and parent.id == cache_parent.id:
                     for c_parent in cache_parent.parents:
                         if c_parent is None:

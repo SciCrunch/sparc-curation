@@ -45,12 +45,12 @@ class ProtcurData:
     def protcur(self):
         """ protcur nodes without parents """
         for protocol_uri in self.protocol_uris:
-            yield from self._protcur(uri, filter=lambda p: not p.hasAstParent)
+            yield from self._protcur(protocol_uri, filter=lambda p: not p.hasAstParent)
 
     @property
     def protcur_all(self):
         for protocol_uri in self.protocol_uris:
-            yield from self._protcur(uri)
+            yield from self._protcur(protocol_uri)
 
     def triples_protcur(self, protocol_subject):
         ps = list(self._protcur(str(protocol_subject)))

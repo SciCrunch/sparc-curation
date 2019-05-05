@@ -522,7 +522,7 @@
 
     #+CAPTION:
     #+BEGIN_SRC bash :results none
-
+      ls -Q | xargs -P10 -r -n 1 sh -c 'spc refresh -r 4 "${1}"'
     #+END_SRC
 
     Pull local copy of data to a new computer. Note the double escape needed for the space.

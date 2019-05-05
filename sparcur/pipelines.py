@@ -53,7 +53,7 @@ class DatasetDescriptionFilePipeline(FilePipeline):
 
     data_transformer_class = dat.DatasetDescriptionFile
 
-    @hasSchema(sc.DatasetSchema)
+    @hasSchema(sc.DatasetDescriptionSchema)
     def data(self):
         return super().data
 
@@ -62,7 +62,7 @@ hasSchema = vldt.HasSchema()
 @hasSchema.mark
 class SubjectsFilePipeline(FilePipeline):
 
-    data_transformer_class = dat.DatasetDescriptionFile
+    data_transformer_class = dat.SubjectsFile
 
     @hasSchema(sc.SubjectsSchema)
     def data(self):
@@ -218,14 +218,23 @@ class SPARCBIDSPipeline(JSONPipeline):
     #lifts = section_pipelines('submission', 'dataset_description', 'subjects')
 
     subpipelines = [
-        [[[['submission'], ['path']]], SubmissionFilePipeline, ['submission']],
-        [[[['dataset_description'], ['path']]], DatasetDescriptionFilePipeline, ['dataset_description']],
-        [[[['subjects'], ['path']]], SubjectsFilePipeline, ['subjects']],
+        [[[['submission_file'], ['path']]],
+         SubmissionFilePipeline,
+         ['submission_file']],
+
+        [[[['dataset_description_file'], ['path']]],
+         DatasetDescriptionFilePipeline,
+         ['dataset_description_file']],
+
+        [[[['subjects_file'], ['path']]],
+         SubjectsFilePipeline,
+         ['subjects_file']],
     ]
 
-    copies = ([['dataset_description', 'contributors'], ['contributors']],
-              [['subjects',], ['inputs', 'subjects']],
-              *copy_all(['dataset_description'], ['meta'],
+    copies = ([['dataset_description_file', 'contributors'], ['contributors']],
+              [['subjects_file',], ['inputs', 'subjects_file']],
+              [['submission_file',], ['inputs', 'submission_file']],
+              *copy_all(['dataset_description_file'], ['meta'],
                         'species',  # TODO validate all source paths against schema
                         'organ',
                         'modality',
@@ -240,14 +249,16 @@ class SPARCBIDSPipeline(JSONPipeline):
                         'acknowledgements',
                         'originating_article_doi',))
 
-    moves = ([['dataset_description',], ['inputs', 'dataset_description']],
-             [['subjects', 'software'], ['resources']],  # FIXME update vs replace
-             [['subjects'], ['subjects_file']],  # first step in ending the confusion
+    moves = ([['dataset_description_file',], ['inputs', 'dataset_description_file']],
+             [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
+             #[['subjects'], ['subjects_file']],  # first step in ending the confusion
              [['subjects_file', 'subjects'], ['subjects']],
-             [['submission',], ['inputs', 'submission']],)
+    )
 
-    derives = ([[['inputs', 'submission', 'submission', 'sparc_award_number'],
-                 ['inputs', 'dataset_description', 'funding']],
+    cleans = [['subjects_file'], ['submission_file']]
+
+    derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
+                 ['inputs', 'dataset_description_file', 'funding']],
                 Derives.award_number,
                 [['meta', 'award_number']]],
 
@@ -283,12 +294,10 @@ class SPARCBIDSPipeline(JSONPipeline):
                [[['samples']],
                  lambda v: (len(v),),
                 [['meta', 'sample_count']]],
-
     )
 
-    cleans = [['subjects_file'],]
-
     adds = [[['id'], lambda lifters: lifters.id],
+            [['meta', 'name'], lambda lifters: lifters.name],
             [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
             [['meta', 'uri_api'], lambda lifters: lifters.uri_api],]
 
@@ -296,44 +305,17 @@ class SPARCBIDSPipeline(JSONPipeline):
     def lifted(self):
         """ doing this pipelines this way for now :/ """
 
-        data = self.pipeline_start
+        data = super().lifted
         if 'errors' in data and len(data) == 1:
             raise self.SkipPipelineError(data)
+        elif 'errors' in data:
+            data['error_index'] = 500 * (len(data) - 1)
 
-        return super().lifted
+        return data
+
         #lifts = [[path, function(self.lifters)] for path, function in self.lifts]
         #DictTransformer.lift(data, lifts)
         #return data
-
-    @property
-    def _copied(self):
-        # meta copies
-        _copies = tuple([['dataset_description', source_target], ['meta', source_target]]
-                        for source_target in
-                          ['species',  # TODO validate all source paths against schema
-                           'organ',
-                           'modality',
-                           'protocol_url_or_doi',
-
-                           'completeness_of_dataset',
-                           'funding',
-                           'description',
-                           'additional_links',
-                           'keywords',
-                           'acknowledgements',
-                           'originating_article_doi',]
-                        + [])
-
-        data = self.data_derived_pre
-        DictTransformer.copy(data, copies, source_key_optional=True)
-        return data
-
-    @property
-    def _data_moved(self):
-        # contributor derives
-        data = self.data_copied
-        DictTransformer.move(data, moves, source_key_optional=True)
-        return data
 
     @property
     def _data_lifted_post(self):  # I think we can just skip this and use json pointer?
@@ -369,12 +351,6 @@ class SPARCBIDSPipeline(JSONPipeline):
         lifts = [[['meta', 'principal_investigator'], pi],]
         data = self.data_moved
         DictTransformer.lift(data, lifts, source_key_optional=True)
-        return data
-
-    @property
-    def _data_derived_post(self):
-        data = self.data_lifted_post
-        DictTransformer.derive(data, derives)
         return data
 
     @property
@@ -415,14 +391,9 @@ class SPARCBIDSPipeline(JSONPipeline):
 
         return data
 
-    @property
-    def data_post(self):
-        # FIXME a bit of a hack
-        data = self.data_out
     @hasSchema(sc.DatasetOutSchema)
     def data(self):
         return super().data
-        #return self.data_post
 
 
 class PipelineExtras(JSONPipeline):
@@ -430,9 +401,6 @@ class PipelineExtras(JSONPipeline):
     # before or after their super()'s name
 
     previous_pipeline_class = SPARCBIDSPipeline
-
-    lifts = [
-    ]
 
     @property
     def lifted(self):
@@ -451,18 +419,19 @@ class PipelineExtras(JSONPipeline):
         if 'error_index' not in data:  # a failure will fill this in
             ei = len(get_all_errors(data))
             if 'inputs' in data:
+                pass
                 #schema = self.__class__.data_out.schema
-                schema = sc.DatasetSchema()
-                subschemas = {'dataset_description':sc.DatasetDescriptionSchema(),
-                              'submission':sc.SubmissionSchema(),
-                              'subjects':sc.SubjectsSchema(),}
-                sci = Derives.submission_completeness_index(schema, subschemas, data['inputs'])
+                #schema = sc.DatasetSchema()
+                #subschemas = {'dataset_description_file':sc.DatasetDescriptionSchema(),
+                              #'submission_file':sc.SubmissionSchema(),
+                              #'subjects_file':sc.SubjectsSchema(),}
+                #sci = Derives.submission_completeness_index(schema, subschemas, data['inputs'])
             else:
                 ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
-                sci = 0
+                #sci = 0
 
             data['error_index'] = ei
-            data['submission_completeness_index'] = sci
+            #data['submission_completeness_index'] = sci
 
         #data['old_errors'] = data.pop('errors')  # FIXME
         return data

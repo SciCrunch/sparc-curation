@@ -113,10 +113,10 @@ class ErrorSchema(JSONSchema):
 
 class DatasetSchema(JSONSchema):
     schema = {'type': 'object',
-              'required': ['submission', 'dataset_description', 'subjects'],
-              'properties': {'submission': {'type': 'string'},
-                             'dataset_description': {'type': 'string'},
-                             'subjects': {'type': 'string'},}}
+              'required': ['submission_file', 'dataset_description_file', 'subjects_file'],
+              'properties': {'submission_file': {'type': 'string'},
+                             'dataset_description_file': {'type': 'string'},
+                             'subjects_file': {'type': 'string'},}}
 
 
 class ContributorSchema(JSONSchema):
@@ -370,9 +370,9 @@ class DatasetOutSchema(JSONSchema):
                             'protocols': {'type':'array'},
                             'inputs': {'type': 'object',
                                        # TODO do we need errors at this level?
-                                       'properties': {'dataset_description': DatasetDescriptionSchema.schema,
-                                                      'submission': SubmissionSchema.schema,
-                                                      'subjects': SubjectsSchema.schema,},},}
+                                       'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
+                                                      'submission_file': SubmissionSchema.schema,
+                                                      'subjects_file': SubjectsSchema.schema,},},}
 
 
 class SummarySchema(JSONSchema):

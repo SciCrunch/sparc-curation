@@ -757,7 +757,9 @@ class BFLocal:
                 raise BaseException('TODO org does not match need other api keys.')
         else:
             thing = self.bf.get(id)
-            #breakpoint()
+
+        if thing is None:
+            raise ValueError(f'No data retrieve for {id}')
 
         return thing
 

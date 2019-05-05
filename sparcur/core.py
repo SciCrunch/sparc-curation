@@ -399,7 +399,7 @@ class AtomicDictOperations:
 
 
     @staticmethod
-    def add(data, target_path, value, fail_on_exists=True):
+    def add(data, target_path, value, fail_on_exists=True, update=False):
         # type errors can occur here ...
         # e.g. you try to go to a string
         if not [_ for _ in (list, tuple) if isinstance(target_path, _)]:
@@ -413,11 +413,17 @@ class AtomicDictOperations:
 
             target = target[target_name]
 
-        if fail_on_exists and target_key in target:
+        if update:
+            pass
+        elif fail_on_exists and target_key in target:
             raise exc.TargetPathExistsError(f'A value already exists at path {target_path}\n'
                                             f'{lj(data)}')
 
         target[target_key] = value
+
+    @classmethod
+    def update(cls, data, target_path, value):
+        cls.add(data, target_path, value, update=True)
 
     @classmethod
     def get(cls, data, source_path):
@@ -683,7 +689,7 @@ class _DictTransformer:
 
 
     @staticmethod
-    def subpipeline(data, runtime_context, subpipelines):
+    def subpipeline(data, runtime_context, subpipelines, update=True, source_key_optional=True):
         """
             [[[[[get-path], [add-path]], ...], pipeline-class, target-path], ...]
         """
@@ -712,11 +718,12 @@ class _DictTransformer:
                 continue
 
             log.debug(lj(selected_data))
-            prepared.append((pipeline_class, DataWrapper(selected_data), None, runtime_context))
+            prepared.append((target_path, pipeline_class, DataWrapper(selected_data), None, runtime_context))
 
-        for pc, *args in prepared:
+        function = adops.update if update else adops.add
+        for target_path, pc, *args in prepared:
             p = pc(*args)
-            adops.add(data, target_path, p.data)
+            function(data, target_path, p.data)
 
     @staticmethod
     def lift(data, lifts, source_key_optional=True):

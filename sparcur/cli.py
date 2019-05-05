@@ -52,6 +52,7 @@ Options:
     -p --pretend            if the defult is to act, dont, opposite of fetch
 
     -t --tab-table          print simple table using tabs for copying
+    -A --latest             run reporting on the latest export
 
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
@@ -71,8 +72,8 @@ from datetime import datetime
 from itertools import chain
 from collections import Counter
 import requests
-from terminaltables import AsciiTable
 from pyontutils import clifun as clif
+from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
@@ -115,7 +116,7 @@ class Dispatcher(clif.Dispatcher):
         else:
             print(AsciiTable(rows, title=title).table)
 
-    def _print_paths(self, paths):
+    def _print_paths(self, paths, title=None):
         if self.options.sort_size_desc:
             key = lambda ps: -ps[-1]
         else:
@@ -125,13 +126,15 @@ class Dispatcher(clif.Dispatcher):
                 *((p, s.hr if isinstance(s, FileSize) else s, 'x' if p.exists() else '')
                   for p, s in
                   sorted(([p, ('/' if p.is_dir() else
-                               (p.cache.meta.size if p.cache.meta.size else '??'))]
+                               (p.cache.meta.size if p.cache.meta.size else '??')
+                               if p.cache.meta else '_')]
                           for p in paths), key=key))]
-        self._print_table(rows)
+        self._print_table(rows, title)
 
 
 class Main(Dispatcher):
-    child_port_attrs = 'anchor', 'project_path', 'bfl', 'summary'  # things all children should have
+    child_port_attrs = 'anchor', 'project_path', 'project_id', 'bfl', 'summary'
+    # things all children should have
     # kind of like a non optional provides you WILL have these in your namespace
     def __init__(self, options):
         super().__init__(options)
@@ -141,7 +144,7 @@ class Main(Dispatcher):
 
         Integrator.no_google = self.options.no_google
 
-        if self.options.clone or self.options.meta:
+        if self.options.clone or self.options.meta or self.options.stats:
             # short circuit since we don't know where we are yet
             return
 
@@ -243,13 +246,16 @@ class Main(Dispatcher):
         # but breaks lots of asusmptions elsehwere
         paths = self.paths
         if not paths:
-            paths = Path('.').resolve(),
-        
+            paths = Path.cwd(),
+
         if self.options.only_meta:
             paths = (mp.absolute() for p in paths for mp in FTLax(p).meta_paths)
             yield from paths
             return
 
+        yield from self._build_paths(paths)
+
+    def _build_paths(self, paths):
         def inner(paths, level=0, stop=self.options.level):
             """ depth first traversal of children """
             for path in paths:
@@ -272,6 +278,18 @@ class Main(Dispatcher):
                     yield from inner(path.children, level + 1)
 
         yield from inner(paths)
+
+    @property
+    def _dirs(self):
+        for p in self._paths:
+            if p.is_dir():
+                yield p
+
+    @property
+    def _not_dirs(self):
+        for p in self._paths:
+            if not p.is_dir():
+                yield p
 
     def clone(self):
         project_id = self.options.project_id
@@ -322,7 +340,9 @@ class Main(Dispatcher):
                 if not d.remote.is_dataset():
                     log.warning('You are pulling recursively from below dataset level.')
 
-                d.remote.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
+                r = d.remote
+                r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
+                d = r.local  # in case a folder moved
                 d.remote.bootstrap(recursive=recursive, only=only, skip=self.skip)
 
     ###
@@ -335,23 +355,67 @@ class Main(Dispatcher):
     ###
 
     def refresh(self):
-        self._print_paths(self._paths)
+        paths = self.paths
+        cwd = Path.cwd()
+        if not paths:
+            paths = cwd,
+
+        to_root = sorted(set(parent
+                             for path in paths
+                             for parent in path.parents
+                             if parent.cache is not None),
+                         key=lambda p: len(p.parts))
+
+        self._print_paths(chain(to_root, self._paths))
         if self.options.pretend:
-            pass
+            return
 
-        elif not self.options.debug:
-            hz = self.options.rate
-            from pyontutils.utils import Async, deferred
-            Async(rate=hz)(deferred(path.remote.refresh)(update_cache=True,
-                                                         update_data=self.options.fetch,
-                                                         size_limit_mb=self.options.limit)
-                           for path in list(self._paths))
+        from pyontutils.utils import Async, deferred
+        hz = self.options.rate
+        fetch = self.options.fetch
+        limit = self.options.limit
 
+        drs = [d.remote for d in chain(to_root, self._dirs)]
+
+        if not self.options.debug:
+            Async(rate=hz)(deferred(r.refresh)() for r in drs)
         else:
-            for path in self._paths:
+            [r.refresh() for r in drs]
+
+        moved = []
+        parent_moved = []
+        for r in drs:
+            oldl = r.local
+            try:
+                r.update_cache()
+            except FileNotFoundError as e:
+                parent_moved.append(oldl)
+                continue
+            newl = r.local
+            if oldl != newl:
+                moved.append([oldl, newl])
+
+        if moved:
+            self._print_table(moved, title='Folders moved')
+            for old, new in moved:
+                if old == cwd:
+                    log.info(f'Changing directory to {new}')
+                    new.chdir()
+
+        if parent_moved:
+            self._print_paths(parent_moved, title='Parent moved')
+
+        if not self.options.debug:
+            Async(rate=hz)(deferred(path.remote.refresh)(update_cache=True,
+                                                            update_data=fetch,
+                                                            size_limit_mb=limit)
+                            for path in self._not_dirs)
+        else:
+            breakpoint()
+            for path in self._not_dirs:
                 path.remote.refresh(update_cache=True,
-                                    update_data=self.options.fetch,
-                                    size_limit_mb=self.options.limit)
+                                    update_data=fetch,
+                                    size_limit_mb=limit)
 
     def fetch(self):
         paths = [p for p in self._paths if not p.is_dir()]
@@ -364,6 +428,19 @@ class Main(Dispatcher):
         Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
                        for path in paths)
         
+    @property
+    def export_base(self):
+        return self.project_path.parent / 'export' / self.project_id
+
+    @property
+    def LATEST(self):
+        return self.project_path.parent / 'export' / self.project_id / 'LATEST'
+
+    @property
+    def latest_export(self):
+        with open(self.LATEST / 'curation-export.json', 'rt') as f:
+            return json.load(f)
+
     def export(self):
         """ export output of curation workflows to file """
         #org_id = Integrator(self.project_path).organization.id
@@ -377,8 +454,8 @@ class Main(Dispatcher):
                 sys.exit(123)
 
             ft = Integrator(cwd)
-            dump_path = cwd.cache.anchor.local.parent / 'export/datasets' / ft.id / timestamp
-            latest_path = dump_path.parent / 'LATEST'
+            dump_path = self.export_base / 'datasets' / ft.id / timestamp
+            latest_path = self.LATEST
             if not dump_path.exists():
                 dump_path.mkdir(parents=True)
                 if latest_path.exists():
@@ -421,8 +498,8 @@ class Main(Dispatcher):
         # start time not end time ...
         # obviously not transactional ...
         filename = 'curation-export'
-        dump_path = summary.path.parent / 'export' / summary.id / timestamp
-        latest_path = dump_path.parent / 'LATEST'
+        dump_path = self.export_base / timestamp
+        latest_path = self.LATEST
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
             if latest_path.exists():
@@ -498,7 +575,7 @@ class Main(Dispatcher):
             if not Path(d).is_dir():
                 continue  # helper files at the top level, and the symlinks that destory python
             path = Path(d).resolve()
-            paths = path.children #list(path.rglob('*'))
+            paths = path.rchildren #list(path.rglob('*'))
             path_meta = {p:p.cache.meta for p in paths}
             outstanding = 0
             total = 0
@@ -531,8 +608,22 @@ class Main(Dispatcher):
                 elif p.is_dir():
                     td += 1
 
-            data.append((path.name, outstanding / G, total / G, ff, tf, td))
+            data.append([path.name,
+                         FileSize(total - outstanding),
+                         FileSize(outstanding),
+                         FileSize(total),
+                         uncertain,
+                         ff, tf, td])
 
+        formatted = [[n, l.hr, o.hr, t.hr if not u else '??', ff, tf, td]
+                     for n, l, o, t, u, ff, tf, td in
+                     sorted(data, key=lambda r: (r[4], -r[3]))]
+        rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
+                *formatted]
+
+        self._print_table(rows, title='File size counts')
+
+        return
         maxn = max(len(n) for n, *_ in data)
         align = 4
         fmt = '\n'.join(f'{n:<{maxn+4}} {(gt - go) * 1024:7.2f}M {go:>8.2f} {gt:>8.2f}G{"":>4}{tf - ff:>{align}} {ff:>{align}} {tf:>{align}} {td:>{align}}'
@@ -701,6 +792,10 @@ class Report(Dispatcher):
     paths = Main.paths
     _paths = Main._paths
 
+    export_base = Main.export_base
+    LATEST = Main.LATEST
+    latest_export = Main.latest_export
+
     @property
     def _sort_key(self):
         if self.options.sort_count_desc:
@@ -742,13 +837,19 @@ class Report(Dispatcher):
         self._print_table(rows, title='Subjects Report')
 
     def completeness(self):
-        rows = [('', 'EI', 'DSCI', 'name', 'id', 'award', 'organ')]
-        rows += [(i + 1, ei, f'{index:.{2}f}' if index else 0,
-                    *rest,
-                    an if an else '', organ if organ else '')
-                 for i, (ei, index, *rest, an, organ) in
-                 enumerate(sorted(self.summary.completeness,
-                                  key=lambda t:(t[0], -t[1], *t[2:], t[-1])))]
+        if self.options.latest:
+            datasets = self.latest_export['datasets']
+            raw = [self.summary._completeness(data) for data in datasets]
+
+        else:
+            raw = self.summary.completeness
+
+        rows = [('', 'EI', 'name', 'id', 'award', 'organ')]
+        rows += [(i + 1, ei, *rest,
+                  an if an else '', organ if organ else '')
+                 for i, (ei, *rest, an, organ) in
+                 enumerate(sorted(raw, key=lambda t: (t[0], t[1])))]
+
         self._print_table(rows, title='Completeness Report')
 
     def keywords(self):
@@ -762,8 +863,15 @@ class Report(Dispatcher):
         self._print_table(rows, title='Report Test')
 
     def errors(self):
-        pprint.pprint([get_all_errors(d) for d in self.summary.data['datasets']])
-        embed()
+        if self.options.latest:
+            datasets = self.latest_export['datasets']
+        else:
+            self.summary.data['datasets']
+
+        pprint.pprint(sorted([(d['meta']['name'], [e['message']
+                                                   for e in get_all_errors(d)])
+                              for d in datasets], key=lambda ab: -len(ab[-1])))
+
 
 class Shell(Dispatcher):
     # property ports
@@ -771,6 +879,9 @@ class Shell(Dispatcher):
     _paths = Main._paths
     datasets = Main.datasets
     datasets_local = Main.datasets_local
+    export_base = Main.export_base
+    LATEST = Main.LATEST
+    latest_export = Main.latest_export
 
     def default(self):
         datasets = list(self.datasets)
@@ -781,15 +892,21 @@ class Shell(Dispatcher):
         org = Integrator(self.project_path)
 
         p, *rest = self._paths
-        f = Integrator(p)
-        dowe = f.data
-        j = JT(dowe)
-        triples = list(f.triples)
+        if p.cache.is_dataset():
+            f = Integrator(p)
+            dowe = f.data
+            j = JT(dowe)
+            triples = list(f.triples)
+
+
+        latest_datasets = self.latest_export['datasets']
+
         embed()
 
     def integration(self):
         from protcur.analysis import protc, Hybrid
         from sparcur import sheets
+        from sparcur import datasets as dat
         #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
         from sparcur.protocols import ProtocolData, ProtcurData
         p, *rest = self._paths

@@ -255,25 +255,42 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                 yield chunk
 
     def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None):
-        if isinstance(id_bfo_or_bfr, self.__class__):
-            bfobject = id_bfo_or_bfr.bfobject
+        self._seed = id_bfo_or_bfr
+        self._file_id = file_id
+        if not [type_ for type_ in (self.__class__,
+                                    BaseNode,
+                                    str,
+                                    PathMeta)
+                if isinstance(self._seed, type_)]:
+            raise TypeError(self._seed)
 
-        elif isinstance(id_bfo_or_bfr, BaseNode):
-            bfobject = id_bfo_or_bfr
+        if cache is not None:
+            self._cache_setter(cache, update_meta=False)
 
-        elif isinstance(id_bfo_or_bfr, str):
-            bfobject = self.bfl.get(id_bfo_or_bfr)
+    @property
+    def bfobject(self):
+        if hasattr(self, '_bfobject'):
+            return self._bfobject
 
-        elif isinstance(id_bfo_or_bfr, PathMeta):
-            bfobject = self.bfl.get(id_bfo_or_bfr.id)
+        if isinstance(self._seed, self.__class__):
+            bfobject = self._seed.bfobject
+
+        elif isinstance(self._seed, BaseNode):
+            bfobject = self._seed
+
+        elif isinstance(self._seed, str):
+            bfobject = self.bfl.get(self._seed)
+
+        elif isinstance(self._seed, PathMeta):
+            bfobject = self.bfl.get(self._seed.id)
 
         else:
-            raise TypeError(id_bfo_or_bfr)
+            raise TypeError(self._seed)
 
         if hasattr(bfobject, '_json'):
             # constructed from a packages query
             # which we need in order for things to be fastish
-            self.bfobject = bfobject
+            self._bfobject = bfobject
             return
 
         if isinstance(bfobject, DataPackage):
@@ -287,11 +304,11 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             files = bfobject.files
             parent = bfobject.parent
             if files:
-                if file_id is not None:
+                if self._file_id is not None:
                     for file in files:
-                        if file.id == file_id:
+                        if file.id == self._file_id:
                             bfobject = transfer(file, bfobject)
-                            
+
                 elif len(files) > 1:
                     log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
                 else:
@@ -302,86 +319,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             else:
                 log.warning(f'No files in package {package.id}')
 
-        self.bfobject = bfobject
-        if cache is not None:
-            self._cache_setter(cache)
-
-    def __dead_init__(self):
-        return
-        self.errors = []
-        if helper_index is not None:
-            self.helper_index.update(helper_index)
-
-        # set _cache to avoid the id equality check since this is in __init__
-        if cache is not None:
-            self._cache = cache
-
-        if isinstance(id_bfo_or_bfr, self.__class__):
-            bfobject = id_bfo_or_bfr.bfobject
-        elif isinstance(id_bfo_or_bfr, BaseNode):
-            bfobject = id_bfo_or_bfr
-            if isinstance(bfobject, DataPackage):  # FIXME :/
-                files = bfobject.files
-                parent = bfobject.parent
-                if files:
-                    if len(files) > 1:
-                        log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
-                    else:
-                        bfobject = files[0]
-                        bfobject.parent = parent
-                else:
-                    log.warning(f'No files in package {package.id}')
-
-        elif id_bfo_or_bfr.startswith('N:organization:'):
-            # FIXME right now I require a 1:1 mapping between
-            # each local object, cache object, and remote object
-            # as a part of the _implementation_, so we do have to
-            # be able to duplicate this one, this is OK
-            # this is an optimization which we don't strictly have
-            # to adhere to, and has caused a lot of trouble :/
-            #if hasattr(self.__class__, '_organization'):
-                #raise TypeError('You already have a perfectly good organization')
-
-            if id_bfo_or_bfr == self.root:
-                if self.cache is None:
-                    raise ValueError('where is your cache m8 you are root!')
-
-                self.__class__._organization = self
-                self.bfobject = self.bfl.organization
-                return
-
-        else:
-            #raise ValueError(f'why are you doing this {id_bfo_or_bfr}')  # because refresh
-            bfobject = self.bfl.get(id_bfo_or_bfr)
-            if isinstance(bfobject, DataPackage):
-                if file_id is not None:
-                    bfobject = self.get_file(self, file_id)
-                else:
-                    files = bfobject.files
-                    if files:
-                        if len(files) > 1:
-                            log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
-                        else:
-                            bfobject = files[0]
-                    else:
-                        log.warning(f'No files in package {package.id}')
-
-            elif file_id is not None:
-                raise TypeError(f'trying to get file id for a {bfobject}')
-
-        if bfobject is None:
-            raise TypeError(f'bfobject cannot be None! {id_bfo_or_bfr}')
-
-        elif isinstance(bfobject, str):
-            raise TypeError(f'bfobject cannot be str! {bfobject}')
-
-        elif isinstance(bfobject.id, int):
-            pass  # it's a file object so don't check its id as a string
-
-        elif bfobject.id.startswith('N:organization:') and hasattr(self.__class__, '_organization'):
-            raise TypeError('You already have a perfectly good organization')
-
-        self.bfobject = bfobject
+        self._bfobject = bfobject
+        return self._bfobject
 
     def is_anchor(self):
         return self.anchor == self
@@ -502,25 +441,25 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     def name(self):
         return self.stem + self.suffix
 
-    def __old_name(self):
-        if isinstance(self.bfobject, File) and not self.from_packages:
-            return PurePosixPath(File.name).stem
-        else:
-            return 
-
-        if ([t for t in (DataPackage, File) if isinstance(self.bfobject, t)] and
-            self.bfobject.type != 'Unknown'):
-            # NOTE we have to use blackfynns extensions until we retrieve the files
-            name += suffix
-
-        return name
-
     @property
     def id(self):
-        if isinstance(self.bfobject, File):
-            return self.bfobject.pkg_id
+        if isinstance(self._seed, self.__class__):
+            return self._seed.bfobject.id
+
+        elif isinstance(self._seed, BaseNode):
+            if isinstance(self._seed, File):
+                return self._seed.pkg_id
+            else:
+                return self._seed.id
+
+        elif isinstance(self._seed, str):
+            return self._seed
+
+        elif isinstance(self._seed, PathMeta):
+            return self._seed.id
+
         else:
-            return self.bfobject.id
+            raise TypeError(self._seed)
 
     @property
     def size(self):
@@ -657,6 +596,18 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
                 if child.is_dir() or child.is_file():
+                    if child.is_file():
+                        cid = child.id
+                        existing = [c for c in self.cache.local.children
+                                    if (c.is_file() or c.is_broken_symlink())
+                                    and c.cache.id == cid]
+                        if existing:
+                            unmatched = [e for e in existing if child.name != e.name]
+                            if unmatched:
+                                log.debug(f'skipping {child.name} becuase a file with that '
+                                          f'id already exists {unmatched}')
+                                continue
+
                     self.cache / child  # construction will cause registration without needing to assign
                     assert child.cache is not None
                     yield child
@@ -675,18 +626,22 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         if self.is_file() and not force:  # this will tigger a fetch
             pass
         else:
-            self.bfobject = self.bfl.get(self.id)
+            self._bfobject = self.bfl.get(self.id)
 
-        if update_cache:
-            #cmeta = self.cache.meta
-            log.info(self.name)
-            if self.cache.name != self.name:
-                self.cache.move(remote=self)
+        if update_cache or update_data:
+            self.update_cache()
 
-            self.cache._meta_setter(self.meta)
+        if update_data and self.is_file():
+            self.cache.fetch(size_limit_mb=size_limit_mb)
 
-            if update_data and self.is_file():
-                self.cache.fetch(size_limit_mb=size_limit_mb)
+    def update_cache(self):
+        log.info(f'updating cache for {self.name}')
+        if self.cache.name != self.name:  # this is localy correct
+            # the issue is that move is now smarter
+            # and will detect if a parent path has changed
+            self.cache.move(remote=self)
+
+        self.cache._meta_setter(self.meta)
 
     @property
     def data(self):

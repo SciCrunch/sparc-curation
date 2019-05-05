@@ -581,6 +581,7 @@ class DatasetData(PathData):
         for section_name in ('submission', 'dataset_description', 'subjects'):
             #path_prop = section_name + '_paths'
             for section in getattr(self, section_name):
+                section_name += '_file'
                 tp = section.path.as_posix()
                 if section_name in out:
                     ot = out[section_name]
@@ -1047,6 +1048,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dataset.id  # in case we are somewhere else
+            name = dataset.name
             uri_api = dataset.uri_api
             uri_human = dataset.uri_human
             # dataset metadata
@@ -1130,20 +1132,22 @@ class Summary(Integrator):
             # FIXME non homogenous, need to find a better way ...
             yield self.__class__.__base__(path)
 
+    def _completeness(self, data):
+        accessor = JT(data)  # can go direct if elements are always present
+        return (accessor.error_index,
+                #accessor.submission_completeness_index,
+                #dataset.name,  # from filename (do we not have that in meta!?)
+                accessor.query('meta', 'name'),
+                accessor.id, #if 'id' in dowe else None,
+                accessor.query('meta', 'award_number'),
+                accessor.query('meta', 'organ'),
+            )
+
     @property
     def completeness(self):
         """ completeness, name, and id for all datasets """
         for dataset in self:
-            # FIXME metamaker was a bad, bad idea
-            dowe = dataset.data
-            accessor = JT(dowe)  # can go direct if elements are always present
-            yield (accessor.error_index,
-                   accessor.submission_completeness_index,
-                   dataset.name,  # from filename (do we not have that in meta!?)
-                   accessor.id if 'id' in dowe else None,
-                   accessor.query('meta', 'award_number'),
-                   accessor.query('meta', 'organ'),
-            )
+            yield self._completeness(dataset.data)
 
     def make_json(self, gen):
         # FIXME this and the datasets is kind of confusing ...
@@ -1267,7 +1271,8 @@ class Summary(Integrator):
             id = dataset.id
             dowe = dataset.data
 
-            row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
+            #row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
+            row = [id, dowe['error_index']]  # FIXME this doubles up on the row
             if 'meta' in dowe:
                 meta = dowe['meta']
                 for k in dsh:
