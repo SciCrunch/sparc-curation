@@ -147,7 +147,7 @@ class FakeBFile(File):
 
         if 'checksum' in kwargs:
             cs = kwargs['checksum']
-            kwargs['size'] = cs['chunkSize']
+            kwargs['chunksize'] = cs['chunkSize']
             kwargs['checksum'] = cs['checksum']  # overwrites but ok
         else:
             kwargs['checksum'] = None

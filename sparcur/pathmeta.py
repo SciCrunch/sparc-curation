@@ -28,6 +28,7 @@ class PathMeta:
                  created=None,
                  updated=None,
                  checksum=None,
+                 chunksize=None,  # used for properly checksumming?
                  id=None,
                  file_id=None,
                  old_id=None,
@@ -55,6 +56,7 @@ class PathMeta:
         self.created = created
         self.updated = updated
         self.checksum = checksum
+        self.chunksize = chunksize
         self.id = id
         self.file_id = file_id
         self.old_id = old_id
@@ -130,18 +132,30 @@ class _PathMetaAsSymlink(_PathMetaConverter):
     empty = '#'
     fieldsep = '.'  # must match the file extension splitter for Path ...
     subfieldsep = ';'  # only one level, not going recursive in a filename ...
-    order = ('file_id',
-             'size',
-             'created',
-             'updated',
-             'checksum',
-             'old_id',
-             'gid',
-             'user_id',
-             'mode',
-             'errors',)
+    versions = {'meta':('file_id',
+                        'size',
+                        'created',
+                        'updated',
+                        'checksum',
+                        'old_id',
+                        'gid',
+                        'user_id',
+                        'mode',
+                        'errors',),
+                'mdv1':('file_id',
+                        'size',
+                        'created',
+                        'updated',
+                        'checksum',
+                        'chunksize',  # added
+                        'old_id',
+                        'gid',
+                        'user_id',
+                        'mode',
+                        'errors',)
+    }
+    write_version = 'mdv1'  # update this on new version
     extras = 'size.hr',
-    order_all = order + extras
 
     def __init__(self):
         # register functionality on PathMeta
@@ -154,6 +168,10 @@ class _PathMetaAsSymlink(_PathMetaConverter):
 
         self.pathmetaclass.as_symlink = as_symlink
         self.pathmetaclass.from_symlink = from_symlink
+
+    @property
+    def order_all(self):
+        return self.versions[write_version] + self.extras
 
     def encode(self, field, value):
         if field == 'file_id':
@@ -173,8 +191,6 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         return _str_encode(field, value)
 
     def decode(self, field, value):
-        value = value.strip(self.fieldsep)
-
         if value == self.empty:
             return None
 
@@ -228,7 +244,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
 
         id = self.encode('id', pathmeta.id)
 
-        return PurePosixPath(id + '/.meta.' + self.fieldsep.join(gen))
+        return PurePosixPath(id + f'/.{self.write_version}.' + self.fieldsep.join(gen))
 
     def from_symlink(self, symlink_path):
         """ contextual portion to make sure something weird isn't going on
@@ -240,9 +256,11 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         return self.from_parts(parts)
 
     def from_parts(self, parts):
-        name = PurePosixPath(parts[-1])
+        data = parts[-1]
+        _, version, *suffixes = data.split(self.fieldsep)
+        order = self.versions[version]
         kwargs = {field:self.decode(field, value)
-                  for field, value in zip(self.order, name.suffixes)}
+                  for field, value in zip(order, suffixes)}
         path = PurePosixPath(*parts)
         kwargs['id'] = str(path.parent)
         return self.pathmetaclass(**kwargs)
