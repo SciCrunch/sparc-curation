@@ -708,7 +708,8 @@ class _DictTransformer:
                     adops.add(selected_data, add_path, value)
                 except exc.NoSourcePathError as e:
                     if source_key_optional:
-                        logd.exception(str(type(e)))
+                        #logd.exception(str(type(e)))
+                        logd.error(f'{e} in {runtime_context.path!r}')
                         ok = False
                         break  # breaks the inner loop
                     else:
@@ -770,8 +771,7 @@ def normalize_tabular_format(project_path):
             try:
                 xlsx2csv.convert(f, sheetid)
             except SheetNotFoundException as e:
-                print('Sheet weirdness in', xf)
-                print(e)
+                log.warning(f'Sheet weirdness in {xf}\n{e}')
 
 
 def extract_errors(dict_):

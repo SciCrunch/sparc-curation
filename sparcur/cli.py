@@ -44,6 +44,7 @@ Commands:
 
 Options:
     -f --fetch              fetch the files
+    -R --refresh            refresh the files
     -l --limit=SIZE_MB      the maximum size to download in megabytes [default: 2]
                             use negative numbers to indicate no limit
     -L --level=LEVEL        how deep to go in a refresh
@@ -55,9 +56,10 @@ Options:
     --project-path=<PTH>    set the project path manually
     -o --overwrite          fetch even if the file exists
     -e --empty              only pull empty directories
+    -x --exists             when searching include files that have already been pulled
     -m --only-meta          only pull known dataset metadata files
     -z --only-no-file-id    only pull files missing file_id
-    -r --rate=HZ            sometimes we can go too fast when fetching
+    -r --rate=HZ            sometimes we can go too fast when fetching [default: 5]
     -p --pretend            if the defult is to act, dont, opposite of fetch
 
     -t --tab-table          print simple table using tabs for copying
@@ -157,6 +159,7 @@ class Main(Dispatcher):
         if (self.options.clone or
             self.options.meta or
             self.options.size or
+            self.options.filetypes or
             self.options.pretend):
             # short circuit since we don't know where we are yet
             return
@@ -465,7 +468,7 @@ class Main(Dispatcher):
         hz = self.options.rate
         Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
                        for path in paths)
-        
+
     @property
     def export_base(self):
         return self.project_path.parent / 'export' / self.project_id
@@ -531,7 +534,7 @@ class Main(Dispatcher):
                 print(f'dataset graph exported to {out}')
 
             return
-        
+
         summary = self.summary
         # start time not end time ...
         # obviously not transactional ...
@@ -666,10 +669,12 @@ class Main(Dispatcher):
 
         if paths:
             paths = [p for p in paths if not p.is_dir()]
+            search_exists = self.options.exists
             if self.options.limit:
                 old_paths = paths
                 paths = [p for p in paths
                          if p.cache.meta.size is None or  # if we have no known size don't limit it
+                         search_exists or
                          not p.exists() and p.cache.meta.size.mb < self.options.limit
                          or p.exists() and p.size != p.cache.meta.size and
                          (not log.info(f'Truncated transfer detected for {p}\n'
@@ -687,11 +692,19 @@ class Main(Dispatcher):
                 for p in paths:
                     print(p.cache.meta.as_pretty(pathobject=p))
 
-            if self.options.fetch:
+            if self.options.fetch or self.options.refresh:
                 from pyontutils.utils import Async, deferred
-                #Async()(deferred(self.bfl.fetch_path)(path, self.options.overwrite) for path in paths)
                 hz = self.options.rate  # was 30
-                Async(rate=hz)(deferred(path.cache.fetch)() for path in paths)
+                limit = self.options.limit
+                fetch = self.options.fetch
+                if self.options.refresh:
+                    Async(rate=hz)(deferred(path.remote.refresh)
+                                   (update_cache=True, update_data=fetch, size_limit_mb=limit)
+                                   for path in paths)
+                elif fetch:
+                    Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=limit)
+                                   for path in paths)
+
             else:
                 self._print_paths(paths)
                 print(f'skipped = {n_skipped:<10}rate = {self.options.rate}')
@@ -728,7 +741,7 @@ class Main(Dispatcher):
                 print(f'| {uri} |')
                 if self.options.browser:
                     webbrowser.open(uri)
-                
+
             try:
                 meta = path.cache.meta
                 if meta is not None:

@@ -57,7 +57,7 @@ class NormAward(NormSimple):
             n = n.replace('D23864', 'D023864')
 
         if n != _ovalue:
-            log.info(f'\n{_ovalue}\n{n}')
+            log.debug(f'\n{_ovalue}\n{n}')
         return n
 
 

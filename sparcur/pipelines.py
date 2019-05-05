@@ -309,7 +309,7 @@ class SPARCBIDSPipeline(JSONPipeline):
         if 'errors' in data and len(data) == 1:
             raise self.SkipPipelineError(data)
         elif 'errors' in data:
-            data['error_index'] = 500 * (len(data) - 1)
+            data['error_index'] = 500 * (len(data['errors']) - 1)
 
         return data
 

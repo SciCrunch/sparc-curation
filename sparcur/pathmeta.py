@@ -398,7 +398,7 @@ class _PathMetaAsXattrs(_PathMetaConverter):
             try:
                 return int(value)
             except ValueError as e:
-                print(field, value)
+                log.exception(f'{field} {value}')
                 raise e
 
 class _PathMetaAsPretty(_PathMetaConverter):
