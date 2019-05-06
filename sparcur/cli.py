@@ -949,7 +949,10 @@ class Shell(Dispatcher):
             j = JT(dowe)
             triples = list(f.triples)
 
-        latest_datasets = self.latest_export['datasets']
+        try:
+            latest_datasets = self.latest_export['datasets']
+        except:
+            pass
 
         embed()
 

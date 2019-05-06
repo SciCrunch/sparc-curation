@@ -223,9 +223,6 @@ class PathData:
         if not hasattr(self, 'path'):
             self.path = path
 
-        self.status = CurationStatusStrict(self)
-        self.lax = CurationStatusLax(self)
-
         self.cypher = cypher
 
     @property
@@ -1000,7 +997,9 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
 
     @property
     def subjects(self):  # XXX
-        yield from self.datasetdata.subjects
+        if 'subjects' in self.data:
+            yield from self.data['subjects']
+
 
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
@@ -1064,7 +1063,7 @@ class Summary(Integrator):
                 'datasets': ds}
 
     @property
-    def data_lift(self):
+    def pipeline_end(self):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
@@ -1074,7 +1073,7 @@ class Summary(Integrator):
 
     @hasSchema(sc.SummarySchema)
     def data(self):
-        data = self.data_lift
+        data = self.pipeline_end
         return data
 
     @property

@@ -169,17 +169,17 @@ class DatasetStructure(Path, HasErrors):
     def data(self):
         out = {}
         for section_name in self.sections:
-            section_name += '_file'
             #section_paths_name = section_name + '_paths'
             #paths = list(getattr(self, section_paths_name))
             glob_type = 'rglob' if section_name in self.rglobs else 'glob'
             paths = list(self._abstracted_paths(section_name, glob_type=glob_type))
+            section_key = section_name + '_file'
             if paths:
                 if len(paths) == 1:
                     path, = paths
-                    out[section_name] = path
+                    out[section_key] = path
                 else:
-                    out[section_name] = paths
+                    out[section_key] = paths
 
         self.embedErrors(out)
         return out

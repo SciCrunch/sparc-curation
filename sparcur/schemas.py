@@ -1,4 +1,5 @@
 import copy
+import json
 import jsonschema
 
 # FIXME these imports should not be here types rules should be set in another way
@@ -6,6 +7,7 @@ from pathlib import Path
 import rdflib
 from pyontutils.core import OntId, OntTerm
 from pysercomb.pyr.units import ProtcParameter
+from sparcur.core import JEncode
 
 class ValidationError(Exception):
     def __init__(self, errors):
@@ -27,6 +29,12 @@ class ValidationError(Exception):
                  if v and k not in skip}
                 for e in self.errors]
 
+class ConvertingChecker(jsonschema.FormatChecker):
+    _enc = JEncode()
+
+    def check(self, instance, format):
+        converted = _enc.default(instance)
+        return super().check(converted, format)
 
 class JSONSchema(object):
 
@@ -34,6 +42,7 @@ class JSONSchema(object):
 
     def __init__(self):
         format_checker = jsonschema.FormatChecker()
+        #format_checker = ConvertingChecker()
         types = dict(array=(list, tuple),
                      string=(str,
                              Path,
@@ -49,6 +58,8 @@ class JSONSchema(object):
     def validate_strict(self, data):
         # Take a copy to ensure we don't modify what we were passed.
         appstruct = copy.deepcopy(data)
+
+        appstruct = json.loads(json.dumps(appstruct, cls=JEncode))  # FIXME figure out converters ...
 
         errors = list(self.validator.iter_errors(appstruct))
         if errors:
@@ -107,7 +118,7 @@ def _format_jsonschema_error(error):
     return error.message
 
 
-metadata_filename_pattern = r'^[a-z_]+\.(xlsx|csv|tsv|json)$'
+metadata_filename_pattern = r'^[a-z_\/]+\.(xlsx|csv|tsv|json)$'
 
 
 class ErrorSchema(JSONSchema):
@@ -374,9 +385,9 @@ class DatasetOutSchema(JSONSchema):
                             'errors': ErrorSchema.schema,
                             'error_index': {'type': 'integer',
                                             'minimum': 0},
-                            'submission_completeness_index': {'type': 'number',
-                                                              'minimum': 0,
-                                                              'maximum': 1,},
+                            #'submission_completeness_index': {'type': 'number',
+                                                              #'minimum': 0,
+                                                              #'maximum': 1,},
                             'contributors': ContributorsOutSchema.schema,
                             'creators': CreatorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer

@@ -219,7 +219,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
             except ValueError:  # FIXME :/ uid vs owner_id etc ...
                 return value
 
-        elif field in ('id', 'mode'):
+        elif field in ('id', 'mode', 'old_id'):
             return value
 
         else:
@@ -425,7 +425,7 @@ class _PathMetaAsXattrs(_PathMetaConverter):
                 return int(value)
             except ValueError:  # FIXME :/ uid vs owner_id etc ...
                 return value.decode()
-        elif field in ('id', 'mode'):
+        elif field in ('id', 'mode', 'old_id'):
             return value.decode(self.encoding)
         elif field not in self.fields:
             log.warning(f'Unhandled field {field}')

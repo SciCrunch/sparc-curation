@@ -760,7 +760,7 @@ class BFLocal:
 
         if thing is None:
             if attempt > retry_limit:
-                raise ValueError(f'No data retrieve for {id}')
+                raise exc.NoMetadataRetrievedError(f'No blackfynn object retrieved for {id}')
             else:
                 thing = self.get(id, attempt + 1)
 
@@ -768,7 +768,12 @@ class BFLocal:
 
     def get_file_url(self, id, file_id):
         resp = self.bf._api.session.get(f'https://api.blackfynn.io/packages/{id}/files/{file_id}')
-        resp_json = resp.json()
+        if resp.ok:
+            resp_json = resp.json()
+        else:
+            msg = f'Error {resp.status_code} {resp.reason!r} when fetching {resp.url}'
+            raise exc.NoRemoteFileWithThatIdError(msg)
+
         try:
             return resp_json['url']
         except KeyError as e:

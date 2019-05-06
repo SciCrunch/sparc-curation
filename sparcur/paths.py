@@ -1495,7 +1495,13 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             raise NotImplementedError('can\'t fetch data without a file id')
 
         gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
-        self.data_headers = next(gen)
+
+        try:
+            self.data_headers = next(gen)
+        except exc.NoRemoteFileWithThatIdError as e:
+            log.error(str(e))
+            raise e  # have to raise so that we don't overwrite the file
+
         yield from gen
 
 
@@ -1683,7 +1689,9 @@ class LocalPath(XattrPath):
     def data(self, generator):
         meta = self.meta
         log.debug(f'writing to {self}')
+        chunk1 = next(generator)  # if an error occurs don't open the file
         with open(self, 'wb') as f:
+            f.write(chunk1)
             for chunk in generator:
                 #log.debug(chunk)
                 f.write(chunk)

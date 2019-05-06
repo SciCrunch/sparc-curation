@@ -682,7 +682,12 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     def refresh(self, update_cache=False, update_data=False, size_limit_mb=2, force=False):
         """ use force if you have a file from packages """
-        old_meta = self.meta
+        try:
+            old_meta = self.meta
+        except exc.NoMetadataRetrievedError as e:
+            log.error(f'{e}\nYou will need to individually refresh {self.local}')
+            return
+
         if self.is_file() and not force:  # this will tigger a fetch
             pass
         else:

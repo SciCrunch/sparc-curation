@@ -54,15 +54,15 @@ class SizeError(SparCurError):
     """ really utoh """
 
 
-class CommandTooLongError(Exception):
+class CommandTooLongError(SparCurError):
     """ not the best solution ... """
 
 
-class NoRemoteImplementationError(Exception):
+class NoRemoteImplementationError(SparCurError):
     """ prevent confusion between local path data and remote path data """
 
 
-class NoRemoteMappingError(Exception):
+class NoRemoteMappingError(SparCurError):
     """ prevent confusion between local path data and remote path data """
 
 
@@ -82,9 +82,19 @@ class TargetPathExistsError(SparCurError):
     """ when adding to a path if fail_on_exists is set raise this """
 
 
-class EncodingError(Exception):
+class EncodingError(SparCurError):
     """ Some encoding error has occured in a file """
 
 
-class FileTypeError(Exception):
+class FileTypeError(SparCurError):
     """ File type is not allowed """
+
+
+class NoMetadataRetrievedError(SparCurError):
+    """ we failed to retrieve metadata for a remote id """
+
+
+class NoRemoteFileWithThatIdError(SparCurError):
+    """ the file you are trying to reach has been disconnected """
+
+
