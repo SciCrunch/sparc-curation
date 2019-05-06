@@ -107,6 +107,9 @@ def _format_jsonschema_error(error):
     return error.message
 
 
+metadata_filename_pattern = r'^[a-z_]+\.(xlsx|csv|tsv|json)$'
+
+
 class ErrorSchema(JSONSchema):
     schema = {'type':'array',
               'minItems': 1,
@@ -116,9 +119,15 @@ class ErrorSchema(JSONSchema):
 class DatasetStructureSchema(JSONSchema):
     schema = {'type': 'object',
               'required': ['submission_file', 'dataset_description_file', 'subjects_file'],
-              'properties': {'submission_file': {'type': 'string'},
-                             'dataset_description_file': {'type': 'string'},
-                             'subjects_file': {'type': 'string'},}}
+              'properties': {'submission_file': {'type': 'string',
+                                                 'pattern': metadata_filename_pattern},
+                             'dataset_description_file': {'type': 'string',
+                                                          'pattern': metadata_filename_pattern},
+                             'subjects_file': {'type': 'string',
+                                               'pattern': metadata_filename_pattern},
+                             'samples_file': {'type': 'string',
+                                              'pattern': metadata_filename_pattern},
+              }}
 
 
 class ContributorSchema(JSONSchema):

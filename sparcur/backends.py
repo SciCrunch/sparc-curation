@@ -1,13 +1,13 @@
 import os
 import atexit
 import subprocess
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PurePath
 from datetime import datetime
 import requests
 from pexpect import pxssh
 from sparcur import exceptions as exc
 from sparcur.core import log
-from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, BlackfynnCache
+from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, SshCache, BlackfynnCache
 from sparcur.paths import StatResult
 
 from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
@@ -27,7 +27,6 @@ class ReflectiveCachePath(CachePath):
 
 
 class RemoteFactory:
-    """ Assumes that Path is a parent. """
     def ___new__(cls, *args, **kwargs):
         # NOTE this should NOT be tagged as a classmethod
         # it is accessed at cls time already and tagging it
@@ -57,14 +56,33 @@ class RemoteFactory:
         return classTypeInstance
 
 
-class SshRemoteFactory(RemoteFactory, RemotePath):
+class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
     """ Testing. To be used with ssh-agent.
         StuFiS The stupid file sync. """
 
+    _cache_class = SshCache
     cypher_command = 'sha256sum'
     encoding = 'utf-8'
 
-    def __new__(cls, local_class, cache_class, host):
+    _meta = None  # override RemotePath dragnet
+
+    def ___new__(cls, *args, **kwargs):
+        # NOTE this should NOT be tagged as a classmethod
+        # it is accessed at cls time already and tagging it
+        # will cause it to bind to the original insource parent
+        _self = PurePosixPath.__new__(cls, *args)  # no kwargs since the only kwargs are for init
+        return _self
+    
+        # TODO this isn't quite working yet due to bootstrapping issues as usual
+        if _self.id != cls._cache_anchor.id:
+            self = _self.relative_to(_self.anchor)
+        else:
+            self = PurePosixPath.__new__(cls, '.')  # FIXME make sure this is interpreted correctly ...
+
+        self._errors = []
+        return self
+
+    def __new__(cls, cache_anchor, local_class, host):
         session = pxssh.pxssh(options=dict(IdentityAgent=os.environ.get('SSH_AUTH_SOCK')))
         session.login(host, ssh_config=Path('~/.ssh/config').expanduser().as_posix())
         cls._rows = 200
@@ -72,25 +90,52 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         session.setwinsize(cls._rows, cls._cols)  # prevent linewraps of long commands
         session.prompt()
         atexit.register(lambda:(session.sendeof(), session.close()))
-        return super().__new__(cls, local_class, cache_class, host=host, session=session)
+        cache_class = cache_anchor.__class__
+        self = super().__new__(cls, local_class, cache_class, host=host, session=session)
+        cls._cache_anchor = cache_anchor
+        return self
+
+    def __init__(self, thing_with_id, cache=None):
+        if isinstance(thing_with_id, PurePath):
+            thing_with_id = thing_with_id.as_posix()
+
+        super().__init__(thing_with_id, cache=cache)
+
+    @property
+    def anchor(self):
+        return self._cache_anchor.remote
+        # FIXME warning on relative paths ...
+        # also ... might be convenient to allow
+        # setting non-/ anchors, but perhaps for another day
+        #return self.__class__('/', host=self.host)
+
+    @property
+    def id(self):
+        return f'{self.host}:{self.rpath}'
+        #return self.host + ':' + self.as_posix()  # FIXME relative to anchor?
+
+    @property
+    def rpath(self):
+        # FIXME relative paths when the anchor is set differently
+        # the anchor will have to be stored as well since there coulde
+        # be many possible anchors per host, thus, if an anchor relative
+        # identifier is supplied then we need to construct the full path
+
+        # conveniently in this case if self is a fully rooted path then
+        # it will overwrite the anchor path
+        # TODO make sure that the common path is the anchor ...
+        return (self._cache_anchor.remote / self).as_posix()
+
+    def _parts_relative_to(self, remote, cache_parent=None):
+        return self.relative_to(remote).parts
 
     def refresh(self):
         # TODO probably not the best idea ...
         raise NotImplementedError('This baby goes to the network every single time!')
 
     @property
-    def id(self):
-        # this allows a remapping once
-        # otherwise we face chicken and egg problem
-        # or rather, in this case, the remote system
-        # really doesn't know how we've mapped something
-        # locally, I guess it could, but for the implementaiton
-        # we don't track that right now
-        return self.cache.id
-
-    @property
     def data(self):
-        cmd = ['scp', f'{self.host}:{self.cache.id}', '/dev/stdout']
+        cmd = ['scp', self.id, '/dev/stdout']
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         while True:
             data = p.stdout.read(4096)  # TODO hinting
@@ -105,31 +150,37 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
     # def meta (make it easier to search for this)
     meta = LocalPath.meta  # magic
 
-    def _ssh(self, remote_cmd):
+    #def _ssh(self, remote_cmd):
+    @classmethod
+    def _ssh(cls, remote_cmd):
         #print(remote_cmd)
-        if len(remote_cmd) > self._cols:
+        if len(remote_cmd) > cls._cols:
             raise exc.CommandTooLongError
-        n_bytes = self.session.sendline(remote_cmd)
-        self.session.prompt()
-        raw = self.session.before
+        n_bytes = cls.session.sendline(remote_cmd)
+        cls.session.prompt()
+        raw = cls.session.before
         out = raw[n_bytes + 1:].strip()  # strip once here since we always will
         #print(raw)
         #print(out)
         return out
 
     def checksum(self):
-        remote_cmd = (f'{self.cypher_command} {self.cache.id} | '
+        remote_cmd = (f'{self.cypher_command} {self.rpath} | '
                       'awk \'{ print $1 }\';')
 
         return bytes.fromhex(self._ssh(remote_cmd).decode(self.encoding))
 
     def stat(self):
-        remote_cmd = f'stat "{self.cache.id}" -c {StatResult.stat_format}'
+        remote_cmd = f'stat "{self.rpath}" -c {StatResult.stat_format}'
         out = self._ssh(remote_cmd)
         return StatResult(out)
 
+    def exists(self):
+        st = self.stat()
+        return bool(st)  # FIXME
+
     @property
-    def parent(self):
+    def __parent(self):  # no longer needed since we inherit from path directly
         # because the identifiers are paths if we move
         # file.ext to another folder, we treat it as if it were another file
         # at least for this SshRemote path, if we move a file on our end
@@ -148,12 +199,17 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         # the remote system doesn't know what context you are in
         # so we need to fail loudly
         # basically force people to manually resolve their paths
-        return self.__class__(self.cache.parent)
+        return self.__class__(self.cache.parent)  # FIXME not right ...
 
     def is_dir(self):
-        remote_cmd = f'stat -c %F {self.cache.id}'
+        remote_cmd = f'stat -c %F {self.rpath}'
         out = self._ssh(remote_cmd)
         return out == b'directory'
+
+    def is_file(self):
+        remote_cmd = f'stat -c %F {self.rpath}'
+        out = self._ssh(remote_cmd)
+        return out == b'regular file'
 
     @property
     def children(self):
@@ -164,7 +220,7 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
         #\"'%n' %o %s %W %X %Y %Z %g %u %f\"
         if self.is_dir():
             # no children if it is a file sadly
-            remote_cmd = (f"cd {self.cache.id};"
+            remote_cmd = (f"cd {self.rpath};"
                           f"stat -c {StatResult.stat_format} {{.,}}*;"
                           "echo '----';"
                           f"{self.cypher_command} {{.,}}*;"  # FIXME fails on directories destroying alignment
@@ -181,6 +237,9 @@ class SshRemoteFactory(RemoteFactory, RemotePath):
 
             return stats, checks  # TODO
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.rpath!r}, host={self.host!r})'
+
 
 class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     # FIXME helper index should try to cooperate with the packages index?
@@ -195,6 +254,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
                 log.critical(f'Could not connect to blackfynn {e!r}')
                 #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
+                blackfynn_local_instance = 'CONNECTION ERROR'
 
         else:
             raise TypeError(f'{type(cache_anchor)} is not BFLocal or BlackfynnCache!')

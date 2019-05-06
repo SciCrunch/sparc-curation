@@ -18,8 +18,53 @@ from sparcur.paths import Path
 a = rdf.type
 
 
-class DatasetStructure(Path):
+class HasErrors:
+    def __init__(self, *args, **kwargs):
+        try:
+            super().__init__(*args, **kwargs)
+        except TypeError as e:  # this is so dumb
+            #breakpoint()
+            super().__init__()
+            #try:
+            #except BaseException as e2:
+                #raise e2 from e
+
+        self._errors = []
+
+    def addError(self, error):
+        self._errors.append(error)
+
+    @property
+    def errors(self):
+        for e in self._errors:
+            o = {}
+            if isinstance(e, str):
+                o['message'] = e
+
+            elif isinstance(e, BaseException):
+                o['message'] = str(e)
+                o['type'] = str(type(e))
+
+            else:
+                raise TypeError(repr(e))
+
+            log.debug(o)
+            yield o
+
+    def embedErrors(self, data):
+        el = list(self.errors)
+        if 'errors' in data:
+            data['errors'].extend(el)
+        elif el:
+            data['errors'] = el
+
+
+class DatasetStructure(Path, HasErrors):
+    sections = ('submission', 'dataset_description', 'subjects', 'samples', 'manifest')
+    rglobs = 'manifest',
+    default_glob = 'glob'
     max_childs = 40
+
     @property
     def bids_root(self):
         # FIXME this will find the first dataset description file at any depth!
@@ -63,14 +108,20 @@ class DatasetStructure(Path):
         elif self.parent:  # organization has no parent
             return self.parent.bids_root
 
-    def _abstracted_paths(self, name_prefix, glob_type='glob'):
+    def _abstracted_paths(self, name_prefix, glob_type=None):
         """ A bottom up search for the closest file in the parent directory.
             For datasets, if the bids root and path do not match, use the bids root.
             In the future this needs to be normalized because the extra code required
             for dealing with the intervening node is quite annoying to maintain.
         """
+        if glob_type is None:
+            glob_type = self.default_glob
+
         path = self
-        if self.cache.is_dataset and self.bids_root is not None and self.bids_root != self:
+        if (self.cache and
+            self.cache.is_dataset and
+            self.bids_root is not None and
+            self.bids_root != self):
             path = self.bids_root
 
         first = name_prefix[0]
@@ -83,7 +134,7 @@ class DatasetStructure(Path):
             if not path.is_broken_symlink():
                 if path.name[0].isupper():
                     msg = f'path has bad casing {path.as_posix()!r}'
-                    self._errors.append(msg)
+                    self.addError(msg)
                     logd.error(msg)
                 yield path
 
@@ -94,7 +145,7 @@ class DatasetStructure(Path):
                 if not path.is_broken_symlink():
                     if path.name[0].isupper():
                         msg = f'path has bad casing {path.as_posix()!r}'
-                        self._errors.append(msg)
+                        self.addError(msg)
                         logd.error(msg)
 
                     yield path
@@ -109,32 +160,20 @@ class DatasetStructure(Path):
                 yield from getattr(self.parent, name_prefix + '_paths')
 
     @property
-    def submission_paths(self):
-        yield from self._abstracted_paths('submission')
-
-    @property
-    def dataset_description_paths(self):
-        yield from self._abstracted_paths('dataset_description')
-
-    @property
-    def subjects_paths(self):
-        yield from self._abstracted_paths('subjects')
-
-    @property
-    def samples_paths(self):
-        yield from self._abstracted_paths('samples')
-
-    @property
-    def manifest_paths(self):
-        yield from self._abstracted_paths('manifest', glob_type='rglob')
+    def meta_paths(self):
+        for section_name in self.sections:
+            glob_type = 'rglob' if section_name in self.rglobs else None
+            yield from self._abstracted_paths(section_name, glob_type=glob_type)
 
     @property
     def data(self):
         out = {}
-        for section_name in ('submission', 'dataset_description', 'subjects', 'samples', 'manifest'):
-            section_paths_name = section_name + '_paths'
+        for section_name in self.sections:
             section_name += '_file'
-            paths = list(getattr(self, section_paths_name))
+            #section_paths_name = section_name + '_paths'
+            #paths = list(getattr(self, section_paths_name))
+            glob_type = 'rglob' if section_name in self.rglobs else 'glob'
+            paths = list(self._abstracted_paths(section_name, glob_type=glob_type))
             if paths:
                 if len(paths) == 1:
                     path, = paths
@@ -142,12 +181,18 @@ class DatasetStructure(Path):
                 else:
                     out[section_name] = paths
 
+        self.embedErrors(out)
         return out
 
 
-class Tabular:
+class DatasetStructureLax(DatasetStructure):
+    default_glob = 'rglob'
+
+
+class Tabular(HasErrors):
+
     def __init__(self, path):
-        self._errors = []
+        super().__init__()
         self.path = path
 
     @property
@@ -167,7 +212,7 @@ class Tabular:
                     yield from csv.reader(f, delimiter=delimiter)
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
-                    self._errors.append(exc.EncodingError(message))
+                    self.addError(exc.EncodingError(message))
                     logd.error(message)
                 return
             except UnicodeDecodeError:
@@ -194,6 +239,15 @@ class Tabular:
             log.warning(f'Sheet weirdness in{self.path}')
             log.warning(str(e))
 
+    def _bad_filetype(self, type_):
+        message = f'bad filetype {type_}\n{self.path.as_posix()!r}'
+        self.addError(exc.FileTypeError(message))
+        logd.error(message)
+        raise TypeError
+
+    def xls(self):
+        return self._bad_filetype('xls')
+
     def normalize(self, rows):
         # FIXME need to detect changes
         # this removes any columns that are all dead
@@ -204,7 +258,7 @@ class Tabular:
         cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
         for row in cleaned_rows:
             n_row = [c.strip().replace('\ufeff', '') for c in row
-                     if (not self._errors.append(error)  # FIXME will probably append multiple ...
+                     if (not self.addError(error)  # FIXME will probably append multiple ...
                          if '\ufeff' in c else True)]
             if not all(not(c) for c in n_row):  # skip totally empty rows
                 yield n_row
@@ -213,7 +267,7 @@ class Tabular:
         try:
             yield from self.normalize(getattr(self, self.file_extension)())
         except UnicodeDecodeError as e:
-            log.error(f'\'{self.path}\' {e}')
+            log.error(f'{self.path.as_posix()!r} {e}')
 
     def __repr__(self):
         limit = 30
@@ -225,7 +279,7 @@ class Tabular:
                           title=title).table
 
 
-class Version1Header:
+class Version1Header(HasErrors):
     to_index = tuple()  # first element indexes row based data
     skip_cols = 'metadata_element', 'description', 'example'
     max_one = tuple()
@@ -240,8 +294,8 @@ class Version1Header:
         return super().__new__(cls)
 
     def __init__(self, path):
+        super().__init__()
         tabular = Tabular(path)
-        self._errors = []
         self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
         self.t = tabular
         l = list(tabular)
@@ -275,8 +329,8 @@ class Version1Header:
 
     @property
     def errors(self):
-        yield from self.t._errors
-        yield from self._errors
+        yield from self.t.errors
+        yield from super().errors
 
     @staticmethod
     def query(value, prefix):
@@ -300,7 +354,7 @@ class Version1Header:
         if v != value:  # TODO can we decouple encoding from value normalization?
             message = f"encoding feff error in '{self.path}'"
             log.error(message)
-            self._errors.append(exc.EncodingError(message))
+            self.addError(exc.EncodingError(message))
 
         if v.lower().strip() not in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
             yield from getattr(self, key, self.default)(v)
@@ -326,7 +380,10 @@ class Version1Header:
         index_col, *_ = self.to_index
         out = {}
         if not hasattr(self.bc, index_col):
-            log.error(f'\'{self.t.path}\' malformed header!')
+            msg = f'{self.path.as_posix()!r} maformed header!'
+            self.addError(msg)
+            logd.error(msg)
+            self.embedErrors(out)
             self._data_cache = out
             return out
 
@@ -345,14 +402,14 @@ class Version1Header:
                     value = tuple(set(_value))
                     if len(value) != len(_value):
                         # TODO counter to show the duplicate values
-                        log.warning(f"duplicate values in {normk} TODO '{self.t.path}'")
+                        log.warning(f'duplicate values in {normk} TODO {self.path.as_posix()!r}')
 
                     if normk in self.max_one:  # schema will handle this ..
                         if not value:
                             #log.warning(f"missing value for {normk} '{self.t.path}'")
                             pass
                         elif len(value) > 1:
-                            log.warning(f"too many values for {normk} {value} '{self.t.path}'")
+                            log.warning(f'too many values for {normk} {value} {self.path.as_posix()!r}')
                             # FIXME not selecting the zeroth element here breaks the schema assumptions
                             #value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
                             #value = 'ERROR>>>' + ','.join(value)
@@ -388,88 +445,23 @@ class Version1Header:
             if value:
                 out[key] = value
 
+        self.embedErrors(out)
         self._data_cache = out
         return out
 
-    @property
-    def __data_with_errors(self):
-        """ data with errors added under the 'errors' key """
-        # FIXME TODO regularize this with the DatasetData version
-        ok, valid, data = self.schema.validate(copy.deepcopy(self.data))
-        if not ok:
-            # FIXME this will dump the whole schema, go smaller
-            error = valid
-            if 'errors' in data:
-                class WatError(Exception):
-                    """ WAT """
 
-                raise WatError('wat')
-
-            data['errors'] = error.json()
-            #data['errors'] = [{k:v if k != 'schema' else k
-                               #for k, v in e._contents().items()}
-                              #for e in error.errors]
-
-        return data
-
-        # FIXME this seems like a much better way to collect things
-        # than the crazy way that I have been doing it ...
-        # this will let us go as deep as we want ...
-
-        for section_name, path in data.items():
-            section = getattr(self, section_name)
-            sec_data = section.data_with_errors
-            out[section_name] = sec_data
-
-    @property
-    def submission_completeness_index(self):
-        """ (/ (- total-possible-errors number-of-errors) total-possible-errors)
-            A naieve implementation that requires a recursive algorithem to actually
-            count the number of potential errors in a given context. """
-        # FIXME the normalized version of this actually isn't helpful
-        # because you could have 1000 errors for one substep of a substep
-        # and you would appear to be almost done ...
-        # what we really want is the total number of non-double-counted errors
-        # so if I have an error that causes an error in a later step
-        # then I would have only 1 not two errors ...
-        # note of course that this just puts the problem off because if
-        # I don't have any of the three spreadsheets then each one of them
-        # could be completely incorrect ... the only reasonable way to do
-        # this is to return the expected value of the number of errors
-        # for the missing value, I don't think there is any other reasonable appraoch
-        # IF you are allowed a second number then you can communicate the uncertainty
-        # TODO this is an augment step in the new pipelined version
-
-        dwe = self.data_with_errors
-        if 'errors' not in dwe:
-            return 1
-
-        else:
-            schema = self.schema.schema
-            total_possible_errors = self.schema.total_possible_errors
-            number_of_errors = len(dwe['errors'])
-            return (total_possible_errors - number_of_errors) / total_possible_errors
-
-
-hasSchema = vldt.HasSchema()
-@hasSchema.mark
 class SubmissionFile(Version1Header):
     to_index = 'submission_item',  # FIXME normalized in version 2
     skip_cols = 'submission_item', 'definition'  # FIXME normalized in version 2
 
     verticals = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
-    #schema_class = sc.SubmissionSchema
-
-    #@hasSchema(sc.SubmissionSchema)
-    #def data_test(self):
-        #return self.data
 
     @property
     def data(self):
         """ lift list with single element to object """
 
         d = copy.deepcopy(super().data)
-        if d:
+        if d and 'submission' in d:
             if d['submission']:
                 d['submission'] = d['submission'][0]
             else:
@@ -478,8 +470,6 @@ class SubmissionFile(Version1Header):
         return d
 
 
-hasSchema = vldt.HasSchema()
-@hasSchema.mark
 class DatasetDescriptionFile(Version1Header):
     to_index = 'metadata_element',
     skip_cols = 'metadata_element', 'description', 'example'
@@ -511,11 +501,6 @@ class DatasetDescriptionFile(Version1Header):
                               'example_image_locator',
                               'example_image_description'),
     }
-    #schema_class = sc.DatasetDescriptionSchema
-
-    #@hasSchema(sc.DatasetDescriptionSchema)
-    #def data_test(self):
-        #return super().data
 
     @property
     def data(self):
@@ -537,7 +522,7 @@ class DatasetDescriptionFile(Version1Header):
                 return
             elif len(v) != 19:
                 msg = f'orcid wrong length {value!r} {self.t.path.as_posix()!r}'
-                self._errors.append(OrcidId.OrcidLengthError(msg))
+                self.addError(OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
@@ -553,7 +538,7 @@ class DatasetDescriptionFile(Version1Header):
                 return
             elif len(numeric) != 19:
                 msg = f'orcid wrong length {value!r} {self.t.path.as_posix()!r}'
-                self._errors.append(OrcidId.OrcidLengthError(msg))
+                self.addError(OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
@@ -563,7 +548,7 @@ class DatasetDescriptionFile(Version1Header):
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
                 msg = f'orcid failed checksum {value!r} {self.t.path.as_posix()!r}'
-                self._errors.append(OrcidId.OrcidChecksumError(msg))
+                self.addError(OrcidId.OrcidChecksumError(msg))
                 logd.error(msg)
                 return
 
@@ -571,7 +556,7 @@ class DatasetDescriptionFile(Version1Header):
 
         except (OntId.BadCurieError, OrcidId.OrcidMalformedError) as e:
             msg = f'orcid malformed {value!r} {self.t.path.as_posix()!r}'
-            self._errors.append(OrcidId.OrcidMalformedError(msg))
+            self.addError(OrcidId.OrcidMalformedError(msg))
             logd.error(msg)
             yield value
 
@@ -630,18 +615,15 @@ class DatasetDescriptionFile(Version1Header):
         return key
 
 
-hasSchema = vldt.HasSchema()
-@hasSchema.mark
 class SubjectsFile(Version1Header):
     to_index = 'subject_id',  # the zeroth is what is used for unique rows by default  # FIXME doesn't work
     # subject id varies, so we have to do something a bit different here
     skip_cols = tuple()
-    horizontals = {'software':('software', 'software_version', 'software_vendor', 'software_url', 'software_rrid')}
-    #schema_class = sc.SubjectsSchema
-
-    @hasSchema(sc.SubjectsSchema)
-    def data_test(self):
-        return self.data
+    horizontals = {'software':('software',
+                               'software_version',
+                               'software_vendor',
+                               'software_url',
+                               'software_rrid')}
 
     @property
     def _data(self):
@@ -661,6 +643,7 @@ class SubjectsFile(Version1Header):
             if tups:
                 out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
 
+        self.embedErrors(out)
         return out
 
     def __init__(self, path):

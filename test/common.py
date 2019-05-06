@@ -33,23 +33,28 @@ ds_roots = (
     'ds5/level/wat',
 )
 
-def mk_fldr_meta(fldr_path, ftype='collection'):
-    meta = fldr_path.meta
+def mk_fldr_meta(fldr_path, ftype='collection', id=None):
+    _meta = fldr_path.meta
+    kwargs = {**_meta}
+    kwargs['id'] = id if id is not None else f'N:{ftype}:' + fldr_path.as_posix()
+    meta = PathMeta(**kwargs)
     # NOTE st_mtime -> modified time of the file contents (data)
     # NOTE st_ctime -> changed time of the file status (metadata)
     # linux does not have a unified way to bet st_btime aka st_crtime which is birth time or created time
-    return {'bf.id': f'N:{ftype}:' + fldr_path.as_posix(),
-            'bf.created': meta.created.isoformat().replace('.', ','),
+    return meta.as_xattrs(prefix='bf')
+    return {'bf.id': id if id is not None else f'N:{ftype}:' + fldr_path.as_posix(),
+            'bf.created': meta.created.isoformat().replace('.', ',') if meta.created is not None else None,
             'bf.updated': meta.updated.isoformat().replace('.', ',')}
 
 
 def mk_file_meta(fp):
     meta = fp.meta
+    return meta.as_xattrs(prefix='bf')
     return {'bf.id': 'N:package:' + fp.as_posix(),
             'bf.file_id': 0,
             'bf.size': meta.size,
             # FIXME timezone
-            'bf.created': meta.created.isoformat().replace('.', ','),
+            'bf.created': meta.created.isoformat().replace('.', ',') if meta.created is not None else None,
             'bf.updated': meta.updated.isoformat().replace('.', ','),
             'bf.checksum': fp.checksum(),
             # 'bf.old_id': None  # TODO
@@ -73,7 +78,7 @@ def mk_required_files(path, suffix='.csv'):
 
 if not project_path.exists() or not list(project_path.iterdir()):
     project_path.mkdir(parents=True, exist_ok=True)
-    attrs = mk_fldr_meta(project_path, 'organization')
+    attrs = mk_fldr_meta(project_path, 'organization', id='N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d')
     project_path.setxattrs(attrs)
     for ds in ds_folders:
         dsp = project_path / ds
@@ -226,9 +231,13 @@ class TestPathHelper:
     def tearDownClass(cls):
         shutil.rmtree(cls.test_base)
 
-    def setUp(self):
+    def setUp(self, init_cache=True):
+        if self.test_path.exists():  # in case something went wrong with a previous test
+            shutil.rmtree(self.test_path)
+
         self.test_path.mkdir()
-        self.test_path.cache_init('0')
+        if init_cache:
+            self.test_path.cache_init('0')
 
     def tearDown(self):
         shutil.rmtree(self.test_path)

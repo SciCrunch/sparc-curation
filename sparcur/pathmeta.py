@@ -63,7 +63,7 @@ class PathMeta:
         self.gid = gid
         self.user_id = user_id
         self.mode = mode
-        self.errors = tuple(errors)
+        self.errors = tuple(errors) if errors else tuple()
         if kwargs:
             log.warning(f'Unexpected meta values! {kwargs}')
             self.__kwargs = kwargs  # roundtrip values we don't explicitly handle
@@ -83,6 +83,15 @@ class PathMeta:
         # FIXME prefix= is a bad api ...
         """ db entry """  # TODO json blob in sqlite? can it index?
         return pickle.dumps(self.as_xattrs(prefix))
+
+    def keys(self):
+        yield from self
+
+    def __getitem__(self, key):
+        try:
+            getattr(self, key)
+        except AttributeError as e:
+            raise KeyError(key)
 
     def __iter__(self):
         yield from (k for k in self.__dict__ if not k.startswith('_'))

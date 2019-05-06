@@ -105,7 +105,7 @@ def _catch_wrapper(func):
 
 
 class StatResult:
-    stat_format = f'\"%n  %o  %s  %w  %W  %x  %X  %y  %Y  %z  %Z  %g  %u  %f\"'
+    stat_format = f'\"%n  %i  %o  %s  %w  %W  %x  %X  %y  %Y  %z  %Z  %g  %u  %f\"'
 
     #stat_format = f'\"\'%n\' %o %s \'%w\' %W \'%x\' %X \'%y\' %Y \'%z\' %Z %g %u %f\"'
 
@@ -117,7 +117,7 @@ class StatResult:
         wat = out.split('  ')
         #print(wat)
         #print(len(wat))
-        name, hint, size, hb, birth, ha, access, hm, modified, hc, changed, gid, uid, raw_mode = wat
+        name, ino, hint, size, hb, birth, ha, access, hm, modified, hc, changed, gid, uid, raw_mode = wat
 
         self.name = name
 
@@ -126,6 +126,7 @@ class StatResult:
             time, ns = time.split('.')
             return '.' + ns
 
+        self.st_ino = int(ino)
         self.st_blksize = int(hint)
         self.st_size = int(size)
         #self.st_birthtime
@@ -204,6 +205,9 @@ class RemotePath:
     @property
     def cache(self):
         return self._cache
+
+    def cache_init(self):
+        return self._cache_anchor / self
 
     @property
     def _cache(self):
@@ -315,6 +319,9 @@ class RemotePath:
 
     @property
     def parts(self):
+        if self == self.anchor:
+            return tuple()
+
         if not hasattr(self, '_parts'):
             if self.cache:
                 cache_parent = self.cache.parent
@@ -362,6 +369,9 @@ class RemotePath:
 
     def __ne__(self, other):
         return not self == other
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.id!r})'
 
 
 class AugmentedPath(PosixPath):
@@ -600,8 +610,8 @@ class CachePath(AugmentedPath):
     @property
     def anchor(self):
         raise NotImplementedError('You need to define the rule for determining '
-                                  'the root for \'remote\' paths. These are sort '
-                                  'of like pseudo mount points.')
+                                  'the local cache root for \'remote\' paths. '
+                                  'These are sort of like pseudo mount points.')
 
     @property
     def is_helper_cache(self):
@@ -965,18 +975,6 @@ class CachePath(AugmentedPath):
         if size_not_ok:
             log.warning(f'File is over the size limit {meta.size.mb} > {size_limit_mb}')
 
-    @property
-    def data(self):
-        # we don't keep two copies of the local data
-        # unless we are doing a git-like thing
-        meta = self.meta
-        if meta.file_id is None:
-            raise NotImplementedError('can\'t fetch data without a file id')
-
-        gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
-        self.data_headers = next(gen)
-        yield from gen
-
     def move(self, *, remote=None, target=None, meta=None):
         """ instantiate a new cache and cleanup self because we are moving """
         # FIXME what to do if we have data
@@ -1189,7 +1187,10 @@ class SymlinkCache(CachePath):
                 log.debug('Metadata exists, but ids match so will update')
                 self.unlink()
 
-            symlink = PosixPath(self.local.name) / pathmeta.as_symlink()
+            # FIXME if an id starts with / then the local name is overwritten due to pathlib logic
+            # we need to error if that happens
+            #symlink = PurePosixPath(self.local.name, pathmeta.as_symlink().as_posix().strip('/'))
+            symlink = PurePosixPath(self.local.name) / pathmeta.as_symlink()
             self.local.symlink_to(symlink)
 
         else:
@@ -1347,6 +1348,25 @@ class PrimaryCache(CachePath):
         # if package/file
 
 
+class SshCache(PrimaryCache, XattrCache):
+    xattr_prefix = 'ssh'
+    _backup_cache = SqliteCache
+    _not_exists_cache = SymlinkCache
+
+    @property
+    def anchor(self):
+        if not hasattr(self, '_anchor') or self._anchor is None:
+            raise ValueError('Cache anchor is none! Did you call '
+                             'localpath.cache_init(id, anchor=True)?')
+
+        return self._anchor
+
+    @property
+    def data(self):
+        # there is no middle man for ssh so we go directly
+        yield from self.remote.data
+
+
 class BlackfynnCache(PrimaryCache, XattrCache):
     xattr_prefix = 'bf'
     _backup_cache = SqliteCache
@@ -1463,6 +1483,21 @@ class BlackfynnCache(PrimaryCache, XattrCache):
 
         return 'https://api.blackfynn.io/' + endpoint
 
+    @property
+    def data(self):
+        # we don't keep two copies of the local data
+        # unless we are doing a git-like thing
+        if self.is_dir():
+            raise TypeError('can\'t retrieve data for a directory')
+
+        meta = self.meta
+        if meta.file_id is None:
+            raise NotImplementedError('can\'t fetch data without a file id')
+
+        gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
+        self.data_headers = next(gen)
+        yield from gen
+
 
 class LocalPath(XattrPath):
     # local data about remote objects
@@ -1493,7 +1528,7 @@ class LocalPath(XattrPath):
 
         return self._cache
 
-    def cache_init(self, id_or_meta):
+    def cache_init(self, id_or_meta, anchor=False):
         """ wow it took way too long to realize this was the way to do it >_< """
         if self.cache and self.cache.meta:
             raise ValueError(f'Cache already exists! {self.cache}\n'
@@ -1507,7 +1542,11 @@ class LocalPath(XattrPath):
         if not isinstance(id_or_meta, PathMeta):
             id_or_meta = PathMeta(id=id_or_meta)
 
-        return self._cache_class(self, meta=id_or_meta)
+        cache = self._cache_class(self, meta=id_or_meta)
+        if anchor:
+            self._cache_class._anchor = cache
+
+        return cache
 
     def mkdir_cache(self, remote):
         """ wow side effects everywhere """
@@ -1542,10 +1581,12 @@ class LocalPath(XattrPath):
                 if found_cache and found_cache != Path('/'):
                     return found_cache
 
-    #@property
-    #def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct
-        #""" THERE CAN BE ONLY ONE """
+    @property
+    def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct
+        """ THERE CAN BE ONLY ONE """
         # return self.checksum()  # doesn't quite work for folders ...
+        # return self.as_posix()  # FIXME which one to use ...
+        return self.sysid + ':' + self.as_posix()
 
     @property
     def created(self):
@@ -1594,7 +1635,7 @@ class LocalPath(XattrPath):
                         fs_data_modified_time) = (st.st_ctime,
                                                   st.st_mtime)
 
-        if hasattr(self, '_meta'):
+        if hasattr(self, '_meta') and self._meta is not None:
             if self.__change_tuple == change_tuple:
                 return self._meta
 
@@ -1613,7 +1654,7 @@ class LocalPath(XattrPath):
                               created=None,
                               updated=updated,
                               checksum=self.checksum(),
-                              id=self.sysid + ':' + self.as_posix(),
+                              id=self.id,
                               file_id=st.st_ino,  # pretend inode number is file_id ... oh wait ...
                               user_id=st.st_uid,
                               # keep in mind that a @meta.setter
@@ -1704,9 +1745,6 @@ class LocalPath(XattrPath):
             return m.digest()
 
 
-LocalPath.sysid = base64.urlsafe_b64encode(LocalPath(sysidpath()).checksum()[:16])[:-2].decode()
-
-
 class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
     """ An augmented path for all the various local needs of the curation process. """
     _cache_class = BlackfynnCache
@@ -1762,4 +1800,10 @@ class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
                 sleep(.01)  # spin a bit more slowly
 
 
+# assign defaults
+
+SshCache._local_class = LocalPath
 BlackfynnCache._local_class = Path
+
+# any additional values
+LocalPath.sysid = base64.urlsafe_b64encode(LocalPath(sysidpath()).checksum()[:16])[:-2].decode()

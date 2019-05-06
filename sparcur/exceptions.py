@@ -84,3 +84,7 @@ class TargetPathExistsError(SparCurError):
 
 class EncodingError(Exception):
     """ Some encoding error has occured in a file """
+
+
+class FileTypeError(Exception):
+    """ File type is not allowed """

@@ -2,14 +2,15 @@ import unittest
 import pytest
 from .common import project_path
 
+from sparcur import schemas as sc
+from sparcur import datasets as dat
 from sparcur import validate as vldt
 from sparcur.paths import Path
-from sparcur.curation import FTLax, DatasetData
 
 
 class TestHierarchy(unittest.TestCase):
     def setUp(self):
-        self.ds =  [DatasetData(p) for p in Path(project_path).children]
+        self.ds =  [dat.DatasetStructure(p) for p in Path(project_path).children]
 
     def tearDown(self):
         pass
@@ -28,24 +29,18 @@ class TestHierarchy(unittest.TestCase):
         # for example if they are buried many levels too low how do we deal with that?
 
     def test_dataset(self):
+        dsc = sc.DatasetStructureSchema()
         for d in self.ds:
             print(d.data)
-            d.schema.validate(d.data)
+            dsc.validate(d.data)
 
         pytest.skip('TODO look at the lists here and figure out where they should go.')
 
     def test_tables(self):
         for d in self.ds:
-            for table in d._meta_tables:
-                for row in table:
+            for p in d.meta_paths:
+                for row in dat.Tabular(p):
                     print(row)
-
-    def test_things(self):
-        for d in self.ds:
-            for thing in d.meta_sections:
-                print(thing.__class__.__name__, thing.data)
-
-        pytest.skip('TODO look at the lists here and figure out where they should go.')
 
     def test_submission(self):
         pass
@@ -59,7 +54,7 @@ class TestHierarchy(unittest.TestCase):
 
 class TestLax(TestHierarchy):
     def setUp(self):
-        self.ds =  [FTLax(p) for p in Path(project_path).children]
+        self.ds =  [dat.DatasetStructureLax(p) for p in Path(project_path).children]
 
 
 class TestStage(unittest.TestCase):

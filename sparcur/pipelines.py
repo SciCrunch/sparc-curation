@@ -22,7 +22,10 @@ class PathPipeline(PrePipeline):
     # FIXME this is a temporary solution to reuse the conversion existing
     data_transformer_class = None
     def __init__(self, previous_pipeline, lifters, runtime_context):
-        log.debug(lj(previous_pipeline.data))
+        try:
+            log.debug(lj(previous_pipeline.data))
+        except TypeError:
+            breakpoint()
         if isinstance(previous_pipeline, Path):
             path = previous_pipeline
         else:

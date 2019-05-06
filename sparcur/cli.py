@@ -92,13 +92,14 @@ from pyontutils import clifun as clif
 from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
+from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, log, logd, python_identifier, FileSize
 from sparcur.core import OntTerm, get_all_errors, DictTransformer as DT
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import PathData, FTLax, Summary, Integrator
+from sparcur.curation import PathData, Summary, Integrator
 from sparcur.curation import JEncode
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
@@ -214,9 +215,7 @@ class Main(Dispatcher):
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
 
-        # get the datasets to tigger instantiation of the remote
-        list(self.datasets_remote)
-        list(self.datasets)
+        self.anchor.remote  # trigger creation of _remote_class
         BlackfynnRemote = BlackfynnCache._remote_class
         self.bfl = BlackfynnRemote.bfl
         Integrator.setup(self.bfl)
@@ -272,7 +271,7 @@ class Main(Dispatcher):
             paths = Path.cwd(),
 
         if self.options.only_meta:
-            paths = (mp.absolute() for p in paths for mp in FTLax(p).meta_paths)
+            paths = (mp.absolute() for p in paths for mp in dat.DatasetStructureLax(p).meta_paths)
             yield from paths
             return
 
@@ -957,7 +956,6 @@ class Shell(Dispatcher):
     def integration(self):
         from protcur.analysis import protc, Hybrid
         from sparcur import sheets
-        from sparcur import datasets as dat
         #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
         from sparcur.protocols import ProtocolData, ProtcurData
         p, *rest = self._paths

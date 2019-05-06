@@ -66,7 +66,7 @@ class CurationStatusStrict:
         if self.fthing.is_dataset:
             return self.fthing
         else:
-            return DatasetStructure(self.bids_root)
+            return DatasetStructureH(self.bids_root)
 
     @property
     def miss_paths(self):
@@ -240,9 +240,9 @@ class PathData:
     def uri_api(self):
         return self.path.cache.uri_api
 
-    @property
-    def name(self):
-        return self.path.name
+    #@property
+    #def name(self):
+        #return self.path.name
 
     @property
     def _meta(self):
@@ -251,6 +251,7 @@ class PathData:
         if cache is not None:
             return self.path.cache.meta
 
+    """
     @property
     def parent(self):
         if self == self.anchor:
@@ -277,6 +278,7 @@ class PathData:
         for child in self.path.children:
             yield self.__class__(child)
 
+    """
     @property
     def anchor(self):
         if hasattr(self, 'project_path'):
@@ -286,7 +288,7 @@ class PathData:
             return self.__class__(self.project_path)
 
 
-class DatasetStructure(dat.DatasetStructure, PathData):
+class DatasetStructureH(PathData, dat.DatasetStructure):
     """ a homogenous representation """
 
     @property
@@ -492,8 +494,8 @@ class DatasetStructure(dat.DatasetStructure, PathData):
     @property
     def _meta_tables(self):
         yield from (s.t for s in self.submission)
-        yield from (dd.t for dd in self._dataset_description_tables)
-        yield from (s.t for s in self._subjects_tables)
+        yield from (dd.t for dd in self.dataset_description)
+        yield from (s.t for s in self.subjects)
 
     @property
     def meta_sections(self):
@@ -504,7 +506,7 @@ class DatasetStructure(dat.DatasetStructure, PathData):
         yield from self.subjects
 
     @property
-    def errors(self):
+    def __errors(self):  # XXX deprecated
         gen = self.meta_sections
         next(gen)  # skip self
         for thing in gen:
@@ -680,11 +682,6 @@ class __Old:
 class LThing:
     def __init__(self, lst):
         self._lst = lst
-
-
-class FTLax(DatasetStructure):
-    def _abstracted_paths(self, name_prefix, glob_type='rglob'):
-        yield from super()._abstracted_paths(name_prefix, glob_type)
 
 
 class TriplesExport:
@@ -926,8 +923,12 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.datasetdata = DatasetStructure(self.path)
+        self.datasetdata = dat.DatasetStructure(self.path)
         #self.protcur = ProtcurData(self)
+
+    @property
+    def name(self):
+        return self.path.name
 
     @property
     def data(self):
@@ -935,17 +936,18 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
             return self._data
 
         datasetdata = self.datasetdata
-        dataset = datasetdata.dataset
+        dsc = datasetdata.cache.dataset
+        dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
         class Lifters:  # do this to prevent accidental data leaks
             # context
-            id = dataset.id  # in case we are somewhere else
-            name = dataset.name
-            uri_api = dataset.uri_api
-            uri_human = dataset.uri_human
+            id = dsc.id  # in case we are somewhere else
+            name = dsc.name
+            uri_api = dsc.uri_api
+            uri_human = dsc.uri_human
             # dataset metadata
-            submission = property(lambda s: (_ for _ in dataset.submission))
-            dataset_description = property(lambda s: (_ for _ in dataset.dataset_description))
-            subjects = property(lambda s: (_ for _ in dataset.subjects))
+            #submission = property(lambda s: (_ for _ in dataset.submission))
+            #dataset_description = property(lambda s: (_ for _ in dataset.dataset_description))
+            #subjects = property(lambda s: (_ for _ in dataset.subjects))
 
             # protocols
             protocol = self.protocol
@@ -966,7 +968,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         helpers = {}
         helper_key = object()
         lifters = Lifters()
-        sources = dataset.data
+        #sources = dataset.data
         # helper key was bad because it means that pipelines have to
         # know the structure of their helper pipelines and maintain them
         # across changes, better to use the lifters as other pipelines that
@@ -1020,8 +1022,8 @@ class Summary(Integrator):
  
     def __iter__(self):
         """ Return the list of datasets for the organization
-            of the current DatasetStructure regardless of whether that
-            DatasetStructure is itself an organization node """
+            of the current Integrator regardless of whether that
+            Integrator is itself an organization node """
 
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth
