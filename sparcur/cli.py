@@ -802,12 +802,16 @@ class Report(Dispatcher):
 
         data = []
 
+        def dead(p):
+            raise ValueError(p)
+
         for d in dirs:
             if not Path(d).is_dir():
                 continue  # helper files at the top level, and the symlinks that destory python
             path = Path(d).resolve()
             paths = path.rchildren #list(path.rglob('*'))
-            path_meta = {p:p.cache.meta for p in paths}
+            path_meta = {p:p.cache.meta if p.cache else dead(p) for p in paths
+                         if p.suffix not in ('.swp',)}
             outstanding = 0
             total = 0
             tf = 0
