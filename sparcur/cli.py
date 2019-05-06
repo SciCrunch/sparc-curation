@@ -458,7 +458,6 @@ class Main(Dispatcher):
                                                             size_limit_mb=limit)
                             for path in self._not_dirs)
         else:
-            breakpoint()
             for path in self._not_dirs:
                 path.remote.refresh(update_cache=True,
                                     update_data=fetch,

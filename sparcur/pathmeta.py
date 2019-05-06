@@ -171,7 +171,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
 
     @property
     def order_all(self):
-        return self.versions[write_version] + self.extras
+        return self.versions[self.write_version] + self.extras
 
     def encode(self, field, value):
         if field == 'file_id':
@@ -271,9 +271,18 @@ class _PathMetaAsXattrs(_PathMetaConverter):
 
     format_name = 'xattrs'
 
-    fields = ('size', 'created', 'updated',
-              'checksum', 'id', 'file_id', 'old_id',
-              'gid', 'user_id', 'mode', 'errors')
+    fields = ('size',
+              'created',
+              'updated',
+              'checksum',
+              'chunksize',
+              'id',
+              'file_id',
+              'old_id',
+              'gid',
+              'user_id',
+              'mode',
+              'errors')
 
     encoding = 'utf-8'
 
@@ -424,9 +433,18 @@ class _PathMetaAsPretty(_PathMetaConverter):
 
     format_name = 'pretty'
 
-    fields = ('size', 'created', 'updated',
-              'checksum', 'id', 'file_id', 'old_id',
-              'gid', 'user_id', 'mode', 'errors')
+    fields = ('size',
+              'created',
+              'updated',
+              'checksum',
+              'chunksize',
+              'id',
+              'file_id',
+              'old_id',
+              'gid',
+              'user_id',
+              'mode',
+              'errors')
 
     def __init__(self):
         # register functionality on PathMeta

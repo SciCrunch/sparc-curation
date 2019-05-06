@@ -56,6 +56,8 @@ class JEncode(json.JSONEncoder):
             return str(obj)
         elif isinstance(obj, OntId):
             return obj.curie + ',' + obj.label
+        elif isinstance(obj, Path):
+            return obj.as_posix()
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
@@ -93,8 +95,14 @@ class OrcidId(OntId):
     _namespaces = OrcidPrefixes
     __firsts = 'iri',
 
-    class MalformedOrcidError(Exception):
+    class OrcidMalformedError(Exception):
         """ WHAT HAVE YOU DONE!? """
+
+    class OrcidLengthError(OrcidMalformedError):
+        """ wrong length """
+
+    class OrcidChecksumError(OrcidMalformedError):
+        """ failed checksum """
 
     @property
     def checksumValid(self):

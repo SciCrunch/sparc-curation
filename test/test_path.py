@@ -2,7 +2,7 @@ import unittest
 from pathlib import PurePosixPath
 from sparcur.core import FileSize
 from sparcur.paths import AugmentedPath
-from sparcur.paths import SymlinkCache
+from sparcur.paths import SymlinkCache, PrimaryCache
 from sparcur.pathmeta import PathMeta, _PathMetaAsSymlink, _PathMetaAsXattrs
 from .common import project_path, test_base, test_path, TestPathHelper
 from .common import TestLocalPath, TestCachePath, TestRemotePath
@@ -134,3 +134,11 @@ class TestIdZero(TestPathHelper, unittest.TestCase):
         zt = TestLocalPath(test_path) / 'zero-test'
         cache = TestCachePath(zt, meta=PathMeta(id='0'))
         assert cache.meta
+
+
+class TestUpdateMeta(unittest.TestCase):
+    def test_update(self):
+        old = PathMeta(id='0', size=10, file_id=1)
+        new = PathMeta(id='0', size=10, checksum='asdf')
+        merged = PrimaryCache._update_meta(old, new)
+        assert merged == PathMeta(id='0', size=10, file_id=1, checksum='asdf')

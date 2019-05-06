@@ -221,7 +221,7 @@ class RemotePath:
     def _cache_setter(self, cache, update_meta=True):
         cache._remote = self
         if update_meta:
-            cache._meta_setter(self.meta)
+            cache._meta_updater(self.meta)
 
         self._cache = cache
 
@@ -590,7 +590,7 @@ class CachePath(AugmentedPath):
             self._remote = remote
             self._meta_setter(remote.meta)
         elif meta:
-            self._meta_setter(meta)
+            self._meta_updater(meta)
         else:
             if self.meta is None:
                 raise exc.NoCachedMetadataError(self.local)
@@ -703,7 +703,7 @@ class CachePath(AugmentedPath):
                 raise exc.BootstrappingError(f'{self} already has meta!\n{self.meta.as_pretty()}')
 
         if self.exists() and self.meta and self.meta.id == meta.id:
-            self._meta_setter(meta)
+            self._meta_updater(meta)
 
         else:
             # set single use bootstrapping id
@@ -1146,7 +1146,7 @@ class SymlinkCache(CachePath):
                     return
 
                 if meta.id != pathmeta.id:
-                    msg = ('Existing cache id does not match new id! {}.\n'
+                    msg = ('Existing cache id does not match new id!\n'
                            f'{meta.id} != {pathmeta.id}\n'
                            f'{meta.as_pretty()}\n'
                            f'{pathmeta.as_pretty()}')
@@ -1278,6 +1278,43 @@ class PrimaryCache(CachePath):
 
         if hasattr(self, '_id'):
             delattr(self, '_id')
+
+    @staticmethod
+    def _update_meta(old, new):
+        if not old:
+            return new
+
+        if not new:
+            return old
+
+        kwargs = {k:v for k, v in old.items()}
+        if old.id != new.id:
+            kwargs['old_id'] = old.id
+
+        for k, vnew in new.items():
+            vold = kwargs[k]
+
+            if vnew is None or hasattr(vnew, '__iter__') and not vnew:
+                # don't update with None or empty iterables
+                continue
+
+            if vold is not None and vold != vnew:
+                log.info(f'{old.id} field {k} changed from {vold} -> {vnew}')
+
+            kwargs[k] = vnew
+
+        #old.updated == new.updated
+        #old.updated < new.updated
+        #old.updated > new.updated
+
+        #old.created == new.created
+        #old.created < new.created
+        #old.created > new.created
+
+        return PathMeta(**kwargs)
+
+    def _meta_updater(self, pathmeta):
+        self._meta_setter(self._update_meta(self.meta, pathmeta))
 
     @property
     def children(self):

@@ -37,9 +37,9 @@ class Tabular:
                 with open(self.path, 'rt', encoding=encoding) as f:
                     yield from csv.reader(f, delimiter=delimiter)
                 if encoding != 'utf-8':
-                    message = f"encoding bad '{encoding}' '{self.path}'"
-                    log.error(message)
+                    message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
                     self._errors.append(exc.EncodingError(message))
+                    logd.error(message)
                 return
             except UnicodeDecodeError:
                 continue
@@ -407,7 +407,9 @@ class DatasetDescriptionFile(Version1Header):
             elif v == '0':  # FIXME ? someone using strange conventions ...
                 return
             elif len(v) != 19:
-                logd.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                msg = f'orcid wrong length {value!r} {self.t.path.as_posix()!r}'
+                self._errors.append(OrcidId.OrcidLengthError(msg))
+                logd.error(msg)
                 return
 
             v = 'ORCID:' + v
@@ -421,7 +423,9 @@ class DatasetDescriptionFile(Version1Header):
             if not len(numeric):
                 return
             elif len(numeric) != 19:
-                logd.error(f"orcid wrong length '{value}' '{self.t.path}'")
+                msg = f'orcid wrong length {value!r} {self.t.path.as_posix()!r}'
+                self._errors.append(OrcidId.OrcidLengthError(msg))
+                logd.error(msg)
                 return
 
         try:
@@ -429,13 +433,17 @@ class DatasetDescriptionFile(Version1Header):
             orcid = OrcidId(v)
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
-                logd.error(f"orcid failed checksum '{value}' '{self.t.path}'")
+                msg = f'orcid failed checksum {value!r} {self.t.path.as_posix()!r}'
+                self._errors.append(OrcidId.OrcidChecksumError(msg))
+                logd.error(msg)
                 return
 
             yield orcid
 
         except (OntId.BadCurieError, OrcidId.MalformedOrcidError) as e:
-            logd.error(f"orcid malformed '{value}' '{self.t.path}'")
+            msg = f'orcid malformed {value!r} {self.t.path.as_posix()!r}'
+            self._errors.append(OrcidId.OrcidMalformedError(msg))
+            logd.error(msg)
             yield value
 
     def contributor_role(self, value):
@@ -444,6 +452,12 @@ class DatasetDescriptionFile(Version1Header):
 
     def is_contact_person(self, value):
         yield value.lower() == 'yes'
+
+    def protocol_url_or_doi(self, value):
+        for val in value.split(','):
+            v = val.strip()
+            if v:
+                yield v
 
     def keywords(self, value):
         if ';' in value:

@@ -2,6 +2,7 @@ import copy
 import jsonschema
 
 # FIXME these imports should not be here types rules should be set in another way
+from pathlib import Path
 import rdflib
 from pyontutils.core import OntId, OntTerm
 from pysercomb.pyr.units import ProtcParameter
@@ -35,6 +36,7 @@ class JSONSchema(object):
         format_checker = jsonschema.FormatChecker()
         types = dict(array=(list, tuple),
                      string=(str,
+                             Path,
                              rdflib.URIRef,
                              rdflib.Literal,
                              OntId,
@@ -219,9 +221,14 @@ class DatasetDescriptionSchema(JSONSchema):
             'prior_batch_number': {'type': 'string'},
             'title_for_complete_data_set': {'type': 'string'},
             'originating_article_doi': {'type': 'array', 'items': {'type': 'string'}},  # TODO doi matching? maybe types?
-            'protocol_url_or_doi': {'type': 'array',
-                                    'minItems': 1,
-                                    'items': {'type': 'string'}},
+            'protocol_url_or_doi': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {'type': 'string',
+                          'pattern': (r'/((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?'
+                                      r'[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)'
+                                      r'((?:\/[\+~%\/\.\w\-_]*)?\??'
+                                      r'(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/')}},
             'links': {
                 'type': 'array',
                 'minItems': 1,
@@ -314,10 +321,10 @@ class MetaOutSchema(JSONSchema):
     schema['properties'].update({
         'errors': ErrorSchema.schema,
         'uri_human': {'type': 'string',
-                      'pattern': '^https://',  # FIXME proper regex
+                      'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
         },
         'uri_api': {'type': 'string',
-                    'pattern': '^https://',  # FIXME proper regex
+                    'pattern': r'^https://api\.blackfynn\.io/(datasets|packages)/',  # FIXME proper regex
         },
         'award_number': {'type': 'string',
                          'pattern': '^OT|^U18',},

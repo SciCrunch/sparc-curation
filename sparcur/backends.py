@@ -291,7 +291,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             # constructed from a packages query
             # which we need in order for things to be fastish
             self._bfobject = bfobject
-            return
+            return self._bfobject
 
         if isinstance(bfobject, DataPackage):
             def transfer(file, bfobject):
@@ -641,7 +641,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             # and will detect if a parent path has changed
             self.cache.move(remote=self)
 
-        self.cache._meta_setter(self.meta)
+        self.cache._meta_updater(self.meta)
 
     @property
     def data(self):
@@ -674,7 +674,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                         errors=self.errors)
 
     def __eq__(self, other):
-        return self.bfobject == other.bfobject
+        return self.id == other.id and self.file_id == other.file_id
+        #return self.bfobject == other.bfobject
 
     def __repr__(self):
         file_id = f', file_id={self.file_id}' if self.file_id else ''

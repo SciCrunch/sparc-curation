@@ -141,6 +141,7 @@ class ProtocolData:
     def _protocol_uris_resolved(self):
         # FIXME quite slow ...
         for start_uri in self.protocol_uris:
+            log.debug(start_uri)
             for end_uri in resolution_chain(start_uri):
                 pass
             else:

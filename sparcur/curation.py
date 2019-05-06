@@ -451,22 +451,25 @@ class DatasetData(PathData):
             path = next(gen)
             if not path.is_broken_symlink():
                 if path.name[0].isupper():
-                    #breakpoint()
-                    log.warning(f"path has bad casing '{path}'")
+                    msg = f'path has bad casing {str(path)!r}'
+                    self._errors.append(msg)
+                    logd.error(msg)
                 yield path
 
             else:
-                log.error(f"path has not been retrieved '{path}'")
+                log.error(f'path has not been retrieved {str(path)!r}')
 
             for path in gen:
                 if not path.is_broken_symlink():
                     if path.name[0].isupper():
-                        log.warning(f"path has bad casing '{path}'")
+                        msg = f'path has bad casing {str(path)!r}'
+                        self._errors.append(msg)
+                        logd.error(msg)
 
                     yield path
 
                 else:
-                    log.warning(f"path has not been retrieved '{path}'")
+                    log.warning(f'path has not been retrieved {str(path)!r}')
 
         except StopIteration:
             if self.parent is not None and self.parent != self:
@@ -1091,11 +1094,17 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
 
     @property
     def protocol_uris(self):
-        yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
+        try:
+            yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
+        except exc.NoSourcePathError:
+            pass
 
     @property
     def keywords(self):
-        yield from adops.get(self.data, ['meta', 'keywords'])
+        try:
+            yield from adops.get(self.data, ['meta', 'keywords'])
+        except exc.NoSourcePathError:
+            pass
 
     ## sandboxed for triple export
 
