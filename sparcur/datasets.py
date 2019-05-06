@@ -2,6 +2,7 @@ import io
 import csv
 import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
+from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
@@ -11,9 +12,137 @@ from sparcur import validate as vldt
 from sparcur import exceptions as exc
 from sparcur import converters as conv
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, sparc
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc
+from sparcur.paths import Path
 
 a = rdf.type
+
+
+class DatasetStructure(Path):
+    max_childs = 40
+    @property
+    def bids_root(self):
+        # FIXME this will find the first dataset description file at any depth!
+        # this is incorrect behavior!
+        """ Sometimes there is an intervening folder. """
+        if self.cache.is_dataset:
+            def check_fordd(paths, level=0, stop=3):
+                if not paths:  # apparently the empty case recurses forever
+                    return
+
+                if len(paths) > self.max_childs:
+                    log.warning(f'Not globing in a folder with > {self.max_childs} children! '
+                                f'{self.as_posix()!r}')
+                    return
+                dd_paths_all = []
+                children = []
+                for path in paths:
+                    dd_paths = list(path.glob('[Dd]ataset_description*.*'))
+                    if dd_paths:
+                        dd_paths_all.extend(dd_paths)
+                    elif not dd_paths_all:
+                        children.extend([p for p in path.children if p.is_dir()])
+
+                if dd_paths_all:
+                    return dd_paths_all
+                else:
+                    return check_fordd(children, level + 1)
+
+            dd_paths = check_fordd((self,))
+
+            if not dd_paths:
+                #log.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
+                return
+
+            elif len(dd_paths) > 1:
+                #log.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
+                pass
+
+            return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
+
+        elif self.parent:  # organization has no parent
+            return self.parent.bids_root
+
+    def _abstracted_paths(self, name_prefix, glob_type='glob'):
+        """ A bottom up search for the closest file in the parent directory.
+            For datasets, if the bids root and path do not match, use the bids root.
+            In the future this needs to be normalized because the extra code required
+            for dealing with the intervening node is quite annoying to maintain.
+        """
+        path = self
+        if self.cache.is_dataset and self.bids_root is not None and self.bids_root != self:
+            path = self.bids_root
+
+        first = name_prefix[0]
+        cased_np = '[' + first.upper() + first + ']' + name_prefix[1:]  # FIXME warn and normalize
+        glob = getattr(path, glob_type)
+        gen = glob(cased_np + '*.*')
+
+        try:
+            path = next(gen)
+            if not path.is_broken_symlink():
+                if path.name[0].isupper():
+                    msg = f'path has bad casing {path.as_posix()!r}'
+                    self._errors.append(msg)
+                    logd.error(msg)
+                yield path
+
+            else:
+                log.error(f'path has not been retrieved {path.as_posix()!r}')
+
+            for path in gen:
+                if not path.is_broken_symlink():
+                    if path.name[0].isupper():
+                        msg = f'path has bad casing {path.as_posix()!r}'
+                        self._errors.append(msg)
+                        logd.error(msg)
+
+                    yield path
+
+                else:
+                    log.warning(f'path has not been retrieved {path.as_posix()!r}')
+
+        except StopIteration:
+            if (self.cache.parent.meta is not None and
+                self.parent.cache != self.cache.anchor and
+                self.parent != self):
+                yield from getattr(self.parent, name_prefix + '_paths')
+
+    @property
+    def submission_paths(self):
+        yield from self._abstracted_paths('submission')
+
+    @property
+    def dataset_description_paths(self):
+        yield from self._abstracted_paths('dataset_description')
+
+    @property
+    def subjects_paths(self):
+        yield from self._abstracted_paths('subjects')
+
+    @property
+    def samples_paths(self):
+        yield from self._abstracted_paths('samples')
+
+    @property
+    def manifest_paths(self):
+        yield from self._abstracted_paths('manifest', glob_type='rglob')
+
+    @property
+    def data(self):
+        out = {}
+        for section_name in ('submission', 'dataset_description', 'subjects', 'samples', 'manifest'):
+            section_paths_name = section_name + '_paths'
+            section_name += '_file'
+            paths = list(getattr(self, section_paths_name))
+            if paths:
+                if len(paths) == 1:
+                    path, = paths
+                    out[section_name] = path
+                else:
+                    out[section_name] = paths
+
+        return out
 
 
 class Tabular:
@@ -101,13 +230,13 @@ class Version1Header:
     skip_cols = 'metadata_element', 'description', 'example'
     max_one = tuple()
     verticals = dict()  # FIXME should really be immutable
-    schema_class = sc.JSONSchema
+    #schema_class = sc.JSONSchema
 
     class NoDataError(Exception):
         """ FIXME HACK workaround for bad handling of empty sheets in byCol """
 
     def __new__(cls, path):
-        cls.schema = cls.schema_class()
+        #cls.schema = cls.schema_class()
         return super().__new__(cls)
 
     def __init__(self, path):
@@ -263,7 +392,7 @@ class Version1Header:
         return out
 
     @property
-    def data_with_errors(self):
+    def __data_with_errors(self):
         """ data with errors added under the 'errors' key """
         # FIXME TODO regularize this with the DatasetData version
         ok, valid, data = self.schema.validate(copy.deepcopy(self.data))
@@ -329,11 +458,11 @@ class SubmissionFile(Version1Header):
     skip_cols = 'submission_item', 'definition'  # FIXME normalized in version 2
 
     verticals = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
-    schema_class = sc.SubmissionSchema
+    #schema_class = sc.SubmissionSchema
 
-    @hasSchema(sc.SubmissionSchema)
-    def data_test(self):
-        return self.data
+    #@hasSchema(sc.SubmissionSchema)
+    #def data_test(self):
+        #return self.data
 
     @property
     def data(self):
@@ -382,11 +511,11 @@ class DatasetDescriptionFile(Version1Header):
                               'example_image_locator',
                               'example_image_description'),
     }
-    schema_class = sc.DatasetDescriptionSchema
+    #schema_class = sc.DatasetDescriptionSchema
 
-    @hasSchema(sc.DatasetDescriptionSchema)
-    def data_test(self):
-        return super().data
+    #@hasSchema(sc.DatasetDescriptionSchema)
+    #def data_test(self):
+        #return super().data
 
     @property
     def data(self):
@@ -440,7 +569,7 @@ class DatasetDescriptionFile(Version1Header):
 
             yield orcid
 
-        except (OntId.BadCurieError, OrcidId.MalformedOrcidError) as e:
+        except (OntId.BadCurieError, OrcidId.OrcidMalformedError) as e:
             msg = f'orcid malformed {value!r} {self.t.path.as_posix()!r}'
             self._errors.append(OrcidId.OrcidMalformedError(msg))
             logd.error(msg)
@@ -453,11 +582,26 @@ class DatasetDescriptionFile(Version1Header):
     def is_contact_person(self, value):
         yield value.lower() == 'yes'
 
+    def _protocol_url_or_doi(self, value):
+        doi = False
+        if 'doi' in value:
+            doi = True
+        elif value.startswith('10.'):
+            value = 'doi:' + value
+            doi = True
+
+        if doi:
+            value = DoiId(prefix='doi', suffix=normalizeDoi(value))
+        else:
+            value = OntId(value)
+
+        return value
+
     def protocol_url_or_doi(self, value):
         for val in value.split(','):
             v = val.strip()
             if v:
-                yield v
+                yield  self._protocol_url_or_doi(v)
 
     def keywords(self, value):
         if ';' in value:
@@ -493,7 +637,7 @@ class SubjectsFile(Version1Header):
     # subject id varies, so we have to do something a bit different here
     skip_cols = tuple()
     horizontals = {'software':('software', 'software_version', 'software_vendor', 'software_url', 'software_rrid')}
-    schema_class = sc.SubjectsSchema
+    #schema_class = sc.SubjectsSchema
 
     @hasSchema(sc.SubjectsSchema)
     def data_test(self):
@@ -563,10 +707,10 @@ class SubjectsFile(Version1Header):
 
     def mass(self, value):
         yield from self._param(value)
-        
+
     def weight(self, value):
         yield from self._param(value)
-        
+
     def rrid_for_strain(self, value):
         yield value
 

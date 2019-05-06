@@ -19,6 +19,7 @@ from terminaltables import AsciiTable
 from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
 from sparcur import exceptions as exc
+from sparcur import datasets as dat
 from sparcur.core import JT, JEncode, log, logd, lj
 from sparcur.core import sparc, memory, DictTransformer, adops, OntId, OntTerm
 from sparcur.paths import Path
@@ -26,10 +27,7 @@ from sparcur import schemas as sc
 from sparcur import converters as conv
 from sparcur.datasources import OrganData, OntologyData, MembersData
 from sparcur.protocols import ProtocolData, ProtcurData
-from sparcur.datasets import SubmissionFile, DatasetDescriptionFile, SubjectsFile
-from sparcur.schemas import (JSONSchema, ValidationError,
-                             DatasetSchema,
-                             SummarySchema, MetaOutSchema)
+from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
 from sparcur import schemas as sc
 from sparcur import validate as vldt
 from sparcur import pipelines as pipes
@@ -68,7 +66,7 @@ class CurationStatusStrict:
         if self.fthing.is_dataset:
             return self.fthing
         else:
-            return DatasetData(self.bids_root)
+            return DatasetStructure(self.bids_root)
 
     @property
     def miss_paths(self):
@@ -222,7 +220,9 @@ class PathData:
         if isinstance(path, str):
             path = Path(path)
 
-        self.path = path
+        if not hasattr(self, 'path'):
+            self.path = path
+
         self.status = CurationStatusStrict(self)
         self.lax = CurationStatusLax(self)
 
@@ -286,10 +286,12 @@ class PathData:
             return self.__class__(self.project_path)
 
 
-hasSchema = vldt.HasSchema()
-@hasSchema.mark
-class DatasetData(PathData):
+class DatasetStructure(dat.DatasetStructure, PathData):
     """ a homogenous representation """
+
+    @property
+    def path(self):
+        return self
 
     @property
     def is_organization(self):
@@ -340,48 +342,6 @@ class DatasetData(PathData):
         return self._id
 
     @property
-    def bids_root(self):
-        # FIXME this will find the first dataset description file at any depth!
-        # this is incorrect behavior!
-        """ Sometimes there is an intervening folder. """
-        if self.is_dataset:
-            def check_fordd(paths, level=0, stop=3):
-                if not paths:  # apparently the empty case recurses forever
-                    return
-
-                if len(paths) > 20:
-                    log.warning('Not globing in a folder with > 20 children!')
-                    return
-                dd_paths_all = []
-                children = []
-                for path in paths:
-                    dd_paths = list(path.glob('[Dd]ataset_description*.*'))
-                    if dd_paths:
-                        dd_paths_all.extend(dd_paths)
-                    elif not dd_paths_all:
-                        children.extend([p for p in path.children if p.is_dir()])
-
-                if dd_paths_all:
-                    return dd_paths_all
-                else:
-                    return check_fordd(children, level + 1)
-
-            dd_paths = check_fordd((self.path,))
-
-            if not dd_paths:
-                #log.warning(f'No bids root for {self.name} {self.id}')  # logging in a property -> logspam
-                return
-
-            elif len(dd_paths) > 1:
-                #log.warning(f'More than one submission for {self.name} {self.id} {dd_paths}')
-                pass
-
-            return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
-
-        elif self.parent:  # organization has no parent
-            return self.parent.bids_root
-
-    @property
     def dataset_name_proper(self):
         try:
             award = next(iter(set(self.award)))  # FIXME len1? testing?
@@ -430,81 +390,14 @@ class DatasetData(PathData):
             # TODO need to determine the hashing rule for folders
             pass
 
-    def _abstracted_paths(self, name_prefix, glob_type='glob'):
-        """ A bottom up search for the closest file in the parent directory.
-            For datasets, if the bids root and path do not match, use the bids root.
-            In the future this needs to be normalized because the extra code required
-            for dealing with the intervening node is quite annoying to maintain.
-        """
-        path = self.path
-        if self.is_dataset and self.bids_root is not None and self.bids_root != self.path:
-            path = self.bids_root
-        else:
-            path = self.path
-
-        first = name_prefix[0]
-        cased_np = '[' + first.upper() + first + ']' + name_prefix[1:]  # FIXME warn and normalize
-        glob = getattr(path, glob_type)
-        gen = glob(cased_np + '*.*')
-
-        try:
-            path = next(gen)
-            if not path.is_broken_symlink():
-                if path.name[0].isupper():
-                    msg = f'path has bad casing {str(path)!r}'
-                    self._errors.append(msg)
-                    logd.error(msg)
-                yield path
-
-            else:
-                log.error(f'path has not been retrieved {str(path)!r}')
-
-            for path in gen:
-                if not path.is_broken_symlink():
-                    if path.name[0].isupper():
-                        msg = f'path has bad casing {str(path)!r}'
-                        self._errors.append(msg)
-                        logd.error(msg)
-
-                    yield path
-
-                else:
-                    log.warning(f'path has not been retrieved {str(path)!r}')
-
-        except StopIteration:
-            if self.parent is not None and self.parent != self:
-                yield from getattr(self.parent, name_prefix + '_paths')
-
-    @property
-    def manifest_paths(self):
-        gen = self.path.glob('manifest*.*')
-        try:
-            yield next(gen)
-            yield from gen
-        except StopIteration:
-            if self.parent is not None:
-                yield from self.parent.manifest_paths
-
-    @property
-    def submission_paths(self):
-        yield from self._abstracted_paths('submission')
-        return
-        gen = self.path.rglob('submission*.*')
-        try:
-            yield next(gen)
-            yield from gen
-        except StopIteration:
-            if self.parent is not None:
-                yield from self.parent.submission_paths
-
     @property
     def _submission_objects(self):
         for p in self.submission_paths:
             try:
-                miss = SubmissionFile(p)
+                miss = dat.SubmissionFile(p)
                 if miss.data:
                     yield miss
-            except SubmissionFile.NoDataError as e:
+            except dat.SubmissionFile.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -518,14 +411,9 @@ class DatasetData(PathData):
         yield from self._subm_cache
 
     @property
-    def dataset_description_paths(self):
-        yield from self._abstracted_paths('dataset_description')
-        #yield from self.path.glob('dataset_description*.*')
-
-    @property
     def _dd(self):
         for p in self.dataset_description_paths:
-            yield DatasetDescriptionFile(p)
+            yield dat.DatasetDescriptionFile(p)
 
     @property
     def _dataset_description_objects(self):
@@ -533,10 +421,10 @@ class DatasetData(PathData):
             #yield from DatasetDescription(t)
             # TODO export adapters for this ... how to recombine and reuse ...
             try:
-                dd = DatasetDescriptionFile(p)
+                dd = dat.DatasetDescriptionFile(p)
                 if dd.data:
                     yield dd
-            except DatasetDescriptionFile.NoDataError as e:
+            except dat.DatasetDescriptionFile.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -550,19 +438,14 @@ class DatasetData(PathData):
         yield from self._dd_cache
 
     @property
-    def subjects_paths(self):
-        yield from self._abstracted_paths('subjects')
-        #yield from self.path.glob('subjects*.*')
-
-    @property
     def _subjects_objects(self):
         """ really subjects_file """
         for path in self.subjects_paths:
             try:
-                sf = SubjectsFile(path)
+                sf = dat.SubjectsFile(path)
                 if sf.data:
                     yield sf
-            except DatasetDescriptionFile.NoDataError as e:
+            except dat.DatasetDescriptionFile.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -597,10 +480,6 @@ class DatasetData(PathData):
                     out[section_name] = tp
 
         return out
-
-    @hasSchema(sc.DatasetSchema)
-    def data(self):
-        return self.data_lift
 
     @property
     def meta_paths(self):
@@ -707,12 +586,21 @@ class DatasetData(PathData):
 
     def __eq__(self, other):
         # TODO order by status
+        if self.path is self:
+            return super().__eq__(other.path)
+
         return self.path == other.path
 
     def __gt__(self, other):
+        if self.path is self:
+            return super().__gt__(other.path)
+
         return self.path > other.path
 
     def __lt__(self, other):
+        if self.path is self:
+            return super().__lt__(other.path)
+
         return self.path < other.path
 
     def __hash__(self):
@@ -794,7 +682,7 @@ class LThing:
         self._lst = lst
 
 
-class FTLax(DatasetData):
+class FTLax(DatasetStructure):
     def _abstracted_paths(self, name_prefix, glob_type='rglob'):
         yield from super()._abstracted_paths(name_prefix, glob_type)
 
@@ -1001,7 +889,7 @@ class TriplesExport:
 
 
 class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurData):
-    """ pull everything together anchored to the DatasetData """
+    """ pull everything together anchored to the DatasetStructure """
     # note that mro means that we have to run methods backwards
     # so any class that uses something produced by a function
     # of an earlier class needs to be further down the mro so
@@ -1038,7 +926,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.datasetdata = DatasetData(self.path)
+        self.datasetdata = DatasetStructure(self.path)
         #self.protcur = ProtcurData(self)
 
     @property
@@ -1087,9 +975,9 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         # all the prior existing data is not a bad one, it just just that it
         # is better to create objects that can take the information already
         # in the data for the current pipeline and return an expanded verion
-        pipeline = pipes.PipelineExtras(dataset, lifters, RuntimeContext())
+        self.pipeline = pipes.PipelineExtras(dataset, lifters, RuntimeContext())
 
-        self._data = pipeline.data
+        self._data = self.pipeline.data
         return self._data
 
     @property
@@ -1112,7 +1000,8 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
     def subjects(self):  # XXX
         yield from self.datasetdata.subjects
 
-
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
 class Summary(Integrator):
     """ A class that summarizes members of its __base__ class """
     #schema_class = MetaOutSchema  # FIXME clearly incorrect
@@ -1131,8 +1020,8 @@ class Summary(Integrator):
  
     def __iter__(self):
         """ Return the list of datasets for the organization
-            of the current DatasetData regardless of whether that
-            DatasetData is itself an organization node """
+            of the current DatasetStructure regardless of whether that
+            DatasetStructure is itself an organization node """
 
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth

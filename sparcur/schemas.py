@@ -113,7 +113,7 @@ class ErrorSchema(JSONSchema):
               'items': {'type': 'object'},}
 
 
-class DatasetSchema(JSONSchema):
+class DatasetStructureSchema(JSONSchema):
     schema = {'type': 'object',
               'required': ['submission_file', 'dataset_description_file', 'subjects_file'],
               'properties': {'submission_file': {'type': 'string'},
@@ -357,7 +357,7 @@ class DatasetOutSchema(JSONSchema):
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
 
-    schema = copy.deepcopy(DatasetSchema.schema)
+    schema = copy.deepcopy(DatasetStructureSchema.schema)
     schema['required'] = ['id', 'meta', 'contributors', 'subjects']
     schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},

@@ -2,7 +2,46 @@ import re
 from functools import wraps
 from sparcur import schemas as sc
 from sparcur.core import python_identifier
-from scibot.utils import mproperty
+
+class hproperty:
+    def __init__(self, fget=None, fset=None, fdel=None, doc=None):
+        self.fget = fget
+        self.fset = fset
+        self.fdel = fdel
+        if doc is None and fget is not None:
+            doc = fget.__doc__
+        self.__doc__ = doc
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+
+        if self.fget is None:
+            raise AttributeError("unreadable attribute")
+
+        return self.fget(obj)
+
+    def __set__(self, obj, value):
+        if self.fset is None:
+            raise AttributeError("can't set attribute")
+
+        self.fset(obj, value)
+
+    def __delete__(self, obj):
+        if self.fdel is None:
+            raise AttributeError("can't delete attribute")
+
+        self.fdel(obj)
+
+    def getter(self, fget):
+        return type(self)(fget, self.fset, self.fdel, self.__doc__)
+
+    def setter(self, fset):
+        return type(self)(self.fget, fset, self.fdel, self.__doc__)
+
+    def deleter(self, fdel):
+        return type(self)(self.fget, self.fset, fdel, self.__doc__)
+
 
 class HasSchema:
     """ decorator for classes with methods whose output can be validated by jsonschema """
@@ -19,7 +58,7 @@ class HasSchema:
             # FIXME probably better to do this as types
             # and check that schemas match at class time
             cls._pipeline_start = cls.pipeline_start
-            @mproperty
+            @hproperty
             def pipeline_start(self, schema=self.input_schema, fail=self.fail):
                 data = self._pipeline_start
                 ok, norm_or_error, data = schema.validate(data)
@@ -48,7 +87,7 @@ class HasSchema:
         # TODO switch for normalized output if value passes?
         schema = schema_class()
         def decorator(function):
-            @mproperty
+            @hproperty
             @wraps(function)
             def schema_wrapped_property(_self):
                 data = function(_self)

@@ -10,9 +10,8 @@ from joblib import Memory
 from pathlib import Path
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
-from pysercomb.pyr.units import ProtcParameter
-from pyontutils.core import OntId
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
+from pysercomb.pyr.units import ProtcParameter
 from sparcur import exceptions as exc
 from sparcur.config import config
 from functools import wraps
@@ -54,6 +53,8 @@ class JEncode(json.JSONEncoder):
             return list(obj)
         elif isinstance(obj, ProtcParameter):
             return str(obj)
+        elif [type_ for type_ in (OrcidId, DoiId) if isinstance(obj, type_)]:
+            return obj.iri
         elif isinstance(obj, OntId):
             return obj.curie + ',' + obj.label
         elif isinstance(obj, Path):
@@ -77,6 +78,23 @@ def zipeq(*iterables):
             raise TypeError('Lengths do not match!')
 
         yield zipped
+
+
+class DoiPrefixes(oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+DoiPrefixes({'DOI':'https://doi.org/',
+             'doi':'https://doi.org/',})
+
+
+class DoiId(OntId):
+    _namespaces = DoiPrefixes
+    __firsts = 'iri',
 
 
 class OrcidPrefixes(oq.OntCuries):
@@ -121,7 +139,7 @@ class OrcidId(OntId):
             result = (12 - remainder) % 11
             return result == check
         except ValueError as e:
-            raise self.MalformedOrcidError(self) from e
+            raise self.OrcidChecksumError(self) from e
 
 
 class JTList:
@@ -499,7 +517,7 @@ class AtomicDictOperations:
             source = source[source_key]
 
             if source != data:  # this should .. always happen ???
-                source = copy.deepcopy(source)
+                source = copy.deepcopy(source)  # FIXME this will mangle types e.g. OntId -> URIRef
                 # copy first then modify means we need to deepcopy these
                 # otherwise we would delete original forms that were being
                 # saved elsewhere in the schema for later

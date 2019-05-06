@@ -112,6 +112,7 @@ class MetaConverter(TripleConverter):
     ]
 
     def protocol_url_or_doi(self, value):
+        doi = False
         if 'doi' in value:
             doi = True
         elif value.startswith('10.'):

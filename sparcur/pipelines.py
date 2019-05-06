@@ -18,17 +18,28 @@ class PrePipeline(Pipeline):
     """ base for pre-json pipelines """
 
 
-class FilePipeline(PrePipeline):
+class PathPipeline(PrePipeline):
     # FIXME this is a temporary solution to reuse the conversion existing
     data_transformer_class = None
     def __init__(self, previous_pipeline, lifters, runtime_context):
         log.debug(lj(previous_pipeline.data))
-        self.path = Path(previous_pipeline.data['path'])
+        if isinstance(previous_pipeline, Path):
+            path = previous_pipeline
+        else:
+            path = previous_pipeline.data['path']  # we already caught the duplicate error
+
+        if isinstance(path, list):
+            path, *_ = path
+
+        self.path = path
+
+    @property
+    def _transformer(self):
+        return self.data_transformer_class(self.path)
 
     @property
     def transformed(self):
-        dt = self.data_transformer_class(self.path)
-        return dt.data
+        return self._transformer.data
 
     # @hasSchema(sc.TransformerSchema)
     @property  # transformer out schema goes here
@@ -38,7 +49,18 @@ class FilePipeline(PrePipeline):
 
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
-class SubmissionFilePipeline(FilePipeline):
+class DatasetStructurePipeline(PathPipeline):
+
+    data_transformer_class = dat.DatasetStructure
+
+    @hasSchema(sc.DatasetStructureSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
+class SubmissionFilePipeline(PathPipeline):
 
     data_transformer_class = dat.SubmissionFile
 
@@ -49,7 +71,7 @@ class SubmissionFilePipeline(FilePipeline):
 
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
-class DatasetDescriptionFilePipeline(FilePipeline):
+class DatasetDescriptionFilePipeline(PathPipeline):
 
     data_transformer_class = dat.DatasetDescriptionFile
 
@@ -60,7 +82,7 @@ class DatasetDescriptionFilePipeline(FilePipeline):
 
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
-class SubjectsFilePipeline(FilePipeline):
+class SubjectsFilePipeline(PathPipeline):
 
     data_transformer_class = dat.SubjectsFile
 
@@ -107,6 +129,9 @@ class JSONPipeline(Pipeline):
             previous_pipeline = self.previous_pipeline_class(previous_pipeline,
                                                              lifters,
                                                              runtime_context)
+
+        if not isinstance(previous_pipeline, Pipeline):
+            raise TypeError(f'{previous_pipeline} is not a Pipeline!')
 
         self.previous_pipeline = previous_pipeline
         self.lifters = lifters
@@ -216,6 +241,8 @@ hasSchema = vldt.HasSchema()
 @hasSchema.mark
 class SPARCBIDSPipeline(JSONPipeline):
     #lifts = section_pipelines('submission', 'dataset_description', 'subjects')
+
+    previous_pipeline_class = DatasetStructurePipeline
 
     subpipelines = [
         [[[['submission_file'], ['path']]],
