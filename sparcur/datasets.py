@@ -2,6 +2,7 @@ import io
 import csv
 import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
+from terminaltables import AsciiTable
 from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
@@ -209,7 +210,13 @@ class Tabular(HasErrors):
         for encoding in ('utf-8', 'latin-1'):
             try:
                 with open(self.path, 'rt', encoding=encoding) as f:
-                    yield from csv.reader(f, delimiter=delimiter)
+                    for row in csv.reader(f, delimiter=delimiter):
+                        if row:
+                            yield row
+                        else:
+                            message = f'empty row in {self.path.as_posix()!r}'
+                            self.addError(message)
+                            logd.error(message)
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
                     self.addError(exc.EncodingError(message))
@@ -271,8 +278,8 @@ class Tabular(HasErrors):
 
     def __repr__(self):
         limit = 30
-        ft = DatasetData(self.path)
-        title = f'{self.path.name:>40}' + ft.dataset.id + ' ' + ft.dataset.name
+        path = Path(self.path)
+        title = f'{self.path.name:>40}' + path.cache.dataset.id + ' ' + path.cache.dataset.name
         return AsciiTable([[c[:limit] + ' ...' if isinstance(c, str)
                             and len(c) > limit else c
                             for c in r] for r in self],
@@ -724,21 +731,3 @@ class SubjectsFile(Version1Header):
 
     def triples_gen(self, prefix_func):
         """ NOTE the subject is LOCAL """
-        for i, subject in enumerate(self):
-            converter = conv.SubjectConverter(subject)
-            if 'subject_id' in subject:
-                s_local = subject['subject_id']
-            else:
-                s_local = f'local-{i + 1}'  # sigh
-
-            s = prefix_func(s_local)
-            yield s, a, owl.NamedIndividual
-            yield s, a, sparc.Subject
-            yield from converter.triples_gen(s)
-            continue
-            for field, value in subject.items():
-                convert = getattr(converter, field, None)
-                if convert is not None:
-                    yield (s, *convert(value))
-                elif field not in converter.known_skipped:
-                    log.warning(f'Unhandled subject field: {field}')

@@ -172,4 +172,5 @@ class ProtocolData:
         if resp.ok:
             return j
         else:
-            log.error(f"protocol no access {uri} '{self.datasetdata.dataset.id if self.datasetdata else self.id}'")
+            log.error(f'protocol no access {uri} '
+                      f'{self.datasetdata.cache.dataset.id if self.datasetdata else self.id!r}')

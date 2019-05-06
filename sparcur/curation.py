@@ -826,11 +826,35 @@ class TriplesExport:
             return s
 
         yield from id_(self.id)
-        for subjects in self.subjects:
-            for s, p, o in subjects.triples_gen(subject_id):
+
+        def triples_gen(prefix_func, subjects):
+
+            for i, subject in enumerate(subjects):
+                converter = conv.SubjectConverter(subject)
+                if 'subject_id' in subject:
+                    s_local = subject['subject_id']
+                else:
+                    s_local = f'local-{i + 1}'  # sigh
+
+                s = prefix_func(s_local)
+                yield s, a, owl.NamedIndividual
+                yield s, a, sparc.Subject
+                yield from converter.triples_gen(s)
+                continue
+                for field, value in subject.items():
+                    convert = getattr(converter, field, None)
+                    if convert is not None:
+                        yield (s, *convert(value))
+                    elif field not in converter.known_skipped:
+                        log.warning(f'Unhandled subject field: {field}')
+
+        yield from triples_gen(subject_id, self.subjects)
+
+        #for subjects in self.subjects:
+            #for s, p, o in subjects.triples_gen(subject_id):
                 #if type(s) == str:
                     #breakpoint()
-                yield s, p, o
+                #yield s, p, o
 
         yield from self.ddt(data)
 

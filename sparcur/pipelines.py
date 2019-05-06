@@ -38,7 +38,13 @@ class PathPipeline(PrePipeline):
 
     @property
     def _transformer(self):
-        return self.data_transformer_class(self.path)
+        try:
+            return self.data_transformer_class(self.path)
+        except TypeError as e:
+            log.exception(e)
+            class NoData:  # FIXME
+                data = {}
+            return NoData
 
     @property
     def transformed(self):
