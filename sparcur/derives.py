@@ -6,7 +6,7 @@ from sparcur import normalization as nml
 from sparcur.core import log, logd
 
 
-def collect(*oops, unpacked=False):
+def collect(*oops, unpacked=True):
     def decorator(generator_function):
         @wraps(generator_function)
         def inner(*args, **kwargs):
@@ -52,8 +52,8 @@ class Derives:
                 yield cont
 
     @staticmethod
-    def award_number(raw_award_number, funding) -> Tuple[str]:
-        return nml.NormAward(nml.NormAward(raw_award_number)),
+    def award_number(raw_award_number, funding) -> str:
+        return nml.NormAward(nml.NormAward(raw_award_number))
 
     def _old_an():
         # old ... # but these do show that we need multi-source derives
@@ -78,7 +78,7 @@ class Derives:
 
     @staticmethod
     @collect
-    def principal_investigator(contributors):
+    def __principal_investigator(contributors):
         mp = 'contributor_role'
         os = ('PrincipalInvestigator',)
         for contributor in contributors:
@@ -111,9 +111,9 @@ class Derives:
                 out.add(subject['species'])
 
         if len(out) == 1:
-            return next(iter(out)),
+            return next(iter(out))
 
-        return tuple(out),
+        return tuple(out)
 
     @staticmethod
     def submission_completeness_index(schema, subschemas, inputs):

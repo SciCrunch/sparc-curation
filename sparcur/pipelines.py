@@ -102,6 +102,17 @@ class SubjectsFilePipeline(PathPipeline):
 
 hasSchema = vldt.HasSchema()
 @hasSchema.mark
+class SamplesFilePipeline(PathPipeline):
+
+    data_transformer_class = dat.SamplesFile
+
+    @hasSchema(sc.SubjectsSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = vldt.HasSchema()
+@hasSchema.mark
 class JSONPipeline(Pipeline):
     # we can't quite do this yet, but these pipelines are best composed
     # by subclassing and then using super().previous_step to insert another
@@ -265,6 +276,10 @@ class SPARCBIDSPipeline(JSONPipeline):
         [[[['subjects_file'], ['path']]],
          SubjectsFilePipeline,
          ['subjects_file']],
+
+        [[[['samples_file'], ['path']]],
+         SubjectsFilePipeline,
+         ['samples_file']],
     ]
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
@@ -295,7 +310,7 @@ class SPARCBIDSPipeline(JSONPipeline):
 
     derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
                  ['inputs', 'dataset_description_file', 'funding']],
-                Derives.award_number,
+                DT.BOX(De.award_number),
                 [['meta', 'award_number']]],
 
                [[['contributors']],
@@ -306,29 +321,29 @@ class SPARCBIDSPipeline(JSONPipeline):
                 []],
 
                [[['contributors']],
-                (lambda cs: [JPointer('/contributors/{i}') for i, c in enumerate(cs)
-                            if ('PrincipalInvestigator' in c['contributor_role']
-                                if 'contributor_role' in c else False)]),  # ah lambda and commas ...
+                DT.BOX(lambda cs: [JPointer(f'/contributors/{i}') for i, c in enumerate(cs)
+                                   if (('PrincipalInvestigator' in c['contributor_role'])
+                                       if 'contributor_role' in c else False)]),  # ah lambda and commas ...
                 [['meta', 'principal_investigator']]],
 
                [[['contributors']],
-                Derives.creators,
+                DT.BOX(De.creators),
                 [['creators']]],
 
                [[['contributors']],
-                lambda v: (len(v),),
+                DT.BOX(len),
                 [['meta', 'contributor_count']]],
 
                [[['subjects']],
-                Derives.dataset_species,
+                DT.BOX(De.dataset_species),
                 [['meta', 'species']]],
 
                [[['subjects']],
-                lambda v: (len(v),),
+                DT.BOX(len),
                 [['meta', 'subject_count']]],
 
                [[['samples']],
-                 lambda v: (len(v),),
+                DT.BOX(len),
                 [['meta', 'sample_count']]],
     )
 

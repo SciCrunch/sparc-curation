@@ -98,3 +98,7 @@ class NoRemoteFileWithThatIdError(SparCurError):
     """ the file you are trying to reach has been disconnected """
 
 
+class LengthMismatchError(SparCurError):
+    """ lenghts of iterators for a zipeq do not match """
+
+

@@ -94,7 +94,7 @@ from sparcur import config
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, python_identifier, FileSize
+from sparcur.core import JT, log, logd, python_identifier, FileSize, JPointer
 from sparcur.core import OntTerm, get_all_errors, DictTransformer as DT
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.derives import Derives as De

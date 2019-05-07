@@ -30,10 +30,10 @@ class HasErrors:
             #except BaseException as e2:
                 #raise e2 from e
 
-        self._errors = []
+        self._errors = set()
 
     def addError(self, error):
-        self._errors.append(error)
+        self._errors.add(error)
 
     @property
     def errors(self):
@@ -632,13 +632,15 @@ class SubjectsFile(Version1Header):
                                'software_url',
                                'software_rrid')}
 
+    dict_key = 'subjects'
+
     @property
     def _data(self):
         return super().data
 
     @property
     def data(self):
-        out = {'subjects': list(self)}
+        out = {self.dict_key: list(self)}
         for k, heads in self.horizontals.items():
             # TODO make sure we actually check that the horizontal
             # isn't used by someone else already ... shouldn't be
@@ -731,3 +733,8 @@ class SubjectsFile(Version1Header):
 
     def triples_gen(self, prefix_func):
         """ NOTE the subject is LOCAL """
+
+class SamplesFile(SubjectsFile):
+    """ TODO ... """
+    to_index ='sample_id'
+    dict_key = 'samples'

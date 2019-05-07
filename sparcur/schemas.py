@@ -120,6 +120,8 @@ def _format_jsonschema_error(error):
 
 metadata_filename_pattern = r'^[a-z_\/]+\.(xlsx|csv|tsv|json)$'
 
+simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
+
 
 class ErrorSchema(JSONSchema):
     schema = {'type':'array',
@@ -138,6 +140,7 @@ class DatasetStructureSchema(JSONSchema):
                                                'pattern': metadata_filename_pattern},
                              'samples_file': {'type': 'string',
                                               'pattern': metadata_filename_pattern},
+                             'errors': ErrorSchema.schema,
               }}
 
 
@@ -245,10 +248,7 @@ class DatasetDescriptionSchema(JSONSchema):
                 'type': 'array',
                 'minItems': 1,
                 'items': {'type': 'string',
-                          'pattern': (r'/((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?'
-                                      r'[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)'
-                                      r'((?:\/[\+~%\/\.\w\-_]*)?\??'
-                                      r'(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/')}},
+                          'pattern': simple_url_pattern}},
             'links': {
                 'type': 'array',
                 'minItems': 1,

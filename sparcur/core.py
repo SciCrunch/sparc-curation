@@ -75,7 +75,9 @@ def zipeq(*iterables):
 
     for zipped in gen:
         if sentinel in zipped:
-            raise TypeError('Lengths do not match!')
+            raise exc.LengthMismatchError('Lengths do not match! '
+                                          'Did you remember to box your function?\n'
+                                          f'{iterables}')
 
         yield zipped
 
@@ -422,7 +424,8 @@ class AtomicDictOperations:
             else:
                 logd.debug(e)
                 return failure_value
-
+        except exc.LengthMismatchError as e:
+            raise e
 
     @staticmethod
     def add(data, target_path, value, fail_on_exists=True, update=False):
@@ -539,6 +542,20 @@ adops = AtomicDictOperations()
 
 class _DictTransformer:
     """ transformations from rules """
+
+    @staticmethod
+    def BOX(function):
+        """ Combinator that takes a function and returns a version of
+            that function whose return value is boxed as a tuple.
+            This makes it _much_ easier to understand what is going on
+            rather than trying to count commas when trying to count
+            how many return values are needed for a derive function """
+
+        @wraps(function)
+        def boxed(*args, **kwargs):
+            return function(*args, **kwargs),
+
+        return boxed
 
     @staticmethod
     def add(data, adds):
