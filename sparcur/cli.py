@@ -362,9 +362,15 @@ class Main(Dispatcher):
         only = tuple()
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         dirs = self.directories
-        # FIXME folder moves!
+        cwd = Path.cwd()
+        if self.project_path.parent.name == 'big':
+            skip = self.skip
+            only = self.skip_big
+        else:
+            skip = self.skip_big + self.skip
+
         if not dirs:
-            dirs = Path.cwd(),
+            dirs = cwd,
 
         for d in dirs:
             if self.options.empty:
@@ -378,11 +384,14 @@ class Main(Dispatcher):
                 r = d.remote
                 r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
                 d = r.local  # in case a folder moved
-                d.remote.bootstrap(recursive=recursive, only=only, skip=self.skip)
+                d.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
     ###
     skip = (
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
+        )
+
+    skip_big = (
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
             'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
             #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
