@@ -302,6 +302,9 @@ class FileSize(int):
         else:
             return '??'  # sigh
 
+    def __repr__(self):
+        return f'{self.__class__.__name__} <{self.hr} {self}>'
+
 
 _type_order = (
     bool, int, float, bytes, str, tuple, list, set, dict, object, type, None

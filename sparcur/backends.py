@@ -699,6 +699,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         if update_data and self.is_file():
             self.cache.fetch(size_limit_mb=size_limit_mb)
 
+        return self.cache  # when a cache calls refresh it needs to know if it no longer exists
+
     def update_cache(self):
         log.debug(f'updating cache for {self.name}')
         if self.cache.name != self.name:  # this is localy correct

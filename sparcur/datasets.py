@@ -4,7 +4,7 @@ import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
 from scibot.extract import normalizeDoi
-from pyontutils.utils import byCol
+from pyontutils.utils import byCol, Async, deferred
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from pysercomb.pyr.units import ProtcParameterParser
@@ -13,7 +13,7 @@ from sparcur import validate as vldt
 from sparcur import exceptions as exc
 from sparcur import converters as conv
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc, FileSize
 from sparcur.paths import Path
 
 a = rdf.type
@@ -61,6 +61,51 @@ class DatasetStructure(Path, HasErrors):
     rglobs = 'manifest',
     default_glob = 'glob'
     max_childs = 40
+
+    @property
+    def counts(self):
+        if not hasattr(self, '_counts'):
+            size = 0
+            dirs = 0
+            files = 0
+            need_meta = []
+            for c in self.rchildren:  # FIXME hidden folders
+                if c.is_dir():
+                    dirs += 1
+                else:
+                    files += 1  # testing for broken symlinks is hard
+                    maybe_size = c.cache.meta.size
+                    if maybe_size is None:
+                        need_meta.append(c)
+                    else:
+                        size += maybe_size
+
+            if need_meta:
+                log.info(f'fetching {len(need_meta)} files with missing metadata')
+                new_caches = Async(rate=8)(deferred(c.cache.refresh)() for c in need_meta)
+                for c in new_caches:  # FIXME first time around meta doesn't get updated ??
+                    size += c.meta.size
+
+            self._counts = dict(size=FileSize(size), dirs=dirs, files=files)
+
+        return self._counts
+
+    @property
+    def total_size(self):
+        """ total remote size, trigger retrieval of all remote metadata """
+        return self.counts['size']
+
+    @property
+    def total_dirs(self):
+        return self.counts['dirs']
+
+    @property
+    def total_files(self):
+        return self.counts['files']
+
+    @property
+    def total_paths(self):
+        return self.counts['dirs'] + self.counts['files']
 
     @property
     def bids_root(self):
@@ -164,7 +209,7 @@ class DatasetStructure(Path, HasErrors):
 
     @property
     def data(self):
-        out = {}
+        out = self.counts
         for section_name in self.sections:
             #section_paths_name = section_name + '_paths'
             #paths = list(getattr(self, section_paths_name))

@@ -6,8 +6,8 @@ Usage:
     spc refresh [options] [<path>...]
     spc fetch [options] [<path>...]
     spc annos [export shell]
-    spc report size [options] [<directory>...]
-    spc report [completeness filetypes keywords subjects errors test] [options]
+    spc report tofetch [options] [<directory>...]
+    spc report [completeness filetypes keywords subjects errors size test] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -165,7 +165,7 @@ class Main(Dispatcher):
 
         if (self.options.clone or
             self.options.meta or
-            self.options.size or
+            self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
             self.options.pretend):
             # short circuit since we don't know where we are yet
@@ -803,7 +803,7 @@ class Report(Dispatcher):
         else:
             return lambda kv: kv
 
-    def size(self, dirs=None):
+    def tofetch(self, dirs=None):
         if dirs is None:
             dirs = self.options.directory
             if not dirs:
@@ -920,6 +920,12 @@ class Report(Dispatcher):
                     for dataset in self.summary]
         rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
         return self._print_table(rows, title='Keywords Report')
+
+    def size(self):
+        rows = [['dataset', 'id', 'dirs', 'files', 'size', 'hr'],
+                *sorted([[d.name, d.id, c['dirs'], c['files'], c['size'], c['size'].hr]
+                         for d in self.summary for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
+        return self._print_table(rows, title='Size Report')
 
     def test(self):
         rows = [['hello', 'world'], [1, 2]]

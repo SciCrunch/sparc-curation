@@ -392,6 +392,9 @@ class MetaOutSchema(JSONSchema):
                       'contributor_count',
                       'uri_human',
                       'uri_api',
+                      'total_size',
+                      'total_files',
+                      'total_folders',
                       #'subject_count',
                       #'sample_count',
     ]

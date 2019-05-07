@@ -950,6 +950,14 @@ class CachePath(AugmentedPath):
         else:
             raise BaseException('multiple candidates!')
 
+    def refresh(self):
+        new = self.remote.refresh(update_cache=True)
+        if new is not None:
+            return new
+        else:
+            log.warning(f'No remote metadata was found for {self}')
+            return self
+
     def fetch(self, size_limit_mb=2):
         """ bypass remote to fetch directly based on stored meta """
         meta = self.meta
