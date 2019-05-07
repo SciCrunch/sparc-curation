@@ -292,6 +292,9 @@ class SPARCBIDSPipeline(JSONPipeline):
               [['submission_file',], ['inputs', 'submission_file']],
               [['samples_file',], ['inputs', 'samples_file']],
               [['manifest_file',], ['inputs', 'manifest_file']],
+              [['dirs',], ['meta', 'dirs']],  # FIXME not quite right ...
+              [['files',], ['meta', 'files']],
+              [['size',], ['meta', 'size']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'species',  # TODO validate all source paths against schema
                         'organ',
