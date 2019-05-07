@@ -69,7 +69,13 @@ class DatasetStructure(Path, HasErrors):
             dirs = 0
             files = 0
             need_meta = []
-            for c in self.rchildren:  # FIXME hidden folders
+            if not self.is_dir():
+                gen = self,
+
+            else:
+                gen = self.rchildren
+
+            for c in gen:
                 if c.is_dir():
                     dirs += 1
                 else:
@@ -81,7 +87,7 @@ class DatasetStructure(Path, HasErrors):
                         size += maybe_size
 
             if need_meta:
-                log.info(f'fetching {len(need_meta)} files with missing metadata')
+                log.info(f'refreshing {len(need_meta)} files with missing metadata')
                 new_caches = Async(rate=8)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
                     size += c.meta.size

@@ -6,8 +6,9 @@ Usage:
     spc refresh [options] [<path>...]
     spc fetch [options] [<path>...]
     spc annos [export shell]
+    spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
-    spc report [completeness filetypes keywords subjects errors size test] [options]
+    spc report [completeness filetypes keywords subjects errors test] [options]
     spc tables [<directory>...]
     spc missing
     spc xattrs
@@ -125,7 +126,7 @@ class Options(clif.Options):
 class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
                  '.~lock',)
-    def _print_table(self, rows, title=None):
+    def _print_table(self, rows, title=None, align=None):
         if self.options.tab_table:
             if title:
                 print(title)
@@ -133,7 +134,14 @@ class Dispatcher(clif.Dispatcher):
         elif self.options.server:
             return render_table(rows[1:], *rows[0]), title
         else:
-            print(AsciiTable(rows, title=title).table)
+            table = AsciiTable(rows, title=title)
+            if align:
+                assert len(align) == len(rows[0])
+                table.justify_columns = {i:('left' if v == 'l'
+                                            else ('center' if v == 'c'
+                                                  else ('right' if v == 'r' else 'left')))
+                                         for i, v in enumerate(align)}
+            print(table.table)
 
     def _print_paths(self, paths, title=None):
         if self.options.sort_size_desc:
@@ -152,7 +160,13 @@ class Dispatcher(clif.Dispatcher):
 
 
 class Main(Dispatcher):
-    child_port_attrs = 'anchor', 'project_path', 'project_id', 'bfl', 'summary'
+    child_port_attrs = ('anchor',
+                        'project_path',
+                        'project_id',
+                        'bfl',
+                        'summary',
+                        'cwd',
+                        'cwdintr')
     # things all children should have
     # kind of like a non optional provides you WILL have these in your namespace
     def __init__(self, options):
@@ -162,6 +176,8 @@ class Main(Dispatcher):
             logd.setLevel('INFO')
 
         Integrator.no_google = self.options.no_google
+        self.cwd = Path.cwd()
+        self.cwdintr = Integrator(self.cwd)
 
         if (self.options.clone or
             self.options.meta or
@@ -922,10 +938,16 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Keywords Report')
 
     def size(self):
-        rows = [['dataset', 'id', 'dirs', 'files', 'size', 'hr'],
+        intrs = [Integrator(p) for p in self.paths]
+        if not intrs:
+            intrs = self.cwdintr,
+
+        rows = [['path', 'id', 'dirs', 'files', 'size', 'hr'],
                 *sorted([[d.name, d.id, c['dirs'], c['files'], c['size'], c['size'].hr]
-                         for d in self.summary for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
-        return self._print_table(rows, title='Size Report')
+                         for d in intrs
+                         for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
+
+        return self._print_table(rows, title='Size Report', align=['l', 'l', 'r', 'r', 'r', 'r'])
 
     def test(self):
         rows = [['hello', 'world'], [1, 2]]
@@ -963,9 +985,8 @@ class Shell(Dispatcher):
 
         p, *rest = self._paths
         if p.cache.is_dataset():
-            f = Integrator(p)
-            dowe = f.data
-            j = JT(dowe)
+            intr = Integrator(p)
+            j = JT(intr.data)
             triples = list(f.triples)
 
         try:

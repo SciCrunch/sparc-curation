@@ -5,6 +5,7 @@ import math
 import hashlib
 from types import GeneratorType
 from datetime import datetime
+from functools import wraps
 from itertools import chain
 from collections import defaultdict, deque
 import rdflib
@@ -906,6 +907,16 @@ class TriplesExport:
                           else None))()]
 
 
+def _wrap_path_gen(prop):
+    @property
+    @wraps(prop.__get__)
+    def impostor(self):
+        for v in prop.__get__(self.path):
+            yield self.__class__(v)
+
+    return impostor
+
+
 class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurData):
     """ pull everything together anchored to the DatasetStructure """
     # note that mro means that we have to run methods backwards
@@ -916,6 +927,11 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
     # class level helpers, instance level helpers go as mixins
 
     no_google = None
+
+    parent = _wrap_path_gen(Path.parent)
+    parents = _wrap_path_gen(Path.parents)
+    children = _wrap_path_gen(Path.children)
+    rchildren = _wrap_path_gen(Path.rchildren)
 
     @classmethod
     def setup(cls, blackfynn_local_instance):
