@@ -2,9 +2,10 @@ from pathlib import Path
 from sparcur import schemas as sc
 from sparcur import validate as vldt
 from sparcur import datasets as dat
-from sparcur.derives import Derives
+from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
 from sparcur.core import JT, JEncode, log, logd, lj, JPointer
+from sparcur.derives import Derives
 
 DT = DictTransformer
 De = Derives
@@ -40,10 +41,14 @@ class PathPipeline(PrePipeline):
     def _transformer(self):
         try:
             return self.data_transformer_class(self.path)
-        except TypeError as e:
-            log.exception(e)
+        except (exc.FileTypeError, exc.NoDataError) as e:
             class NoData:  # FIXME
                 data = {}
+
+            he = dat.HasErrors()
+            logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+            he.addError(e)
+            he.embedErrors(NoData.data)
             return NoData
 
     @property
@@ -106,7 +111,7 @@ class SamplesFilePipeline(PathPipeline):
 
     data_transformer_class = dat.SamplesFile
 
-    @hasSchema(sc.SubjectsSchema)
+    @hasSchema(sc.SamplesFileSchema)
     def data(self):
         return super().data
 
@@ -285,6 +290,7 @@ class SPARCBIDSPipeline(JSONPipeline):
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['submission_file',], ['inputs', 'submission_file']],
+              [['samples_file',], ['inputs', 'samples_file']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'species',  # TODO validate all source paths against schema
                         'organ',
@@ -304,6 +310,7 @@ class SPARCBIDSPipeline(JSONPipeline):
              [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
              #[['subjects'], ['subjects_file']],  # first step in ending the confusion
              [['subjects_file', 'subjects'], ['subjects']],
+             [['samples_file', 'samples'], ['samples']],
     )
 
     cleans = [['subjects_file'], ['submission_file']]

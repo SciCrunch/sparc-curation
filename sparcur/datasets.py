@@ -24,11 +24,7 @@ class HasErrors:
         try:
             super().__init__(*args, **kwargs)
         except TypeError as e:  # this is so dumb
-            #breakpoint()
             super().__init__()
-            #try:
-            #except BaseException as e2:
-                #raise e2 from e
 
         self._errors = set()
 
@@ -217,6 +213,7 @@ class Tabular(HasErrors):
                             message = f'empty row in {self.path.as_posix()!r}'
                             self.addError(message)
                             logd.error(message)
+
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
                     self.addError(exc.EncodingError(message))
@@ -248,9 +245,7 @@ class Tabular(HasErrors):
 
     def _bad_filetype(self, type_):
         message = f'bad filetype {type_}\n{self.path.as_posix()!r}'
-        self.addError(exc.FileTypeError(message))
-        logd.error(message)
-        raise TypeError
+        raise exc.FileTypeError(message)
 
     def xls(self):
         return self._bad_filetype('xls')
@@ -293,27 +288,24 @@ class Version1Header(HasErrors):
     verticals = dict()  # FIXME should really be immutable
     #schema_class = sc.JSONSchema
 
-    class NoDataError(Exception):
-        """ FIXME HACK workaround for bad handling of empty sheets in byCol """
-
     def __new__(cls, path):
         #cls.schema = cls.schema_class()
         return super().__new__(cls)
 
     def __init__(self, path):
         super().__init__()
-        tabular = Tabular(path)
+        self.path = path
+        tabular = Tabular(self.path)
         self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
         self.t = tabular
         l = list(tabular)
         if not l:
             # FIXME bad design, this try block is a workaround for bad handling of empty lists
-            raise self.NoDataError(self.path)
+            raise exc.NoDataError(self.path)
 
         orig_header, *rest = l
         header = vldt.Header(orig_header).output
-        #print(header)
-        #print(f"'{tabular.path}'", header)
+
         self.fail = False
         if self.to_index:
             for head in self.to_index:
@@ -325,10 +317,6 @@ class Version1Header(HasErrors):
             self.bc = byCol(rest, header)
         else:
             self.bc = byCol(rest, header, to_index=self.to_index)
-
-    @property
-    def path(self):
-        return self.t.path
 
     def xopen(self):
         """ open file using xdg-open """

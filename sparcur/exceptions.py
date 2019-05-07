@@ -90,6 +90,11 @@ class FileTypeError(SparCurError):
     """ File type is not allowed """
 
 
+class NoDataError(SparCurError):
+    """ There was no data in the file (not verified with stat)
+        FIXME HACK workaround for bad handling of empty sheets in byCol """
+
+
 class NoMetadataRetrievedError(SparCurError):
     """ we failed to retrieve metadata for a remote id """
 
