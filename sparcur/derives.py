@@ -3,7 +3,7 @@ from typing import Tuple
 from functools import wraps
 from sparcur import schemas as sc
 from sparcur import normalization as nml
-from sparcur.core import log, logd
+from sparcur.core import log, logd, JPointer
 
 
 def collect(*oops, unpacked=True):
@@ -75,6 +75,19 @@ class Derives:
                 dict_ = d.data
                 if 'funding' in dict_:
                     yield dict_['funding']
+
+    @staticmethod
+    def pi(contributors):
+        pointers = [JPointer(f'/contributors/{i}')
+                    for i, c in enumerate(contributors)
+                    if (('PrincipalInvestigator' in c['contributor_role'])
+                        if 'contributor_role' in c else False)]
+
+        if len(pointers) == 1:
+            pointer, = pointers
+            return pointer
+
+        return pointers
 
     @staticmethod
     @collect

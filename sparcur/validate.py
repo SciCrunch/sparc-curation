@@ -1,6 +1,7 @@
 import re
 from functools import wraps
 from sparcur import schemas as sc
+from sparcur import normalization as nml
 from sparcur.core import python_identifier
 
 class hproperty:
@@ -180,6 +181,7 @@ class Header(Stage):
         for i, c in enumerate(orig_header):
             if c:
                 c = python_identifier(c)
+                c = nml.NormHeader(c)
             if not c:
                 c = f'TEMP_{i}'
 

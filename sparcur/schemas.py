@@ -9,6 +9,15 @@ from pyontutils.core import OntId, OntTerm
 from pysercomb.pyr.units import ProtcParameter
 from sparcur.core import JEncode
 
+
+def _format_jsonschema_error(error):
+    """Format a :py:class:`jsonschema.ValidationError` as a string."""
+    if error.path:
+        dotted_path = ".".join([str(c) for c in error.path])
+        return "{path}: {message}".format(path=dotted_path, message=error.message)
+    return error.message
+
+
 class ValidationError(Exception):
     def __init__(self, errors):
         self.errors = errors
@@ -22,12 +31,13 @@ class ValidationError(Exception):
 
     def json(self):
         """ update this to change how errors appear in the validation pipeline """
-        skip = 'schema', 'instance'
+        skip = 'schema', 'instance', 'context'  # have to skip context because it has unserializable content
         return [{k:v if k not in skip else k + ' REMOVED'
                  for k, v in e._contents().items()
                  # TODO see if it makes sense to drop these because the parser did know ...
                  if v and k not in skip}
                 for e in self.errors]
+
 
 class ConvertingChecker(jsonschema.FormatChecker):
     _enc = JEncode()
@@ -109,13 +119,6 @@ class JSONSchema(object):
         # information in the schema will be used to generate the score
         # FIXME the above doesn't actually work because missing optional
         # fields do need to be added at runtime, we'll do that next time
-
-def _format_jsonschema_error(error):
-    """Format a :py:class:`jsonschema.ValidationError` as a string."""
-    if error.path:
-        dotted_path = ".".join([str(c) for c in error.path])
-        return "{path}: {message}".format(path=dotted_path, message=error.message)
-    return error.message
 
 
 metadata_filename_pattern = r'^[a-z_\/]+\.(xlsx|csv|tsv|json)$'
@@ -281,14 +284,15 @@ class SubmissionSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
-        'properties': { 'submission': {
-            'type': 'object',
-            'required': ['sparc_award_number', 'milestone_achieved', 'milestone_completion_date'],
-            # TODO allOf?
-            'properties': {
-                'sparc_award_number': {'type': 'string'},
-                'milestone_achieved': {'type': 'string'},
-                'milestone_completion_date': {'type': 'string'},}}}}
+        'properties': {
+            'errors': ErrorSchema.schema,
+            'submission': {
+                'type': 'object',
+                'required': ['sparc_award_number', 'milestone_achieved', 'milestone_completion_date'],
+                # TODO allOf?
+                'properties': {'sparc_award_number': {'type': 'string'},
+                               'milestone_achieved': {'type': 'string'},
+                               'milestone_completion_date': {'type': 'string'},}}}}
 
 
 class SubjectsSchema(JSONSchema):
@@ -310,6 +314,62 @@ class SubjectsSchema(JSONSchema):
                                             'age': {'type': 'string'},  # TODO protc -> json
                                             'age_category': {'type': 'string'},  # TODO uberon
                                         },},},
+
+                       'errors': ErrorSchema.schema,
+                       'software': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': {
+                                        'type': 'object',
+                                        'properties': {
+                                            'software_version': {'type': 'string'},
+                                            'software_vendor': {'type': 'string'},
+                                            'software_url': {'type': 'string'},
+                                            'software_rri': {'type': 'string'},
+                                        },},}}}
+
+
+class SamplesFileSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'required': ['samples'],
+        'properties': {'samples': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': {
+                                        'type': 'object',
+                                        'required': ['sample_id', 'subject_id'],
+                                        'properties': {
+                                            'sample_id': {'type': 'string'},
+                                            'subject_id': {'type': 'string'},
+                                            'group': {'type': 'string'},  # FIXME required ??
+
+                                            'specimen': {'type': 'string'},  # what are we expecting here?
+                                            'specimen_anatomical_location': {'type': 'string'},
+
+                                            'species': {'type': 'string'},
+                                            'strain': {'type': 'string'},  # TODO RRID
+                                            'RRID_for_strain': {'type': 'string'},  # FIXME why is this in samples and not subjects?
+                                            'genotype': {'type': 'string'},
+
+                                            'sex': {'type': 'string'},  # sex as a variable ?
+
+                                            'mass': {'type': 'string'},  # TODO protc -> json
+                                            'weight': {'type': 'string'},  # TODO protc -> json
+
+                                            'age': {'type': 'string'},  # TODO protc -> json
+                                            'age_category': {'type': 'string'},  # TODO uberon
+                                            'age_range_min': {'type': 'string'},
+                                            'age_range_max': {'type': 'string'},
+
+                                            'handedness': {'type': 'string'},
+                                            'disease': {'type': 'string'},
+                                            'reference_atlas': {'type': 'string'},
+                                            'protocol_title': {'type': 'string'},
+                                            'protocol_url_or_doi': {'type': 'string'},  # protocols_io_location ??
+
+                                            'experimental_log_file_name': {'type': 'string'},
+                                        },},},
+
+                       'errors': ErrorSchema.schema,
                        'software': {'type': 'array',
                                     'minItems': 1,
                                     'items': {
@@ -323,22 +383,22 @@ class SubjectsSchema(JSONSchema):
 
 
 class MetaOutSchema(JSONSchema):
-    schema = copy.deepcopy(DatasetDescriptionSchema.schema)
+    _schema = copy.deepcopy(DatasetDescriptionSchema.schema)
     extra_required = ['award_number',
                       'principal_investigator',
                       'species',
                       'organ',
                       'modality',
                       'contributor_count',
-                      'subject_count',
                       'uri_human',
                       'uri_api',
+                      #'subject_count',
                       #'sample_count',
     ]
-    schema['required'].remove('contributors')
-    schema['required'] += extra_required
-    schema['properties'].pop('contributors')
-    schema['properties'].update({
+    _schema['required'].remove('contributors')
+    _schema['required'] += extra_required
+    _schema['properties'].pop('contributors')
+    _schema['properties'].update({
         'errors': ErrorSchema.schema,
         'uri_human': {'type': 'string',
                       'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
@@ -371,15 +431,20 @@ class MetaOutSchema(JSONSchema):
         'sample_count': {'type': 'integer'},
         'contributor_count': {'type': 'integer'},})
 
+    schema = {'allOf': [_schema,
+                        {'oneOf': [
+                            {'required': ['subject_count']},  # FIXME extract subjects from samples ?
+                            {'required': ['sample_count']}
+                        ]}]}
 
 class DatasetOutSchema(JSONSchema):
     """ Schema that adds the id field since investigators shouldn't need to know
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
 
-    schema = copy.deepcopy(DatasetStructureSchema.schema)
-    schema['required'] = ['id', 'meta', 'contributors', 'subjects']
-    schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
+    _schema = copy.deepcopy(DatasetStructureSchema.schema)
+    _schema['required'] = ['id', 'meta', 'contributors']
+    _schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
                             'errors': ErrorSchema.schema,
@@ -392,6 +457,7 @@ class DatasetOutSchema(JSONSchema):
                             'creators': CreatorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer
                             'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
+                            'samples': SamplesFileSchema.schema['properties']['samples'],
                             'resources': {'type':'array',
                                           'items': {'type': 'object'},},
                             'protocols': {'type':'array'},
@@ -400,6 +466,13 @@ class DatasetOutSchema(JSONSchema):
                                        'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
                                                       'submission_file': SubmissionSchema.schema,
                                                       'subjects_file': SubjectsSchema.schema,},},}
+
+    # FIXME switch to make samples optional since subject_id will always be there even in samples?
+    schema = {'allOf': [_schema,
+                        {'oneOf': [
+                            {'required': ['subjects']},  # FIXME extract subjects from samples ?
+                            {'required': ['samples']}
+                        ]}]}
 
 
 class SummarySchema(JSONSchema):

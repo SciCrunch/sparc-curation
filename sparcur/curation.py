@@ -1160,7 +1160,7 @@ class Summary(Integrator):
                 ('errors', xe))
     @property
     def disco(self):
-        dsh = sorted(MetaOutSchema.schema['properties'])
+        dsh = sorted(MetaOutSchema.schema['allOf'][0]['properties'])
         chs = sorted(('name',
                       'contributor_orcid_id',
                       'is_contact_person',

@@ -4,7 +4,7 @@ from sparcur import validate as vldt
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
-from sparcur.core import JT, JEncode, log, logd, lj, JPointer
+from sparcur.core import JT, JEncode, log, logd, lj
 from sparcur.derives import Derives
 
 DT = DictTransformer
@@ -283,7 +283,7 @@ class SPARCBIDSPipeline(JSONPipeline):
          ['subjects_file']],
 
         [[[['samples_file'], ['path']]],
-         SubjectsFilePipeline,
+         SamplesFilePipeline,
          ['samples_file']],
     ]
 
@@ -291,6 +291,7 @@ class SPARCBIDSPipeline(JSONPipeline):
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['submission_file',], ['inputs', 'submission_file']],
               [['samples_file',], ['inputs', 'samples_file']],
+              [['manifest_file',], ['inputs', 'manifest_file']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'species',  # TODO validate all source paths against schema
                         'organ',
@@ -313,7 +314,7 @@ class SPARCBIDSPipeline(JSONPipeline):
              [['samples_file', 'samples'], ['samples']],
     )
 
-    cleans = [['subjects_file'], ['submission_file']]
+    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
                  ['inputs', 'dataset_description_file', 'funding']],
@@ -328,9 +329,7 @@ class SPARCBIDSPipeline(JSONPipeline):
                 []],
 
                [[['contributors']],
-                DT.BOX(lambda cs: [JPointer(f'/contributors/{i}') for i, c in enumerate(cs)
-                                   if (('PrincipalInvestigator' in c['contributor_role'])
-                                       if 'contributor_role' in c else False)]),  # ah lambda and commas ...
+                DT.BOX(De.pi),  # ah lambda and commas ...
                 [['meta', 'principal_investigator']]],
 
                [[['contributors']],

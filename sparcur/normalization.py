@@ -94,6 +94,16 @@ class NormSex(NormSimple):
     }
 
 
+class NormHeader(NormSimple):
+    armi = 'age_range_min'
+    arma = 'age_range_max'
+    data = {
+        'age_range_minimum': armi,
+        'age_range_maximum': arma,
+        'protocol_io_location': 'protocol_url_or_doi',
+    }
+
+
 class NormContributorRole(str):
     values = ('ContactPerson',
               'DataCollector',

@@ -339,6 +339,7 @@ class Version1Header(HasErrors):
                 continue
 
         else:
+            log.warning(f'No ontology id found for {value}')
             return value
 
     def default(self, value):
@@ -666,6 +667,9 @@ class SubjectsFile(Version1Header):
         nv = nml.NormSpecies(value)
         yield self.query(nv, 'NCBITaxon')
 
+    def strain(self, value):
+        yield self.query(value, 'BIRNLEX')  # FIXME
+
     def sex(self, value):
         nv = nml.NormSex(value)
         yield self.query(nv, 'PATO')
@@ -685,6 +689,15 @@ class SubjectsFile(Version1Header):
     def age(self, value):
         yield from self._param(value)
 
+    def age_category(self, value):
+        yield self.query(value, 'UBERON')
+
+    def age_range_min(self, value):
+        yield from self._param(value)
+
+    def age_range_max(self, value):
+        yield from self._param(value)
+
     def mass(self, value):
         yield from self._param(value)
 
@@ -694,8 +707,8 @@ class SubjectsFile(Version1Header):
     def rrid_for_strain(self, value):
         yield value
 
-    def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
-        yield value
+    #def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
+        #yield value
 
     def process_dict(self, dict_):
         """ deal with multiple fields """
@@ -724,5 +737,18 @@ class SubjectsFile(Version1Header):
 
 class SamplesFile(SubjectsFile):
     """ TODO ... """
-    to_index ='sample_id'
+    to_index = 'sample_id', 'subject_id'
     dict_key = 'samples'
+
+    def specimen_anatomical_location(self, value):
+        seps = '|',
+        for sep in seps:
+            if sep in value:
+                for v in value.split(sep):
+                    if v:
+                        yield self.query(v, 'UBERON')
+
+                return
+
+        else:
+            return self.query(value, 'UBERON')
