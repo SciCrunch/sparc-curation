@@ -535,6 +535,12 @@
       find \( -name '*.xlsx' -o -name '*.csv' -o -name '*.tsv' \) -exec ls -hlS {} \+
     #+END_SRC
 
+    #+CAPTION: clean up empty directories
+    #+CAPTION: temp fix for summary making folders when it should skip
+    #+BEGIN_SRC bash :results none
+      find -maxdepth 1 -type d -exec rmdir {} \;
+    #+END_SRC
+
     Pull local copy of data to a new computer. Note the double escape needed for the space.
     #+BEGIN_SRC bash :results none :eval never
       rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local/SPARC\\\ Consortium ~/files/blackfynn_local/
