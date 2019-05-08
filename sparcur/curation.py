@@ -34,7 +34,7 @@ from sparcur import validate as vldt
 from sparcur import pipelines as pipes
 from sparcur import sheets
 from ttlser import CustomTurtleSerializer
-from pysercomb.pyr.units import ProtcParameter
+from pysercomb.pyr.units import Expr
 from pyontutils.utils import byCol as _byCol
 
 
@@ -901,8 +901,8 @@ class TriplesExport:
         [graph.add(t) for t in self.triples_header]
         [graph.add(t) for t in self.triples
          if not (lambda: (log.error(t)
-                          if any(isinstance(_, ProtcParameter)
-                                 or (hasattr(_, '_value') and isinstance(_._value, ProtcParameter))
+                          if any(isinstance(_, Expr)
+                                 or (hasattr(_, '_value') and isinstance(_._value, Expr))
                                  for _ in t)
                           else None))()]
 
@@ -1140,7 +1140,7 @@ class Summary(Integrator):
         def normv(v):
             if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
                 return OntId(v).curie
-            if isinstance(v, ProtcParameter):
+            if isinstance(v, Expr):
                 return v.for_text
             else:
                 #log.debug(repr(v))

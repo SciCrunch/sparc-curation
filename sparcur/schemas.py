@@ -6,7 +6,7 @@ import jsonschema
 from pathlib import Path
 import rdflib
 from pyontutils.core import OntId, OntTerm
-from pysercomb.pyr.units import ProtcParameter
+from pysercomb.pyr.units import Expr
 from sparcur.core import JEncode
 
 
@@ -60,7 +60,7 @@ class JSONSchema(object):
                              rdflib.Literal,
                              OntId,
                              OntTerm,
-                             ProtcParameter,))
+                             Expr,))
         self.validator = jsonschema.Draft6Validator(self.schema,
                                                     format_checker=format_checker,
                                                     types=types)
@@ -143,6 +143,12 @@ class DatasetStructureSchema(JSONSchema):
                                                'pattern': metadata_filename_pattern},
                              'samples_file': {'type': 'string',
                                               'pattern': metadata_filename_pattern},
+                             'dirs': {'type': 'integer',
+                                      'minimum': 0},
+                             'files': {'type': 'integer',
+                                       'minimum': 0},
+                             'size': {'type': 'integer',
+                                      'minimum': 0},
                              'errors': ErrorSchema.schema,
               }}
 
@@ -392,9 +398,9 @@ class MetaOutSchema(JSONSchema):
                       'contributor_count',
                       'uri_human',
                       'uri_api',
-                      'size',
                       'files',
-                      'folders',
+                      'dirs',
+                      'size',
                       #'subject_count',
                       #'sample_count',
     ]

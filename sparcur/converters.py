@@ -5,7 +5,7 @@ from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from scibot.extract import normalizeDoi
-from pysercomb.pyr.units import ProtcParameter
+from pysercomb.pyr.units import Expr
 
 a = rdf.type
 
@@ -35,7 +35,7 @@ class TripleConverter:
     def l(self, value):
         if isinstance(value, OntId):
             return value.u
-        if isinstance(value, ProtcParameter):
+        if isinstance(value, Expr):
             return value
         elif isinstance(value, str) and value.startswith('http'):
             return OntId(value).u
@@ -61,7 +61,7 @@ class TripleConverter:
                 for v in values:
                     p, o = convert(v)
                     log.debug(o)
-                    if isinstance(o, ProtcParameter):
+                    if isinstance(o, Expr):
                         s = rdflib.BNode()
                         text = o.for_triples
                         value, unit = text.split(' ')

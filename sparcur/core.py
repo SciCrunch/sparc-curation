@@ -11,7 +11,7 @@ from pathlib import Path
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
-from pysercomb.pyr.units import ProtcParameter
+from pysercomb.pyr.units import Expr
 from sparcur import exceptions as exc
 from sparcur.config import config
 from functools import wraps
@@ -51,8 +51,8 @@ class JEncode(json.JSONEncoder):
             return list(obj)
         elif isinstance(obj, deque):
             return list(obj)
-        elif isinstance(obj, ProtcParameter):
-            return str(obj)
+        elif isinstance(obj, Expr):
+            return obj.for_json
         elif [type_ for type_ in (OrcidId, DoiId) if isinstance(obj, type_)]:
             return obj.iri
         elif isinstance(obj, OntId):

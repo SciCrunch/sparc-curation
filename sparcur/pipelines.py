@@ -317,8 +317,6 @@ class SPARCBIDSPipeline(JSONPipeline):
              [['samples_file', 'samples'], ['samples']],
     )
 
-    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
-
     derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
                  ['inputs', 'dataset_description_file', 'funding']],
                 DT.BOX(De.award_number),
@@ -355,6 +353,8 @@ class SPARCBIDSPipeline(JSONPipeline):
                 DT.BOX(len),
                 [['meta', 'sample_count']]],
     )
+
+    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
 
     adds = [[['id'], lambda lifters: lifters.id],
             [['meta', 'name'], lambda lifters: lifters.name],

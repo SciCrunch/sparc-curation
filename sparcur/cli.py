@@ -70,6 +70,7 @@ Options:
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
 
+    -O --open               open the output file
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
 
@@ -561,6 +562,9 @@ class Main(Dispatcher):
                     function(f)
 
                 print(f'dataset graph exported to {out}')
+
+                if self.options.open:
+                    out.xopen()
 
             return
 

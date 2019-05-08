@@ -7,7 +7,7 @@ from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol, Async, deferred
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
-from pysercomb.pyr.units import ProtcParameterParser
+from pysercomb.pyr.units import UnitsParser
 from sparcur import schemas as sc
 from sparcur import validate as vldt
 from sparcur import exceptions as exc
@@ -730,9 +730,9 @@ class SubjectsFile(Version1Header):
         yield from self.sex(value)
 
     def _param(self, value):
-        pv = ProtcParameterParser(value)
-        if not pv._tuple[0] == 'param:parse-failure':
-            yield str(pv.for_text)  # this one needs to be a string since it is combined below
+        pv = UnitsParser(value)
+        if not pv[0] == 'param:parse-failure':
+            yield str(pv)  # this one needs to be a string since it is combined below
         else:
             # TODO warn
             yield value
@@ -767,8 +767,8 @@ class SubjectsFile(Version1Header):
         for h_unit, h_value in zip(self.h_unit, self.h_value):
             compose = dict_[h_value] + dict_[h_unit]
             #_, v, rest = parameter_expression(compose)
-            #out[h_value] = str(ProtcParameterParser(compose).for_text)  # FIXME sparc repr
-            out[h_value] = ProtcParameterParser(compose)
+            #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
+            out[h_value] = UnitsParser(compose)
 
         if 'gender' in out and 'species' in out:
             if out['species'] != OntTerm('NCBITaxon:9606'):
