@@ -1,4 +1,5 @@
 import io
+import ast
 import csv
 import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -7,10 +8,9 @@ from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
-from pysercomb.pyr.units import UnitsParser
+from protcur.units import UnitsParser, Unit, Quantity
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
-from sparcur import converters as conv
 from sparcur import normalization as nml
 from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc, FileSize
 from sparcur.paths import Path
@@ -58,17 +58,17 @@ class HasErrors:
             super().__init__()
 
         self._pipeline_stage = pipeline_stage
-        self._errors = set()
+        self._errors_set = set()
 
     def addError(self, error, pipeline_stage=None):
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
-        self._errors.add((error, stage))
+        self._errors_set.add((error, stage))
 
     @property
-    def errors(self):
-        for e, stage in self._errors:
+    def _errors(self):
+        for e, stage in self._errors_set:
             o = {'pipeline_stage': stage}  # FIXME
 
             if isinstance(e, str):
@@ -85,7 +85,7 @@ class HasErrors:
             yield o
 
     def embedErrors(self, data):
-        el = list(self.errors)
+        el = list(self._errors)
         if 'errors' in data:
             data['errors'].extend(el)
         elif el:
@@ -779,7 +779,7 @@ class SubjectsFile(Version1Header):
 
         #if not pv[0] == 'param:parse-failure':
         if pv is not None:  # parser failure  # FIXME check on this ...
-            yield str(pv)  # this one needs to be a string since it is combined below
+            yield pv  # this one needs to be a string since it is combined below
         else:
             # TODO warn
             yield value
@@ -812,10 +812,14 @@ class SubjectsFile(Version1Header):
         """ deal with multiple fields """
         out = {k:v for k, v in dict_.items() if k not in self.skip}
         for h_unit, h_value in zip(self.h_unit, self.h_value):
-            compose = dict_[h_value] + dict_[h_unit]
+            dhv = dict_[h_value]
+            if isinstance(dhv, str):
+                dhv = Quantity(ast.literal_eval(dhv))
+            compose = dhv + Unit(dict_[h_unit])
             #_, v, rest = parameter_expression(compose)
             #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
-            out[h_value] = UnitsParser(compose).asPython()
+            #breakpoint()
+            out[h_value] = compose #UnitsParser(compose).asPython()
 
         if 'gender' in out and 'species' in out:
             if out['species'] != OntTerm('NCBITaxon:9606'):

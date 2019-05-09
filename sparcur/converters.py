@@ -1,15 +1,16 @@
 import rdflib
 from types import GeneratorType
-from sparcur.core import log, sparc
 from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from scibot.extract import normalizeDoi
-from pysercomb.pyr.units import Expr
+from protcur.units import Expr
+from sparcur import datasets as dat
+from sparcur.core import log, sparc
 
 a = rdf.type
 
-class TripleConverter:
+class TripleConverter(dat.HasErrors):
     # TODO consider putting mappings in a dict hierarchy
     # that reflects where they are in the schema??
     known_skipped = tuple()
@@ -28,6 +29,7 @@ class TripleConverter:
 
     def __init__(self, json_source, integrator=None):
         """ in case we want to do contextual things here """
+        super().__init__()
         self._source = json_source
         self.integrator = integrator
         self.extra = self.Extra(self)
@@ -47,7 +49,7 @@ class TripleConverter:
             subject = rdflib.URIRef(subject)
 
         for field, value in self._source.items():
-            log.debug(f'{field}: {value}')
+            #log.debug(f'{field}: {value}')
             if type(field) is object:
                 continue  # the magic helper key for Pipeline
             convert = getattr(self, field, None)
@@ -59,15 +61,13 @@ class TripleConverter:
                     values = value,
 
                 for v in values:
+                    log.debug(f'{field} {v} {convert}')
                     p, o = convert(v)
                     log.debug(o)
                     if isinstance(o, Expr):
                         s = rdflib.BNode()
-                        text = o.for_triples
-                        value, unit = text.split(' ')
                         yield subject, p, s
-                        yield s, TEMP.hasValue, rdflib.Literal(value)
-                        yield s, TEMP.hasUnit, rdflib.Literal(unit)
+                        yield from o.n3(s)
 
                     else:
                         yield subject, p, o
@@ -79,7 +79,9 @@ class TripleConverter:
                 pass
 
             else:
-                log.warning(f'Unhandled {self.__class__.__name__} field: {field}')
+                msg = f'Unhandled {self.__class__.__name__} field: {field}'
+                log.warning(msg)
+                self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error')
 
 
 class ContributorConverter(TripleConverter):

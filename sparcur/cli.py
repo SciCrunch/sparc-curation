@@ -927,11 +927,11 @@ class Report(Dispatcher):
         else:
             raw = self.summary.completeness
 
-        rows = [('', 'EI', 'name', 'id', 'award', 'organ')]
-        rows += [(i + 1, ei, *rest,
+        rows = [('', 'SI', 'CI', 'EI', 'name', 'id', 'award', 'organ')]
+        rows += [(i + 1, si, ci, ei, *rest,
                   an if an else '', organ if organ else '')
-                 for i, (ei, *rest, an, organ) in
-                 enumerate(sorted(raw, key=lambda t: (t[0], t[1])))]
+                 for i, (si, ci, ei, *rest, an, organ) in
+                 enumerate(sorted(raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
 
         return self._print_table(rows, title='Completeness Report')
 

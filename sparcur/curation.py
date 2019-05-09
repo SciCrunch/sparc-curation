@@ -13,6 +13,7 @@ import dicttoxml
 from pyontutils.config import devconfig
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
+from nifstd_tools.methods.core import prot, proc, tech, asp, dim, unit
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
@@ -33,14 +34,17 @@ from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
 from ttlser import CustomTurtleSerializer
-from pysercomb.pyr.units import Expr
+from protcur.units import Expr
 from pyontutils.utils import byCol as _byCol
 
+xsd = rdflib.XSD
 a = rdf.type
 
 po = CustomTurtleSerializer.predicateOrder
 po.extend((sparc.firstName,
            sparc.lastName,
+           xsd.minInclusive,
+           xsd.maxInclusive,
            TEMP.hasValue,
            TEMP.hasUnit,))
 
@@ -49,6 +53,10 @@ OntCuries({'orcid':'https://orcid.org/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
+           'unit': str(unit),
+           'dim': str(dim),
+           'asp': str(asp),
+           'tech': str(tech),
            'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})
 
@@ -943,6 +951,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
 
         # unanchored helpers
         if cls.no_google:
+            log.critical('no google no organ data')
             class asdf:
                 modality = lambda v: None
                 organ_term = lambda v: None
@@ -1067,19 +1076,41 @@ class Summary(Integrator):
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth
         # do not cache in here
-        for path in self.anchor.path.iterdir():
+        for i, path in enumerate(self.anchor.path.iterdir()):
             # FIXME non homogenous, need to find a better way ...
             yield self.__class__.__base__(path)
+            #if i > 4:
+                #break
 
     def _completeness(self, data):
         accessor = JT(data)  # can go direct if elements are always present
-        return (accessor.error_index,
+        #organ = accessor.query('meta', 'organ')
+        try:
+            organ = adops.get(data, ['meta', 'organ'])
+        except:
+            organ = None
+
+        if isinstance(organ, list):
+            if len(organ) == 1:
+                organ, = organ
+                organ = (repr(OntTerm(organ)))
+            else:
+                organ = ' '.join(repr(OntTerm(o)) for o in organ)
+
+        elif organ == 'othertargets':
+            pass
+        elif organ:
+            organ = repr(OntTerm(organ))
+
+        return (accessor.status.submission_index,
+                accessor.status.curation_index,
+                accessor.status.error_index,
                 #accessor.submission_completeness_index,
                 #dataset.name,  # from filename (do we not have that in meta!?)
                 accessor.query('meta', 'name'),
                 accessor.id, #if 'id' in dowe else None,
                 accessor.query('meta', 'award_number'),
-                accessor.query('meta', 'organ'),
+                organ,
             )
 
     @property
@@ -1211,7 +1242,7 @@ class Summary(Integrator):
             dowe = dataset.data
 
             #row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
-            row = [id, dowe['error_index']]  # FIXME this doubles up on the row
+            row = [id, dowe['status']['submission_index'], dowe['status']['curation_index']]  # FIXME this doubles up on the row
             if 'meta' in dowe:
                 meta = dowe['meta']
                 for k in dsh:

@@ -347,10 +347,14 @@ class SPARCBIDSPipeline(JSONPipeline):
     @property
     def pipeline_start(self):
         data = super().pipeline_start
-        if 'errors' in data and len(data) == 1:  # only errors no data
-            raise self.SkipPipelineError(data)
-        elif 'errors' in data:
-            pass
+        if 'errors' in data:
+            get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
+            sections = set((s,) for s in data)
+            # FIXME probably should just use adops.get to check for the path
+            both = get_paths & sections
+            if not both:
+                log.debug(f'{get_paths}\n{sections}\n{both}')
+                raise self.SkipPipelineError(data)
 
         return data
 
@@ -426,7 +430,7 @@ class PipelineExtras(JSONPipeline):
                 if o:
                     data['meta']['organ'] = o
 
-        if 'organ' not in data['meta']:
+        if 'organ' not in data['meta'] or data['meta']['organ'] == 'othertargets':
             o = self.lifters.organ_term
             if o:
                 data['meta']['organ'] = o

@@ -80,4 +80,4 @@ class Organs(FieldAlignment):
 
     def award_manual(self, dataset_id):
         row = self.byCol.searchIndex('id', dataset_id)
-        return row.award_manual if row.award else None
+        return row.award_manual if row.award_manual else None
