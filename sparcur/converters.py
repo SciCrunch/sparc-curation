@@ -156,11 +156,18 @@ MetaConverter.setup()  # box in so we don't forget
 
 class DatasetConverter(TripleConverter):
     known_skipped = 'id', 'errors', 'inputs', 'subjects', 'meta', 'creators'
-    mapping = [
-        ['error_index', TEMP.errorIndex],
-        ['submission_completeness_index', TEMP.submissionCompletenessIndex],
-        ]
+    mapping = []
 DatasetConverter.setup()
+
+
+class StatusConverter(TripleConverter):
+    known_skipped = 'submission_errors', 'curation_errors'
+    mapping = [
+        ['submission_index', TEMP.submissionIndex],
+        ['curation_index', TEMP.curationIndex],
+        ['error_index', TEMP.errorIndex],
+    ]
+StatusConverter.setup()
 
 
 class SubjectConverter(TripleConverter):

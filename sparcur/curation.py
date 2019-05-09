@@ -50,7 +50,7 @@ po.extend((sparc.firstName,
 
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
-           'DOI':'https://doi.org/'
+           'DOI':'https://doi.org/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
@@ -819,8 +819,10 @@ class TriplesExport:
         else:
             log.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
 
-        converter = conv.DatasetConverter(data)
-        yield from converter.triples_gen(dsid)
+        yield from conv.StatusConverter(data['status'], self).triples_gen(dsid)
+
+        #converter = conv.DatasetConverter(data)
+        #yield from converter.triples_gen(dsid)
 
         def id_(v):
             s = rdflib.URIRef(dsid)
