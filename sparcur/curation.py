@@ -50,6 +50,7 @@ po.extend((sparc.firstName,
 
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
+           'DOI':'https://doi.org/'
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
