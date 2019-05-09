@@ -309,7 +309,7 @@
     #+HEADER: :var RKTROOTS=rkt-roots
     #+BEGIN_SRC bash :results output :eval no-export
       pushd ~/git
-      raco pkg install --skip-installed --auto --batch ${RKTROOTS}
+      raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
       popd
     #+END_SRC
 
@@ -623,19 +623,64 @@
    #+CAPTION: export commands to set if running remotely via copy and paste
    #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
    #+BEGIN_SRC bash :results output code example :exports results :eval no-export
-     echo export REPOS='<<EOL'
+     echo export REPOS="'"
      printf "$(echo ${REPOS} | tr ' ' '\n')"
      echo
-     echo EOL
-     echo export PYROOTS='<<EOL'
+     echo "'"
+     echo export PYROOTS="'"
      printf "$(echo ${PYROOTS} | tr ' ' '\n')"
      echo
-     echo EOL
-     echo export RKTROOTS='<<EOL'
+     echo "'"
+     echo export RKTROOTS="'"
      printf "$(echo ${RKTROOTS} | tr ' ' '\n')"
      echo
-     echo EOL
+     echo "'"
    #+END_SRC
+
+   #+RESULTS: remote-exports-code
+   #+begin_src bash
+   export REPOS='
+   https://github.com/tgbugs/hyputils
+   https://github.com/tgbugs/ontquery
+   https://github.com/tgbugs/parsercomb
+   https://github.com/tgbugs/pyontutils
+   https://github.com/tgbugs/protc
+   https://github.com/tgbugs/rrid-metadata
+   https://github.com/tgbugs/rkdf
+   https://github.com/tgbugs/orgstrap
+   https://github.com/SciCrunch/NIF-Ontology
+   https://github.com/SciCrunch/scibot
+   https://github.com/SciCrunch/sparc-curation
+   https://github.com/Ophirr33/pda
+   https://github.com/zussitarze/qrcode
+   '
+   export PYROOTS='
+   pyontutils/htmlfn
+   pyontutils/ttlser
+   hyputils
+   ontquery
+   parsercomb
+   pyontutils
+   pyontutils/nifstd
+   pyontutils/neurondm
+   protc/protcur
+   sparc-curation
+   scibot
+   '
+   export RKTROOTS='
+   qrcode/
+   pda/
+   protc/protc-lib
+   protc/protc-tools-lib
+   protc/protc
+   protc/protc-tools
+   rkdf/rkdf-lib
+   rkdf/rkdf
+   rrid-metadata/rrid
+   NIF-Ontology/
+   '
+   #+end_src
+
 * Appendix
 ** Code
 *** Remote exports
@@ -646,44 +691,44 @@
     #+NAME: remote-exports
     #+RESULTS:
     #+begin_src bash
-    export REPOS=<<EOL
-    https://github.com/tgbugs/hyputils
-    https://github.com/tgbugs/ontquery
-    https://github.com/tgbugs/parsercomb
-    https://github.com/tgbugs/pyontutils
-    https://github.com/tgbugs/protc
-    https://github.com/tgbugs/rrid-metadata
-    https://github.com/tgbugs/rkdf
-    https://github.com/tgbugs/orgstrap
-    https://github.com/SciCrunch/NIF-Ontology
-    https://github.com/SciCrunch/scibot
-    https://github.com/SciCrunch/sparc-curation
-    https://github.com/Ophirr33/pda
-    https://github.com/zussitarze/qrcode
-    EOL
-    export PYROOTS=<<EOL
-    pyontutils/htmlfn
-    pyontutils/ttlser
-    hyputils
-    ontquery
-    parsercomb
-    pyontutils
-    pyontutils/nifstd
-    pyontutils/neurondm
-    protc/protcur
-    sparc-curation
-    scibot
-    EOL
-    export RKTROOTS=<<EOL
-    qrcode/
-    pda/
-    protc/protc-lib
-    protc/protc-tools-lib
-    protc/protc
-    protc/protc-tools
-    rkdf/rkdf-lib
-    rkdf/rkdf
-    rrid-metadata/rrid
-    NIF-Ontology/
-    EOL
+      export REPOS='
+      https://github.com/tgbugs/hyputils
+      https://github.com/tgbugs/ontquery
+      https://github.com/tgbugs/parsercomb
+      https://github.com/tgbugs/pyontutils
+      https://github.com/tgbugs/protc
+      https://github.com/tgbugs/rrid-metadata
+      https://github.com/tgbugs/rkdf
+      https://github.com/tgbugs/orgstrap
+      https://github.com/SciCrunch/NIF-Ontology
+      https://github.com/SciCrunch/scibot
+      https://github.com/SciCrunch/sparc-curation
+      https://github.com/Ophirr33/pda
+      https://github.com/zussitarze/qrcode
+      '
+      export PYROOTS='
+      pyontutils/htmlfn
+      pyontutils/ttlser
+      hyputils
+      ontquery
+      parsercomb
+      pyontutils
+      pyontutils/nifstd
+      pyontutils/neurondm
+      protc/protcur
+      sparc-curation
+      scibot
+      '
+      export RKTROOTS='
+      qrcode/
+      pda/
+      protc/protc-lib
+      protc/protc-tools-lib
+      protc/protc
+      protc/protc-tools
+      rkdf/rkdf-lib
+      rkdf/rkdf
+      rrid-metadata/rrid
+      NIF-Ontology/
+      '
     #+end_src
