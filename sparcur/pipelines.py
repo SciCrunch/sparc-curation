@@ -162,6 +162,11 @@ class JSONPipeline(Pipeline):
         self.lifters = lifters
         self.runtime_context = runtime_context
 
+    def subpipeline_errors(self, errors):
+        """ override this for pipeline specific error handling rules """
+        for path, error, subpipeline_class in errors:
+            log.error(f'{path}\n{error}\n{subpipeline_class}\n{self!r}')
+
     @property
     def pipeline_start(self):
         """ cooperate with HasSchema input schema validation """
@@ -182,7 +187,8 @@ class JSONPipeline(Pipeline):
     @property
     def subpipelined(self):
         data = self.lifted
-        DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines)
+        errors = list(DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines))
+        self.subpipeline_errors(errors)
         return data
 
     @property
@@ -360,6 +366,21 @@ class SPARCBIDSPipeline(JSONPipeline):
             [['meta', 'name'], lambda lifters: lifters.name],
             [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
             [['meta', 'uri_api'], lambda lifters: lifters.uri_api],]
+
+    def subpipeline_errors(self, errors):
+        paths = []
+        saf = ['samples_file']
+        suf = ['subjects_file']
+        for_super = []
+        for path, error, subpipeline_class in errors:
+            paths.append(path)
+            if path not in (saf, suf):
+                for_super.append((path, error, subpipeline_class))
+
+        if saf not in paths and suf not in paths:
+            log.error(f'samples_file nor subjects_file')
+
+        super().subpipeline_errors(for_super)
 
     @property
     def lifted(self):

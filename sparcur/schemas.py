@@ -67,9 +67,9 @@ class JSONSchema(object):
 
     def validate_strict(self, data):
         # Take a copy to ensure we don't modify what we were passed.
-        appstruct = copy.deepcopy(data)
+        #appstruct = copy.deepcopy(data)
 
-        appstruct = json.loads(json.dumps(appstruct, cls=JEncode))  # FIXME figure out converters ...
+        appstruct = json.loads(json.dumps(data, cls=JEncode))  # FIXME figure out converters ...
 
         errors = list(self.validator.iter_errors(appstruct))
         if errors:
@@ -301,6 +301,15 @@ class SubmissionSchema(JSONSchema):
                                'milestone_completion_date': {'type': 'string'},}}}}
 
 
+class UnitSchema(JSONSchema):
+    schema = {'oneOf': [{'type': 'string'},
+                        {'type': 'object',
+                         # TODO enum on the allowed values here
+                         'properties': {'type': {'type': 'string'},
+                                        'value': {'type': 'number'},
+                                        'unit': {'type': 'string'}}}]}
+
+
 class SubjectsSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -315,9 +324,9 @@ class SubjectsSchema(JSONSchema):
                                             'species': {'type': 'string'},
                                             'strain': {'type': 'string'},  # TODO RRID
                                             'sex': {'type': 'string'},  # sex as a variable ?
-                                            'mass': {'type': 'string'},  # TODO protc -> json
-                                            'weight': {'type': 'string'},  # TODO protc -> json
-                                            'age': {'type': 'string'},  # TODO protc -> json
+                                            'mass': UnitSchema.schema,
+                                            'weight': UnitSchema.schema,
+                                            'age': UnitSchema.schema,
                                             'age_category': {'type': 'string'},  # TODO uberon
                                         },},},
 
@@ -389,7 +398,7 @@ class SamplesFileSchema(JSONSchema):
 
 
 class MetaOutSchema(JSONSchema):
-    _schema = copy.deepcopy(DatasetDescriptionSchema.schema)
+    __schema = copy.deepcopy(DatasetDescriptionSchema.schema)
     extra_required = ['award_number',
                       'principal_investigator',
                       'species',
@@ -404,11 +413,14 @@ class MetaOutSchema(JSONSchema):
                       #'subject_count',
                       #'sample_count',
     ]
-    _schema['required'].remove('contributors')
-    _schema['required'] += extra_required
-    _schema['properties'].pop('contributors')
-    _schema['properties'].update({
+    __schema['required'].remove('contributors')
+    __schema['required'] += extra_required
+    __schema['properties'].pop('contributors')
+    __schema['properties'].update({
         'errors': ErrorSchema.schema,
+        'dirs': {'type': 'integer'},
+        'files': {'type': 'integer'},
+        'size': {'type': 'integer'},
         'uri_human': {'type': 'string',
                       'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
         },
@@ -440,7 +452,7 @@ class MetaOutSchema(JSONSchema):
         'sample_count': {'type': 'integer'},
         'contributor_count': {'type': 'integer'},})
 
-    schema = {'allOf': [_schema,
+    schema = {'allOf': [__schema,
                         {'oneOf': [
                             {'required': ['subject_count']},  # FIXME extract subjects from samples ?
                             {'required': ['sample_count']}
@@ -451,9 +463,9 @@ class DatasetOutSchema(JSONSchema):
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
 
-    _schema = copy.deepcopy(DatasetStructureSchema.schema)
-    _schema['required'] = ['id', 'meta', 'contributors']
-    _schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
+    __schema = copy.deepcopy(DatasetStructureSchema.schema)
+    __schema['required'] = ['id', 'meta', 'contributors']
+    __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
                             'errors': ErrorSchema.schema,
@@ -477,7 +489,7 @@ class DatasetOutSchema(JSONSchema):
                                                       'subjects_file': SubjectsSchema.schema,},},}
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
-    schema = {'allOf': [_schema,
+    schema = {'allOf': [__schema,
                         {'oneOf': [
                             {'required': ['subjects']},  # FIXME extract subjects from samples ?
                             {'required': ['samples']}

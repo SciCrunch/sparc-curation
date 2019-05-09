@@ -115,7 +115,7 @@ class Stage:
         self._data = data
 
     @property
-    def data(self):
+    def pipeline_start(self):
         """ The 'raw' input, may be passed in at run time """
         # NOTE put io here for some stages
         # TODO what about lifting? where does that fit? restructuring?
@@ -162,13 +162,14 @@ class Stage:
         return aug
 
     @hasSchema(sc.JSONSchema)
-    def output(self):
+    def data(self):
         aug = self.augmented
         out = aug
         return out
 
 
-HasSchema(sc.HeaderSchema).mark
+hasSchema = HasSchema()
+@hasSchema.mark
 class Header(Stage):
     """ generic header normalization for python """
     def __init__(self, first_row_or_column):
@@ -176,7 +177,7 @@ class Header(Stage):
 
     @property
     def normalized(self):
-        orig_header = self.data
+        orig_header = self.pipeline_start
         header = []
         for i, c in enumerate(orig_header):
             if c:
@@ -191,3 +192,7 @@ class Header(Stage):
             header.append(c)
 
         return header
+
+    @hasSchema(sc.HeaderSchema)
+    def data(self):
+        return self.normalized

@@ -355,7 +355,7 @@ class Version1Header(HasErrors):
             raise exc.NoDataError(self.path)
 
         orig_header, *rest = l
-        header = vldt.Header(orig_header).output
+        header = vldt.Header(orig_header).data
 
         self.fail = False
         if self.to_index:
@@ -435,7 +435,7 @@ class Version1Header(HasErrors):
             return out
 
         ic = list(getattr(self.bc, index_col))
-        nme = vldt.Header(ic).output
+        nme = vldt.Header(ic).data
         nmed = {v:normk for normk, v in zip(nme, ic)}
 
         for v, nt in self.bc._byCol__indexes[index_col].items():
@@ -730,8 +730,9 @@ class SubjectsFile(Version1Header):
         yield from self.sex(value)
 
     def _param(self, value):
-        pv = UnitsParser(value)
-        if not pv[0] == 'param:parse-failure':
+        pv = UnitsParser(value).asPython()
+        #if not pv[0] == 'param:parse-failure':
+        if pv is not None:  # parser failure  # FIXME check on this ...
             yield str(pv)  # this one needs to be a string since it is combined below
         else:
             # TODO warn
@@ -768,7 +769,7 @@ class SubjectsFile(Version1Header):
             compose = dict_[h_value] + dict_[h_unit]
             #_, v, rest = parameter_expression(compose)
             #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
-            out[h_value] = UnitsParser(compose)
+            out[h_value] = UnitsParser(compose).asPython()
 
         if 'gender' in out and 'species' in out:
             if out['species'] != OntTerm('NCBITaxon:9606'):

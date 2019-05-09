@@ -524,8 +524,8 @@ class Main(Dispatcher):
                 print(f'{cwd.cache} is not at dataset level!')
                 sys.exit(123)
 
-            ft = Integrator(cwd)
-            dump_path = self.export_base / 'datasets' / ft.id / timestamp
+            intr = Integrator(cwd)
+            dump_path = self.export_base / 'datasets' / intr.id / timestamp
             latest_path = self.LATEST
             if not dump_path.exists():
                 dump_path.mkdir(parents=True)
@@ -541,14 +541,14 @@ class Main(Dispatcher):
             suffixes = []
             modes = []
             if self.options.json:  # json first since we can cache dowe
-                j = lambda f: json.dump(ft.data,
-                                        f, sort_keys=True, indent=2, cls=JEncode)
+                j = lambda f: json.dump(intr.data, f,
+                                        sort_keys=True, indent=2, cls=JEncode)
                 functions.append(j)
                 suffixes.append('.json')
                 modes.append('wt')
 
             if self.options.ttl:
-                t = lambda f: f.write(ft.ttl)
+                t = lambda f: f.write(intr.ttl)
                 functions.append(t)
                 suffixes.append('.ttl')
                 modes.append('wb')
@@ -910,8 +910,8 @@ class Report(Dispatcher):
 
     def subjects(self):
         key = self._sort_key
-        subjects_headers = tuple(h for ft in self.summary
-                                    for sf in ft.subjects
+        subjects_headers = tuple(h for intr in self.summary
+                                    for sf in intr.subjects
                                     for h in sf.bc.header)
         counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
                                             key=key))

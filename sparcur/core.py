@@ -11,7 +11,7 @@ from pathlib import Path
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
-from pysercomb.pyr.units import Expr
+from pysercomb.pyr.units import Expr as ProtcurExpression
 from sparcur import exceptions as exc
 from sparcur.config import config
 from functools import wraps
@@ -47,16 +47,10 @@ class _log:
 
 class JEncode(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, tuple):
+        if isinstance(obj, deque):
             return list(obj)
-        elif isinstance(obj, deque):
-            return list(obj)
-        elif isinstance(obj, Expr):
-            return obj.for_json
-        elif [type_ for type_ in (OrcidId, DoiId) if isinstance(obj, type_)]:
-            return obj.iri
-        elif isinstance(obj, OntId):
-            return obj.curie + ',' + obj.label
+        elif isinstance(obj, ProtcurExpression):
+            return obj.json()
         elif isinstance(obj, Path):
             return obj.as_posix()
 
@@ -738,6 +732,8 @@ class _DictTransformer:
     def subpipeline(data, runtime_context, subpipelines, update=True, source_key_optional=True):
         """
             [[[[[get-path], [add-path]], ...], pipeline-class, target-path], ...]
+
+            NOTE: this function is a generator, you have to express it!
         """
 
         class DataWrapper:
@@ -754,8 +750,7 @@ class _DictTransformer:
                     adops.add(selected_data, add_path, value)
                 except exc.NoSourcePathError as e:
                     if source_key_optional:
-                        #logd.exception(str(type(e)))
-                        logd.error(f'{e} in {runtime_context.path!r}')
+                        yield get_path, e, pipeline_class
                         ok = False
                         break  # breaks the inner loop
                     else:
