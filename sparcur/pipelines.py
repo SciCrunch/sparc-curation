@@ -1,6 +1,5 @@
 from pathlib import Path
 from sparcur import schemas as sc
-from sparcur import validate as vldt
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
@@ -45,7 +44,7 @@ class PathPipeline(PrePipeline):
             class NoData:  # FIXME
                 data = {}
 
-            he = dat.HasErrors()
+            he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
             logd.exception(e)  # FIXME isn't this were we should accumulate errors?
             he.addError(e)
             he.embedErrors(NoData.data)
@@ -61,7 +60,7 @@ class PathPipeline(PrePipeline):
         return self.transformed
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class DatasetStructurePipeline(PathPipeline):
 
@@ -72,7 +71,7 @@ class DatasetStructurePipeline(PathPipeline):
         return super().data
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class SubmissionFilePipeline(PathPipeline):
 
@@ -83,7 +82,7 @@ class SubmissionFilePipeline(PathPipeline):
         return super().data
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class DatasetDescriptionFilePipeline(PathPipeline):
 
@@ -94,7 +93,7 @@ class DatasetDescriptionFilePipeline(PathPipeline):
         return super().data
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class SubjectsFilePipeline(PathPipeline):
 
@@ -105,7 +104,7 @@ class SubjectsFilePipeline(PathPipeline):
         return super().data
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class SamplesFilePipeline(PathPipeline):
 
@@ -116,7 +115,7 @@ class SamplesFilePipeline(PathPipeline):
         return super().data
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class JSONPipeline(Pipeline):
     # we can't quite do this yet, but these pipelines are best composed
@@ -129,13 +128,12 @@ class JSONPipeline(Pipeline):
     # basically this is the 'intervening' pipeline between the previous pipeline and this pipeline
     # need a better name for it ...
 
-    adds = []
-    lifts = []
     subpipelines = []
     copies = []
     moves = []
-    derives = []
     cleans = []
+    derives = []
+    adds = []
 
     class SkipPipelineError(Exception):
         """ go directly to the end we are done here """
@@ -175,18 +173,8 @@ class JSONPipeline(Pipeline):
         return self.previous_pipeline.data
 
     @property
-    def lifted(self):
-        """ use contents of pipeline start + lifters to populate the data """
-        # lifters are really 'run other pipelines'
-        # or run_subpipelines
-        data = self.pipeline_start
-        DictTransformer.lift(data, [[path, function(self.lifters, self.runtime_context)]
-                                    for path, function in self.lifts])
-        return data
-
-    @property
     def subpipelined(self):
-        data = self.lifted
+        data = self.pipeline_start
         errors = list(DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines))
         self.subpipeline_errors(errors)
         return data
@@ -245,33 +233,9 @@ class JSONPipeline(Pipeline):
         return self.added
 
 
-def section_pipelines(*sections):
-    # FIXME deprecate this ...
-    def section_binder(section):
-        def lift_wrapper(lifters, runtime_context):
-            def lift_function(__unused_path):
-                # throw 'em in a list and let the schema sort 'em out!
-                dwe = [section.data_with_errors
-                       for section in getattr(lifters, section)]
-                if dwe:
-                    dwe, *oops = dwe
-                    if oops:
-                        logd.error(f'{runtime_context.path} '
-                                    f'has too may {section} files!')
-                    return dwe
-
-            return lift_function
-
-        return lift_wrapper
-
-    return [[[section], section_binder(section)]
-            for section in sections]
-
-
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class SPARCBIDSPipeline(JSONPipeline):
-    #lifts = section_pipelines('submission', 'dataset_description', 'subjects')
 
     previous_pipeline_class = DatasetStructurePipeline
 
@@ -323,6 +287,8 @@ class SPARCBIDSPipeline(JSONPipeline):
              [['samples_file', 'samples'], ['samples']],
     )
 
+    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
+
     derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
                  ['inputs', 'dataset_description_file', 'funding']],
                 DT.BOX(De.award_number),
@@ -360,8 +326,6 @@ class SPARCBIDSPipeline(JSONPipeline):
                 [['meta', 'sample_count']]],
     )
 
-    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
-
     adds = [[['id'], lambda lifters: lifters.id],
             [['meta', 'name'], lambda lifters: lifters.name],
             [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
@@ -383,56 +347,13 @@ class SPARCBIDSPipeline(JSONPipeline):
         super().subpipeline_errors(for_super)
 
     @property
-    def lifted(self):
-        """ doing this pipelines this way for now :/ """
-
-        data = super().lifted
-        if 'errors' in data and len(data) == 1:
+    def pipeline_start(self):
+        data = super().pipeline_start
+        if 'errors' in data and len(data) == 1:  # only errors no data
             raise self.SkipPipelineError(data)
         elif 'errors' in data:
-            #data['error_index'] = 500 * (len(data['errors']) - 1)
             pass
 
-        return data
-
-        #lifts = [[path, function(self.lifters)] for path, function in self.lifts]
-        #DictTransformer.lift(data, lifts)
-        #return data
-
-    @property
-    def _data_lifted_post(self):  # I think we can just skip this and use json pointer?
-        # essentially stateful injection of new data
-        # In theory we could include ALL the prior data
-        # in one big blob at the start and then never use lifts
-        def pi_lift_wrapper(lifters):
-            def pi(contributor):
-                if 'contributor_orcid_id' in contributor:
-                    return contributor['contributor_orcid_id']
-
-                # get member if we can find them
-                elif 'name' in contributor and 'first_name' in contributor:
-                    fn = contributor['first_name']
-                    ln = contributor['last_name']
-                    if ' ' in fn:
-                        fn, mn = fn.split(' ', 1)
-
-                    failover = f'{fn}-{ln}'
-                    member = lifters.member(fn, ln)
-
-                    if member is not None:
-                        userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
-
-                    return userid
-
-                else:
-                    member = None
-                    failover = 'no-orcid-no-name'
-                    log.warning(f'No name!' + lj(contributor))
-                    return rdflib.URIRef(dsid + '/contributors/' + failover)
-
-        lifts = [[['meta', 'principal_investigator'], pi],]
-        data = self.data_moved
-        DictTransformer.lift(data, lifts, source_key_optional=True)
         return data
 
     @property
@@ -485,8 +406,8 @@ class PipelineExtras(JSONPipeline):
     previous_pipeline_class = SPARCBIDSPipeline
 
     @property
-    def lifted(self):
-        data = super().lifted
+    def added(self):
+        data = super().added
         # FIXME conditional lifts ...
         if 'award_number' not in data['meta']:
             am = self.lifters.award_manual
@@ -497,6 +418,18 @@ class PipelineExtras(JSONPipeline):
             m = self.lifters.modality
             if m:
                 data['meta']['modality'] = m
+
+        if 'organ' not in data['meta']:
+            if 'award_number' in data['meta']:
+                an = data['meta']['award_number']
+                o = self.lifters.organ(an)
+                if o:
+                    data['meta']['organ'] = o
+
+        if 'organ' not in data['meta']:
+            o = self.lifters.organ_term
+            if o:
+                data['meta']['organ'] = o
 
         if 'error_index' not in data:  # a failure will fill this in
             ei = len(get_all_errors(data))
@@ -515,7 +448,6 @@ class PipelineExtras(JSONPipeline):
             data['error_index'] = ei
             #data['submission_completeness_index'] = sci
 
-        #data['old_errors'] = data.pop('errors')  # FIXME
         return data
 
     @hasSchema(sc.DatasetOutSchema)

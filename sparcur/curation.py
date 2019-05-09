@@ -30,13 +30,11 @@ from sparcur.datasources import OrganData, OntologyData, MembersData
 from sparcur.protocols import ProtocolData, ProtcurData
 from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
 from sparcur import schemas as sc
-from sparcur import validate as vldt
 from sparcur import pipelines as pipes
 from sparcur import sheets
 from ttlser import CustomTurtleSerializer
 from pysercomb.pyr.units import Expr
 from pyontutils.utils import byCol as _byCol
-
 
 a = rdf.type
 
@@ -975,6 +973,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         datasetdata = self.datasetdata
         dsc = datasetdata.cache.dataset
         dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
+        # FIXME except for the adds, everything here should be a pipeline
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dsc.id  # in case we are somewhere else
@@ -997,6 +996,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
             award_manual = self.organs_sheet.award_manual(id)
 
             #sheets
+            organ_term = self.organs_sheet.organ_term(id)
 
         class RuntimeContext:
             """ utility for logging etc. """
@@ -1041,7 +1041,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
             yield from self.data['subjects']
 
 
-hasSchema = vldt.HasSchema()
+hasSchema = sc.HasSchema()
 @hasSchema.mark
 class Summary(Integrator):
     """ A class that summarizes members of its __base__ class """

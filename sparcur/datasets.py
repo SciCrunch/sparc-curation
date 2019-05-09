@@ -4,12 +4,11 @@ import copy
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
 from scibot.extract import normalizeDoi
-from pyontutils.utils import byCol, Async, deferred
+from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from pysercomb.pyr.units import UnitsParser
 from sparcur import schemas as sc
-from sparcur import validate as vldt
 from sparcur import exceptions as exc
 from sparcur import converters as conv
 from sparcur import normalization as nml
@@ -18,14 +17,47 @@ from sparcur.paths import Path
 
 a = rdf.type
 
+# FIXME this whole file needs to be properly converted into pipelines
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class Header:
+    """ generic header normalization for python """
+    # FIXME this is a really a pipeline stage
+    def __init__(self, first_row_or_column):
+        self.pipeline_start = first_row_or_column
+
+    @property
+    def normalized(self):
+        orig_header = self.pipeline_start
+        header = []
+        for i, c in enumerate(orig_header):
+            if c:
+                c = python_identifier(c)
+                c = nml.NormHeader(c)
+            if not c:
+                c = f'TEMP_{i}'
+
+            if c in header:
+                c = c + f'_TEMP_{i}'
+
+            header.append(c)
+
+        return header
+
+    @hasSchema(sc.HeaderSchema)
+    def data(self):
+        return self.normalized
+
 
 class HasErrors:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, pipeline_stage=None, **kwargs):
         try:
             super().__init__(*args, **kwargs)
         except TypeError as e:  # this is so dumb
             super().__init__()
 
+        self._pipeline_stage = pipeline_stage
         self._errors = set()
 
     def addError(self, error):
@@ -34,7 +66,11 @@ class HasErrors:
     @property
     def errors(self):
         for e in self._errors:
-            o = {}
+            o = {'pipeline_stage':
+                 self._pipeline_stage
+                 if self._pipeline_stage
+                 else self.__class__.__name__}  # FIXME
+
             if isinstance(e, str):
                 o['message'] = e
 
@@ -355,7 +391,7 @@ class Version1Header(HasErrors):
             raise exc.NoDataError(self.path)
 
         orig_header, *rest = l
-        header = vldt.Header(orig_header).data
+        header = Header(orig_header).data
 
         self.fail = False
         if self.to_index:
@@ -435,7 +471,7 @@ class Version1Header(HasErrors):
             return out
 
         ic = list(getattr(self.bc, index_col))
-        nme = vldt.Header(ic).data
+        nme = Header(ic).data
         nmed = {v:normk for normk, v in zip(nme, ic)}
 
         for v, nt in self.bc._byCol__indexes[index_col].items():

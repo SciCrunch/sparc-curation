@@ -1,5 +1,6 @@
 import copy
 import json
+from functools import wraps
 import jsonschema
 
 # FIXME these imports should not be here types rules should be set in another way
@@ -7,36 +8,114 @@ from pathlib import Path
 import rdflib
 from pyontutils.core import OntId, OntTerm
 from pysercomb.pyr.units import Expr
+from sparcur import exceptions as exc
 from sparcur.core import JEncode
 
 
-def _format_jsonschema_error(error):
-    """Format a :py:class:`jsonschema.ValidationError` as a string."""
-    if error.path:
-        dotted_path = ".".join([str(c) for c in error.path])
-        return "{path}: {message}".format(path=dotted_path, message=error.message)
-    return error.message
+class hproperty:
+    def __init__(self, fget=None, fset=None, fdel=None, doc=None):
+        self.fget = fget
+        self.fset = fset
+        self.fdel = fdel
+        if doc is None and fget is not None:
+            doc = fget.__doc__
+        self.__doc__ = doc
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+
+        if self.fget is None:
+            raise AttributeError("unreadable attribute")
+
+        return self.fget(obj)
+
+    def __set__(self, obj, value):
+        if self.fset is None:
+            raise AttributeError("can't set attribute")
+
+        self.fset(obj, value)
+
+    def __delete__(self, obj):
+        if self.fdel is None:
+            raise AttributeError("can't delete attribute")
+
+        self.fdel(obj)
+
+    def getter(self, fget):
+        return type(self)(fget, self.fset, self.fdel, self.__doc__)
+
+    def setter(self, fset):
+        return type(self)(self.fget, fset, self.fdel, self.__doc__)
+
+    def deleter(self, fdel):
+        return type(self)(self.fget, self.fset, fdel, self.__doc__)
 
 
-class ValidationError(Exception):
-    def __init__(self, errors):
-        self.errors = errors
+class HasSchema:
+    """ decorator for classes with methods whose output can be validated by jsonschema """
+    def __init__(self, input_schema_class=None, fail=True, normalize=False):
+        self.input_schema = input_schema_class() if input_schema_class is not None else None
+        self.fail = fail
+        self.normalize = normalize
+        self.schema = None  # deprecated output schema ...
 
-    def __repr__(self):
-        msg = ', '.join([_format_jsonschema_error(e) for e in self.errors])
-        return self.__class__.__name__ + f'({msg})'
+    def mark(self, cls):
+        """ note that this runs AFTER all the methods """
 
-    def __str__(self):
-        return repr(self)
+        if self.input_schema is not None:
+            # FIXME probably better to do this as types
+            # and check that schemas match at class time
+            cls._pipeline_start = cls.pipeline_start
+            @hproperty
+            def pipeline_start(self, schema=self.input_schema, fail=self.fail):
+                data = self._pipeline_start
+                ok, norm_or_error, data = schema.validate(data)
+                if not ok and fail:
+                    raise norm_or_error
 
-    def json(self):
-        """ update this to change how errors appear in the validation pipeline """
-        skip = 'schema', 'instance', 'context'  # have to skip context because it has unserializable content
-        return [{k:v if k not in skip else k + ' REMOVED'
-                 for k, v in e._contents().items()
-                 # TODO see if it makes sense to drop these because the parser did know ...
-                 if v and k not in skip}
-                for e in self.errors]
+                return data
+
+            pipeline_start.schema = self.input_schema
+            cls.pipeline_start = pipeline_start
+
+        return cls
+
+        # pretty sure this functionality is no longer used
+        if self.schema is not None:
+            cls._output = cls.output
+            @property
+            def output(_self):
+                return self.schema.validate(cls._output)
+
+            cls.output = output
+
+        return cls
+
+    def __call__(self, schema_class):
+        # TODO switch for normalized output if value passes?
+        schema = schema_class()
+        def decorator(function):
+            pipeline_stage_name = function.__qualname__
+            @hproperty
+            @wraps(function)
+            def schema_wrapped_property(_self):
+                data = function(_self)
+                ok, norm_or_error, data = schema.validate(data)
+                if not ok:
+                    if 'errors' not in data:
+                        data['errors'] = []
+                        
+                    data['errors'] += norm_or_error.json(pipeline_stage_name)
+                    # TODO make sure the step is noted even if the schema is the same
+                elif self.normalize:
+                    return norm_or_error
+
+                return data
+
+            schema_wrapped_property.schema = schema
+            return schema_wrapped_property
+        return decorator
 
 
 class ConvertingChecker(jsonschema.FormatChecker):
@@ -45,6 +124,7 @@ class ConvertingChecker(jsonschema.FormatChecker):
     def check(self, instance, format):
         converted = _enc.default(instance)
         return super().check(converted, format)
+
 
 class JSONSchema(object):
 
@@ -73,7 +153,7 @@ class JSONSchema(object):
 
         errors = list(self.validator.iter_errors(appstruct))
         if errors:
-            raise ValidationError(errors)
+            raise exc.ValidationError(errors)
 
         return appstruct
 
@@ -83,7 +163,7 @@ class JSONSchema(object):
             ok = self.validate_strict(data)  # validate {} to get better error messages
             return True, ok, data  # FIXME better format
 
-        except ValidationError as e:
+        except exc.ValidationError as e:
             return False, e, data  # FIXME better format
 
     @property
@@ -121,7 +201,7 @@ class JSONSchema(object):
         # fields do need to be added at runtime, we'll do that next time
 
 
-metadata_filename_pattern = r'^[a-z_\/]+\.(xlsx|csv|tsv|json)$'
+metadata_filename_pattern = r'^.+\/[a-z_\/]+\.(xlsx|csv|tsv|json)$'
 
 simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
