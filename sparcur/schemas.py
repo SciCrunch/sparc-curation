@@ -92,7 +92,7 @@ class HasSchema:
 
         return cls
 
-    def __call__(self, schema_class):
+    def __call__(self, schema_class, fail=False):
         # TODO switch for normalized output if value passes?
         schema = schema_class()
         def decorator(function):
@@ -103,6 +103,9 @@ class HasSchema:
                 data = function(_self)
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
+                    if fail:
+                        raise norm_or_error
+
                     if 'errors' not in data:
                         data['errors'] = []
                         
@@ -549,11 +552,6 @@ class DatasetOutSchema(JSONSchema):
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
                             'errors': ErrorSchema.schema,
-                            'error_index': {'type': 'integer',
-                                            'minimum': 0},
-                            #'submission_completeness_index': {'type': 'number',
-                                                              #'minimum': 0,
-                                                              #'maximum': 1,},
                             'contributors': ContributorsOutSchema.schema,
                             'creators': CreatorsSchema.schema,
                             # FIXME subjects_file might make the name overlap clearer
@@ -576,6 +574,27 @@ class DatasetOutSchema(JSONSchema):
                         ]}]}
 
 
+class StatusSchema(JSONSchema):
+    schema = {'type': 'object',
+              'required': ['submission_index', 'curation_index', 'error_index'],
+              'properties': {
+                  'submission_index': {'type': 'integer', 'minimum': 0},
+                  'curation_index': {'type': 'integer', 'minimum': 0},
+                  'error_index': {'type': 'integer', 'minimum': 0},
+                  'submission_errors': ErrorSchema.schema,
+                  'curation_errors': ErrorSchema.schema,
+              }}
+
+
+class PostSchema(JSONSchema):
+    """ This is used to validate only the status schema part that is added to the DatasetOutSchema """
+    schema = {
+        'type': 'object',
+        'required': ['status'],
+        'properties': {'status': StatusSchema.schema,}
+    }
+
+
 class SummarySchema(JSONSchema):
     # TODO add expected counts
     schema = {'type': 'object',
@@ -586,8 +605,8 @@ class SummarySchema(JSONSchema):
                                       'properties': {'count': {'type': 'integer'},},},
                              'datasets': {'type': 'array',
                                           'minItems': 1,
-                                          'items': DatasetOutSchema.schema,},
-                             'errors': ErrorSchema.schema,}}
+                                          'items': {'type': 'object'},  # DatasetOutSchema already validated
+                             }}}
 
 
 class HeaderSchema(JSONSchema):

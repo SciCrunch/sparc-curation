@@ -127,34 +127,3 @@ class Derives:
             return next(iter(out))
 
         return tuple(out)
-
-    @staticmethod
-    def submission_completeness_index(schema, subschemas, inputs):
-        log.debug(pprint.pformat(inputs))
-        def section_dsci(schema, section):
-            if 'errors' not in section:
-                return 1
-
-            total_possible_errors = schema.total_possible_errors
-            number_of_errors = len(section['errors'])
-            return (total_possible_errors - number_of_errors) / total_possible_errors
-
-        #schema = sc.DatasetOutSchema()
-        total_possible_errors = schema.total_possible_errors
-        data = inputs
-        if not data:
-            return 0
-
-        else:
-            actual_errors = 0
-            for required_field in schema.schema['required']:
-                jtype = schema.schema['properties'][required_field]
-                actual_errors += 1
-                if required_field in data:
-                    required_value = data[required_field]
-                    if jtype['type'] == 'object':
-                        if isinstance(required_value, dict):
-                            subschema = subshcemas[required_field]
-                            actual_errors -= section_dsci(required_value)
-
-            return (total_possible_errors - actual_errors) / total_possible_errors

@@ -60,16 +60,16 @@ class HasErrors:
         self._pipeline_stage = pipeline_stage
         self._errors = set()
 
-    def addError(self, error):
-        self._errors.add(error)
+    def addError(self, error, pipeline_stage=None):
+        stage = (pipeline_stage if pipeline_stage is not None
+                 else (self._pipeline_stage if self._pipeline_stage
+                       else self.__class__.__name__))
+        self._errors.add((error, stage))
 
     @property
     def errors(self):
-        for e in self._errors:
-            o = {'pipeline_stage':
-                 self._pipeline_stage
-                 if self._pipeline_stage
-                 else self.__class__.__name__}  # FIXME
+        for e, stage in self._errors:
+            o = {'pipeline_stage': stage}  # FIXME
 
             if isinstance(e, str):
                 o['message'] = e
@@ -223,7 +223,9 @@ class DatasetStructure(Path, HasErrors):
                 yield path
 
             else:
-                log.error(f'path has not been retrieved {path.as_posix()!r}')
+                msg = f'path has not been retrieved {path.as_posix()!r}'
+                self.addError(msg, pipeline_stage=self.__class__.__name__ + '.curation-error')
+                log.error(msg)
 
             for path in gen:
                 if not path.is_broken_symlink():
@@ -766,7 +768,15 @@ class SubjectsFile(Version1Header):
         yield from self.sex(value)
 
     def _param(self, value):
-        pv = UnitsParser(value).asPython()
+        try:
+            pv = UnitsParser(value).asPython()
+        except UnitsParser.ParseFailure as e:
+            caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
+            msg = f'Unexpected and unhandled value {value} for {caller_name}'
+            log.error(msg)
+            self.addError(msg, pipeline_stage=self.__class__.__name__ + '.curation-error')
+            return value
+
         #if not pv[0] == 'param:parse-failure':
         if pv is not None:  # parser failure  # FIXME check on this ...
             yield str(pv)  # this one needs to be a string since it is combined below
@@ -822,6 +832,7 @@ class SubjectsFile(Version1Header):
 
     def triples_gen(self, prefix_func):
         """ NOTE the subject is LOCAL """
+
 
 class SamplesFile(SubjectsFile):
     """ TODO ... """

@@ -1014,7 +1014,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         # all the prior existing data is not a bad one, it just just that it
         # is better to create objects that can take the information already
         # in the data for the current pipeline and return an expanded verion
-        self.pipeline = pipes.PipelineExtras(dataset, lifters, RuntimeContext())
+        self.pipeline = pipes.PipelineEnd(dataset, lifters, RuntimeContext())
 
         self._data = self.pipeline.data
         return self._data
@@ -1111,7 +1111,7 @@ class Summary(Integrator):
 
         return self._data_cache
 
-    @hasSchema(sc.SummarySchema)
+    @hasSchema(sc.SummarySchema, fail=True)
     def data(self):
         data = self.pipeline_end
         return data
@@ -1141,7 +1141,7 @@ class Summary(Integrator):
             if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
                 return OntId(v).curie
             if isinstance(v, Expr):
-                return v.for_text
+                return str(v)  # FIXME for xml?
             else:
                 #log.debug(repr(v))
                 return v

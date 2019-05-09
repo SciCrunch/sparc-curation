@@ -139,3 +139,7 @@ class LengthMismatchError(SparCurError):
     """ lenghts of iterators for a zipeq do not match """
 
 
+class LengthMismatchError(SparCurError):
+    """ lenghts of iterators for a zipeq do not match """
+
+

@@ -22,10 +22,7 @@ class PathPipeline(PrePipeline):
     # FIXME this is a temporary solution to reuse the conversion existing
     data_transformer_class = None
     def __init__(self, previous_pipeline, lifters, runtime_context):
-        try:
-            log.debug(lj(previous_pipeline.data))
-        except TypeError:
-            breakpoint()
+        #log.debug(lj(previous_pipeline.data))
         if isinstance(previous_pipeline, Path):
             path = previous_pipeline
         else:
@@ -195,7 +192,8 @@ class JSONPipeline(Pipeline):
     def cleaned(self):
         data = self.moved
         removed = list(DictTransformer.pop(data, self.cleans, source_key_optional=True))
-        log.debug(f'cleaned the following values from {self}' + lj(removed))
+        #log.debug(f'cleaned the following values from {self}' + lj(removed))
+        log.debug(f'cleaned {len(removed)} values from {self}')
         return data
 
     @property
@@ -384,12 +382,14 @@ class SPARCBIDSPipeline(JSONPipeline):
             data = super().pipeline_end
         except self.SkipPipelineError as e:
             data = e.data
-            #data['id'] = self.lifters.id
             data['meta'] = {}
-            #data['meta']['uri_human'] = self.lifters.uri_human
-            #data['meta']['uri_api'] = self.lifters.uri_api
-            data['error_index'] = 9999
-            data['submission_completeness_index'] = 0
+            data['status'] = {}
+            si = 5555
+            ci = 4444
+            data['status']['submission_index'] = si
+            data['status']['curation_index'] = ci
+            data['status']['error_index'] = si + ci
+            #data['protocol_index'] = 9999  # I think this one has to go in reverse?
             log.debug('pipeline skipped to end due to errors')
 
         return data
@@ -431,23 +431,6 @@ class PipelineExtras(JSONPipeline):
             if o:
                 data['meta']['organ'] = o
 
-        if 'error_index' not in data:  # a failure will fill this in
-            ei = len(get_all_errors(data))
-            if 'inputs' in data:
-                pass
-                #schema = self.__class__.data_out.schema
-                #schema = sc.DatasetSchema()
-                #subschemas = {'dataset_description_file':sc.DatasetDescriptionSchema(),
-                              #'submission_file':sc.SubmissionSchema(),
-                              #'subjects_file':sc.SubjectsSchema(),}
-                #sci = Derives.submission_completeness_index(schema, subschemas, data['inputs'])
-            else:
-                ei = 9999  # datasets without metadata can have between 0 and +inf.0 so 9999 seems charitable :)
-                #sci = 0
-
-            data['error_index'] = ei
-            #data['submission_completeness_index'] = sci
-
         return data
 
     @hasSchema(sc.DatasetOutSchema)
@@ -464,5 +447,82 @@ class PipelineExtras(JSONPipeline):
         DictTransformer.derive(data, derives)
         return data
 
+
+class PipelineEnd(JSONPipeline):
+    """ This is the final pipeline, it computes post processing stats
+        such as errors it it does not validate itself """
+
+    previous_pipeline_class = PipelineExtras
+
+    _submission = (
+        'DatasetStructure',
+        'DatasetStructurePipeline.data',
+        'Tabular',  # FIXME which Tabular
+        'SubmissionFile',
+        'SubmissionFilePipeline.data',
+        'DatasetDescriptionFile',
+        'DatasetDescriptionFilePipeline._transformer',
+        'DatasetDescriptionFilePipeline.data',
+        'SubjectsFilePipeline.data',
+        'SamplesFilePipeline._transformer',
+        'SamplesFilePipeline.data',
+    )
+    _curation = (
+        'DatasetStructure.curation-error',
+        'SubjectsFile.curation-error',
+        'SPARCBIDSPipeline.data',
+        'PipelineExtras.data',
+    )
+
+    @classmethod
+    def _indexes(cls, data):
+        """ compute submission and curation error indexes """
+        errors = get_all_errors(data)
+        submission_errors = []
+        curation_errors = []
+        for error in reversed(errors):
+            if error in submission_errors or error in curation_errors:
+                log.debug('error detected multiple times not counting '
+                          'subsequent occurances' + lj(error))
+                continue
+
+            stage = error['pipeline_stage']
+            message = error['message']
+            if stage in cls._submission:
+                submission_errors.append(error)
+            elif stage in cls._curation:
+                curation_errors.append(error)
+            else:
+                raise ValueError(f'Unhandled stage {stage} {message}')
+
+        si = len(submission_errors)
+        ci = len(curation_errors)
+        data['status'] = {}
+        data['status']['submission_index'] = si
+        data['status']['curation_index'] = ci
+        data['status']['error_index'] = si + ci
+        if submission_errors:
+            data['status']['submission_errors'] = submission_errors
+
+        if curation_errors:
+            data['status']['curation_errors'] = curation_errors
+
+        return si + ci
+
+    @property
+    def added(self):
+        data = super().added
+
+        if 'status' not in data:
+            self._indexes(data)
+
+        return data
+
+    @hasSchema(sc.PostSchema, fail=True)
+    def data(self):
+        return super().data
+
+
 SPARCBIDSPipeline.check()
 PipelineExtras.check()
+PipelineEnd.check()
