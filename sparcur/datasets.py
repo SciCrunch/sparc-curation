@@ -8,7 +8,7 @@ from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
-from protcur.units import UnitsParser, Unit, Quantity
+from pysercomb.pyr.units import UnitsParser, Unit, Quantity
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
@@ -97,6 +97,7 @@ class DatasetStructure(Path, HasErrors):
     rglobs = 'manifest',
     default_glob = 'glob'
     max_childs = 40
+    rate = 8  # set by Integrator from cli
 
     @property
     def counts(self):
@@ -124,7 +125,7 @@ class DatasetStructure(Path, HasErrors):
 
             if need_meta:
                 log.info(f'refreshing {len(need_meta)} files with missing metadata')
-                new_caches = Async(rate=8)(deferred(c.cache.refresh)() for c in need_meta)
+                new_caches = Async(rate=self.rate)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
                     size += c.meta.size
 

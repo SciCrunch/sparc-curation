@@ -34,7 +34,7 @@ from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
 from ttlser import CustomTurtleSerializer
-from protcur.units import Expr
+from pysercomb.pyr.units import Expr
 from pyontutils.utils import byCol as _byCol
 
 xsd = rdflib.XSD
@@ -936,6 +936,7 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
     # class level helpers, instance level helpers go as mixins
 
     no_google = None
+    rate = 8
 
     parent = _wrap_path_gen(Path.parent)
     parents = _wrap_path_gen(Path.parents)
@@ -951,6 +952,8 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
             if _cls != cls:
                 if hasattr(_cls, 'setup'):
                     _cls.setup()
+
+        dat.DatasetStructure.rate = cls.rate
 
         # unanchored helpers
         if cls.no_google:
@@ -1093,17 +1096,17 @@ class Summary(Integrator):
         except:
             organ = None
 
-        if isinstance(organ, list):
+        if isinstance(organ, list) or isinstance(organ, tuple):
             if len(organ) == 1:
                 organ, = organ
-                organ = (repr(OntTerm(organ)))
+                organ = (OntTerm(organ))
             else:
-                organ = ' '.join(repr(OntTerm(o)) for o in organ)
+                organ = [(OntTerm(o)) for o in organ]
 
         elif organ == 'othertargets':
             pass
         elif organ:
-            organ = repr(OntTerm(organ))
+            organ = OntTerm(organ)
 
         return (accessor.status.submission_index,
                 accessor.status.curation_index,

@@ -89,7 +89,7 @@ from datetime import datetime
 from itertools import chain
 from collections import Counter
 import requests
-from htmlfn import render_table
+import htmlfn as hfn
 from pyontutils import clifun as clif
 from terminaltables import AsciiTable
 from sparcur import config
@@ -133,7 +133,7 @@ class Dispatcher(clif.Dispatcher):
                 print(title)
             print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
         elif self.options.server:
-            return render_table(rows[1:], *rows[0]), title
+            return hfn.render_table(rows[1:], *rows[0]), title
         else:
             table = AsciiTable(rows, title=title)
             if align:
@@ -176,6 +176,7 @@ class Main(Dispatcher):
             log.setLevel('INFO')
             logd.setLevel('INFO')
 
+        Integrator.rate = self.options.rate
         Integrator.no_google = self.options.no_google
         self.cwd = Path.cwd()
         self.cwdintr = Integrator(self.cwd)
@@ -529,13 +530,6 @@ class Main(Dispatcher):
             latest_path = self.LATEST
             if not dump_path.exists():
                 dump_path.mkdir(parents=True)
-                if latest_path.exists():
-                    if not latest_path.is_symlink():
-                        raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
-
-                    latest_path.unlink()
-
-                latest_path.symlink_to(dump_path)
 
             functions = []
             suffixes = []
@@ -566,6 +560,14 @@ class Main(Dispatcher):
                 if self.options.open:
                     out.xopen()
 
+            if latest_path.exists():
+                if not latest_path.is_symlink():
+                    raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+
+                latest_path.unlink()
+
+            latest_path.symlink_to(dump_path)
+
             return
 
         summary = self.summary
@@ -576,13 +578,6 @@ class Main(Dispatcher):
         latest_path = self.LATEST
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
-            if latest_path.exists():
-                if not latest_path.is_symlink():
-                    raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
-
-                latest_path.unlink()
-
-            latest_path.symlink_to(dump_path)
 
         filepath = dump_path / filename
 
@@ -616,7 +611,13 @@ class Main(Dispatcher):
 
                 print(f'dataset graph exported to {out}')
 
-            return
+        if latest_path.exists():
+            if not latest_path.is_symlink():
+                raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+
+            latest_path.unlink()
+
+        latest_path.symlink_to(dump_path)
 
         if self.options.debug:
             embed()
@@ -788,10 +789,15 @@ class Main(Dispatcher):
         log.setLevel(old_level)
 
     def server(self):
-        from sparcur.server import make_app
+        from sparcur.server import make_app, url_for
         self.report = Report(self)
-        self.dataset_index = {d.meta.id:d for d in self.datasets}
+        self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
+
+        Report.url_for = staticmethod(url_for)
+        self.__class__.url_for = staticmethod(url_for)
+
         app, *_ = make_app(self)
+        self.app = app
         app.debug = False
         app.run(host='localhost', port=self.options.port, threaded=True)
 
@@ -927,10 +933,30 @@ class Report(Dispatcher):
         else:
             raw = self.summary.completeness
 
+        def rformat(i, si, ci, ei, name, id, award, organ):
+            if self.options.server:
+                rsurl = 'https://projectreporter.nih.gov/reporter_searchresults.cfm'
+                dataset_dash_url = self.url_for('route_datasets_id', id=id)
+                si = hfn.atag('/TODO', si)
+                ci = hfn.atag('/TODO', ci)
+                ei = hfn.atag('/TODO', ei)
+                name = hfn.atag(dataset_dash_url, name)
+                id = hfn.atag(dataset_dash_url, id[:10] + '...')
+                award = hfn.atagpost(rsurl, **{'p_projectnum': f'%{award}%'}) if award else ''  # TODO
+                organ = organ if organ else ''
+                if isinstance(organ, list) or isinstance(organ, tuple):
+                    ' '.join([o.atag() for o in organ])
+                if isinstance(organ, OntTerm):
+                    organ = organ.atag()
+            else:
+                if isinstance(organ, list):
+                    organ = ' '.join([repr(o) for o in organ])
+                    
+
+            return (i + 1, si, ci, ei, name, id, award, organ)
+
         rows = [('', 'SI', 'CI', 'EI', 'name', 'id', 'award', 'organ')]
-        rows += [(i + 1, si, ci, ei, *rest,
-                  an if an else '', organ if organ else '')
-                 for i, (si, ci, ei, *rest, an, organ) in
+        rows += [rformat(i, *cols) for i, cols in
                  enumerate(sorted(raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
 
         return self._print_table(rows, title='Completeness Report')

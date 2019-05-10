@@ -4,7 +4,7 @@ from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from scibot.extract import normalizeDoi
-from protcur.units import Expr
+from pysercomb.pyr.units import Expr
 from sparcur import datasets as dat
 from sparcur.core import log, sparc
 
@@ -67,7 +67,7 @@ class TripleConverter(dat.HasErrors):
                     if isinstance(o, Expr):
                         s = rdflib.BNode()
                         yield subject, p, s
-                        yield from o.n3(s)
+                        yield from o.asRdf(s)
 
                     else:
                         yield subject, p, o

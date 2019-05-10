@@ -1,11 +1,17 @@
 from flask import Flask, request, url_for
 from htmlfn import htmldoc, atag
 from htmlfn import table_style, navbar_style
+from sparcur.curation import Integrator
+
+
+def nowrap(class_, tag=''):
+    return (f'{tag}.{class_}'
+            '{ white-space: nowrap; }')
 
 
 def wrap_tables(*tables, title=None):
     return htmldoc(*tables,
-                   styles=(table_style,),
+                   styles=(table_style, nowrap('td', 'col-id')),
                    title=title)
 
 
@@ -14,12 +20,14 @@ def make_app(self, name='spc-server'):
     app = Flask(name)
     yield app
 
-    @app.route('/datasets')
+    bp = '/dashboard'
+
+    @app.route(f'{bp}/datasets')
     def route_datasets(id):
         table, title = self._print_paths(self.project_path.children)
         return wrap_tables(table, title=title)
 
-    @app.route('/datasets/<id>')
+    @app.route(f'{bp}/datasets/<id>')
     def route_datasets_id(id):
         if id not in self.dataset_index:
             return abort(404)
@@ -27,7 +35,7 @@ def make_app(self, name='spc-server'):
         dataset = self.dataset_index[id]
         tables = []
         try:
-            ddt = next(dataset.dataset_description).t
+            ddt = [['TO', 'DO'], [id, 'derive tables from curation export!']]
             table, _ = self._print_table(ddt)
             tables.append(table)
         except StopIteration:
@@ -35,8 +43,8 @@ def make_app(self, name='spc-server'):
 
         return wrap_tables(*tables, title='Dataset metadata tables')
 
-    @app.route('/reports')
-    @app.route('/reports/')
+    @app.route(f'{bp}/reports')
+    @app.route(f'{bp}/reports/')
     def route_reports():
         report_names = (
             'completeness',
@@ -49,21 +57,20 @@ def make_app(self, name='spc-server'):
                        *report_links,
                        title='Reports')
 
-    @app.route('/reports/completeness')
+    @app.route(f'{bp}/reports/completeness')
     def route_reports_completeness():
         table, title = self.report.completeness()
         return wrap_tables(table, title=title)
 
-    @app.route('/reports/size')
+    @app.route(f'{bp}/reports/size')
     def route_reports_size():
         table, title = self.report.size(dirs=self.project_path.children)
         return wrap_tables(table, title=title)
 
-    @app.route('/reports/filetypes')
+    @app.route(f'{bp}/reports/filetypes')
     def route_reports_filetypes():
         tables = []
         for table, title in self.report.filetypes():
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Filetypes')
-

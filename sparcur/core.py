@@ -5,11 +5,12 @@ import hashlib
 import inspect
 from collections import deque
 import rdflib
+import htmlfn as hfn
 import ontquery as oq
 from joblib import Memory
 from pathlib import Path
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pyontutils.core import OntTerm, OntId, cull_prefixes, makeGraph
+from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
 from pysercomb.pyr.units import Expr as ProtcurExpression
 from sparcur import exceptions as exc
@@ -43,6 +44,16 @@ class _log:
     def error(nothing): pass
     @staticmethod
     def critical(nothing): pass
+
+
+class OntId(OIDB):
+    def atag(self, **kwargs):
+        return hfn.atag(self.iri, self.curie, **kwargs)
+
+
+class OntTerm(OTB):
+    def atag(self, **kwargs):
+        return hfn.atag(self.iri, self.label, **kwargs)  # TODO schema.org ...
 
 
 class JEncode(json.JSONEncoder):
