@@ -1324,7 +1324,7 @@ class PrimaryCache(CachePath):
         #old.created < new.created
         #old.created > new.created
 
-        return file_is_different = PathMeta(**kwargs)
+        return file_is_different, PathMeta(**kwargs)
 
     def _meta_updater(self, pathmeta):
         file_is_different, updated = self._update_meta(self.meta, pathmeta)
@@ -1640,6 +1640,13 @@ class LocalPath(XattrPath):
 
     @property
     def meta(self):
+        return self._meta_maker()
+
+    @property
+    def meta_no_checksum(self):
+        return self._meta_maker(checksum=True)
+
+    def _meta_maker(self, *, checksum=True):
         if not self.exists():
             return PathMeta(
                 id=self.sysid + ':' + self.as_posix(),
@@ -1673,7 +1680,7 @@ class LocalPath(XattrPath):
         self._meta = PathMeta(size=st.st_size,
                               created=None,
                               updated=updated,
-                              checksum=self.checksum(),
+                              checksum=self.checksum() if checksum else None,
                               id=self.id,
                               file_id=st.st_ino,  # pretend inode number is file_id ... oh wait ...
                               user_id=st.st_uid,

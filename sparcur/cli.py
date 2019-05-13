@@ -8,8 +8,10 @@ Usage:
     spc annos [export shell]
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
+    spc report terms [anatomy cells subcelluar] [options] [<directory>...]
     spc report [completeness filetypes keywords subjects errors test] [options]
     spc tables [<directory>...]
+    spc status
     spc missing
     spc xattrs
     spc export [ttl json datasets] [options]
@@ -31,11 +33,16 @@ Commands:
                 completeness    submission and curation completeness
                 filetypes       filetypes used across datasets
                 keywords        keywords used per dataset
+                terms           all ontology terms used in the export
+                                anatomy
+                                cells
+                                subcelluar
                 subjects        all headings from subjects files
                 errors          list of all errors per dataset
 
                 options: [--tab-table --sort-count-desc --debug]
 
+    status      list existing files where local meta does not match cached
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
     export      export extracted data
@@ -787,6 +794,27 @@ class Main(Dispatcher):
             inner(path)
 
         log.setLevel(old_level)
+
+    def status(self):
+        existing_files = [f for f in self.project_path.rchildren if f.is_file()]
+        different = []
+        for f in existing_files:
+            cmeta = f.cache.meta
+            lmeta = f.meta if cmeta.checksum else f.meta_no_checksum
+            if lmeta.checksum != cmeta.checksum:
+                changed = True
+            elif lmeta.size != cmeta.size:
+                changed = True
+            elif lmeta.updated < cmeta.updated:
+                changed = True
+            else:
+                changed = False
+
+            if changed:
+                different.append(f, lmeta, cmeta)
+
+        # TODO side by side using lmeta.as_pretty_diff(cmeta)
+        self._print_paths([f for f, _, _ in different])
 
     def server(self):
         from sparcur.server import make_app, url_for
