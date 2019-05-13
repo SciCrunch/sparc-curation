@@ -34,7 +34,7 @@ from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
 from ttlser import CustomTurtleSerializer
-from pysercomb.pyr.units import Expr
+from pysercomb.pyr.units import Expr, _Quant as Quantity
 from pyontutils.utils import byCol as _byCol
 
 xsd = rdflib.XSD
@@ -910,7 +910,7 @@ class TriplesExport:
         [graph.add(t) for t in self.triples_header]
         [graph.add(t) for t in self.triples
          if not (lambda: (log.error(t)
-                          if any(isinstance(_, Expr)
+                          if any(isinstance(_, Expr) or isinstance(_, Quantity)
                                  or (hasattr(_, '_value') and isinstance(_._value, Expr))
                                  for _ in t)
                           else None))()]
@@ -1179,6 +1179,8 @@ class Summary(Integrator):
                 return OntId(v).curie
             if isinstance(v, Expr):
                 return str(v)  # FIXME for xml?
+            if isinstance(v, Quantity):
+                return str(v)
             else:
                 #log.debug(repr(v))
                 return v
@@ -1220,7 +1222,7 @@ class Summary(Integrator):
                       'contributor_affiliation',
                       'contributor_role'))
 
-        datasets = [['id', 'error_index', 'dataset_completeness_index'] + dsh]
+        datasets = [['id', 'submission_index', 'curation_index'] + dsh]
         contributors = [['id'] + chs]
         subjects = [['id', 'blob']]
         errors = [['id', 'blob']]

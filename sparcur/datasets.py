@@ -8,7 +8,7 @@ from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
-from pysercomb.pyr.units import UnitsParser, Unit, Quantity
+from pysercomb.pyr import units as pyru
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
@@ -770,8 +770,8 @@ class SubjectsFile(Version1Header):
 
     def _param(self, value):
         try:
-            pv = UnitsParser(value).asPython()
-        except UnitsParser.ParseFailure as e:
+            pv = pyru.UnitsParser(value).asPython()
+        except pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
             msg = f'Unexpected and unhandled value {value} for {caller_name}'
             log.error(msg)
@@ -815,8 +815,8 @@ class SubjectsFile(Version1Header):
         for h_unit, h_value in zip(self.h_unit, self.h_value):
             dhv = dict_[h_value]
             if isinstance(dhv, str):
-                dhv = Quantity(ast.literal_eval(dhv))
-            compose = dhv + Unit(dict_[h_unit])
+                dhv = ast.literal_eval(dhv)
+            compose = dhv * pyru.ur.parse_units(dict_[h_unit])
             #_, v, rest = parameter_expression(compose)
             #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
             #breakpoint()

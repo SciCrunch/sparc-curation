@@ -4,7 +4,7 @@ from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from scibot.extract import normalizeDoi
-from pysercomb.pyr.units import Expr
+from pysercomb.pyr.units import Expr, _Quant as Quantity
 from sparcur import datasets as dat
 from sparcur.core import log, sparc
 
@@ -39,6 +39,8 @@ class TripleConverter(dat.HasErrors):
             return value.u
         if isinstance(value, Expr):
             return value
+        if isinstance(value, Quantity):
+            return value
         elif isinstance(value, str) and value.startswith('http'):
             return OntId(value).u
         else:
@@ -64,11 +66,10 @@ class TripleConverter(dat.HasErrors):
                     log.debug(f'{field} {v} {convert}')
                     p, o = convert(v)
                     log.debug(o)
-                    if isinstance(o, Expr):
+                    if isinstance(o, Expr) or isinstance(o, Quantity):
                         s = rdflib.BNode()
                         yield subject, p, s
                         yield from o.asRdf(s)
-
                     else:
                         yield subject, p, o
 
