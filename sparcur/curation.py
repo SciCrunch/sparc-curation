@@ -1216,13 +1216,16 @@ class Summary(Integrator):
     @property
     def disco(self):
         dsh = sorted(MetaOutSchema.schema['allOf'][0]['properties'])
-        chs = sorted(('name',
-                      'contributor_orcid_id',
-                      'is_contact_person',
-                      'contributor_affiliation',
-                      'contributor_role'))
+        oldh = ['error_index', 'dataset_completeness_index']
+        chs = ['contributor_affiliation',
+               'contributor_orcid_id',
+               'contributor_role',
+               'is_contact_person',
+               'name',
+               'first_name',
+               'last_name',]
 
-        datasets = [['id', 'submission_index', 'curation_index'] + dsh]
+        datasets = [['id', 'submission_index', 'curation_index'] + dsh + oldh]
         contributors = [['id'] + chs]
         subjects = [['id', 'blob']]
         errors = [['id', 'blob']]
@@ -1264,6 +1267,9 @@ class Summary(Integrator):
 
             else:
                 row += [None for k in sc.MetaOutSchema.schema['properties']]
+
+            for k in oldh:
+                row.append(None)
 
             datasets.append(row)
 
