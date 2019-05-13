@@ -949,6 +949,8 @@ class Report(Dispatcher):
                 if isinstance(organ, OntTerm):
                     organ = organ.atag()
             else:
+                award = award if award else ''
+                organ = (repr(organ) if isinstance(organ, OntTerm) else organ) if organ else ''
                 if isinstance(organ, list):
                     organ = ' '.join([repr(o) for o in organ])
                     
