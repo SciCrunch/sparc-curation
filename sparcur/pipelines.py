@@ -172,8 +172,10 @@ class JSONPipeline(Pipeline):
     @property
     def subpipelined(self):
         data = self.pipeline_start
-        errors = list(DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines))
+        errors_subpipelines = list(DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines))
+        errors = tuple(es for es in errors_subpipelines if isinstance(es, tuple))
         self.subpipeline_errors(errors)
+        self.subpipeline_instances = tuple(es for es in errors_subpipelines if isinstance(es, Pipeline))
         return data
 
     @property

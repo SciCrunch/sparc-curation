@@ -779,6 +779,7 @@ class _DictTransformer:
         for target_path, pc, *args in prepared:
             p = pc(*args)
             function(data, target_path, p.data)
+            yield p
 
     @staticmethod
     def lift(data, lifts, source_key_optional=True):

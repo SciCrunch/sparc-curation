@@ -413,9 +413,9 @@ class Version1Header(HasErrors):
         self.path.xopen()
 
     @property
-    def errors(self):
-        yield from self.t.errors
-        yield from super().errors
+    def _errors(self):
+        yield from self.t._errors
+        yield from super()._errors
 
     @staticmethod
     def query(value, prefix):
