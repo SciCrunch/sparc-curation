@@ -781,12 +781,12 @@ class Main(Dispatcher):
             try:
                 cmeta = path.cache.meta
                 if cmeta is not None:
-                    print(cmeta.as_pretty(pathobject=path, human=self.options.human))
-                if self.options.diff:
-                    # TODO lmeta.as_pretty_diff(cmeta)
-                    lmeta = path.meta
-                    print(lmeta.content_different(cmeta))
-                    print(lmeta.as_pretty(pathobject=path, human=self.options.human))
+                    if self.options.diff:
+                        lmeta = path.meta
+                        print(lmeta.as_pretty_diff(cmeta, pathobject=path, human=self.options.human))
+                    else:
+                        print(cmeta.as_pretty(pathobject=path, human=self.options.human))
+
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
 
@@ -807,10 +807,7 @@ class Main(Dispatcher):
             cmeta = f.cache.meta
             lmeta = f.meta if cmeta.checksum else f.meta_no_checksum
             if lmeta.content_different(cmeta):
-                different.append((f, lmeta, cmeta))
-
-        # TODO side by side using lmeta.as_pretty_diff(cmeta)
-        self._print_paths([f for f, _, _ in different])
+                print(lmeta.as_pretty_diff(cmeta, pathobject=f, human=self.options.human))
 
     def server(self):
         from sparcur.server import make_app, url_for

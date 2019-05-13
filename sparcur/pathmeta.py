@@ -7,6 +7,7 @@ from pathlib import PurePosixPath
 from datetime import datetime
 from dateutil import parser
 from terminaltables import AsciiTable
+from pyontutils.utils import TermColors as tc
 from sparcur import exceptions as exc
 from sparcur.utils import log, FileSize
 
@@ -490,13 +491,7 @@ class _PathMetaAsPretty(_PathMetaConverter):
         
         return value
 
-    def as_pretty(self, pathmeta, pathobject=None, title=None, human=False):
-        if title is None:
-            if pathobject is not None:
-                title = pathobject.name
-            else:
-                title = ''
-            
+    def rows(self, meta, human=False):
         def key(kv):
             k, v = kv
             if k in self.fields:
@@ -504,15 +499,24 @@ class _PathMetaAsPretty(_PathMetaConverter):
             else:
                 return 1, 0, k, v
 
+        return sorted(([k, v.hr
+                        if human and isinstance(v, FileSize)
+                        else self.encode(k, v)]
+                       for k, v in meta.items()
+                       if (v is not None and
+                           (isinstance(v, tuple) and
+                            v or not isinstance(v, tuple)))),
+                      key=key)
+
+    def as_pretty(self, pathmeta, pathobject=None, title=None, human=False):
+        if title is None:
+            if pathobject is not None:
+                title = pathobject.name
+            else:
+                title = ''
+            
         h = [['Key', f'Value    {title}']]
-        rows = h + sorted(([k, v.hr
-                            if human and isinstance(v, FileSize)
-                            else self.encode(k, v)]
-                           for k, v in pathmeta.items()
-                           if (v is not None and
-                               (isinstance(v, tuple) and
-                                v or not isinstance(v, tuple)))),
-                          key=key)
+        rows = h + self.rows(pathmeta, human=human)
 
         try:
             table = AsciiTable(rows, title=title).table
@@ -528,7 +532,85 @@ class _PathMetaAsPretty(_PathMetaConverter):
 
 class _PathMetaAsPrettyDiff(_PathMetaAsPretty):
     """ TODO """
-    pass
+    format_name = 'pretty-diff'
+
+    def __init__(self):
+        # register functionality on PathMeta
+        def as_pretty_diff(self, othermeta, pathobject=None, title=None, human=False,
+                           _as_pretty_diff=self.as_pretty_diff):
+            return _as_pretty_diff(self, othermeta, pathobject=pathobject, title=title, human=human)
+
+        @classmethod
+        def from_pretty_diff(cls, pretty, _from_pretty_diff=self.from_pretty_diff):
+            # FIXME cls(**kwargs) vs calling self.pathmetaclass
+            return _from_pretty_diff(pretty)
+
+        self.pathmetaclass.as_pretty_diff = as_pretty_diff
+        self.pathmetaclass.from_pretty_diff = from_pretty_diff
+
+        self.maxf = max([len(f) for f in self.fields])
+
+    def as_pretty_diff(self, pathmeta, othermeta, pathobject=None, title=None, human=False):
+        if title is None:
+            if pathobject is not None:
+                title = pathobject.name
+            else:
+                title = ''
+            
+        if pathmeta.content_different(othermeta):
+            title = tc.red(title)
+
+        def merge(a, b):
+            keys = [k for k, _ in a]
+            okeys = [ok for ok, _ in b]
+            kind = [(k, okeys.index(k) - i, k) if k in okeys else (None, 0, k)
+                    for i, k in enumerate(keys)]
+            okind = [(ok, keys.index(ok) - i, ok) if ok in keys else (None, 0, ok)
+                     for i, ok in enumerate(okeys)]
+            long, short = (kind, okind) if len(kind) > len(okind) else (okind, kind)
+            start_align = None
+            aligned = []
+            offset = 0
+            for i, (k, v, av) in enumerate(long):
+                i -= offset
+                if k is None and start_align is None:
+                    aligned.append(av)
+                    aligned.append(short[i + v][-1])
+                elif k is not None:
+                    if v <= 0:
+                        start_align = i
+                        aligned.append(av)
+                    else:
+                        for j in range(v):
+                            aligned.append(short[i + j][-1])
+                        offset += v
+                        aligned.append(av)
+
+                elif k is None:
+                    aligned.append(av)
+                # FIXME what to do if short has a key that long does not?
+
+            lkv = len(a[0])
+            lokv = len(b[0])
+            kv = {k:[k, v] for k, v in a}
+            okv = {k:[k, v] for k, v in b}
+            for k in aligned:
+                l = kv[k] if k in kv else ([''] * lkv)
+                r = okv[k] if k in okv else ([''] * lokv)
+                yield l + r
+
+        h = [['Key', 'Value', 'Key Other', 'Value Other']]
+        rows = h + list(merge(self.rows(pathmeta, human=human), self.rows(othermeta, human=human)))
+        try:
+            table = AsciiTable(rows, title=title).table
+        except TypeError as e:
+            breakpoint()
+            raise e
+
+        return table
+
+    def from_pretty_diff(self, pretty):
+        raise NotImplementedError('yeah ... really don\'t want to do this')
 
 
 class _EncodeByField:
@@ -603,5 +685,5 @@ _bytes_encode = _EncodeByFieldBytes()
 _PathMetaAsSymlink()
 _PathMetaAsXattrs()
 _PathMetaAsPretty()
-#_PathMetaAsPrettyDiff()  # TODO
+_PathMetaAsPrettyDiff()  # TODO
 
