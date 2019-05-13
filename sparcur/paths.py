@@ -1296,6 +1296,8 @@ class PrimaryCache(CachePath):
         if not new:
             return old
 
+        file_is_different = False
+
         kwargs = {k:v for k, v in old.items()}
         if old.id != new.id:
             kwargs['old_id'] = old.id
@@ -1309,6 +1311,8 @@ class PrimaryCache(CachePath):
 
             if vold is not None and vold != vnew:
                 log.info(f'{old.id} field {k} changed from {vold} -> {vnew}')
+                if k in ('created', 'updated', 'size', 'checksum', 'file_id'):
+                    file_is_different = True
 
             kwargs[k] = vnew
 
@@ -1320,10 +1324,12 @@ class PrimaryCache(CachePath):
         #old.created < new.created
         #old.created > new.created
 
-        return PathMeta(**kwargs)
+        return file_is_different = PathMeta(**kwargs)
 
     def _meta_updater(self, pathmeta):
-        self._meta_setter(self._update_meta(self.meta, pathmeta))
+        file_is_different, updated = self._update_meta(self.meta, pathmeta)
+        self._meta_setter(updated)
+        return file_is_different
 
     @property
     def children(self):

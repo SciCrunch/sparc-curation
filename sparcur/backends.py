@@ -694,7 +694,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             self._bfobject = self.bfl.get(self.id)
 
         if update_cache or update_data:
-            self.update_cache()
+            file_is_different = self.update_cache()
+            update_data = update_data or file_is_different and self.cache.exists()
 
         if update_data and self.is_file():
             self.cache.fetch(size_limit_mb=size_limit_mb)
@@ -708,7 +709,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             # and will detect if a parent path has changed
             self.cache.move(remote=self)
 
-        self.cache._meta_updater(self.meta)
+        file_is_different = self.cache._meta_updater(self.meta)
+        return file_is_different
 
     @property
     def data(self):
