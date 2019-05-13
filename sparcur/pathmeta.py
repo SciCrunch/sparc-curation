@@ -8,7 +8,7 @@ from datetime import datetime
 from dateutil import parser
 from terminaltables import AsciiTable
 from sparcur import exceptions as exc
-from sparcur.core import log, FileSize
+from sparcur.utils import log, FileSize
 
 
 class PathMeta:
@@ -73,6 +73,11 @@ class PathMeta:
         #embed()
         #return self._as_xattrs(self, prefix=prefix)
 
+    def content_different(self, other):
+        """ is there any evidence that the file itself changed? """
+        return ((self.checksum and other.checksum and self.checksum != other.checksum) or
+                self.size != other.size or
+                self.updated < other.updated)
 
     def items(self):
         return self.__dict__.items()  # FIXME nonfields?
@@ -521,6 +526,11 @@ class _PathMetaAsPretty(_PathMetaConverter):
         raise NotImplementedError('yeah ... really don\'t want to do this')
 
 
+class _PathMetaAsPrettyDiff(_PathMetaAsPretty):
+    """ TODO """
+    pass
+
+
 class _EncodeByField:
     def __call__(self, field, value):
         if type(value) == str:
@@ -593,4 +603,5 @@ _bytes_encode = _EncodeByFieldBytes()
 _PathMetaAsSymlink()
 _PathMetaAsXattrs()
 _PathMetaAsPretty()
+#_PathMetaAsPrettyDiff()  # TODO
 

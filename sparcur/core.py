@@ -3,27 +3,24 @@ import json
 import shutil
 import hashlib
 import inspect
+import itertools
+from pathlib import Path
+from functools import wraps
 from collections import deque
 import rdflib
 import htmlfn as hfn
 import ontquery as oq
-from joblib import Memory
-from pathlib import Path
+#from joblib import Memory
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
-from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
-from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity
+from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
-from sparcur.config import config
-from functools import wraps
-import itertools
 
-log = makeSimpleLogger('sparcur')
-logd = makeSimpleLogger('sparcur-data')
-sparc = rdflib.Namespace('http://uri.interlex.org/tgbugs/uris/readable/sparc/')
+from sparcur.utils import log, logd, sparc, FileSize, python_identifier  # FIXME fix other imports
+
 
 # disk cache decorator
-memory = Memory(config.cache_dir, verbose=0)
+#memory = Memory(config.cache_dir, verbose=0)
 
 
 def lj(j):
@@ -286,31 +283,6 @@ def JT(blob):
     nc = type('JT' + str(type(blob)), (type_,), cd)  # use object to prevent polution of ns
     #nc = type('JT' + str(type(blob)), (type(blob),), cd)
     return nc()
-
-
-class FileSize(int):
-    @property
-    def mb(self):
-        return self / 1024 ** 2
-
-    @property
-    def hr(self):
-        """ human readable file size """
-
-        def sizeof_fmt(num, suffix=''):
-            for unit in ['','K','M','G','T','P','E','Z']:
-                if abs(num) < 1024.0:
-                    return "%0.0f%s%s" % (num, unit, suffix)
-                num /= 1024.0
-            return "%.1f%s%s" % (num, 'Yi', suffix)
-
-        if self is not None and self >= 0:
-            return sizeof_fmt(self)
-        else:
-            return '??'  # sigh
-
-    def __repr__(self):
-        return f'{self.__class__.__name__} <{self.hr} {self}>'
 
 
 _type_order = (

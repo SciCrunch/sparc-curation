@@ -19,7 +19,7 @@ Usage:
     spc shell [integration] [options]
     spc feedback <feedback-file> <feedback>...
     spc find [options] --name=<PAT>...
-    spc meta [--uri] [--browser] [--human] [<path>...]
+    spc meta [--uri] [--browser] [--human] [--diff] [<path>...]
     spc server [options]
 
 Commands:
@@ -80,6 +80,7 @@ Options:
     -O --open               open the output file
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
+    -D --diff               diff local vs cache
 
     --port=PORT             server port [default: 7250]
 
@@ -98,6 +99,7 @@ from collections import Counter
 import requests
 import htmlfn as hfn
 from pyontutils import clifun as clif
+from pysercomb.pyr import units as pyru
 from terminaltables import AsciiTable
 from sparcur import config
 from sparcur import schemas as sc
@@ -192,6 +194,7 @@ class Main(Dispatcher):
             self.options.meta or
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
+            self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend):
             # short circuit since we don't know where we are yet
             return
@@ -226,14 +229,6 @@ class Main(Dispatcher):
 
         self.project_path = self.anchor.local
 
-        """
-        try:
-            path = BlackfynnCache(path_string).resolve()  # avoid infinite recursion from '.'
-            self.anchor = path.anchor
-        except exc.NotInProjectError as e:
-            print(e.message)
-            sys.exit(1)
-        """
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
         PathData.project_path = self.project_path
 
@@ -784,9 +779,14 @@ class Main(Dispatcher):
                     webbrowser.open(uri)
 
             try:
-                meta = path.cache.meta
-                if meta is not None:
-                    print(path.cache.meta.as_pretty(pathobject=path, human=self.options.human))
+                cmeta = path.cache.meta
+                if cmeta is not None:
+                    print(cmeta.as_pretty(pathobject=path, human=self.options.human))
+                if self.options.diff:
+                    # TODO lmeta.as_pretty_diff(cmeta)
+                    lmeta = path.meta
+                    print(lmeta.content_different(cmeta))
+                    print(lmeta.as_pretty(pathobject=path, human=self.options.human))
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
 
@@ -796,22 +796,18 @@ class Main(Dispatcher):
         log.setLevel(old_level)
 
     def status(self):
-        existing_files = [f for f in self.project_path.rchildren if f.is_file()]
+        project_path = self.cwd.find_cache_root()
+        if project_path is None:
+            print(f'{self.cwd} is not in a project!')
+            sys.exit(111)
+
+        existing_files = [f for f in project_path.rchildren if f.is_file()]
         different = []
         for f in existing_files:
             cmeta = f.cache.meta
             lmeta = f.meta if cmeta.checksum else f.meta_no_checksum
-            if lmeta.checksum != cmeta.checksum:
-                changed = True
-            elif lmeta.size != cmeta.size:
-                changed = True
-            elif lmeta.updated < cmeta.updated:
-                changed = True
-            else:
-                changed = False
-
-            if changed:
-                different.append(f, lmeta, cmeta)
+            if lmeta.content_different(cmeta):
+                different.append((f, lmeta, cmeta))
 
         # TODO side by side using lmeta.as_pretty_diff(cmeta)
         self._print_paths([f for f, _, _ in different])

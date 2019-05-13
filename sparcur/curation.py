@@ -23,7 +23,7 @@ from sparcur import config
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT, JEncode, log, logd, lj
-from sparcur.core import sparc, memory, DictTransformer, adops, OntId, OntTerm
+from sparcur.core import sparc, DictTransformer, adops, OntId, OntTerm
 from sparcur.paths import Path
 from sparcur import schemas as sc
 from sparcur import converters as conv

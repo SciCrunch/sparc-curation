@@ -37,8 +37,9 @@ import subprocess
 from time import sleep
 from errno import ELOOP, ENOENT, ENOTDIR, EBADF
 from pathlib import PosixPath, PurePosixPath
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
+from itertools import chain
 import magic  # from sys-apps/file consider python-magic ?
 import xattr
 import psutil
@@ -46,7 +47,7 @@ from dateutil import parser
 from Xlib.display import Display
 from Xlib import Xatom
 from sparcur import exceptions as exc
-from sparcur.core import log
+from sparcur.utils import log
 from sparcur.pathmeta import PathMeta
 from pyontutils.utils import sysidpath
 
@@ -1581,15 +1582,15 @@ class LocalPath(XattrPath):
                 rc(parent, cache=cc(local_path, remote=parent, meta=parent.meta))
 
     def find_cache_root(self):
-        """ find the root of the cache tree, even if we start with skips """
+        """ find the local root of the cache tree, even if we start with skips """
         found_cache = None
         # try all the variants in case some symlinking weirdness is going on
         # TODO may want to detect and warn on that?
         for variant in set((self, self.absolute(), self.resolve())):
-            for parent in variant.parents:
+            for parent in chain((variant,), variant.parents):
                 try:
-                    parent.cache
-                    found_cache = parent
+                    if parent.cache:
+                        found_cache = parent
                 except (exc.NoCachedMetadataError, exc.NotInProjectError) as e:
                     # if we had a cache, went to the parent and lost it
                     # then we are at the root, assuming of course that
@@ -1671,7 +1672,7 @@ class LocalPath(XattrPath):
 
         self.__change_tuple = change_tuple  # TODO log or no?
 
-        updated = datetime.fromtimestamp(fs_data_modified_time)
+        updated = datetime.fromtimestamp(fs_data_modified_time, tz=timezone.utc)
         # these use our internal representation of timestamps
         # the choice of how to store them in xattrs, sqlite, json, etc is handled at those interfaces
         # replace with comma since it is conformant to the standard _and_
