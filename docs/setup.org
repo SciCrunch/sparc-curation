@@ -562,13 +562,39 @@
     Also, having this on an ssd makes it funfast.
     After finishing a =spc pull= and =spc -n "*" -l 2 -f=
     #+BEGIN_SRC bash
-      cd ~/files/blackfynn_local/SPARC\ Consortium
+      pushd ~/files/blackfynn_local/SPARC\ Consortium
       git init
       git add *
       git commit -m "snapshot"
     #+END_SRC
+*** Export
+    #+CAPTION: export everything
+    #+BEGIN_SRC bash
+      pushd ${SPARCDATA}
+      spc export datasets
+      popd
+    #+END_SRC
+
+    #+CAPTION: copy export to server location, run as root
+    #+BEGIN_SRC bash
+      FULLPATH=$(readlink ~sparc-data-user/files/blackfynn_local/export/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/LATEST)
+      FOLDERNAME=$(basename $FULLPATH)
+      pushd /var/www/sparc/sparc
+      cp -a "${FULLPATH}" archive/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/${FOLDERNAME}" exports
+      popd
+    #+END_SRC
+
 *** Reporting
-    =spc stats *=
+    #+CAPTION: reports
+    #+BEGIN_SRC bash
+      spc report completeness
+    #+END_SRC
+
+    #+CAPTION: reporting dashboard
+    #+BEGIN_SRC bash
+      spc server --latest --count
+    #+END_SRC
+
 * Variables :noexport:
   :PROPERTIES:
   :VISIBILITY: folded
