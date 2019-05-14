@@ -3,7 +3,8 @@ from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
-from sparcur.core import JT, JEncode, log, logd, lj
+from sparcur.core import JT, JEncode, log, logd, lj, OntId
+from sparcur.state import State
 from sparcur.derives import Derives
 
 DT = DictTransformer
@@ -12,6 +13,59 @@ De = Derives
 
 class Pipeline:
     """ base pipeline """
+
+
+class DatasourcePipeline(Pipeline):
+    """ pipeline that sources complex data from somewhere else """
+
+
+class ContributorsPipeline(DatasourcePipeline):
+
+    def __init__(self, previous_pipeline, lifters, runtime_context):
+        self.member = State.member
+        self.contributors = previous_pipeline.data
+        self.runtime_context = runtime_context
+        self.dataset_id = runtime_context.id
+        self.dsid = runtime_context.uri_api  # FIXME need a BlackfynnId class
+    
+    @property
+    def data(self):
+        for contributor in self.contributors:
+            self._process(contributor)
+
+    def _process(self, contributor):
+        # get member if we can find them
+        if 'name' in contributor and 'first_name' in contributor:
+            fn = contributor['first_name']
+            ln = contributor['last_name']
+            if ' ' in fn:
+                fn, mn = fn.split(' ', 1)
+                contributor['middle_name'] = mn
+                contributor['first_name'] = fn
+
+            failover = f'{fn}-{ln}'
+            member = self.member(fn, ln)
+
+            if member is not None:
+                userid = OntId('https://api.blackfynn.io/users/' + member.id)
+                contributor['blackfynn_user_id'] = userid
+
+        else:
+            member = None
+            failover = 'no-orcid-no-name'
+            log.warning(f'No name!' + lj(contributor))
+
+        if 'contributor_orcid_id' in contributor:
+            s = OntId(contributor['contributor_orcid_id'])
+
+        else:
+            if member is not None:
+                s = userid
+            else:
+                log.debug(lj(contributor))
+                s = OntId(self.dsid + '/contributors/' + failover)
+
+        contributor['id'] = s
 
 
 class PrePipeline(Pipeline):
@@ -410,6 +464,12 @@ class PipelineExtras(JSONPipeline):
     # before or after their super()'s name
 
     previous_pipeline_class = SPARCBIDSPipeline
+
+    subpipelines = [
+        [[[['contributors'], None]],
+         ContributorsPipeline,
+         None],
+    ]
 
     @property
     def added(self):

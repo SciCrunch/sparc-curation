@@ -105,9 +105,11 @@ from sparcur import config
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, python_identifier, FileSize, JPointer
+from sparcur.core import JT, log, logd, JPointer
 from sparcur.core import OntTerm, get_all_errors, DictTransformer as DT
+from sparcur.utils import FileSize, python_identifier
 from sparcur.paths import Path, BlackfynnCache, PathMeta
+from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, Summary, Integrator
@@ -238,6 +240,7 @@ class Main(Dispatcher):
         self.anchor.remote  # trigger creation of _remote_class
         BlackfynnRemote = BlackfynnCache._remote_class
         self.bfl = BlackfynnRemote.bfl
+        State.bind_blackfynn(self.bfl)
         Integrator.setup(self.bfl)
 
     @property

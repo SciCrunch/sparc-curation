@@ -11,7 +11,7 @@ from collections import defaultdict, deque
 import rdflib
 import dicttoxml
 from pyontutils.config import devconfig
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, sparc
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from nifstd_tools.methods.core import prot, proc, tech, asp, dim, unit
 from protcur.analysis import parameter_expression
@@ -23,8 +23,9 @@ from sparcur import config
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT, JEncode, log, logd, lj
-from sparcur.core import sparc, DictTransformer, adops, OntId, OntTerm
+from sparcur.core import DictTransformer, adops, OntId, OntTerm
 from sparcur.paths import Path
+from sparcur.state import State
 from sparcur import schemas as sc
 from sparcur import converters as conv
 from sparcur.datasources import OrganData, OntologyData, MembersData
@@ -691,8 +692,20 @@ class LThing:
 
 class TriplesExport:
 
-    def __init__(self, path, *args, **kwargs):
+    def __init__(self, data_json, *args, **kwargs):
+        self.data = data_json
+        self.uri_api = self.path.cache.uri_api
+        self.uri_human = self.path.cache.uri_human
+        self.id = self.data['id']
+        self.name = self.data['meta']['name']
+        #self.subjects =  # property
+        self.member
         super().__init__(path, *args, **kwargs)
+
+    @property
+    def subjects(self):
+        if 'subjects' in self.data:
+            yield from self.data['subjects']
 
     def ddt(self, data):
         dsid = self.uri_api
@@ -890,8 +903,8 @@ class TriplesExport:
             (a, owl.Ontology),
             (owl.versionIRI, ver_ontid),
             (owl.versionInfo, rdflib.Literal(iso)),
-            (isAbout, rdflib.URIRef(self.path.cache.uri_api)),
-            (TEMP.hasHumanUri, rdflib.URIRef(self.path.cache.uri_human)),
+            (isAbout, rdflib.URIRef(self.uri_api)),
+            (TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
             (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
@@ -926,7 +939,7 @@ def _wrap_path_gen(prop):
     return impostor
 
 
-class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurData):
+class Integrator(PathData, ProtocolData, OntologyData, ProtcurData):
     """ pull everything together anchored to the DatasetStructure """
     # note that mro means that we have to run methods backwards
     # so any class that uses something produced by a function
@@ -967,14 +980,17 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         else:
             cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
 
-        cls.organ = OrganData(organs_sheet=cls.organs_sheet)
         cls.organ = OrganData()
-        cls.member = MembersData(blackfynn_local_instance)
+        cls.member = State.member
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasetdata = dat.DatasetStructure(self.path)
         #self.protcur = ProtcurData(self)
+
+    @property
+    def triples(self):
+        yield from TriplesExport(self.data)
 
     @property
     def name(self):
@@ -1015,6 +1031,9 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
 
         class RuntimeContext:
             """ utility for logging etc. """
+            id = dsc.id  # TODO can we eliminate the need for lifters this way?
+            uri_api = dsc.uri_api  # FIXME black blackfynn ids their own thing
+            uri_human = dsc.uri_human  # so uri_api and uri_human can be computed from them ...
             path = self.path
 
         helpers = {}
@@ -1048,45 +1067,20 @@ class Integrator(TriplesExport, PathData, ProtocolData, OntologyData, ProtcurDat
         except exc.NoSourcePathError:
             pass
 
-    ## sandboxed for triple export
+
+class ExporterSummarizer:
+    def __init__(self, data_json):
+        self.data = data_json
+
+    def __iter__(self):
+        for dataset_blob in self.data['datasets']:
+            yield dataset_blob
 
     @property
-    def subjects(self):  # XXX
-        if 'subjects' in self.data:
-            yield from self.data['subjects']
-
-
-hasSchema = sc.HasSchema()
-@hasSchema.mark
-class Summary(Integrator):
-    """ A class that summarizes members of its __base__ class """
-    #schema_class = MetaOutSchema  # FIXME clearly incorrect
-    schema_class = SummarySchema
-    schema_out_class = SummarySchema
-
-    def __new__(cls, path, cypher=hashlib.sha256):
-        #cls.schema = cls.schema_class()
-        cls.schema_out = cls.schema_out_class()
-        return super().__new__(cls, path, cypher)
-
-    def __init__(self, path, cypher=hashlib.sha256):
-        super().__init__(path, cypher)
-        # not sure if this is kosher ... but it works
-        super().__init__(self.anchor.path, self.cypher)
- 
-    def __iter__(self):
-        """ Return the list of datasets for the organization
-            of the current Integrator regardless of whether that
-            Integrator is itself an organization node """
-
-        # when going up or down the tree _ALWAYS_
-        # use the filesystem as the source of truth
-        # do not cache in here
-        for i, path in enumerate(self.anchor.path.iterdir()):
-            # FIXME non homogenous, need to find a better way ...
-            yield self.__class__.__base__(path)
-            #if i > 4:
-                #break
+    def completeness(self):
+        """ completeness, name, and id for all datasets """
+        for dataset_blob in self:
+            yield self._completeness(dataset_blob)
 
     def _completeness(self, data):
         accessor = JT(data)  # can go direct if elements are always present
@@ -1120,40 +1114,6 @@ class Summary(Integrator):
             )
 
     @property
-    def completeness(self):
-        """ completeness, name, and id for all datasets """
-        for dataset in self:
-            yield self._completeness(dataset.data)
-
-    def make_json(self, gen):
-        # FIXME this and the datasets is kind of confusing ...
-        # might be worth moving those into a reporting class
-        # that always works at the top level regardless of which
-        # file it is give?
-
-        # TODO parallelize and stream this!
-        ds = list(gen)
-        count = len(ds)
-        meta = {'count': count}
-        return {'id': self.id,
-                'meta': meta,
-                'datasets': ds}
-
-    @property
-    def pipeline_end(self):
-        if not hasattr(self, '_data_cache'):
-            # FIXME validating in vs out ...
-            # return self.make_json(d.validate_out() for d in self)
-            self._data_cache = self.make_json(d.data for d in self)
-
-        return self._data_cache
-
-    @hasSchema(sc.SummarySchema, fail=True)
-    def data(self):
-        data = self.pipeline_end
-        return data
-
-    @property
     def foundary(self):
         pass
 
@@ -1176,7 +1136,8 @@ class Summary(Integrator):
 
         def normv(v):
             if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
-                return OntId(v).curie
+                ot = OntTerm(v)
+                return ot.label + '|' + ot.curie
             if isinstance(v, Expr):
                 return str(v)  # FIXME for xml?
             if isinstance(v, Quantity):
@@ -1185,9 +1146,11 @@ class Summary(Integrator):
                 #log.debug(repr(v))
                 return v
 
-        for dataset in self:
-            id = dataset.id
-            dowe = dataset.data
+        for dataset_blob in self:
+            id = dataset_blob['id']
+            dowe = dataset_blob
+            #id = dataset.id
+            #dowe = dataset.data
             if 'subjects' in dowe:
                 for subject in dowe['subjects']:
                     subject['dataset_id'] = id
@@ -1248,9 +1211,11 @@ class Summary(Integrator):
 
             return v
 
-        for dataset in self:
-            id = dataset.id
-            dowe = dataset.data
+        for dataset_blob in self:
+            id = dataset_blob['id']
+            dowe = dataset_blob
+            #id = dataset.id
+            #dowe = dataset.data
 
             #row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
             row = [id, dowe['status']['submission_index'], dowe['status']['curation_index']]  # FIXME this doubles up on the row
@@ -1321,6 +1286,72 @@ class Summary(Integrator):
                 ('resources', resources),
                 ('errors', errors))
 
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class Summary(Integrator, ExporterSummarizer):
+    """ A class that summarizes members of its __base__ class """
+    #schema_class = MetaOutSchema  # FIXME clearly incorrect
+    schema_class = SummarySchema
+    schema_out_class = SummarySchema
+
+    def __new__(cls, path, cypher=hashlib.sha256):
+        #cls.schema = cls.schema_class()
+        cls.schema_out = cls.schema_out_class()
+        return super().__new__(cls, path, cypher)
+
+    def __init__(self, path, cypher=hashlib.sha256):
+        super().__init__(path, cypher)
+        # not sure if this is kosher ... but it works
+        super().__init__(self.anchor.path, self.cypher)
+ 
+    def __iter__(self):
+        """ Return the list of datasets for the organization
+            of the current Integrator regardless of whether that
+            Integrator is itself an organization node """
+
+        # when going up or down the tree _ALWAYS_
+        # use the filesystem as the source of truth
+        # do not cache in here
+        for i, path in enumerate(self.anchor.path.iterdir()):
+            # FIXME non homogenous, need to find a better way ...
+            yield self.__class__.__base__(path)
+            #if i > 4:
+                #break
+
+    @property
+    def completeness(self):
+        """ completeness, name, and id for all datasets """
+        for dataset in self:
+            yield self._completeness(dataset.data)
+
+    def make_json(self, gen):
+        # FIXME this and the datasets is kind of confusing ...
+        # might be worth moving those into a reporting class
+        # that always works at the top level regardless of which
+        # file it is give?
+
+        # TODO parallelize and stream this!
+        ds = list(gen)
+        count = len(ds)
+        meta = {'count': count}
+        return {'id': self.id,
+                'meta': meta,
+                'datasets': ds}
+
+    @property
+    def pipeline_end(self):
+        if not hasattr(self, '_data_cache'):
+            # FIXME validating in vs out ...
+            # return self.make_json(d.validate_out() for d in self)
+            self._data_cache = self.make_json(d.data for d in self)
+
+        return self._data_cache
+
+    @hasSchema(sc.SummarySchema, fail=True)
+    def data(self):
+        data = self.pipeline_end
+        return data
 
 
 def express_or_return(thing):

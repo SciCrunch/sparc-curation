@@ -148,6 +148,26 @@ class OrcidId(OntId):
             raise self.OrcidChecksumError(self) from e
 
 
+class BlackfynnId(str):
+    """ put all static information derivable from a blackfynn id here """
+    def __new__(cls, id):
+        # TODO validate structure
+        self = super().__new__(cls, id)
+        is_organization = False
+        is_dataset = False
+        is_package = False
+        is_collection = False
+
+    @property
+    def uri_api(self):
+        # these could be dynamic of the same package is in multiple orgs?
+        return self  # TODO
+
+    @property
+    def uri_human(self):
+        return self  # TODO
+
+
 class JTList:
     pass
 
@@ -714,9 +734,9 @@ class _DictTransformer:
 
 
     @staticmethod
-    def subpipeline(data, runtime_context, subpipelines, update=True, source_key_optional=True):
+    def subpipeline(data, runtime_context, subpipelines, update=True, source_key_optional=True, lifters=None):
         """
-            [[[[[get-path], [add-path]], ...], pipeline-class, target-path], ...]
+            [[[[get-path, add-path], ...], pipeline-class, target-path], ...]
 
             NOTE: this function is a generator, you have to express it!
         """
@@ -732,7 +752,10 @@ class _DictTransformer:
             for get_path, add_path in get_adds:
                 try:
                     value = adops.get(data, get_path)
-                    adops.add(selected_data, add_path, value)
+                    if add_path is not None:
+                        adops.add(selected_data, add_path, value)
+                    else:
+                        selected_data = value
                 except exc.NoSourcePathError as e:
                     if source_key_optional:
                         yield get_path, e, pipeline_class
@@ -745,12 +768,17 @@ class _DictTransformer:
                 continue
 
             log.debug(lj(selected_data))
-            prepared.append((target_path, pipeline_class, DataWrapper(selected_data), None, runtime_context))
+            prepared.append((target_path, pipeline_class, DataWrapper(selected_data),
+                             lifters, runtime_context))
 
         function = adops.update if update else adops.add
         for target_path, pc, *args in prepared:
             p = pc(*args)
-            function(data, target_path, p.data)
+            if target_path is not None:
+                function(data, target_path, p.data)
+            else:
+                p.data  # trigger the pipeline since it is stateful
+
             yield p
 
     @staticmethod
