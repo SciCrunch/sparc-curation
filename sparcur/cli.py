@@ -220,6 +220,8 @@ class Main(Dispatcher):
         local = Path(path_string).resolve()
         try:
             path = local.cache  # FIXME project vs subfolder
+            if path is None:
+                raise exc.NoCachedMetadataError  # FIXME somehow we decided not to raise this!??!
             self.anchor = path.anchor
         except exc.NoCachedMetadataError as e:
             root = local.find_cache_root()
