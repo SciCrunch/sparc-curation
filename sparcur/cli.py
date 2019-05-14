@@ -114,6 +114,7 @@ from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, Summary, Integrator
 from sparcur.curation import JEncode
+from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
 
@@ -241,6 +242,7 @@ class Main(Dispatcher):
         BlackfynnRemote = BlackfynnCache._remote_class
         self.bfl = BlackfynnRemote.bfl
         State.bind_blackfynn(self.bfl)
+        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
         Integrator.setup(self.bfl)
 
     @property

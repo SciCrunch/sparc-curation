@@ -6,7 +6,8 @@ from pyontutils.closed_namespaces import rdf, rdfs, owl
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity
 from sparcur import datasets as dat
-from sparcur.core import log, sparc
+from sparcur.utils import log, sparc
+from sparcur.protocols import ProtocolData
 
 a = rdf.type
 
@@ -144,7 +145,7 @@ class MetaConverter(TripleConverter):
             _, s = self.c.protocol_url_or_doi(value)
             yield s, a, owl.NamedIndividual
             yield s, a, sparc.Protocol
-            pj = self.integrator.protocol(value)
+            pj = ProtocolData()(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
             if pj:
                 label = pj['protocol']['title']
                 yield s, rdfs.label, rdflib.Literal(label)

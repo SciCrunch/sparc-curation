@@ -107,6 +107,9 @@ class ProtcurData:
 class ProtocolData:
     # this class is best used as a helper class not as a __call__ class
 
+    def __init__(self, protocol_uris=None):  # FIXME lots of ways to use this class ...
+        self.protocol_uris = protocol_uris
+
     def protocol(self, uri):
         return self._get_protocol_json(uri)
 
@@ -126,11 +129,6 @@ class ProtocolData:
     @classmethod
     def cache_path(cls):
         return config.protocol_cache_path
-
-    @property
-    def protocol_uris(self):
-        raise NotImplementedError('your class needs to have a way of producing protocol uris '
-                                  'otherwise we can\'t help you')
 
     @property
     def protocol_uris_resolved(self):

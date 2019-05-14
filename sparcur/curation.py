@@ -690,17 +690,14 @@ class LThing:
         self._lst = lst
 
 
-class TriplesExport:
+class TriplesExport(ProtcurData):
 
     def __init__(self, data_json, *args, **kwargs):
         self.data = data_json
-        self.uri_api = self.path.cache.uri_api
-        self.uri_human = self.path.cache.uri_human
+        self.uri_api = self.data['meta']['uri_api']
+        self.uri_human = self.data['meta']['uri_human']
         self.id = self.data['id']
         self.name = self.data['meta']['name']
-        #self.subjects =  # property
-        self.member
-        super().__init__(path, *args, **kwargs)
 
     @property
     def subjects(self):
@@ -768,34 +765,11 @@ class TriplesExport:
             log.error(e)
             return
 
-        # get member if we can find them
-        if 'name' in contributor and 'first_name' in contributor:
-            fn = contributor['first_name']
-            ln = contributor['last_name']
-            if ' ' in fn:
-                fn, mn = fn.split(' ', 1)
+        s = contributor['id']
 
-            failover = f'{fn}-{ln}'
-            member = self.member(fn, ln)
-
-            if member is not None:
-                userid = rdflib.URIRef('https://api.blackfynn.io/users/' + member.id)
-
-        else:
-            member = None
-            failover = 'no-orcid-no-name'
-            log.warning(f'No name!' + lj(contributor))
-
-        if 'contributor_orcid_id' in contributor:
-            s = rdflib.URIRef(contributor['contributor_orcid_id'])
-            if member is not None:
-                yield s, TEMP.hasBlackfynnUserId, userid
-        else:
-            if member is not None:
-                s = userid
-            else:
-                log.debug(lj(contributor))
-                s = rdflib.URIRef(dsid + '/contributors/' + failover)
+        if 'blackfynn_user_id' in contributor:
+            userid = rdflib.URIRef(contributor['blackfynn_user_id'])
+            yield s, TEMP.hasBlackfynnUserId, userid
 
         yield s, a, owl.NamedIndividual
         yield s, a, sparc.Researcher
@@ -804,17 +778,6 @@ class TriplesExport:
         yield from converter.triples_gen(s)
         if creator:
             yield s, TEMP.creatorOf, rdflib.URIRef(dsid)
-
-        return
-        for field, value in contributor.items():
-            convert = getattr(converter, field, None)
-            for v in (value if isinstance(value, tuple) or isinstance(value, list) else (value,)):
-                if convert is not None:
-                    yield (s, *convert(v))
-                elif field == 'name':  # skip because we do first/last
-                    pass
-                else:
-                    log.warning(f'Unhandled contributor field: {field}')
 
     @property
     def triples(self):
@@ -939,7 +902,7 @@ def _wrap_path_gen(prop):
     return impostor
 
 
-class Integrator(PathData, ProtocolData, OntologyData, ProtcurData):
+class Integrator(PathData, ProtocolData, OntologyData):
     """ pull everything together anchored to the DatasetStructure """
     # note that mro means that we have to run methods backwards
     # so any class that uses something produced by a function
@@ -990,7 +953,13 @@ class Integrator(PathData, ProtocolData, OntologyData, ProtcurData):
 
     @property
     def triples(self):
-        yield from TriplesExport(self.data)
+       # convenience property that ttl doesn't use directly
+       # but is here in case we want to access the triples
+       yield from TriplesExport(self.data)
+
+    @property
+    def ttl(self):
+        return TriplesExport(self.data).ttl
 
     @property
     def name(self):
@@ -1305,7 +1274,8 @@ class Summary(Integrator, ExporterSummarizer):
         # not sure if this is kosher ... but it works
         super().__init__(self.anchor.path, self.cypher)
  
-    def __iter__(self):
+    @property
+    def iter_datasets(self):
         """ Return the list of datasets for the organization
             of the current Integrator regardless of whether that
             Integrator is itself an organization node """
@@ -1318,6 +1288,10 @@ class Summary(Integrator, ExporterSummarizer):
             yield self.__class__.__base__(path)
             #if i > 4:
                 #break
+
+    def __iter__(self):
+        for ds in self.iter_datasets:
+            yield ds.data
 
     @property
     def completeness(self):
@@ -1344,7 +1318,7 @@ class Summary(Integrator, ExporterSummarizer):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
-            self._data_cache = self.make_json(d.data for d in self)
+            self._data_cache = self.make_json(d.data for d in self.iter_datasets)
 
         return self._data_cache
 

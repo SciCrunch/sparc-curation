@@ -1,5 +1,6 @@
 from sparcur import sheets
 from sparcur import datasources as ds
+#from sparcur import protocols
 
 # state downstream of static external sources
 
@@ -21,3 +22,7 @@ class State:
         # our purposes here, we do need a way to say 'one at a time please'
         cls.blackfynn_local_instance = blackfynn_local_instance
         cls.member = ds.MembersData(blackfynn_local_instance)
+
+    @classmethod
+    def bind_protocol(cls, protocol_data):
+        cls.protocol = protocol_data
