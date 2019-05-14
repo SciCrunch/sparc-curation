@@ -5,6 +5,7 @@ Usage:
     spc pull [options] [<directory>...]
     spc refresh [options] [<path>...]
     spc fetch [options] [<path>...]
+    spc find [options] --name=<PAT>...
     spc status [options]
     spc meta [--uri] [--browser] [--human] [--diff] [<path>...]
     spc export [ttl json datasets] [options]
@@ -13,7 +14,6 @@ Usage:
     spc report terms [anatomy cells subcelluar] [options] [<directory>...]
     spc report [completeness filetypes keywords subjects errors test] [options]
     spc shell [integration] [options]
-    spc find [options] --name=<PAT>...
     spc server [options]
     spc tables [<directory>...]
     spc annos [export shell]
@@ -24,52 +24,99 @@ Usage:
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
-    pull        pull the remote files
-    refresh     refresh to get file sizes and data
-    fetch       fetch based on the metadata that we have
+
+    pull        retrieve remote file structure
+
+                options: --empty
+
+    refresh     retrieve remote file sizes and fild ids (can also fetch using the new data)
+
+                options: --fetch
+                       : --level
+                       : --only-no-file-id
+
+    fetch       fetch remote data based on local metadata (NOTE does NOT refresh first)
+
+                options: --level
+
+    find        list unfetched files with option to fetch
+
+                options: --name=<PAT>...  glob options should be quoted to avoid expansion
+                       : --existing       include existing files in search
+                       : --refresh        refresh matching files
+                       : --fetch          fetch matching files
+                       : --level
+
+    status      list existing files where local meta does not match cached
+
+    meta        display the metadata the current folder or specified paths
+
+                options: --diff     diff the local and cached metadata
+                       : --browser  navigate to the human uri for this file
+                       : --human
+
+    export      export extracted data to json (and everything else)
+
+                datasets        ttl for individual datasets in addition to full export
+                json            json for a single dataset
+                ttl             turtle for a single dataset
+
+                options: --latest   run derived pipelines from latest json
+                       : --open     open the output file using xopen
 
     report      print a report on all datasets
+
                 size            dataset sizes and file counts
                 completeness    submission and curation completeness
                 filetypes       filetypes used across datasets
                 keywords        keywords used per dataset
                 terms           all ontology terms used in the export
+
                                 anatomy
                                 cells
                                 subcelluar
+
                 subjects        all headings from subjects files
                 errors          list of all errors per dataset
 
-                options: [--tab-table --sort-count-desc --debug]
+                options: --latest   run reports on latest json export
+                       : --tab-table
+                       : --sort-count-desc
+                       : --debug
 
-    status      list existing files where local meta does not match cached
+    shell       drop into an ipython shell
+
+                integration     integration subshell with different defaults
+
+    server      reporting server
+
+                options: --latest   run server from latest json export
+
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
-    export      export extracted data
     demos       long running example queries
-    shell       drop into an ipython shell
-    find        list unfetched files with option to fetch
-    meta        display the metadata the current folder or list of folders
 
 Options:
-    -f --fetch              fetch the files
-    -R --refresh            refresh the files
+    -f --fetch              fetch matching files
+    -R --refresh            refresh matching files
+    -r --rate=HZ            sometimes we can go too fast when fetching [default: 5]
     -l --limit=SIZE_MB      the maximum size to download in megabytes [default: 2]
                             use negative numbers to indicate no limit
     -L --level=LEVEL        how deep to go in a refresh
-    -n --name=<PAT>         filename pattern to match (like find -name)
-    -u --uri                print the human uri for the path in question
-    -a --uri-api            print the api uri for the path in question
+                            used by any command that acceps <path>...
+    -p --pretend            if the defult is to act, dont, opposite of fetch
+
     -h --human              print human readable values
     -b --browser            open the uri in default browser
-    --project-path=<PTH>    set the project path manually
-    -o --overwrite          fetch even if the file exists
+    -u --uri                print the human uri for the path in question
+    -a --uri-api            print the api uri for the path in question
+    -n --name=<PAT>         filename pattern to match (like find -name)
     -e --empty              only pull empty directories
     -x --exists             when searching include files that have already been pulled
     -m --only-meta          only pull known dataset metadata files
     -z --only-no-file-id    only pull files missing file_id
-    -r --rate=HZ            sometimes we can go too fast when fetching [default: 5]
-    -p --pretend            if the defult is to act, dont, opposite of fetch
+    -o --overwrite          fetch even if the file exists
+    --project-path=<PTH>    set the project path manually
 
     -t --tab-table          print simple table using tabs for copying
     -A --latest             run reporting on the latest export
