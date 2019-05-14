@@ -1292,10 +1292,10 @@ class PrimaryCache(CachePath):
     @staticmethod
     def _update_meta(old, new):
         if not old:
-            return new
+            return False, new  # if there is no file it is both different and not different
 
         if not new:
-            return old
+            return False, old
 
         file_is_different = False
 

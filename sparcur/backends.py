@@ -695,7 +695,11 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
         if update_cache or update_data:
             file_is_different = self.update_cache()
-            update_data = update_data or file_is_different and self.cache.exists()
+            update_existing = file_is_different and self.cache.exists()
+            if update_existing:
+                size_limit_mb = None
+
+            update_data = update_data or update_existing
 
         if update_data and self.is_file():
             self.cache.fetch(size_limit_mb=size_limit_mb)
