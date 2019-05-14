@@ -104,6 +104,7 @@ class HasSchema:
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
                     if fail:
+                        breakpoint()
                         raise norm_or_error
 
                     if 'errors' not in data:
@@ -602,7 +603,16 @@ class SummarySchema(JSONSchema):
               'properties': {'id': {'type': 'string',
                                     'pattern': '^N:organization:'},
                              'meta': {'type': 'object',
-                                      'properties': {'count': {'type': 'integer'},},},
+                                      'required': ['name', 'count', 'uri_api', 'uri_human'],
+                                      'properties': {'name': {'type': 'string'},
+                                                     # FIXME common source for these with MetaOutSchema
+                                                     'uri_human': {'type': 'string',
+                                                                   'pattern': r'^https://app\.blackfynn\.io/N:organization:',
+        },
+                                                     'uri_api': {'type': 'string',
+                                                                 'pattern': r'^https://api\.blackfynn\.io/organizations/N:organization:',
+                                                     },
+                                                     'count': {'type': 'integer'},},},
                              'datasets': {'type': 'array',
                                           'minItems': 1,
                                           'items': {'type': 'object'},  # DatasetOutSchema already validated

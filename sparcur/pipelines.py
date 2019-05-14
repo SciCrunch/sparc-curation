@@ -3,7 +3,7 @@ from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
-from sparcur.core import JT, JEncode, log, logd, lj, OntId
+from sparcur.core import JT, JEncode, log, logd, lj, OntId, OrcidId
 from sparcur.state import State
 from sparcur.derives import Derives
 
@@ -55,15 +55,17 @@ class ContributorsPipeline(DatasourcePipeline):
             failover = 'no-orcid-no-name'
             log.warning(f'No name!' + lj(contributor))
 
+        orcid = None
         if 'contributor_orcid_id' in contributor:
-            s = OntId(contributor['contributor_orcid_id'])
+            orcid = contributor['contributor_orcid_id']
+            if isinstance(orcid, OrcidId):
+                s = orcid
 
+        if orcid is None and member is not None:
+            s = userid
         else:
-            if member is not None:
-                s = userid
-            else:
-                log.debug(lj(contributor))
-                s = OntId(self.dsid + '/contributors/' + failover)
+            log.debug(lj(contributor))
+            s = OntId(self.dsid + '/contributors/' + failover)
 
         contributor['id'] = s
 

@@ -5,22 +5,22 @@ Usage:
     spc pull [options] [<directory>...]
     spc refresh [options] [<path>...]
     spc fetch [options] [<path>...]
-    spc annos [export shell]
+    spc status [options]
+    spc meta [--uri] [--browser] [--human] [--diff] [<path>...]
+    spc export [ttl json datasets] [options]
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options] [<directory>...]
     spc report [completeness filetypes keywords subjects errors test] [options]
-    spc tables [<directory>...]
-    spc status
-    spc missing
-    spc xattrs
-    spc export [ttl json datasets] [options]
-    spc demos
     spc shell [integration] [options]
-    spc feedback <feedback-file> <feedback>...
     spc find [options] --name=<PAT>...
-    spc meta [--uri] [--browser] [--human] [--diff] [<path>...]
     spc server [options]
+    spc tables [<directory>...]
+    spc annos [export shell]
+    spc feedback <feedback-file> <feedback>...
+    spc missing [options]
+    spc xattrs [options]
+    spc demos [options]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -112,8 +112,8 @@ from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import PathData, Summary, Integrator
-from sparcur.curation import JEncode
+from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer
+from sparcur.curation import JEncode, TriplesExportDataset
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
@@ -579,7 +579,6 @@ class Main(Dispatcher):
 
             return
 
-        summary = self.summary
         # start time not end time ...
         # obviously not transactional ...
         filename = 'curation-export'
@@ -590,19 +589,23 @@ class Main(Dispatcher):
 
         filepath = dump_path / filename
 
-        for xml_name, xml in summary.xml:
+        data = self.latest_export if self.options.latest else self.summary.data
+
+        # FIXME we still create a new export folder every time even if the json didn't change ...
+        with open(filepath.with_suffix('.json'), 'wt') as f:
+            json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
+
+        es = ExporterSummarizer(data)
+
+        with open(filepath.with_suffix('.ttl'), 'wb') as f:
+            f.write(es.ttl)
+
+        for xml_name, xml in es.xml:
             with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
                 f.write(xml)
 
-        # FIXME skip the big fellows how?
-        with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(summary.data, f, sort_keys=True, indent=2, cls=JEncode)
-
-        with open(filepath.with_suffix('.ttl'), 'wb') as f:
-            f.write(summary.ttl)
-
         # datasets, contributors, subjects, samples, resources
-        for table_name, tabular in summary.disco:
+        for table_name, tabular in es.disco:
             with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
@@ -612,11 +615,11 @@ class Main(Dispatcher):
             dataset_dump_path.mkdir()
             suffix = '.ttl'
             mode = 'wb'
-            for d in summary:
-                filepath = dataset_dump_path / d.id
+            for dataset_blob in es:
+                filepath = dataset_dump_path / dataset_blob['id']
                 out = filepath.with_suffix(suffix)
                 with open(out, 'wb') as f:
-                    f.write(d.ttl)
+                    f.write(TriplesExportDataset(dataset_blob).ttl)
 
                 print(f'dataset graph exported to {out}')
 

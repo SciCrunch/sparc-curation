@@ -694,10 +694,88 @@ class TriplesExport(ProtcurData):
 
     def __init__(self, data_json, *args, **kwargs):
         self.data = data_json
-        self.uri_api = self.data['meta']['uri_api']
-        self.uri_human = self.data['meta']['uri_human']
         self.id = self.data['id']
         self.name = self.data['meta']['name']
+        self.uri_api = self.data['meta']['uri_api']
+        self.uri_human = self.data['meta']['uri_human']
+
+
+    @property
+    def ontid(self):
+        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/{self.id}')
+
+    @property
+    def header_graph_description(self):
+        raise NotImplementedError
+
+    @property
+    def triples_header(self):
+        ontid = self.ontid
+        nowish = datetime.utcnow()  # request doesn't have this
+        epoch = nowish.timestamp()
+        iso = nowish.isoformat().replace('.', ',')  # sakes fist at iso for non standard
+        ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
+        sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
+                                      'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
+
+        pos = (
+            (a, owl.Ontology),
+            (owl.versionIRI, ver_ontid),
+            (owl.versionInfo, rdflib.Literal(iso)),
+            (isAbout, rdflib.URIRef(self.uri_api)),
+            (TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
+            (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
+            (rdfs.comment, self.header_graph_description),
+            (owl.imports, sparc_methods),
+        )
+        for p, o in pos:
+            yield ontid, p, o
+
+    @property
+    def ttl(self):
+        graph = rdflib.Graph()
+        self.populate(graph)
+        return graph.serialize(format='nifttl')
+
+    def populate(self, graph):
+        def warn(triple):
+            for element in triple:
+                if (not (isinstance(element, rdflib.URIRef) or
+                        isinstance(element, rdflib.BNode) or
+                        isinstance(element, rdflib.Literal)) or
+                    (hasattr(element, '_value') and isinstance(element._value, dict))):
+                    log.critical(element)
+
+            return triple
+
+        OntCuries.populate(graph)  # ah smalltalk thinking
+        [graph.add(t) for t in self.triples_header if warn(t)]
+        [graph.add(t) for t in self.triples if warn(t)]
+         #if not (lambda: (log.error(t)
+                          #if any(isinstance(_, Expr) or isinstance(_, Quantity)
+                                 #or (hasattr(_, '_value') and isinstance(_._value, Expr))
+                                 #for _ in t)
+                          #else None))()]
+
+
+class TriplesExportSummary(TriplesExport):
+    def __iter__(self):
+        yield from self.data['datasets']
+
+    @property
+    def header_graph_description(self):
+        return rdflib.Literal(f'SPARC organization graph for {self.id}')
+
+    @property
+    def triples(self):
+        for dataset_blob in self:
+            yield from TriplesExportDataset(dataset_blob).triples
+
+
+class TriplesExportDataset(TriplesExport):
+    @property
+    def header_graph_description(self):
+        return rdflib.Literal(f'SPARC single dataset graph for {self.id}')
 
     @property
     def subjects(self):
@@ -732,7 +810,11 @@ class TriplesExport(ProtcurData):
                     'sample_count': '',
                     'species': '',
                     'subject_count': '',
-                    'title_for_complete_data_set': ''}
+                    'title_for_complete_data_set': '',
+                    'dirs': '',
+                    'files': '',
+                    'size': '',
+            }
 
             for k, _v in data['meta'].items():
                 # FIXME how is temp sneeking through?
@@ -760,12 +842,12 @@ class TriplesExport(ProtcurData):
 
     def triples_contributors(self, contributor, creator=False):
         try:
-            dsid = self.uri_api
+            dsid = rdflib.URIRef(self.uri_api)  # FIXME json reload needs to deal with this
         except BaseException as e:  # FIXME ...
             log.error(e)
             return
 
-        s = contributor['id']
+        s = rdflib.URIRef(contributor['id'])  # FIXME json reload needs to deal with this
 
         if 'blackfynn_user_id' in contributor:
             userid = rdflib.URIRef(contributor['blackfynn_user_id'])
@@ -773,11 +855,11 @@ class TriplesExport(ProtcurData):
 
         yield s, a, owl.NamedIndividual
         yield s, a, sparc.Researcher
-        yield s, TEMP.contributorTo, rdflib.URIRef(dsid)
+        yield s, TEMP.contributorTo, dsid
         converter = conv.ContributorConverter(contributor)
         yield from converter.triples_gen(s)
         if creator:
-            yield s, TEMP.creatorOf, rdflib.URIRef(dsid)
+            yield s, TEMP.creatorOf, dsid
 
     @property
     def triples(self):
@@ -795,6 +877,8 @@ class TriplesExport(ProtcurData):
         else:
             log.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
 
+        if 'status' not in data:
+            breakpoint()
         yield from conv.StatusConverter(data['status'], self).triples_gen(dsid)
 
         #converter = conv.DatasetConverter(data)
@@ -844,53 +928,6 @@ class TriplesExport(ProtcurData):
 
         yield from self.ddt(data)
 
-    @property
-    def ontid(self):
-        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/{self.id}')
-
-    @property
-    def header_graph_description(self):
-        return rdflib.Literal(f'SPARC single dataset graph for {self.id}')
-
-    @property
-    def triples_header(self):
-        ontid = self.ontid
-        nowish = datetime.utcnow()  # request doesn't have this
-        epoch = nowish.timestamp()
-        iso = nowish.isoformat().replace('.', ',')  # sakes fist at iso for non standard
-        ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
-        sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
-                                      'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
-
-        pos = (
-            (a, owl.Ontology),
-            (owl.versionIRI, ver_ontid),
-            (owl.versionInfo, rdflib.Literal(iso)),
-            (isAbout, rdflib.URIRef(self.uri_api)),
-            (TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
-            (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
-            (rdfs.comment, self.header_graph_description),
-            (owl.imports, sparc_methods),
-        )
-        for p, o in pos:
-            yield ontid, p, o
-
-    @property
-    def ttl(self):
-        graph = rdflib.Graph()
-        self.populate(graph)
-        return graph.serialize(format='nifttl')
-
-    def populate(self, graph):
-        OntCuries.populate(graph)  # ah smalltalk thinking
-        [graph.add(t) for t in self.triples_header]
-        [graph.add(t) for t in self.triples
-         if not (lambda: (log.error(t)
-                          if any(isinstance(_, Expr) or isinstance(_, Quantity)
-                                 or (hasattr(_, '_value') and isinstance(_._value, Expr))
-                                 for _ in t)
-                          else None))()]
-
 
 def _wrap_path_gen(prop):
     @property
@@ -918,6 +955,8 @@ class Integrator(PathData, ProtocolData, OntologyData):
     parents = _wrap_path_gen(Path.parents)
     children = _wrap_path_gen(Path.children)
     rchildren = _wrap_path_gen(Path.rchildren)
+
+    triples_class = TriplesExportDataset
 
     @classmethod
     def setup(cls, blackfynn_local_instance):
@@ -953,13 +992,13 @@ class Integrator(PathData, ProtocolData, OntologyData):
 
     @property
     def triples(self):
-       # convenience property that ttl doesn't use directly
-       # but is here in case we want to access the triples
-       yield from TriplesExport(self.data)
+        # convenience property that ttl doesn't use directly
+        # but is here in case we want to access the triples
+        yield from self.triples_class(self.data).triples
 
     @property
     def ttl(self):
-        return TriplesExport(self.data).ttl
+        return self.triples_class(self.data).ttl
 
     @property
     def name(self):
@@ -1087,15 +1126,6 @@ class ExporterSummarizer:
         pass
 
     @property
-    def header_graph_description(self):
-        return rdflib.Literal(f'SPARC organization graph for {self.id}')
-
-    @property
-    def triples(self):
-        for d in self:
-            yield from d.triples
-
-    @property
     def xml(self):
         #datasets = []
         #contributors = []
@@ -1104,9 +1134,16 @@ class ExporterSummarizer:
         resources = []
 
         def normv(v):
+            if isinstance(v, str) and v.startswith('http'):
+                # needed for loading from json that has been serialized
+                # rather than from our internal representation
+                # probably better to centralized the reload ...
+                v = OntTerm(v)
+                return v.tabular()
+
             if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
                 ot = OntTerm(v)
-                return ot.label + '|' + ot.curie
+                return ot.tabular()
             if isinstance(v, Expr):
                 return str(v)  # FIXME for xml?
             if isinstance(v, Quantity):
@@ -1165,6 +1202,18 @@ class ExporterSummarizer:
 
         #cje = JEncode()
         def normv(v):
+            if isinstance(v, str) and v.startswith('http'):
+                # needed for loading from json that has been serialized
+                # rather than from our internal representation
+                # probably better to centralized the reload ...
+                v = OntTerm(v)
+                return v.tabular()
+
+            if isinstance(v, OntId):
+                if not isinstance(v, OntTerm):
+                    v = OntTerm(v)
+
+                v = v.tabular()
             if isinstance(v, list) or isinstance(v, tuple):
                 v = ','.join(json.dumps(_, cls=JEncode)
                              if isinstance(_, dict) else
@@ -1183,9 +1232,13 @@ class ExporterSummarizer:
         for dataset_blob in self:
             id = dataset_blob['id']
             dowe = dataset_blob
-            #id = dataset.id
-            #dowe = dataset.data
+            graph = rdflib.Graph()
+            TriplesExportDataset(dataset_blob).populate(graph)
+            is_about = [OntTerm(o) for s, o in graph[:isAbout:] if isinstance(o, rdflib.URIRef)]
+            involves = [OntTerm(o) for s, o in graph[:TEMP.involvesAnatomicalRegion:]]
 
+            inv = ','.join(i.tabular() for i in involves)
+            ia = ','.join(a.tabular() for a in is_about)
             #row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
             row = [id, dowe['status']['submission_index'], dowe['status']['curation_index']]  # FIXME this doubles up on the row
             if 'meta' in dowe:
@@ -1255,6 +1308,9 @@ class ExporterSummarizer:
                 ('resources', resources),
                 ('errors', errors))
 
+    @property
+    def ttl(self):
+        return TriplesExportSummary(self.data).ttl
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
@@ -1263,6 +1319,7 @@ class Summary(Integrator, ExporterSummarizer):
     #schema_class = MetaOutSchema  # FIXME clearly incorrect
     schema_class = SummarySchema
     schema_out_class = SummarySchema
+    triples_class = TriplesExportSummary
 
     def __new__(cls, path, cypher=hashlib.sha256):
         #cls.schema = cls.schema_class()
@@ -1308,7 +1365,11 @@ class Summary(Integrator, ExporterSummarizer):
         # TODO parallelize and stream this!
         ds = list(gen)
         count = len(ds)
-        meta = {'count': count}
+        meta = {'name': self.name,
+                'uri_api': self.uri_api,
+                'uri_human': self.uri_human,
+                'count': count,}
+
         return {'id': self.id,
                 'meta': meta,
                 'datasets': ds}

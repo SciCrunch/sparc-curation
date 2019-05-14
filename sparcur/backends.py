@@ -6,7 +6,8 @@ from datetime import datetime
 import requests
 from pexpect import pxssh
 from sparcur import exceptions as exc
-from sparcur.core import log
+from sparcur.utils import log
+from sparcur.core import BlackfynnId
 from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, SshCache, BlackfynnCache
 from sparcur.paths import StatResult
 
@@ -504,22 +505,24 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
     @property
     def id(self):
         if isinstance(self._seed, self.__class__):
-            return self._seed.bfobject.id
+            id = self._seed.bfobject.id
 
         elif isinstance(self._seed, BaseNode):
             if isinstance(self._seed, File):
-                return self._seed.pkg_id
+                id = self._seed.pkg_id
             else:
-                return self._seed.id
+                id = self._seed.id
 
         elif isinstance(self._seed, str):
-            return self._seed
+            id = self._seed
 
         elif isinstance(self._seed, PathMeta):
-            return self._seed.id
+            id = self._seed.id
 
         else:
             raise TypeError(self._seed)
+
+        return BlackfynnId(id)
 
     @property
     def size(self):

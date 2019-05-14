@@ -9,7 +9,7 @@ from protcur import namespace_mappings as nm
 from protcur.core import annoSync
 from protcur.analysis import Hybrid, protc
 from sparcur.protocols_io_api import get_protocols_io_auth
-from sparcur.core import log, cache
+from sparcur.utils import log, logd, cache
 from sparcur.paths import Path
 from sparcur.config import config
 from sparcur.core import log, logd, OntTerm, OntId, OrcidId, sparc
@@ -107,7 +107,8 @@ class ProtcurData:
 class ProtocolData:
     # this class is best used as a helper class not as a __call__ class
 
-    def __init__(self, protocol_uris=None):  # FIXME lots of ways to use this class ...
+    def __init__(self, id, protocol_uris=None):  # FIXME lots of ways to use this class ...
+        self.id = id
         self.protocol_uris = protocol_uris
 
     def protocol(self, uri):
@@ -172,5 +173,4 @@ class ProtocolData:
         if resp.ok:
             return j
         else:
-            log.error(f'protocol no access {uri} '
-                      f'{self.datasetdata.cache.dataset.id if self.datasetdata else self.id!r}')
+            logd.error(f'protocol no access {uri} {self.id!r}')

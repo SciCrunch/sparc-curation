@@ -739,9 +739,9 @@ class SubjectsFile(Version1Header):
 
         # units merging
         # TODO pull the units in the parens out
-        self.h_unit = [k for k in self.bc.header if '_units' in k]
+        self.h_unit = [k for k in self.bc.header if '_unit' in k]
         h_value = [k.replace('_units', '') for k in self.h_unit]
-        no_unit = [k for k in self.bc.header if '_units' not in k]
+        no_unit = [k for k in self.bc.header if '_unit' not in k]
         #self.h_value = [k for k in self.bc.header if '_units' not in k and any(k.startswith(hv) for hv in h_value)]
         self.h_value = [k for hv in h_value
                         for k in no_unit

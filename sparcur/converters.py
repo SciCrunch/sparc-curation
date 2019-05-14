@@ -1,10 +1,11 @@
 import rdflib
 from types import GeneratorType
+from pyontutils import combinators as cmb
 from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
-from pyontutils.closed_namespaces import rdf, rdfs, owl
+from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
-from pysercomb.pyr.units import Expr, _Quant as Quantity
+from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from sparcur import datasets as dat
 from sparcur.utils import log, sparc
 from sparcur.protocols import ProtocolData
@@ -44,6 +45,15 @@ class TripleConverter(dat.HasErrors):
             return value
         elif isinstance(value, str) and value.startswith('http'):
             return OntId(value).u
+        elif isinstance(value, dict):  # FIXME this is too late to convert?
+            # NOPE! This idiot put a type field in his json dicts!
+            if 'type' in value:
+                if value['type'] == 'quantity':
+                    return Quantity.fromJson(value)
+                elif value['type'] == 'range':
+                    return Range.fromJson(value)
+
+            raise ValueError(value)
         else:
             return rdflib.Literal(value)
 
@@ -87,13 +97,16 @@ class TripleConverter(dat.HasErrors):
 
 
 class ContributorConverter(TripleConverter):
-    known_skipped = 'contributor_orcid_id', 'name'
+    known_skipped = 'id', 'name'
     mapping = (
         ('first_name', sparc.firstName),
+        ('middle_name', TEMP.middleName),
         ('last_name', sparc.lastName),
         ('contributor_affiliation', TEMP.hasAffiliation),
         ('is_contact_person', sparc.isContactPerson),
         ('is_responsible_pi', sparc.isContactPerson),
+        ('blackfynn_user_id', TEMP.hasBlackfynnUserId),
+        ('contributor_orcid_id', sparc.hasORCIDId),
         )
  
     def contributor_role(self, value):
@@ -104,15 +117,23 @@ ContributorConverter.setup()
 
 class MetaConverter(TripleConverter):
     mapping = [
+        ['name', rdfs.label],
         ['principal_investigator', TEMP.hasResponsiblePrincialInvestigator],
         ['protocol_url_or_doi', TEMP.hasProtocol],
         #['award_number', TEMP.hasAwardNumber],
         ['species', isAbout],
         ['organ', isAbout],
         ['modality', TEMP.hasExperimentalModality],
-        ['subject_count', TEMP.hasNumberOfSubjects],
-        ['uri_human', TEMP.hasHumanUri],
+        ['uri_api', TEMP.hasUriApi],
+        ['uri_human', TEMP.hasUriHuman],
         ['keywords', isAbout],
+        ['description', dc.description],
+        ['dirs', TEMP.hasNumberOfDirectories],
+        ['files', TEMP.hasNumberOfFiles],
+        ['size', TEMP.hasSizeInBytes],
+        ['subject_count', TEMP.hasNumberOfSubjects],
+        ['sample_count', TEMP.hasNumberOfSamples],
+        ['contributor_count', TEMP.hasNumberOfContributors],
     ]
 
     def protocol_url_or_doi(self, value):
@@ -145,7 +166,7 @@ class MetaConverter(TripleConverter):
             _, s = self.c.protocol_url_or_doi(value)
             yield s, a, owl.NamedIndividual
             yield s, a, sparc.Protocol
-            pj = ProtocolData()(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
+            pj = ProtocolData(self.integrator.id)(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
             if pj:
                 label = pj['protocol']['title']
                 yield s, rdfs.label, rdflib.Literal(label)
@@ -175,7 +196,7 @@ StatusConverter.setup()
 class SubjectConverter(TripleConverter):
     known_skipped = 'subject_id',
     mapping = [
-        ['age_cateogry', TEMP.hasAgeCategory],
+        ['age_category', TEMP.hasAgeCategory],
         ['species', sparc.animalSubjectIsOfSpecies],
         ['group', TEMP.hasAssignedGroup],
         #['rrid_for_strain', rdf.type],  # if only
@@ -184,9 +205,13 @@ class SubjectConverter(TripleConverter):
         ['species', sparc.animalSubjectIsOfSpecies],
         ['strain', sparc.animalSubjectIsOfStrain],
         ['weight', sparc.animalSubjectHasWeight],
+        ['initial_weight', sparc.animalSubjectHasWeight],  # TODO time
         ['mass', sparc.animalSubjectHasWeight],
+        ['body_mass', sparc.animalSubjectHasWeight],  # TODO
         ['sex', TEMP.hasBiologicalSex],
         ['gender', sparc.hasGender],
         ['age', TEMP.hasAge],
+        ['stimulation_site', sparc.spatialLocationOfModulator],  # TODO ontology
+        ['stimulator', sparc.stimulatorUtilized],
     ]
 SubjectConverter.setup()
