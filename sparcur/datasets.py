@@ -740,12 +740,12 @@ class SubjectsFile(Version1Header):
         # units merging
         # TODO pull the units in the parens out
         self.h_unit = [k for k in self.bc.header if '_unit' in k]
-        h_value = [k.replace('_units', '') for k in self.h_unit]
+        h_value = [k.replace('_units', '').replace('_unit', '') for k in self.h_unit]
         no_unit = [k for k in self.bc.header if '_unit' not in k]
         #self.h_value = [k for k in self.bc.header if '_units' not in k and any(k.startswith(hv) for hv in h_value)]
         self.h_value = [k for hv in h_value
                         for k in no_unit
-                        if k.startswith(hv)]
+                        if k.startswith(hv) or k.endswith(hv)]
         err = f'Problem! {self.h_unit} {self.h_value} {self.bc.header} \'{self.t.path}\''
         #assert all(v in self.bc.header for v in self.h_value), err
         assert len(self.h_unit) == len(self.h_value), err
@@ -813,9 +813,13 @@ class SubjectsFile(Version1Header):
         """ deal with multiple fields """
         out = {k:v for k, v in dict_.items() if k not in self.skip}
         for h_unit, h_value in zip(self.h_unit, self.h_value):
+            if h_value not in dict_:  # we drop null cells so if one of these was null then we have to skip it here too
+                continue
+
             dhv = dict_[h_value]
             if isinstance(dhv, str):
                 dhv = ast.literal_eval(dhv)
+
             compose = dhv * pyru.ur.parse_units(dict_[h_unit])
             #_, v, rest = parameter_expression(compose)
             #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr

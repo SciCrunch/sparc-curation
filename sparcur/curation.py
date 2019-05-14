@@ -1184,17 +1184,51 @@ class ExporterSummarizer:
                 ('errors', xe))
     @property
     def disco(self):
-        dsh = sorted(MetaOutSchema.schema['allOf'][0]['properties'])
-        oldh = ['error_index', 'dataset_completeness_index']
+        #dsh = sorted(MetaOutSchema.schema['allOf'][0]['properties'])
+        dsh = ['acknowledgements',
+               'additional_links',
+               'award_number',
+               'completeness_of_data_set',
+               'contributor_count',
+               'description',
+               'dirs',
+               'errors',
+               'examples',
+               'files',
+               'funding',
+               'keywords',
+               'links',
+               'modality',
+               'name',
+               'organ',
+               'originating_article_doi',
+               'principal_investigator',
+               'prior_batch_number',
+               'protocol_url_or_doi',
+               'sample_count',
+               'size',
+               'species',
+               'subject_count',
+               'title_for_complete_data_set',
+               'uri_api',
+               'uri_human',
+               'error_index',
+               'dataset_completeness_index',
+               'is_about',
+               'involves_anatomical_region',
+        ]
         chs = ['contributor_affiliation',
                'contributor_orcid_id',
                'contributor_role',
                'is_contact_person',
                'name',
                'first_name',
-               'last_name',]
+               'last_name',
+               'middle_name',
+               'id',
+               'blackfynn_user_id',]
 
-        datasets = [['id', 'submission_index', 'curation_index'] + dsh + oldh]
+        datasets = [['id', 'submission_index', 'curation_index'] + dsh]
         contributors = [['id'] + chs]
         subjects = [['id', 'blob']]
         errors = [['id', 'blob']]
@@ -1247,6 +1281,10 @@ class ExporterSummarizer:
                     if k in meta:
                         v = meta[k]
                         v = normv(v)
+                    elif k == 'is_about':
+                        v = ia
+                    elif k == 'involves_anatomical_region':
+                        v = inv
                     else:
                         v = None
 
@@ -1254,9 +1292,6 @@ class ExporterSummarizer:
 
             else:
                 row += [None for k in sc.MetaOutSchema.schema['properties']]
-
-            for k in oldh:
-                row.append(None)
 
             datasets.append(row)
 
