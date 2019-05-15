@@ -50,6 +50,10 @@ def make_app(self, name='spc-server'):
             'completeness',
             'size',
             'filetypes',
+            'keywords',
+            'subjects',
+            'errors',
+            'terms',
         )
         report_links = [atag(url_for(f'route_reports_{rn}'), rn) + '<br>\n'
                         for rn in report_names]
@@ -74,3 +78,24 @@ def make_app(self, name='spc-server'):
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Filetypes')
+
+    @app.route(f'{bp}/reports/keywords')
+    def route_reports_keywords():
+        table, title = self.report.keywords()
+        return wrap_tables(table, title=title)
+
+    @app.route(f'{bp}/reports/subjects')
+    def route_reports_subjects():
+        table, title = self.report.subjects()
+        return wrap_tables(table, title=title)
+
+    @app.route(f'{bp}/reports/errors')
+    def route_reports_errors():
+        return 'TODO'
+        table, title = self.report.errors()
+        return wrap_tables(table, title=title)
+
+    @app.route(f'{bp}/reports/terms')
+    def route_reports_terms():
+        table, title = self.report.terms()
+        return wrap_tables(table, title=title)

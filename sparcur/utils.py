@@ -11,6 +11,10 @@ log = makeSimpleLogger('sparcur')
 logd = makeSimpleLogger('sparcur-data')
 
 
+want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr', 'sparc',
+                 'BIRNLEX',)
+
+
 class FileSize(int):
     @property
     def mb(self):

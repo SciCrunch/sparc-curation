@@ -11,7 +11,7 @@ Usage:
     spc export [ttl json datasets] [options]
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
-    spc report terms [anatomy cells subcelluar] [options] [<directory>...]
+    spc report terms [anatomy cells subcelluar] [options]
     spc report [completeness filetypes keywords subjects errors test] [options]
     spc shell [integration] [options]
     spc server [options]
@@ -153,14 +153,14 @@ from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, log, logd, JPointer
-from sparcur.core import OntTerm, get_all_errors, DictTransformer as DT
-from sparcur.utils import FileSize, python_identifier
+from sparcur.core import OntId, OntTerm, get_all_errors, DictTransformer as DT, adops
+from sparcur.utils import FileSize, python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
 from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer
-from sparcur.curation import JEncode, TriplesExportDataset
+from sparcur.curation import JEncode, TriplesExportDataset, TriplesExportSummary
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
@@ -569,6 +569,10 @@ class Main(Dispatcher):
         with open(self.LATEST / 'curation-export.json', 'rt') as f:
             return json.load(f)
 
+    def latest_export_ttl_populate(self, graph):
+        # intentionally fail if the ttl export failed
+        return graph.parse((self.LATEST / 'curation-export.ttl').as_posix(), format='ttl')
+
     def export(self):
         """ export output of curation workflows to file """
         #org_id = Integrator(self.project_path).organization.id
@@ -611,7 +615,7 @@ class Main(Dispatcher):
                 with open(out, mode) as f:
                     function(f)
 
-                print(f'dataset graph exported to {out}')
+                log.info(f'dataset graph exported to {out}')
 
                 if self.options.open:
                     out.xopen()
@@ -668,7 +672,7 @@ class Main(Dispatcher):
                 with open(out, 'wb') as f:
                     f.write(TriplesExportDataset(dataset_blob).ttl)
 
-                print(f'dataset graph exported to {out}')
+                log.info(f'dataset graph exported to {out}')
 
         if latest_path.exists():
             if not latest_path.is_symlink():
@@ -899,6 +903,7 @@ class Report(Dispatcher):
     export_base = Main.export_base
     LATEST = Main.LATEST
     latest_export = Main.latest_export
+    latest_export_ttl_populate = Main.latest_export_ttl_populate
 
     @property
     def _sort_key(self):
@@ -993,10 +998,15 @@ class Report(Dispatcher):
         return self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
 
     def subjects(self):
+        data = self.latest_export if self.options.latest else self.summary.data
+        datasets = data['datasets']
         key = self._sort_key
-        subjects_headers = tuple(h for intr in self.summary
-                                    for sf in intr.subjects
-                                    for h in sf.bc.header)
+        # FIXME we need the blob wrapper in addition to the blob generator
+        # FIXME these are the normalized ones ...
+        subjects_headers = tuple(k for dataset_blob in datasets
+                                 if 'subjects' in dataset_blob  # FIXME inputs?
+                                 for subject_blob in dataset_blob['subjects']
+                                 for k in subject_blob)
         counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
                                             key=key))
 
@@ -1042,13 +1052,20 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Completeness Report')
 
     def keywords(self):
-        _rows = [sorted(set(dataset.keywords), key=lambda v: -len(v))
-                    for dataset in self.summary]
-        rows = sorted(set(tuple(r) for r in _rows if r), key = lambda r: (len(r), r))
+        data = self.latest_export if self.options.latest else self.summary.data
+        datasets = data['datasets']
+        _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])), key=lambda v: -len(v))
+                    for dataset_blob in datasets]
+        rows = [list(r) for r in sorted(set(tuple(r) for r in _rows if r),
+                                        key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
+        header = [[f'{i + 1}' for i, _ in enumerate(rows[-1])]]
+        rows = header + rows
         return self._print_table(rows, title='Keywords Report')
 
-    def size(self):
-        intrs = [Integrator(p) for p in self.paths]
+    def size(self, dirs=None):
+        if dirs is None:
+            dirs = self.paths
+        intrs = [Integrator(p) for p in dirs]
         if not intrs:
             intrs = self.cwdintr,
 
@@ -1073,6 +1090,43 @@ class Report(Dispatcher):
                                                    for e in get_all_errors(d)])
                               for d in datasets], key=lambda ab: -len(ab[-1])))
 
+    def terms(self):
+        # anatomy
+        # cells
+        # subcelluar
+        import rdflib
+        # FIXME cache these results and only recompute if latest changes?
+        if self.options.latest:
+            graph = rdflib.Graph()
+            self.latest_export_ttl_populate(graph)
+        else:
+            graph = self.summary.triples_exporter.graph
+
+        objects = set()
+        skipped_prefixes = set()
+        for s, o in graph.subject_objects():
+            if isinstance(o, rdflib.URIRef):
+                oid = OntId(o)
+                if oid.prefix in want_prefixes:
+                    objects.add(o)
+                else:
+                    skipped_prefixes.add(oid.prefix)
+
+        if self.options.server:
+            def reformat(o):
+                ot = OntTerm(o)
+                return [ot.label if ot.label else '', ot.atag(curie=True)]
+
+        else:
+            def reformat(o):
+                ot = OntTerm(o)
+                return [ot.label if ot.label else '', ot.curie]
+
+        log.info(' '.join(sorted(skipped_prefixes)))
+        header = [['Term', 'CURIE']]
+        rows = header + sorted([reformat(o) for o in sorted(objects)], key=lambda ab: (ab[1], ab[0]))
+        return self._print_table(rows, title='Terms')
+
 
 class Shell(Dispatcher):
     # property ports
@@ -1084,6 +1138,7 @@ class Shell(Dispatcher):
     export_base = Main.export_base
     LATEST = Main.LATEST
     latest_export = Main.latest_export
+    latest_export_ttl_populate = Main.latest_export_ttl_populate
 
     def default(self):
         datasets = list(self.datasets)

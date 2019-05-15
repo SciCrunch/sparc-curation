@@ -70,6 +70,10 @@ class AlreadyInProjectError(SparCurError):
             self.message = self.__doc__.format(more)
 
 
+class NotInDatasetError(SparCurError):
+    """ trying to run a comman on a dataset when not inside one """
+
+
 class NotInProjectError(SparCurError):
     """fatal: not a spc directory {}"""
     def __init__(self, message=None):

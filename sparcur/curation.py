@@ -26,6 +26,7 @@ from sparcur.core import JT, JEncode, log, logd, lj
 from sparcur.core import DictTransformer, adops, OntId, OntTerm
 from sparcur.paths import Path
 from sparcur.state import State
+from sparcur.utils import want_prefixes
 from sparcur import schemas as sc
 from sparcur import converters as conv
 from sparcur.datasources import OrganData, OntologyData, MembersData
@@ -732,10 +733,18 @@ class TriplesExport(ProtcurData):
             yield ontid, p, o
 
     @property
+    def graph(self):
+        """ you can populate other graphs, but this one runs once """
+        if not hasattr(self, '_graph'):
+            graph = rdflib.Graph()
+            self.populate(graph)
+            self._graph = graph
+
+        return self._graph
+
+    @property
     def ttl(self):
-        graph = rdflib.Graph()
-        self.populate(graph)
-        return graph.serialize(format='nifttl')
+        return self.graph.serialize(format='nifttl')
 
     def populate(self, graph):
         def warn(triple):
@@ -751,11 +760,6 @@ class TriplesExport(ProtcurData):
         OntCuries.populate(graph)  # ah smalltalk thinking
         [graph.add(t) for t in self.triples_header if warn(t)]
         [graph.add(t) for t in self.triples if warn(t)]
-         #if not (lambda: (log.error(t)
-                          #if any(isinstance(_, Expr) or isinstance(_, Quantity)
-                                 #or (hasattr(_, '_value') and isinstance(_._value, Expr))
-                                 #for _ in t)
-                          #else None))()]
 
 
 class TriplesExportSummary(TriplesExport):
@@ -1011,6 +1015,9 @@ class Integrator(PathData, ProtocolData, OntologyData):
 
         datasetdata = self.datasetdata
         dsc = datasetdata.cache.dataset
+        if dsc is None:
+            raise exc.NotInDatasetError
+
         dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
         # FIXME except for the adds, everything here should be a pipeline
         class Lifters:  # do this to prevent accidental data leaks
@@ -1240,8 +1247,11 @@ class ExporterSummarizer:
                 # needed for loading from json that has been serialized
                 # rather than from our internal representation
                 # probably better to centralized the reload ...
-                v = OntTerm(v)
-                return v.tabular()
+                oid = OntId(v)
+                if oid.prefix in want_prefixes:
+                    return OntTerm(v).tabular()
+                else:
+                    return oid.iri
 
             if isinstance(v, OntId):
                 if not isinstance(v, OntTerm):
@@ -1251,7 +1261,7 @@ class ExporterSummarizer:
             if isinstance(v, list) or isinstance(v, tuple):
                 v = ','.join(json.dumps(_, cls=JEncode)
                              if isinstance(_, dict) else
-                             str(_) for _ in v)
+                             normv(_) for _ in v)
                 v = v.replace('\n', ' ').replace('\t', ' ')
             elif any(isinstance(v, c) for c in
                      (int, float, str)):
@@ -1344,8 +1354,16 @@ class ExporterSummarizer:
                 ('errors', errors))
 
     @property
+    def triples_exporter(self):
+        if not hasattr(self, '_triples_exporter'):
+            self._triples_exporter = TriplesExportSummary(self.data)
+
+        return self._triples_exporter
+
+    @property
     def ttl(self):
-        return TriplesExportSummary(self.data).ttl
+        return self.triples_exporter.ttl
+
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
@@ -1421,7 +1439,7 @@ class Summary(Integrator, ExporterSummarizer):
     @hasSchema(sc.SummarySchema, fail=True)
     def data(self):
         data = self.pipeline_end
-        return data
+        return data  # FIXME we want objects that wrap the output rather than generate it ...
 
 
 def express_or_return(thing):

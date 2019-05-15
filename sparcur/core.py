@@ -47,8 +47,8 @@ class OntId(OIDB):
 
 
 class OntTerm(OTB):
-    def atag(self, **kwargs):
-        return hfn.atag(self.iri, self.label, **kwargs)  # TODO schema.org ...
+    def atag(self, curie=False, **kwargs):
+        return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
     def tabular(self, sep='|'):
         if self.label is None:
@@ -166,7 +166,9 @@ class BlackfynnId(str):
                 setattr(self, name, gotem)
             else:
                 setattr(self, name, False)
-                
+
+        return self
+
     @property
     def uri_api(self):
         # NOTE: this cannot handle file ids

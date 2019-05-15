@@ -95,7 +95,8 @@ class ProtcurData:
         group = devconfig.secrets('hypothesis', 'group', group_name)
         get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group + 'sparcur'),
                                                               helpers=(HypothesisHelper, Hybrid, protc),
-                                                              group=group)
+                                                              group=group,
+                                                              sync=False)
 
         [protc(a, annos) for a in annos]
         [Hybrid(a, annos) for a in annos]

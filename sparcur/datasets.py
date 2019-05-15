@@ -393,8 +393,8 @@ class Version1Header(HasErrors):
             # FIXME bad design, this try block is a workaround for bad handling of empty lists
             raise exc.NoDataError(self.path)
 
-        orig_header, *rest = l
-        header = Header(orig_header).data
+        self.orig_header, *rest = l
+        header = Header(self.orig_header).data
 
         self.fail = False
         if self.to_index:
