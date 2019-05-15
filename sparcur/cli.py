@@ -1030,7 +1030,8 @@ class Report(Dispatcher):
                 ei = hfn.atag('/TODO', ei)
                 name = hfn.atag(dataset_dash_url, name)
                 id = hfn.atag(dataset_dash_url, id[:10] + '...')
-                award = hfn.atagpost(rsurl, **{'p_projectnum': f'%{award}%'}) if award else ''  # TODO
+                award = hfn.atag(('https://scicrunch.org/scicrunch/data/source/'
+                                  f'nif-0000-10319-1/search?q={award}'), award) if award else 'MISSING'
                 organ = organ if organ else ''
                 if isinstance(organ, list) or isinstance(organ, tuple):
                     ' '.join([o.atag() for o in organ])
@@ -1104,28 +1105,45 @@ class Report(Dispatcher):
 
         objects = set()
         skipped_prefixes = set()
-        for s, o in graph.subject_objects():
-            if isinstance(o, rdflib.URIRef):
-                oid = OntId(o)
-                if oid.prefix in want_prefixes:
-                    objects.add(oid)
-                else:
-                    skipped_prefixes.add(oid.prefix)
+        for t in graph:
+            for e in t:
+                if isinstance(e, rdflib.URIRef):
+                    oid = OntId(e)
+                    if oid.prefix in want_prefixes:
+                        objects.add(oid)
+                    else:
+                        skipped_prefixes.add(oid.prefix)
 
         if self.options.server:
             def reformat(ot):
-                return [ot.label if ot.label else '', ot.atag(curie=True)]
+                return [ot.label if hasattr(ot, 'label') and ot.label else '', ot.atag(curie=True)]
 
         else:
             def reformat(ot):
-                return [ot.label if ot.label else '', ot.curie]
+                return [ot.label if hasattr(ot, 'label') and ot.label else '', ot.curie]
 
         log.info(' '.join(sorted(skipped_prefixes)))
-        header = [['Term', 'CURIE']]
-        rows = header + [reformat(ot) for ot in
-                         sorted([OntTerm(o) for o in sorted(objects)],
-                                key=lambda ot: (ot.prefix, ot.label.lower() if ot.label else ''))]
-        return self._print_table(rows, title='Terms')
+        objs = [OntTerm(o) if o.prefix not in ('TEMP', 'sparc') else o for o in objects]
+        term_sets = {title:[o for o in objs if o.prefix == prefix]
+                     for prefix, title in
+                     (('NCBITaxon', 'Species'),
+                      ('UBERON', 'Anatomy and age category'),  # FIXME
+                      ('FMA', 'Anatomy'),
+                      ('PATO', 'Qualities'),
+                      ('sparc', 'MIS terms'),
+                      ('TEMP', 'Suggested terms'),
+                     )}
+
+        term_sets['Other'] = set(objs) - set(ot for v in term_sets.values() for ot in v)
+
+        for title, terms in term_sets.items():
+            header = [['Label', 'CURIE']]
+            rows = header + [reformat(ot) for ot in
+                            sorted(terms,
+                                   key=lambda ot: (ot.prefix, ot.label.lower()
+                                                   if hasattr(ot, 'label') and ot.label else ''))]
+
+            yield self._print_table(rows, title=title)
 
 
 class Shell(Dispatcher):

@@ -43,6 +43,8 @@ class _log:
 
 class OntId(OIDB):
     def atag(self, **kwargs):
+        if 'curie' in kwargs:
+            kwargs.pop('curie')
         return hfn.atag(self.iri, self.curie, **kwargs)
 
 

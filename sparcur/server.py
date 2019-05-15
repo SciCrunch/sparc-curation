@@ -97,5 +97,8 @@ def make_app(self, name='spc-server'):
 
     @app.route(f'{bp}/reports/terms')
     def route_reports_terms():
-        table, title = self.report.terms()
-        return wrap_tables(table, title=title)
+        tables = []
+        for table, title in self.report.terms():
+            tables.append(table + '<br>\n')
+
+        return wrap_tables(*tables, title='Terms')
