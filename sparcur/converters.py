@@ -118,7 +118,6 @@ ContributorConverter.setup()
 class MetaConverter(TripleConverter):
     mapping = [
         ['name', rdfs.label],
-        ['principal_investigator', TEMP.hasResponsiblePrincialInvestigator],
         ['protocol_url_or_doi', TEMP.hasProtocol],
         #['award_number', TEMP.hasAwardNumber],
         ['species', isAbout],
@@ -135,6 +134,11 @@ class MetaConverter(TripleConverter):
         ['sample_count', TEMP.hasNumberOfSamples],
         ['contributor_count', TEMP.hasNumberOfContributors],
     ]
+
+    def principal_investigator(self, value):
+        index = int(value.rsplit('/', 1)[-1])
+        id = self.integrator.data['contributors'][index]['id']
+        return TEMP.hasResponsiblePrincialInvestigator, rdflib.URIRef(id)  # FIXME reload -> ir
 
     def protocol_url_or_doi(self, value):
         doi = False

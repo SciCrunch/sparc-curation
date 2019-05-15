@@ -11,6 +11,21 @@ log = makeSimpleLogger('sparcur')
 logd = makeSimpleLogger('sparcur-data')
 
 
+class _log:
+    """ logging prevents nice ipython recurions error printing
+        so rename this class to log when you need fake logging """
+    @staticmethod
+    def debug(nothing): pass
+    @staticmethod
+    def info(nothing): pass
+    @staticmethod
+    def warning(nothing): print(nothing)
+    @staticmethod
+    def error(nothing): pass
+    @staticmethod
+    def critical(nothing): pass
+
+
 want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr', 'sparc',
                  'BIRNLEX',)
 

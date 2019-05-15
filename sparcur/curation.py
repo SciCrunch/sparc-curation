@@ -11,9 +11,8 @@ from collections import defaultdict, deque
 import rdflib
 import dicttoxml
 from pyontutils.config import devconfig
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, sparc
+from pyontutils.namespaces import makeNamespaces, TEMP, isAbout, sparc
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
-from nifstd_tools.methods.core import prot, proc, tech, asp, dim, unit
 from protcur.analysis import parameter_expression
 from protcur.core import annoSync
 from protcur.analysis import protc, Hybrid
@@ -23,7 +22,7 @@ from sparcur import config
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT, JEncode, log, logd, lj
-from sparcur.core import DictTransformer, adops, OntId, OntTerm
+from sparcur.core import DictTransformer, adops, OntId, OntTerm, OntCuries
 from sparcur.paths import Path
 from sparcur.state import State
 from sparcur.utils import want_prefixes
@@ -35,33 +34,10 @@ from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
 from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
-from ttlser import CustomTurtleSerializer
 from pysercomb.pyr.units import Expr, _Quant as Quantity
 from pyontutils.utils import byCol as _byCol
 
-xsd = rdflib.XSD
 a = rdf.type
-
-po = CustomTurtleSerializer.predicateOrder
-po.extend((sparc.firstName,
-           sparc.lastName,
-           xsd.minInclusive,
-           xsd.maxInclusive,
-           TEMP.hasValue,
-           TEMP.hasUnit,))
-
-OntCuries({'orcid':'https://orcid.org/',
-           'ORCID':'https://orcid.org/',
-           'DOI':'https://doi.org/',
-           'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
-           'package':'https://api.blackfynn.io/packages/N:package:',
-           'user':'https://api.blackfynn.io/users/N:user:',
-           'unit': str(unit),
-           'dim': str(dim),
-           'asp': str(asp),
-           'tech': str(tech),
-           'awards':str(TEMP['awards/']),
-           'sparc':str(sparc),})
 
 
 class CurationStatusStrict:

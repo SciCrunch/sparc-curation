@@ -9,8 +9,11 @@ import rdflib
 import htmlfn as hfn
 import ontquery as oq
 #from joblib import Memory
+from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
+from pyontutils.namespaces import OntCuries, TEMP, sparc
+from pyontutils.namespaces import prot, proc, tech, asp, dim, unit
 from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
 
@@ -21,24 +24,28 @@ from sparcur.utils import log, logd, sparc, FileSize, python_identifier  # FIXME
 #memory = Memory(config.cache_dir, verbose=0)
 
 
-def lj(j):
-    """ use with log to format json """
-    return '\n' + json.dumps(j, indent=2, cls=JEncode)
+xsd = rdflib.XSD
+po = CustomTurtleSerializer.predicateOrder
+po.extend((sparc.firstName,
+           sparc.middleName,
+           sparc.lastName,
+           xsd.minInclusive,
+           xsd.maxInclusive,
+           TEMP.hasValue,
+           TEMP.hasUnit,))
 
-
-class _log:
-    """ logging prevents nice ipython recurions error printing
-        so rename this class to log when you need fake logging """
-    @staticmethod
-    def debug(nothing): pass
-    @staticmethod
-    def info(nothing): pass
-    @staticmethod
-    def warning(nothing): print(nothing)
-    @staticmethod
-    def error(nothing): pass
-    @staticmethod
-    def critical(nothing): pass
+OntCuries({'orcid':'https://orcid.org/',
+           'ORCID':'https://orcid.org/',
+           'DOI':'https://doi.org/',
+           'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
+           'package':'https://api.blackfynn.io/packages/N:package:',
+           'user':'https://api.blackfynn.io/users/N:user:',
+           'unit': str(unit),
+           'dim': str(dim),
+           'asp': str(asp),
+           'tech': str(tech),
+           'awards':str(TEMP['awards/']),
+           'sparc':str(sparc),})
 
 
 class OntId(OIDB):
@@ -58,6 +65,11 @@ class OntTerm(OTB):
             return self.curie
 
         return self.label + sep + self.curie
+
+
+def lj(j):
+    """ use with log to format json """
+    return '\n' + json.dumps(j, indent=2, cls=JEncode)
 
 
 class JEncode(json.JSONEncoder):
@@ -487,6 +499,17 @@ class _DictTransformer:
         """
         for target_path, value in adds:
             adops.add(data, target_path, value)
+
+    @staticmethod
+    def update(data, updates, source_key_optional=False):
+        """ updates is a list (or tuples) with the following structure
+            [[path, function], ...]
+        """
+
+        for path, function in updates:
+            value = adops.get(data, path)
+            new = function(value)
+            adopts.update(data, path, new)
 
     @staticmethod
     def get(data, gets, source_key_optional=False):

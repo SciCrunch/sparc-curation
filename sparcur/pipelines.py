@@ -58,14 +58,20 @@ class ContributorsPipeline(DatasourcePipeline):
         orcid = None
         if 'contributor_orcid_id' in contributor:
             orcid = contributor['contributor_orcid_id']
+            if type(orcid) == str and 'orcid.org' in orcid:
+                orcid = OrcidId(orcid)  # FIXME reloading from json
+
             if isinstance(orcid, OrcidId):
                 s = orcid
+            else:  # it's not an orcid or its a bad orcid
+                orcid = None
 
-        if orcid is None and member is not None:
-            s = userid
-        else:
-            log.debug(lj(contributor))
-            s = OntId(self.dsid + '/contributors/' + failover)
+        if orcid is None:
+            if member is not None:
+                s = userid
+            else:
+                log.debug(lj(contributor))
+                s = OntId(self.dsid + '/contributors/' + failover)
 
         contributor['id'] = s
 
@@ -187,6 +193,7 @@ class JSONPipeline(Pipeline):
     moves = []
     cleans = []
     derives = []
+    updates = []
     adds = []
 
     class SkipPipelineError(Exception):
@@ -256,8 +263,14 @@ class JSONPipeline(Pipeline):
         return data
 
     @property
-    def augmented(self):
+    def updated(self):
         data = self.cleaned
+        DictTransformer.update(data, self.updates, source_key_optional=True)
+        return data
+
+    @property
+    def augmented(self):
+        data = self.updated
         DictTransformer.derive(data, self.derives, source_key_optional=True)
         return data
 
@@ -288,6 +301,21 @@ class JSONPipeline(Pipeline):
     @property
     def data(self):
         return self.added
+
+
+class LoadIR(JSONPipeline):
+    """ Reload the internal python types from a json export """
+
+    # TODO by key vs by path
+    #updates = [['contributors', 'contributor_orcid_id'], derives.LoadIR.function]
+
+    @classmethod
+    def check(cls):
+        schema = sc.DatasetOutSchema.schema
+        for update in cls.updates:
+            # make sure that the update path is in the schema
+            # TODO path in schema function
+            pass
 
 
 hasSchema = sc.HasSchema()
@@ -382,6 +410,8 @@ class SPARCBIDSPipeline(JSONPipeline):
                 DT.BOX(len),
                 [['meta', 'sample_count']]],
     )
+
+    updates = []
 
     adds = [[['id'], lambda lifters: lifters.id],
             [['meta', 'name'], lambda lifters: lifters.name],
