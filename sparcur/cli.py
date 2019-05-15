@@ -1108,23 +1108,23 @@ class Report(Dispatcher):
             if isinstance(o, rdflib.URIRef):
                 oid = OntId(o)
                 if oid.prefix in want_prefixes:
-                    objects.add(o)
+                    objects.add(oid)
                 else:
                     skipped_prefixes.add(oid.prefix)
 
         if self.options.server:
-            def reformat(o):
-                ot = OntTerm(o)
+            def reformat(ot):
                 return [ot.label if ot.label else '', ot.atag(curie=True)]
 
         else:
-            def reformat(o):
-                ot = OntTerm(o)
+            def reformat(ot):
                 return [ot.label if ot.label else '', ot.curie]
 
         log.info(' '.join(sorted(skipped_prefixes)))
         header = [['Term', 'CURIE']]
-        rows = header + sorted([reformat(o) for o in sorted(objects)], key=lambda ab: (ab[1], ab[0]))
+        rows = header + [reformat(ot) for ot in
+                         sorted([OntTerm(o) for o in sorted(objects)],
+                                key=lambda ot: (ot.prefix, ot.label.lower() if ot.label else ''))]
         return self._print_table(rows, title='Terms')
 
 
