@@ -96,6 +96,7 @@ class PathPipeline(PrePipeline):
         except (exc.FileTypeError, exc.NoDataError) as e:
             class NoData:  # FIXME
                 data = {}
+                t = f'No data for {self.path}'
 
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
             logd.exception(e)  # FIXME isn't this were we should accumulate errors?

@@ -744,7 +744,25 @@ class Main(Dispatcher):
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """
         # TODO per dataset
+        from sparcur import pipelines as pipes
         summary = self.summary
+        tables = []
+        for intr in self.summary.iter_datasets:
+            pipe = intr.pipeline
+            while not isinstance(pipe, pipes.SPARCBIDSPipeline):
+                pipe = pipe.previous_pipeline
+
+            try:
+                pipe.subpipelined
+            except pipe.SkipPipelineError:
+                continue
+
+            for sp in pipe.subpipeline_instances:
+                tabular = sp._transformer.t
+                tables.append(tabular)
+
+        [print(repr(t)) for t in tables]
+        return
         tabular_view_demo = [next(d.dataset_description).t
                                 for d in summary
                                 if 'dataset_description' in d.data]

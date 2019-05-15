@@ -361,14 +361,23 @@ class Tabular(HasErrors):
         except UnicodeDecodeError as e:
             log.error(f'{self.path.as_posix()!r} {e}')
 
+    #@property
+    #def title(self):
+        #path = Path(self.path)
+        #return f'{path.name:<39} ' + path.cache.dataset.id + ' ' + path.cache.dataset.name
+
+    @property
+    def title(self):
+        path = Path(self.path)
+        return f'{path.name} {path.cache.dataset.name[:30]} ...'
+
     def __repr__(self):
         limit = 30
-        path = Path(self.path)
-        title = f'{self.path.name:>40}' + path.cache.dataset.id + ' ' + path.cache.dataset.name
-        return AsciiTable([[c[:limit] + ' ...' if isinstance(c, str)
-                            and len(c) > limit else c
-                            for c in r] for r in self],
-                          title=title).table
+        rows = [[c[:limit] + ' ...' if isinstance(c, str)
+                 and len(c) > limit else c
+                 for c in r] for r in self]
+        table = AsciiTable(rows, title=self.title)
+        return table.table
 
 
 class Version1Header(HasErrors):

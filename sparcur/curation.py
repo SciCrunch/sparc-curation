@@ -1009,9 +1009,9 @@ class Integrator(PathData, ProtocolData, OntologyData):
         return self.path.name
 
     @property
-    def data(self):
-        if hasattr(self, '_data'):
-            return self._data
+    def pipeline(self):
+        if hasattr(self, '_pipeline'):
+            return self._pipeline
 
         datasetdata = self.datasetdata
         dsc = datasetdata.cache.dataset
@@ -1063,7 +1063,13 @@ class Integrator(PathData, ProtocolData, OntologyData):
         # all the prior existing data is not a bad one, it just just that it
         # is better to create objects that can take the information already
         # in the data for the current pipeline and return an expanded verion
-        self.pipeline = pipes.PipelineEnd(dataset, lifters, RuntimeContext())
+        self._pipeline = pipes.PipelineEnd(dataset, lifters, RuntimeContext())
+        return self._pipeline
+
+    @property
+    def data(self):
+        if hasattr(self, '_data'):
+            return self._data
 
         self._data = self.pipeline.data
         return self._data
