@@ -80,7 +80,14 @@ class TripleConverter(dat.HasErrors):
                     if isinstance(o, Expr) or isinstance(o, Quantity):
                         s = rdflib.BNode()
                         yield subject, p, s
-                        yield from o.asRdf(s)
+                        qt = sparc.Measurement
+                        if isinstance(o, Range):
+                            yield from o.asRdf(s, quantity_rdftype=qt)
+                        elif isinstance(o, Quantity):
+                            yield from o.asRdf(s, rdftype=qt)
+                        else:
+                            log.warning(f'unhanded Expr type {o}')
+                            yield from o.asRdf(s)
                     else:
                         yield subject, p, o
 
