@@ -494,17 +494,22 @@ class MetaOutSchema(JSONSchema):
                       'files',
                       'dirs',
                       'size',
+                      'title',
                       #'subject_count',
                       #'sample_count',
     ]
     __schema['required'].remove('contributors')
+    __schema['required'].remove('name')
     __schema['required'] += extra_required
     __schema['properties'].pop('contributors')
+    __schema['properties'].pop('name')
     __schema['properties'].update({
         'errors': ErrorSchema.schema,
         'dirs': {'type': 'integer'},
         'files': {'type': 'integer'},
         'size': {'type': 'integer'},
+        'folder_name': {'type': 'string'},
+        'title': {'type': 'string'},
         'uri_human': {'type': 'string',
                       'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
         },
@@ -537,7 +542,7 @@ class MetaOutSchema(JSONSchema):
         'contributor_count': {'type': 'integer'},})
 
     schema = {'allOf': [__schema,
-                        {'oneOf': [
+                        {'anyOf': [
                             {'required': ['subject_count']},  # FIXME extract subjects from samples ?
                             {'required': ['sample_count']}
                         ]}]}
@@ -569,7 +574,7 @@ class DatasetOutSchema(JSONSchema):
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
     schema = {'allOf': [__schema,
-                        {'oneOf': [
+                        {'anyOf': [
                             {'required': ['subjects']},  # FIXME extract subjects from samples ?
                             {'required': ['samples']}
                         ]}]}

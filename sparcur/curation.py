@@ -672,10 +672,17 @@ class TriplesExport(ProtcurData):
     def __init__(self, data_json, *args, **kwargs):
         self.data = data_json
         self.id = self.data['id']
-        self.name = self.data['meta']['name']
         self.uri_api = self.data['meta']['uri_api']
         self.uri_human = self.data['meta']['uri_human']
+        self.folder_name = self.data['meta']['folder_name']
+        #self.title = self.data['meta']['title'] if 
 
+    @property
+    def protocol_uris(self):  # FIXME this needs to be pipelined
+        try:
+            yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
+        except exc.NoSourcePathError:
+            pass
 
     @property
     def ontid(self):
@@ -701,7 +708,7 @@ class TriplesExport(ProtcurData):
             (owl.versionInfo, rdflib.Literal(iso)),
             (isAbout, rdflib.URIRef(self.uri_api)),
             (TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
-            (rdfs.label, rdflib.Literal(f'{self.name} curation export graph')),
+            (rdfs.label, rdflib.Literal(f'{self.folder_name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
         )
@@ -868,7 +875,7 @@ class TriplesExportDataset(TriplesExport):
             s = rdflib.URIRef(dsid)
             yield s, a, owl.NamedIndividual
             yield s, a, sparc.Resource
-            yield s, rdfs.label, rdflib.Literal(self.name)
+            yield s, rdfs.label, rdflib.Literal(self.folder_name)  # not all datasets have titles
 
         def subject_id(v, species=None):  # TODO species for human/animal
             v = v.replace(' ', '%20')  # FIXME use quote urlencode
@@ -1051,18 +1058,25 @@ class Integrator(PathData, ProtocolData, OntologyData):
         return self._data
 
     @property
-    def protocol_uris(self):
+    def keywords(self):
+        try:
+            yield from adops.get(self.data, ['meta', 'keywords'])
+        except exc.NoSourcePathError:
+            pass
+
+    @property
+    def protocol_uris(self):  # FIXME this needs to be pipelined
         try:
             yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
         except exc.NoSourcePathError:
             pass
 
     @property
-    def keywords(self):
-        try:
-            yield from adops.get(self.data, ['meta', 'keywords'])
-        except exc.NoSourcePathError:
-            pass
+    def triples_exporter(self):
+        if not hasattr(self, '_triples_exporter'):
+            self._triples_exporter = TriplesExportDataset(self.data)
+
+        return self._triples_exporter
 
 
 class ExporterSummarizer:
@@ -1188,7 +1202,7 @@ class ExporterSummarizer:
                'keywords',
                'links',
                'modality',
-               'name',
+               'name',  # -> title
                'organ',
                'originating_article_doi',
                'principal_investigator',
@@ -1201,10 +1215,12 @@ class ExporterSummarizer:
                'title_for_complete_data_set',
                'uri_api',
                'uri_human',
-               'error_index',
-               'dataset_completeness_index',
+               'error_index',  # (sum *_index)
+               'dataset_completeness_index',  # dead
                'is_about',
                'involves_anatomical_region',
+               'title',
+               'folder_name',
         ]
         chs = ['contributor_affiliation',
                'contributor_orcid_id',
@@ -1322,7 +1338,7 @@ class ExporterSummarizer:
                     resources.append(row)
 
             if 'errors' in dowe:
-                ers = dowe['errors']
+                ers = get_all_errors(dowe)
                 for er in ers:
                     row = [id]
                     row.append(json.dumps(er, cls=JEncode))

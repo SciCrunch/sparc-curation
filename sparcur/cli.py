@@ -1206,7 +1206,7 @@ class Shell(Dispatcher):
         intr = Integrator(p)
         j = JT(intr.data)
         pj = list(intr.protocol_jsons)
-        pc = list(intr.protcur)
+        pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         embed()
 

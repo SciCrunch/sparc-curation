@@ -124,7 +124,8 @@ ContributorConverter.setup()
 
 class MetaConverter(TripleConverter):
     mapping = [
-        ['name', rdfs.label],
+        ['folder_name', rdfs.label],
+        ['title', dc.title],
         ['protocol_url_or_doi', TEMP.hasProtocol],
         #['award_number', TEMP.hasAwardNumber],
         ['species', isAbout],

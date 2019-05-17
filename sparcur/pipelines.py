@@ -350,20 +350,22 @@ class SPARCBIDSPipeline(JSONPipeline):
               [['dirs',], ['meta', 'dirs']],  # FIXME not quite right ...
               [['files',], ['meta', 'files']],
               [['size',], ['meta', 'size']],
+              [['dataset_description_file', 'name'], ['meta', 'title']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'species',  # TODO validate all source paths against schema
                         'organ',
                         'modality',
                         'protocol_url_or_doi',
 
-                        'completeness_of_dataset',
                         'completeness_of_data_set',
                         'funding',
                         'description',
                         'additional_links',
                         'keywords',
                         'acknowledgements',
-                        'originating_article_doi',))
+                        'originating_article_doi',
+                        'title_for_complete_dataset',
+              ))
 
     moves = ([['dataset_description_file',], ['inputs', 'dataset_description_file']],
              [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
@@ -414,7 +416,7 @@ class SPARCBIDSPipeline(JSONPipeline):
     updates = []
 
     adds = [[['id'], lambda lifters: lifters.id],
-            [['meta', 'name'], lambda lifters: lifters.name],
+            [['meta', 'folder_name'], lambda lifters: lifters.name],
             [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
             [['meta', 'uri_api'], lambda lifters: lifters.uri_api],]
 
