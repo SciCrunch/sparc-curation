@@ -1129,7 +1129,7 @@ class ExporterSummarizer:
                     resources.append(res)
 
             if 'errors' in dowe:
-                ers = dowe['errors']
+                ers = get_all_errors(dowe)
                 for er in ers:
                     er['dataset_id'] = id
                     er = {k:normv(v) for k, v in er.items()}

@@ -687,7 +687,11 @@ class DatasetDescriptionFile(Version1Header):
         for val in value.split(','):
             v = val.strip()
             if v:
-                yield DoiId(prefix='doi', suffix=normalizeDoi(v))
+                doi = DoiId(prefix='doi', suffix=normalizeDoi(v))
+                if doi.valid:
+                    # TODO make sure they resolve as well
+                    # probably worth implementing this as part of OntId
+                    yield doi
 
     def keywords(self, value):
         if ';' in value:

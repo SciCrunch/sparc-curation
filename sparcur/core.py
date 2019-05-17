@@ -121,6 +121,13 @@ class DoiId(OntId):
     _namespaces = DoiPrefixes
     __firsts = 'iri',
 
+    class DoiMalformedError(Exception):
+        """ WHAT HAVE YOU DONE!? """
+
+    @property
+    def valid(self):
+        return self.suffix.startswith('10.')
+
 
 class OrcidPrefixes(oq.OntCuries):
     # set these manually since, sigh, factory patterns

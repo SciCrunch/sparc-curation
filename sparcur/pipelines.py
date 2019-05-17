@@ -372,7 +372,7 @@ class SPARCBIDSPipeline(JSONPipeline):
                         'keywords',
                         'acknowledgements',
                         'originating_article_doi',
-                        'title_for_complete_dataset',
+                        'title_for_complete_data_set',
               ))
 
     moves = ([['dataset_description_file',], ['inputs', 'dataset_description_file']],
