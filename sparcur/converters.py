@@ -124,6 +124,7 @@ ContributorConverter.setup()
 
 class MetaConverter(TripleConverter):
     mapping = [
+        ['acknowledgements', TEMP.acknowledgements],
         ['folder_name', rdfs.label],
         ['title', dc.title],
         ['protocol_url_or_doi', TEMP.hasProtocol],
@@ -141,27 +142,24 @@ class MetaConverter(TripleConverter):
         ['subject_count', TEMP.hasNumberOfSubjects],
         ['sample_count', TEMP.hasNumberOfSamples],
         ['contributor_count', TEMP.hasNumberOfContributors],
+
+        ['title_for_complete_data_set', TEMP.collectionTitle],
+        ['prior_batch_number', TEMP.Continues],  # see datacite relationType
+
+        ['originating_article_doi', TEMP.IsDescribedBy],  # see relationType
+
+        # TODO
+        #['additional_links', ],
+        #['completeness_of_data_set', ],
+        #['examples'],
+        #['links'],
+
     ]
 
     def principal_investigator(self, value):
         index = int(value.rsplit('/', 1)[-1])
         id = self.integrator.data['contributors'][index]['id']
         return TEMP.hasResponsiblePrincialInvestigator, rdflib.URIRef(id)  # FIXME reload -> ir
-
-    def protocol_url_or_doi(self, value):
-        doi = False
-        if 'doi' in value:
-            doi = True
-        elif value.startswith('10.'):
-            value = 'doi:' + value
-            doi = True
-            
-        if doi:
-            value = OntId(normalizeDoi(value))
-        else:
-            value = rdflib.URIRef(value)
-
-        return TEMP.hasProtocol, value
 
     def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']
     class Extra:

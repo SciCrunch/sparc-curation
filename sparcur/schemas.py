@@ -277,6 +277,7 @@ class ContributorSchema(JSONSchema):
                                    'Other',]}
                   },
                   'is_contact_person': {'type': 'boolean'},
+                  'errors': ErrorSchema.schema,
               }}
 
 
@@ -608,8 +609,8 @@ class SummarySchema(JSONSchema):
               'properties': {'id': {'type': 'string',
                                     'pattern': '^N:organization:'},
                              'meta': {'type': 'object',
-                                      'required': ['name', 'count', 'uri_api', 'uri_human'],
-                                      'properties': {'name': {'type': 'string'},
+                                      'required': ['folder_name', 'count', 'uri_api', 'uri_human'],
+                                      'properties': {'folder_name': {'type': 'string'},
                                                      # FIXME common source for these with MetaOutSchema
                                                      'uri_human': {'type': 'string',
                                                                    'pattern': r'^https://app\.blackfynn\.io/N:organization:',

@@ -3,7 +3,7 @@ from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
-from sparcur.core import JT, JEncode, log, logd, lj, OntId, OrcidId
+from sparcur.core import JT, JEncode, log, logd, lj, OntId, OrcidId, OntTerm
 from sparcur.state import State
 from sparcur.derives import Derives
 
@@ -42,6 +42,14 @@ class ContributorsPipeline(DatasourcePipeline):
                 fn, mn = fn.split(' ', 1)
                 contributor['middle_name'] = mn
                 contributor['first_name'] = fn
+
+            if ' ' in ln:
+                he = dat.HasErrors(pipeline_stage=self.__class__.__name__)
+                msg = f'Malformed last_name {ln!r}'
+                he.addError(msg)
+                he.embedErrors(contributor)
+                logd.error(msg)
+                ln = ln.replace(' ', '-')
 
             failover = f'{fn}-{ln}'
             member = self.member(fn, ln)
@@ -416,7 +424,7 @@ class SPARCBIDSPipeline(JSONPipeline):
     updates = []
 
     adds = [[['id'], lambda lifters: lifters.id],
-            [['meta', 'folder_name'], lambda lifters: lifters.name],
+            [['meta', 'folder_name'], lambda lifters: lifters.folder_name],
             [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
             [['meta', 'uri_api'], lambda lifters: lifters.uri_api],]
 
@@ -525,12 +533,30 @@ class PipelineExtras(JSONPipeline):
                 an = data['meta']['award_number']
                 o = self.lifters.organ(an)
                 if o:
+                    if o != 'othertargets':
+                        o = OntId(o)
+                        if o.prefix == 'FMA':
+                            ot = OntTerm(o)
+                            o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+
                     data['meta']['organ'] = o
 
         if 'organ' not in data['meta'] or data['meta']['organ'] == 'othertargets':
             o = self.lifters.organ_term
             if o:
-                data['meta']['organ'] = o
+                if isinstance(o, str):
+                    o = o,
+
+                out = tuple()
+                for _o in o:
+                    _o = OntId(_o)
+                    if _o.prefix == 'FMA':
+                        ot = OntTerm(_o)
+                        _o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+
+                    out += (_o,)
+
+                data['meta']['organ'] = out
 
         return data
 

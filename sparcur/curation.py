@@ -21,7 +21,7 @@ from hyputils.hypothesis import group_to_memfile, HypothesisHelper
 from sparcur import config
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
-from sparcur.core import JT, JEncode, log, logd, lj
+from sparcur.core import JT, JEncode, log, logd, lj, get_all_errors
 from sparcur.core import DictTransformer, adops, OntId, OntTerm, OntCuries
 from sparcur.paths import Path
 from sparcur.state import State
@@ -772,51 +772,7 @@ class TriplesExportDataset(TriplesExport):
     def ddt(self, data):
         dsid = self.uri_api
         s = rdflib.URIRef(dsid)
-        if 'meta' in data:
-            dmap = {'acknowledgements': '',
-                    'additional_links': '',
-                    'award_number': '',
-                    'completeness_of_data_set': '',
-                    'contributor_count': '',
-                    #'contributors': '',
-                    'description': dc.description,
-                    'errors': '',
-                    'examples': '',
-                    'funding': '',
-                    'uri_human': '',
-                    'uri_api': '',
-                    'keywords': '',
-                    'links': '',
-                    'modality': '',
-                    'name': '',
-                    'organ': '',
-                    'originating_article_doi': '',
-                    'principal_investigator': '',
-                    'prior_batch_number': '',
-                    'protocol_url_or_doi': '',
-                    'sample_count': '',
-                    'species': '',
-                    'subject_count': '',
-                    'title_for_complete_data_set': '',
-                    'dirs': '',
-                    'files': '',
-                    'size': '',
-            }
 
-            for k, _v in data['meta'].items():
-                # FIXME how is temp sneeking through?
-                if k in dmap:
-                    p = dmap[k]
-                    if p:
-                        for v in (_v if  # FIXME write a function for list vs atom
-                                    isinstance(_v, tuple) or
-                                    isinstance(_v, list) else
-                                    (_v,)):
-                            o = rdflib.Literal(v)
-                            yield s, p, o
-
-                else:
-                    log.error(f'wtf error {k}')
         if 'contributors' in data:
             if 'creators' in data:
                 creators = data['creators']
@@ -1006,7 +962,7 @@ class Integrator(PathData, ProtocolData, OntologyData):
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dsc.id  # in case we are somewhere else
-            name = dsc.name
+            folder_name = dsc.name
             uri_api = dsc.uri_api
             uri_human = dsc.uri_human
             # dataset metadata
@@ -1416,7 +1372,7 @@ class Summary(Integrator, ExporterSummarizer):
         # TODO parallelize and stream this!
         ds = list(gen)
         count = len(ds)
-        meta = {'name': self.name,
+        meta = {'folder_name': self.name,
                 'uri_api': self.uri_api,
                 'uri_human': self.uri_human,
                 'count': count,}

@@ -683,6 +683,12 @@ class DatasetDescriptionFile(Version1Header):
             if v:
                 yield  self._protocol_url_or_doi(v)
 
+    def originating_article_doi(self, value):
+        for val in value.split(','):
+            v = val.strip()
+            if v:
+                yield DoiId(prefix='doi', suffix=normalizeDoi(v))
+
     def keywords(self, value):
         if ';' in value:
             # FIXME error for this
@@ -809,6 +815,8 @@ class SubjectsFile(Version1Header):
     def mass(self, value):
         yield from self._param(value)
 
+    body_mass = mass
+
     def weight(self, value):
         yield from self._param(value)
 
@@ -827,7 +835,10 @@ class SubjectsFile(Version1Header):
 
             dhv = dict_[h_value]
             if isinstance(dhv, str):
-                dhv = ast.literal_eval(dhv)
+                try:
+                    dhv = ast.literal_eval(dhv)
+                except ValueError as e:
+                    raise exc.UnhandledTypeError(f'{h_value} {dhv!r} was not parsed!') from e
 
             compose = dhv * pyru.ur.parse_units(dict_[h_unit])
             #_, v, rest = parameter_expression(compose)
