@@ -98,14 +98,48 @@
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 *** Windows
+    git
+    https://git-scm.com/download/win
+    All the default options in the wizard are fine except for one.
+    You need to choose the last option to use all unix tools from the
+    git bash prompt.
+
+    python
     https://www.anaconda.com/distribution
     Download the python 3.7 version.
     Anaconda is more bloated than I like, but it is the simplest way forward
-    for most users.
+    for most users. When installing you DO want to anaconda to add itself to PATH
     Start -> All programs -> Anaconda3 -> Anaconda Powershell Prompt
-    git for windows
-    https://git-scm.com/download/win
-    pip install --user 
+
+    add to PATH so we can just link everything there
+    =%HOMEPATH%\bin;%ProgramData%\Anaconda3\Scripts;%APPDATA%\Python\Python37\Scripts=
+    =;%ProgramFiles%\Racket\;%HOMEPATH%\Downloads\redland-1.0.3-Win32;%HOMEPATH%\Downloads\emacs-26.2-x86_64\bin=
+
+    racket
+    install the latest x86_64 racket from https://racket-lang.org/download/
+    e.g. https://mirror.racket-lang.org/installers/7.3/racket-7.3-x86_64-win32.exe
+    add  to PATH
+
+    emacs
+    Grab the latest x86_64 emacs from http://ftp.gnu.org/gnu/emacs/windows/
+    e.g. http://ftp.gnu.org/gnu/emacs/windows/emacs-26/emacs-26.2-x86_64.zip
+    extract the zip, and add =${unzipped-folder}/bin/runemacs= to your taskbar
+    desktop, or wherever you usually put your program links
+    You will also need to add =${unzipped-folder}/bin= to the windows
+    PATH environment variable under User variables.
+    start -> type: edit environment -> edit environment variables for your account -> new
+    Variable name: PATH
+    Variable value: =${unzipped-folder}/bin= with the ${unzipped-folder} expanded
+    to wherever you installed/unzipped emacs. This will allow you to launch emacs
+    from a terminal window
+    TODO =-l %HOMEPATH%/opt/scimax/init.el setup.org= in the shortcut ...
+    also =%HOMEPATH%= for the start in ...
+
+    rapper
+    http://download.librdf.org/binaries/win32/1.0.3/redland-1.0.3-Win32.zip
+    download unzip, path should deal with it, except that there seems to be
+    a shared object file that is missing
+
 ** User
    :PROPERTIES:
    :CUSTOM_ID: user-start-here
@@ -168,10 +202,12 @@
       # This is dangerous. I (Tom) have reviewed the install script at this commit.
       # Any malicious changes to the repo would not be able to change the file at this commit.
       # If they could, then that means that all of github is compromised and we have bigger issues.
-      cd ~/opt
+      pushd ~/opt
+      # TODO os detection
       bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
-      cd
-      ln -sT ~/opt/scimax.sh ~/bin/scimax
+      # if you have not configured git prior to this step you will be prompted to set your name and email
+      popd
+      ln -sT ~/opt/scimax.sh ~/bin/scimax  # TODO windows emacs -l opt/scimax/init.el setup.org
       # scimax user config
       # Needed to get sane behavior for executing this file out of the box.
       { cat <<EOL
@@ -286,7 +322,7 @@
     #+HEADER: :var REPOS=repos
     #+BEGIN_SRC bash :results output :eval no-export
       pushd ~/git
-      for repo_url in ${REPOS}; do git clone ${repo_url}.git; done
+      for repo_url in ${REPOS}; do git clone ${repo_url}.git 2>&1; done
       popd
     #+END_SRC
 
@@ -296,7 +332,7 @@
     #+HEADER: :var PYROOTS=py-roots
     #+BEGIN_SRC bash :results output :eval no-export
       pushd ~/git
-      for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . || break; popd; done
+      for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
       popd
     #+END_SRC
 
