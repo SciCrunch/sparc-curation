@@ -97,6 +97,15 @@
     Other software that you will probably need at some point but that is not packaged on ubuntu.
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
+*** Windows
+    https://www.anaconda.com/distribution
+    Download the python 3.7 version.
+    Anaconda is more bloated than I like, but it is the simplest way forward
+    for most users.
+    Start -> All programs -> Anaconda3 -> Anaconda Powershell Prompt
+    git for windows
+    https://git-scm.com/download/win
+    pip install --user 
 ** User
    :PROPERTIES:
    :CUSTOM_ID: user-start-here
