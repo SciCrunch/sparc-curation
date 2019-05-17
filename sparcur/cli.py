@@ -1188,7 +1188,7 @@ class Shell(Dispatcher):
         if p.cache.is_dataset():
             intr = Integrator(p)
             j = JT(intr.data)
-            triples = list(f.triples)
+            #triples = list(f.triples)
 
         try:
             latest_datasets = self.latest_export['datasets']
