@@ -1060,9 +1060,9 @@ class ExporterSummarizer:
         if isinstance(organ, list) or isinstance(organ, tuple):
             if len(organ) == 1:
                 organ, = organ
-                organ = (OntTerm(organ))
+                organ = OntTerm(organ)
             else:
-                organ = [(OntTerm(o)) for o in organ]
+                organ = [OntTerm(o) for o in organ]
 
         elif organ == 'othertargets':
             pass
@@ -1074,7 +1074,7 @@ class ExporterSummarizer:
                 accessor.status.error_index,
                 #accessor.submission_completeness_index,
                 #dataset.name,  # from filename (do we not have that in meta!?)
-                accessor.query('meta', 'name'),
+                accessor.query('meta', 'folder_name'),
                 accessor.id, #if 'id' in dowe else None,
                 accessor.query('meta', 'award_number'),
                 organ,

@@ -1052,7 +1052,7 @@ class Report(Dispatcher):
                                   f'nif-0000-10319-1/search?q={award}'), award) if award else 'MISSING'
                 organ = organ if organ else ''
                 if isinstance(organ, list) or isinstance(organ, tuple):
-                    ' '.join([o.atag() for o in organ])
+                    organ = ' '.join([o.atag() for o in organ])
                 if isinstance(organ, OntTerm):
                     organ = organ.atag()
             else:
