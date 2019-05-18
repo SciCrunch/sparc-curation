@@ -111,7 +111,7 @@ class OrganData:
                 soup = BeautifulSoup(f.read(), 'lxml')
         else:
             resp = requests.get(self.url)
-            soup = BeautifulSoup(requests.content, 'lxml')
+            soup = BeautifulSoup(resp.content, 'lxml')
 
         self.raw = {}
         self.former_to_current = {}
