@@ -6,6 +6,7 @@ from sparcur import exceptions as exc
 from sparcur.paths import Path
 from sparcur.paths import LocalPath, PrimaryCache, RemotePath
 from sparcur.paths import XattrCache, SymlinkCache
+from sparcur.state import State
 from sparcur.pathmeta import PathMeta
 from sparcur.datasets import Version1Header
 from sparcur.curation import PathData, Integrator
@@ -102,7 +103,9 @@ if not project_path.exists() or not list(project_path.iterdir()):
         mk_required_files(rp)  # TODO all variants of missing files
 
 
-Integrator.setup(FakeBFLocal(project_path.cache.id, project_path.cache))
+fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
+State.bind_blackfynn(fbfl)
+Integrator.setup(fbfl)
 
 
 class TestLocalPath(LocalPath):

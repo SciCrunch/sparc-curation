@@ -49,21 +49,34 @@ def populate_tests(only=tuple(), do_mains=True):
     if 'TRAVIS' in os.environ:
         skip += tuple()
 
-    mains = {'cli':[['spc', 'tables'],
-                    ['spc', 'missing'],
-                    ['spc', 'xattrs'],
-                    ['spc', 'stats'],
+    mains = {'cli':[['spc', 'clone'],  # TODO
+                    ['spc', 'pull'],
+                    ['spc', 'refresh'],
+                    ['spc', 'fetch'],
+
+                    ['spc', 'find', '-n', '*.xlsx'],
+                    ['spc', 'find', '-l', '3'],
+
+                    ['spc', 'status'],
+                    ['spc', 'meta'],
+
                     ['spc', 'report', 'completeness'],
                     ['spc', 'report', 'filetypes'],
                     ['spc', 'report', 'subjects'],
                     ['spc', 'report', 'keywords'],
-                    ['spc', 'annos'],
-                    ['spc', 'annos', 'export'],
+                    ['spc', 'report', 'stats'],
+                    ['spc', 'report', 'size'],
+                    ['spc', 'report', 'test'],
                     ['spc', 'export'],
+                    ['spc', 'export', 'datasets'],
                     ['spc', 'export', 'ttl'],
                     ['spc', 'export', 'json'],
-                    ['spc', 'find', '-n', '*.xlsx'],
-                    ['spc', 'find', '-l', '3'],
+
+                    ['spc', 'tables'],
+                    ['spc', 'missing'],
+                    ['spc', 'xattrs'],
+                    ['spc', 'annos'],
+                    ['spc', 'annos', 'export'],
                    ],
              'curation':None,
             }

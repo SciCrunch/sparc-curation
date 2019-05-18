@@ -4,7 +4,6 @@ from .common import project_path
 
 from sparcur import schemas as sc
 from sparcur import datasets as dat
-from sparcur import validate as vldt
 from sparcur.paths import Path
 
 
@@ -55,18 +54,3 @@ class TestHierarchy(unittest.TestCase):
 class TestLax(TestHierarchy):
     def setUp(self):
         self.ds =  [dat.DatasetStructureLax(p) for p in Path(project_path).children]
-
-
-class TestStage(unittest.TestCase):
-    def test_simple(self):
-        i = 'hello world'
-        s = vldt.Stage(i)
-        o = s.output
-        assert o == i
-
-class TestHeader(unittest.TestCase):
-    def test_simple(self):
-        i = ['a', 'b', 'c', 'd']
-        s = vldt.Header(i)
-        o = s.output
-        assert o == i
