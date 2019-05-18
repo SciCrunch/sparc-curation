@@ -2,6 +2,7 @@ import io
 import ast
 import csv
 import copy
+from itertools import chain
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
 from scibot.extract import normalizeDoi
@@ -216,29 +217,22 @@ class DatasetStructure(Path, HasErrors):
 
         try:
             path = next(gen)
-            if not path.is_broken_symlink():
+            for path in chain((path,), gen):
+                if path.is_broken_symlink():
+                    log.info(f'fetching unretrieved metadata path {path.as_posix()!r}')
+                    path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
+
+                if path.suffix in path.stem:
+                    msg = f'path has duplicate suffix {path.as_posix()!r}'
+                    self.addError(msg)
+                    logd.error(msg)
+
                 if path.name[0].isupper():
                     msg = f'path has bad casing {path.as_posix()!r}'
                     self.addError(msg)
                     logd.error(msg)
+
                 yield path
-
-            else:
-                msg = f'path has not been retrieved {path.as_posix()!r}'
-                self.addError(msg, pipeline_stage=self.__class__.__name__ + '.curation-error')
-                log.error(msg)
-
-            for path in gen:
-                if not path.is_broken_symlink():
-                    if path.name[0].isupper():
-                        msg = f'path has bad casing {path.as_posix()!r}'
-                        self.addError(msg)
-                        logd.error(msg)
-
-                    yield path
-
-                else:
-                    log.warning(f'path has not been retrieved {path.as_posix()!r}')
 
         except StopIteration:
             if (self.cache.parent.meta is not None and
