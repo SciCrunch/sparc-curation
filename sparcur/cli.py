@@ -428,6 +428,8 @@ class Main(Dispatcher):
                 message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
                 sys.exit(2)
 
+        self.anchor = anchor
+        self.project_path = self.anchor.local
         with anchor:
             self.pull()
 
