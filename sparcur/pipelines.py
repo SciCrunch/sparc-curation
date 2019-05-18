@@ -35,7 +35,14 @@ class ContributorsPipeline(DatasourcePipeline):
 
     def _process(self, contributor):
         # get member if we can find them
+        he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.data')
         if 'name' in contributor and 'first_name' in contributor:
+            name = contributor['name']
+            if ';' in name:
+                msg = f'Bad symbol in name {name!r}'
+                he.addError(msg)
+                logd.error(msg)
+
             fn = contributor['first_name']
             ln = contributor['last_name']
             if ' ' in fn:
@@ -44,10 +51,8 @@ class ContributorsPipeline(DatasourcePipeline):
                 contributor['first_name'] = fn
 
             if ' ' in ln:
-                he = dat.HasErrors(pipeline_stage=self.__class__.__name__)
                 msg = f'Malformed last_name {ln!r}'
                 he.addError(msg)
-                he.embedErrors(contributor)
                 logd.error(msg)
                 ln = ln.replace(' ', '-')
 
@@ -82,6 +87,7 @@ class ContributorsPipeline(DatasourcePipeline):
                 s = OntId(self.dsid + '/contributors/' + failover)
 
         contributor['id'] = s
+        he.embedErrors(contributor)
 
 
 class PrePipeline(Pipeline):
