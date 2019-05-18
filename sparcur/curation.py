@@ -1360,8 +1360,8 @@ class Summary(Integrator, ExporterSummarizer):
     @property
     def completeness(self):
         """ completeness, name, and id for all datasets """
-        for dataset in self:
-            yield self._completeness(dataset.data)
+        for dataset_blob in self:
+            yield self._completeness(dataset_blob)
 
     def make_json(self, gen):
         # FIXME this and the datasets is kind of confusing ...
