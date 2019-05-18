@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<!-- https://commonfund.nih.gov/sites/default/files/sparc_nervous_system_graphic/main.html -->
+<html xml:lang="en" class="mozwebext" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=windows-1252">
+<script type="text/javascript" src="sparc-nervous-system-graphic_files/ruxitagentjs_ICA2SVfqr_10163190401123328.js" data-dtconfig="rid=RID_1892653225|rpid=1801913108|domain=nih.gov|reportUrl=/rb_9241edb6-baf5-4883-910b-7af459e48ec7|app=ea388eff05c4c35d|srms=1,1,,,|uxrgcm=100,25,300,3;100,25,300,3|featureHash=ICA2SVfqr|dpvc=1|lastModification=1555600722226|srsr=25000|dtVersion=10163190401123328|tp=500,50,0,1|rdnt=1|uxrgce=1|bp=2|agentUri=/ruxitagentjs_ICA2SVfqr_10163190401123328.js"></script><script src="sparc-nervous-system-graphic_files/jquery-3.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+<style media="screen" type="text/css">
+
+#content-graphic {
+  width: 385px;
+  height: 600px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  position: absolute;
+  left: 0;
+  right: 100px;
+}
+
+#background-image {
+  position: absolute;
+  width: 275px;
+  left: 55px;
+  top: 20px;
+  z-index: 0;
+}
+
+.icon, .glow-icon{
+  /*display: none;*/
+  position: absolute;
+  width: 45px;
+  height: 46px;
+  z-index: 1;
+  cursor: pointer;
+  cursor: hand;
+}
+.bubble, .big-icon {
+  position: absolute;
+  display: none;
+  z-index: 2;
+  height: auto;
+  width: auto;
+  cursor: pointer;
+  cursor: hand;
+}
+.speech-bubble-left-column {
+	/*position: relative;*/
+	border-radius: .4em;
+  max-width: 260px;
+  min-height: 50px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: #373d88;
+}
+
+.speech-bubble-left-column:after {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 50%;
+	width: auto;
+	height: auto;
+	border: 7px solid transparent;
+	border-left: 0;
+	margin-top: -7px;
+	margin-left: -5px;
+}
+
+.speech-bubble-left-column > .speech-bubble-triangle-border:after {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 50%;
+	width: auto;
+	height: auto;
+	border: 10px solid transparent;
+	border-left: 0;
+	margin-top: -10px;
+	margin-left: -8px;
+  border-right-color: #373d88;
+}
+
+.speech-bubble-right-column {
+	/* position: relative; */
+	border-radius: .4em;
+  max-width: 260px;
+  min-height: 50px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: #373d88;
+}
+
+.speech-bubble-right-column:after {
+	content: '';
+	position: absolute;
+	right: 0;
+	top: 50%;
+	width: auto;
+	height: auto;
+	border: 7px solid transparent;
+	border-right: 0;
+	margin-top: -7px;
+	margin-right: -5px;
+}
+
+.speech-bubble-right-column.heart:after {
+  top: 33%;
+}
+
+.speech-bubble-right-column.heart > .speech-bubble-triangle-border:after {
+  top: 33%;
+}
+
+.speech-bubble-right-column > .speech-bubble-triangle-border:after {
+	content: '';
+	position: absolute;
+	right: 0;
+	top: 50%;
+	width: auto;
+	height: auto;
+	border: 10px solid transparent;
+	border-right: 0;
+	margin-top: -10px;
+	margin-right: -8px;
+  border-left-color: #373d88;
+}
+
+.speech-bubble-bottom {
+	/* position: relative; */
+  border-radius: .4em;
+  max-width: 260px;
+  min-height: 50px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: #373d88;
+}
+
+.speech-bubble-bottom:after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	width: 0;
+	height: 0;
+	border: 7px solid transparent;
+	border-bottom: 0;
+	margin-left: -7px;
+	margin-bottom: -5px;
+}
+
+.speech-bubble-bottom > .speech-bubble-triangle-border:after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	width: 0;
+	height: 0;
+	border: 10px solid transparent;
+	border-bottom: 0;
+	margin-left: -10px;
+	margin-bottom: -8px;
+  border-top-color: #373d88;
+}
+
+.speech-bubble-top {
+  /* position: relative; */
+  border-radius: .4em;
+  max-width: 260px;
+  min-height: 50px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: #373d88;
+}
+
+.speech-bubble-top:after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 50%;
+	width: 0;
+	height: 0;
+	border: 7px solid transparent;
+	border-top: 0;
+	margin-left: -7px;
+	margin-top: -5px;
+}
+
+.speech-bubble-top > .speech-bubble-triangle-border:after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 50%;
+	width: 0;
+	height: 0;
+	border: 10px solid transparent;
+	border-top: 0;
+	margin-left: -10px;
+	margin-top: -8px;
+  border-bottom-color: #373d88;
+}
+
+.speech-bubble-left-column.liver {
+  background: #cdeaf1;
+}
+
+.speech-bubble-left-column.liver:after {
+  border-right-color: #cdeaf1;
+}
+
+.speech-bubble-left-column.lungs {
+  background: #fbe5e9;
+}
+
+.speech-bubble-left-column.lungs:after {
+  border-right-color: #fbe5e9;
+}
+
+.speech-bubble-left-column.pancreas {
+  background: #cdedec;
+}
+
+.speech-bubble-left-column.pancreas:after {
+  border-right-color: #cdedec;
+}
+
+.speech-bubble-left-column.large-intestine {
+  background: #fdefd0;
+}
+
+.speech-bubble-left-column.large-intestine:after {
+  border-right-color: #fdefd0;
+}
+
+.speech-bubble-left-column.small-intestine {
+  background: #cde8dd;
+}
+
+.speech-bubble-left-column.small-intestine:after {
+  border-right-color: #cde8dd;
+}
+
+.speech-bubble-bottom.uterus {
+  background: #e7d3e9;
+}
+
+.speech-bubble-bottom.uterus:after {
+  border-top-color: #e7d3e9;
+}
+
+.speech-bubble-bottom.computer {
+  background: #c4d3d7;
+}
+
+.speech-bubble-bottom.computer:after {
+  border-top-color: #c4d3d7;
+}
+
+.speech-bubble-bottom.male-genitals {
+  background: #fbe2d4;
+}
+
+.speech-bubble-bottom.male-genitals:after {
+  border-top-color: #fbe2d4;
+}
+
+.speech-bubble-right-column.bladder {
+  background: #cce2e5;
+}
+
+.speech-bubble-right-column.bladder:after {
+  border-left-color: #cce2e5;
+}
+
+.speech-bubble-right-column.kidneys {
+  background: #e4e8eb;
+}
+
+.speech-bubble-right-column.kidneys:after {
+  border-left-color: #e4e8eb;
+}
+
+.speech-bubble-right-column.stomach {
+  background: #eae5f1;
+}
+
+.speech-bubble-right-column.stomach:after {
+  border-left-color: #eae5f1;
+}
+
+.speech-bubble-right-column.spleen {
+  background: #f9d2d4;
+}
+
+.speech-bubble-right-column.spleen:after {
+  border-left-color: #f9d2d4;
+}
+
+.speech-bubble-right-column.heart {
+  background: #ebedd7;
+}
+
+.speech-bubble-right-column.heart:after {
+  border-left-color: #ebedd7;
+}
+
+.speech-bubble-top.other-targets {
+  background: #fdefd0;
+}
+.speech-bubble-top.other-targets:after {
+  border-bottom-color: #fdefd0;
+}
+
+.speech-bubble-top.brain {
+  background: #a8e6ab;
+}
+.speech-bubble-top.brain:after {
+  border-bottom-color: #a8e6ab;
+}
+
+#lung-icon.icon {
+  left: 35px;
+  top: 40px;
+  z-index: 7;
+}
+#lung-big-icon.big-icon {
+  left: 30px;
+  top: 35px;
+  z-index: 7;
+}
+#lung-bubble.bubble {
+  left: 100px;
+  top: 6px;
+  z-index: 8;
+}
+
+#liver-icon.icon {
+  left: 35px;
+  top: 100px;
+}
+#liver-big-icon.big-icon {
+  left: 30px;
+  top: 95px;
+}
+#liver-bubble.bubble {
+  left: 100px;
+  top: 94px;
+}
+
+#pancreas-icon.icon {
+  left: 35px;
+  top: 160px;
+}
+#pancreas-big-icon.big-icon {
+  left: 30px;
+  top: 155px;
+}
+#pancreas-bubble.bubble {
+  left: 100px;
+  top: 122px;
+}
+
+#largeintestine-icon.icon {
+  left: 35px;
+  top: 220px;
+}
+#largeintestine-big-icon.big-icon {
+  left: 30px;
+  top: 215px;
+}
+#largeintestine-bubble.bubble {
+  left: 100px;
+  top: 151px;
+  z-index: 4;
+}
+
+#smallintestine-icon.icon {
+  left: 35px;
+  top: 280px;
+}
+#smallintestine-big-icon.big-icon {
+  left: 30px;
+  top: 275px;
+}
+#smallintestine-bubble.bubble {
+  left: 100px;
+  top: 257px;
+  z-index: 4;
+}
+
+#uterus-icon.icon {
+  left: 85px;
+  top: 334px;
+  z-index: 3;
+}
+#uterus-big-icon.big-icon {
+  left: 80px;
+  top: 329px;
+}
+#uterus-bubble.bubble {
+  left: 10px;
+  top: 260px;
+}
+
+#computer-icon.icon {
+  left: 170px;
+  top: 365px;
+  z-index: 5;
+}
+#computer-big-icon.big-icon {
+  left: 165px;
+  top: 360px;
+  z-index: 2;
+}
+#computer-bubble.bubble {
+  left: 91px;
+  top: 268px;
+  z-index: 4;
+}
+
+#malerepro-icon.icon {
+  left: 255px;
+  top: 334px;
+  z-index: 3;
+}
+#malerepro-big-icon.big-icon {
+  left: 250px;
+  top: 329px;
+}
+#malerepro-bubble.bubble {
+  right: 16px;
+  top: 260px;
+}
+
+#bladder-icon.icon {
+  left: 305px;
+  top: 280px;
+}
+#bladder-big-icon.big-icon {
+  left: 300px;
+  top: 275px;
+}
+#bladder-bubble.bubble {
+  right: 100px;
+  top: 210px;
+  z-index: 5;
+}
+
+#kidneys-icon.icon {
+  left: 305px;
+  top: 220px;
+}
+#kidneys-big-icon.big-icon {
+  left: 300px;
+  top: 215px;
+}
+#kidneys-bubble.bubble {
+  right: 100px;
+  top: 212px;
+}
+
+#stomach-icon.icon {
+  left: 305px;
+  top: 160px;
+}
+#stomach-big-icon.big-icon {
+  left: 300px;
+  top: 155px;
+}
+#stomach-bubble.bubble {
+  right: 100px;
+  top: 86px;
+}
+
+#spleen-icon.icon {
+  left: 305px;
+  top: 100px;
+}
+#spleen-big-icon.big-icon {
+  left: 300px;
+  top: 95px;
+}
+#spleen-bubble.bubble {
+  right: 100px;
+  top: 92px;
+}
+
+#heart-icon.icon {
+  left: 305px;
+  top: 40px;
+  z-index: 7;
+}
+#heart-big-icon.big-icon {
+  left: 300px;
+  top: 35px;
+  z-index: 7;
+}
+#heart-bubble.bubble {
+  right: 100px;
+  top: 5px;
+  z-index: 8;
+}
+
+#brain-icon.icon {
+  left: 175px;
+  top: 60px;
+}
+#brain-big-icon.big-icon {
+  display: none;
+  left: 165px;
+  top: 55px;
+}
+#brain-bubble.bubble {
+  left: 132px;
+  top: 118px;
+}
+
+
+#othertargets-icon.icon {
+  left: 92px;
+  top: 20px;
+}
+#othertargets-big-icon.big-icon {
+  left: 83px;
+  top: 20px;
+}
+#othertargets-bubble.bubble {
+  left: 60px;
+  top: 70px;
+  z-index: 8;
+}
+
+ul#links-graphic {
+  /* position: absolute; */
+  font-size: 11px;
+  color: #000000;
+  margin-top: 0;
+  margin-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  list-style: none;
+  font-weight: bold;
+}
+ul#links-graphic li {
+  margin-top: 4px;
+  padding-right: 1px;
+}
+p#heading-graphic {
+  /* position: absolute; */
+  font-size: 13px;
+  font-weight: bold;
+  color: #c561ce;
+  margin-top: 5px;
+  margin-bottom: 0;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+ul#links-graphic a {
+  color: #31368a;
+  text-decoration: none;
+}
+ul#links-graphic a:hover {
+  color: #31368a;
+  font-weight: bold;
+  text-decoration: underline;
+}
+a#brain {
+  color: #bd87c4;
+  text-decoration: none;
+}
+a#brain:hover {
+  color: #c060cc;
+  text-decoration: underline;
+}
+.left-column {
+  left: 5px;
+}
+.right-column {
+  left: 5px;
+}
+.othertargets-text {
+  left: 0;
+}
+
+</style>
+
+<script type="text/javascript">
+function toggleBubbleIcon(id) {
+  //if the icon being clicked is opened already, hide it and it's bubble, and show the regular icon
+  if ($('#' + id + '-big-icon').is(":visible")) {
+    $('#' + id + '-big-icon').hide();
+    $('#' + id + '-bubble').hide();
+    $('#' + id + '-icon').show();
+  }
+  // otherwise check to make sure every bubble and big icon is closed and every regular icon is showing (essentially reset to default state)
+  else {
+    $(".big-icon").each(function() {
+      if ($(this).is(":visible")) {
+        $(this).hide();
+      }
+    });
+    $(".bubble").each(function() {
+      if ($(this).is(":visible")) {
+        $(this).hide();
+      }
+    });
+    $(".icon").each(function() {
+      if ($(this).is(":hidden")) {
+        $(this).show();
+      }
+    });
+    // then open up the bubble and big icon being clicked on and hide the regular size icon
+    $('#' + id + '-big-icon').show();
+    $('#' + id + '-bubble').show();
+    $('#' + id + '-icon').hide();
+  }
+}
+/*<div class="glow-icon" id="brain-glow-icon">
+  <img src="assets/big_icons/brain-glow-big-icon.png" alt="" onClick="toggleBubbleIcon('brain')" onmouseover="showBrainGlow()" onmouseout="hideBrainGlow()">
+</div>*/
+function showBrainGlow() {
+  $('#brain-big-icon').show();
+}
+
+function hideBrainGlow() {
+  $('#brain-big-icon').hide();
+}
+
+</script>
+</head>
+<body>
+<div id="content-graphic">
+  <div id="background-image"><img src="sparc-nervous-system-graphic_files/OD_nervous_system_bg.png" alt="A graphic of the body and the underlying nervous system." width="275" height="338">
+  </div>
+  <!-- Lung -->
+	<div class="icon" id="lung-icon">
+    <img src="sparc-nervous-system-graphic_files/lungs-icon.png" alt="Clickable icon showing an image of the lungs." onclick="toggleBubbleIcon('lung')">
+  </div>
+  <div class="big-icon" id="lung-big-icon">
+    <img src="sparc-nervous-system-graphic_files/lung-big-icon.png" alt="Clickable icon showing an image of the lungs." onclick="toggleBubbleIcon('lung')">
+  </div>
+  <div class="bubble" id="lung-bubble">
+    <div class="speech-bubble-left-column lungs">
+      <div class="speech-bubble-triangle-border">
+        <p class="left-column" id="heading-graphic">Lung</p>
+        <ul class="left-column" id="links-graphic">
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023854-01" alt="OT2 - Bolser - U Florida " target="_blank">OT2 – Bolser – U Florida </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1U18TR001925-01" alt="U18 - Canning - Johns Hopkins U " target="_blank">U18 – Canning – Johns Hopkins U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023860-01" alt="OT2 - Lewis - Case Western Reserve U" target="_blank">OT2 – Lewis – Case Western Reserve U</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9054568&amp;icde=26495861&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=10&amp;csb=default&amp;cs=ASC" alt="U18 - Strohl - Case Western Reserve U" target="_blank">U18 – Strohl – Case Western Reserve U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9301227&amp;icde=32918449" alt="OT2 - Sun - U California, San Diego" target="_blank">OT2 – Sun – U California, San Diego </a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/lung-bubble.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Liver -->
+  <div class="icon" id="liver-icon">
+    <img src="sparc-nervous-system-graphic_files/liver-icon.png" alt="Clickable icon showing an image of the liver." onclick="toggleBubbleIcon('liver')">
+  </div>
+  <div class="big-icon" id="liver-big-icon">
+    <img src="sparc-nervous-system-graphic_files/liver-big-icon.png" alt="Clickable icon showing an image of the liver." onclick="toggleBubbleIcon('liver')">
+  </div>
+  <div class="bubble" id="liver-bubble">
+    <div class="speech-bubble-left-column liver">
+      <div class="speech-bubble-triangle-border">
+        <p class="left-column" id="heading-graphic">Liver</p>
+        <ul class="left-column" id="links-graphic">
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023864-01" alt="OT2 - Muenzberg-Gruening - Louisiana State U" target="_blank">OT2 – Muenzberg-Gruening – Louisiana State U</a></li>
+        </ul>
+        <!--<img src="assets/bubbles/liver-bubble.png" />-->
+      </div>
+    </div>
+  </div>
+  <!-- Pancreas -->
+  <div class="icon" id="pancreas-icon">
+    <img src="sparc-nervous-system-graphic_files/pancreas-icon.png" alt="Clickable icon showing an image of the pancreas." onclick="toggleBubbleIcon('pancreas')">
+  </div>
+  <div class="big-icon" id="pancreas-big-icon">
+    <img src="sparc-nervous-system-graphic_files/pancreas-big-icon.png" alt="Clickable icon showing an image of the pancreas." onclick="toggleBubbleIcon('pancreas')">
+  </div>
+  <div class="bubble" id="pancreas-bubble">
+    <div class="speech-bubble-left-column pancreas">
+      <div class="speech-bubble-triangle-border">
+        <p class="left-column" id="heading-graphic">Pancreas</p>
+        <ul class="left-column" id="links-graphic">
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023861-01" alt="OT2 - Campbell-Thompson - U Florida " target="_blank">OT2 – Campbell-Thompson – U Florida </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9526682&amp;icde=40364867" alt="OT2 - Soh - Stanford U" target="_blank">OT2 – Soh – Stanford U</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9415871&amp;icde=36110097&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=19&amp;csb=default&amp;cs=ASC&amp;pball=" alt="" target="_blank">OT2 – Stanley – Ichan School of Medicine, Mount Sinai</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023852-01" alt="OT2 - Weir - U Colorado, Denver" target="_blank">OT2 – Weir – U Colorado, Denver </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1U18TR001926-01" alt="U18 - Yin - Transtimulation Research" target="_blank">U18 – Yin – Transtimulation Research</a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/pancreas-bubble.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Colon/Large Intestine -->
+  <div class="icon" id="largeintestine-icon">
+    <img src="sparc-nervous-system-graphic_files/largeintestine-icon.png" alt="Clickable icon showing an image of the colon/large intestine." onclick="toggleBubbleIcon('largeintestine')">
+  </div>
+  <div class="big-icon" id="largeintestine-big-icon">
+    <img src="sparc-nervous-system-graphic_files/largeintestine-big-icon.png" alt="Clickable icon showing an image of the ." onclick="toggleBubbleIcon('largeintestine')">
+  </div>
+  <div class="bubble" id="largeintestine-bubble">
+    <div class="speech-bubble-left-column large-intestine">
+      <div class="speech-bubble-triangle-border">
+        <p class="left-column" id="heading-graphic">Colon/Large Intestine</p>
+        <ul class="left-column" id="links-graphic">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9627773" alt="OT2 - Axelrod - G-Tech, INC." target="_blank">OT2 – Axelrod – G-Tech, INC.</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9513947&amp;icde=36302933&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Gregersen - California Medical Innovations Institute" target="_blank">OT2 – Gregersen – California Medical Innovations Institute </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023859-01" alt="OT2 - Howard - U Toledo" target="_blank">OT2 – Howard – U Toledo </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9054555&amp;icde=26495861&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=8&amp;csb=default&amp;cs=ASC" alt="U18 - Howard - U Toledo (ended)" target="_blank">U18 – Howard – U Toledo (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023850-01" alt="OT2 - Southard-Smith - Vanderbilt U " target="_blank">OT2 – Southard-Smith – Vanderbilt U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9412069&amp;icde=36111610&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=3&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Tache - U California, Los Angeles" target="_blank">OT2 – Tache – U California, Los Angeles </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9150569&amp;icde=41703219" alt="U18 - Vulchonova â€“ U Minnesota (ended)" target="_blank">U18 – Vulchonova – U Minnesota (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9150561&amp;icde=41703219" alt="U18 â€“ Wells - Cincinnati Children's Hospital Medical Center (ended)" target="_blank">U18 – Wells – Cincinnati Children's Hospital Medical Center (ended)</a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/largeintestine-bubble.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Small Intestine -->
+  <div class="icon" id="smallintestine-icon">
+    <img src="sparc-nervous-system-graphic_files/smallintestine-icon.png" alt="Clickable icon showing an image of the small intestine." onclick="toggleBubbleIcon('smallintestine')">
+  </div>
+  <div class="big-icon" id="smallintestine-big-icon">
+    <img src="sparc-nervous-system-graphic_files/smallintestine-big-icon.png" alt="Clickable icon showing an image of the ." onclick="toggleBubbleIcon('smallintestine')">
+  </div>
+  <div class="bubble" id="smallintestine-bubble">
+    <div class="speech-bubble-left-column small-intestine">
+      <div class="speech-bubble-triangle-border">
+        <p class="left-column" id="heading-graphic">Small Intestine</p>
+        <ul class="left-column" id="links-graphic">
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023849-01" alt="OT2 - Shen - Duke U (ended)" target="_blank">OT2 – Shen – Duke U (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023850-01" alt="OT2 - Southard-Smith - Vanderbilt U" target="_blank">OT2 – Southard-Smith – Vanderbilt U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9150561&amp;icde=41703219" alt="U18 â€“ Wells - Cincinnati Children's Hospital Medical Center (ended)" target="_blank">U18 – Wells – Cincinnati Children's Hospital Medical Center (ended)</a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/smallintestine-bubble.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Female Reproductive System -->
+  <div class="icon" id="uterus-icon">
+    <img src="sparc-nervous-system-graphic_files/uterus-icon.png" alt="Clickable icon showing an image of the female reproductive system." onclick="toggleBubbleIcon('uterus')">
+  </div>
+  <div class="big-icon" id="uterus-big-icon">
+    <img src="sparc-nervous-system-graphic_files/uterus-big-icon.png" alt="Clickable icon showing an image of the female reproductive system." onclick="toggleBubbleIcon('uterus')">
+  </div>
+  <div class="bubble" id="uterus-bubble">
+    <div class="speech-bubble-bottom uterus">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="top: 32px; left: 2px;">Female Reproductive System</p>
+        <ul id="links-graphic" style="top: 32px; left: 2px;">
+          <li>No awards at this time.</li>
+        </ul>
+        <!-- <img src="assets/bubbles/uterus-bubble.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Data & Resource Center (DRC) -->
+  <div class="icon" id="computer-icon"><img src="sparc-nervous-system-graphic_files/computer-icon.png" alt="Clickable icon showing an image of cloud computing." onclick="toggleBubbleIcon('computer')"></div>
+  <div class="big-icon" id="computer-big-icon">
+    <img src="sparc-nervous-system-graphic_files/computer-big-icon.png" alt="Clickable icon showing an image of the cloud computing." onclick="toggleBubbleIcon('computer')">
+  </div>
+  <div class="bubble" id="computer-bubble">
+    <div class="speech-bubble-bottom computer">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="left: 2px">Data &amp; Resource Center (DRC)</p>
+        <ul id="links-graphic" style="left: 2px">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9538432&amp;icde=36509345&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball" alt="OT3 - Hunter - U Auckland " target="_blank">OT3 – Hunter – U Auckland </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9538418&amp;icde=36509345&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=2&amp;csb=default&amp;cs=ASC&amp;MMOpt" alt="OT3 - Kuster - IT’IS Foundation" target="_blank">OT3 – Kuster – IT’IS Foundation </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9538409&amp;icde=36509337&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball" alt="OT3 - Wagenaar - Blackfynn" target="_blank">OT3 – Wagenaar – Blackfynn </a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/computer-bubble-centered.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Male Reproductive System -->
+  <div class="icon" id="malerepro-icon">
+    <img src="sparc-nervous-system-graphic_files/malerepro-icon.png" alt="Clickable icon showing an image of the male reproductive system." onclick="toggleBubbleIcon('malerepro')">
+  </div>
+  <div class="big-icon" id="malerepro-big-icon">
+    <img src="sparc-nervous-system-graphic_files/malerepro-big-icon.png" alt="Clickable icon showing an image of the male reproductive system." onclick="toggleBubbleIcon('malerepro')">
+  </div>
+  <div class="bubble" id="malerepro-bubble">
+    <div class="speech-bubble-bottom male-genitals">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="top: 32px; left: 2px;">Male Reproductive System</p>
+        <ul id="links-graphic" style="top: 32px; left: 2px;">
+          <li>No awards at this time.</li>
+        </ul>
+        <!-- <img src="assets/bubbles/malerepro-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Bladder/Lower Urinary Tract -->
+  <div class="icon" id="bladder-icon">
+    <img src="sparc-nervous-system-graphic_files/bladder-icon.png" alt="Clickable icon showing an image of the bladder/lower urinary tract." onclick="toggleBubbleIcon('bladder')">
+  </div>
+  <div class="big-icon" id="bladder-big-icon">
+    <img src="sparc-nervous-system-graphic_files/bladder-big-icon.png" alt="Clickable icon showing an image of the bladder/lower urinary tract." onclick="toggleBubbleIcon('bladder')">
+  </div>
+  <div class="bubble" id="bladder-bubble">
+    <div class="speech-bubble-right-column bladder">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="left: 2px;">Bladder/Lower Urinary Tract</p>
+        <ul id="links-graphic" style="left: 2px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9053927&amp;icde=26495861&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=2&amp;csb=default&amp;cs=ASC" alt="U18 - Bruns - U Michigan (ended)" target="_blank">U18 – Bruns – U Michigan (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9303489&amp;icde=32918421&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=2&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Damaser - Cleveland Clinic Lerner College of Medicine" target="_blank">OT2 – Damaser – Cleveland Clinic Lerner College of Medicine </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9150600&amp;icde=41703219" alt="U18 â€“ Davis â€“ U Pittsburgh (ended)" target="_blank">U18 – Davis – U Pittsburgh (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9513136&amp;icde=36109934&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Gaunt - U Pittsburgh" target="_blank">OT2 – Gaunt – U Pittsburgh </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9054600&amp;icde=26495861&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=6&amp;csb=default&amp;cs=ASC" alt="U18 - Gereau - Washington U" target="_blank">U18 – Gereau – Washington U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9411848&amp;icde=36302975&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Hubscher - U Louisville" target="_blank">OT2 – Hubscher – U Louisville </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023872-01" alt="OT2 - Keast - U Melbourne" target="_blank">OT2 – Keast – U Melbourne </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9415526&amp;icde=36509296&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - McLaughlin - Micro-Leads" target="_blank">OT2 – McLaughlin – Micro-Leads </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9415137&amp;icde=36527592&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=3&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Seymour - U Michigan" target="_blank">OT2 – Seymour – U Michigan</a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/bladder-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Kidneys -->
+  <div class="icon" id="kidneys-icon">
+    <img src="sparc-nervous-system-graphic_files/kidneys-icon.png" alt="Clickable icon showing an image of the kidneys." onclick="toggleBubbleIcon('kidneys')">
+  </div>
+  <div class="big-icon" id="kidneys-big-icon">
+    <img src="sparc-nervous-system-graphic_files/kidneys-big-icon.png" alt="Clickable icon showing an image of the kidneys." onclick="toggleBubbleIcon('kidneys')">
+  </div>
+  <div class="bubble" id="kidneys-bubble">
+    <div class="speech-bubble-right-column kidneys">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="left: 2px;">Kidneys</p>
+        <ul id="links-graphic" style="left: 2px;">
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023864-01" alt="OT2 - Muenzberg-Gruening - Louisiana State U" target="_blank">OT2 – Muenzberg-Gruening – Louisiana State U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9464080&amp;icde=36302906&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="U01 - Osborn - U Minnesota" target="_blank">U01 – Osborn – U Minnesota </a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/kidneys-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Stomach -->
+  <div class="icon" id="stomach-icon">
+    <img src="sparc-nervous-system-graphic_files/stomach-icon.png" alt="Clickable icon showing an image of the stomach." onclick="toggleBubbleIcon('stomach')">
+  </div>
+  <div class="big-icon" id="stomach-big-icon">
+    <img src="sparc-nervous-system-graphic_files/stomach-big-icon.png" alt="Clickable icon showing an image of the stomach." onclick="toggleBubbleIcon('stomach')">
+  </div>
+  <div class="bubble" id="stomach-bubble">
+    <div class="speech-bubble-right-column stomach">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="left: 2px;">Stomach</p>
+        <ul id="links-graphic" style="left: 2px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9627773" alt="OT2 - Axelrod - G-Tech, INC." target="_blank">OT2 – Axelrod – G-Tech, INC.</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1U18TR001920-01" alt="U18 - Chen - Johns Hopkins U" target="_blank">U18 – Chen – Johns Hopkins U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9054538&amp;icde=26495861&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=5&amp;csb=default&amp;cs=ASC" alt="U18 - Farajidavar - New York Institute of Technology" target="_blank">U18 – Farajidavar – New York Institute of Technology </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9533820&amp;icde=41703219" alt="U18 - Horn - U Pittsburgh (ended)" target="_blank">U18 – Horn – U Pittsburgh (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9405061&amp;icde=36109500&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=7&amp;csb=default&amp;cs=ASC&amp;pball=" alt="U18 - Horn - U Pittsburgh" target="_blank">U18 – Horn – U Pittsburgh </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9596771" alt="OT2-Miller-Feinsten Institute for Medical Research" target="_blank">OT2 – Miller – Feinsten Institute for Medical Research</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023847-01" alt="OT2 - Powley - Purdue U" target="_blank">OT2 – Powley – Purdue U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9150561&amp;icde=41703219" alt="U18 â€“ Wells - Cincinnati Children's Hospital Medical Center (ended)" target="_blank">U18 – Wells – Cincinnati Children's Hospital Medical Center (ended)</a></li>
+
+        </ul>
+        <!-- <img src="assets/bubbles/stomach-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Spleen -->
+  <div class="icon" id="spleen-icon">
+    <img src="sparc-nervous-system-graphic_files/spleen-icon.png" alt="Clickable icon showing an image of the spleen." onclick="toggleBubbleIcon('spleen')">
+  </div>
+  <div class="big-icon" id="spleen-big-icon">
+    <img src="sparc-nervous-system-graphic_files/spleen-big-icon.png" alt="Clickable icon showing an image of the spleen." onclick="toggleBubbleIcon('spleen')">
+  </div>
+  <div class="bubble" id="spleen-bubble">
+    <div class="speech-bubble-right-column spleen">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="left: 0;">Spleen</p>
+        <ul id="links-graphic" style="left: 0;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9054531&amp;icde=26495861&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=9&amp;csb=default&amp;cs=ASC" alt="U18 - Okusa - U Virginia" target="_blank">U18 – Okusa – U Virginia </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9294446&amp;icde=32918437&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Reardon - U California, Davis" target="_blank">OT2 – Reardon – U California, Davis </a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/spleen-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Heart -->
+  <div class="icon" id="heart-icon">
+    <img src="sparc-nervous-system-graphic_files/heart-icon.png" alt="Clickable icon showing an image of the heart." onclick="toggleBubbleIcon('heart')">
+  </div>
+  <div class="big-icon" id="heart-big-icon">
+    <img src="sparc-nervous-system-graphic_files/heart-big-icon.png" alt="Clickable icon showing an image of the heart." onclick="toggleBubbleIcon('heart')">
+  </div>
+  <div class="bubble" id="heart-bubble">
+    <div class="speech-bubble-right-column heart">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="left: 2px;">Heart</p>
+        <ul id="links-graphic" style="left: 2px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9150563&amp;icde=36108809" alt="U18 - Ardell - U California, Los Angeles (ended)" target="_blank">U18 – Ardell – U California, Los Angeles (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9405146&amp;icde=36509309&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=2&amp;csb=default&amp;cs=ASC&amp;pball" alt="U18 - Chen - Indiana U-Purdue U, Indianapolis" target="_blank">U18 – Chen – Indiana U-Purdue U, Indianapolis </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9630596" alt="OT2 - Clancy - U California, Davis" target="_blank">OT2 – Clancy – U California, Davis</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9526220&amp;icde=41703219" alt="OT2 - Durand - Case Western Reserve U (ended)" target="_blank">OT2 – Durand – Case Western Reserve U (ended)</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023867-01" alt="OT2 - Napadow - Massachusetts General Hospital" target="_blank">OT2 – Napadow – Massachusetts General Hospital </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9530807&amp;icde=36509326&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball" alt="OT2 - Shivkumar - U California, Los Angeles" target="_blank">OT2 – Shivkumar – U California, Los Angeles </a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/heart-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- Brain Initiative -->
+  <div class="icon" id="brain-icon">
+    <img src="sparc-nervous-system-graphic_files/brain.png" alt="Clickable icon showing an image of the brain." onclick="toggleBubbleIcon('brain')">
+  </div>
+  <div class="big-icon" id="brain-big-icon">
+    <img src="sparc-nervous-system-graphic_files/brain-glow-big-icon.png" alt="Clickable icon showing an image of the brain." onclick="toggleBubbleIcon('brain')">
+  </div>
+  <div class="bubble" id="brain-bubble">
+    <div class="speech-bubble-top brain">
+      <div class="speech-bubble-triangle-border">
+        <p id="heading-graphic" style="font-size: 15px; top: 46px; left: 18px;"><a id="brain" href="https://www.braininitiative.nih.gov/" alt="Brain Initiative" target="_blank">Brain Initiative</a></p>
+        <!-- <img src="assets/bubbles/brain-bubble-flipped.png" /> -->
+      </div>
+    </div>
+  </div>
+  <!-- OTHER TARGETS -->
+  <div class="icon" id="othertargets-icon">
+    <img src="sparc-nervous-system-graphic_files/othertargets.png" alt="Clickable icon showing that reveals abstract links to other various body parts not represented by one of the icons." onclick="toggleBubbleIcon('othertargets')">
+  </div>
+  <div class="big-icon" id="othertargets-big-icon">
+    <img src="sparc-nervous-system-graphic_files/othertargets-big-icon.png" alt="Clickable icon showing that reveals abstract links to other various body parts not represented by one of the icons." onclick="toggleBubbleIcon('othertargets')">
+  </div>
+  <div class="bubble" id="othertargets-bubble">
+    <div class="speech-bubble-top other-targets">
+      <div class="speech-bubble-triangle-border">
+        <p class="othertargets-text" id="heading-graphic" style="top: 48px;" alt="Adipose Tissue">Adipose Tissue </p>
+        <ul class="othertargets-text" id="links-graphic" style="top:43px;">
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023864-01" alt="OT2 - Muenzberg-Gruening - Louisiana State U" target="_blank">OT2 – Muenzberg-Gruening – Louisiana State U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_description.cfm?projectnumber=1OT2OD023853-01" alt="OT2 - Zeltser - Columbia U" target="_blank">OT2 – Zeltser – Columbia U </a></li>
+        </ul>
+        <p class="othertargets-text" id="heading-graphic" style="top: 98px;" alt="Bone Marrow">Bone Marrow</p>
+        <ul class="othertargets-text" id="links-graphic" style="top: 93px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9463256&amp;icde=36303033&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="U01 - Frenette - Albert Einstein College of Medicine" target="_blank">U01 – Frenette – Albert Einstein College of Medicine </a></li>
+        </ul>
+        <p class="othertargets-text" id="heading-graphic" style="top: 130px;" alt="Esophagus">Esophagus</p>
+        <ul class="othertargets-text" id="links-graphic" style="top: 125px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9463173&amp;icde=36303023&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="U01 - Kollarik - Johns Hopkins U" target="_blank">U01 – Kollarik – Johns Hopkins U </a></li>
+        </ul>
+        <p class="othertargets-text" id="heading-graphic" style="top: 162px;" alt="Various Ganglia">Various Ganglia</p>
+        <ul class="othertargets-text" id="links-graphic" style="top: 157px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9415585&amp;icde=36303008&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Clark - Northeastern U" target="_blank">OT2 – Clark – Northeastern U </a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9513867&amp;icde=36111663&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=19&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2 - Jenkins - Case Western Reserve U" target="_blank">OT2 – Jenkins – Case Western Reserve U </a></li>
+        </ul>
+        <p class="othertargets-text" id="heading-graphic" style="top: 212px;" alt="Skeleton">Skeleton</p>
+        <ul class="othertargets-text" id="links-graphic" style="top: 207px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9463977&amp;icde=36509323&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball" alt="U18 - Scheller - U Michigan, Ann Arbor" target="_blank">U18 – Scheller – U Michigan, Ann Arbor</a></li>
+        </ul>
+        <p class="othertargets-text" id="heading-graphic" style="top: 245px;" alt="Vagus Nerve">Vagus Nerve</p>
+        <ul class="othertargets-text" id="links-graphic" style="top: 240px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9525478&amp;icde=36509287&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball" alt="OT2 - Grill - Duke U" target="_blank">OT2 – Grill – Duke U</a></li>
+        </ul>
+        <p class="othertargets-text" id="heading-graphic" style="top: 279px;" alt="Characterization of Neural Structures">Characterization of Neural Structures</p>
+        <ul class="othertargets-text" id="links-graphic" style="top: 274px;">
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9631368" alt="OT2-Havton-U California, Los Angeles" target="_blank">OT2 – Havton – U California, Los Angeles</a></li>
+          <li><a href="https://projectreporter.nih.gov/project_info_description.cfm?aid=9513756&amp;icde=40364859&amp;ddparam=&amp;ddvalue=&amp;ddsub=&amp;cr=1&amp;csb=default&amp;cs=ASC&amp;pball=" alt="OT2-Vakoc-Massachusetts General Hospital" target="_blank">OT2 – Vakoc – Massachusetts General Hospital</a></li>
+        </ul>
+        <!-- <img src="assets/bubbles/othertargets-bubble-centered-border.png" /> -->
+      </div>
+    </div>
+  </div>
+</div>
+
+
+</body></html>
