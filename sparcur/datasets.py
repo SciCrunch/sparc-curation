@@ -87,10 +87,11 @@ class HasErrors:
 
     def embedErrors(self, data):
         el = list(self._errors)
-        if 'errors' in data:
-            data['errors'].extend(el)
-        elif el:
-            data['errors'] = el
+        if el:
+            if 'errors' in data:
+                data['errors'].extend(el)
+            elif el:
+                data['errors'] = el
 
 
 class DatasetStructure(Path, HasErrors):
@@ -219,7 +220,8 @@ class DatasetStructure(Path, HasErrors):
             path = next(gen)
             for path in chain((path,), gen):
                 if path.is_broken_symlink():
-                    log.info(f'fetching unretrieved metadata path {path.as_posix()!r}')
+                    log.info(f'fetching unretrieved metadata path {path.as_posix()!r}'
+                             '\nFIXME batch these using async in cli export ...')
                     path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
 
                 if path.suffix in path.stem:
