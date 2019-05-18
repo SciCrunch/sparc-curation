@@ -98,6 +98,7 @@
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 *** Windows
+    # TODO download everything to ~/opt
     git
     https://git-scm.com/download/win
     All the default options in the wizard are fine except for one.
