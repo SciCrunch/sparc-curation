@@ -1,5 +1,5 @@
 from pathlib import Path
 
 class config:
-    organ_html_path = Path('~/ni/sparc/sparc-nervous-system-graphic.html').expanduser()
-    cache_dir = '/tmp/sparcur-cache'
+    organ_html_path = Path('../resources/sparc-nervous-system-graphic.html')  # FIXME include in distribution ...
+    cache_dir = '/tmp/sparcur-cache'  # FIXME per user ...

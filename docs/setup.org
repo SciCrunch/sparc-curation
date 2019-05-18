@@ -557,7 +557,7 @@
     #+CAPTION: first time per local network
     #+BEGIN_SRC bash :results none
       pushd ~/files/blackfynn_local/
-      spc clone  # initialize a new repo and pull existing structure
+      spc clone ${SPARC_ORG_ID} # initialize a new repo and pull existing structure
       scp refresh -f
       spc fetch  # actually download files
       spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'  # see what to fetch
