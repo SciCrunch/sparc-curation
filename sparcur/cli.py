@@ -12,7 +12,7 @@ Usage:
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
-    spc report [completeness filetypes keywords subjects errors test] [options]
+    spc report [completeness filetypes keywords subjects errors pathids test] [options]
     spc shell [integration] [options]
     spc server [options]
     spc tables [<directory>...]
@@ -1110,6 +1110,12 @@ class Report(Dispatcher):
         pprint.pprint(sorted([(d['meta']['name'], [e['message']
                                                    for e in get_all_errors(d)])
                               for d in datasets], key=lambda ab: -len(ab[-1])))
+
+    def pathids(self):
+        base = self.project_path.parent
+        rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]  # slower to include the uris
+                               for c in chain((self.cwd,), self.cwd.rchildren))
+        self._print_table(rows)
 
     def terms(self):
         # anatomy
