@@ -75,6 +75,9 @@ def make_app(self, name='spc-server'):
     @app.route(f'{bp}/reports/filetypes')
     @app.route(f'{bp}/reports/filetypes<ext>')
     def route_reports_filetypes(ext=None):
+        if ext is not None:  # TODO
+            return 'Not found', 404
+
         tables = []
         for table, title in self.report.filetypes():
             tables.append(table + '<br>\n')
@@ -106,6 +109,9 @@ def make_app(self, name='spc-server'):
     @app.route(f'{bp}/reports/terms')
     @app.route(f'{bp}/reports/terms<ext>')
     def route_reports_terms(ext=None):
+        if ext is not None:  # TODO
+            return 'Not found', 404
+
         tables = []
         for table, title in self.report.terms():
             tables.append(table + '<br>\n')
