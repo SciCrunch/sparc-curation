@@ -1673,6 +1673,11 @@ class LocalPath(XattrPath):
         self.__change_tuple = change_tuple  # TODO log or no?
 
         updated = datetime.fromtimestamp(fs_data_modified_time, tz=timezone.utc)
+        # sanity check
+        # td = (datetime.fromtimestamp(fs_data_modified_time, tz=timezone.utc)
+              # - datetime(1970, 1, 1, tzinfo=timezone.utc))
+        # assert int(fs_data_modified_time) == int(td.total_seconds())
+
         # these use our internal representation of timestamps
         # the choice of how to store them in xattrs, sqlite, json, etc is handled at those interfaces
         # replace with comma since it is conformant to the standard _and_

@@ -56,24 +56,25 @@ def make_app(self, name='spc-server'):
             'errors',
             'terms',
         )
-        report_links = [atag(url_for(f'route_reports_{rn}'), rn) + '<br>\n'
+        report_links = [atag(url_for(f'route_reports_{rn}', ext=None), rn) + '<br>\n'
                         for rn in report_names]
         return htmldoc('Reports<br>\n',
                        *report_links,
                        title='Reports')
 
     @app.route(f'{bp}/reports/completeness')
-    def route_reports_completeness():
-        table, title = self.report.completeness()
-        return wrap_tables(table, title=title)
+    @app.route(f'{bp}/reports/completeness<ext>')
+    def route_reports_completeness(ext=wrap_tables):
+        return self.report.completeness(ext=ext)
 
     @app.route(f'{bp}/reports/size')
-    def route_reports_size():
-        table, title = self.report.size(dirs=self.project_path.children)
-        return wrap_tables(table, title=title)
+    @app.route(f'{bp}/reports/size<ext>')
+    def route_reports_size(ext=wrap_tables):
+        return self.report.size(dirs=self.project_path.children, ext=ext)
 
     @app.route(f'{bp}/reports/filetypes')
-    def route_reports_filetypes():
+    @app.route(f'{bp}/reports/filetypes<ext>')
+    def route_reports_filetypes(ext=None):
         tables = []
         for table, title in self.report.filetypes():
             tables.append(table + '<br>\n')
@@ -81,28 +82,30 @@ def make_app(self, name='spc-server'):
         return wrap_tables(*tables, title='Filetypes')
 
     @app.route(f'{bp}/reports/pathids')
-    def route_reports_pathids():
-        table, title = self.report.pathids()
-        return wrap_tables(table, title=title)
+    @app.route(f'{bp}/reports/pathids<ext>')
+    def route_reports_pathids(ext=wrap_tables):
+        return self.report.pathids(ext=ext)
 
     @app.route(f'{bp}/reports/keywords')
-    def route_reports_keywords():
-        table, title = self.report.keywords()
-        return wrap_tables(table, title=title)
+    @app.route(f'{bp}/reports/keywords<ext>')
+    def route_reports_keywords(ext=wrap_tables):
+        return self.report.keywords(ext=ext)
 
     @app.route(f'{bp}/reports/subjects')
-    def route_reports_subjects():
-        table, title = self.report.subjects()
-        return wrap_tables(table, title=title)
+    @app.route(f'{bp}/reports/subjects<ext>')
+    def route_reports_subjects(ext=wrap_tables):
+        return self.report.subjects(ext=ext)
 
     @app.route(f'{bp}/reports/errors')
-    def route_reports_errors():
+    @app.route(f'{bp}/reports/errors<ext>')
+    def route_reports_errors(ext=wrap_tables):
         return 'TODO'
         table, title = self.report.errors()
         return wrap_tables(table, title=title)
 
     @app.route(f'{bp}/reports/terms')
-    def route_reports_terms():
+    @app.route(f'{bp}/reports/terms<ext>')
+    def route_reports_terms(ext=None):
         tables = []
         for table, title in self.report.terms():
             tables.append(table + '<br>\n')

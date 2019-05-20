@@ -140,13 +140,14 @@ import sys
 import csv
 import json
 import errno
+import types
 import pprint
-from datetime import datetime
 from itertools import chain
 from collections import Counter
 import requests
 import htmlfn as hfn
 from pyontutils import clifun as clif
+from pyontutils.utils import NOWDANGER, NOWISO, UTCNOWISO
 from pysercomb.pyr import units as pyru
 from terminaltables import AsciiTable
 from sparcur import config
@@ -187,13 +188,32 @@ class Options(clif.Options):
 class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
                  '.~lock',)
-    def _print_table(self, rows, title=None, align=None):
+
+    def _print_table(self, rows, title=None, align=None, ext=None):
+        """ ext is only used when self.options.server -> True """
+        def simple_tsv(rows):
+            return '\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n'
+
         if self.options.tab_table:
             if title:
                 print(title)
-            print('\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n')
+
+            print(simple_tsv(rows))
+
         elif self.options.server:
+            if ext is not None:
+                if ext == '.tsv':
+                    nowish = UTCNOWISO('seconds')
+                    fn = json.dumps(f'{title} {nowish}')
+                    return simple_tsv(rows), 200, {'Content-Type': 'text/tsv; charset=utf-8',
+                                                   'Content-Disposition': f'attachment; filename={fn}'}
+                if isinstance(ext, types.FunctionType):
+                    return ext(hfn.render_table(rows[1:], *rows[0]), title=title)
+                else:
+                    return 'Not found', 404
+
             return hfn.render_table(rows[1:], *rows[0]), title
+
         else:
             table = AsciiTable(rows, title=title)
             if align:
@@ -581,7 +601,7 @@ class Main(Dispatcher):
         #org_id = Integrator(self.project_path).organization.id
 
         cwd = Path.cwd()
-        timestamp = datetime.now().isoformat().replace('.', ',')
+        timestamp = NOWDANGER(implicit_tz='PST PDT')
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
         if cwd != cwd.cache.anchor and format_specified:
             if not cwd.cache.is_dataset:
@@ -994,9 +1014,9 @@ class Report(Dispatcher):
         rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
                 *formatted]
 
-        return self._print_table(rows, title='File size counts')
+        return self._print_table(rows, title='File size counts', ext=ext)
 
-    def filetypes(self):
+    def filetypes(self, ext=None):
         key = self._sort_key
         paths = self.paths if self.paths else (Path('.').resolve(),)
         paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
@@ -1016,9 +1036,11 @@ class Report(Dispatcher):
                                         for f in paths]).items()], key=key)
 
         header = ['suffix', 'mimetype', 'magic mimetype', 'count']
-        return self._print_table((header, *all_counts), title='All types aligned (has duplicates)')
+        return self._print_table((header, *all_counts),
+                                 title='All types aligned (has duplicates)',
+                                 ext=ext)
 
-    def subjects(self):
+    def subjects(self, ext=None):
         data = self.latest_export if self.options.latest else self.summary.data
         datasets = data['datasets']
         key = self._sort_key
@@ -1032,9 +1054,9 @@ class Report(Dispatcher):
                                             key=key))
 
         rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-        return self._print_table(rows, title='Subjects Report')
+        return self._print_table(rows, title='Subjects Report', ext=ext)
 
-    def completeness(self):
+    def completeness(self, ext=None):
         if self.options.latest:
             datasets = self.latest_export['datasets']
             raw = [self.summary._completeness(data) for data in datasets]
@@ -1043,7 +1065,7 @@ class Report(Dispatcher):
             raw = self.summary.completeness
 
         def rformat(i, si, ci, ei, name, id, award, organ):
-            if self.options.server:
+            if self.options.server and isinstance(ext, types.FunctionType):
                 rsurl = 'https://projectreporter.nih.gov/reporter_searchresults.cfm'
                 dataset_dash_url = self.url_for('route_datasets_id', id=id)
                 si = hfn.atag('/TODO', si)
@@ -1071,9 +1093,9 @@ class Report(Dispatcher):
         rows += [rformat(i, *cols) for i, cols in
                  enumerate(sorted(raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
 
-        return self._print_table(rows, title='Completeness Report')
+        return self._print_table(rows, title='Completeness Report', ext=ext)
 
-    def keywords(self):
+    def keywords(self, ext=None):
         data = self.latest_export if self.options.latest else self.summary.data
         datasets = data['datasets']
         _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])), key=lambda v: -len(v))
@@ -1084,7 +1106,7 @@ class Report(Dispatcher):
         rows = header + rows
         return self._print_table(rows, title='Keywords Report')
 
-    def size(self, dirs=None):
+    def size(self, dirs=None, ext=None):
         if dirs is None:
             dirs = self.paths
         intrs = [Integrator(p) for p in dirs]
@@ -1096,13 +1118,13 @@ class Report(Dispatcher):
                          for d in intrs
                          for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
 
-        return self._print_table(rows, title='Size Report', align=['l', 'l', 'r', 'r', 'r', 'r'])
+        return self._print_table(rows, title='Size Report', align=['l', 'l', 'r', 'r', 'r', 'r'], ext=ext)
 
-    def test(self):
+    def test(self, ext=None):
         rows = [['hello', 'world'], [1, 2]]
-        return self._print_table(rows, title='Report Test')
+        return self._print_table(rows, title='Report Test', ext=ext)
 
-    def errors(self):
+    def errors(self, ext=None):
         if self.options.latest:
             datasets = self.latest_export['datasets']
         else:
@@ -1112,13 +1134,13 @@ class Report(Dispatcher):
                                                    for e in get_all_errors(d)])
                               for d in datasets], key=lambda ab: -len(ab[-1])))
 
-    def pathids(self):
+    def pathids(self, ext=None):
         base = self.project_path.parent
         rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]  # slower to include the uris
                                for c in chain((self.cwd,), self.cwd.rchildren))
-        return self._print_table(rows, title='Path -> identifier')
+        return self._print_table(rows, title='Path identifiers', ext=ext)
 
-    def terms(self):
+    def terms(self, ext=None):
         # anatomy
         # cells
         # subcelluar
@@ -1141,7 +1163,7 @@ class Report(Dispatcher):
                     else:
                         skipped_prefixes.add(oid.prefix)
 
-        if self.options.server:
+        if self.options.server and isinstance(ext, types.FunctionType):
             def reformat(ot):
                 return [ot.label if hasattr(ot, 'label') and ot.label else '', ot.atag(curie=True)]
 
@@ -1170,7 +1192,7 @@ class Report(Dispatcher):
                                    key=lambda ot: (ot.prefix, ot.label.lower()
                                                    if hasattr(ot, 'label') and ot.label else ''))]
 
-            yield self._print_table(rows, title=title)
+            yield self._print_table(rows, title=title, ext=ext)
 
 
 class Shell(Dispatcher):

@@ -10,6 +10,7 @@ from itertools import chain
 from collections import defaultdict, deque
 import rdflib
 import dicttoxml
+from pyontutils.utils import byCol as _byCol, isoformat, utcnowtz
 from pyontutils.config import devconfig
 from pyontutils.namespaces import makeNamespaces, TEMP, isAbout, sparc
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
@@ -35,7 +36,6 @@ from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
 from pysercomb.pyr.units import Expr, _Quant as Quantity
-from pyontutils.utils import byCol as _byCol
 
 a = rdf.type
 
@@ -695,9 +695,9 @@ class TriplesExport(ProtcurData):
     @property
     def triples_header(self):
         ontid = self.ontid
-        nowish = datetime.utcnow()  # request doesn't have this
+        nowish = utcnowtz()
         epoch = nowish.timestamp()
-        iso = nowish.isoformat().replace('.', ',')  # sakes fist at iso for non standard
+        iso = isoformat(nowish)
         ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
         sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
                                       'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
