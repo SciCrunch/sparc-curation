@@ -12,7 +12,7 @@ Usage:
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
-    spc report [completeness filetypes keywords subjects errors pathids test] [options]
+    spc report [completeness filetypes pathids keywords subjects errors test] [options]
     spc shell [integration] [options]
     spc server [options]
     spc tables [<directory>...]
@@ -69,6 +69,7 @@ Commands:
                 size            dataset sizes and file counts
                 completeness    submission and curation completeness
                 filetypes       filetypes used across datasets
+                pathids         mapping from local path to cached id
                 keywords        keywords used per dataset
                 terms           all ontology terms used in the export
 
@@ -1115,7 +1116,7 @@ class Report(Dispatcher):
         base = self.project_path.parent
         rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]  # slower to include the uris
                                for c in chain((self.cwd,), self.cwd.rchildren))
-        self._print_table(rows)
+        return self._print_table(rows, title='Path -> identifier')
 
     def terms(self):
         # anatomy

@@ -50,6 +50,7 @@ def make_app(self, name='spc-server'):
             'completeness',
             'size',
             'filetypes',
+            'pathids',
             'keywords',
             'subjects',
             'errors',
@@ -78,6 +79,11 @@ def make_app(self, name='spc-server'):
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Filetypes')
+
+    @app.route(f'{bp}/reports/pathids')
+    def route_reports_pathids():
+        table, title = self.report.pathids()
+        return wrap_tables(table, title=title)
 
     @app.route(f'{bp}/reports/keywords')
     def route_reports_keywords():
