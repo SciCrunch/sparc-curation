@@ -196,20 +196,18 @@ class MetaMaker:
             return l
 
 class PathData:
-    def __new__(cls, path, cypher=hashlib.sha256):
+    def __new__(cls, path):
         #cls.schema = cls.schema_class()
         #cls.schema_out = cls.schema_out_class()
         return super().__new__(cls)
 
-    def __init__(self, path, cypher=hashlib.sha256):
+    def __init__(self, path):
         self._errors = []
         if isinstance(path, str):
             path = Path(path)
 
         if not hasattr(self, 'path'):
             self.path = path
-
-        self.cypher = cypher
 
     @property
     def id(self):
@@ -362,18 +360,6 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
 
         else:
             log.warning(f'unknown thing at path {self.path}')
-
-    @property
-    def bf_checksum(self):
-        return self._meta.checksum
-
-    def checksum(self):
-        if self.path.is_file():
-            return self.path.checksum(cypher=self.cypher)
-
-        elif self.path.is_dir():
-            # TODO need to determine the hashing rule for folders
-            pass
 
     @property
     def _submission_objects(self):
@@ -1328,15 +1314,15 @@ class Summary(Integrator, ExporterSummarizer):
     schema_out_class = SummarySchema
     triples_class = TriplesExportSummary
 
-    def __new__(cls, path, cypher=hashlib.sha256):
+    def __new__(cls, path):
         #cls.schema = cls.schema_class()
         cls.schema_out = cls.schema_out_class()
-        return super().__new__(cls, path, cypher)
+        return super().__new__(cls, path)
 
-    def __init__(self, path, cypher=hashlib.sha256):
-        super().__init__(path, cypher)
+    def __init__(self, path):
+        super().__init__(path)
         # not sure if this is kosher ... but it works
-        super().__init__(self.anchor.path, self.cypher)
+        super().__init__(self.anchor.path)
  
     @property
     def iter_datasets(self):
