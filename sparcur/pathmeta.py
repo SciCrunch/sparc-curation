@@ -7,7 +7,7 @@ from pathlib import PurePosixPath
 from datetime import datetime
 from dateutil import parser
 from terminaltables import AsciiTable
-from pyontutils.utils import TermColors as tc
+from pyontutils.utils import TermColors as tc, isoformat
 from sparcur import exceptions as exc
 from sparcur.utils import log, FileSize
 
@@ -29,6 +29,7 @@ class PathMeta:
                  created=None,
                  updated=None,
                  checksum=None,
+                 etag=None,
                  chunksize=None,  # used for properly checksumming?
                  id=None,
                  file_id=None,
@@ -57,6 +58,7 @@ class PathMeta:
         self.created = created
         self.updated = updated
         self.checksum = checksum
+        self.etag = etag
         self.chunksize = chunksize
         self.id = id
         self.file_id = file_id
@@ -167,9 +169,21 @@ class _PathMetaAsSymlink(_PathMetaConverter):
                         'gid',
                         'user_id',
                         'mode',
-                        'errors',)
+                        'errors',),
+                'mdv2':('file_id',
+                        'size',
+                        'created',
+                        'updated',
+                        'checksum',
+                        'etag',  # added
+                        'chunksize',
+                        'old_id',
+                        'gid',
+                        'user_id',
+                        'mode',
+                        'errors',),
     }
-    write_version = 'mdv1'  # update this on new version
+    write_version = 'mdv2'  # update this on new version
     extras = 'size.hr',
 
     def __init__(self):
@@ -194,6 +208,7 @@ class _PathMetaAsSymlink(_PathMetaConverter):
                 if value is not None:
                     log.critical(f'{value!r} for file_id empty but not None!')
                 value = None
+
         if value is None:
             return self.empty
 
@@ -218,6 +233,11 @@ class _PathMetaAsSymlink(_PathMetaConverter):
         elif field == 'checksum':  # FIXME checksum encoding ...
             #return value.encode()
             return bytes.fromhex(value)
+
+        elif field == 'etag':
+            checksum, strcount = value.rsplit('-', 1)
+            count = int(strcount)
+            return bytes.fromhex(checksum), count
 
         elif field == 'user_id':
             try:
@@ -290,6 +310,7 @@ class _PathMetaAsXattrs(_PathMetaConverter):
               'created',
               'updated',
               'checksum',
+              'etag',
               'chunksize',
               'id',
               'file_id',
@@ -298,8 +319,6 @@ class _PathMetaAsXattrs(_PathMetaConverter):
               'user_id',
               'mode',
               'errors')
-
-    encoding = 'utf-8'
 
     def __init__(self):
         # register functionality on PathMeta
@@ -349,11 +368,11 @@ class _PathMetaAsXattrs(_PathMetaConverter):
             prefix += '.'
             kwargs = {k:decode(k, v)
                     for kraw, v in xattrs.items()
-                    for k in (self.deprefix(kraw.decode(self.encoding), prefix),)}
+                    for k in (self.deprefix(kraw.decode(), prefix),)}
         else:  # ah manual optimization
             kwargs = {k:decode(k, v)
                     for kraw, v in xattrs.items()
-                    for k in (kraw.decode(self.encoding),)}
+                    for k in (kraw.decode(),)}
 
         return self.pathmetaclass(**kwargs)
 
@@ -371,7 +390,7 @@ class _PathMetaAsXattrs(_PathMetaConverter):
                 else:
                     key = field
 
-                key_bytes = key.encode(self.encoding)
+                key_bytes = key.encode()
                 out[key_bytes] = self.encode(field, value)
 
         return out
@@ -390,6 +409,8 @@ class _PathMetaAsXattrs(_PathMetaConverter):
         except exc.UnhandledTypeError:
             log.warning(f'conversion not implemented for field {field}')
 
+        raise exc.UnhandledTypeError(f'dont know what to do with {value!r}')
+        return
         if field == 'errors':
             value = ';'.join(value)
 
@@ -400,11 +421,13 @@ class _PathMetaAsXattrs(_PathMetaConverter):
         if isinstance(value, int):
             # this is local and will pass through here before move?
             #out = value.to_bytes(value.bit_length() , sys.byteorder)
-            out = str(value).encode(self.encoding)  # better to have human readable
+            out = str(value).encode()  # better to have human readable
         elif isinstance(value, float):
             out = struct.pack('d', value) #= bytes(value.hex())
+
         elif isinstance(value, str):
-            out = value.encode(self.encoding)
+            out = value.encode()
+
         else:
             raise exc.UnhandledTypeError(f'dont know what to do with {value!r}')
 
@@ -423,19 +446,31 @@ class _PathMetaAsXattrs(_PathMetaConverter):
 
         elif field == 'checksum':
             return value
+
+        elif field == 'etag':
+            # struct pack this sucker so the count can fit as well?
+            value = value.decode()  # FIXME
+            checksum, strcount = value.rsplit('-', 1)
+            count = int(strcount)
+            return bytes.fromhex(checksum), count
+
         elif field == 'errors':
-            value = value.decode(self.encoding)
+            value = value.decode()
             return tuple(_ for _ in value.split(';') if _)
+
         elif field == 'user_id':
             try:
                 return int(value)
             except ValueError:  # FIXME :/ uid vs owner_id etc ...
                 return value.decode()
+
         elif field in ('id', 'mode', 'old_id'):
-            return value.decode(self.encoding)
+            return value.decode()
+
         elif field not in self.fields:
             log.warning(f'Unhandled field {field}')
             return value
+
         else:
             try:
                 return int(value)
@@ -452,6 +487,7 @@ class _PathMetaAsPretty(_PathMetaConverter):
               'created',
               'updated',
               'checksum',
+              'etag',
               'chunksize',
               'id',
               'file_id',
@@ -628,17 +664,11 @@ class _EncodeByField:
             raise TypeError(f'{type(value)} is not a datetime for {value}')
 
         has_tz = value.tzinfo is not None and value.tzinfo.utcoffset(None) is not None
-        value = value.isoformat().replace('.', ',')
-        if has_tz:
-            dt, tz = value.rsplit('+', 1)
-            if tz == '00:00':
-                return dt + 'Z'  # for bf compat
-            else:
-                return value
-        else:
+        value = isoformat(value)
+        if not has_tz:
             log.warning('why do you have a timestamp without a timezone ;_;')
-            return value
 
+        return value
 
     def _list(self, value):
         return ';'.join(value)
@@ -660,6 +690,8 @@ class _EncodeByField:
 
     def size(self, value): return str(value)
     def checksum(self, value): return value
+    def etag(self, value): return f'{value[0].hex()}-{value[1]}'  # checksum-count  # TODO pack this?
+    def chunksize(self, value): return str(value)
     def file_id(self, value): return str(value)
     def gid(self, value): return str(value)
     def user_id(self, value): return str(value)

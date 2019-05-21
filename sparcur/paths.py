@@ -46,10 +46,10 @@ import psutil
 from dateutil import parser
 from Xlib.display import Display
 from Xlib import Xatom
-from sparcur import exceptions as exc
-from sparcur.utils import log
-from sparcur.pathmeta import PathMeta
 from pyontutils.utils import sysidpath
+from sparcur import exceptions as exc
+from sparcur.utils import log, default_cypher, etag
+from sparcur.pathmeta import PathMeta
 
 _IGNORED_ERROS = (ENOENT, ENOTDIR, EBADF, ELOOP)
 
@@ -789,16 +789,26 @@ class CachePath(AugmentedPath):
             self.validate_file()
 
     def validate_file(self):
-        if self.meta.checksum:
+        meta = self.meta
+        if meta.etag:
+            local_checksum, local_count = self.local.etag(meta.chunksize)
+            cache_checksum, cache_count = meta.etag
+            if local_checksum != cache_checksum or local_count != cache_count:
+                msg = (f'etags do not match!\n(!='
+                       f'\n{local_checksum}-{local_count}'
+                       f'\n{cache_checksum}-{cache_count}\n)')
+                log.critical(msg)
+
+        elif meta.checksum:
             lc = self.local.meta.checksum 
             cc = self.meta.checksum
             if lc != cc:
                 msg = f'Checksums do not match!\n(!=\n{lc}\n{cc}\n)'
                 log.critical(msg)  # haven't figured out how to comput the bf checksums yet
                 #raise exc.ChecksumError(msg)
-        elif self.meta.size is not None:
+        elif meta.size is not None:
             log.warning(f'No checksum! Your data is at risk!\n'
-                        '{self.remote!r} -> {self.local!r}! ')
+                        f'{self.remote!r} -> {self.local!r}! ')
             ls = self.local.meta.size
             cs = self.meta.size
             if ls != cs:
@@ -1024,9 +1034,17 @@ class CachePath(AugmentedPath):
 
         if target.exists() or target.is_broken_symlink():
             if target.id == self.id: #(remote.id if remote else meta.id):
-                if self.is_symlink():
-                    log.error(f'file was not removed during the previous move!'
-                              f'\n{self} -/-> {target}')
+                if self.is_broken_symlink():
+                    # we may be a package with extra metadata that needs to
+                    # be merged with the target before we are unlinked
+                    file_is_different = target._meta_updater(self.meta)
+                    # FIXME ... if file is different then this causes staleness
+                    # and we need to fetch
+                    if file_is_different:
+                        log.critical('DO SOMETHING ABOUT THIS STALE DATA'
+                                     f'\n{target}\n{target.meta.as_pretty()}')
+                else:
+                    log.warning(f'what is this!?\n{target}\n{self}')
             else:
                 raise exc.PathExistsError(f'Target {target} already exists!')
 
@@ -1647,7 +1665,8 @@ class LocalPath(XattrPath):
     def meta_no_checksum(self):
         return self._meta_maker(checksum=True)
 
-    def _meta_maker(self, *, checksum=True):
+    def _meta_maker(self, *, checksum=True, chunksize=None):
+        """ setting chunksize will cause an etag to be calculated """
         if not self.exists():
             return PathMeta(
                 id=self.sysid + ':' + self.as_posix(),
@@ -1687,6 +1706,8 @@ class LocalPath(XattrPath):
                               created=None,
                               updated=updated,
                               checksum=self.checksum() if checksum else None,
+                              etag=self.etag() if chunksize else None,
+                              chunksize=chunksize,
                               id=self.id,
                               file_id=st.st_ino,  # pretend inode number is file_id ... oh wait ...
                               user_id=st.st_uid,
@@ -1765,13 +1786,34 @@ class LocalPath(XattrPath):
         self.remote.data = self.data
         self.remote.annotations = self.annotations
 
-    def checksum(self, cypher=hashlib.sha256):
+    def checksum(self, cypher=default_cypher):
         if self.is_file():
             m = cypher()
             chunk_size = 4096
             with open(self, 'rb') as f:
                 while True:
                     chunk = f.read(chunk_size)
+                    if chunk:
+                        m.update(chunk)
+                    else:
+                        break
+
+            return m.digest()
+
+    def etag(self, chunksize):
+        if self.is_file():
+            m = etag(chunksize)
+            for chunk in self.data:
+                m.update(chunk)
+
+            return m.digest()
+
+        return
+        if self.is_file():
+            m = etag(chunksize)
+            with open(self, 'rb') as f:
+                while True:
+                    chunk = f.read(chunksize)
                     if chunk:
                         m.update(chunk)
                     else:

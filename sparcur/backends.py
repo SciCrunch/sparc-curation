@@ -586,15 +586,27 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
 
     @property
     def checksum(self):
+        return None
+
+    @property
+    def etag(self):
+        """ NOTE returns checksum, count since it is an etag"""
+        # FIXME rename to etag in the event that we get proper checksumming ??
         if hasattr(self.bfobject, 'checksum'):
             checksum = self.bfobject.checksum
             if checksum:
                 log.debug(checksum)
                 if isinstance(checksum, str):
-                    checksum, hrm = checksum.rsplit('-', 1)
+                    checksum, strcount = checksum.rsplit('-', 1)
+                    count = int(strcount)
                     #if checksum[-2] == '-':  # these are 34 long, i assume the -1 is a check byte?
                         #return bytes.fromhex(checksum[:-2])
-                    return bytes.fromhex(checksum)
+                    return bytes.fromhex(checksum), count
+
+    @property
+    def chunksize(self):
+        if hasattr(self.bfobject, 'chunksize'):
+            return self.bfobject.chunksize
 
     @property
     def owner_id(self):
@@ -731,6 +743,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             file = self.bfobject
         else:
             return
+
         gen = self.get_file_by_url(file.url)
         self.data_headers = next(gen)
         yield from gen
@@ -741,6 +754,8 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
                         created=self.created,
                         updated=self.updated,
                         checksum=self.checksum,
+                        etag=self.etag,
+                        chunksize=self.chunksize,
                         id=self.id,
                         file_id=self.file_id,
                         old_id=None,

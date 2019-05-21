@@ -1,3 +1,4 @@
+import io
 import json
 import hashlib
 import inspect
@@ -6,6 +7,7 @@ from functools import wraps
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
 from pyontutils.namespaces import sparc
 from sparcur.config import config
+
 
 log = makeSimpleLogger('sparcur')
 logd = makeSimpleLogger('sparcur-data')
@@ -24,6 +26,69 @@ class _log:
     def error(nothing): pass
     @staticmethod
     def critical(nothing): pass
+
+
+default_cypher = hashlib.blake2b
+
+
+class etag:
+
+    cypher = hashlib.md5
+
+    def __init__(self, chunksize):
+        self.chunksize = chunksize
+        self._m = self.cypher()
+        self._parts = []
+        self._remainder = b''
+        self._last_chunksize = 0
+
+    def update(self, bytes_):
+        remainder, self._remainder = self._remainder, b''
+        bio = io.BytesIO(remainder + bytes_)  # inefficient for len(bytes_) << self.chunksize
+        while True:
+            if self._last_chunksize:
+                # in the event a restart is required only
+                # only read the number of bytes left for
+                # the current chunk to update self._m
+                chunksize = self.chunksize - self._last_chunksize
+                self._last_chunksize = 0
+            else:
+                chunksize = self.chunksize
+
+            chunk = self._remainder
+            self._remainder = bio.read(chunksize)
+            if not self._remainder:
+                # the second time around at the end this will break the loop if the chunk
+                # is exactly equal to the chunk size
+                if len(chunk) < chunksize:
+                    self._remainder = chunk
+                    return
+
+            if chunk:
+                self._m.update(chunk)  # empty remainder doesn't advance the function
+                digest = self._m.digest()
+                self._m = self.cypher()
+                if chunksize < self.chunksize:
+                    # we are in a restart and need to update the last part with the
+                    # digest for the full chunksize
+                    self._parts[-1] = digest
+                else:
+                    self._parts.append(digest)
+
+    def digest(self):
+        if self._remainder:
+            self._last_chunksize = len(self._remainder)  # in case someone calls an early digest
+            self._m.update(self._remainder)
+            self._parts.append(self._m.digest())  # do not overwrite self._m yet
+            self._remainder = b''  # this allows a stable call at the end
+
+        m = self.cypher()
+        m.update(b''.join(self._parts))
+        return m.digest(), len(self._parts)
+
+    def hexdigest(self):
+        digest, count = self.digest()
+        return f'{digest.hex()}-{count}'
 
 
 want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr', 'sparc',
@@ -152,5 +217,3 @@ def cache(folder, ser='json', clear_cache=False, create=False):
         return superinner
 
     return inner
-
-
