@@ -5,11 +5,16 @@ cypherResources:
     query: |
             MATCH path = (start:Class{iri:'${id}'})-[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)-[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup) RETURN path
     operations:
-      - summary: Get the parts list for an organ including nervse and blood vessles
+      - summary: Get the parts list for an organ including nerves and blood vessles
         parameters:
          - name: id
            descprtion: ontology id of the organ
            paramType: path
+  - path: /dynamic/prod/sparc/parcellationGraph
+    query: |
+            MATCH path = (label)-[:subClassOf]->(root)-[:ilxtr:isDefinedBy]->(artifact)-[:subClassOf*0..2]->(parent)-[:ilxtr:isDefinedInTaxon]->(species) RETURN path
+    operations:
+      - summary: Get the graph of all parcellation labels for all species including
   - path: /dynamic/prod/sparc/organList
     query: |
             MATCH (n)
