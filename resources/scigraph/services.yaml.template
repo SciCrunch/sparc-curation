@@ -2,22 +2,34 @@ applicationContextPath: scigraph
 
 cypherResources:
   - path: /dynamic/prod/sparc/organParts/{id}
-    query: |
-            MATCH path = (start:Class{iri:'${id}'})-[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)-[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup) RETURN path
     operations:
       - summary: Get the parts list for an organ including nerves and blood vessles
         parameters:
          - name: id
            descprtion: ontology id of the organ
            paramType: path
+    query: 'MATCH path = (start:Class{iri: "${id}"})
+            -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
+            -[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup)
+            RETURN path'
   - path: /dynamic/prod/sparc/parcellationGraph
-    query: |
-            MATCH path = (label)-[:subClassOf]->(root)-[:ilxtr:isDefinedBy]->(artifact)-[:subClassOf*0..2]->(parent)-[:ilxtr:isDefinedInTaxon]->(species) RETURN path
     operations:
       - summary: Get the graph of all parcellation labels for all species including
+    query: 'MATCH path = (artifact)
+            -[:subClassOf*0..2]->(parent)
+            -[:ilxtr:isDefinedInTaxon]->(species)
+            return path
+            UNION
+            MATCH path = (label)
+            -[:subClassOf]->(root)
+            -[:ilxtr:isDefinedBy]->(artifact)
+            -[:subClassOf*0..2]->(parent)
+            -[:ilxtr:isDefinedInTaxon]->(species)
+            RETURN path'
   - path: /dynamic/prod/sparc/organList
-    query: |
-            MATCH (n)
+    operations:
+      - summary: Get the list of all FMA organ identifiers relevant to SPARC
+    query: 'MATCH (n)
             WHERE n.iri IN [
                     "http://purl.org/sig/ont/fma/fma7195",
                     "http://purl.org/sig/ont/fma/fma7088",
@@ -32,10 +44,11 @@ cypherResources:
                     "http://purl.org/sig/ont/fma/fma15900",
                     "http://purl.org/sig/ont/fma/fma45659",
                     "http://purl.org/sig/ont/fma/fma7647"]
-            RETURN n
+            RETURN n'
   - path: /dynamic/prod/sparc/speciesList
-    query: |
-            MATCH (n)
+    operations:
+      - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
+    query: 'MATCH (n)
             WHERE n.iri IN [
                     "http://purl.obolibrary.org/obo/NCBITaxon_9378",
                     "http://purl.obolibrary.org/obo/NCBITaxon_9606",
@@ -43,9 +56,7 @@ cypherResources:
                     "http://purl.obolibrary.org/obo/NCBITaxon_9823",
                     "http://purl.obolibrary.org/obo/NCBITaxon_10090",
                     "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
-            RETURN n
-    operations:
-      - summary: Get the list of all FMA organ identifiers relevant to SPARC
+            RETURN n'
 
 graphConfiguration:
   curies:
