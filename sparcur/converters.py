@@ -225,3 +225,8 @@ class SubjectConverter(TripleConverter):
         ['stimulator', sparc.stimulatorUtilized],
     ]
 SubjectConverter.setup()
+
+
+class ApiNATOMYConverter(TripleConverter):
+    pass
+ApiNATOMYConverter.setup()

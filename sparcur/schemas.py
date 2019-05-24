@@ -10,6 +10,7 @@ import requests
 from pyontutils.core import OntId, OntTerm
 from pysercomb.pyr.units import Expr
 from sparcur import exceptions as exc
+from sparcur.utils import logd
 from sparcur.core import JEncode
 
 
@@ -105,6 +106,7 @@ class HasSchema:
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
                     if fail:
+                        logd.error('schema validation has failed and fail=True')
                         breakpoint()
                         raise norm_or_error
 

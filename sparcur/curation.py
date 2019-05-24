@@ -719,8 +719,8 @@ class TriplesExport(ProtcurData):
         def warn(triple):
             for element in triple:
                 if (not (isinstance(element, rdflib.URIRef) or
-                        isinstance(element, rdflib.BNode) or
-                        isinstance(element, rdflib.Literal)) or
+                         isinstance(element, rdflib.BNode) or
+                         isinstance(element, rdflib.Literal)) or
                     (hasattr(element, '_value') and isinstance(element._value, dict))):
                     log.critical(element)
 

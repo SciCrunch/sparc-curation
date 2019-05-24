@@ -10,7 +10,7 @@ class ValidationError(SparCurError):
         self.errors = errors
 
     def __repr__(self):
-        msg = ', '.join([_format_jsonschema_error(e) for e in self.errors])
+        msg = ', '.join([self._format_jsonschema_error(e) for e in self.errors])
         return self.__class__.__name__ + f'({msg})'
 
     def __str__(self):

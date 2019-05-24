@@ -1,19 +1,33 @@
 import json
 from pathlib import Path
+import rdflib
+from pyontutils.core import OntRes, OntGraph
+from pyontutils.utils import utcnowtz, isoformat
+from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
+from pyontutils.closed_namespaces import rdf, rdfs, owl
 from sparcur import schemas as sc
 from sparcur import datasets as dat
+from sparcur import converters as conv
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
-from sparcur.core import JT, JEncode, log, logd, lj, OntId, OrcidId, OntTerm
+from sparcur.core import JT, JEncode, log, logd, lj, OntId, OrcidId, OntTerm, OntCuries
 from sparcur.state import State
 from sparcur.derives import Derives
 
 DT = DictTransformer
 De = Derives
 
+a = rdf.type
+
 
 class Pipeline:
     """ base pipeline """
+
+    object_class = None
+
+    @property
+    def object(self):
+        return self.object_class(self.data)
 
 
 class DatasourcePipeline(Pipeline):
@@ -328,6 +342,74 @@ class LoadJSON(Pipeline):
             return json.load(f)
 
 
+class ExportPipeline(Pipeline):
+    """ Pipelines that start with some json blob and return something else. """
+    # TODO we need a flexible way to map export pipelines to json pipelines
+    # for maximum reusability and in order to set default export pipelines
+
+    def __init__(self, data_pipeline_endpoint):
+        self.pipeline_start = data_pipeline_endpoint
+
+
+class RdfPipeline(ExportPipeline):
+
+    object_class = lambda g: g
+
+    # previous pipeline and converter should match
+    previous_pipeline_class = None
+    converter_class = None
+
+    @property
+    def triples(self):
+        yield from self.converter_class(self.pipeline_start, self)
+
+    @property
+    def triples_header(self):
+        yield TEMP.subject, TEMP.predicate, TEMP.object
+        raise NotImplementedError
+
+    def populate(self, graph):
+        def warn(triple):
+            for element in triple:
+                if (not (isinstance(element, rdflib.URIRef) or
+                         isinstance(element, rdflib.BNode) or
+                         isinstance(element, rdflib.Literal)) or
+                    (hasattr(element, '_value') and isinstance(element._value, dict))):
+                    log.critical(element)
+
+            return triple
+
+        OntCuries.populate(graph)  # ah smalltalk thinking
+        [graph.add(t) for t in self.triples_header if warn(t)]
+        [graph.add(t) for t in self.triples if warn(t)]
+
+    @property
+    def graph(self):
+        """ you can populate other graphs, but this one runs once """
+        if not hasattr(self, '_graph'):
+            graph = OntGraph()
+            self.populate(graph)
+            self._graph = graph
+
+        return self._graph
+
+    @property
+    def data(self):
+        return self.graph
+
+
+class TurtleExport:
+    """ bad way to implement helper class for export
+        the choice of serialization can be deferred
+        until much later in time, so creating a high
+        level invariant is not required """
+
+    @property
+    def data(self):
+        raise NotImplementedError("don't use this, it is here as an example only")
+        return self.graph.serialize(format='nifttl')
+
+
 hasSchema = sc.HasSchema()
 @hasSchema.mark
 class ApiNATOMY(JSONPipeline):
@@ -337,6 +419,49 @@ class ApiNATOMY(JSONPipeline):
     @hasSchema(sc.ApiNATOMYSchema, fail=True)
     def data(self):
         return self.pipeline_start
+
+
+# TODO register export pipelines with the json endpoint pipeline?
+# is one way to solve this problem
+class ApiNATOMY_rdf(RdfPipeline):
+
+    converter_class = conv.ApiNATOMYConverter
+
+    @property
+    def id(self):
+        return 'FIXME-TODO'
+        # FIXME this seems wrong ...
+        # the pipelines are separate from the objects they maniuplate or output
+        return self.pipeline_start.object.id
+
+    @property
+    def ontid(self):
+        # FIXME TODO
+        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/apinat/{self.id}')
+
+    @property
+    def triples_header(self):
+        # TODO TODO
+        ontid = self.ontid
+        nowish = utcnowtz()  # FIXME pass in so we can align all times per export??
+        epoch = nowish.timestamp()
+        iso = isoformat(nowish)
+        ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
+        #sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
+                                      #'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
+
+        pos = (
+            (a, owl.Ontology),
+            (owl.versionIRI, ver_ontid),
+            (owl.versionInfo, rdflib.Literal(iso)),
+            #(isAbout, rdflib.URIRef(self.uri_api)),
+            #(TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
+            (rdfs.label, rdflib.Literal(f'TODO export graph')),
+            #(rdfs.comment, self.header_graph_description),
+            #(owl.imports, sparc_methods),
+        )
+        for p, o in pos:
+            yield ontid, p, o
 
 
 class LoadIR(JSONPipeline):
