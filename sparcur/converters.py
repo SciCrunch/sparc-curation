@@ -1,13 +1,13 @@
 import rdflib
 from types import GeneratorType
 from pyontutils import combinators as cmb
-from pyontutils.core import OntId
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from sparcur import datasets as dat
-from sparcur.utils import log, sparc
+from sparcur.core import OntId, OntTerm
+from sparcur.utils import log, logd, sparc
 from sparcur.protocols import ProtocolData
 
 a = rdf.type
@@ -228,5 +228,94 @@ SubjectConverter.setup()
 
 
 class ApiNATOMYConverter(TripleConverter):
-    pass
+    @staticmethod
+    def apinatbase():
+        # TODO move it external file
+        yield TEMP.isAdvectivelyConnectedTo, a, owl.ObjectProperty
+        yield TEMP.isAdvectivelyConnectedTo, a, owl.SymmetricProperty
+        yield TEMP.isAdvectivelyConnectedTo, a, owl.TransitiveProperty
+
+        yield TEMP.advectivelyConnects, a, owl.ObjectProperty
+        yield TEMP.advectivelyConnects, a, owl.TransitiveProperty
+
+        yield TEMP.advectivelyConnectsFrom, a, owl.ObjectProperty
+        yield TEMP.advectivelyConnectsFrom, rdfs.subPropertyOf, TEMP.advectivelyConnects
+
+        yield TEMP.advectivelyConnectsTo, a, owl.ObjectProperty
+        yield TEMP.advectivelyConnectsTo, rdfs.subPropertyOf, TEMP.advectivelyConnects
+        yield TEMP.advectivelyConnectsTo, owl.inverseOf, TEMP.advectivelyConnectsFrom
+
+    @property
+    def triples_gen(self):
+        rm = self._source
+
+        # FIXME there doesn't seem to be a section that tells me the name
+        # of top level model so I have to know its name beforhand
+        # the id is in the model, having the id in the resource map
+        # prevents issues if these things get sent decoupled
+        id = 'Urinary Omega Tree'
+
+        links = rm[id]['links']
+
+        st = []
+        from_to = []
+        ot = None
+        yield from self.apinatbase()
+        for link in links:
+            if 'conveyingType' in link:
+                if link['conveyingType'] == 'ADVECTIVE':
+                    source = link['source']
+                    target = link['target']
+                    ok = True
+                    if len(from_to) == 2:  # otherwise
+                        st = []
+                        from_to = []
+                    for i, e in enumerate((source, target)):
+                        ed = rm[e]
+                        if 'external' not in ed:
+                            if not i and from_to:
+                                # TODO make sure the intermediate ids match
+                                pass
+                            else:
+                                ok = False
+                                break
+                        else:
+                            st.append(e)
+                            from_to.append(OntId(ed['external'][0]))
+
+                    conveying = link['conveyingLyph']
+                    cd = rm[conveying]
+                    if 'external' in cd:
+                        old_ot = ot
+                        ot = OntTerm(cd['external'][0])
+                        yield ot.u, a, owl.Class
+                        yield ot.u, TEMP.internalId, rdflib.Literal(conveying)
+                        yield ot.u, rdfs.label, rdflib.Literal(ot.label)
+                        if ok:
+                            u, d = from_to
+                            if st[0] == source:
+                                yield u, rdfs.label, rdflib.Literal(OntTerm(u).label)
+                                yield u, a, owl.Class
+                                yield from cmb.restriction.serialize(ot.u, TEMP.advectivelyConnectsFrom, u)
+
+                            if st[1] == target:
+                                yield d, rdfs.label, rdflib.Literal(OntTerm(d).label)
+                                yield d, a, owl.Class
+                                yield from cmb.restriction.serialize(ot.u, TEMP.advectivelyConnectsTo, d)
+
+                        elif old_ot != ot:
+                            yield from cmb.restriction.serialize(ot.u, TEMP.advectivelyConnectsFrom, old_ot.u)
+
+                    if not ok:
+                        logd.info(f'{source} {target} issue')
+                        continue
+
+                    for inid, e in zip(st, from_to):
+                        yield e.u, a, owl.Class
+                        yield e.u, rdfs.label, rdflib.Literal(OntTerm(e).label)
+                        yield e.u, TEMP.internalId, rdflib.Literal(inid)
+
+                    f, t = from_to
+                    yield from cmb.restriction.serialize(f.u, TEMP.isAdvectivelyConnectedTo, t.u)
+
 ApiNATOMYConverter.setup()

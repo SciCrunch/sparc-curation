@@ -1,6 +1,9 @@
+from pathlib import Path
 from flask import Flask, request, url_for
+import htmlfn as hfn
 from htmlfn import htmldoc, atag
 from htmlfn import table_style, navbar_style
+from sparcur import pipelines as pipes
 from sparcur.curation import Integrator
 
 
@@ -117,3 +120,14 @@ def make_app(self, name='spc-server'):
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Terms')
+
+
+    @app.route(f'{bp}/apinat/demo')
+    @app.route(f'{bp}/apinat/demo<ext>')
+    def route_apinat_demo(ext=None):
+        source = Path('~/ni/sparc/apinat/sources/').expanduser()  # FIXME config probably
+        rm = pipes.ApiNATOMY(source / 'apinatomy-resourceMap.json')
+        r = pipes.ApiNATOMY_rdf(rm.data)  # FIXME ... should be able to pass the pipeline
+        return hfn.htmldoc(r.data.ttl_html,
+                           styles=(hfn.ttl_html_style,),
+                           title='ApiNATOMY demo')

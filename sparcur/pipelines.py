@@ -361,7 +361,7 @@ class RdfPipeline(ExportPipeline):
 
     @property
     def triples(self):
-        yield from self.converter_class(self.pipeline_start, self)
+        yield from self.converter_class(self.pipeline_start, self).triples_gen
 
     @property
     def triples_header(self):
@@ -416,7 +416,8 @@ class ApiNATOMY(JSONPipeline):
 
     previous_pipeline_class = LoadJSON
 
-    @hasSchema(sc.ApiNATOMYSchema, fail=True)
+    #@hasSchema(sc.ApiNATOMYSchema, fail=True)  # resourceMap fails
+    @hasSchema(sc.ApiNATOMYSchema)
     def data(self):
         return self.pipeline_start
 

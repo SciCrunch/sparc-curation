@@ -15,7 +15,7 @@ class TestApiNAT(unittest.TestCase):
         m.data.keys()
         #asdf = m.data.keys(), g.data.keys(), rm.data.keys()
 
-    def test_export(self):
+    def test_export_model(self):
         m = pipes.ApiNATOMY(Path(self.source, 'apinatomy-model.json'))
         # FIXME need a way to combine this that doesn't require
         # the user to know how to compose these, just send a message
@@ -23,4 +23,9 @@ class TestApiNAT(unittest.TestCase):
         # the information at hand
         r = pipes.ApiNATOMY_rdf(m)
         r.data
-        #breakpoint()
+
+    def test_export_rm(self):
+        rm = pipes.ApiNATOMY(Path(self.source, 'apinatomy-resourceMap.json'))
+        r = pipes.ApiNATOMY_rdf(rm.data)  # FIXME ... should be able to pass the pipeline
+        r.data
+        breakpoint()
