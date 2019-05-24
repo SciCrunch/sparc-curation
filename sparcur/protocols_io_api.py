@@ -4,12 +4,12 @@ from urllib import parse
 from pathlib import Path
 from getpass import getpass
 from argparse import Namespace
-import robobrowser
 from oauth2client import file, client
 from pyontutils.config import devconfig
 
 
 def get_auth_code(url):
+    import robobrowser
     br = robobrowser.RoboBrowser()
     br.open(url)
     form = br.get_form(id=0)

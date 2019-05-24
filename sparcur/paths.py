@@ -442,6 +442,9 @@ class AugmentedPath(PosixPath):
     def readlink(self):
         """ this returns the string of the link only due to cycle issues """
         link = os.readlink(self)
+        if isinstance(link, bytes):  # on pypy3 readlink still returns bytes
+            link = link.decode()
+
         #log.debug(link)
         return PurePosixPath(link)
 

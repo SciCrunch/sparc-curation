@@ -6,6 +6,7 @@ import jsonschema
 # FIXME these imports should not be here types rules should be set in another way
 from pathlib import Path
 import rdflib
+import requests
 from pyontutils.core import OntId, OntTerm
 from pysercomb.pyr.units import Expr
 from sparcur import exceptions as exc
@@ -203,6 +204,20 @@ class JSONSchema(object):
         # information in the schema will be used to generate the score
         # FIXME the above doesn't actually work because missing optional
         # fields do need to be added at runtime, we'll do that next time
+
+
+class RemoteSchema(JSONSchema):
+    schema = ''
+    def __new__(cls):
+        if isinstance(cls.schema, str):
+            cls.schema = requests.get(cls.schema).json()
+
+        return super().__new__(cls)
+
+
+class ApiNATOMYSchema(RemoteSchema):
+    schema = ('https://raw.githubusercontent.com/open-physiology/'
+              'open-physiology-viewer/master/src/model/graphScheme.json')
 
 
 metadata_filename_pattern = r'^.+\/[a-z_\/]+\.(xlsx|csv|tsv|json)$'

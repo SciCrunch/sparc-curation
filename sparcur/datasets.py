@@ -315,7 +315,7 @@ class Tabular(HasErrors):
             'outputencoding': 'utf-8',
         }
         sheetid = 0
-        xlsx2csv = Xlsx2csv(self.path, **kwargs)
+        xlsx2csv = Xlsx2csv(self.path.as_posix(), **kwargs)
 
         f = io.StringIO()
         try:

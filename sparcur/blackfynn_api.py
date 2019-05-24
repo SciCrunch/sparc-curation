@@ -35,8 +35,9 @@ import os
 import json
 import asyncio
 from copy import deepcopy
-from nibabel import nifti1
-from pydicom import dcmread
+#from nibabel import nifti1
+#from pydicom import dcmread
+#from scipy.io import loadmat
 import yaml
 import requests
 from requests import Session
@@ -55,7 +56,6 @@ from sparcur import exceptions as exc
 from sparcur.core import log, lj
 from sparcur.paths import Path
 from sparcur.metastore import MetaStore
-from scipy.io import loadmat
 
 
 @property

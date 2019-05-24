@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from sparcur import schemas as sc
 from sparcur import datasets as dat
@@ -220,7 +221,7 @@ class JSONPipeline(Pipeline):
     def check(cls):
         assert not [d for d in cls.derives if len(d) != 3]
 
-    def __init__(self, previous_pipeline, lifters, runtime_context):
+    def __init__(self, previous_pipeline, lifters=None, runtime_context=None):
         """ sources stay, helpers are tracked for prov and then disappear """
         #log.debug(lj(sources))
         if self.previous_pipeline_class is not None:
@@ -315,6 +316,27 @@ class JSONPipeline(Pipeline):
     @property
     def data(self):
         return self.added
+
+
+class LoadJSON(Pipeline):
+    def __init__(self, path, *args, **kwargs):
+        self.path = path
+
+    @property
+    def data(self):
+        with open(self.path, 'rt') as f:
+            return json.load(f)
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class ApiNATOMY(JSONPipeline):
+
+    previous_pipeline_class = LoadJSON
+
+    @hasSchema(sc.ApiNATOMYSchema, fail=True)
+    def data(self):
+        return self.pipeline_start
 
 
 class LoadIR(JSONPipeline):
