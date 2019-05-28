@@ -6,7 +6,7 @@ cypherResources:
       - summary: Get the parts list for an organ including nerves and blood vessles
         parameters:
          - name: id
-           descprtion: ontology id of the organ
+           description: ontology id of the organ
            paramType: path
     query: 'MATCH path = (start:Class{iri: "${id}"})
             -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
@@ -24,6 +24,10 @@ cypherResources:
   - path: /dynamic/prod/sparc/parcellationArtifacts/{species-id}
     operations:
       - summary: Get the graph of all parcellation artifacts for a single species
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
     query: 'MATCH path = (artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
@@ -32,6 +36,10 @@ cypherResources:
   - path: /dynamic/prod/sparc/artifactRoots/{artifact-id}
     operations:
       - summary: Get the graph of all parcellation label roots for a single artifact WARNING this can return no results
+        parameters:
+         - name: artifact-id
+           description: ontology id of the parcellation artifact
+           paramType: path
     query: 'MATCH path = (root)
             -[:ilxtr:isDefinedBy]->(artifact:Class{iri: "${artifact-id}"})
             RETURN path'
@@ -39,6 +47,10 @@ cypherResources:
   - path: /dynamic/prod/sparc/artifactLabels/{artifact-id}
     operations:
       - summary: Get the graph of all parcellation labels for a single artifact WARNING this can return no results
+        parameters:
+         - name: artifact-id
+           description: ontology id of the parcellation artifact
+           paramType: path
     query: 'MATCH path = (label)
             -[:subClassOf]->(root)
             -[:ilxtr:isDefinedBy]->(artifact:Class{iri: "${artifact-id}"})
@@ -47,6 +59,10 @@ cypherResources:
   - path: /dynamic/prod/sparc/rootLabels/{root-id}
     operations:
       - summary: Get the list of all parcellation labels for a single label root
+        parameters:
+         - name: root-id
+           description: ontology id of the parcellation label root
+           paramType: path
     query: 'MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
             WITH label
             MATCH path = (label)-[relation*0..1]-(maybe)
@@ -66,6 +82,10 @@ cypherResources:
   - path: /dynamic/prod/sparc/parcellationRoots/{species-id}
     operations:
       - summary: Get the graph of all parcellation label roots for a single species
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
     query: 'MATCH path = (root)
             -[:ilxtr:isDefinedBy]->(artifact)
             -[:subClassOf*0..2]->(parent)
