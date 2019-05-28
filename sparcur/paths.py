@@ -464,6 +464,9 @@ class AugmentedPath(PosixPath):
     def commonpath(self, other):
         return self.__class__(os.path.commonpath((self, other)))
 
+    def rename(self, target):
+        os.rename(self, target)
+
     def chdir(self):
         os.chdir(self)
 
@@ -616,6 +619,11 @@ class CachePath(AugmentedPath):
         raise NotImplementedError('You need to define the rule for determining '
                                   'the local cache root for \'remote\' paths. '
                                   'These are sort of like pseudo mount points.')
+
+    @property
+    def trash(self):
+        # FIXME mkdir and put it in a more conventional location
+        return self.anchor.local.parent / '.trash'
 
     @property
     def is_helper_cache(self):
@@ -969,8 +977,8 @@ class CachePath(AugmentedPath):
         if new is not None:
             return new
         else:
-            log.warning(f'No remote metadata was found for {self}')
-            return self
+            log.info(f'Remote for {self} has been deleted. Moving to trash.')
+            self.rename(self.trash / f'{self.parent.id}-{self.name}')
 
     def fetch(self, size_limit_mb=2):
         """ bypass remote to fetch directly based on stored meta """
@@ -1052,7 +1060,7 @@ class CachePath(AugmentedPath):
                 raise exc.PathExistsError(f'Target {target} already exists!')
 
         if self.exists():
-            os.rename(self, target)  # if target is_dir then this will fail, which is ok
+            self.rename(target)  # if target is_dir then this will fail, which is ok
 
         elif self.is_broken_symlink():
             self.unlink()  # don't move the meta since it will break the naming insurance measure
