@@ -12,9 +12,69 @@ cypherResources:
             -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
             -[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup)
             RETURN path'
+
+  - path: /dynamic/prod/sparc/parcellationArtifacts
+    operations:
+      - summary: Get the graph of all parcellation artifacts for all species
+    query: 'MATCH path = (artifact)
+            -[:subClassOf*0..2]->(parent)
+            -[:ilxtr:isDefinedInTaxon]->(species)
+            RETURN path'
+
+  - path: /dynamic/prod/sparc/parcellationArtifacts/{species-id}
+    operations:
+      - summary: Get the graph of all parcellation artifacts for a single species
+    query: 'MATCH path = (artifact)
+            -[:subClassOf*0..2]->(parent)
+            -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+            RETURN path'
+
+  - path: /dynamic/prod/sparc/artifactRoots/{artifact-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single artifact WARNING this can return no results
+    query: 'MATCH path = (root)
+            -[:ilxtr:isDefinedBy]->(artifact:Class{iri: "${artifact-id}"})
+            RETURN path'
+
+  - path: /dynamic/prod/sparc/artifactLabels/{artifact-id}
+    operations:
+      - summary: Get the graph of all parcellation labels for a single artifact WARNING this can return no results
+    query: 'MATCH path = (label)
+            -[:subClassOf]->(root)
+            -[:ilxtr:isDefinedBy]->(artifact:Class{iri: "${artifact-id}"})
+            RETURN path'
+
+  - path: /dynamic/prod/sparc/rootLabels/{root-id}
+    operations:
+      - summary: Get the list of all parcellation labels for a single label root
+    query: 'MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
+            WITH label
+            MATCH path = (label)-[relation*0..1]-(maybe)
+            WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
+                  AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
+            RETURN path'
+
+  - path: /dynamic/prod/sparc/parcellationRoots
+    operations:
+      - summary: Get the graph of all parcellation label roots for all species
+    query: 'MATCH path = (root)
+            -[:ilxtr:isDefinedBy]->(artifact)
+            -[:subClassOf*0..2]->(parent)
+            -[:ilxtr:isDefinedInTaxon]->(species)
+            RETURN path'
+
+  - path: /dynamic/prod/sparc/parcellationRoots/{species-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single species
+    query: 'MATCH path = (root)
+            -[:ilxtr:isDefinedBy]->(artifact)
+            -[:subClassOf*0..2]->(parent)
+            -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+            RETURN path'
+
   - path: /dynamic/prod/sparc/parcellationGraph
     operations:
-      - summary: Get the graph of all parcellation labels for all species including
+      - summary: Get the graph of all parcellation labels for all species
     query: 'MATCH path = (artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
@@ -26,6 +86,7 @@ cypherResources:
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
             RETURN path'
+
   - path: /dynamic/prod/sparc/organList
     operations:
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
