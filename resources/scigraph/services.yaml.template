@@ -45,7 +45,8 @@ cypherResources:
            description: ontology id of the parcellation artifact
            paramType: path
     query: 'MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(artifact:Class{iri: "${artifact-id}"})
+            -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
+            -(artifact:Class{iri: "${artifact-id}"})
             RETURN path'
 
   - path: /dynamic/prod/sparc/artifactLabels/{artifact-id}
@@ -57,7 +58,8 @@ cypherResources:
            paramType: path
     query: 'MATCH path = (label)
             -[:subClassOf]->(root)
-            -[:ilxtr:isDefinedBy]->(artifact:Class{iri: "${artifact-id}"})
+            -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
+            -(artifact:Class{iri: "${artifact-id}"})
             WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
             RETURN path'
 
@@ -150,6 +152,7 @@ cypherResources:
                     "http://purl.org/sig/ont/fma/fma45659",
                     "http://purl.org/sig/ont/fma/fma7647"]
             RETURN n'
+
   - path: /dynamic/prod/sparc/speciesList
     operations:
       - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
