@@ -125,12 +125,15 @@ cypherResources:
             WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
             return path
             UNION
-            MATCH path = (label)
+            MATCH path = (maybe)
+            -[relation*0..1]-(label)
             -[:subClassOf]->(root)
             -[:ilxtr:isDefinedBy]->(artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
-            WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+            WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
+                  AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
+                  AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
             RETURN path'
 
   - path: /dynamic/prod/sparc/organList
