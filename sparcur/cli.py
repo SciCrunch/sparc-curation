@@ -479,6 +479,8 @@ class Main(Dispatcher):
                     log.warning('You are pulling recursively from below dataset level.')
 
                 r = d.remote
+                # FIXME for some reason this does not seem to be working as expected
+                # because new datasets are being added when there is an existing dataset
                 r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
                 d = r.local  # in case a folder moved
                 d.remote.bootstrap(recursive=recursive, only=only, skip=skip)
@@ -1136,8 +1138,10 @@ class Report(Dispatcher):
 
     def pathids(self, ext=None):
         base = self.project_path.parent
-        rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]  # slower to include the uris
-                               for c in chain((self.cwd,), self.cwd.rchildren))
+        rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]
+                                         # slower to include the uris
+                                         for c in chain((self.cwd,), self.cwd.rchildren)
+        )
         return self._print_table(rows, title='Path identifiers', ext=ext)
 
     def terms(self, ext=None):

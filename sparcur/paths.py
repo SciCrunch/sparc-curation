@@ -540,6 +540,8 @@ class CachePath(AugmentedPath):
         the exact implementations for the local and remote objects.
     """
 
+    cache_ignore = '.git',  # TODO
+
     _local_class = None
     _remote_class_factory = None
 
@@ -679,11 +681,13 @@ class CachePath(AugmentedPath):
                   skip=tuple()):
         try:
             self._in_bootstrap = True
-            self._bootstrap(meta, parents=parents,
+            self._bootstrap(meta,
+                            parents=parents,
                             recursive=recursive,
                             fetch_data=fetch_data,
                             size_limit_mb=size_limit_mb,
-                            only=only, skip=skip)
+                            only=only,
+                            skip=skip)
         finally:
             delattr(self, '_in_bootstrap')
             if hasattr(self, '_meta'):
@@ -770,6 +774,7 @@ class CachePath(AugmentedPath):
                 # you could do this with a dict or something else in pythong
                 # bit it is awkward (see also my crazy case implementation in interlex)
                 self.mkdir(parents=parents)
+
         elif self.remote.is_file():
             if not self.parent.exists():
                 self.parent.mkdir(parents=parents)
@@ -1296,6 +1301,7 @@ class PrimaryCache(CachePath):
 
         if self.exists_not_symlink():  # if a file already exists just follow instructions
             super()._meta_setter(pathmeta)
+
         else:
             if not hasattr(self, '_remote') or self._remote is None:
                 self._bootstrapping_id = pathmeta.id
