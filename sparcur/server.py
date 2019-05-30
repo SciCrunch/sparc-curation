@@ -128,6 +128,9 @@ def make_app(self, name='spc-server'):
         source = Path('~/ni/sparc/apinat/sources/').expanduser()  # FIXME config probably
         rm = pipes.ApiNATOMY(source / 'apinatomy-resourceMap.json')
         r = pipes.ApiNATOMY_rdf(rm.data)  # FIXME ... should be able to pass the pipeline
+        if ext == '.ttl':
+            return r.data.ttl, 200, {'Content-Type': 'text/turtle; charset=utf-8',}
+
         return hfn.htmldoc(r.data.ttl_html,
                            styles=(hfn.ttl_html_style,),
                            title='ApiNATOMY demo')

@@ -28,4 +28,4 @@ class TestApiNAT(unittest.TestCase):
         rm = pipes.ApiNATOMY(Path(self.source, 'apinatomy-resourceMap.json'))
         r = pipes.ApiNATOMY_rdf(rm.data)  # FIXME ... should be able to pass the pipeline
         r.data
-        breakpoint()
+        #breakpoint()

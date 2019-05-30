@@ -245,6 +245,41 @@ class ApiNATOMYConverter(TripleConverter):
         yield TEMP.advectivelyConnectsTo, rdfs.subPropertyOf, TEMP.advectivelyConnects
         yield TEMP.advectivelyConnectsTo, owl.inverseOf, TEMP.advectivelyConnectsFrom
 
+        idct = TEMP.isDiffusivelyConnectedTo
+        yield idct, a, owl.ObjectProperty
+        yield idct, a, owl.SymmetricProperty
+        yield idct, a, owl.TransitiveProperty  # technically correct modulate the concentration gradient
+
+        yield TEMP.diffusivelyConnects, a, owl.ObjectProperty
+        yield TEMP.diffusivelyConnects, a, owl.TransitiveProperty
+
+        yield TEMP.diffusivelyConnectsFrom, a, owl.ObjectProperty
+        yield TEMP.diffusivelyConnectsFrom, rdfs.subPropertyOf, TEMP.advectivelyConnects
+
+        yield TEMP.diffusivelyConnectsTo, a, owl.ObjectProperty
+        yield TEMP.diffusivelyConnectsTo, rdfs.subPropertyOf, TEMP.advectivelyConnects
+        yield TEMP.diffusivelyConnectsTo, owl.inverseOf, TEMP.advectivelyConnectsFrom
+
+    def materialTriples(self, subject, link):
+        rm = self._source
+
+        def yield_from_id(s, matid, predicate=TEMP.advectivelyConnectsMaterial):
+            mat = rm[matid]
+            if 'external' in mat:
+                mat_s = OntTerm(mat['external'][0])
+                yield s, predicate, mat_s.u
+                yield mat_s.u, a, owl.Class
+                yield mat_s.u, rdfs.label, rdflib.Literal(mat_s.label)
+                if 'materials' in mat:
+                    for submat_id in mat['materials']:
+                        yield from yield_from_id(mat_s, submat_id, TEMP.hasConstituent)
+
+            else:
+                log.warning(f'no external id for {mat}')
+
+        for matid in link['conveyingMaterials']:
+            yield from yield_from_id(subject, matid)
+
     @property
     def triples_gen(self):
         rm = self._source
@@ -264,58 +299,72 @@ class ApiNATOMYConverter(TripleConverter):
         for link in links:
             if 'conveyingType' in link:
                 if link['conveyingType'] == 'ADVECTIVE':
-                    source = link['source']
-                    target = link['target']
-                    ok = True
-                    if len(from_to) == 2:  # otherwise
-                        st = []
-                        from_to = []
-                    for i, e in enumerate((source, target)):
-                        ed = rm[e]
-                        if 'external' not in ed:
-                            if not i and from_to:
-                                # TODO make sure the intermediate ids match
-                                pass
-                            else:
-                                ok = False
-                                break
+                    p_is =   TEMP.isAdvectivelyConnectedTo
+                    p_from = TEMP.advectivelyConnectsFrom
+                    p_to =   TEMP.advectivelyConnectsTo
+                elif link['conveyingType'] == 'DIFFUSIVE':
+                    p_is =   TEMP.isDiffusivelyConnectedTo
+                    p_from = TEMP.diffusivelyConnectsFrom
+                    p_to =   TEMP.diffusivelyConnectsTo
+                else:
+                    log.critical(f'unhandled conveying type {link}')
+                    continue
+
+                source = link['source']
+                target = link['target']
+                ok = True
+                if len(from_to) == 2:  # otherwise
+                    st = []
+                    from_to = []
+                for i, e in enumerate((source, target)):
+                    ed = rm[e]
+                    if 'external' not in ed:
+                        if not i and from_to:
+                            # TODO make sure the intermediate ids match
+                            pass
                         else:
-                            st.append(e)
-                            from_to.append(OntId(ed['external'][0]))
+                            ok = False
+                            break
+                    else:
+                        st.append(e)
+                        from_to.append(OntId(ed['external'][0]))
 
-                    conveying = link['conveyingLyph']
-                    cd = rm[conveying]
-                    if 'external' in cd:
-                        old_ot = ot
-                        ot = OntTerm(cd['external'][0])
-                        yield ot.u, a, owl.Class
-                        yield ot.u, TEMP.internalId, rdflib.Literal(conveying)
-                        yield ot.u, rdfs.label, rdflib.Literal(ot.label)
-                        if ok:
-                            u, d = from_to
-                            if st[0] == source:
-                                yield u, rdfs.label, rdflib.Literal(OntTerm(u).label)
-                                yield u, a, owl.Class
-                                yield from cmb.restriction.serialize(ot.u, TEMP.advectivelyConnectsFrom, u)
+                conveying = link['conveyingLyph']
+                cd = rm[conveying]
+                if 'external' in cd:
+                    old_ot = ot
+                    ot = OntTerm(cd['external'][0])
+                    yield ot.u, a, owl.Class
+                    yield ot.u, TEMP.internalId, rdflib.Literal(conveying)
+                    yield ot.u, rdfs.label, rdflib.Literal(ot.label)
 
-                            if st[1] == target:
-                                yield d, rdfs.label, rdflib.Literal(OntTerm(d).label)
-                                yield d, a, owl.Class
-                                yield from cmb.restriction.serialize(ot.u, TEMP.advectivelyConnectsTo, d)
+                    yield from self.materialTriples(ot.u, link)  # FIXME locate this correctly
 
-                        elif old_ot != ot:
-                            yield from cmb.restriction.serialize(ot.u, TEMP.advectivelyConnectsFrom, old_ot.u)
+                    if ok:
+                        u, d = from_to
+                        if st[0] == source:
+                            yield u, rdfs.label, rdflib.Literal(OntTerm(u).label)
+                            yield u, a, owl.Class
+                            yield from cmb.restriction.serialize(ot.u, p_from, u)
 
-                    if not ok:
-                        logd.info(f'{source} {target} issue')
-                        continue
+                        if st[1] == target:
+                            yield d, rdfs.label, rdflib.Literal(OntTerm(d).label)
+                            yield d, a, owl.Class
+                            yield from cmb.restriction.serialize(ot.u, p_to, d)
 
-                    for inid, e in zip(st, from_to):
-                        yield e.u, a, owl.Class
-                        yield e.u, rdfs.label, rdflib.Literal(OntTerm(e).label)
-                        yield e.u, TEMP.internalId, rdflib.Literal(inid)
+                    elif old_ot != ot:
+                        yield from cmb.restriction.serialize(ot.u, p_from, old_ot.u)
 
-                    f, t = from_to
-                    yield from cmb.restriction.serialize(f.u, TEMP.isAdvectivelyConnectedTo, t.u)
+                if not ok:
+                    logd.info(f'{source} {target} issue')
+                    continue
+
+                for inid, e in zip(st, from_to):
+                    yield e.u, a, owl.Class
+                    yield e.u, rdfs.label, rdflib.Literal(OntTerm(e).label)
+                    yield e.u, TEMP.internalId, rdflib.Literal(inid)
+
+                f, t = from_to
+                yield from cmb.restriction.serialize(f.u, p_is, t.u)
 
 ApiNATOMYConverter.setup()
