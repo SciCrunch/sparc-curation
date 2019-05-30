@@ -340,6 +340,39 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
 Dataset.packages = packages
 
 
+@property
+def users(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/collaborators/users')
+    return resp.json()
+
+
+# monkey patch Dataset to implement teams endpoint
+Dataset.users = users
+
+
+@property
+def teams(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/collaborators/teams')
+    return resp.json()
+
+
+# monkey patch Dataset to implement teams endpoint
+Dataset.teams = teams
+
+
+@property
+def teams(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/organizations/{self.id}/teams')
+    return resp.json()
+
+
+# monkey patch Organization to implement teams endpoint
+Organization.teams = teams
+
+
 prefix = 'https://app.blackfynn.io/'
 lp = len(prefix)
 def destructure_uri(uri):
