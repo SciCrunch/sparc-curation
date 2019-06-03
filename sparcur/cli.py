@@ -488,6 +488,7 @@ class Main(Dispatcher):
     ###
     skip = (
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
+            'N:dataset:a896935a-4718-4906-8a7b-b6d76fb260b6',  # test computational resource
         )
 
     skip_big = (
