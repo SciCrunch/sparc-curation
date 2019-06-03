@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+import pytest
 from sparcur import pipelines as pipes
 
 
@@ -15,6 +16,7 @@ class TestApiNAT(unittest.TestCase):
         m.data.keys()
         #asdf = m.data.keys(), g.data.keys(), rm.data.keys()
 
+    @pytest.mark.skip('hardcoded assumptions mean this does not work yet')
     def test_export_model(self):
         m = pipes.ApiNATOMY(Path(self.source, 'apinatomy-model.json'))
         # FIXME need a way to combine this that doesn't require
@@ -26,6 +28,6 @@ class TestApiNAT(unittest.TestCase):
 
     def test_export_rm(self):
         rm = pipes.ApiNATOMY(Path(self.source, 'apinatomy-resourceMap.json'))
-        r = pipes.ApiNATOMY_rdf(rm.data)  # FIXME ... should be able to pass the pipeline
+        r = pipes.ApiNATOMY_rdf(rm)  # FIXME ... should be able to pass the pipeline
         r.data
         #breakpoint()

@@ -348,7 +348,11 @@ class ExportPipeline(Pipeline):
     # for maximum reusability and in order to set default export pipelines
 
     def __init__(self, data_pipeline_endpoint):
-        self.pipeline_start = data_pipeline_endpoint
+        self._pipeline_start = data_pipeline_endpoint
+
+    @property
+    def pipeline_start(self):
+        return self._pipeline_start.data
 
 
 class RdfPipeline(ExportPipeline):
@@ -433,7 +437,7 @@ class ApiNATOMY_rdf(RdfPipeline):
         return 'FIXME-TODO'
         # FIXME this seems wrong ...
         # the pipelines are separate from the objects they maniuplate or output
-        return self.pipeline_start.object.id
+        return self._pipeline_start.object.id
 
     @property
     def ontid(self):

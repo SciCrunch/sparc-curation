@@ -1,12 +1,12 @@
-import rdflib
 from types import GeneratorType
+import rdflib
 from pyontutils import combinators as cmb
 from pyontutils.namespaces import TEMP, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from sparcur import datasets as dat
-from sparcur.core import OntId, OntTerm
+from sparcur.core import OntId, OntTerm, lj
 from sparcur.utils import log, logd, sparc
 from sparcur.protocols import ProtocolData
 
@@ -260,10 +260,10 @@ class ApiNATOMYConverter(TripleConverter):
         yield TEMP.diffusivelyConnectsTo, rdfs.subPropertyOf, TEMP.advectivelyConnects
         yield TEMP.diffusivelyConnectsTo, owl.inverseOf, TEMP.advectivelyConnectsFrom
 
-    def materialTriples(self, subject, link):
+    def materialTriples(self, subject, link, predicate):
         rm = self._source
 
-        def yield_from_id(s, matid, predicate=TEMP.advectivelyConnectsMaterial):
+        def yield_from_id(s, matid, predicate=predicate):
             mat = rm[matid]
             if 'external' in mat:
                 mat_s = OntTerm(mat['external'][0])
@@ -289,8 +289,10 @@ class ApiNATOMYConverter(TripleConverter):
         # the id is in the model, having the id in the resource map
         # prevents issues if these things get sent decoupled
         id = 'Urinary Omega Tree'
+        mid = id.replace(' ', '-')
 
         links = rm[id]['links']
+        #linknodes = [n for n in rm[id]['nodes'] if n['class'] == 'Link']  # visible confusion
 
         st = []
         from_to = []
@@ -302,10 +304,14 @@ class ApiNATOMYConverter(TripleConverter):
                     p_is =   TEMP.isAdvectivelyConnectedTo
                     p_from = TEMP.advectivelyConnectsFrom
                     p_to =   TEMP.advectivelyConnectsTo
+                    p_cmat = TEMP.advectivelyConnectsMaterial
+                    diffusive = False
                 elif link['conveyingType'] == 'DIFFUSIVE':
                     p_is =   TEMP.isDiffusivelyConnectedTo
                     p_from = TEMP.diffusivelyConnectsFrom
                     p_to =   TEMP.diffusivelyConnectsTo
+                    p_cmat = TEMP.diffusivelyConnectsMaterial
+                    diffusive = True
                 else:
                     log.critical(f'unhandled conveying type {link}')
                     continue
@@ -338,7 +344,7 @@ class ApiNATOMYConverter(TripleConverter):
                     yield ot.u, TEMP.internalId, rdflib.Literal(conveying)
                     yield ot.u, rdfs.label, rdflib.Literal(ot.label)
 
-                    yield from self.materialTriples(ot.u, link)  # FIXME locate this correctly
+                    yield from self.materialTriples(ot.u, link, p_cmat)  # FIXME locate this correctly
 
                     if ok:
                         u, d = from_to
@@ -354,6 +360,43 @@ class ApiNATOMYConverter(TripleConverter):
 
                     elif old_ot != ot:
                         yield from cmb.restriction.serialize(ot.u, p_from, old_ot.u)
+
+                if diffusive:
+                    # we can try to hack this using named individuals
+                    # but it is not going to do exactly what is desired
+                    s_link = TEMP[f'apinat/{mid}/{link["id"]}']
+                    s_cd = TEMP[f'apinat/{mid}/{cd["id"]}']
+                    yield s_link, a, owl.NamedIndividual
+                    yield s_link, a, TEMP.diffusiveLink  # FIXME I'm not sure these go in the model ...
+                    yield s_cd, a, owl.NamedIndividual
+                    if 'external' in cd and cd['external']:
+                        oid = OntId(cd['external'][0])
+                        yield s_cd, a, oid.u
+                        ot = oid.asTerm
+                        if ot.label:
+                            yield oid.u, rdfs.label, ot.label
+
+                    else:
+                        yield s_cd, a, TEMP.conveyingLyph
+                        for icd in cd['inCoalescences']:
+                            dcd = rm[icd]
+                            log.info(lj(dcd))
+                            s_icd = TEMP[f'apinat/{mid}/{dcd["id"]}']
+                            yield s_cd, TEMP.partOfCoalescence, s_icd
+                            yield s_icd, a, owl.NamedIndividual
+                            yield s_icd, a, TEMP['apinat/Coalescence']
+                            if 'external' in dcd and dcd['external']:
+                                oid = OntId(dcd['external'][0])
+                                yield s_icd, a, oid.u
+                                ot = oid.asTerm
+                                if ot.label:
+                                    yield oid.u, rdfs.label, ot.label
+
+                            for lyphid in dcd['lyphs']:
+                                ild = rm[lyphid]
+                                log.info(lj(ild))
+                                if 'external' in ild and ild['external']:
+                                    yield s_icd, TEMP.hasLyphWithMaterial, OntId(ild['external'][0])
 
                 if not ok:
                     logd.info(f'{source} {target} issue')
