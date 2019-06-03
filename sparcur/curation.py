@@ -1117,6 +1117,9 @@ class ExporterSummarizer:
             if 'errors' in dowe:
                 ers = get_all_errors(dowe)
                 for er in ers:
+                    if er['pipeline_stage'] == 'SPARCBIDSPipeline.data':
+                        continue
+
                     er['dataset_id'] = id
                     er = {k:normv(v) for k, v in er.items()}
                     errors.append(er)

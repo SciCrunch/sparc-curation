@@ -1740,6 +1740,39 @@ class LocalPath(XattrPath):
     def meta(self, value):
         raise TypeError('Cannot set meta on LocalPath, it is a source of metadata.')
 
+    def _data(self, ranges=tuple(), chunksize=4096):
+        """ request arbitrary subjests of data from an object """
+
+        with open(self, 'rb') as f:
+            if not ranges:
+                ranges = (0, None),
+            else:
+                # TODO validate ranges
+                pass
+
+            for start, end in ranges:
+                f.seek(start, 2 if start < 0 else 0)
+                if end is not None:
+                    total = end - start
+                    if total < chunksize:
+                        nchunks = 0
+                        last_chunksize = total
+                    elif total > chunksize:
+                        nchunks, last_chunksize = divmod(total, chunksize)
+
+                    for _ in range(nchunks):  # FIXME boundscheck ...
+                        yield f.read(chunksize)
+
+                    yield f.read(last_chunksize)
+
+                else:
+                    while True:
+                        data = f.read(chunksize)  # TODO hinting
+                        if not data:
+                            break
+
+                        yield data
+
     @property
     def data(self):
         with open(self, 'rb') as f:
