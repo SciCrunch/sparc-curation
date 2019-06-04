@@ -773,7 +773,8 @@ class Main(Dispatcher):
         from sparcur import pipelines as pipes
         summary = self.summary
         tables = []
-        for intr in self.summary.iter_datasets:
+        datasets = self.summary.iter_datasets if self.cwd.cache.is_organization() else (Integrator(self.cwd.cache.dataset.local),)
+        for intr in datasets:
             pipe = intr.pipeline
             while not isinstance(pipe, pipes.SPARCBIDSPipeline):
                 pipe = pipe.previous_pipeline
