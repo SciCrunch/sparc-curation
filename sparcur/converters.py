@@ -288,7 +288,7 @@ class ApiNATOMYConverter(TripleConverter):
         # of top level model so I have to know its name beforhand
         # the id is in the model, having the id in the resource map
         # prevents issues if these things get sent decoupled
-        id = 'Urinary Omega Tree'
+        id = rm['id']
         mid = id.replace(' ', '-')
 
         links = rm[id]['links']
@@ -364,8 +364,8 @@ class ApiNATOMYConverter(TripleConverter):
                 if diffusive:
                     # we can try to hack this using named individuals
                     # but it is not going to do exactly what is desired
-                    s_link = TEMP[f'apinat/{mid}/{link["id"]}']
-                    s_cd = TEMP[f'apinat/{mid}/{cd["id"]}']
+                    s_link = TEMP[f'ApiNATOMY/{mid}/{link["id"]}']
+                    s_cd = TEMP[f'ApiNATOMY/{mid}/{cd["id"]}']
                     yield s_link, a, owl.NamedIndividual
                     yield s_link, a, TEMP.diffusiveLink  # FIXME I'm not sure these go in the model ...
                     yield s_cd, a, owl.NamedIndividual
@@ -381,10 +381,10 @@ class ApiNATOMYConverter(TripleConverter):
                         for icd in cd['inCoalescences']:
                             dcd = rm[icd]
                             log.info(lj(dcd))
-                            s_icd = TEMP[f'apinat/{mid}/{dcd["id"]}']
+                            s_icd = TEMP[f'ApiNATOMY/{mid}/{dcd["id"]}']
                             yield s_cd, TEMP.partOfCoalescence, s_icd
                             yield s_icd, a, owl.NamedIndividual
-                            yield s_icd, a, TEMP['apinat/Coalescence']
+                            yield s_icd, a, TEMP['ApiNATOMY/Coalescence']
                             if 'external' in dcd and dcd['external']:
                                 oid = OntId(dcd['external'][0])
                                 yield s_icd, a, oid.u

@@ -434,7 +434,8 @@ class ApiNATOMY_rdf(RdfPipeline):
 
     @property
     def id(self):
-        return 'FIXME-TODO'
+        mid = self.pipeline_start['id'].replace(' ', '-')
+        return mid
         # FIXME this seems wrong ...
         # the pipelines are separate from the objects they maniuplate or output
         return self._pipeline_start.object.id
@@ -442,7 +443,7 @@ class ApiNATOMY_rdf(RdfPipeline):
     @property
     def ontid(self):
         # FIXME TODO
-        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/apinat/{self.id}')
+        return rdflib.URIRef(f'https://sparc.olympiangods.org/ApiNATOMY/ontologies/{self.id}')
 
     @property
     def triples_header(self):
