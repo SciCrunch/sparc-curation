@@ -358,7 +358,7 @@ class ApiNATOMYConverter(TripleConverter):
                             yield d, a, owl.Class
                             yield from cmb.restriction.serialize(ot.u, p_to, d)
 
-                    elif old_ot != ot:
+                    if old_ot is not None and old_ot != ot:
                         yield from cmb.restriction.serialize(ot.u, p_from, old_ot.u)
 
                 if diffusive:
