@@ -10,7 +10,7 @@ from sparcur.config import config
 
 
 log = makeSimpleLogger('sparcur')
-logd = makeSimpleLogger('sparcur-data')
+logd = log.getChild('data')
 
 
 class _log:

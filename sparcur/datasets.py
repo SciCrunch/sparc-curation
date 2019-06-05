@@ -129,6 +129,9 @@ class DatasetStructure(Path, HasErrors):
                 log.info(f'refreshing {len(need_meta)} files with missing metadata')
                 new_caches = Async(rate=self.rate)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
+                    if c is None:
+                        continue  # file was deleted (logged previously)
+
                     if c.meta is None:
                         log.critical(f'missing metdata! {c}')
                         continue
