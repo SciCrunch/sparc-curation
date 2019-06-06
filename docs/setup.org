@@ -413,8 +413,11 @@
                              'group':{'sparc-curation': 'FakeId12'}},
               'blackfynn': {'sparc':{'key': 'fake-api-key',
                                      'secret': 'fake-api-secret'}},
-              'protocols-io': {'api': {'creds-file': '/path/to/creds-file.json'}},
-              'google': {'api': {'creds-file': '/path/to/creds-file.json'},
+              'protocols-io': {'api': {'creds-file': '/path/to/creds-file.json',
+                                       'store-file': 'protocols-io-api-token-rw.json'}},
+              'google': {'api': {'creds-file': '/path/to/creds-file.json',
+                                 'store-file': 'google-api-token-rw.json',  # store files created in the same folder as secrets.yaml by default
+                                 'store-file-readonly': 'google-api-token.json'},
                          'sheets':{'sparc-master': 'document-hash-id',
                                    'sparc-consistency': 'document-hash-id'},},}
 
