@@ -1,0 +1,106 @@
+* Instructions
+  See [[https://github.com/SciCrunch/sparc-curation/blob/master/docs/setup.org#bootstrapping-this-setuporg-file][setup.org bootstrapping]]
+  for instructions on how to get an emacs environment that can tangle the outputs of this file.
+  =TODO= tangle automatically from command line
+  See [[https://github.com/nakkaya/ferret/blob/7a374f52b90b1ec813eb027adf4beaaa16751c09/Makefile#L35][ferret's Makefile]]
+  for inspiration.
+
+* Load script
+  #+NAME: build-location
+  | /tmp/scigraph-build/sparc-data |
+
+  #+NAME: build-script
+  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location
+    if [[ -d "${BUILD_LOCATION}" ]]; then
+        rm "${BUILD_LOCATION}" -r
+    fi
+    mkdir -p "${BUILD_LOCATION}"
+    scigraph-load -c <(cat graphload.yaml.template | sed 's|BUILD_LOCATION|'"${BUILD_LOCATION}"'|g' )
+  #+end_src
+
+  #+NAME: blf
+  #+begin_src elisp :results value :var build-location=build-location :exports none
+    (caar build-location)
+  #+end_src
+
+  Tangle using =C-c C-v t= and run as =./build=
+  #+NAME: build
+  #+HEADER: :eval never :noweb yes :tangle build :tangle-mode (identity #o755)
+  #+begin_src bash
+    #!/usr/bin/env bash
+    BUILD_LOCATION=<<blf()>>
+    <<build-script>>
+  #+end_src
+
+* Deploy graph
+  #+NAME: deploy-script
+  #+HEADER: :var SERVER=localhost RUNTIME_LOCATION=/var/lib/scigraph SVC_USER=scigraph
+  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location 
+    BASENAME=$(basename "${BUILD_LOCATION}")
+    STAMPED="${BASENAME}-graph-$(date +%Y%m%dT%H%M%S)"
+    ZIPNAME="${STAMPED}.zip" 
+    #ZIPNAME="${BASENAME}-graph-$(date +%Y%m%dT%H%M%S,%N | cut -b-22).zip"   # overkill
+    ZIPPATH="$(dirname "${BUILD_LOCATION}")/${ZIPNAME}"
+    echo $BUILD_LOCATION $BASENAME $STAMPED $ZIPNAME $ZIPPATH
+    pushd "${BUILD_LOCATION}/.."
+    # mv prevents accidentally deploying the same graph twice
+    # but use cp -r for development to avoid continual rebuild
+    cp -r ${BASENAME} ${STAMPED}
+    zip -r ${ZIPNAME} ${STAMPED}
+    popd
+    if [ "${SERVER}" = "localhost" ]; then
+        CMD="su - ${SVC_USER} -c \"cp ${ZIPPATH} ${RUNTIME_LOCATION};
+                                   pushd ${RUNTIME_LOCATION};
+                                   unzip ${ZIPPATH};
+                                   unlink ${BASENAME};
+                                   ln -sT ${STAMPED} ${BASENAME};
+                                   popd\""
+        su - root -c "${CMD}"
+    else
+        echo ssh todo ...
+    fi
+  #+end_src
+
+  Tangle using =C-c C-v t= and run as =./deploy=
+  #+NAME: deploy
+  #+HEADER: :eval never :noweb yes :tangle deploy :tangle-mode (identity #o755)
+  #+begin_src bash
+    #!/usr/bin/env bash
+    SERVER=localhost
+    SVC_USER=scigraph
+    RUNTIME_LOCATION=/var/lib/scigraph
+    BUILD_LOCATION=<<blf()>>
+    <<deploy-script>>
+  #+end_src
+
+* TODO Deploy services
+  Still not satisfied with any of the prior approaches to this ...
+  #+NAME: cypher-resources
+  #+begin_src yaml
+    cypherResources:
+      - path: /dynamic/shortestSimple
+        query: |
+                MATCH (start:Class{iri: '${start_id}'})
+                WITH start
+                MATCH (end:Class{iri: '${end_id}'})
+                WITH start, end
+                MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
+                RETURN path
+        operations:
+          - summary: Get the shortest path between two IDs
+            parameters:
+              - name: start_id
+                description: The starting node (ex UBERON:0005751)
+                paramType: query
+              - name: end_id
+                description: The ending node (ex UBERON:0001255)
+                paramType: query
+              - name: max_depth
+                description: the maximum depth to traverse
+                paramType: query
+              - name: relationship
+                description: The property to traverse (ex subClassOf or subClassOf|partOf|isA)
+                paramType: query
+                required: false
+  #+end_src
+
