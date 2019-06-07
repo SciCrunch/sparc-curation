@@ -353,7 +353,7 @@ class BlackfynnRemote(RemotePath):
     @classmethod
     def get_file_url(cls, id, file_id):
         if file_id is not None:
-            return cls.bfl.get_file_url(id, file_id)
+            return cls._api.get_file_url(id, file_id)
 
     @classmethod
     def get_file_by_id(cls, id, file_id):
@@ -757,6 +757,9 @@ class BlackfynnRemote(RemotePath):
             old_meta = self.meta
         except exc.NoMetadataRetrievedError as e:
             log.error(f'{e}\nYou will need to individually refresh {self.local}')
+            return
+        except exc.NoRemoteFileWithThatIdError as e:
+            log.exception(e)
             return
 
         if self.is_file() and not force:  # this will tigger a fetch

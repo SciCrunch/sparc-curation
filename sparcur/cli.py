@@ -134,6 +134,7 @@ Options:
 
     -d --debug              drop into a shell after running a step
     -v --verbose            print extra information
+    --log-location=PATH     folder into which logs are saved [default: ${SPARC_EXPORTS}/log/]
 """
 
 import sys
@@ -142,6 +143,7 @@ import json
 import errno
 import types
 import pprint
+import logging
 from itertools import chain
 from collections import Counter
 import requests
@@ -310,7 +312,7 @@ class Main(Dispatcher):
 
         self.anchor.remote  # trigger creation of _remote_class
         BlackfynnRemote = BlackfynnCache._remote_class
-        self.bfl = BlackfynnRemote.bfl
+        self.bfl = BlackfynnRemote._api
         State.bind_blackfynn(self.bfl)
         ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
         Integrator.setup(self.bfl)
@@ -1252,6 +1254,20 @@ def main():
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
+
+    # set logging to file before anything else is done
+    # FIXME remove this hardcoded nonsense
+    from pyontutils.utils import isoformat_safe, utcnowtz
+    sparc_export = Path('~/files/blackfynn_local/export').expanduser()  # no s for maximum confusion
+    ll = Path(args['--log-location'].replace('${SPARC_EXPORTS}', sparc_export.as_posix()))
+    if not ll.exists():
+        ll.mkdir()
+
+    lf = ll / isoformat_safe(utcnowtz())
+    lfh = logging.FileHandler(lf.as_posix())
+    log.addHandler(lfh)
+    logd.addHandler(lfh)
+
     options = Options(args, defaults)
     main = Main(options)
     if main.options.debug:

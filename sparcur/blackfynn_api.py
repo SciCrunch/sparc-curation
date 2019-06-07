@@ -86,6 +86,14 @@ def patch_session(self):
 bfb.ClientSession.session = patch_session
 
 
+def get(self, id, update=True):
+    return self._api.core.get(id, update=update)
+
+
+# monkey patch Blackfynn so that it doesn't eat errors and hide their type
+Blackfynn.get = get
+
+
 def download(self, destination):
     """ remove prefix functionality since there are filenames without extensions ... """
     if self.type=="DirectoryViewerData":
@@ -195,7 +203,7 @@ def get(self, pkg, include='files,source'):
     if include is not None:
         if isinstance(include, string_types):
             params.update({'include': include})
-        if hasattr(include, '__iter__'):
+        elif hasattr(include, '__iter__'):
             params.update({'include': ','.join(include)})
 
     resp = self._get(self._uri('/{id}', id=pkg_id), params=params)
@@ -793,7 +801,16 @@ class BFLocal:
                 # this would work
                 raise BaseException('TODO org does not match need other api keys.')
         else:
-            thing = self.bf.get(id)
+            try:
+                thing = self.bf.get(id)
+            except requests.exceptions.HTTPError as e:
+                resp = e.response
+                if resp.status_code == 404:
+                    msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
+                    raise exc.NoRemoteFileWithThatIdError(msg) from e
+
+                log.exception(e)
+                thing = None
 
         if thing is None:
             if attempt > retry_limit:
@@ -807,9 +824,11 @@ class BFLocal:
         resp = self.bf._api.session.get(f'https://api.blackfynn.io/packages/{id}/files/{file_id}')
         if resp.ok:
             resp_json = resp.json()
-        else:
-            msg = f'Error {resp.status_code} {resp.reason!r} when fetching {resp.url}'
+        elif resp.status_code == 404:
+            msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
             raise exc.NoRemoteFileWithThatIdError(msg)
+        else:
+            resp.raise_for_status()
 
         try:
             return resp_json['url']

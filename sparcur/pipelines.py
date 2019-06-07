@@ -598,7 +598,7 @@ class SPARCBIDSPipeline(JSONPipeline):
                 for_super.append((path, error, subpipeline_class))
 
         if saf not in paths and suf not in paths:
-            log.error(f'samples_file nor subjects_file')
+            logd.error(f'samples_file nor subjects_file')
 
         super().subpipeline_errors(for_super)
 

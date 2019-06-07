@@ -1057,8 +1057,8 @@ class CachePath(AugmentedPath):
         else:
             raise BaseException('multiple candidates!')
 
-    def refresh(self):
-        new = self.remote.refresh(update_cache=True)
+    def refresh(self, update_data=False):
+        new = self.remote.refresh(update_cache=True, update_data=update_data)
         if new is not None:
             return new
         else:
@@ -1071,7 +1071,7 @@ class CachePath(AugmentedPath):
         if self.is_dir():
             raise NotImplementedError('not going to fetch all data in a dir at the moment')
         if meta.file_id is None:
-            self.remote.refresh(update_cache=True, update_data=True)
+            self.refresh(update_data=True)
             # the file name could be different so we have to return here
             return
 
