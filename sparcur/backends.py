@@ -9,7 +9,7 @@ from sparcur import exceptions as exc
 from sparcur.utils import log
 from sparcur.core import BlackfynnId
 from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, SshCache, BlackfynnCache
-from sparcur.paths import StatResult
+from sparcur.paths import StatResult, _bind_sysid_
 
 from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File
@@ -28,6 +28,19 @@ class ReflectiveCachePath(CachePath):
 
 
 class RemoteFactory:
+    _api_class = None
+    @classmethod
+    def fromId(cls, identifier, cache_class, local_class):
+        # FIXME decouple class construction for identifier binding
+        # _api is not required at all and can be bound explicitly later
+        api = cls._api_class(identifier)
+        self = RemoteFactory.__new__(cls, local_class, cache_class, _api=api)
+        self._errors = []
+        self.root = self._api.root
+        log.debug('When initializing a remote using fromId be sure to set the cache anchor '
+                  'before doing anything else, otherwise you will have a baaad time')
+        return self
+
     def ___new__(cls, *args, **kwargs):
         # NOTE this should NOT be tagged as a classmethod
         # it is accessed at cls time already and tagging it
@@ -66,6 +79,10 @@ class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
     encoding = 'utf-8'
 
     _meta = None  # override RemotePath dragnet
+    _meta_maker = LocalPath._meta_maker
+
+    sysid = None
+    _bind_sysid = classmethod(_bind_sysid_)
 
     def ___new__(cls, *args, **kwargs):
         # NOTE this should NOT be tagged as a classmethod
@@ -84,6 +101,7 @@ class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
         return self
 
     def __new__(cls, cache_anchor, local_class, host):
+        # TODO decouple _new from init here as well
         session = pxssh.pxssh(options=dict(IdentityAgent=os.environ.get('SSH_AUTH_SOCK')))
         session.login(host, ssh_config=Path('~/.ssh/config').expanduser().as_posix())
         cls._rows = 200
@@ -92,9 +110,18 @@ class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
         session.prompt()
         atexit.register(lambda:(session.sendeof(), session.close()))
         cache_class = cache_anchor.__class__
-        self = super().__new__(cls, local_class, cache_class, host=host, session=session)
-        cls._cache_anchor = cache_anchor
-        return self
+        newcls = super().__new__(cls, local_class, cache_class,
+                               host=host,
+                               session=session)
+        newcls._uid, *newcls._gids = [int(i) for i in (newcls._ssh('echo $(id -u) $(id -G)')
+                                                       .decode().split(' '))]
+
+        newcls._cache_anchor = cache_anchor
+        # must run before we can get the sysid, which is a bit odd
+        # given that we don't actually sandbox the filesystem
+        newcls._bind_sysid()
+
+        return newcls
 
     def __init__(self, thing_with_id, cache=None):
         if isinstance(thing_with_id, PurePath):
@@ -133,6 +160,41 @@ class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
     def refresh(self):
         # TODO probably not the best idea ...
         raise NotImplementedError('This baby goes to the network every single time!')
+
+    def access(self, mode):
+        """ types are 'read', 'write', and 'execute' """
+        try:
+            st = self.stat()
+
+        except (PermissionError, FileNotFoundError) as e:
+            return False
+
+        r, w, x = 0x124, 0x92, 0x49
+        read    = ((r & st.st_mode) >> 2) & (mode == 'read'    or mode == os.R_OK) * x
+        write   = ((w & st.st_mode) >> 1) & (mode == 'write'   or mode == os.W_OK) * x
+        execute =  (x & st.st_mode)       & (mode == 'execute' or mode == os.X_OK) * x
+        current = read + write + execute
+
+        u, g, e = 0x40, 0x8, 0x1
+        return (u & current and st.st_uid == self._uid or
+                g & current and st.st_gid in self._gids or
+                e & current)
+
+    def open(self, mode='wt', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        if mode not in ('wb', 'wt'):
+            raise TypeError('only w[bt] mode is supported')  # TODO ...
+
+        #breakpoint()
+        return
+        class Hrm:
+            session = self.session
+            def write(self, value):
+                self.session
+
+        #cmd = ['ssh', self.host, f'"cat - > {self.rpath}"']
+        #self.session
+        #p = subprocess.Popen()
 
     @property
     def data(self):
@@ -174,11 +236,24 @@ class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
     def stat(self):
         remote_cmd = f'stat "{self.rpath}" -c {StatResult.stat_format}'
         out = self._ssh(remote_cmd)
-        return StatResult(out)
+        try:
+            return StatResult(out)
+        except ValueError as e:
+            if out.endswith(b'Permission denied'):
+                raise PermissionError(out.decode())
+
+            elif out.endswith(b'No such file or directory'):
+                raise FileNotFoundError(out.decode())
+
+            else:
+                raise ValueError(out) from e
 
     def exists(self):
-        st = self.stat()
-        return bool(st)  # FIXME
+        try:
+            st = self.stat()
+            return bool(st)  # FIXME
+        except FileNotFoundError:  # FIXME there will be more types here ...
+            pass
 
     @property
     def __parent(self):  # no longer needed since we inherit from path directly
@@ -242,30 +317,11 @@ class SshRemoteFactory(RemoteFactory, PurePosixPath, RemotePath):
         return f'{self.__class__.__name__}({self.rpath!r}, host={self.host!r})'
 
 
-class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
-    # FIXME helper index should try to cooperate with the packages index?
+class BlackfynnRemote(RemotePath):
 
     uri_human = BlackfynnCache.uri_human
     uri_api = BlackfynnCache.uri_api
-
-    def __new__(cls, cache_anchor, local_class):
-        if isinstance(cache_anchor, BlackfynnCache):
-            try:
-                blackfynn_local_instance = BFLocal(cache_anchor.id)
-            except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
-                log.critical(f'Could not connect to blackfynn {e!r}')
-                #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
-                blackfynn_local_instance = 'CONNECTION ERROR'
-
-        else:
-            raise TypeError(f'{type(cache_anchor)} is not BFLocal or BlackfynnCache!')
-
-        cache_class = cache_anchor.__class__
-        self = super().__new__(cls, local_class, cache_class, bfl=blackfynn_local_instance)
-        cls._cache_anchor = cache_anchor
-        self._errors = []
-        self.root = self.bfl.organization.id
-        return self
+    _api_class = BFLocal
 
     @property
     def errors(self):
@@ -340,10 +396,10 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
             bfobject = self._seed
 
         elif isinstance(self._seed, str):
-            bfobject = self.bfl.get(self._seed)
+            bfobject = self._api.get(self._seed)
 
         elif isinstance(self._seed, PathMeta):
-            bfobject = self.bfl.get(self._seed.id)
+            bfobject = self._api.get(self._seed.id)
 
         else:
             raise TypeError(self._seed)
@@ -404,7 +460,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         # can be reused (as in something like dat)
 
         if not hasattr(self.__class__, '_organization'):
-            self.__class__._organization = self.__class__(self.bfl.organization)
+            self.__class__._organization = self.__class__(self._api.organization)
 
         return self._organization
 
@@ -706,7 +762,7 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         if self.is_file() and not force:  # this will tigger a fetch
             pass
         else:
-            self._bfobject = self.bfl.get(self.id)
+            self._bfobject = self._api.get(self.id)
 
         if update_cache or update_data:
             file_is_different = self.update_cache()
@@ -772,6 +828,27 @@ class BlackfynnRemoteFactory(RemoteFactory, RemotePath):
         file_id = f', file_id={self.file_id}' if self.file_id else ''
         return f'{self.__class__.__name__}({self.id!r}{file_id})'
 
+
+class BlackfynnRemoteFactory(RemoteFactory, BlackfynnRemote):  # XXX soon to be deprecated
+    # FIXME helper index should try to cooperate with the packages index?
+    def __new__(cls, cache_anchor, local_class):
+        if isinstance(cache_anchor, BlackfynnCache):
+            try:
+                blackfynn_local_instance = BFLocal(cache_anchor.id)
+            except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
+                log.critical(f'Could not connect to blackfynn {e!r}')
+                #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
+                blackfynn_local_instance = 'CONNECTION ERROR'
+
+        else:
+            raise TypeError(f'{type(cache_anchor)} is not BFLocal or BlackfynnCache!')
+
+        cache_class = cache_anchor.__class__
+        self = super().__new__(cls, local_class, cache_class, _api=blackfynn_local_instance)
+        cls._cache_anchor = cache_anchor
+        self._errors = []
+        self.root = self._api.root
+        return self
 
 
 def main():

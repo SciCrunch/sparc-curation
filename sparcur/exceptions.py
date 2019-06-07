@@ -46,6 +46,14 @@ class PathExistsError(SparCurError):
     """ path exists so don't try to symlink """
 
 
+class TargetPathExistsError(PathExistsError):
+    """ when adding to a path if fail_on_exists is set raise this """
+
+
+class PathNotEmptyError(SparCurError):
+    """ folder has children and is not empty, don't overwrite """
+
+
 class MetadataIdMismatchError(SparCurError):
     """ there is already cached metadata and id does not match """
 
@@ -112,10 +120,6 @@ class NotBootstrappingError(SparCurError):
 
 class NoSourcePathError(SparCurError):
     """ dictionary at some level is missing the expected key """
-
-
-class TargetPathExistsError(SparCurError):
-    """ when adding to a path if fail_on_exists is set raise this """
 
 
 class EncodingError(SparCurError):

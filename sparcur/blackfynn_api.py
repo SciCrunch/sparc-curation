@@ -742,6 +742,10 @@ class BFLocal:
             self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
 
     @property
+    def root(self):
+        return self.organization.id
+
+    @property
     def error_meta(self):
         for path in list(self.project_path.rglob('*ERROR')):
             yield self.get_file_meta(path)

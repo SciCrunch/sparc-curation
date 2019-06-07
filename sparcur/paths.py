@@ -169,6 +169,67 @@ class RemotePath:
     # know that
 
     @classmethod
+    def _new(cls, local_class, cache_class):
+        # FIXME 1:1ness issue from local -> cache
+        # probably best to force the type of the cache
+        # to switch if there are multiple remote mappings
+        # since there can be only 1 local file with the same
+        # path, a composite cache or a multi-remote cache
+        # seems a bit saner, or require explicit switching of
+        # the active remote if one-at-a-time semantics are desired
+        # see also the note RemoteFactory.__new__
+
+        newcls = type(cls.__name__,
+                      (cls,),
+                      dict(_local_class=local_class,
+                           _cache_class=cache_class))
+
+        local_class._remote_class = newcls
+        local_class._cache_class = cache_class
+        cache_class._remote_class = newcls
+
+        return newcls
+
+    @classmethod
+    def init(cls, identifier):
+        """ initialize the api from an identifier and bind the root """
+        if not hasattr(cls, '_api'):
+            cls._api = cls._api_class(identifier)
+            cls.root = cls._api.root
+
+        else:
+            raise ValueError(f'{cls} already bound an api to {cls._api}')
+
+    @classmethod
+    def dropAnchor(cls, parent_path=None):
+        """ When ya know where ya want ta land ... """
+        if not hasattr(cls, '_cache_anchor'):
+            if parent_path is None:
+                parent_path = cls._local_class.cwd()
+            else:
+                parent_path = cls._local_class(parent_path)
+
+            root = cls(cls.root)  # FIXME formalize the use of root
+            path = parent_path / root.name
+            if not path.exists():
+                if root.is_file():
+                    raise NotImplementedError('Have not implemented mapping for individual files yet.')
+
+                elif root.is_dir():
+                    path.mkdir()
+
+                else:
+                    raise NotImplementedError(f'What\'s a {root}?!')
+
+            elif list(path.children):
+                raise exc.NotEmptyError(f'has children {path}')
+
+            cls._cache_anchor = path.cache_init(root.id, anchor=True)
+
+        else:
+            raise ValueError(f'already anchored to {cls._cache_anchor}')
+
+    @classmethod
     def setup(cls, local_class, cache_class):
         """ call this once to bind everything together """
         cache_class.setup(local_class, cls)
@@ -205,7 +266,24 @@ class RemotePath:
 
     @property
     def cache(self):
-        return self._cache
+        if hasattr(self, '_cache_anchor') and self._cache_anchor is not None:
+            return self._cache
+        else:
+            # cache is not real
+            class NullCache:
+                @property
+                def _are_we_there_yet(self, remote=self):
+                    # this is useless since these classes are ephemoral
+                    if hasattr(remote, '_cache_anchor') and remote._cache_anchor is not None:
+                        remote.cache_init()
+
+                def __rtruediv__(self, other):
+                    return None
+
+                def __truediv__(self, other):
+                    return None
+
+            return NullCache()
 
     def cache_init(self):
         return self._cache_anchor / self
@@ -213,7 +291,7 @@ class RemotePath:
     @property
     def _cache(self):
         """ To catch a bad call to set ... """
-        if hasattr(self, f'_c_cache'):
+        if hasattr(self, '_c_cache'):
             return self._c_cache
 
     @_cache.setter
@@ -450,7 +528,9 @@ class AugmentedPath(PosixPath):
 
     def access(self, mode='read', follow_symlinks=True):
         """ types are 'read', 'write', and 'execute' """
-        if mode == 'read':
+        if mode in (os.R_OK, os.W_OK, os.X_OK):
+            pass
+        elif mode == 'read':
             mode = os.R_OK
         elif mode == 'write':
             mode = os.W_OK
@@ -1555,11 +1635,23 @@ class BlackfynnCache(PrimaryCache, XattrCache):
         yield from gen
 
 
+def _bind_sysid_(cls):
+    if cls.sysid is None:
+        cls.sysid = (base64
+                        .urlsafe_b64encode(cls(sysidpath(path_class=cls))
+                                        .checksum()[:16])[:-2]
+                        .decode())
+    else:
+        raise ValueError(f'{cls} already has sysid {cls.sysid}')
+
+
 class LocalPath(XattrPath):
     # local data about remote objects
 
     _cache_class = None  # must be defined by child classes
     sysid = None  # set below
+
+    _bind_sysid = classmethod(_bind_sysid_)
 
     @classmethod
     def setup(cls, cache_class, remote_class_factory):
@@ -1933,4 +2025,4 @@ SshCache._local_class = LocalPath
 BlackfynnCache._local_class = Path
 
 # any additional values
-LocalPath.sysid = base64.urlsafe_b64encode(LocalPath(sysidpath()).checksum()[:16])[:-2].decode()
+LocalPath._bind_sysid()# = base64.urlsafe_b64encode(LocalPath(sysidpath()).checksum()[:16])[:-2].decode()

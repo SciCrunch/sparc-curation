@@ -55,6 +55,11 @@ class TestSshRemote(TestPathHelper, unittest.TestCase):
         assert list(self.this_file_darkly.data) == list(self.this_file.data)
 
     #stats, checks = this_file_darkly.parent.children  # FIXME why does this list the home directory!?
+    def test_access(self):
+        f = self.SshRemote('/root/this-file-does-not-exist')
+        assert not f.access('read')
+        f = self.SshRemote(__file__)
+        assert f.access('write')
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
@@ -93,3 +98,7 @@ class TestBlackfynnRemote(unittest.TestCase):
         BlackfynnRemote = BlackfynnRemoteFactory(Path, BlackfynnCache, bfl)
         project_path = bfl.project_path
         list(project_path.remote.rchildren)
+
+    def test_parts_relative_to(self):
+        root = self.BlackfynnRemote(self.BlackfynnRemote.root)
+        assert root.id == self.BlackfynnRemote.root
