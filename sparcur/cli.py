@@ -471,6 +471,8 @@ class Main(Dispatcher):
         if not dirs:
             dirs = cwd,
 
+        existing_locals = set(rc for d in dirs for rc in d.rchildren)
+
         for d in dirs:
             if self.options.empty:
                 if list(d.children):
@@ -485,7 +487,15 @@ class Main(Dispatcher):
                 # because new datasets are being added when there is an existing dataset
                 r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
                 d = r.local  # in case a folder moved
-                d.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+                caches = d.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+
+        new_locals = set(c.local for c in caches)
+        maybe_removed = set(existing_locals) - set(new_locals)
+        maybe_new = set(new_locals) - set(existing_locals)
+        if maybe_removed:
+            # FIXME pull sometimes has fake file extensions
+            from pyontutils.utils import Async, deferred
+            Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed)
 
     ###
     skip = (

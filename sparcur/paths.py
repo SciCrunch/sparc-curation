@@ -239,7 +239,7 @@ class RemotePath:
         # if you forget to tell the cache you exist of course it will go to
         # the internet to look for you, it isn't quite smart enough and
         # we're trying not to throw dicts around willy nilly here ...
-        self.cache.bootstrap(self.meta, recursive=recursive, only=only, skip=skip)
+        return self.cache.bootstrap(self.meta, recursive=recursive, only=only, skip=skip)
 
     def __init__(self, thing_with_id, cache=None):
         if isinstance(thing_with_id, str):
@@ -761,13 +761,13 @@ class CachePath(AugmentedPath):
                   skip=tuple()):
         try:
             self._in_bootstrap = True
-            self._bootstrap(meta,
-                            parents=parents,
-                            recursive=recursive,
-                            fetch_data=fetch_data,
-                            size_limit_mb=size_limit_mb,
-                            only=only,
-                            skip=skip)
+            return  list(self._bootstrap(meta,
+                                         parents=parents,
+                                         recursive=recursive,
+                                         fetch_data=fetch_data,
+                                         size_limit_mb=size_limit_mb,
+                                         only=only,
+                                         skip=skip))
         finally:
             delattr(self, '_in_bootstrap')
             if hasattr(self, '_meta'):
@@ -804,7 +804,7 @@ class CachePath(AugmentedPath):
 
         if self.meta is not None:
             if recursive:
-                self._bootstrap_recursive(only, skip)
+                yield from self._bootstrap_recursive(only, skip)
             else:
                 raise exc.BootstrappingError(f'{self} already has meta!\n{self.meta.as_pretty()}')
 
@@ -824,13 +824,15 @@ class CachePath(AugmentedPath):
             self._bootstrap_data(is_file_and_fetch_data)
 
         if recursive:  # ah the irony of using loops to do this
-            self._bootstrap_recursive(only, skip)
+            yield from self._bootstrap_recursive(only, skip)
+
+        yield self
 
     def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
         # bootstrap the rest if we told it to
         if self.id.startswith('N:organization:'):  # FIXME :/
             for child in self.remote.children:
-                child.bootstrap(recursive=True, only=only, skip=skip)
+                yield from child.bootstrap(recursive=True, only=only, skip=skip)
         else:
             # TODO if rchildren looks like it could be bad
             # go back up to dataset level?
@@ -841,7 +843,7 @@ class CachePath(AugmentedPath):
                 #child.bootstrap(only=only, skip=skip)
                 # because of how remote works now we don't even have to
                 # bootstrap this
-                child
+                yield child.cache
 
     def _bootstrap_prepare_filesystem(self, parents, fetch_data, size_limit_mb):
         # we could use bootstrapping id here and introspect the id, but that is cheating
