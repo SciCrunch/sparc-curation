@@ -1057,8 +1057,8 @@ class CachePath(AugmentedPath):
         else:
             raise BaseException('multiple candidates!')
 
-    def refresh(self, update_data=False):
-        new = self.remote.refresh(update_cache=True, update_data=update_data)
+    def refresh(self, update_data=False, size_limit_mb=2):
+        new = self.remote.refresh(update_cache=True, update_data=update_data, size_limit_mb=2)
         if new is not None:
             return new
         else:

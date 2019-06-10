@@ -528,13 +528,16 @@ class Main(Dispatcher):
         drs = [d.remote for d in chain(to_root, self._dirs)]
 
         if not self.options.debug:
-            Async(rate=hz)(deferred(r.refresh)() for r in drs)
+            refreshed = Async(rate=hz)(deferred(r.refresh)() for r in drs)
         else:
-            [r.refresh() for r in drs]
+            refreshed = [r.refresh() for r in drs]
 
         moved = []
         parent_moved = []
-        for r in drs:
+        for new, r in zip(refreshed, drs):
+            if new is None:
+                log.critical('utoh')
+
             oldl = r.local
             try:
                 r.update_cache()
@@ -563,15 +566,13 @@ class Main(Dispatcher):
             self._print_paths(parent_moved, title='Parent moved')
 
         if not self.options.debug:
-            Async(rate=hz)(deferred(path.remote.refresh)(update_cache=True,
-                                                            update_data=fetch,
-                                                            size_limit_mb=limit)
-                            for path in self._not_dirs)
+            refreshed = Async(rate=hz)(deferred(path.cache.refresh)(update_data=fetch,
+                                                                    size_limit_mb=limit)
+                                       for path in self._not_dirs)
+
         else:
             for path in self._not_dirs:
-                path.remote.refresh(update_cache=True,
-                                    update_data=fetch,
-                                    size_limit_mb=limit)
+                path.cache.refresh(update_data=fetch, size_limit_mb=limit)
 
     def fetch(self):
         paths = [p for p in self._paths if not p.is_dir()]
