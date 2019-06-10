@@ -500,14 +500,18 @@ class Version1Header(HasErrors):
                     value = tuple(set(_value))
                     if len(value) != len(_value):
                         # TODO counter to show the duplicate values
-                        log.warning(f'duplicate values in {normk} TODO {self.path.as_posix()!r}')
+                        msg = f'duplicate values in {normk} TODO {self.path.as_posix()!r}'
+                        self.addError(msg)
+                        logd.error(msg)
 
                     if normk in self.max_one:  # schema will handle this ..
                         if not value:
                             #log.warning(f"missing value for {normk} '{self.t.path}'")
                             pass
                         elif len(value) > 1:
-                            log.warning(f'too many values for {normk} {value} {self.path.as_posix()!r}')
+                            msg = f'too many values for {normk} {value} {self.path.as_posix()!r}'
+                            self.addError(msg)
+                            logd.error(msg)
                             # FIXME not selecting the zeroth element here breaks the schema assumptions
                             #value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
                             #value = 'ERROR>>>' + ','.join(value)
