@@ -811,6 +811,9 @@ class BFLocal:
 
                 log.exception(e)
                 thing = None
+            except bfb.UnauthorizedException as e:
+                log.error(f'Unauthorized to access {id}')
+                thing = None
 
         if thing is None:
             if attempt > retry_limit:
