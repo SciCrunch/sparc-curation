@@ -648,6 +648,16 @@
       spc server --latest --count
     #+END_SRC
 
+*** Other random commands
+#+CAPTION: simplified error report
+#+begin_src bash
+  jq -r '[ .datasets[] |
+           {id: .id,
+            name: .meta.folder_name,
+            se: [ .status.submission_errors[].message ] | unique,
+            ce: [ .status.curation_errors[].message   ] | unique } ]' curation-export.json
+#+end_src
+
 * Variables :noexport:
   :PROPERTIES:
   :VISIBILITY: folded
