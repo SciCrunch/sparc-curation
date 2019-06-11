@@ -11,6 +11,7 @@ import ontquery as oq
 #from joblib import Memory
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
+from scibot.utils import resolution_chain
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.namespaces import OntCuries, TEMP, sparc
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit
@@ -126,7 +127,53 @@ class DoiId(OntId):
 
     @property
     def valid(self):
-        return self.suffix.startswith('10.')
+        return self.suffix is not None and self.suffix.startswith('10.')
+
+    def asInstrumented(self):
+        return DoiInst(self)
+
+
+class DoiInst(DoiId):
+    # TODO FIXME pull this into idlib or whatever we are calling it
+    #def __new__(self, doi_thing):
+        # FIXME autofetch ... hrm ... data vs metadata ...
+        #return super().__new__(doi_thing)
+
+    def metadata(self):
+        # e.g. crossref, datacite, etc.
+        pass
+
+    def data(self):
+        pass
+
+    @property
+    def resolution_chain(self):
+        # FIXME what should an identifier object represent?
+        # the eternal now of the identifier? or the state
+        # that it was in when this particular representation
+        # was created? This means that really each one of these
+        # objects should be timestamped and that equiality of
+        # instrumented objects should return false, which seems
+        # very bad for usability ...
+        if not hasattr(self, '_resolution_chain'):
+            # FIXME the chain should at least be formed out of
+            # IriHeader objects ...
+            self._resolution_chain = [uri for uri in resolution_chain(self)]
+
+        yield from self._resolution_chain
+
+    def resolve(self, target_class=None):
+        """ match the terminology used by pathlib """
+        # TODO generic probing instrumented identifier matcher
+        # by protocol, domain name, headers, etc.
+        for uri in self.resolution_chain:
+            pass
+
+        if target_class is not None:
+            return target_class(uri)
+
+        else:
+            return uri  # FIXME TODO identifier it
 
 
 class OrcidPrefixes(oq.OntCuries):
@@ -172,6 +219,42 @@ class OrcidId(OntId):
             return result == check
         except ValueError as e:
             raise self.OrcidChecksumError(self) from e
+
+
+class _PioPrefixes(oq.OntCuries): pass
+PioPrefixes = _PioPrefixes.new()
+PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
+             'pio.edit': 'https://www.protocols.io/edit/',  # sigh
+             'pio.private': 'https://www.protocols.io/private/',
+})
+
+
+class PioId(OntId):
+    _namespaces = PioPrefixes
+    __firsts = 'iri',
+
+    def normalize(self):
+        return self.__class__(self.replace('://protocols.io', '://www.protocols.io'))
+
+    @property
+    def slug(self):
+        return self.suffix.rsplit('/', 1)[0]
+
+
+def get_right_id(uri):
+    # FIXME this is a bad way to do this ...
+    if isinstance(uri, DoiId) or 'doi' in uri:
+        if isinstance(uri, DoiId):
+            di = uri.asInstrumented()
+        elif 'doi' in uri:
+            di = DoiInst(uri)
+
+        pi = di.resolve(PioId)
+
+    else:
+        pi = PioId(uri).normalize()
+
+    return pi
 
 
 class BlackfynnId(str):

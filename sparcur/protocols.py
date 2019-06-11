@@ -8,11 +8,13 @@ from pysercomb.pyr import units as pyru
 from protcur import namespace_mappings as nm
 from protcur.core import annoSync
 from protcur.analysis import Hybrid, protc
+from sparcur import datasets as dat
 from sparcur.protocols_io_api import get_protocols_io_auth
 from sparcur.utils import log, logd, cache
 from sparcur.paths import Path
 from sparcur.config import config
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, sparc
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, PioId, sparc
+from sparcur.core import get_right_id, DoiId, DoiInst
 
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
@@ -29,6 +31,7 @@ class ProtcurData:
 
     def _protcur(self, protocol_uri, filter=lambda p: True):
         self.lazy_setup()
+        protocol_uri = get_right_id(protocol_uri)
         gen = (p for p in protc if p.uri.startswith(protocol_uri) and filter(p))
 
         try:
@@ -105,12 +108,12 @@ class ProtcurData:
         self.protocol_uri = protocol_uri
 
 
-class ProtocolData:
+class ProtocolData(dat.HasErrors):
     # this class is best used as a helper class not as a __call__ class
 
-    def __init__(self, id, protocol_uris=None):  # FIXME lots of ways to use this class ...
-        self.id = id
-        self.protocol_uris = protocol_uris
+    def __init__(self, id=None):  # FIXME lots of ways to use this class ...
+        self.id = id  # still needed for the converters use case :/
+        super().__init__(pipeline_stage=self.__class__)
 
     def protocol(self, uri):
         return self._get_protocol_json(uri)
@@ -162,16 +165,43 @@ class ProtocolData:
     @cache(Path(config.cache_dir, 'protocol_json'))
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
-        uri_path = uri.rsplit('/', 1)[-1]
-        apiuri = 'https://protocols.io/api/v3/protocols/' + uri_path
+        logd.info(uri)
+        pi = get_right_id(uri)
+        if 'protocols.io' in pi:
+            pioid = pi.slug  # FIXME normalize before we ever get here ...
+            log.info(pioid)
+        else:
+            msg = f'protocol uri is not from protocols.io {pi} {self.id}'
+            logd.error(msg)
+            self.addError(msg)
+            return
+
+        #uri_path = uri.rsplit('/', 1)[-1]
+        apiuri = 'https://protocols.io/api/v3/protocols/' + pioid
         #'https://www.protocols.io/api/v3/groups/sparc/protocols'
         #apiuri = 'https://www.protocols.io/api/v3/filemanager/folders?top'
         #print(apiuri, header)
         log.debug('going to network for protocols')
         resp = requests.get(apiuri, headers=self._pio_header)
         #log.info(str(resp.request.headers))
-        j = resp.json()  # the api is reasonably consistent
         if resp.ok:
+            try:
+                j = resp.json()  # the api is reasonably consistent
+            except BaseException as e:
+                log.exception(e)
+                breakpoint()
+                raise e
             return j
         else:
+            try:
+                j = resp.json()
+                sc = j['status_code']
+                em = j['error_message']
+                msg = f'protocol issue {uri} {resp.status_code} {sc} {em} {self.id!r}'
+                logd.error(msg)
+                self.addError(msg)
+                # can't return here because of the cache
+            except BaseException as e:
+                log.exception(e)
+
             logd.error(f'protocol no access {uri} {self.id!r}')

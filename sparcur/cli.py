@@ -1276,6 +1276,7 @@ def main():
 
     lf = ll / isoformat_safe(utcnowtz())
     lfh = logging.FileHandler(lf.as_posix())
+    lfh.setFormatter(log.handlers[0].formatter)
     log.addHandler(lfh)
     logd.addHandler(lfh)
 

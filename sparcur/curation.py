@@ -868,7 +868,7 @@ def _wrap_path_gen(prop):
     return impostor
 
 
-class Integrator(PathData, ProtocolData, OntologyData):
+class Integrator(PathData, OntologyData):
     """ pull everything together anchored to the DatasetStructure """
     # note that mro means that we have to run methods backwards
     # so any class that uses something produced by a function
@@ -944,6 +944,17 @@ class Integrator(PathData, ProtocolData, OntologyData):
             raise exc.NotInDatasetError
 
         dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
+
+        class ProtocolHelper(ProtocolData):  # FIXME so ... bad ...
+            @property
+            def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
+                try:
+                    yield from adops.get(outer_self.data, ['meta', 'protocol_url_or_doi'])
+                except exc.NoSourcePathError:
+                    pass
+
+        ph = ProtocolHelper()
+
         # FIXME except for the adds, everything here should be a pipeline
         class Lifters:  # do this to prevent accidental data leaks
             # context
@@ -957,7 +968,7 @@ class Integrator(PathData, ProtocolData, OntologyData):
             #subjects = property(lambda s: (_ for _ in dataset.subjects))
 
             # protocols
-            protocol = self.protocol
+            protocol = ph.protocol
             #protcur = self.protcur
 
             # aux
@@ -1003,13 +1014,6 @@ class Integrator(PathData, ProtocolData, OntologyData):
     def keywords(self):
         try:
             yield from adops.get(self.data, ['meta', 'keywords'])
-        except exc.NoSourcePathError:
-            pass
-
-    @property
-    def protocol_uris(self):  # FIXME this needs to be pipelined
-        try:
-            yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
         except exc.NoSourcePathError:
             pass
 

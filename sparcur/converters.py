@@ -6,7 +6,7 @@ from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from sparcur import datasets as dat
-from sparcur.core import OntId, OntTerm, lj
+from sparcur.core import OntId, OntTerm, lj, get_right_id
 from sparcur.utils import log, logd, sparc
 from sparcur.protocols import ProtocolData
 
@@ -176,7 +176,9 @@ class MetaConverter(TripleConverter):
             _, s = self.c.protocol_url_or_doi(value)
             yield s, a, owl.NamedIndividual
             yield s, a, sparc.Protocol
-            pj = ProtocolData(self.integrator.id)(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
+            pd = ProtocolData(self.integrator.id)
+            # FIXME needs to be a pipeline so that we can export errors
+            pj = pd(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
             if pj:
                 label = pj['protocol']['title']
                 yield s, rdfs.label, rdflib.Literal(label)

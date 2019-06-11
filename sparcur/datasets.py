@@ -13,7 +13,7 @@ from pysercomb.pyr import units as pyru
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc, FileSize
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc, FileSize, PioId
 from sparcur.paths import Path
 
 a = rdf.type
@@ -680,7 +680,7 @@ class DatasetDescriptionFile(Version1Header):
         if doi:
             value = DoiId(prefix='doi', suffix=normalizeDoi(value))
         else:
-            value = OntId(value)
+            value = PioId(value).normalize()
 
         return value
 
