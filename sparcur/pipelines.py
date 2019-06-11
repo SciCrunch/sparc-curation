@@ -651,6 +651,8 @@ class SPARCBIDSPipeline(JSONPipeline):
             data['status']['submission_index'] = si
             data['status']['curation_index'] = ci
             data['status']['error_index'] = si + ci
+            data['status']['submission_errors'] = []
+            data['status']['curation_errors'] = []
             #data['protocol_index'] = 9999  # I think this one has to go in reverse?
             log.debug('pipeline skipped to end due to errors')
 
@@ -787,11 +789,8 @@ class PipelineEnd(JSONPipeline):
         data['status']['submission_index'] = si
         data['status']['curation_index'] = ci
         data['status']['error_index'] = si + ci
-        if submission_errors:
-            data['status']['submission_errors'] = submission_errors
-
-        if curation_errors:
-            data['status']['curation_errors'] = curation_errors
+        data['status']['submission_errors'] = submission_errors
+        data['status']['curation_errors'] = curation_errors
 
         return si + ci
 

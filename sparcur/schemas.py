@@ -600,13 +600,16 @@ class DatasetOutSchema(JSONSchema):
 
 class StatusSchema(JSONSchema):
     schema = {'type': 'object',
-              'required': ['submission_index', 'curation_index', 'error_index'],
+              'required': ['submission_index', 'curation_index', 'error_index',
+                           'submission_errors', 'curation_errors'],
               'properties': {
                   'submission_index': {'type': 'integer', 'minimum': 0},
                   'curation_index': {'type': 'integer', 'minimum': 0},
                   'error_index': {'type': 'integer', 'minimum': 0},
-                  'submission_errors': ErrorSchema.schema,
-                  'curation_errors': ErrorSchema.schema,
+                  'submission_errors':{'type':'array',  # allow these to be empty
+                                       'items': {'type': 'object'},},
+                  'curation_errors':{'type':'array',  # allow these to be empty
+                                     'items': {'type': 'object'},},
               }}
 
 
