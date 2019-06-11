@@ -57,13 +57,16 @@ class OntId(OIDB):
 
 
 class OntTerm(OTB):
+    _known_no_label = 'dataset',
     def atag(self, curie=False, **kwargs):
         return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
     def tabular(self, sep='|'):
         if self.label is None:
-            log.error(f'No label {self.curie}')
-            return self.curie
+            if self.prefix not in self._known_no_label:
+                log.error(f'No label {self.curie if self.curie else self.iri}')
+
+            return self.curie if self.curie else self.iri
 
         return self.label + sep + self.curie
 
@@ -226,6 +229,7 @@ PioPrefixes = _PioPrefixes.new()
 PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
              'pio.edit': 'https://www.protocols.io/edit/',  # sigh
              'pio.private': 'https://www.protocols.io/private/',
+             'pio.fileman': 'https://www.protocols.io/file-manager/',
 })
 
 

@@ -626,7 +626,7 @@ class Main(Dispatcher):
 
             intr = Integrator(cwd)
             dump_path = self.export_base / 'datasets' / intr.id / timestamp
-            latest_path = self.LATEST
+            latest_path = self.export_base / 'datasets' / intr.id / 'LATEST'
             if not dump_path.exists():
                 dump_path.mkdir(parents=True)
 
@@ -1147,7 +1147,7 @@ class Report(Dispatcher):
         else:
             self.summary.data['datasets']
 
-        pprint.pprint(sorted([(d['meta']['name'], [e['message']
+        pprint.pprint(sorted([(d['meta']['folder_name'], [e['message']
                                                    for e in get_all_errors(d)])
                               for d in datasets], key=lambda ab: -len(ab[-1])))
 

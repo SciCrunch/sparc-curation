@@ -278,6 +278,7 @@ class ContributorSchema(JSONSchema):
                                    'Editor',
                                    'HostingInstitution',
                                    'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
+                                   'CoInvestigator', # added for sparc, to distingusih ResponsibleInvestigator
                                    'Producer',
                                    'ProjectLeader',
                                    'ProjectManager',
@@ -512,6 +513,7 @@ class MetaOutSchema(JSONSchema):
                       'files',
                       'dirs',
                       'size',
+                      'folder_name',
                       'title',
                       #'subject_count',
                       #'sample_count',

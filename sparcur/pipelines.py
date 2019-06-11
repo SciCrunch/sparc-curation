@@ -742,6 +742,8 @@ class PipelineEnd(JSONPipeline):
 
     previous_pipeline_class = PipelineExtras
 
+    # FIXME HasErrors needs to require a level specification
+    # and not define these here because they have to be maintained
     _submission = (
         'DatasetStructure',
         'DatasetStructurePipeline.data',
@@ -760,6 +762,7 @@ class PipelineEnd(JSONPipeline):
         'SubjectsFile.curation-error',
         'SPARCBIDSPipeline.data',
         'PipelineExtras.data',
+        'ProtocolData',  # FIXME this is here as a placeholder
     )
 
     @classmethod

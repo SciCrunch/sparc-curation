@@ -113,6 +113,7 @@ class NormContributorRole(str):
               'Editor',
               'HostingInstitution',
               'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
+              'CoInvestigator',  # added for sparc, to distingusih ResponsibleInvestigator
               'Creator',  # this is a separate field in datacite so we will need lift on export
               'Producer',
               'ProjectLeader',
