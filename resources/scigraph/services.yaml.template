@@ -8,19 +8,21 @@ cypherResources:
          - name: id
            description: ontology id of the organ
            paramType: path
-    query: 'MATCH path = (start:Class{iri: "${id}"})
+    query: |
+            MATCH path = (start:Class{iri: "${id}"})
             -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
             -[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup)
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
     operations:
       - summary: Get the graph of all parcellation artifacts for all species
-    query: 'MATCH path = (artifact)
+    query: |
+            MATCH path = (artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
             WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/parcellationArtifacts/{species-id}
     operations:
@@ -29,13 +31,14 @@ cypherResources:
          - name: species-id
            description: ontology id of the species
            paramType: path
-    query: 'MATCH (parent)
+    query: |
+            MATCH (parent)
             -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
             WITH parent
             MATCH path = (artifact)
             -[:subClassOf*0..2]->(parent)
             WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/artifactRoots/{artifact-id}
     operations:
@@ -44,10 +47,11 @@ cypherResources:
          - name: artifact-id
            description: ontology id of the parcellation artifact
            paramType: path
-    query: 'MATCH path = (root)
+    query: |
+            MATCH path = (root)
             -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
             -(artifact:Class{iri: "${artifact-id}"})
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/artifactLabels/{artifact-id}
     operations:
@@ -56,12 +60,13 @@ cypherResources:
          - name: artifact-id
            description: ontology id of the parcellation artifact
            paramType: path
-    query: 'MATCH path = (label)
+    query: |
+            MATCH path = (label)
             -[:subClassOf]->(root)
             -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
             -(artifact:Class{iri: "${artifact-id}"})
             WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/rootLabels/{root-id}
     operations:
@@ -70,18 +75,20 @@ cypherResources:
          - name: root-id
            description: ontology id of the parcellation label root
            paramType: path
-    query: 'MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
+    query: |
+            MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
             WITH label
             MATCH path = (label)-[relation*0..1]-(maybe)
             WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
                   AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
                   AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/parcellationRoots
     operations:
       - summary: Get the graph of all parcellation label roots for all species
-    query: 'MATCH path = (artifact)
+    query: |
+            MATCH path = (artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
             WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
@@ -91,7 +98,7 @@ cypherResources:
             -[:ilxtr:isDefinedBy]->(artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/parcellationRoots/{species-id}
     operations:
@@ -100,7 +107,8 @@ cypherResources:
          - name: species-id
            description: ontology id of the species
            paramType: path
-    query: 'MATCH (parent)
+    query: |
+            MATCH (parent)
             -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
             WITH parent
             MATCH path = (artifact)
@@ -114,12 +122,13 @@ cypherResources:
             MATCH path = (root)
             -[:ilxtr:isDefinedBy]->(artifact)
             -[:subClassOf*0..2]->(parent)
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/parcellationGraph
     operations:
       - summary: Get the graph of all parcellation labels for all species
-    query: 'MATCH path = (artifact)
+    query: |
+            MATCH path = (artifact)
             -[:subClassOf*0..2]->(parent)
             -[:ilxtr:isDefinedInTaxon]->(species)
             WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
@@ -134,12 +143,13 @@ cypherResources:
             WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
                   AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
                   AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path'
+            RETURN path
 
   - path: /dynamic/prod/sparc/organList
     operations:
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
-    query: 'MATCH (n)
+    query: |
+            MATCH (n)
             WHERE n.iri IN [
                     "http://purl.org/sig/ont/fma/fma7195",
                     "http://purl.org/sig/ont/fma/fma7088",
@@ -154,12 +164,13 @@ cypherResources:
                     "http://purl.org/sig/ont/fma/fma15900",
                     "http://purl.org/sig/ont/fma/fma45659",
                     "http://purl.org/sig/ont/fma/fma7647"]
-            RETURN n'
+            RETURN n
 
   - path: /dynamic/prod/sparc/speciesList
     operations:
       - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
-    query: 'MATCH (n)
+    query: |
+            MATCH (n)
             WHERE n.iri IN [
                     "http://purl.obolibrary.org/obo/NCBITaxon_9378",
                     "http://purl.obolibrary.org/obo/NCBITaxon_9606",
@@ -167,7 +178,7 @@ cypherResources:
                     "http://purl.obolibrary.org/obo/NCBITaxon_9823",
                     "http://purl.obolibrary.org/obo/NCBITaxon_10090",
                     "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
-            RETURN n'
+            RETURN n
 
 graphConfiguration:
   curies:
