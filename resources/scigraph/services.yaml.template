@@ -180,6 +180,31 @@ cypherResources:
                     "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
             RETURN n
 
+  - path: /dynamic/shortestSimple
+    query: |
+            MATCH (start:Class{iri: '${start_id}'})
+            WITH start
+            MATCH (end:Class{iri: '${end_id}'})
+            WITH start, end
+            MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
+            RETURN path
+    operations:
+      - summary: Get the shortest path between two IDs
+        parameters:
+          - name: start_id
+            description: The starting node (ex UBERON:0005751)
+            paramType: query
+          - name: end_id
+            description: The ending node (ex UBERON:0001255)
+            paramType: query
+          - name: max_depth
+            description: the maximum depth to traverse
+            paramType: query
+          - name: relationship
+            description: The property to traverse (ex subClassOf or subClassOf|partOf|isA)
+            paramType: query
+            required: false
+
 graphConfiguration:
   curies:
   exactNodeProperties:
