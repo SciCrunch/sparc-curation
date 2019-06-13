@@ -7,5 +7,6 @@ name = "pypi"
 htmlfn = {git = "https://github.com/tgbugs/pyontutils.git", subdirectory = "htmlfn"}
 protcur = {git = "https://github.com/tgbugs/protc.git", subdirectory = "protcur"}
 pyontutils = {git = "https://github.com/tgbugs/pyontutils.git"}
+scibot = {git = "https://github.com/SciCrunch/scibot.git"}
 ttlser = {git = "https://github.com/tgbugs/pyontutils.git", subdirectory = "ttlser"}
 "e1839a8" = {path = ".", editable = true}
