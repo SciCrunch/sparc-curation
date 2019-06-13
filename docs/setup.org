@@ -141,6 +141,11 @@
     download unzip, path should deal with it, except that there seems to be
     a shared object file that is missing
 
+*** OS X
+    emacs
+    emacs script
+    homebrew
+    relink python3
 ** User
    :PROPERTIES:
    :CUSTOM_ID: user-start-here
