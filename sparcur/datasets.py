@@ -811,8 +811,16 @@ class SubjectsFile(Version1Header):
             # TODO warn
             yield value
 
+    def _param_unit(self, value, unit):
+        yield from self._param(value + unit)
+
     def age(self, value):
         yield from self._param(value)
+
+    def age_years(self, value):
+        # FIXME the proper way to do this is to detect
+        # the units and lower them to the data, and leave the aspect
+        yield from self._param_unit(value, 'years')
 
     def age_category(self, value):
         yield self.query(value, 'UBERON')
@@ -830,6 +838,12 @@ class SubjectsFile(Version1Header):
 
     def weight(self, value):
         yield from self._param(value)
+
+    def weight_kg(self, value):  # TODO populate this?
+        yield from self._param_unit(value, 'kg')
+
+    def height_inches(self, value):
+        yield from self._param_value(value, 'in')
 
     def rrid_for_strain(self, value):
         yield value

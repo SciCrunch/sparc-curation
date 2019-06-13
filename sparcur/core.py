@@ -50,16 +50,18 @@ OntCuries({'orcid':'https://orcid.org/',
 
 
 class OntId(OIDB):
-    def atag(self, **kwargs):
-        if 'curie' in kwargs:
-            kwargs.pop('curie')
-        return hfn.atag(self.iri, self.curie, **kwargs)
+    pass
+    #def atag(self, **kwargs):
+        #if 'curie' in kwargs:
+            #kwargs.pop('curie')
+        #return hfn.atag(self.iri, self.curie, **kwargs)
 
 
 class OntTerm(OTB):
     _known_no_label = 'dataset',
-    def atag(self, curie=False, **kwargs):
-        return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
+    pass
+    #def atag(self, curie=False, **kwargs):
+        #return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
     def tabular(self, sep='|'):
         if self.label is None:

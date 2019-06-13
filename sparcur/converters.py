@@ -1,7 +1,7 @@
 from types import GeneratorType
 import rdflib
 from pyontutils import combinators as cmb
-from pyontutils.namespaces import TEMP, isAbout
+from pyontutils.namespaces import TEMP, TEMPRAW, isAbout
 from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
@@ -17,6 +17,8 @@ class TripleConverter(dat.HasErrors):
     # that reflects where they are in the schema??
     known_skipped = tuple()
     mapping = tuple()
+
+    _already_warned = set()
 
     class Extra:
         def __init__(self, converter):
@@ -99,8 +101,10 @@ class TripleConverter(dat.HasErrors):
 
             else:
                 msg = f'Unhandled {self.__class__.__name__} field: {field}'
-                log.warning(msg)
-                self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error')
+                if msg not in self._already_warned:
+                    self._already_warned.add(msg)
+                    log.warning(msg)
+                    self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error')
 
 
 class ContributorConverter(TripleConverter):
@@ -204,30 +208,100 @@ class StatusConverter(TripleConverter):
     ]
 StatusConverter.setup()
 
+file_related = [
+    # file related
+    # this is about the file about the sample, not the spamle itself
+    # FIXME we don't want to export this, we want to use it to point
+    # to a blackfynn package id, but that processing has to come during
+    # the pipeline stage not here ...
+    ['sha1', TEMP.hasDigitalArtifactThatIsAboutItWithHash],
+    ['filename', TEMP.hasDigitalArtifactThatIsAboutIt],  #
+    ['upload_filename', TEMP.hasDigitalArtifactThatIsAboutIt],
+    ['dataset_id', TEMP.providerDatasetIdentifier],  # FIXME need a global convention for this
+    ]
+execution_related = [
 
+    ['experiment_number', TEMP.localExecutionNumber],  # FIXME TODO
+    ['session', TEMP.localExecutionNumber],
+]
+
+utility = [
+    ['comment', TEMP.providerNote],
+    ['note', TEMP.providerNote],
+]
 class SubjectConverter(TripleConverter):
-    known_skipped = 'subject_id',
     mapping = [
+        ['subject_id', TEMP.localId],
+        ['ear_tag_number', TEMP.localIdAlt],
         ['age_category', TEMP.hasAgeCategory],
-        ['species', sparc.animalSubjectIsOfSpecies],
         ['group', TEMP.hasAssignedGroup],
+        ['treatment', TEMP.TODO],
         #['rrid_for_strain', rdf.type],  # if only
         ['rrid_for_strain', sparc.specimenHasIdentifier],  # really subClassOf strain
         ['genus', sparc.animalSubjectIsOfGenus],
         ['species', sparc.animalSubjectIsOfSpecies],
         ['strain', sparc.animalSubjectIsOfStrain],
+        ['genotype', TEMP.hasGenotype],
         ['weight', sparc.animalSubjectHasWeight],
         ['initial_weight', sparc.animalSubjectHasWeight],  # TODO time
         ['mass', sparc.animalSubjectHasWeight],
         ['body_mass', sparc.animalSubjectHasWeight],  # TODO
+        ['height_inches', TEMP.subjectHasHeight],  # FIXME converted in datasets sigh
         ['sex', TEMP.hasBiologicalSex],
         ['gender', sparc.hasGender],
         ['age', TEMP.hasAge],
+        ['age_years', TEMP.hasAge],  # FIXME this is ok because we catch it when converting but
+        # it is yet another case where things are decoupled
+
+        ['body_mass_weight', TEMP.subjectHasWeight],  # FIXME human vs animal, sigh
+
+        ['anesthesia', TEMP.wasAdministeredAnesthesia],
+        # TODO experiment hasParticpant (some (subject wasAdministeredAnesthesia))
+        # or something like that -> experimentHasSubjectUnder ...
+
+
         ['stimulation_site', sparc.spatialLocationOfModulator],  # TODO ontology
         ['stimulator', sparc.stimulatorUtilized],
-    ]
+        ['stimulating_electrode_type', sparc.stimulatorUtilized],  # FIXME instance vs type
+
+        ['organism_rrid', TEMP.TODO],
+
+        ['nerve', TEMPRAW.involvesAnatomicalRegion],  # FIXME we can be more specific than this probably
+
+        # require extras
+        ['experiment_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
+        ['injection_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
+        ['date_of_euthanasia', TEMP.protocolExecutionDate],
+        ['date_of_injection', TEMP.protocolExecutionDate],
+    ] + file_related + execution_related + utility
 SubjectConverter.setup()
 
+
+class SampleConverter(TripleConverter):
+    mapping = [
+        ['sample_id', TEMP.localId],  # unmangled
+        #['subject_id', TEMP.wasDerivedFromSubject],
+        ['specimen_anatomical_location', TEMPRAW.wasExtractedFromAnatomicalRegion],
+        ['sample_name', rdfs.label],
+        ['sample_description', dc.description],
+        ['group', TEMP.hasAssignedGroup],
+
+        ['specimen', TEMP.TODO],  # sometimes used as anatomical location ...
+        ['tissue', TEMP.TODO],
+        ['counterstain', TEMP.TODO],
+        ['muscle_layer', TEMP.TODO],
+
+        # complex conversions required here ...
+        ['target_electrode_location_relative_to_greater_lesser_curvature', TEMP.TODO],  # YEEEE aspects!
+        ['target_electrode_orientation_relative_to_local_greater_curvature', TEMP.TODO],  # :D
+        ['electrode_implant_location', TEMP.TODO],
+        ['stimulation_electrode___chronic_or_acute', TEMP.TODO],
+        ['includes_chronically_implanted_electrode_', TEMP.TODO],
+    ] + file_related + execution_related + utility
+    def subject_id(self, value):
+        # FIXME _subject_id is monkey patched in
+        return TEMP.wasDerivedFromSubject, self._subject_id(value)
+SampleConverter.setup()
 
 class ApiNATOMYConverter(TripleConverter):
     @staticmethod

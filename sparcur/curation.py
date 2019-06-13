@@ -8,6 +8,7 @@ from datetime import datetime
 from functools import wraps
 from itertools import chain
 from collections import defaultdict, deque
+from urllib.parse import quote
 import rdflib
 import dicttoxml
 from pyontutils.utils import byCol as _byCol, isoformat, utcnowtz
@@ -423,11 +424,32 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
                 self._errors.append(e)
 
     @property
+    def _samples_objects(self):
+        """ really samples_file """
+        for path in self.samples_paths:
+            try:
+                sf = dat.SamplesFile(path)
+                if sf.data:
+                    yield sf
+            except dat.DatasetDescriptionFile.NoDataError as e:
+                self._errors.append(e)  # NOTE we treat empty file as no file
+            except AttributeError as e:
+                log.warning(f'unhandled metadata type {e!r}')
+                self._errors.append(e)
+
+    @property
     def subjects(self):
         if not hasattr(self, '_subj_cache'):
             self._subj_cache = list(self._subjects_objects)
 
         yield from self._subj_cache
+
+    @property
+    def samples(self):
+        if not hasattr(self, '_samp_cache'):
+            self._samp_cache = list(self._samples_objects)
+
+        yield from self._samp_cache
 
     @property
     def data_lift(self):
@@ -755,10 +777,16 @@ class TriplesExportDataset(TriplesExport):
         if 'subjects' in self.data:
             yield from self.data['subjects']
 
-    def ddt(self, data):
-        dsid = self.uri_api
-        s = rdflib.URIRef(dsid)
+    @property
+    def samples(self):
+        if 'samples' in self.data:
+            yield from self.data['samples']
 
+    @property
+    def dsid(self):
+        return rdflib.URIRef(self.uri_api)
+
+    def ddt(self, data):
         if 'contributors' in data:
             if 'creators' in data:
                 creators = data['creators']
@@ -771,7 +799,7 @@ class TriplesExportDataset(TriplesExport):
 
     def triples_contributors(self, contributor, creator=False):
         try:
-            dsid = rdflib.URIRef(self.uri_api)  # FIXME json reload needs to deal with this
+            dsid = self.dsid  # FIXME json reload needs to deal with this
         except BaseException as e:  # FIXME ...
             log.error(e)
             return
@@ -808,6 +836,7 @@ class TriplesExportDataset(TriplesExport):
 
         if 'status' not in data:
             breakpoint()
+
         yield from conv.StatusConverter(data['status'], self).triples_gen(dsid)
 
         #converter = conv.DatasetConverter(data)
@@ -819,13 +848,25 @@ class TriplesExportDataset(TriplesExport):
             yield s, a, sparc.Resource
             yield s, rdfs.label, rdflib.Literal(self.folder_name)  # not all datasets have titles
 
-        def subject_id(v, species=None):  # TODO species for human/animal
-            v = v.replace(' ', '%20')  # FIXME use quote urlencode
-            s = rdflib.URIRef(dsid + '/subjects/' + v)
-            return s
-
         yield from id_(self.id)
 
+        #for subjects in self.subjects:
+            #for s, p, o in subjects.triples_gen(subject_id):
+                #if type(s) == str:
+                    #breakpoint()
+                #yield s, p, o
+
+        yield from self.ddt(data)
+        yield from self.triples_subjects
+        yield from self.triples_samples
+
+    def subject_id(self, v, species=None):  # TODO species for human/animal
+        v = quote(v, safe=tuple())
+        s = rdflib.URIRef(self.dsid + '/subjects/' + v)
+        return s
+
+    @property
+    def triples_subjects(self):
         def triples_gen(prefix_func, subjects):
 
             for i, subject in enumerate(subjects):
@@ -847,15 +888,41 @@ class TriplesExportDataset(TriplesExport):
                     elif field not in converter.known_skipped:
                         log.warning(f'Unhandled subject field: {field}')
 
-        yield from triples_gen(subject_id, self.subjects)
+        yield from triples_gen(self.subject_id, self.subjects)
 
-        #for subjects in self.subjects:
-            #for s, p, o in subjects.triples_gen(subject_id):
-                #if type(s) == str:
-                    #breakpoint()
-                #yield s, p, o
+    def sample_id(self, v, species=None):  # TODO species for human/animal
+        #v = v.replace(' ', '%20')  # FIXME use quote urlencode
+        v = quote(v, safe=tuple())
+        s = rdflib.URIRef(self.dsid + '/samples/' + v)
+        return s
 
-        yield from self.ddt(data)
+    @property
+    def triples_samples(self):
+        conv.SampleConverter._subject_id = self.subject_id  # FIXME
+        conv.SampleConverter.dsid = self.dsid  # FIXME FIXME very evil
+        # yes this indicates that converters and exporters are
+        # highly related here ...
+        def triples_gen(prefix_func, samples):
+            for i, sample in enumerate(samples):
+                converter = conv.SampleConverter(sample)
+                if 'sample_id' in sample:
+                    s_local = sample['sample_id']
+                else:
+                    s_local = f'local-{i + 1}'  # sigh
+
+                s = prefix_func(s_local)
+                yield s, a, owl.NamedIndividual
+                yield s, a, sparc.Sample
+                yield from converter.triples_gen(s)
+                continue
+                for field, value in sample.items():
+                    convert = getattr(converter, field, None)
+                    if convert is not None:
+                        yield (s, *convert(value))
+                    elif field not in converter.known_skipped:
+                        log.warning(f'Unhandled sample field: {field}')
+
+        yield from triples_gen(self.sample_id, self.samples)
 
 
 def _wrap_path_gen(prop):
