@@ -21,6 +21,7 @@ Usage:
     spc missing [options]
     spc xattrs [options]
     spc demos [options]
+    spc goto <remote-id>
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -96,6 +97,8 @@ Commands:
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
     demos       long running example queries
+    goto        given an id cd to the containing directory
+                invoke as `pushd $(spc goto <id>)`
 
 Options:
     -f --fetch              fetch matching files
@@ -265,6 +268,7 @@ class Main(Dispatcher):
 
         if (self.options.clone or
             self.options.meta or
+            self.options.goto or
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
@@ -913,6 +917,16 @@ class Main(Dispatcher):
             inner(path)
 
         log.setLevel(old_level)
+
+    def goto(self):
+        # TODO this needs an inverted index
+        for rc in self.cwd.rchildren:
+            if rc.cache.id == self.options.remote_id:
+                if rc.is_broken_symlink() or rc.is_file():
+                    rc = rc.parent
+
+                print(rc.relative_to(self.cwd).as_posix())
+                return
 
     def status(self):
         project_path = self.cwd.find_cache_root()
