@@ -481,7 +481,7 @@ class Main(Dispatcher):
         dirs = sorted(dirs, key=lambda d: d.name)
 
         existing_locals = set(rc for d in dirs for rc in d.rchildren)
-        existing_d = {c.cache.id:c for c in existing_locals}
+        existing_d = {c.cache.id:c for c in existing_locals if c.cache is not None}  # yay null cache
         existing_ids = set(existing_d)
 
         log.debug(dirs)
