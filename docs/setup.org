@@ -546,6 +546,15 @@
 
       You will be prompted for your protocols.io email and password the first
       time you run.
+** Developer extras
+   If you can use python3.7 (>=ubuntu-19.04) you can set the embedded debugger as follows.
+   #+begin_src bash
+     pip install --user pudb
+   #+end_src
+   #+CAPTION: .bashrc extras
+   #+begin_src bash
+     export PYTHONBREAKPOINT=pudb.set_trace
+   #+end_src
 * Workflows
 ** General
 *** Staying up to date
@@ -662,6 +671,30 @@
             se: [ .status.submission_errors[].message ] | unique,
             ce: [ .status.curation_errors[].message   ] | unique } ]' curation-export.json
 #+end_src
+
+** Developer
+*** Debugging terminal pipeline errors
+    You have an error!
+    #+begin_src python
+      maybe_size = c.cache.meta.size  # << AttributeError here
+    #+end_src
+
+    Modify to wrap code
+    #+begin_src python
+      try:
+          maybe_size = c.cache.meta.size
+      except AttributeError as e:
+          breakpoint()  # << investigate error
+    #+end_src
+
+    Temporary squash by logging as an exception with optional explanation
+    #+begin_src python
+      try:
+          maybe_size = c.cache.meta.size
+      except AttributeError as e:
+          log.exception(e)
+          log.error(f'explanation for error and local variables {c}')
+    #+end_src
 
 * Variables :noexport:
   :PROPERTIES:
