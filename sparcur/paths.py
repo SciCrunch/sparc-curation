@@ -851,7 +851,11 @@ class CachePath(AugmentedPath):
             while old_local:
                 thisl = sorted(old_local, key=lambda d: len(d.as_posix()))
                 for d in thisl:
-                    new = d.cache.refresh()
+                    ad = self.anchor.local / d
+                    if ad.cache is None:
+                        log.critical(f'would you fix the nullability already? {d}')
+                        continue
+                    new = ad.cache.refresh()
                     #log.info(f'{new}')
                     local_dirs = set(ld for ld in local_dirs
                                     if not ld.as_posix().startswith(d.as_posix()))
@@ -985,14 +989,31 @@ class CachePath(AugmentedPath):
         return local
 
     def dedupe(self, other, pretend=False):
+        # FIXME blackfynn doesn't set update when a folder name changes ??!
         if self.id != other.id:
             raise ValueError('Can only dedupe when ids match, {self.id} != {other.id}')
 
         su, ou = self.meta.updated, other.meta.updated
+        lsu, lou = self.local.meta.updated, other.local.meta.updated
         if su < ou:
             old, new = self, other
 
         elif su > ou:
+            new, old = self, other
+
+        elif lsu is None and lou is None:
+            new, old = self, other
+
+        elif lsu is None:
+            old, new = self, other
+
+        elif lou is None:
+            new, old = self, other
+
+        elif lsu < lou:
+            old, new = self, other
+
+        elif lsu > lou:
             new, old = self, other
 
         else:  # ==
@@ -1124,6 +1145,8 @@ class CachePath(AugmentedPath):
             raise BaseException('multiple candidates!')
 
     def refresh(self, update_data=False, size_limit_mb=2):
+        if self.meta is None:
+            breakpoint()
         limit = (size_limit_mb if
                  not self.meta.size or (size_limit_mb > self.meta.size.mb)
                  else self.meta.size.mb + 1)
@@ -1135,7 +1158,11 @@ class CachePath(AugmentedPath):
             return new
         else:
             log.info(f'Remote for {self} has been deleted. Moving to trash.')
-            self.rename(self.trash / f'{self.parent.id}-{self.id}-{self.name}')
+            try:
+                self.rename(self.trash / f'{self.parent.id}-{self.id}-{self.name}')
+            except FileNotFoundError as e:
+                breakpoint()
+                raise e
 
     def fetch(self, size_limit_mb=2):
         """ bypass remote to fetch directly based on stored meta """

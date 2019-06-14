@@ -546,9 +546,18 @@ class Main(Dispatcher):
 
             all_[rc.cache.id].append(rc)
 
-        dupes = {i:l for i, l in all_.items() if len(l) > 1}
+        def mkey(p):
+            mns = p.cache.meta
+            return (not bool(mns),
+                    not bool(mns.updated),
+                    -mns.updated.timestamp())
+
+        dupes = {i:sorted(l, key=mkey)#, reverse=True)
+                 for i, l in all_.items() if len(l) > 1}
         dv = list(dupes.values())
-        deduped = [a.dedupe(b, pretend=True) for a, b in dv]  # FIXME assumes a single dupe...
+        deduped = [a.dedupe(b, pretend=True) for a, b, *c in dv
+                   if (not log.warning(c) if c else not c)
+        ]  # FIXME assumes a single dupe...
         to_remove = [d for paths, new in zip(dv, deduped) for d in paths if d != new]
         to_remove_size = [p for p in to_remove if p.cache.meta.size is not None]
         #[p.unlink() for p in to_remove if p.cache.meta.size is None] 
