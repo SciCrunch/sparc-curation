@@ -316,6 +316,7 @@ class Main(Dispatcher):
 
         self.anchor.remote  # trigger creation of _remote_class
         BlackfynnRemote = BlackfynnCache._remote_class
+        BlackfynnRemote._async_rate = self.options.rate
         self.bfl = BlackfynnRemote._api
         State.bind_blackfynn(self.bfl)
         ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
@@ -475,31 +476,43 @@ class Main(Dispatcher):
         if not dirs:
             dirs = cwd,
 
+        dirs = sorted(dirs, key=lambda d: d.name)
+
         existing_locals = set(rc for d in dirs for rc in d.rchildren)
 
+        log.debug(dirs)
         for d in dirs:
             if self.options.empty:
                 if list(d.children):
                     continue
 
-            if d.is_dir():
-                if not d.remote.is_dataset():
-                    log.warning('You are pulling recursively from below dataset level.')
+            if not d.is_dir():
+                raise TypeError(f'dir is not a dir?!? {d}')
 
-                r = d.remote
-                # FIXME for some reason this does not seem to be working as expected
-                # because new datasets are being added when there is an existing dataset
-                r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
-                d = r.local  # in case a folder moved
-                caches = d.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+            if not (d.remote.is_dataset() or d.remote.is_organization()):
+                log.warning('You are pulling recursively from below dataset level.')
 
-        new_locals = set(c.local for c in caches)
+            #r = d.remote
+            # FIXME for some reason this does not seem to be working as expected
+            # because new datasets are being added when there is an existing dataset
+            #r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
+            c = d.cache
+            newc = c.refresh()  # this does the move for us now
+            if newc is None:
+                continue  # directory was deleted
+
+            #d = r.local  # in case a folder moved
+            caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+
+        new_locals = set(c.local for c in caches if c is not None)  # FIXME 
         maybe_removed = set(existing_locals) - set(new_locals)
         maybe_new = set(new_locals) - set(existing_locals)
         if maybe_removed:
             # FIXME pull sometimes has fake file extensions
             from pyontutils.utils import Async, deferred
-            Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed)
+            Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed
+                                          # FIXME deal with untracked files
+                                          if l.cache)
 
     ###
     skip = (

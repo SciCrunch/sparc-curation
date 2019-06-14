@@ -3,6 +3,7 @@ import ast
 import csv
 import copy
 from itertools import chain
+from collections import Counter
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
 from scibot.extract import normalizeDoi
@@ -745,7 +746,23 @@ class SubjectsFile(Version1Header):
 
     @property
     def data(self):
-        out = {self.dict_key: list(self)}
+        return self._data()
+
+    def _data(self):
+        # sigh
+        #notunique = (len([r for r in self.bc.subject_id if r]) !=
+                     #len([k for k in self.bc._byCol__indexes['subject_id']
+                          #if k != 'subject_id' and k]))
+        sids = Counter(r for r in self.bc.subject_id if r)
+        notunique = {s:c for s, c in sids.items() if c > 1}
+        values = list(self)
+
+        if notunique:
+            msg = f'subject_ids are not unique for {self.path}\n{notunique}'
+            logd.critical(msg)
+            self.addError(msg)
+
+        out = {self.dict_key: values}
         for k, heads in self.horizontals.items():
             # TODO make sure we actually check that the horizontal
             # isn't used by someone else already ... shouldn't be
@@ -843,7 +860,7 @@ class SubjectsFile(Version1Header):
         yield from self._param_unit(value, 'kg')
 
     def height_inches(self, value):
-        yield from self._param_value(value, 'in')
+        yield from self._param_unit(value, 'in')
 
     def rrid_for_strain(self, value):
         yield value
@@ -892,6 +909,46 @@ class SamplesFile(SubjectsFile):
     """ TODO ... """
     to_index = 'sample_id', 'subject_id'
     dict_key = 'samples'
+
+    @property
+    def data(self):
+        return self._data()
+
+    def _data(self):
+        #notunique = (len([r for r in self.bc.sample_id if r]) !=
+                     #len([k for k in self.bc._byCol__indexes['sample_id']
+                          #if k != 'sample_id' and k]))
+
+        sids = Counter(r for r in self.bc.sample_id if r)
+        notunique = {s:c for s, c in sids.items() if c > 1}
+        values = list(self)
+        if notunique:
+            if not values or 'sample_id' not in values[0]:
+                # [] [{}], caused by a bunch of N/A or missing rows
+                breakpoint()
+
+            msg = f'sample_ids are not unique for {self.path}\n{notunique}'
+            logd.critical(msg)
+            self.addError(msg)
+            # FIXME this needs to be pipelined so we can do the diff ??
+            for v in values:
+                v['local_sample_id'] = v['sample_id']
+                v['sample_id'] = v['subject_id'] + '-' + v['sample_id']  # FIXME '/' gets quoted ...
+
+        out = {self.dict_key: values}
+        for k, heads in self.horizontals.items():
+            # TODO make sure we actually check that the horizontal
+            # isn't used by someone else already ... shouldn't be
+            # it should be skipped but maybe not?
+            tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
+                                               # FIXME one [] drops whole horiz group ...
+                                               for head in heads))
+                              if any(_)))
+            if tups:
+                out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
+
+        self.embedErrors(out)
+        return out
 
     def specimen_anatomical_location(self, value):
         seps = '|',

@@ -744,11 +744,16 @@ class PipelineEnd(JSONPipeline):
 
     # FIXME HasErrors needs to require a level specification
     # and not define these here because they have to be maintained
+    # and of course my workaround was simply to error on unhandled
+    # which is an entirely reasonable approach, if astoundingly
+    # inefficient
     _submission = (
         'DatasetStructure',
         'DatasetStructurePipeline.data',
         'Tabular',  # FIXME which Tabular
         'SubmissionFile',
+        'SubjectsFile',
+        'SamplesFile',
         'SubmissionFilePipeline.data',
         'DatasetDescriptionFile',
         'DatasetDescriptionFilePipeline._transformer',

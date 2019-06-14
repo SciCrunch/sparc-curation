@@ -5,6 +5,7 @@ from pathlib import PurePosixPath, PurePath
 from datetime import datetime
 import requests
 from pexpect import pxssh
+from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
 from sparcur.core import BlackfynnId
@@ -322,6 +323,7 @@ class BlackfynnRemote(RemotePath):
     uri_human = BlackfynnCache.uri_human
     uri_api = BlackfynnCache.uri_api
     _api_class = BFLocal
+    _async_rate = None
 
     @property
     def errors(self):
@@ -543,7 +545,23 @@ class BlackfynnRemote(RemotePath):
         if isinstance(self.bfobject, File) and not self.from_packages:
             realname = os.path.basename(self.bfobject.s3_key)
             if name != realname:  # mega weirdness
-                name = realname
+                if realname.startswith(name):
+                    name = realname
+
+                else:
+                    realpath = PurePath(realname)
+                    namepath = PurePath(name)
+                    if namepath.suffixes:
+                        log.critical('sigh {namepath!r} -?-> {realpath!r}')
+
+                    else:
+                        path = namepath
+                        for suffix in realpath.suffixes:
+                            path = path.with_suffix(suffix)
+
+                        old_name = name
+                        name = path.as_posix()
+                        log.info(f'name {old_name} -> {name}')
 
         if '/' in name:
             bads = ','.join(f'{i}' for i, c in enumerate(name) if c == '/')
@@ -715,6 +733,9 @@ class BlackfynnRemote(RemotePath):
 
     @property
     def rchildren(self):
+        yield from self._rchildren()
+
+    def _rchildren(self, create_cache=True):
         if isinstance(self.bfobject, File):
             return
         elif isinstance(self.bfobject, DataPackage):
@@ -730,7 +751,7 @@ class BlackfynnRemote(RemotePath):
                     if child.is_file():
                         cid = child.id
                         existing = [c for c in self.cache.local.children
-                                    if (c.is_file() or c.is_broken_symlink())
+                                    if (c.is_file() and c.cache or c.is_broken_symlink())
                                     and c.cache.id == cid]
                         if existing:
                             unmatched = [e for e in existing if child.name != e.name]
@@ -739,8 +760,10 @@ class BlackfynnRemote(RemotePath):
                                           f'id already exists {unmatched}')
                                 continue
 
-                    self.cache / child  # construction will cause registration without needing to assign
-                    assert child.cache is not None
+                    if create_cache:
+                        self.cache / child  # construction will cause registration without needing to assign
+                        assert child.cache is not None
+
                     yield child
                 else:
                     # probably a package that has files
@@ -748,10 +771,44 @@ class BlackfynnRemote(RemotePath):
         else:
             raise exc.UnhandledTypeError  # TODO
 
+    def children_pull(self, existing_caches=tuple(), only=tuple(), skip=tuple()):
+        # FIXME this is really a recursive pull for organization level only ...
+        sname = lambda gen: sorted(gen, key=lambda c: c.name)
+        def refresh(c):
+            updated = c.meta.updated
+            newc = c.refresh()
+            if newc is None:
+                return
+
+            nupdated = newc.meta.updated
+            if nupdated != updated:
+                return newc
+
+        existing = sname(existing_caches)
+        skipexisting = {e.id:e for e in
+                        Async(rate=self._async_rate)(deferred(refresh)(e) for e in existing)
+                        if e is not None}
+
+        # FIXME
+        # in theory the remote could change betwee these two loops
+        # since we currently cannot do a single atomic pull for
+        # a set of remotes and have them refresh existing files
+        # in one shot
+
+        yield from (rc for d in Async(rate=self._async_rate)(
+            deferred(child.bootstrap)(recursive=True, only=only, skip=skip)
+            for child in sname(self.children)
+            #if child.id in skipexisting
+            # TODO when dataset's have a 'anything in me updated'
+            # field then we can use that to skip things that haven't
+            # changed (hello git ...)
+            ) for rc in d)
+
     def isinstance_bf(self, *types):
         return [t for t in types if isinstance(self.bfobject, t)]
 
-    def refresh(self, update_cache=False, update_data=False, size_limit_mb=2, force=False):
+    def refresh(self, update_cache=False, update_data=False,
+                update_data_on_cache=False, size_limit_mb=2, force=False):
         """ use force if you have a file from packages """
         try:
             old_meta = self.meta
@@ -770,10 +827,11 @@ class BlackfynnRemote(RemotePath):
         if update_cache or update_data:
             file_is_different = self.update_cache()
             update_existing = file_is_different and self.cache.exists()
-            if update_existing:
+            udoc = update_data_on_cache and file_is_different
+            if update_existing or udoc:
                 size_limit_mb = None
 
-            update_data = update_data or update_existing
+            update_data = update_data or update_existing or udoc
 
         if update_data and self.is_file():
             self.cache.fetch(size_limit_mb=size_limit_mb)
@@ -826,6 +884,9 @@ class BlackfynnRemote(RemotePath):
     def __eq__(self, other):
         return self.id == other.id and self.file_id == other.file_id
         #return self.bfobject == other.bfobject
+
+    def __hash__(self):
+        return hash((self.__class__, self.id))
 
     def __repr__(self):
         file_id = f', file_id={self.file_id}' if self.file_id else ''

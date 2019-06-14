@@ -419,6 +419,8 @@ class SubjectsSchema(JSONSchema):
         'required': ['subjects'],
         'properties': {'subjects': {'type': 'array',
                                     'minItems': 1,
+                                    # FIXME there is currently no way to require that
+                                    # a key be unique among all objects
                                     'items': {
                                         'type': 'object',
                                         'required': ['subject_id', 'species'],
@@ -444,6 +446,9 @@ class SubjectsSchema(JSONSchema):
                                             'software_url': {'type': 'string'},
                                             'software_rri': {'type': 'string'},
                                         },},}}}
+
+    # FIXME not implemented
+    extras = [['unique', ['subjects', '*', 'subject_id']]]
 
 
 class SamplesFileSchema(JSONSchema):
@@ -498,6 +503,9 @@ class SamplesFileSchema(JSONSchema):
                                             'software_url': {'type': 'string'},
                                             'software_rri': {'type': 'string'},
                                         },},}}}
+
+    # FIXME not implemented
+    extras = [['unique', ['samples', '*', 'sample_id']]]
 
 
 class MetaOutSchema(JSONSchema):

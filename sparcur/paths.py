@@ -310,7 +310,12 @@ class RemotePath:
 
     @property
     def local(self):
-        return self.cache.local
+        return self.cache.local  # FIXME there are use cases for bypassing the cache ...
+
+    @property
+    def local_direct(self):
+        # kind of uninstrumeted ???
+        return self.local_class(self.as_path())
 
     @property
     def anchor(self):
@@ -431,6 +436,14 @@ class RemotePath:
     @property
     def rchildren(self):
         # uniform interface for retrieving remote hierarchies decoupled from meta
+        yield from self._rchildren()
+
+    def _rchildren(self, create_cache=True):
+        raise NotImplementedError
+
+    def children_pull(self, existing):
+        # uniform interface for asking the remote to
+        # update children using its own implementation
         raise NotImplementedError
 
     def iterdir(self):
@@ -802,11 +815,8 @@ class CachePath(AugmentedPath):
                 log.info(f'Bootstrapping {meta.id} -> {self.local!r}')
                 only = tuple()
 
-        if self.meta is not None:
-            if recursive:
-                yield from self._bootstrap_recursive(only, skip)
-            else:
-                raise exc.BootstrappingError(f'{self} already has meta!\n{self.meta.as_pretty()}')
+        if self.meta is not None and not recursive:
+            raise exc.BootstrappingError(f'{self} already has meta!\n{self.meta.as_pretty()}')
 
         if self.exists() and self.meta and self.meta.id == meta.id:
             self._meta_updater(meta)
@@ -829,21 +839,36 @@ class CachePath(AugmentedPath):
         yield self
 
     def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
-        # bootstrap the rest if we told it to
-        if self.id.startswith('N:organization:'):  # FIXME :/
-            for child in self.remote.children:
-                yield from child.bootstrap(recursive=True, only=only, skip=skip)
-        else:
-            # TODO if rchildren looks like it could be bad
-            # go back up to dataset level?
-            for child in self.remote.rchildren:
-                # use the remote's recursive implementation
-                # not the local implementation, since the
-                # remote may have additional requirements
-                #child.bootstrap(only=only, skip=skip)
-                # because of how remote works now we don't even have to
-                # bootstrap this
-                yield child.cache
+        # TODO if rchildren looks like it could be bad
+        # go back up to dataset level?
+        sname = lambda gen: sorted(gen, key=lambda c: c.name)
+        rcs = sname(self.remote._rchildren(create_cache=False))
+        local_dirs = set(c.relative_to(self.anchor) for c in self.local.rchildren if c.is_dir())
+        if local_dirs:
+            remote_dirs = set(c for c in rcs if c.is_dir())
+            rd = set(d.as_path() for d in remote_dirs)
+            old_local = local_dirs - rd
+            while old_local:
+                thisl = sorted(old_local, key=lambda d: len(d.as_posix()))
+                for d in thisl:
+                    new = d.cache.refresh()
+                    #log.info(f'{new}')
+                    local_dirs = set(ld for ld in local_dirs
+                                    if not ld.as_posix().startswith(d.as_posix()))
+                    old_local = local_dirs - rd
+
+        for child in sorted(rcs, key=lambda c: len(c.as_path().as_posix())):
+            # use the remote's recursive implementation
+            # not the local implementation, since the
+            # remote may have additional requirements
+            #child.bootstrap(only=only, skip=skip)
+            # because of how remote works now we don't even have to
+            # bootstrap this
+            cc = child.cache
+            if cc is None:
+                cc = child.cache_init()
+
+            yield cc
 
     def _bootstrap_prepare_filesystem(self, parents, fetch_data, size_limit_mb):
         # we could use bootstrapping id here and introspect the id, but that is cheating
@@ -1065,12 +1090,13 @@ class CachePath(AugmentedPath):
                  else self.meta.size.mb + 1)
         new = self.remote.refresh(update_cache=True,
                                   update_data=update_data,
+                                  update_data_on_cache=(self.is_file() and self.exists()),
                                   size_limit_mb=size_limit_mb)
         if new is not None:
             return new
         else:
             log.info(f'Remote for {self} has been deleted. Moving to trash.')
-            self.rename(self.trash / f'{self.parent.id}-{self.name}')
+            self.rename(self.trash / f'{self.parent.id}-{self.id}-{self.name}')
 
     def fetch(self, size_limit_mb=2):
         """ bypass remote to fetch directly based on stored meta """
@@ -1147,6 +1173,7 @@ class CachePath(AugmentedPath):
                         log.critical('DO SOMETHING ABOUT THIS STALE DATA'
                                      f'\n{target}\n{target.meta.as_pretty()}')
                 else:
+                    # directory moves that are resolved during pull
                     log.warning(f'what is this!?\n{target}\n{self}')
             else:
                 raise exc.PathExistsError(f'Target {target} already exists!')
@@ -1640,6 +1667,14 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             raise e  # have to raise so that we don't overwrite the file
 
         yield from gen
+
+    def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
+        # bootstrap the rest if we told it to
+        if self.id.startswith('N:organization:'):  # FIXME :/
+            yield from self.remote.children_pull(self.children, only=only, skip=skip)
+
+        else:
+            yield from super()._bootstrap_recursive()
 
 
 def _bind_sysid_(cls):
