@@ -22,6 +22,7 @@ Usage:
     spc xattrs [options]
     spc demos [options]
     spc goto <remote-id>
+    spc dedupe
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -99,6 +100,7 @@ Commands:
     demos       long running example queries
     goto        given an id cd to the containing directory
                 invoke as `pushd $(spc goto <id>)`
+    dedupe      find and resolve cases with multiple ids
 
 Options:
     -f --fetch              fetch matching files
@@ -148,7 +150,7 @@ import types
 import pprint
 import logging
 from itertools import chain
-from collections import Counter
+from collections import Counter, defaultdict
 import requests
 import htmlfn as hfn
 from pyontutils import clifun as clif
@@ -479,6 +481,7 @@ class Main(Dispatcher):
         dirs = sorted(dirs, key=lambda d: d.name)
 
         existing_locals = set(rc for d in dirs for rc in d.rchildren)
+        existing_ids = set(c.id for c in existing_locals)
 
         log.debug(dirs)
         for d in dirs:
@@ -505,11 +508,14 @@ class Main(Dispatcher):
             caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
         new_locals = set(c.local for c in caches if c is not None)  # FIXME 
-        maybe_removed = set(existing_locals) - set(new_locals)
-        maybe_new = set(new_locals) - set(existing_locals)
-        if maybe_removed:
+        new_ids = set(c.id for c in new_locals)
+        maybe_removed_ids = set(existing_ids) - set(new_ids)
+        maybe_new = set(new_ids) - set(existing_ids)
+        if maybe_removed_ids:
+            breakpoint()
             # FIXME pull sometimes has fake file extensions
             from pyontutils.utils import Async, deferred
+            maybe_removed = [c for c in existing_locals if c.id in maybe_removed_ids]
             Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed
                                           # FIXME deal with untracked files
                                           if l.cache)
@@ -518,6 +524,7 @@ class Main(Dispatcher):
     skip = (
             'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
             'N:dataset:a896935a-4718-4906-8a7b-b6d76fb260b6',  # test computational resource
+            'N:dataset:8bcf659c-f4b3-425f-ac33-8c560e02d4aa',  # test dataset
         )
 
     skip_big = (
@@ -527,6 +534,23 @@ class Main(Dispatcher):
         )
     ###
 
+    def dedupe(self):
+        all_ = defaultdict(list)
+        for rc in self.anchor.local.rchildren:
+            if rc.cache is None:
+                log.critical(f'WHAT THE WHAT {rc}')
+                continue
+
+            all_[rc.cache.id].append(rc)
+
+        dupes = {i:l for i, l in all_.items() if len(l) > 1}
+        dv = list(dupes.values())
+        deduped = [a.dedupe(b, pretend=True) for a, b in dv]  # FIXME assumes a single dupe...
+        to_remove = [d for paths, new in zip(dv, deduped) for d in paths if d != new]
+        to_remove_size = [p for p in to_remove if p.cache.meta.size is not None]
+        #[p.unlink() for p in to_remove if p.cache.meta.size is None] 
+        breakpoint()
+        
     def refresh(self):
         paths = self.paths
         cwd = Path.cwd()

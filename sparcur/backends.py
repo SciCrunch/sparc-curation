@@ -761,6 +761,8 @@ class BlackfynnRemote(RemotePath):
                                 continue
 
                     if create_cache:
+                        # FIXME I don't think existing detection is working
+                        # correctly here so this get's triggered incorrectly?
                         self.cache / child  # construction will cause registration without needing to assign
                         assert child.cache is not None
 

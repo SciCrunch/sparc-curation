@@ -315,7 +315,7 @@ class RemotePath:
     @property
     def local_direct(self):
         # kind of uninstrumeted ???
-        return self.local_class(self.as_path())
+        return self._local_class(self.as_path())
 
     @property
     def anchor(self):
@@ -983,6 +983,45 @@ class CachePath(AugmentedPath):
 
         local._cache = cache
         return local
+
+    def dedupe(self, other, pretend=False):
+        if self.id != other.id:
+            raise ValueError('Can only dedupe when ids match, {self.id} != {other.id}')
+
+        su, ou = self.meta.updated, other.meta.updated
+        if su < ou:
+            old, new = self, other
+
+        elif su > ou:
+            new, old = self, other
+
+        else:  # ==
+            ss, os = self.meta.size, other.meta.size
+            if ss is not None and os is not None:
+                new, old = self, other
+
+            elif ss is None:
+                old, new = self, other
+
+            elif os is None:
+                new, old = self, other
+
+            else:
+                raise BaseException('how did we get here!?')
+
+        file_is_different, meta = self._update_meta(old.meta, new.meta)
+        if file_is_different:
+            log.info(f'{self}\n!=\n{other}\n{meta}')
+
+        if not pretend:
+            #old.rename('/dev/null')  # hah
+            pass
+
+        return new
+        # TODO go look in meta for this
+        # check updated ... etc.
+        # missing size
+        # missing file_id
 
     @property
     def id(self):
@@ -1771,6 +1810,9 @@ class LocalPath(XattrPath):
                 if found_cache and found_cache != Path('/'):
                     return found_cache
 
+    def dedupe(self, other, pretend=False):
+        return self.cache.dedupe(other.cache, pretend=pretend)
+            
     @property
     def id(self):  # FIXME reuse of the name here could be confusing, though it is technically correct
         """ THERE CAN BE ONLY ONE """
