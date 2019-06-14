@@ -120,7 +120,12 @@ class DatasetStructure(Path, HasErrors):
                     dirs += 1
                 else:
                     files += 1  # testing for broken symlinks is hard
-                    maybe_size = c.cache.meta.size
+                    try:
+                        maybe_size = c.cache.meta.size
+                    except AttributeError as e:
+                        log.error(f'no cache or no meta for {c}\n{e}')
+                        continue
+
                     if maybe_size is None:
                         need_meta.append(c)
                     else:
