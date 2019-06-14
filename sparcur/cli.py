@@ -481,7 +481,8 @@ class Main(Dispatcher):
         dirs = sorted(dirs, key=lambda d: d.name)
 
         existing_locals = set(rc for d in dirs for rc in d.rchildren)
-        existing_ids = set(c.id for c in existing_locals)
+        existing_d = {c.cache.id:c for c in existing_locals}
+        existing_ids = set(existing_d)
 
         log.debug(dirs)
         for d in dirs:
@@ -508,14 +509,16 @@ class Main(Dispatcher):
             caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
         new_locals = set(c.local for c in caches if c is not None)  # FIXME 
-        new_ids = set(c.id for c in new_locals)
+        new_ids = set(c.id for c in caches if c is not None)
         maybe_removed_ids = set(existing_ids) - set(new_ids)
         maybe_new = set(new_ids) - set(existing_ids)
         if maybe_removed_ids:
-            breakpoint()
             # FIXME pull sometimes has fake file extensions
             from pyontutils.utils import Async, deferred
-            maybe_removed = [c for c in existing_locals if c.id in maybe_removed_ids]
+            maybe_removed = []
+            for id in maybe_removed_ids:
+                maybe_removed.append(existing_d[id])
+
             Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed
                                           # FIXME deal with untracked files
                                           if l.cache)
