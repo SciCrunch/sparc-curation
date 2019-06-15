@@ -1161,8 +1161,11 @@ class CachePath(AugmentedPath):
             try:
                 self.rename(self.trash / f'{self.parent.id}-{self.id}-{self.name}')
             except FileNotFoundError as e:
-                breakpoint()
-                raise e
+                if not self.trash.exists():
+                    self.trash.mkdir()
+                    log.info('created {self.trash}')
+                else:
+                    raise e
 
     def fetch(self, size_limit_mb=2):
         """ bypass remote to fetch directly based on stored meta """
