@@ -521,6 +521,13 @@
       #+END_SRC
       To get Hypothes.is API keys [[https://web.hypothes.is/start/][create an account]],
       login, and go to your [[https://hypothes.is/account/developer][developer page]].
+
+      Temporary additions to .bashrc until this can be sourced from secrets directly
+      #+BEGIN_SRC bash
+        HYP_USER=your-hypothesis-user-name
+        HYP_GROUP=$(cat ~/secrets.yaml | grep sparc-curation: | awk '{ print $2 }')
+        HYP_API_TOKEN=$(cat ~/secrets.yaml | grep "${HYP_USER}:" | awk '{ print $2 }')
+      #+END_SRC
 ***** protocols.io
       To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
       login, and go to your [[https://www.protocols.io/developers][developer page]].
