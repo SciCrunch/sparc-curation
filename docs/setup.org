@@ -836,6 +836,8 @@ Hackathon Team Materials
 sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ mv Hackathon\ Team\ Materials ../.trash/
 sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
 #+end_src
+
+*** Keep letsencrypt up to date
 * Variables :noexport:
   :PROPERTIES:
   :VISIBILITY: folded
