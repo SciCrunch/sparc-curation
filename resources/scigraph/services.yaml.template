@@ -249,7 +249,8 @@ cypherResources:
                     "http://purl.org/sig/ont/fma/fma7200",
                     "http://purl.org/sig/ont/fma/fma15900",
                     "http://purl.org/sig/ont/fma/fma45659",
-                    "http://purl.org/sig/ont/fma/fma7647"]
+                    "http://purl.org/sig/ont/fma/fma7647",
+                    "http://purl.org/sig/ont/fma/fma50801"]
             RETURN n
 
   - path: /dynamic/prod/sparc/speciesList
