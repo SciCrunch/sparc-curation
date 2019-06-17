@@ -124,6 +124,92 @@ cypherResources:
             -[:subClassOf*0..2]->(parent)
             RETURN path
 
+  - path: /dynamic/prod/sparc/parcellationRoots/{species-id}/{region-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single species and anatomical region
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
+         - name: region-id
+           description: ontology id of the anatomical region
+           paramType: path
+    query: |
+            MATCH
+            (region:Class{iri: "${region-id}"})
+            <-[:ilxtr:isDefinedInRegion]-
+            (parent)
+            -[:ilxtr:isDefinedInTaxon]->
+            (species:Class{iri: "${species-id}"})
+            WITH parent
+            MATCH path = (artifact)
+            -[:subClassOf*0..2]->(parent)
+            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+            RETURN path
+            UNION
+            MATCH
+            (region:Class{iri: "${region-id}"})
+            <-[:ilxtr:isDefinedInRegion]-
+            (parent)
+            -[:ilxtr:isDefinedInTaxon]->
+            (species:Class{iri: "${species-id}"})
+            WITH parent
+            MATCH path = (root)
+            -[:ilxtr:isDefinedBy]->(artifact)
+            -[:subClassOf*0..2]->(parent)
+            RETURN path
+
+  - path: /dynamic/prod/sparc/parcellationRootsFMA/{species-id}/{fma-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single species and anatomical region
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
+         - name: fma-id
+           description: ontology id of the anatomical region
+           paramType: path
+    query: |
+            MATCH (fma:Class{iri: "${fma-id}"})
+            WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
+            MATCH (region)
+            -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
+            WHERE any(x IN
+                      region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
+                      WHERE x =~ curie)
+            WITH region
+            MATCH
+            (region)
+            <-[:ilxtr:isDefinedInRegion]-
+            (parent)
+            -[:ilxtr:isDefinedInTaxon]->
+            (species:Class{iri: "${species-id}"})
+            WITH parent
+            MATCH path = (artifact)
+            -[:subClassOf*0..2]->(parent)
+            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+            RETURN path
+            UNION
+            MATCH (fma:Class{iri: "${fma-id}"})
+            WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
+            MATCH (region)
+            -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
+            WHERE any(x IN
+                      region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
+                      WHERE x =~ curie)
+            WITH region
+            MATCH
+            (region)
+            <-[:ilxtr:isDefinedInRegion]-
+            (parent)
+            -[:ilxtr:isDefinedInTaxon]->
+            (species:Class{iri: "${species-id}"})
+            WITH parent
+            MATCH path = (root)
+            -[:ilxtr:isDefinedBy]->(artifact)
+            -[:subClassOf*0..2]->(parent)
+            RETURN path
+
   - path: /dynamic/prod/sparc/parcellationGraph
     operations:
       - summary: Get the graph of all parcellation labels for all species
