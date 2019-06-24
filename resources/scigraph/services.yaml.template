@@ -208,7 +208,7 @@ cypherResources:
             MATCH path = (root)
             -[:ilxtr:isDefinedBy]->(artifact)
             -[:subClassOf*0..2]->(parent)
-            RETURN path
+            RETURN root
 
   - path: /dynamic/prod/sparc/parcellationGraph
     operations:
