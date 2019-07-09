@@ -1335,7 +1335,7 @@ def main():
     sparc_export = Path('~/files/blackfynn_local/export').expanduser()  # no s for maximum confusion
     ll = Path(args['--log-location'].replace('${SPARC_EXPORTS}', sparc_export.as_posix()))
     if not ll.exists():
-        ll.mkdir()
+        ll.mkdir(parents=True)  # FIXME switch to a .local folder or something
 
     lf = ll / isoformat_safe(utcnowtz())
     lfh = logging.FileHandler(lf.as_posix())
