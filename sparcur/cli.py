@@ -22,7 +22,7 @@ Usage:
     spc xattrs [options]
     spc demos [options]
     spc goto <remote-id>
-    spc dedupe
+    spc dedupe [<path>...]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -539,7 +539,12 @@ class Main(Dispatcher):
 
     def dedupe(self):
         all_ = defaultdict(list)
-        for rc in self.anchor.local.rchildren:
+        if not self.options.path:
+            paths = self.anchor.local.rchildren
+        else:
+            paths = self.paths
+
+        for rc in paths:
             if rc.cache is None:
                 log.critical(f'WHAT THE WHAT {rc}')
                 continue
