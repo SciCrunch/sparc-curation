@@ -18,8 +18,10 @@ graphConfiguration:
       - abbreviation
 
 ontologies:
-  - url: https://sparc.olympiangods.org/sparc/ontologies/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0
   - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl
+  - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/Bolser-Lewis-Model2.ttl
+  - url: https://cassava.ucsd.edu/sparc/exports/curation-export.ttl
+  - url: https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/neuron-development.ttl
   #- url: http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl
   #- url: http://ontology.neuinfo.org/NIF/extra.ttl
   #- url: http://ontology.neuinfo.org/NIF/ttl/nif.ttl
@@ -37,6 +39,7 @@ categories:
     #http://purl.obolibrary.org/obo/ERO_0000007 : technique
     http://purl.obolibrary.org/obo/GO_0005623 : cell
     http://uri.neuinfo.org/nif/nifstd/sao1813327414 : cell
+    http://uri.neuinfo.org/nif/nifstd/sao1417703748 : neuron
     http://purl.obolibrary.org/obo/GO_0008150 : biological process
     http://purl.obolibrary.org/obo/GO_0005575 : subcellular entity
     http://purl.obolibrary.org/obo/PATO_0000001 : quality
