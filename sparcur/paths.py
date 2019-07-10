@@ -1604,6 +1604,7 @@ class BlackfynnCache(PrimaryCache, XattrCache):
     xattr_prefix = 'bf'
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
+    cypher = hashlib.sha256  # set the remote hash cypher on the cache class
 
     @classmethod
     def decode_value(cls, field, value):
@@ -2044,6 +2045,10 @@ class LocalPath(XattrPath):
 
     def checksum(self, cypher=default_cypher):
         if self.is_file():
+            if (hasattr(self._cache_class, 'cypher') and
+                self._cache_class.cypher != cypher):  # FIXME this could be static ...
+                cypher = self._cache_class.cypher
+
             m = cypher()
             chunk_size = 4096
             with open(self, 'rb') as f:

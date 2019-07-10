@@ -936,6 +936,7 @@ class Main(Dispatcher):
             import webbrowser
 
         BlackfynnCache._local_class = Path  # since we skipped _setup
+        Path._cache_class = BlackfynnCache
         paths = self.paths
         if not paths:
             paths = Path('.').resolve(),

@@ -429,14 +429,22 @@ class BlackfynnRemote(RemotePath):
                             bfobject = transfer(file, bfobject)
 
                 elif len(files) > 1:
-                    log.critical(f'MORE THAN ONE FILE IN PACKAGE {package.id}')
+                    log.critical(f'MORE THAN ONE FILE IN PACKAGE {bfobject.id}')
+                    if (len(set(f.size for f in files)) == 1 and
+                        len(set(f.name for f in files)) == 1):
+                        log.critical('Why are there multiple files with the same name and size here?')
+                        file = files[0]
+                        bfobject = transfer(file, bfobject)
+                    else:
+                        log.critical(f'There are actually multiple files ...\n{files}')
+
                 else:
                     file = files[0]
                     bfobject = transfer(file, bfobject)
 
                 bfobject.parent = parent  # sometimes we will just reset a parent to itself
             else:
-                log.warning(f'No files in package {package.id}')
+                log.warning(f'No files in package {bfobject.id}')
 
         self._bfobject = bfobject
         return self._bfobject
@@ -660,7 +668,10 @@ class BlackfynnRemote(RemotePath):
 
     @property
     def checksum(self):
-        return None
+        if hasattr(self.bfobject, 'checksum'):
+            checksum = self.bfobject.checksum
+            if checksum and '-' not in checksum:
+                return bytes.fromhex(checksum)
 
     @property
     def etag(self):
@@ -668,7 +679,7 @@ class BlackfynnRemote(RemotePath):
         # FIXME rename to etag in the event that we get proper checksumming ??
         if hasattr(self.bfobject, 'checksum'):
             checksum = self.bfobject.checksum
-            if checksum:
+            if checksum and '-' in checksum:
                 log.debug(checksum)
                 if isinstance(checksum, str):
                     checksum, strcount = checksum.rsplit('-', 1)
