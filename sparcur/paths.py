@@ -1245,10 +1245,7 @@ class CachePath(AugmentedPath):
                     # directory moves that are resolved during pull
                     log.warning(f'what is this!?\n{target}\n{self}')
             elif target.is_broken_symlink():
-                #old_id = target.id
-                #self.meta
-                #target.rename(target.trash / f'{target.parent.id}-{target.id}-{target.name}')
-                #breakpoint()
+                remote._cache = self  # restore the mapping for remote -> self
                 raise exc.WhyDidntThisGetMovedBeforeError(f'\n{target}\n{self}')
             else:
                 raise exc.PathExistsError(f'Target {target} already exists!')
@@ -1257,6 +1254,7 @@ class CachePath(AugmentedPath):
             self.rename(target)  # if target is_dir then this will fail, which is ok
 
         elif self.is_broken_symlink():
+            # we don't move to trash here because this was just a file rename
             self.unlink()  # don't move the meta since it will break the naming insurance measure
 
         return target

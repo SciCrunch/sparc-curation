@@ -860,7 +860,25 @@ class BlackfynnRemote(RemotePath):
         if self.cache.name != self.name:  # this is localy correct
             # the issue is that move is now smarter
             # and will detect if a parent path has changed
-            self.cache.move(remote=self)
+            try:
+                self.cache.move(remote=self)
+            except exc.WhyDidntThisGetMovedBeforeError as e:
+                # AAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+                # deal with the sadness that is non-unique filenames
+                # I am 99.999999999999999% certain that users do not
+                # expect this behavior ...
+                log.error(e)
+                if self.bfobject.package.name != self.bfobject.name:
+                    argh = self.bfobject.name
+                    self.bfobject.name = self.bfobject.package.name
+                    try:
+                        log.critical(f'Non unique filename :( '
+                                     f'{self.cache.name} -> {argh} -> {self.bfobject.name}')
+                        self.cache.move(remote=self)
+                    finally:
+                        self.bfobject.name = argh
+                else:
+                    raise e
 
         return file_is_different
 
