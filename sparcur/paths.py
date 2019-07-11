@@ -2011,10 +2011,26 @@ class LocalPath(XattrPath):
                 #log.debug(chunk)
                 f.write(chunk)
 
-        if not self.cache.meta:
-            self.cache.meta = meta  # glories of persisting xattrs :/
-        # yep sometimes the xattrs get  blasted >_<
-        assert self.cache.meta
+        if self.cache is not None:
+            if not self.cache.meta:
+                self.cache.meta = meta  # glories of persisting xattrs :/
+            # yep sometimes the xattrs get  blasted >_<
+            assert self.cache.meta
+
+    def copy_to(self, target, force=False):
+        if type(target) != type(self):
+            target = self.__class__(target)
+
+        if not target.exists() and not target.is_symlink() or force:
+            target.data = self.data
+        else:
+            raise exc.PathExistsError(f'{target}')
+
+    def copy_from(self, source, force=False):
+        if type(source) != type(self):
+            source = self.__class__(source)
+
+        source.copy_to(self, force=force)
 
     @property
     def children(self):
