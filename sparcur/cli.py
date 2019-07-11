@@ -608,7 +608,7 @@ class Main(Dispatcher):
 
             oldl = r.local
             try:
-                r.update_cache()
+                r.update_cache()  # calling this directly is ok for directories
             except FileNotFoundError as e:
                 parent_moved.append(oldl)
                 continue

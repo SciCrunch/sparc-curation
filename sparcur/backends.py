@@ -853,12 +853,15 @@ class BlackfynnRemote(RemotePath):
 
     def update_cache(self):
         log.debug(f'updating cache for {self.name}')
+        file_is_different = self.cache._meta_updater(self.meta)
+        # update the cache first
+        # then move to the new name if relevant
+        # prevents moving partial metadata onto existing files
         if self.cache.name != self.name:  # this is localy correct
             # the issue is that move is now smarter
             # and will detect if a parent path has changed
             self.cache.move(remote=self)
 
-        file_is_different = self.cache._meta_updater(self.meta)
         return file_is_different
 
     @property

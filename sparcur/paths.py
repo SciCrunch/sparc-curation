@@ -1244,6 +1244,12 @@ class CachePath(AugmentedPath):
                 else:
                     # directory moves that are resolved during pull
                     log.warning(f'what is this!?\n{target}\n{self}')
+            elif target.is_broken_symlink():
+                #old_id = target.id
+                #self.meta
+                #target.rename(target.trash / f'{target.parent.id}-{target.id}-{target.name}')
+                #breakpoint()
+                raise exc.WhyDidntThisGetMovedBeforeError(f'\n{target}\n{self}')
             else:
                 raise exc.PathExistsError(f'Target {target} already exists!')
 
@@ -1377,9 +1383,10 @@ class SymlinkCache(CachePath):
                     log.critical(msg)
                     meta_newer = 'Meta newer. Not updating.'
                     pathmeta_newer = 'Other meta newer.'
+                    msg = '{}'  # apparently I was out of my mind when I wrote this originally ...
                     if meta.updated > pathmeta.updated:
                         log.info(msg.format(meta_newer))
-                        return
+                        return  # this is the right thing to do for a sane filesystem
                     elif meta.updated < pathmeta.updated:
                         log.info(msg.format(pathmeta_newer))
                     else:  # they are equal
@@ -1411,7 +1418,12 @@ class SymlinkCache(CachePath):
 
                 # FIXME do the timestamp dance above here
                 log.debug('Metadata exists, but ids match so will update')
-                self.unlink()
+
+                # trash old versions instead of just unlinking
+                pc = self.local.cache
+                trash = pc.trash
+                self.rename(trash / f'{pc.parent.id}-{meta.id}-{self.name}')
+                #self.unlink()
 
             # FIXME if an id starts with / then the local name is overwritten due to pathlib logic
             # we need to error if that happens
@@ -1517,7 +1529,7 @@ class PrimaryCache(CachePath):
 
         file_is_different = False
 
-        kwargs = {k:v for k, v in old.items()}
+        kwargs = {k:v for k, v in old.items()}  # FIXME this can cause stale file_id if new has no file_id
         if old.id != new.id:
             kwargs['old_id'] = old.id
 
