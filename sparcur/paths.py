@@ -43,6 +43,7 @@ from itertools import chain
 import magic  # from sys-apps/file consider python-magic ?
 import xattr
 import psutil
+from git import Repo
 from dateutil import parser
 from Xlib.display import Display
 from Xlib import Xatom
@@ -2109,9 +2110,26 @@ class LocalPath(XattrPath):
             return m.digest()
 
 
-class Path(LocalPath):  # NOTE this is a hack to keep everything consisten
+class Path(LocalPath):  # NOTE this is a hack to keep everything consistent
     """ An augmented path for all the various local needs of the curation process. """
     _cache_class = BlackfynnCache
+    _repos = {}  # repo cache
+
+    @property
+    def repo(self):
+        if self in self._repos:
+            return self._repos[self]
+
+        elif (self / '.git').exists():  # FIXME kind of a hack
+            repo = Repo(self.as_posix())
+            self._repos[self] = repo
+            return repo
+
+        elif str(self) == '/':  # FIXME windows ...
+            return None
+
+        else:
+            return self.parent.repo
 
     def xopen(self):
         """ open file using xdg-open """
