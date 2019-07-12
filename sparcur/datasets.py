@@ -62,11 +62,15 @@ class HasErrors:
         self._pipeline_stage = pipeline_stage
         self._errors_set = set()
 
-    def addError(self, error, pipeline_stage=None):
+    def addError(self, error, pipeline_stage=None, logfunc=None):
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
+        b = len(self._errors_set)
         self._errors_set.add((error, stage))
+        a = len(self._errors_set)
+        if logfunc is not None and a != b:  # only log on new errors
+            logfunc(error)
 
     @property
     def _errors(self):
@@ -359,7 +363,7 @@ class Tabular(HasErrors):
         cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
         for row in cleaned_rows:
             n_row = [c.strip().replace('\ufeff', '') for c in row
-                     if (not self.addError(error)  # FIXME will probably append multiple ...
+                     if (not self.addError(error, logfunc=logd.error)  # FIXME will probably append multiple ...
                          if '\ufeff' in c else True)]
             if not all(not(c) for c in n_row):  # skip totally empty rows
                 yield n_row

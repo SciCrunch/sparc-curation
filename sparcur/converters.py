@@ -136,6 +136,7 @@ class MetaConverter(TripleConverter):
         ['species', isAbout],
         ['organ', isAbout],
         ['modality', TEMP.hasExperimentalModality],
+        ['techniques', TEMP.protocolEmploysTechnique],
         ['uri_api', TEMP.hasUriApi],
         ['uri_human', TEMP.hasUriHuman],
         ['keywords', isAbout],

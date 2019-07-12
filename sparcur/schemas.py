@@ -475,10 +475,10 @@ class SamplesFileSchema(JSONSchema):
 
                                             'sex': {'type': 'string'},  # sex as a variable ?
 
-                                            'mass': {'type': 'string'},  # TODO protc -> json
-                                            'weight': {'type': 'string'},  # TODO protc -> json
+                                            'mass': UnitSchema.schema,
+                                            'weight': UnitSchema.schema,
 
-                                            'age': {'type': 'string'},  # TODO protc -> json
+                                            'age': UnitSchema.schema,
                                             'age_category': {'type': 'string'},  # TODO uberon
                                             'age_range_min': {'type': 'string'},
                                             'age_range_max': {'type': 'string'},
@@ -515,6 +515,7 @@ class MetaOutSchema(JSONSchema):
                       'species',
                       'organ',
                       'modality',
+                      'techniques',
                       'contributor_count',
                       'uri_human',
                       'uri_api',
@@ -560,7 +561,13 @@ class MetaOutSchema(JSONSchema):
                      'items': {
                          'type': 'string',
                      },
-        },  # FIXME array?
+        },
+        'techniques': {'type': 'array',
+                       'minItems': 1,
+                       'items': {
+                           'type': 'string',
+                       },
+        },
 
         # TODO $ref these w/ pointer?
         # in contributor etc?

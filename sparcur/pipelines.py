@@ -675,6 +675,8 @@ class PipelineExtras(JSONPipeline):
          None],
     ]
 
+    adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
+
     @property
     def added(self):
         data = super().added
@@ -726,7 +728,8 @@ class PipelineExtras(JSONPipeline):
         return super().data
 
     @property
-    def data_derived_post(self):
+    def data_derived_post(self):  # XXX deprecated
+        raise NotImplementedError
         todo = [[['meta', 'modality'], 'TODO should come from sheets maybe?']]
         derives = [[[['meta', 'award_number']],
                     lambda an: (self.lifters.organ(an),),

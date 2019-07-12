@@ -117,6 +117,7 @@ def make_app(self, name='spc-server'):
 
         tables = []
         for table, title in self.report.terms():
+            tables.append(hfn.h2tag(title) + '<br>\n')
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Terms')

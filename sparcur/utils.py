@@ -92,7 +92,7 @@ class etag:
 
 
 want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr', 'sparc',
-                 'BIRNLEX',)
+                 'BIRNLEX', 'tech', 'unit', 'ILX', 'lex',)
 
 
 class FileSize(int):

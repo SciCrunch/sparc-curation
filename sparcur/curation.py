@@ -1043,6 +1043,7 @@ class Integrator(PathData, OntologyData):
             member = self.member
             modality = self.organs_sheet.modality(id)
             award_manual = self.organs_sheet.award_manual(id)
+            techniques = self.organs_sheet.techniques(id)
 
             #sheets
             organ_term = self.organs_sheet.organ_term(id)

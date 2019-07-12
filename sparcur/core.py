@@ -57,7 +57,7 @@ class OntId(OIDB):
         #return hfn.atag(self.iri, self.curie, **kwargs)
 
 
-class OntTerm(OTB):
+class OntTerm(OTB, OntId):
     _known_no_label = 'dataset',
     pass
     #def atag(self, curie=False, **kwargs):

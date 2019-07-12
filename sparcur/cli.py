@@ -153,8 +153,11 @@ from itertools import chain
 from collections import Counter, defaultdict
 import requests
 import htmlfn as hfn
+import ontquery as oq
 from pyontutils import clifun as clif
+from pyontutils.core import OntResGit
 from pyontutils.utils import NOWDANGER, NOWISO, UTCNOWISO
+from pyontutils.config import devconfig
 from pysercomb.pyr import units as pyru
 from terminaltables import AsciiTable
 from sparcur import config
@@ -323,6 +326,14 @@ class Main(Dispatcher):
         State.bind_blackfynn(self.bfl)
         ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
         Integrator.setup(self.bfl)
+
+        # pull in additional graphs for query that aren't loaded properly
+        RDFL = oq.plugin.get('rdflib')
+        olr = Path(devconfig.ontology_local_repo)
+        branch = 'methods'
+        for fn in ('methods', 'methods-helper', 'methods-core'):
+            org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
+            OntTerm.query.ladd(RDFL(org.graph, OntId))
 
     @property
     def project_name(self):
@@ -1260,13 +1271,17 @@ class Report(Dispatcher):
                 return [ot.label if hasattr(ot, 'label') and ot.label else '', ot.curie]
 
         log.info(' '.join(sorted(skipped_prefixes)))
-        objs = [OntTerm(o) if o.prefix not in ('TEMP', 'sparc') else o for o in objects]
+        objs = [OntTerm(o) if o.prefix not in ('TEMP', 'sparc') or
+                o.prefix == 'TEMP' and o.suffix.isdigit() else
+                o for o in objects]
         term_sets = {title:[o for o in objs if o.prefix == prefix]
                      for prefix, title in
                      (('NCBITaxon', 'Species'),
                       ('UBERON', 'Anatomy and age category'),  # FIXME
-                      ('FMA', 'Anatomy'),
+                      ('FMA', 'Anatomy (FMA)'),
                       ('PATO', 'Qualities'),
+                      ('tech', 'Techniques'),
+                      ('unit', 'Units'),
                       ('sparc', 'MIS terms'),
                       ('TEMP', 'Suggested terms'),
                      )}

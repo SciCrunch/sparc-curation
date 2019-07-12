@@ -1,6 +1,7 @@
-from pyontutils.core import OntId
 from pyontutils.sheets import Sheet
-from sparcur.utils import log
+from sparcur.core import OntId, OntTerm
+from sparcur.utils import log, logd
+from urllib.parse import quote
 
 # google sheets
 
@@ -58,6 +59,7 @@ class KeywordSets(FieldAlignment):
 class Organs(FieldAlignment):
     sheet_name = 'Organs'
     index_columns = 'id',
+    fetch_grid = True
 
     def _lookup(self, dataset_id):
         try:
@@ -65,6 +67,12 @@ class Organs(FieldAlignment):
         except KeyError as e:
             # TODO update the sheet automatically
             log.critical(f'New dataset! {dataset_id}')
+
+    def _dataset_row_index(self, dataset_id):
+        # FIXME dict or cache this for performance
+        for i, id in enumerate(self.byCol.id):
+            if id == dataset_id:
+                return i + 1
 
     def modality(self, dataset_id):
         """ tuple of modalities """
@@ -94,3 +102,30 @@ class Organs(FieldAlignment):
         row = self._lookup(dataset_id)
         if row:
             return row.award_manual if row.award_manual else None
+
+    def techniques(self, dataset_id):
+        row = self._lookup(dataset_id)
+
+        def mkval(cell):
+            hl = cell.hyperlink
+            if hl is not None:
+                oid = OntId(hl)
+                if oid.prefix == 'TEMP':
+                    logd.warning(f'{cell.value} -> {oid!r}')
+                    #return OntTerm(curie=f'lex:{quote(cell.value)}')
+                #else:
+
+                return oid.asTerm
+
+            else:
+                logd.warning(f'unhandled technique {cell.value}')
+                return cell.value
+
+        if row:
+            row_index = self._dataset_row_index(dataset_id)
+            return [mkval(self.cell_object(row_index, column_index))
+                    for column_index, (field, value)
+                    in enumerate(zip(row._fields, row))
+                    if field.startswith('technique') and value]
+        else:
+            return []
