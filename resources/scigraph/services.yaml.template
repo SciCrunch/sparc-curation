@@ -292,6 +292,44 @@ cypherResources:
             paramType: query
             required: false
 
+  - path: /dynamic/neurons/connectivity
+    query: |
+            MATCH (blank)-
+            [entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
+            ->(location:Class{iri: '${start_id}'})
+            WITH location, entrytype, blank
+            MATCH (phenotype)<-[predicate]-(blank)<-[:equivalentClass]-(neuron)
+            WHERE NOT (phenotype.iri =~ ".*_:.*")
+            // RETURN phenotype, (phenotype)-[predicate]-(neuron) as e
+            // WITH location, predicate, phenotype, neuron
+            RETURN location, entrytype, neuron, predicate, phenotype
+    operations:
+      - summary: Get connected anatomical regions by neuron type
+        parameters:
+          - name: start_id
+            description: The starting location (eg UBERON:0001759)
+            paramType: query
+
+  - path: /dynamic/neurons/connectedRegions
+    query: |
+            MATCH (blank)-
+            [entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
+            ->(location:Class{iri: '${start_id}'})
+            WITH entrytype, blank
+            MATCH (phenotype)<-[:${target_predicate}]-(blank)
+            // WHERE NOT (phenotype.iri =~ ".*_:.*")
+            RETURN phenotype
+    operations:
+      - summary: Get connected anatomical regions by starting location and target relationship
+        parameters:
+          - name: start_id
+            description: The starting location (eg UBERON:0001759)
+            paramType: query
+          - name: target_predicate
+            description: The predicate for the type of connectivity (eg ilxtr:hasPresynapticTerminalsIn)
+            paramType: query
+            required: false
+
 graphConfiguration:
   curies:
   exactNodeProperties:
