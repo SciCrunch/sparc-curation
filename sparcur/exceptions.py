@@ -135,6 +135,10 @@ class NoDataError(SparCurError):
         FIXME HACK workaround for bad handling of empty sheets in byCol """
 
 
+class BadDataError(SparCurError):
+    """ something went wrong """
+
+
 class NoMetadataRetrievedError(SparCurError):
     """ we failed to retrieve metadata for a remote id """
 

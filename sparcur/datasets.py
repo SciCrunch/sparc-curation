@@ -426,7 +426,10 @@ class Version1Header(HasErrors):
                     self.fail = True
 
         if self.fail:
-            self.bc = byCol(rest, header)
+            try:
+                self.bc = byCol(rest, header)
+            except ValueError as e:
+                raise exc.BadDataError from e
         else:
             self.bc = byCol(rest, header, to_index=self.to_index)
 

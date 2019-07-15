@@ -128,7 +128,7 @@ class PathPipeline(PrePipeline):
     def _transformer(self):
         try:
             return self.data_transformer_class(self.path)
-        except (exc.FileTypeError, exc.NoDataError) as e:
+        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
             class NoData:  # FIXME
                 data = {}
                 t = f'No data for {self.path}'
