@@ -544,6 +544,7 @@ class Main(Dispatcher):
     skip_big = (
             'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
             'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
+            'N:dataset:ca9afa19-b616-41a9-a532-3ae5aaf4088f',  # big tif
             #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
         )
     ###
