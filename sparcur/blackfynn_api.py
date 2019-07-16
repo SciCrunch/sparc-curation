@@ -268,8 +268,11 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 if out_of_order[0] is None:
                     out_of_order.remove(None)
                 elif packages == out_of_order:
-                    breakpoint()
-                    raise RuntimeError('We are going nowhere!')
+                    if 'cursor' not in j:
+                        raise RuntimeError('We are going nowhere!')
+                    else:
+                        # the missing parent is in another castle!
+                        break
                 else:
                     packages = out_of_order
                     out_of_order = []
