@@ -286,6 +286,7 @@ class Main(Dispatcher):
             Integrator.no_google = True
             return
         elif (self.options.pull or
+              self.options.mismatch or
               self.options.missing):
             Integrator.no_google = True
 
@@ -1392,21 +1393,37 @@ class Fix(Shell):
         timestamp = NOWDANGER(implicit_tz='PST PDT')
         stash = StashPath(self.anchor.local.parent, 'stash', timestamp)
         new_anchor = stash / self.anchor.name
+        new_anchor.mkdir(parents=True)
         new_anchor.cache_init(self.anchor.meta, anchor=True)
         for p in to_stash[1:]:
+            p = p.relative_to(self.anchor) if p.root == '/' else p
             new_path = new_anchor / p
+            log.debug(p)
+            log.debug(new_path)
+            p = self.anchor.local / p
             if p.is_dir():
                 new_path.mkdir()
-                new_path.cache_init(p.meta)
+                new_path.cache_init(p.cache.meta)
             else:
+                log.debug(f'{p!r} {new_path!r}')
                 new_path.copy_from(p)
+                pc, npc = p.checksum(), new_path.checksum()
+                # TODO a better way to do this might be to
+                # treat the stash as another local for which
+                # the current local is the remote
+                # however this might require layering
+                # remote and remote remote metadata ...
+                assert pc == npc, f'\n{pc}\n{npc}'
                 cmeta = p.cache.meta
-                new_path.cache_init(PathMeta(id=cmeta.old_id))
-            new_path / 
+                nmeta = PathMeta(id=cmeta.old_id)
+                log.debug(nmeta)
+                new_path.cache_init(nmeta)
 
-            
-
+        nall = list(new_anchor.rchildren)
+        [print(n.cache.meta.as_pretty(n)) for n in nall]
         embed()
+        # once everything is in order and backed up 
+        # [p.fetch() for p in paths]
 
     def duplicates(self):
         all_ = defaultdict(list)

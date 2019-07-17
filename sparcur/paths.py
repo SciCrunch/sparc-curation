@@ -1593,8 +1593,9 @@ class PrimaryCache(CachePath):
                 self.fetch(size_limit_mb=None)
 
         except BaseException as e:
-            trashed.rename(self)
             log.error(e)
+            if must_fetch:
+                trashed.rename(self)
             raise e
 
         return file_is_different
