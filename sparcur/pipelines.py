@@ -759,6 +759,7 @@ class PipelineEnd(JSONPipeline):
         'SamplesFile',
         'SubmissionFilePipeline.data',
         'DatasetDescriptionFile',
+        'DatasetDescriptionFile.protocol_url_or_doi',
         'DatasetDescriptionFilePipeline._transformer',
         'DatasetDescriptionFilePipeline.data',
         'SubjectsFilePipeline.data',

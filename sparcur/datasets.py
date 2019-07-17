@@ -702,7 +702,16 @@ class DatasetDescriptionFile(Version1Header):
         for val in value.split(','):
             v = val.strip()
             if v:
-                yield  self._protocol_url_or_doi(v)
+                try:
+                    yield  self._protocol_url_or_doi(v)
+                except BaseException as e:
+                    self.addError(e,
+                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
+                                  logfunc=logd.error)
+                    self.addError(self.path.as_posix(),
+                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
+                                  logfunc=logd.critical)
+                    # TODO raise exc.BadDataError from e
 
     def originating_article_doi(self, value):
         for val in value.split(','):
