@@ -1270,12 +1270,15 @@ class Report(Dispatcher):
             import htmlfn as hfn
             for dataset_blob in datasets:
                 if dataset_blob['id'] == id:
+                    dso = DatasetObject.from_json(dataset_blob)
                     title = f'Errors for {id}'
                     urih = dataset_blob['meta']['uri_human']
                     formatted_title = (hfn.h2tag(f'Errors for {hfn.atag(urih, id)}<br>\n') +
-                                       hfn.h3tag(dataset_blob['meta']['title']))
+                                       (hfn.h3tag(dataset_blob['meta']['title']
+                                        if 'title' in dataset_blob['meta'] else
+                                        dataset_blob['meta']['folder_name'])))
                     log.info(list(dataset_blob.keys()))
-                    errors = list(DatasetObject.from_json(dataset_blob).errors)
+                    errors = list(dso.errors)
                     return [(self._print_table(e.as_table(), ext=pt)) for e in errors], formatted_title, title
         else:
             pprint.pprint(sorted([(d['meta']['folder_name'], [e['message']
