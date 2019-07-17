@@ -78,9 +78,12 @@ class PathMeta:
 
     def content_different(self, other):
         """ is there any evidence that the file itself changed? """
-        return ((self.checksum and other.checksum and self.checksum != other.checksum) or
-                self.size != other.size or
-                self.updated < other.updated)
+        # branch on checksum presence since it is definitional
+        if self.checksum and other.checksum:
+            return self.checksum != other.checksum
+        else:
+            return (self.size != other.size or
+                    self.updated < other.updated)
 
     def items(self):
         return self.__dict__.items()  # FIXME nonfields?

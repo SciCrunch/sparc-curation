@@ -22,7 +22,7 @@ Usage:
     spc xattrs [options]
     spc demos [options]
     spc goto <remote-id>
-    spc dedupe [<path>...]
+    spc fix [options] [duplicates mismatch] [<path>...]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -101,6 +101,10 @@ Commands:
     goto        given an id cd to the containing directory
                 invoke as `pushd $(spc goto <id>)`
     dedupe      find and resolve cases with multiple ids
+    fix         broke something? put the code to fix it here
+
+                mismatch
+                duplicates
 
 Options:
     -f --fetch              fetch matching files
@@ -167,7 +171,7 @@ from sparcur import exceptions as exc
 from sparcur.core import JT, log, logd, JPointer
 from sparcur.core import OntId, OntTerm, get_all_errors, DictTransformer as DT, adops
 from sparcur.utils import FileSize, python_identifier, want_prefixes
-from sparcur.paths import Path, BlackfynnCache, PathMeta
+from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
@@ -574,37 +578,6 @@ class Main(Dispatcher):
         )
     ###
 
-    def dedupe(self):
-        all_ = defaultdict(list)
-        if not self.options.path:
-            paths = self.anchor.local.rchildren
-        else:
-            paths = self.paths
-
-        for rc in paths:
-            if rc.cache is None:
-                log.critical(f'WHAT THE WHAT {rc}')
-                continue
-
-            all_[rc.cache.id].append(rc)
-
-        def mkey(p):
-            mns = p.cache.meta
-            return (not bool(mns),
-                    not bool(mns.updated),
-                    -mns.updated.timestamp())
-
-        dupes = {i:sorted(l, key=mkey)#, reverse=True)
-                 for i, l in all_.items() if len(l) > 1}
-        dv = list(dupes.values())
-        deduped = [a.dedupe(b, pretend=True) for a, b, *c in dv
-                   if (not log.warning(c) if c else not c)
-        ]  # FIXME assumes a single dupe...
-        to_remove = [d for paths, new in zip(dv, deduped) for d in paths if d != new]
-        to_remove_size = [p for p in to_remove if p.cache.meta.size is not None]
-        #[p.unlink() for p in to_remove if p.cache.meta.size is None] 
-        breakpoint()
-        
     def refresh(self):
         paths = self.paths
         cwd = Path.cwd()
@@ -633,9 +606,11 @@ class Main(Dispatcher):
         drs = [d.remote for d in chain(to_root, self._dirs)]
 
         if not self.options.debug:
-            refreshed = Async(rate=hz)(deferred(r.refresh)() for r in drs)
+            refreshed = Async(rate=hz)(deferred(r.refresh)(update_data_on_cache=r.cache.is_file() and
+                                                           r.cache.exists()) for r in drs)
         else:
-            refreshed = [r.refresh() for r in drs]
+            refreshed = [r.refresh(update_data_on_cache=r.cache.is_file() and
+                                   r.cache.exists()) for r in drs]
 
         moved = []
         parent_moved = []
@@ -1007,6 +982,9 @@ class Main(Dispatcher):
                 if cmeta is not None:
                     if self.options.diff:
                         lmeta = path.meta
+                        # id and file_id are fake in this instance
+                        setattr(lmeta, 'id', None)
+                        setattr(lmeta, 'file_id', None)
                         print(lmeta.as_pretty_diff(cmeta, pathobject=path, human=self.options.human))
                     else:
                         print(cmeta.as_pretty(pathobject=path, human=self.options.human))
@@ -1038,10 +1016,21 @@ class Main(Dispatcher):
         existing_files = [f for f in project_path.rchildren if f.is_file()]
         different = []
         for f in existing_files:
-            cmeta = f.cache.meta
+            try:
+                cmeta = f.cache.meta
+            except AttributeError:
+                if f.skip_cache:
+                    continue
+
             lmeta = f.meta if cmeta.checksum else f.meta_no_checksum
+            # id and file_id are fake in this instance
+            setattr(lmeta, 'id', None)
+            setattr(lmeta, 'file_id', None)
             if lmeta.content_different(cmeta):
-                print(lmeta.as_pretty_diff(cmeta, pathobject=f, human=self.options.human))
+                if self.options.status:
+                    print(lmeta.as_pretty_diff(cmeta, pathobject=f, human=self.options.human))
+                else:
+                    yield f, lmeta, cmeta
 
     def server(self):
         from sparcur.server import make_app, url_for
@@ -1067,6 +1056,9 @@ class Main(Dispatcher):
         shell = Shell(self)
         shell()
 
+    def fix(self):
+        fix = Fix(self)
+        fix()
 
 class Report(Dispatcher):
 
@@ -1378,6 +1370,76 @@ class Shell(Dispatcher):
         pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         embed()
+
+
+class Fix(Shell):
+
+    def default(self):
+        pass
+
+    def mismatch(self):
+        """ once upon a time it was (still at the time of writing) possible
+            to update meta on an existing file without preserving the old data
+            AND without downloading the new data (insanity) this can be used to fix
+            those cases, preserving the old version """
+        oops = list(self.parent.status())
+        [print(lmeta.as_pretty_diff(cmeta, pathobject=path, human=self.options.human))
+         for path, lmeta, cmeta in oops]
+        paths = [p for p, *_ in oops]
+        to_stash = sorted(set(parent for p in paths for parent in
+                               chain((p,), p.cache.relative_to(self.anchor).parents)),
+                           key=lambda p: len(p.as_posix()))
+        timestamp = NOWDANGER(implicit_tz='PST PDT')
+        stash = StashPath(self.anchor.local.parent, 'stash', timestamp)
+        new_anchor = stash / self.anchor.name
+        new_anchor.cache_init(self.anchor.meta, anchor=True)
+        for p in to_stash[1:]:
+            new_path = new_anchor / p
+            if p.is_dir():
+                new_path.mkdir()
+                new_path.cache_init(p.meta)
+            else:
+                new_path.copy_from(p)
+                cmeta = p.cache.meta
+                new_path.cache_init(PathMeta(id=cmeta.old_id))
+            new_path / 
+
+            
+
+        embed()
+
+    def duplicates(self):
+        all_ = defaultdict(list)
+        if not self.options.path:
+            paths = self.anchor.local.rchildren
+        else:
+            paths = self.paths
+
+        for rc in paths:
+            if rc.cache is None:
+                if not rc.skip_cache:
+                    log.critical(f'WHAT THE WHAT {rc}')
+
+                continue
+
+            all_[rc.cache.id].append(rc)
+
+        def mkey(p):
+            mns = p.cache.meta
+            return (not bool(mns),
+                    not bool(mns.updated),
+                    -mns.updated.timestamp())
+
+        dupes = {i:sorted(l, key=mkey)#, reverse=True)
+                 for i, l in all_.items() if len(l) > 1}
+        dv = list(dupes.values())
+        deduped = [a.dedupe(b, pretend=True) for a, b, *c in dv
+                   if (not log.warning(c) if c else not c)
+        ]  # FIXME assumes a single dupe...
+        to_remove = [d for paths, new in zip(dv, deduped) for d in paths if d != new]
+        to_remove_size = [p for p in to_remove if p.cache.meta.size is not None]
+        #[p.unlink() for p in to_remove if p.cache.meta.size is None] 
+        breakpoint()
 
 
 def main():

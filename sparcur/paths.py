@@ -1200,7 +1200,7 @@ class CachePath(AugmentedPath):
         size_ok = size_limit_mb is not None and meta.size is not None and meta.size.mb < size_limit_mb
         size_not_ok = size_limit_mb is not None and meta.size is not None and meta.size.mb > size_limit_mb
 
-        if size_ok or size_limit_mb is None:
+        if size_ok or size_limit_mb is None:  # FIXME should we force fetch here by default if the file exists?
             if self.is_broken_symlink():
                 self.unlink()
                 self.touch()
@@ -1331,6 +1331,11 @@ class XattrCache(CachePath, XattrPath):
         if self.exists():
             if self.is_symlink():
                 raise TypeError('will not write meta on symlinks! {self}')
+            # FIXME FIXME FIXME this needs to be written to absolutely
+            # prevent the writing of new metadata onto an existing file
+            # where the checksum differs, the old version needs to be
+            # trashed before any of this is written, otherwise the old
+            # metadata is lost >_<
             self.setxattrs(pathmeta.as_xattrs(self.xattr_prefix))
             if hasattr(self, '_meta'):  # prevent reading from in-memory store
                 delattr(self, '_meta')
@@ -1577,7 +1582,21 @@ class PrimaryCache(CachePath):
 
     def _meta_updater(self, pathmeta):
         file_is_different, updated = self._update_meta(self.meta, pathmeta)
-        self._meta_setter(updated)
+        must_fetch = file_is_different and self.is_file() and self.exists()
+        if must_fetch:
+            log.info(f'crumpling to preserve existing metadata\n{self}')
+            trashed = self.crumple()
+
+        try:
+            self._meta_setter(updated)
+            if must_fetch:
+                self.fetch(size_limit_mb=None)
+
+        except BaseException as e:
+            trashed.rename(self)
+            log.error(e)
+            raise e
+
         return file_is_different
 
     @property
@@ -2057,6 +2076,7 @@ class LocalPath(XattrPath):
             assert self.cache.meta
 
     def copy_to(self, target, force=False):
+        """ copy from a the current path object to a target path """
         if type(target) != type(self):
             target = self.__class__(target)
 
@@ -2066,6 +2086,7 @@ class LocalPath(XattrPath):
             raise exc.PathExistsError(f'{target}')
 
     def copy_from(self, source, force=False):
+        """ copy from a source path to the current path object """
         if type(source) != type(self):
             source = self.__class__(source)
 
@@ -2218,6 +2239,24 @@ class Path(LocalPath):  # NOTE this is a hack to keep everything consistent
                 break
             else:
                 sleep(.01)  # spin a bit more slowly
+
+
+class StashCache(BlackfynnCache):
+    def remote(self):
+        return None
+
+    def _meta_setter(self, value):
+        if not self.meta:
+            super()._meta_setter(value)
+        else:
+            raise TypeError('you dont want to set a stashed cache')
+
+
+class StashPath(Path):
+    _cache_class = StashCache
+    @property
+    def remote(self):
+        return None
 
 
 # assign defaults
