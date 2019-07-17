@@ -676,6 +676,25 @@
       spc server --latest --count
     #+END_SRC
 
+*** Archiving files with xattrs
+=tar= is the only one of the 'usual' suspects for file archiving that
+supports xattrs, =zip= cannot.
+
+#+CAPTION: archive
+#+begin_src bash
+tar --force-local --xattrs -cvzf 2019-07-17T10\:44\:16\,457344.tar.gz '2019-07-17T10:44:16,457344/'
+#+end_src
+
+#+CAPTION: extract
+#+begin_src bash
+tar --force-local --xattrs -xvzf 2019-07-17T10\:44\:16\,457344.tar.gz
+#+end_src
+
+#+CAPTION: test
+#+begin_src bash
+find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
+#+end_src
+
 *** Other random commands
 #+CAPTION: simplified error report
 #+begin_src bash
