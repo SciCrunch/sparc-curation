@@ -173,11 +173,6 @@ class OrganData:
 class MembersData:
     """ blackfynn members data """
     def __init__(self, blackfynn_local_instance):
-        log.debug('going to network for members')
-        # there are other ways to get here but this one caches
-        # e.g. self.organization.path.remote.bfobject
-        # self.path.remote.oranization.bfobject
-        # self.path.remote.bfl.organization.members
         self.__class__._bfli = blackfynn_local_instance
 
     def __call__(self, first_name, last_name):

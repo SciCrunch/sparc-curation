@@ -49,7 +49,7 @@ from Xlib.display import Display
 from Xlib import Xatom
 from pyontutils.utils import sysidpath
 from sparcur import exceptions as exc
-from sparcur.utils import log, default_cypher, etag
+from sparcur.utils import log, default_cypher, etag, LOCAL_DATA_DIR
 from sparcur.pathmeta import PathMeta
 
 _IGNORED_ERROS = (ENOENT, ENOTDIR, EBADF, ELOOP)
@@ -634,7 +634,8 @@ class CachePath(AugmentedPath):
         the exact implementations for the local and remote objects.
     """
 
-    cache_ignore = '.git',  # TODO
+    _local_data_dir = LOCAL_DATA_DIR
+    cache_ignore = _local_data_dir, '.git',  # TODO
 
     _local_class = None
     _remote_class_factory = None
@@ -720,6 +721,24 @@ class CachePath(AugmentedPath):
     def trash(self):
         # FIXME mkdir and put it in a more conventional location
         return self.anchor.local.parent / '.trash'
+
+    def crumple(self):  # FIXME change name to something more obvious ...
+        trashed = self.trash / f'{self.parent.id}-{self.id}-{self.name}'
+        try:
+            self.rename(trashed)
+        except OSError as e:
+            if e.errno == 36:  # File name too long  # SIGH
+                trashed = self.trash / self.name  # FIXME SIGH
+                log.critical(f'Long name {self.name}')
+                self.rename(trashed)
+            else:
+                raise e
+
+        return trashed
+
+    @property
+    def local_data_dir(self):
+        return self.anchor.local / self._local_data_dir
 
     @property
     def is_helper_cache(self):
@@ -1578,6 +1597,7 @@ class PrimaryCache(CachePath):
         # have to express the generator to build the index
         # otherwise child.parents will not work correctly (annoying)
         for child_remote in self.remote.rchildren:
+            # FIXME is this causing the creation of folders during bootstrap ???
             args = child_remote._parts_relative_to(self.remote)  # usually this would just be one level
             child_cache = self._make_child(args, child_remote)
             #child_cache = self
@@ -1851,6 +1871,24 @@ class LocalPath(XattrPath):
             else:
                 if found_cache and found_cache != Path('/'):
                     return found_cache
+
+    @property
+    def skip_cache(self):
+        """ returns True if the path should not have a cache
+            because the file has been ignored """
+        if self.cache is None:
+            parent_cache = self.parent.cache
+            if parent_cache:
+                rel_path = self.relative_to(parent_cache.anchor)
+            else:
+                root = self.find_cache_root()  # FIXME is it safe to cache this??
+                rel_path = self.relative_to(root)
+            return (rel_path._cpath[0] in self._cache_class.cache_ignore or
+                    # TODO more conditions
+                    False)
+        else:
+            # FIXME technically not correct ...
+            return True
 
     def dedupe(self, other, pretend=False):
         return self.cache.dedupe(other.cache, pretend=pretend)

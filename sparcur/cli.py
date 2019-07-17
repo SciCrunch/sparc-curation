@@ -279,7 +279,11 @@ class Main(Dispatcher):
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend):
             # short circuit since we don't know where we are yet
+            Integrator.no_google = True
             return
+        elif (self.options.pull or
+              self.options.missing):
+            Integrator.no_google = True
 
         self._setup()  # if this isn't run up here the internal state of the program get's wonky
 
@@ -305,7 +309,11 @@ class Main(Dispatcher):
         except exc.NoCachedMetadataError as e:
             root = local.find_cache_root()
             if root is not None:
-                self.anchor = root.anchor
+                self.anchor = root.cache
+                if local.skip_cache:
+                    print(f'{local} is ignored!')
+                    sys.exit(112)
+
                 raise NotImplementedError('TODO recover meta?')
             else:
                 print(f'{local} is not in a project!')
@@ -469,6 +477,8 @@ class Main(Dispatcher):
                 message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
                 sys.exit(2)
 
+        anchor.local_data_dir.mkdir()
+
         self.anchor = anchor
         self.project_path = self.anchor.local
         with anchor:
@@ -516,6 +526,21 @@ class Main(Dispatcher):
             if newc is None:
                 continue  # directory was deleted
 
+            if d.cache.is_organization():  # FIXME FIXME FIXME hack to mask broken bootstrap handling of existing dirs :/
+                for cd in d.children:
+                    if cd.is_dir():
+                        oc = cd.cache
+                        if oc is None and cd.skip_cache:
+                            continue
+
+                        nc = oc.refresh()
+                        if nc != oc:
+                            log.info(f'Dataset moved!\n{oc} -> {nc}')
+                            # FIXME FIXME FIXME
+                            with open(self.anchor.local_data_dir / 'renames.log', 'at') as f:
+                                f.write(f'{oc} -> {nc} -> {nc.id}\n')
+
+            # FIXME something after this point is retaining stale filepaths on dataset rename ...
             #d = r.local  # in case a folder moved
             caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
@@ -853,7 +878,9 @@ class Main(Dispatcher):
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """
         # TODO per dataset
+        from sparcur.datasets import DatasetStructure
         from sparcur import pipelines as pipes
+        DatasetStructure._refresh_on_missing = False
         summary = self.summary
         tables = []
         datasets = self.summary.iter_datasets if self.cwd.cache.is_organization() else (Integrator(self.cwd.cache.dataset.local),)
@@ -943,7 +970,14 @@ class Main(Dispatcher):
         print(eff, feedback)
 
     def missing(self):
-        self.bfl.find_missing_meta()
+        for path in self._paths:
+            for rc in path.rchildren:
+                if rc.is_broken_symlink():
+                    m = rc.cache.meta
+                    if m.file_id is None:
+                        #print(rc)
+                        print(m.as_pretty(pathobject=rc))
+        #self.bfl.find_missing_meta()
 
     def xattrs(self):
         self.bfl.populate_metastore()

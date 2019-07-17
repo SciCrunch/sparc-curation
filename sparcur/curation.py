@@ -1410,6 +1410,13 @@ class Summary(Integrator, ExporterSummarizer):
         # do not cache in here
         for i, path in enumerate(self.anchor.path.iterdir()):
             # FIXME non homogenous, need to find a better way ...
+            if path.cache is None and path.skip_cache:
+                # FIXME just as anticipated nullability of cache is BAD
+                # probably better to switch out cache is None for cache is NullCache
+                # to make treatment of cache homogenous for all local files so that
+                # handling the None case doesn't spread througout the codebase :/
+                continue
+
             yield self.__class__.__base__(path)
             #if i > 4:
                 #break

@@ -29,6 +29,7 @@ class _log:
 
 
 default_cypher = hashlib.blake2b
+LOCAL_DATA_DIR = '.operations'
 
 
 class etag:

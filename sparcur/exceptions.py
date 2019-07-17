@@ -122,6 +122,10 @@ class NoSourcePathError(SparCurError):
     """ dictionary at some level is missing the expected key """
 
 
+class CacheIgnoreError(SparCurError):
+    """ Path is excluded via cache_ignore. """
+
+
 class EncodingError(SparCurError):
     """ Some encoding error has occured in a file """
 

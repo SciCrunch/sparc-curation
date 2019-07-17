@@ -762,6 +762,7 @@ class PipelineEnd(JSONPipeline):
         'DatasetDescriptionFilePipeline._transformer',
         'DatasetDescriptionFilePipeline.data',
         'SubjectsFilePipeline.data',
+        'SubjectsFilePipeline._transformer',
         'SamplesFilePipeline._transformer',
         'SamplesFilePipeline.data',
     )

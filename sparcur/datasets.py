@@ -105,6 +105,7 @@ class DatasetStructure(Path, HasErrors):
     default_glob = 'glob'
     max_childs = 40
     rate = 8  # set by Integrator from cli
+    _refresh_on_missing = True
 
     @property
     def counts(self):
@@ -135,8 +136,8 @@ class DatasetStructure(Path, HasErrors):
                     else:
                         size += maybe_size
 
-            if need_meta:
-                log.info(f'refreshing {len(need_meta)} files with missing metadata')
+            if need_meta and self._refresh_on_missing:
+                log.info(f'refreshing {len(need_meta)} files with missing metadata in {self}')
                 new_caches = Async(rate=self.rate)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
                     if c is None:
