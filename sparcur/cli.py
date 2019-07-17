@@ -175,7 +175,7 @@ from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
-from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer
+from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer, DatasetObject
 from sparcur.curation import JEncode, TriplesExportDataset, TriplesExportSummary
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
@@ -1193,9 +1193,10 @@ class Report(Dispatcher):
             if self.options.server and isinstance(ext, types.FunctionType):
                 rsurl = 'https://projectreporter.nih.gov/reporter_searchresults.cfm'
                 dataset_dash_url = self.url_for('route_datasets_id', id=id)
-                si = hfn.atag('/TODO', si)
-                ci = hfn.atag('/TODO', ci)
-                ei = hfn.atag('/TODO', ei)
+                errors_url = self.url_for('route_reports_errors_id', id=id)
+                si = hfn.atag(errors_url + '#submission', si)
+                ci = hfn.atag(errors_url + '#curation', ci)
+                ei = hfn.atag(errors_url + '#total', ei)
                 name = hfn.atag(dataset_dash_url, name)
                 id = hfn.atag(dataset_dash_url, id[:10] + '...')
                 award = hfn.atag(('https://scicrunch.org/scicrunch/data/source/'
@@ -1249,15 +1250,37 @@ class Report(Dispatcher):
         rows = [['hello', 'world'], [1, 2]]
         return self._print_table(rows, title='Report Test', ext=ext)
 
-    def errors(self, ext=None):
+    def errors(self, *, id=None, ext=None):
         if self.options.latest:
             datasets = self.latest_export['datasets']
         else:
             self.summary.data['datasets']
 
-        pprint.pprint(sorted([(d['meta']['folder_name'], [e['message']
-                                                   for e in get_all_errors(d)])
-                              for d in datasets], key=lambda ab: -len(ab[-1])))
+        if self.cwd != self.anchor:
+            id = self.cwd.cache.dataset.id
+            
+        if id is not None:
+            if not id.startswith('N:dataset:'):
+                return []
+
+            def pt(rendered_table, title=None):
+                """ passthrough """
+                return rendered_table
+
+            import htmlfn as hfn
+            for dataset_blob in datasets:
+                if dataset_blob['id'] == id:
+                    title = f'Errors for {id}'
+                    urih = dataset_blob['meta']['uri_human']
+                    formatted_title = (hfn.h2tag(f'Errors for {hfn.atag(urih, id)}<br>\n') +
+                                       hfn.h3tag(dataset_blob['meta']['title']))
+                    log.info(list(dataset_blob.keys()))
+                    errors = list(DatasetObject.from_json(dataset_blob).errors)
+                    return [(self._print_table(e.as_table(), ext=pt)) for e in errors], formatted_title, title
+        else:
+            pprint.pprint(sorted([(d['meta']['folder_name'], [e['message']
+                                                              for e in get_all_errors(d)])
+                                  for d in datasets], key=lambda ab: -len(ab[-1])))
 
     def pathids(self, ext=None):
         base = self.project_path.parent

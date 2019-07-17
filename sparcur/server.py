@@ -5,6 +5,9 @@ from htmlfn import htmldoc, atag
 from htmlfn import table_style, navbar_style
 from sparcur import pipelines as pipes
 from sparcur.curation import Integrator
+from sparcur.utils import log
+
+log = log.getChild('server')
 
 
 def nowrap(class_, tag=''):
@@ -109,6 +112,15 @@ def make_app(self, name='spc-server'):
         table, title = self.report.errors()
         return wrap_tables(table, title=title)
 
+    @app.route(f'{bp}/reports/errors/<id>')
+    @app.route(f'{bp}/reports/errors/<id>.<ext>')
+    def route_reports_errors_id(id, ext=wrap_tables):
+        tables, formatted_title, title = self.report.errors(id=id)
+        log.info(id)
+        if tables is None:
+            return 'Not found', 404
+        return wrap_tables(formatted_title, *tables, title=title)
+
     @app.route(f'{bp}/reports/terms')
     @app.route(f'{bp}/reports/terms<ext>')
     def route_reports_terms(ext=None):
@@ -121,7 +133,6 @@ def make_app(self, name='spc-server'):
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Terms')
-
 
     @app.route(f'{bp}/apinat/demo')
     @app.route(f'{bp}/apinat/demo<ext>')

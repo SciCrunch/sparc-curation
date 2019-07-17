@@ -1093,6 +1093,64 @@ class Integrator(PathData, OntologyData):
         return self._triples_exporter
 
 
+class JsonObject:
+    @classmethod
+    def from_json(cls, json):
+        self = object.__new__(cls)
+        self.data = json
+        return self
+
+
+class DatasetObject(JsonObject):
+    """ Object representation of a dataset. Currently static. """
+
+    @classmethod
+    def from_pipeline(cls, pipeline):
+        """ inversion of control, use this in pipeline.object """
+        self = object.__new__(cls)
+        self.data = pipeline.data
+        return self
+
+    @property
+    def errors(self):
+        for error_type in 'submission', 'curation':
+            for error_blob in self.data['status'][error_type + '_errors']:
+                yield ErrorObject.from_json(error_blob)
+
+
+class ErrorObject(JsonObject):
+    """ Static representation of an error. """
+    # FIXME error type ...
+    _keys = ('pipeline_stage',
+             'message',
+             'schema_path',
+             'validator',
+             'validator_value')
+
+    @classmethod
+    def from_json(cls, json):
+        self = super().from_json(json)
+        for key in self._keys:
+            if key in self.data:
+                value = self.data[key]
+            else:
+                value = None
+
+            setattr(self, key, value)
+
+        return self
+
+    def as_table(self):
+        d = self.data
+        def ex(k):
+            v = getattr(self, k)
+            if v is None:
+                return ''
+            else:
+                return str(v)
+
+        return [['Key', 'Value']] + [[key, ex(key)] for key in self._keys]
+
 class ExporterSummarizer:
     def __init__(self, data_json):
         self.data = data_json
