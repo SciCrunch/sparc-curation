@@ -188,6 +188,7 @@ class RemotePath:
         local_class._remote_class = newcls
         local_class._cache_class = cache_class
         cache_class._remote_class = newcls
+        cache_class._local_class = local_class
 
         return newcls
 
@@ -226,6 +227,7 @@ class RemotePath:
                 raise exc.NotEmptyError(f'has children {path}')
 
             cls._cache_anchor = path.cache_init(root.id, anchor=True)
+            return cls._cache_anchor
 
         else:
             raise ValueError(f'already anchored to {cls._cache_anchor}')
@@ -256,6 +258,8 @@ class RemotePath:
         if cache is not None:
             self._cache = cache
             self.cache._remote = self
+
+        self._errors = []
 
     @property
     def id(self):
@@ -342,6 +346,7 @@ class RemotePath:
 
     @property
     def data(self):
+        raise NotImplementedError
         self.cache.id
         for chunk in chunks:
             yield chunk

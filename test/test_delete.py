@@ -10,13 +10,13 @@ test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
 
 
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
-class TestDelete(unittest.TestCase):
+@pytest.mark.skip()
+class TestOperation(unittest.TestCase):
     def setUp(self):
         class BlackfynnCache(BFC):
             pass
 
-        base = AugmentedPath(__file__).parent / 'test-delete'
+        base = AugmentedPath(__file__).parent / 'test-operation'
 
         if base.exists():
             shutil.rmtree(base)
@@ -26,9 +26,26 @@ class TestDelete(unittest.TestCase):
 
         self.BlackfynnRemote = BlackfynnRemote._new(LocalPath, BlackfynnCache)
         self.BlackfynnRemote.init(test_organization)
-        self.BlackfynnRemote.dropAnchor(base)
-        root = self.BlackfynnRemote(self.BlackfynnRemote.root)
+        self.anchor = self.BlackfynnRemote.dropAnchor(base)
+        self.root = self.anchor.remote
+        self.project_path = self.anchor.local
+        list(self.root.children)  # populate datasets
+        self.test_base = [p for p in self.project_path.children if p.cache.id == test_dataset][0]
         #breakpoint()
 
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class TestDelete(TestOperation):
+
     def test(self):
+        pass
+
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class TestUpdate(TestOperation):
+
+    def test(self):
+        test_file = self.test_base / 'dataset_description.csv'
+        test_file.data = iter(('lol'.encode(),))
+        test_file.remote.data = test_file.data
         pass

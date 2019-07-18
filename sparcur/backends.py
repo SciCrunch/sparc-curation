@@ -386,6 +386,8 @@ class BlackfynnRemote(RemotePath):
         if cache is not None:
             self._cache_setter(cache, update_meta=False)
 
+        self._errors = []
+
     @property
     def bfobject(self):
         if hasattr(self, '_bfobject'):
@@ -898,6 +900,66 @@ class BlackfynnRemote(RemotePath):
         gen = self.get_file_by_url(file.url)
         self.data_headers = next(gen)
         yield from gen
+
+    @data.setter
+    def data(self):
+        if hasattr(self, '_seed'):
+            # upload the new file
+            # delete the old file
+            # or move to .trash  self._api.bf.move(target, self.id)
+            # where target is the bfobject for .trash
+            raise NotImplementedError('TODO')
+        else:  # doesn't exist yet
+            # see https://github.com/HumanCellAtlas/dcp-cli/pull/252
+            # for many useful references
+            raise NotImplementedError('TODO')
+
+    def __truediv__(self, other):  # XXX
+        """ this is probably the we want to use for this at all
+            it is kept around as a reminder NOT to do this
+            however might revisit this at some point if we want
+            to explore translating remote semantics to file system
+            on the RemotePath class ... """
+        # probably better to work from the cache class
+        # since it is the one that knows that the file doesn't
+        # exist at the remote and can provide a way to move data
+        # to the remote using copy_to or something like that
+        children = list(self.children)
+        names = {c.name:c for c in children}
+        opath = PurePath(other)
+        if len(opath.parts) > 1:
+            # FIXME ... handle/paths/like/this
+            raise NotImplementedError('TODO')
+        else:
+            if other in names:
+                return names[other]
+            else:  # create an empty
+                child = object.__new__(self.__class__)
+                child._parent = self
+                class TempBFObject:
+                    name = other
+                child._bfobject = TempBFObject()
+                return child
+
+    def _mkdir_child(self, child_name):
+        """ direct children only for this, call in recursion for multi """
+        if self.is_organization():
+            bfobject = self._api.bf.create_dataset(child_name)
+        elif self.is_dir():  # all other possible dirs are already handled
+            bfobject = self.bfobject.create_collection(child_name)
+        else:
+            raise exc.NotADirectoryError(f'{self}')
+
+        return bfobject
+
+    def mkdir(self, parents=False):  # XXX
+        # same issue as with __rtruediv__
+        if hasattr(self, '_seed'):
+            raise exc.PathExistsError(f'remote already exists {self}')
+
+        bfobject = self._parent._mkdir_child(self.name)
+        self._seed = bfobject
+        self._bfobject = bfobject
 
     @property
     def meta(self):
