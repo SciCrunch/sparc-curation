@@ -39,6 +39,13 @@ class Completeness(Sheet):
     sheet_name = 'Completeness'
 
 
+# affiliations
+class Affiliations(Sheet):
+    name = 'sparc-affiliations'
+    sheet_name = 'Affiliations'
+    index_columns = 'affiliation_string',
+
+
 # field alignment
 class FieldAlignment(Sheet):
     name = 'sparc-field-alignment'
