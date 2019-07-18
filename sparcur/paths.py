@@ -863,7 +863,9 @@ class CachePath(AugmentedPath):
         # go back up to dataset level?
         sname = lambda gen: sorted(gen, key=lambda c: c.name)
         rcs = sname(self.remote._rchildren(create_cache=False))
-        local_dirs = set(c.relative_to(self.anchor) for c in self.local.rchildren if c.is_dir())
+        local_paths = list(self.local.rchildren)
+        local_files = set(p for p in local_paths if p.is_file() or p.is_broken_symlink())
+        local_dirs = set(p.relative_to(self.anchor) for p in local_paths if p.is_dir())
         if local_dirs:
             remote_dirs = set(c for c in rcs if c.is_dir())
             rd = set(d.as_path() for d in remote_dirs)
@@ -881,6 +883,7 @@ class CachePath(AugmentedPath):
                                     if not ld.as_posix().startswith(d.as_posix()))
                     old_local = local_dirs - rd
 
+        file_index = {f.cache.id:f for f in local_files}  # FIXME WARNING can get big
         for child in sorted(rcs, key=lambda c: len(c.as_path().as_posix())):
             # use the remote's recursive implementation
             # not the local implementation, since the
@@ -890,6 +893,20 @@ class CachePath(AugmentedPath):
             # bootstrap this
             cc = child.cache
             if cc is None:
+                if child.is_file() and child.id in file_index:
+                    _cache = file_index[child.id].cache
+                    cmeta = _cache.meta
+                    rmeta = child.meta
+                    file_is_different, nmeta = self._update_meta(cmeta, rmeta)
+                    if file_is_different:
+                        log.critical(f'WAT {_cache}')
+                    else:
+                        yield _cache
+                        # yield the old cache if it exists
+                        # otherwise consumers of bootstrap will
+                        # think the file may have been deleted
+                        continue
+                    
                 cc = child.cache_init()
 
             yield cc
@@ -1400,6 +1417,7 @@ class SymlinkCache(CachePath):
 
                 if meta.id != pathmeta.id:
                     msg = ('Existing cache id does not match new id!\n'
+                           f'{self!r}\n'
                            f'{meta.id} != {pathmeta.id}\n'
                            f'{meta.as_pretty()}\n'
                            f'{pathmeta.as_pretty()}')

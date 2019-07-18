@@ -137,7 +137,9 @@ class DatasetStructure(Path, HasErrors):
                         size += maybe_size
 
             if need_meta and self._refresh_on_missing:
-                log.info(f'refreshing {len(need_meta)} files with missing metadata in {self}')
+                nl = '\n'
+                log.info(f'refreshing {len(need_meta)} files with missing metadata in {self}'
+                         f'\n{nl.join(_.as_posix() for _ in need_meta)}')
                 new_caches = Async(rate=self.rate)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
                     if c is None:
