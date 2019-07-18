@@ -1,6 +1,7 @@
 import os
 import shutil
 import unittest
+from sparcur.utils import FileSize
 from sparcur.paths import AugmentedPath, BlackfynnCache as BFC, LocalPath
 from sparcur.backends import BlackfynnRemote
 from sparcur.blackfynn_api import BFLocal
@@ -31,6 +32,24 @@ class TestOperation(unittest.TestCase):
         self.project_path = self.anchor.local
         list(self.root.children)  # populate datasets
         self.test_base = [p for p in self.project_path.children if p.cache.id == test_dataset][0]
+        asdf = self.root / 'lol' / 'lol' / 'lol (1)'
+
+        class Fun(os.PathLike):
+            name = 'hohohohohoho'
+
+            def __fspath__(self):
+                return ''
+
+            @property
+            def size(self):
+                return FileSize(len(b''.join(self.data)))
+
+            @property
+            def data(self):
+                for i in range(100):
+                    yield b'0' * 1000
+
+        wat = asdf.bfobject.upload(Fun())
         #breakpoint()
 
 

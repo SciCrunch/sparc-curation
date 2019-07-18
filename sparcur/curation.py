@@ -969,12 +969,14 @@ class Integrator(PathData, OntologyData):
         # unanchored helpers
         if cls.no_google:
             log.critical('no google no organ data')
-            class asdf:
+            class FakeOrganSheet:
                 modality = lambda v: None
                 organ_term = lambda v: None
                 award_manual = lambda v: None
                 byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
-            cls.organs_sheet = asdf
+                techniques = lambda v: []
+
+            cls.organs_sheet = FakeOrganSheet
         else:
             cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
 

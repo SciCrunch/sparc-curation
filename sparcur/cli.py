@@ -550,15 +550,24 @@ class Main(Dispatcher):
             caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
 
         new_locals = set(c.local for c in caches if c is not None)  # FIXME 
-        new_ids = set(c.id for c in caches if c is not None)
+        new_ids = {c.id:c for c in caches if c is not None}
         maybe_removed_ids = set(existing_ids) - set(new_ids)
-        maybe_new = set(new_ids) - set(existing_ids)
+        maybe_new_ids = set(new_ids) - set(existing_ids)
         if maybe_removed_ids:
             # FIXME pull sometimes has fake file extensions
             from pyontutils.utils import Async, deferred
-            maybe_removed = []
-            for id in maybe_removed_ids:
-                maybe_removed.append(existing_d[id])
+            from pathlib import PurePath
+            maybe_removed = [existing_d[id] for id in maybe_removed_ids]
+            maybe_removed_stems = {PurePath(p.parent) / p.stem:p for p in maybe_removed}  # FIXME still a risk of collisions?
+            maybe_new = [new_ids[id] for id in maybe_new_ids]
+            maybe_new_stems = {PurePath(p.parent) / p.stem:p for p in maybe_new}
+            for pstem, p in maybe_new_stems.values():
+                if pstem in maybe_removed_stems:
+                    mr_path = maybe_removed_stems[pstem]
+                    assert p != mr_path, f'wat\n{mr_path}\n{p}'
+                    new_new_path = p.refresh()
+                    if new_new_path == mr_path:
+                        maybe_removed.remove(mr_path)
 
             Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed
                                           # FIXME deal with untracked files

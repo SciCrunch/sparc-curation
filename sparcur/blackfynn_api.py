@@ -33,12 +33,15 @@ blackfynn-mvp-secret: ${apisecret}
 import io
 import os
 import json
+import types
 import asyncio
 from copy import deepcopy
 #from nibabel import nifti1
 #from pydicom import dcmread
 #from scipy.io import loadmat
 import yaml
+import boto3
+import botocore
 import requests
 from requests import Session
 from requests.exceptions import HTTPError, ConnectionError
@@ -49,13 +52,142 @@ from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset, BaseNode
 from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
+from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.config import devconfig
+from werkzeug.contrib.iterio import IterIO
 from sparcur import exceptions as exc
 from sparcur.core import log, lj
 from sparcur.paths import Path
 from sparcur.metastore import MetaStore
+
+
+def upload_fileobj(
+        file,  # aka Path
+        s3_host,
+        s3_port,
+        s3_bucket,
+        s3_keybase,
+        region,
+        access_key_id,
+        secret_access_key,
+        session_token,
+        encryption_key_id,
+        upload_session_id=None,
+        ):
+    """ streaming upload
+        the object passed in as 'file'
+        doesn't have to be Path at all
+        it just needs to implement the following methods
+        `name`, `size`, and `data`
+    """
+    local_path = file
+
+    try:
+        # account for dev connections
+        resource_args = {}
+        config_args = dict(signature_version='s3v4')
+        if 'amazon' not in s3_host.lower() and len(s3_host)!=0:
+            resource_args = dict(endpoint_url="http://{}:{}".format(s3_host, s3_port))
+            config_args = dict(s3=dict(addressing_style='path'))
+
+        # connect to s3
+        session = boto3.session.Session()
+        s3 = session.client('s3',
+            region_name = region,
+            aws_access_key_id = access_key_id,
+            aws_secret_access_key = secret_access_key,
+            aws_session_token = session_token,
+            config = botocore.client.Config(**config_args),
+            **resource_args
+        )
+
+        # s3 key
+        s3_key = '{}/{}'.format(s3_keybase, local_path.name)
+
+        # override seek to raise an IOError so
+        # we don't get a TypeError
+        # FIXME IterIO stores a buffer of the whole generator >_<
+        f = IterIO(local_path.data, sentinel=b'')
+        def _seek(self, *args):
+            raise IOError('nope')
+        f.seek = _seek
+
+        # upload file to s3
+        s3.upload_fileobj(
+            Fileobj=f,  # FIXME checksumming wrapper probably ...
+            Bucket=s3_bucket,
+            Key=s3_key,
+            #Callback=progress,
+            ExtraArgs=dict(
+                ServerSideEncryption="aws:kms",
+                SSEKMSKeyId=encryption_key_id,
+                #Metadata=checksums,  # hca does it this way
+                # annoyingly this means that you have to read the file twice :/
+            ))
+
+        return s3_key
+
+    except Exception as e:
+        log.error(e)
+        raise e
+
+
+transfers.upload_file = upload_fileobj
+
+
+def check_files(files):
+    """ of course they don't exist """
+
+
+transfers.check_files = check_files
+
+
+def get_preview(self, files, append):
+    paths = files
+
+    params = dict(
+        append = append,
+    )
+
+    payload = { "files": [
+        {
+            "fileName": p.name,
+            "size": p.size,
+            "uploadId": i,
+        } for i, p in enumerate(paths)
+    ]}
+
+    response = self._post(
+        endpoint = self._uri('/files/upload/preview'),
+        params = params,
+        json=payload,
+        )
+
+    import_id_map = dict()
+    for p in response.get("packages", list()):
+        import_id = p.get("importId")
+        warnings = p.get("warnings", list())
+        for warning in warnings:
+            logger.warn("API warning: {}".format(warning))
+        for f in p.get("files", list()):
+            index = f.get("uploadId")
+            import_id_map[paths[index]] = import_id
+    return import_id_map
+
+
+transfers.IOAPI.get_preview = get_preview
+
+
+def init_file(self, filename):
+    """ not using any of this """
+
+
+transfers.UploadManager.init_file = init_file
+
+
+# monkey patches
 
 
 @property
