@@ -592,7 +592,7 @@ class _PathMetaAsPrettyDiff(_PathMetaAsPretty):
     def as_pretty_diff(self, pathmeta, othermeta, pathobject=None, title=None, human=False):
         if title is None:
             if pathobject is not None:
-                title = pathobject.name
+                title = pathobject.relative_to(pathobject.cwd()).as_posix()
             else:
                 title = ''
             
