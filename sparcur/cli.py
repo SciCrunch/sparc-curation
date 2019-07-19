@@ -561,7 +561,7 @@ class Main(Dispatcher):
             maybe_removed_stems = {PurePath(p.parent) / p.stem:p for p in maybe_removed}  # FIXME still a risk of collisions?
             maybe_new = [new_ids[id] for id in maybe_new_ids]
             maybe_new_stems = {PurePath(p.parent) / p.stem:p for p in maybe_new}
-            for pstem, p in maybe_new_stems.values():
+            for pstem, p in maybe_new_stems.items():
                 if pstem in maybe_removed_stems:
                     mr_path = maybe_removed_stems[pstem]
                     assert p != mr_path, f'wat\n{mr_path}\n{p}'
