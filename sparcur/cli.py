@@ -7,7 +7,7 @@ Usage:
     spc fetch [options] [<path>...]
     spc find [options] --name=<PAT>...
     spc status [options]
-    spc meta [--uri] [--browser] [--human] [--diff] [<path>...]
+    spc meta [options] [--uri] [--browser] [--human] [--diff] [<path>...]
     spc export [ttl json datasets] [options]
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
@@ -23,6 +23,7 @@ Usage:
     spc demos [options]
     spc goto <remote-id>
     spc fix [options] [duplicates mismatch] [<path>...]
+    spc stash [options --restore] <path>...
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -105,6 +106,7 @@ Commands:
 
                 mismatch
                 duplicates
+    stash       stash a copy of the specific files and their parents
 
 Options:
     -f --fetch              fetch matching files
@@ -287,6 +289,7 @@ class Main(Dispatcher):
             return
         elif (self.options.pull or
               self.options.mismatch or
+              self.options.stash or
               self.options.missing):
             Integrator.no_google = True
 
@@ -483,6 +486,7 @@ class Main(Dispatcher):
                 sys.exit(2)
 
         anchor.local_data_dir.mkdir()
+        anchor.local_objects_dir.mkdir()
 
         self.anchor = anchor
         self.project_path = self.anchor.local
@@ -978,7 +982,8 @@ class Main(Dispatcher):
             paths = Path('.').resolve(),
 
         old_level = log.level
-        log.setLevel('ERROR')
+        if not self.options.verbose:
+            log.setLevel('ERROR')
         def inner(path):
             if self.options.uri or self.options.browser:
                 uri = path.cache.uri_human
@@ -991,6 +996,12 @@ class Main(Dispatcher):
                 cmeta = path.cache.meta
                 if cmeta is not None:
                     if self.options.diff:
+                        if cmeta.checksum is None:
+                            if not path.cache.local_object_cache_path.exists():
+                                # we are going to have to go to network
+                                self._setup()
+
+                            cmeta.checksum = path.cache.checksum()  # FIXME :/
                         lmeta = path.meta
                         # id and file_id are fake in this instance
                         setattr(lmeta, 'id', None)
@@ -1054,6 +1065,63 @@ class Main(Dispatcher):
         self.app = app
         app.debug = False
         app.run(host='localhost', port=self.options.port, threaded=True)
+
+    def stash(self, paths=None, stashmetafunc=lambda v:v):
+        if paths is None:
+            paths = self.paths
+
+        stash_base = self.anchor.local.parent / 'stash'  # TODO move to operations
+        to_stash = sorted(set(parent for p in paths for parent in
+                               chain((p,), p.relative_to(self.anchor).parents)),
+                           key=lambda p: len(p.as_posix()))
+
+        if self.options.restore:
+            # horribly inefficient, maybe build on a default dict?
+            rcs = sorted((c for c in stash_base.rchildren if not c.is_dir()), key=lambda p:p.as_posix(), reverse=True)
+            for path in paths:
+                relpath = path.relative_to(self.anchor)
+                for p in rcs:
+                    if p.parts[-len(relpath.parts):] == relpath.parts:
+                        p.copy_to(path, force=True, copy_cache_meta=True)  # FIXME old remote may have been deleted, worth a check?
+                        # TODO checksum? sync?
+                        break
+
+            breakpoint()
+
+        else:
+            timestamp = NOWDANGER(implicit_tz='PST PDT')
+            stash = StashPath(stash_base, timestamp)
+            new_anchor = stash / self.anchor.name
+            new_anchor.mkdir(parents=True)
+            new_anchor.cache_init(self.anchor.meta, anchor=True)
+            for p in to_stash[1:]:
+                p = p.relative_to(self.anchor) if p.root == '/' else p
+                new_path = new_anchor / p
+                log.debug(p)
+                log.debug(new_path)
+                p = self.anchor.local / p
+                if p.is_dir():
+                    new_path.mkdir()
+                    new_path.cache_init(p.cache.meta)
+                else:
+                    # TODO search existing stashes to see if
+                    # we already have a stash of the file
+                    log.debug(f'{p!r} {new_path!r}')
+                    new_path.copy_from(p)
+                    pc, npc = p.checksum(), new_path.checksum()
+                    # TODO a better way to do this might be to
+                    # treat the stash as another local for which
+                    # the current local is the remote
+                    # however this might require layering
+                    # remote and remote remote metadata ...
+                    assert pc == npc, f'\n{pc}\n{npc}'
+                    cmeta = p.cache.meta
+                    nmeta = stashmetafunc(cmeta)
+                    log.debug(nmeta)
+                    new_path.cache_init(nmeta)
+
+            nall = list(new_anchor.rchildren)
+            return nall
 
     ### sub dispatchers
 
@@ -1372,6 +1440,7 @@ class Shell(Dispatcher):
     LATEST = Main.LATEST
     latest_export = Main.latest_export
     latest_export_ttl_populate = Main.latest_export_ttl_populate
+    stash = Main.stash
 
     def default(self):
         datasets = list(self.datasets)
@@ -1422,43 +1491,17 @@ class Fix(Shell):
         [print(lmeta.as_pretty_diff(cmeta, pathobject=path, human=self.options.human))
          for path, lmeta, cmeta in oops]
         paths = [p for p, *_ in oops]
-        to_stash = sorted(set(parent for p in paths for parent in
-                               chain((p,), p.cache.relative_to(self.anchor).parents)),
-                           key=lambda p: len(p.as_posix()))
-        timestamp = NOWDANGER(implicit_tz='PST PDT')
-        stash = StashPath(self.anchor.local.parent, 'stash', timestamp)
-        new_anchor = stash / self.anchor.name
-        new_anchor.mkdir(parents=True)
-        new_anchor.cache_init(self.anchor.meta, anchor=True)
-        for p in to_stash[1:]:
-            p = p.relative_to(self.anchor) if p.root == '/' else p
-            new_path = new_anchor / p
-            log.debug(p)
-            log.debug(new_path)
-            p = self.anchor.local / p
-            if p.is_dir():
-                new_path.mkdir()
-                new_path.cache_init(p.cache.meta)
-            else:
-                log.debug(f'{p!r} {new_path!r}')
-                new_path.copy_from(p)
-                pc, npc = p.checksum(), new_path.checksum()
-                # TODO a better way to do this might be to
-                # treat the stash as another local for which
-                # the current local is the remote
-                # however this might require layering
-                # remote and remote remote metadata ...
-                assert pc == npc, f'\n{pc}\n{npc}'
-                cmeta = p.cache.meta
-                nmeta = PathMeta(id=cmeta.old_id)
-                log.debug(nmeta)
-                new_path.cache_init(nmeta)
 
-        nall = list(new_anchor.rchildren)
+        def sf(cmeta):
+            nmeta = PathMeta(id=cmeta.old_id)
+            assert nmeta.id, f'No old_id for {pathmeta}'
+            return nmeta
+
+        nall = self.stash(paths, stashmetafunc=sf)
         [print(n.cache.meta.as_pretty(n)) for n in nall]
         embed()
         # once everything is in order and backed up 
-        # [p.fetch() for p in paths]
+        # [p.cache.fetch() for p in paths]
 
     def duplicates(self):
         all_ = defaultdict(list)

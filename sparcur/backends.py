@@ -669,7 +669,7 @@ class BlackfynnRemote(RemotePath):
         return True
 
     @property
-    def checksum(self):
+    def checksum(self):  # FIXME using a property is inconsistent with LocalPath
         if hasattr(self.bfobject, 'checksum'):
             checksum = self.bfobject.checksum
             if checksum and '-' not in checksum:

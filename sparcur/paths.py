@@ -624,6 +624,26 @@ class AugmentedPath(PosixPath):
         if self.exists():
             return magic.detect_from_filename(self).mime_type
 
+    def checksum(self, cypher=default_cypher):
+        """ checksum() always recomputes from the data
+            meta.checksum is static for cache and remote IF it exists """
+
+        if self.is_file():
+            if ((hasattr(self, '_cache_class') and
+                 hasattr(self._cache_class, 'cypher') and
+                 self._cache_class.cypher != cypher)):  # FIXME this could be static ...
+                cypher = self._cache_class.cypher
+
+            elif (hasattr(self, 'cypher') and
+                  self.cypher != cypher):
+                cypher = self.cypher
+
+            m = cypher()
+            for chunk in self.data:
+                m.update(chunk)
+
+            return m.digest()
+
 
 class CachePath(AugmentedPath):
     # CachePaths this needs to be a real path so that it can navigate the local path sturcture
@@ -744,6 +764,17 @@ class CachePath(AugmentedPath):
     @property
     def local_data_dir(self):
         return self.anchor.local / self._local_data_dir
+
+    @property
+    def local_objects_dir(self):
+        """ sort of like .git/objects """
+        return self.local_data_dir / 'objects'
+
+    @property
+    def local_object_cache_path(self):
+        # FIXME probably need the 2 char directory convention
+        # to limit directory size
+        return self.local_objects_dir / self.cache_key
 
     @property
     def is_helper_cache(self):
@@ -1101,6 +1132,11 @@ class CachePath(AugmentedPath):
                 return
 
         return self._id
+
+    @property
+    def cache_key(self):
+        """ since some systems have compound ids ... """
+        raise NotImplementedError
 
     # TODO how to toggle fetch from remote to heal?
     @property
@@ -1754,6 +1790,10 @@ class BlackfynnCache(PrimaryCache, XattrCache):
         return self.meta.file_id
 
     @property
+    def cache_key(self):
+        return f'{self.id}-{self.file_id}'
+
+    @property
     def uri_human(self):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
@@ -1793,6 +1833,9 @@ class BlackfynnCache(PrimaryCache, XattrCache):
 
     @property
     def data(self):
+        """ get the 'cached' data which isn't really cached at the moment
+            once we implement an index for local files then we can hit that
+            first from here """
         # we don't keep two copies of the local data
         # unless we are doing a git-like thing
         if self.is_dir():
@@ -1802,7 +1845,18 @@ class BlackfynnCache(PrimaryCache, XattrCache):
         if meta.file_id is None:
             raise NotImplementedError('can\'t fetch data without a file id')
 
-        gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
+        #cands = list(self.local_object_cache_dir.glob(self.cache_key))
+        # FIXME this does not play well with old_id ...
+        # can probably get away with just globing for the old_id in
+        # most cases
+        # TODO where to store the chain of prior versions? i.e. do
+        # we just keep the xattrs in the object cache? how about file moves?
+        # sigh git ...
+        if self.local_object_cache_path.exists():
+            gen = chain((f'from local cache {self.local_object_cache_path}',),
+                        self.local_object_cache_path.data)
+        else:
+            gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
 
         try:
             self.data_headers = next(gen)
@@ -1810,7 +1864,12 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             log.error(str(e))
             raise e  # have to raise so that we don't overwrite the file
 
-        yield from gen
+        log.debug(self.data_headers)
+        if self.local_object_cache_path.exists():
+            yield from gen
+        else:
+            yield from self.local_object_cache_path._data_setter(gen)
+            self.local_object_cache_path.cache_init(self.meta)
 
     def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
         # bootstrap the rest if we told it to
@@ -1834,6 +1893,7 @@ def _bind_sysid_(cls):
 class LocalPath(XattrPath):
     # local data about remote objects
 
+    chunksize = 4096  # make the data generator chunksize visible externally
     _cache_class = None  # must be defined by child classes
     sysid = None  # set below
 
@@ -2039,8 +2099,11 @@ class LocalPath(XattrPath):
     def meta(self, value):
         raise TypeError('Cannot set meta on LocalPath, it is a source of metadata.')
 
-    def _data(self, ranges=tuple(), chunksize=4096):
-        """ request arbitrary subjests of data from an object """
+    def _data(self, ranges=tuple(), chunksize=None):
+        """ request arbitrary subsets of data from an object """
+
+        if chunksize is None:
+            chunksize = self.chunksize
 
         with open(self, 'rb') as f:
             if not ranges:
@@ -2076,7 +2139,7 @@ class LocalPath(XattrPath):
     def data(self):
         with open(self, 'rb') as f:
             while True:
-                data = f.read(4096)  # TODO hinting
+                data = f.read(self.chunksize)  # TODO hinting
                 if not data:
                     break
 
@@ -2084,7 +2147,15 @@ class LocalPath(XattrPath):
 
     @data.setter
     def data(self, generator):
-        meta = self.meta
+        if self.cache is not None:
+            cmeta = self.cache.meta
+        # FIXME do we touch a file, write the meta
+        # and then write the data?
+        # do we touch a temporary file, write the meta
+        # unlink the symlink, and move the temp file in, and then write the data?
+        # the order that we do this in is very important for robustness to failure
+        # especially when updating a file ...
+        # storing history in the symlink cache also an option?
         log.debug(f'writing to {self}')
         chunk1 = next(generator)  # if an error occurs don't open the file
         with open(self, 'wb') as f:
@@ -2093,13 +2164,25 @@ class LocalPath(XattrPath):
                 #log.debug(chunk)
                 f.write(chunk)
 
-        if self.cache is not None:
+        if self.cache is not None:  # FIXME cache 
             if not self.cache.meta:
-                self.cache.meta = meta  # glories of persisting xattrs :/
+                self.cache.meta = cmeta  # glories of persisting xattrs :/
             # yep sometimes the xattrs get  blasted >_<
             assert self.cache.meta
 
-    def copy_to(self, target, force=False):
+    def _data_setter(self, generator):
+        """ a data setter that can be used in a chain of generators """
+        log.debug(f'writing to {self}')
+        chunk1 = next(generator)  # if an error occurs don't open the file
+        with open(self, 'wb') as f:
+            f.write(chunk1)
+            yield chunk1
+            for chunk in generator:
+                #log.debug(chunk)
+                f.write(chunk)
+                yield chunk
+
+    def copy_to(self, target, force=False, copy_cache_meta=False):
         """ copy from a the current path object to a target path """
         if type(target) != type(self):
             target = self.__class__(target)
@@ -2109,12 +2192,16 @@ class LocalPath(XattrPath):
         else:
             raise exc.PathExistsError(f'{target}')
 
-    def copy_from(self, source, force=False):
+        if copy_cache_meta:
+            log.debug(f'copying cache meta {self.cache.meta}')
+            target.cache_init(self.cache.meta)
+
+    def copy_from(self, source, force=False, copy_cache_meta=False):
         """ copy from a source path to the current path object """
         if type(source) != type(self):
             source = self.__class__(source)
 
-        source.copy_to(self, force=force)
+        source.copy_to(self, force=force, copy_cache_meta=copy_cache_meta)
 
     @property
     def children(self):
@@ -2125,8 +2212,22 @@ class LocalPath(XattrPath):
     def rchildren(self):
         yield from self.rglob('*')
 
+    def content_different(self):
+        cmeta = self.cache.meta
+        if self.cmeta.checksum:
+            return self.meta.content_different(cmeta)
+        else:
+            # TODO use the index for this
+            # but for now just pull down the remote file
+            # NOTE: this is all handled behind the scenes
+            # by cache.checksum now
+            return self.checksum() != self.cache.checksum()
+
     def diff(self):
-        pass
+        """ This is a bit tricky because it means that we need to
+            keep a shadow copy/cache of all the downloaded files in
+            operations by default... """
+        raise NotImplementedError
 
     def meta_to_remote(self):
         # pretty sure that we don't wan't this independent of data_to_remote
@@ -2153,25 +2254,12 @@ class LocalPath(XattrPath):
         self.remote.data = self.data
         self.remote.annotations = self.annotations
 
-    def checksum(self, cypher=default_cypher):
-        if self.is_file():
-            if (hasattr(self._cache_class, 'cypher') and
-                self._cache_class.cypher != cypher):  # FIXME this could be static ...
-                cypher = self._cache_class.cypher
-
-            m = cypher()
-            chunk_size = 4096
-            with open(self, 'rb') as f:
-                while True:
-                    chunk = f.read(chunk_size)
-                    if chunk:
-                        m.update(chunk)
-                    else:
-                        break
-
-            return m.digest()
-
     def etag(self, chunksize):
+        """ chunksize is the etag cypher chunksize which is
+            different than the data generator chunksize
+            etag chunksize has be implemented so that it
+            works correctly with any data generator chunksize """
+
         if self.is_file():
             m = etag(chunksize)
             for chunk in self.data:
@@ -2180,17 +2268,6 @@ class LocalPath(XattrPath):
             return m.digest()
 
         return
-        if self.is_file():
-            m = etag(chunksize)
-            with open(self, 'rb') as f:
-                while True:
-                    chunk = f.read(chunksize)
-                    if chunk:
-                        m.update(chunk)
-                    else:
-                        break
-
-            return m.digest()
 
 
 class Path(LocalPath):  # NOTE this is a hack to keep everything consistent
