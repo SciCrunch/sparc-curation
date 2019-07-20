@@ -134,6 +134,10 @@ class FileTypeError(SparCurError):
     """ File type is not allowed """
 
 
+class LocalChangesError(SparCurError):
+    """ File has local changes """
+
+
 class NoDataError(SparCurError):
     """ There was no data in the file (not verified with stat)
         FIXME HACK workaround for bad handling of empty sheets in byCol """

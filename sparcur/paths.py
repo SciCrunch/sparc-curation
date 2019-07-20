@@ -308,8 +308,17 @@ class RemotePath:
 
     def _cache_setter(self, cache, update_meta=True):
         cache._remote = self
+        # FIXME in principle
+        # setting cache needs to come before update_meta
+        # in the event that self.meta is missing file_id
+        # if meta updater fails we unset self._c_cache
         if update_meta:
-            cache._meta_updater(self.meta)
+            try:
+                cache._meta_updater(self.meta)
+            except BaseException as e:
+                self._c_cache = None
+                delattr(self, '_c_cache')
+                raise e
 
         self._cache = cache
 
@@ -1222,7 +1231,7 @@ class CachePath(AugmentedPath):
         else:
             raise BaseException('multiple candidates!')
 
-    def refresh(self, update_data=False, size_limit_mb=2):
+    def refresh(self, update_data=False, size_limit_mb=2, force=False):
         if self.meta is None:
             breakpoint()
         limit = (size_limit_mb if
@@ -1231,7 +1240,8 @@ class CachePath(AugmentedPath):
         new = self.remote.refresh(update_cache=True,
                                   update_data=update_data,
                                   update_data_on_cache=(self.is_file() and self.exists()),
-                                  size_limit_mb=size_limit_mb)
+                                  size_limit_mb=size_limit_mb,
+                                  force=force)
         if new is not None:
             return new
         else:
@@ -1251,7 +1261,7 @@ class CachePath(AugmentedPath):
         if self.is_dir():
             raise NotImplementedError('not going to fetch all data in a dir at the moment')
         if meta.file_id is None:
-            self.refresh(update_data=True)
+            self.refresh(update_data=True, force=True)
             # the file name could be different so we have to return here
             return
 
@@ -1260,12 +1270,13 @@ class CachePath(AugmentedPath):
 
         if size_ok or size_limit_mb is None:  # FIXME should we force fetch here by default if the file exists?
             if self.is_broken_symlink():
+                # FIXME touch a temporary file and set the meta first!
                 self.unlink()
                 self.touch()
                 self._meta_setter(meta)
 
             log.info(f'Fetching from cache id {self.id} -> {self.local}')
-            self.local.data = self.data
+            self.local.data = self.data  # note that this should trigger storage to .ops/objects
 
         if size_not_ok:
             log.warning(f'File is over the size limit {meta.size.mb} > {size_limit_mb}')
@@ -1611,7 +1622,7 @@ class PrimaryCache(CachePath):
 
         file_is_different = False
 
-        kwargs = {k:v for k, v in old.items()}  # FIXME this can cause stale file_id if new has no file_id
+        kwargs = {k:v for k, v in old.items()}
         if old.id != new.id:
             kwargs['old_id'] = old.id
 
@@ -1629,6 +1640,14 @@ class PrimaryCache(CachePath):
 
             kwargs[k] = vnew
 
+        if file_is_different:
+            # strip fields missing from new in the case where
+            # we aren't merging metadata from two different sources
+
+            for k, vnew in new.items():
+                if vnew is None:
+                    log.debug(kwargs.pop(k))
+
         #old.updated == new.updated
         #old.updated < new.updated
         #old.updated > new.updated
@@ -1640,9 +1659,14 @@ class PrimaryCache(CachePath):
         return file_is_different, PathMeta(**kwargs)
 
     def _meta_updater(self, pathmeta):
-        file_is_different, updated = self._update_meta(self.meta, pathmeta)
+        original = self.meta
+        file_is_different, updated = self._update_meta(original, pathmeta)
         must_fetch = file_is_different and self.is_file() and self.exists()
         if must_fetch:
+            # FIXME performance, and pathmeta.checksum is None case
+            if self.local.content_different() and self.local.meta.checksum != pathmeta.checksum:
+                raise exc.LocalChangesError(f'not fetching {self}')
+
             log.info(f'crumpling to preserve existing metadata\n{self}')
             trashed = self.crumple()
 
@@ -1869,7 +1893,7 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             yield from gen
         else:
             yield from self.local_object_cache_path._data_setter(gen)
-            self.local_object_cache_path.cache_init(self.meta)
+            self.local_object_cache_path.cache_init(self.meta)  # FIXME self.meta be stale here?!
 
     def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
         # bootstrap the rest if we told it to
@@ -2214,7 +2238,7 @@ class LocalPath(XattrPath):
 
     def content_different(self):
         cmeta = self.cache.meta
-        if self.cmeta.checksum:
+        if cmeta.checksum:
             return self.meta.content_different(cmeta)
         else:
             # TODO use the index for this

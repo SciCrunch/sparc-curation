@@ -665,7 +665,7 @@ class BlackfynnRemote(RemotePath):
         file.parent = bfobject.parent
         file.dataset = bfobject.dataset
         file.package = bfobject
-        self.bfobject = file
+        self._bfobject = file
         return True
 
     @property
@@ -837,7 +837,11 @@ class BlackfynnRemote(RemotePath):
         if self.is_file() and not force:  # this will tigger a fetch
             pass
         else:
+            #self._bfo0 = self._bfobject
             self._bfobject = self._api.get(self.id)
+            #self._bfo1 = self._bfobject
+            self.is_file()  # trigger fetching file in the no file_id case
+            #self._bfo2 = self._bfobject
 
         if update_cache or update_data:
             file_is_different = self.update_cache()
@@ -854,7 +858,7 @@ class BlackfynnRemote(RemotePath):
         return self.cache  # when a cache calls refresh it needs to know if it no longer exists
 
     def update_cache(self):
-        log.debug(f'updating cache for {self.name}')
+        log.debug(f'maybe updating cache for {self.name}')
         file_is_different = self.cache._meta_updater(self.meta)
         # update the cache first
         # then move to the new name if relevant

@@ -568,8 +568,13 @@ class Main(Dispatcher):
             for pstem, p in maybe_new_stems.items():
                 if pstem in maybe_removed_stems:
                     mr_path = maybe_removed_stems[pstem]
-                    assert p != mr_path, f'wat\n{mr_path}\n{p}'
-                    new_new_path = p.refresh()
+                    #assert p != mr_path, f'wat\n{mr_path}\n{p}'
+                    if p != mr_path:
+                        new_new_path = p.refresh()
+                    else:
+                        # csv files match
+                        log.info(f'wat\n{mr_path}\n{p}')
+
                     if new_new_path == mr_path:
                         maybe_removed.remove(mr_path)
 
