@@ -136,3 +136,25 @@ class Organs(FieldAlignment):
                     if field.startswith('technique') and value]
         else:
             return []
+
+    def protocol_uris(self, dataset_id):
+        row = self._lookup(dataset_id)
+
+        def mkval(cell):
+            hl = cell.hyperlink
+            if hl is not None:
+                return hl
+
+            else:
+                logd.warning(f'unhandled value {cell.value}')
+                return cell.value
+
+        if row:
+            row_index = self._dataset_row_index(dataset_id)
+            return [mkval(self.cell_object(row_index, column_index))
+                    for column_index, (field, value)
+                    in enumerate(zip(row._fields, row))
+                    if field.startswith('Protocol') and value]
+        else:
+            return []
+
