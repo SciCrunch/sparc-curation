@@ -589,6 +589,11 @@
     #+END_SRC
 
 ** SPARC
+*** WARNINGS
+    1. *DO NOT USE* =cp -a= copy files with xattrs! \\
+       *INSTEAD* use =rsync -X -u -v=. \\
+       =cp= does not remove absent fields from xattrs of the file previously
+       occupying that name! OH NO (is this a =cp= bug!?)
 *** Get data
     :PROPERTIES:
     :CUSTOM_ID: get-data
