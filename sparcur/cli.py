@@ -572,6 +572,8 @@ class Main(Dispatcher):
                     if p != mr_path:
                         new_new_path = p.refresh()
                     else:
+                        new_new_path = p
+                        # TODO check if file_id needs to be updated in some cases ...
                         # csv files match
                         log.info(f'wat\n{mr_path}\n{p}')
 

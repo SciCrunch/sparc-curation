@@ -312,6 +312,7 @@ class RemotePath:
         # setting cache needs to come before update_meta
         # in the event that self.meta is missing file_id
         # if meta updater fails we unset self._c_cache
+        self._cache = cache
         if update_meta:
             try:
                 cache._meta_updater(self.meta)
@@ -319,8 +320,6 @@ class RemotePath:
                 self._c_cache = None
                 delattr(self, '_c_cache')
                 raise e
-
-        self._cache = cache
 
     @property
     def local(self):
@@ -1645,6 +1644,9 @@ class PrimaryCache(CachePath):
             # we aren't merging metadata from two different sources
 
             for k, vnew in new.items():
+                if k == 'old_id':
+                    continue
+
                 if vnew is None:
                     log.debug(kwargs.pop(k))
 
