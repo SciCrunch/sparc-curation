@@ -1028,12 +1028,17 @@ class Main(Dispatcher):
     def goto(self):
         # TODO this needs an inverted index
         for rc in self.cwd.rchildren:
-            if rc.cache.id == self.options.remote_id:
-                if rc.is_broken_symlink() or rc.is_file():
-                    rc = rc.parent
+            try:
+                if rc.cache.id == self.options.remote_id:
+                    if rc.is_broken_symlink() or rc.is_file():
+                        rc = rc.parent
 
-                print(rc.relative_to(self.cwd).as_posix())
-                return
+                    print(rc.relative_to(self.cwd).as_posix())
+                    return
+            except AttributeError as e:
+                if not rc.skip_cache:
+                    log.critical(rc)
+                    log.error(e)
 
     def status(self):
         project_path = self.cwd.find_cache_root()
