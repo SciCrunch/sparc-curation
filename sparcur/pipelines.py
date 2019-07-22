@@ -42,6 +42,7 @@ class ContributorsPipeline(DatasourcePipeline):
         self.runtime_context = runtime_context
         self.dataset_id = runtime_context.id
         self.dsid = runtime_context.uri_api  # FIXME need a BlackfynnId class
+        self.lifters = lifters
     
     @property
     def data(self):
@@ -103,6 +104,13 @@ class ContributorsPipeline(DatasourcePipeline):
 
         contributor['id'] = s
         he.embedErrors(contributor)
+
+        # lifting + adding
+        if 'contributor_affiliation' in contributor:
+            ca = contributor['contributor_affiliation']
+            maybe_ror = self.lifters.affiliations(ca)
+            if maybe_ror is not None:
+                contributor['affiliation'] = maybe_ror
 
 
 class PrePipeline(Pipeline):
@@ -265,7 +273,10 @@ class JSONPipeline(Pipeline):
     @property
     def subpipelined(self):
         data = self.pipeline_start
-        errors_subpipelines = list(DictTransformer.subpipeline(data, self.runtime_context, self.subpipelines))
+        errors_subpipelines = list(DictTransformer.subpipeline(data,
+                                                               self.runtime_context,
+                                                               self.subpipelines,
+                                                               lifters=self.lifters))
         errors = tuple(es for es in errors_subpipelines if isinstance(es, tuple))
         self.subpipeline_errors(errors)
         self.subpipeline_instances = tuple(es for es in errors_subpipelines if isinstance(es, Pipeline))

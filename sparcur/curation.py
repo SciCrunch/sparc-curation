@@ -982,6 +982,7 @@ class Integrator(PathData, OntologyData):
 
         cls.organ = OrganData()
         cls.member = State.member
+        cls.affiliations = sheets.Affiliations()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1047,6 +1048,7 @@ class Integrator(PathData, OntologyData):
             award_manual = self.organs_sheet.award_manual(id)
             techniques = self.organs_sheet.techniques(id)
             protocol_uris = self.organs_sheet.protocol_uris(id)
+            affiliations = self.affiliations
 
             #sheets
             organ_term = self.organs_sheet.organ_term(id)

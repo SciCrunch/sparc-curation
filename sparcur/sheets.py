@@ -45,6 +45,23 @@ class Affiliations(Sheet):
     sheet_name = 'Affiliations'
     index_columns = 'affiliation_string',
 
+    def __call__(self, affiliation_string):
+        m = self.mapping
+        if affiliation_string in m:
+            return m[affiliation_string]
+        else:
+            # FIXME super inefficient
+            las = len(affiliation_string)
+            for l, s in sorted([(len(k), k) for k in m.keys()], reverse=True):
+                if l <= las and s in affiliation_string:
+                    return m[s]
+
+    @property
+    def mapping(self):
+        return {a:AutoId(r).asInstrumented() if r else None
+                for a, r in zip(self.byCol.affiliation_string,
+                                self.byCol.ror_id)}
+
 
 # field alignment
 class FieldAlignment(Sheet):

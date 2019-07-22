@@ -13,7 +13,7 @@ Usage:
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
     spc report [completeness filetypes pathids keywords subjects errors test] [options]
-    spc shell [integration protocols] [options]
+    spc shell [affil integration protocols] [options]
     spc server [options]
     spc tables [<directory>...]
     spc annos [export shell]
@@ -277,6 +277,7 @@ class Main(Dispatcher):
         self.cwd = Path.cwd()
         self.cwdintr = Integrator(self.cwd)
 
+        # FIXME populate this via decorator
         if (self.options.clone or
             self.options.meta or
             self.options.goto or
@@ -1473,6 +1474,16 @@ class Shell(Dispatcher):
         except:
             pass
 
+        embed()
+
+    def affil(self):
+        from pyontutils.utils import Async, deferred
+        from sparcur.sheets import Affiliations
+        a = Affiliations()
+        m = a.mapping
+        rors = sorted(set(_ for _ in m.values() if _))
+        #dat = Async(rate=5)(deferred(lambda r:r.data)(i) for i in rors)
+        dat = [r.data for r in rors]  # once the cache has been populated
         embed()
 
     def protocols(self):

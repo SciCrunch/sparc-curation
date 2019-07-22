@@ -8,6 +8,7 @@ from collections import deque
 import rdflib
 import htmlfn as hfn
 import ontquery as oq
+import requests
 #from joblib import Memory
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -15,11 +16,11 @@ from scibot.utils import resolution_chain
 from scibot.extract import normalizeDoi
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.namespaces import OntCuries, TEMP, sparc
-from pyontutils.namespaces import prot, proc, tech, asp, dim, unit
+from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl
 from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
-
-from sparcur.utils import log, logd, sparc, FileSize, python_identifier  # FIXME fix other imports
+from sparcur.utils import log, logd, cache, sparc, FileSize, python_identifier  # FIXME fix other imports
+from sparcur.config import config
 
 
 # disk cache decorator
@@ -39,6 +40,7 @@ po.extend((sparc.firstName,
 OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
            'DOI':'https://doi.org/',
+           'ror':'https://ror.org/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
@@ -286,6 +288,91 @@ class PioInst(URIInstrumentation, PioId):
         return json
 
 
+class _RorPrefixes(oq.OntCuries): pass
+RorPrefixes = _RorPrefixes.new()
+RorPrefixes({'ror': 'https://ror.org/',
+             'rorapi': 'https://api.ror.org/organizations/',
+})
+
+
+class RorId(OntId):
+    _namespaces = RorPrefixes
+    # TODO checksumming
+    # TODO FIXME for ids like this should we render only the suffix
+    # since the prefix is redundant with the identifier type?
+    # initial answer: yes
+
+
+class RorInst(URIInstrumentation, RorId):
+
+    @property
+    def data(self):
+        return self._data(self.suffix)
+
+    @cache(Path(config.cache_dir, 'ror_json'))
+    def _data(self, suffix):
+        # TODO data endpoint prefix ?? vs data endpoint pattern ...
+        resp = requests.get(RorId(prefix='rorapi', suffix=suffix))
+        if resp.ok:
+            return resp.json()
+
+    @property
+    def name(self):
+        return self.data['name']
+
+    label = name  # map their schema to ours
+
+    def asExternalId(self, id_class):
+        eids = self.data['external_ids']
+        if id_class._ror_key in eids:
+            eid_record = eids[id_class._ror_key]
+            if eid_record['preferred']:
+                eid = eid_record['preferred']
+            else:
+                eid_all = eid_record['all']
+                if isinstance(eid_all, str):  # https://github.com/ror-community/ror-api/issues/53
+                    eid = eid_all
+                else:
+                    eid = eid_all[0]
+
+            return id_class(eid)
+
+    _type_map = {
+        'Education': TEMP.Institution,
+    }
+    @property
+    def institutionTypes(self):
+        for t in self.data['types']:
+            yield self._type_map[t]
+
+    @property
+    def synonyms(self):
+        d = self.data
+        # FIXME how to deal with type conversion an a saner way ...
+        yield from [rdflib.Literal(a) for a in d['aliases']]
+        yield from [rdflib.Literal(a) for a in d['acronyms']]
+        yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
+
+    @property
+    def triples_gen(self):
+        """ produce a triplified version of the record """
+        s = self.u
+        a = rdf.type
+        yield s, a, owl.NamedIndividual
+        for o in self.institutionTypes:
+            yield s, a, o
+
+        yield s, rdfs.label, rdflib.Literal(value.label)
+        for o in self.synonyms:
+            yield s, a, rdflib.Literal(o)
+
+        # TODO also yeild all the associated grid identifiers
+
+
+class IsniId(OntId):  # TODO
+    prefix = 'http://isni.org/isni/'
+
+
 class AutoId:
     """ dispatch to type on identifier structure """
     def __new__(cls, something):
@@ -297,6 +384,9 @@ class AutoId:
 
         if 'orcid' in something:
             return OrcidId(something)
+
+        if '/ror.org/' in something or something.startswith('ror:'):
+            return RorId(something)
 
         if 'protocols.io' in something:
             return PioId(something)

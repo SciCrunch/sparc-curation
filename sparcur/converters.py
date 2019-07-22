@@ -114,6 +114,7 @@ class ContributorConverter(TripleConverter):
         ('middle_name', TEMP.middleName),
         ('last_name', sparc.lastName),
         ('contributor_affiliation', TEMP.hasAffiliation),
+        ('affiliation', TEMP.hasAffiliation),  # FIXME iri vs literal
         ('is_contact_person', sparc.isContactPerson),
         ('is_responsible_pi', sparc.isContactPerson),
         ('blackfynn_user_id', TEMP.hasBlackfynnUserId),
@@ -122,6 +123,16 @@ class ContributorConverter(TripleConverter):
  
     def contributor_role(self, value):
         return TEMP.hasRole, TEMP[value]
+
+    class Extra:
+        def __init__(self, converter):
+            self.c = converter
+            self.integrator = converter.integrator
+
+        def affiliation(self, value):
+            #_, s = self.c.affiliation(value)
+            yield from value.triples_gen
+               
 
 ContributorConverter.setup()
 
