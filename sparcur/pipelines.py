@@ -721,6 +721,14 @@ class PipelineExtras(JSONPipeline):
 
                 data['meta']['organ'] = out
 
+        if 'protocol_url_or_doi' not in data['meta']:
+            if self.lifters.protocol_uris:
+                data['meta']['protocol_url_or_doi'] = tuple(self.lifters.protocol_uris)
+
+        else:
+            data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
+            data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
+
         return data
 
     @hasSchema(sc.DatasetOutSchema)

@@ -130,7 +130,10 @@ class DoiId(OntId):
     class DoiMalformedError(Exception):
         """ WHAT HAVE YOU DONE!? """
 
-    def __new__(cls, doi_in_various_states_of_mangling):
+    def __new__(cls, doi_in_various_states_of_mangling=None, iri=None):
+        if doi_in_various_states_of_mangling is None and iri is not None:
+            doi_in_various_states_of_mangling = iri
+
         self = super().__new__(cls, prefix='doi', suffix=normalizeDoi(doi_in_various_states_of_mangling))
         self._unnormalized = doi_in_various_states_of_mangling
         return self
@@ -246,9 +249,11 @@ PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
 class PioId(OntId):
     _namespaces = PioPrefixes
 
-    def __new__(cls, curie_or_iri=None):
+    def __new__(cls, curie_or_iri=None, iri=None):
+        if curie_or_iri is None and iri:
+            curie_or_iri = iri
         normalized = curie_or_iri.replace('://protocols.io', '://www.protocols.io')
-        self = super().__new__(cls, curie_or_iri=normalized)
+        self = super().__new__(cls, curie_or_iri=normalized, iri=iri)
         self._unnormalized = curie_or_iri
         return self
         
