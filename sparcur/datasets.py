@@ -694,7 +694,8 @@ class DatasetDescriptionFile(Version1Header):
             doi = True
 
         if doi:
-            value = DoiId(prefix='doi', suffix=normalizeDoi(value))
+            #value = DoiId(prefix='doi', suffix=normalizeDoi(value))
+            value = DoiId(value)
         else:
             value = PioId(value).normalize()
 

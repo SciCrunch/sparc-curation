@@ -13,7 +13,7 @@ Usage:
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
     spc report [completeness filetypes pathids keywords subjects errors test] [options]
-    spc shell [integration] [options]
+    spc shell [integration protocols] [options]
     spc server [options]
     spc tables [<directory>...]
     spc annos [export shell]
@@ -1473,6 +1473,23 @@ class Shell(Dispatcher):
         except:
             pass
 
+        embed()
+
+    def protocols(self):
+        """ test protocol identifier functionality """
+        org = Integrator(self.project_path)
+        from sparcur.core import get_right_id, AutoId, DoiId, PioId
+        from pyontutils.utils import Async, deferred
+        skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, '
+        asdf = [us for us in sorted(org.organs_sheet.byCol.protocol_url_1)
+                if us not in skip and us and ',' not in us]
+        wat = [AutoId(_) for _ in asdf]
+        inst = [i.asInstrumented() for i in wat]
+        res = Async(rate=5)(deferred(i.resolve)(AutoId) for i in inst)
+        pis = [i.asInstrumented() for i in res if isinstance(i, PioId)]
+        #dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
+        #dois = [d['protocol']['doi'] for d in dat if d]
+        dois = [p.doi for p in pis]
         embed()
 
     def integration(self):

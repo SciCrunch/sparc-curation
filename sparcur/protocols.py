@@ -14,7 +14,7 @@ from sparcur.utils import log, logd, cache
 from sparcur.paths import Path
 from sparcur.config import config
 from sparcur.core import log, logd, OntTerm, OntId, OrcidId, PioId, sparc
-from sparcur.core import get_right_id, DoiId, DoiInst
+from sparcur.core import get_right_id, DoiId, DoiInst, PioInst
 
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
@@ -111,8 +111,12 @@ class ProtcurData:
 class ProtocolData(dat.HasErrors):
     # this class is best used as a helper class not as a __call__ class
 
+    _instance_wanted_by = PioInst,
+
     def __init__(self, id=None):  # FIXME lots of ways to use this class ...
         self.id = id  # still needed for the converters use case :/
+        # FIXME protocol data shouldn't need do know anything about
+        # what dataset is using it, >_<
         super().__init__(pipeline_stage=self.__class__)
 
     def protocol(self, uri):
@@ -130,6 +134,9 @@ class ProtocolData(dat.HasErrors):
                                 ' unless you have it in secrets') from e
         _pio_creds = get_protocols_io_auth(creds_file)
         cls._pio_header = QuietDict({'Authorization': 'Bearer ' + _pio_creds.access_token})
+        _inst = cls()
+        for wants in cls._instance_wanted_by:
+            wants._protocol_data = _inst
 
     @classmethod
     def cache_path(cls):

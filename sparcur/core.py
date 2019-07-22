@@ -12,6 +12,7 @@ import ontquery as oq
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from scibot.utils import resolution_chain
+from scibot.extract import normalizeDoi
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.namespaces import OntCuries, TEMP, sparc
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit
@@ -125,10 +126,14 @@ DoiPrefixes({'DOI':'https://doi.org/',
 
 class DoiId(OntId):
     _namespaces = DoiPrefixes
-    __firsts = 'iri',
 
     class DoiMalformedError(Exception):
         """ WHAT HAVE YOU DONE!? """
+
+    def __new__(cls, doi_in_various_states_of_mangling):
+        self = super().__new__(cls, prefix='doi', suffix=normalizeDoi(doi_in_various_states_of_mangling))
+        self._unnormalized = doi_in_various_states_of_mangling
+        return self
 
     @property
     def valid(self):
@@ -138,19 +143,7 @@ class DoiId(OntId):
         return DoiInst(self)
 
 
-class DoiInst(DoiId):
-    # TODO FIXME pull this into idlib or whatever we are calling it
-    #def __new__(self, doi_thing):
-        # FIXME autofetch ... hrm ... data vs metadata ...
-        #return super().__new__(doi_thing)
-
-    def metadata(self):
-        # e.g. crossref, datacite, etc.
-        pass
-
-    def data(self):
-        pass
-
+class URIInstrumentation(oq.terms.InstrumentedIdentifier):
     @property
     def resolution_chain(self):
         # FIXME what should an identifier object represent?
@@ -181,6 +174,22 @@ class DoiInst(DoiId):
             return uri  # FIXME TODO identifier it
 
 
+class DoiInst(URIInstrumentation, DoiId):
+    # TODO FIXME pull this into idlib or whatever we are calling it
+    #def __new__(self, doi_thing):
+        # FIXME autofetch ... hrm ... data vs metadata ...
+        #return super().__new__(doi_thing)
+
+    @property
+    def metadata(self):
+        # e.g. crossref, datacite, etc.
+        pass
+
+    @property
+    def data(self):
+        pass
+
+
 class OrcidPrefixes(oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
@@ -195,7 +204,6 @@ OrcidPrefixes({'orcid':'https://orcid.org/',
 
 class OrcidId(OntId):
     _namespaces = OrcidPrefixes
-    __firsts = 'iri',
 
     class OrcidMalformedError(Exception):
         """ WHAT HAVE YOU DONE!? """
@@ -237,14 +245,58 @@ PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
 
 class PioId(OntId):
     _namespaces = PioPrefixes
-    __firsts = 'iri',
 
+    def __new__(cls, curie_or_iri=None):
+        normalized = curie_or_iri.replace('://protocols.io', '://www.protocols.io')
+        self = super().__new__(cls, curie_or_iri=normalized)
+        self._unnormalized = curie_or_iri
+        return self
+        
     def normalize(self):
-        return self.__class__(self.replace('://protocols.io', '://www.protocols.io'))
+        return self
 
     @property
     def slug(self):
         return self.suffix.rsplit('/', 1)[0]
+
+
+class PioInst(URIInstrumentation, PioId):
+    """ instrumented protocols """
+    # FIXME defining this here breaks the import chain
+    # since protocols.py imports from core.py (sigh)
+    _wants_instance = '.protocols.ProtocolData'  # this is an awful pattern
+    # but what do you want :/
+
+    @property
+    def doi(self):
+        data = self.data
+        if data:
+            doi = data['protocol']['doi']
+            if doi:
+                return DoiId(doi)
+        
+    @property
+    def data(self):
+        json = self._protocol_data.protocol(self.iri)
+        return json
+
+
+class AutoId:
+    """ dispatch to type on identifier structure """
+    def __new__(cls, something):
+        if '10.' in something:
+            if 'http' in something and 'doi.org' not in something:
+                pass  # probably a publisher uri that uses the handle
+            else:
+                return DoiId(something)
+
+        if 'orcid' in something:
+            return OrcidId(something)
+
+        if 'protocols.io' in something:
+            return PioId(something)
+
+        return OntId(something)
 
 
 def get_right_id(uri):

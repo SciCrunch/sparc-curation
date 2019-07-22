@@ -1,5 +1,5 @@
 from pyontutils.sheets import Sheet
-from sparcur.core import OntId, OntTerm
+from sparcur.core import OntId, OntTerm, AutoId
 from sparcur.utils import log, logd
 from urllib.parse import quote
 
@@ -143,18 +143,19 @@ class Organs(FieldAlignment):
         def mkval(cell):
             hl = cell.hyperlink
             if hl is not None:
-                return hl
+                return AutoId(hl)
 
             else:
                 logd.warning(f'unhandled value {cell.value}')
                 return cell.value
 
         if row:
+            skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, '
             row_index = self._dataset_row_index(dataset_id)
             return [mkval(self.cell_object(row_index, column_index))
                     for column_index, (field, value)
                     in enumerate(zip(row._fields, row))
-                    if field.startswith('Protocol') and value]
+                    if field.startswith('Protocol') and value and value not in skip]
         else:
             return []
 
