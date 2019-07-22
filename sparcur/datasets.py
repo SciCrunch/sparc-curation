@@ -826,7 +826,12 @@ class SubjectsFile(Version1Header):
         yield self.query(nv, 'NCBITaxon')
 
     def strain(self, value):
-        yield self.query(value, 'BIRNLEX')  # FIXME
+        if value == 'DSH':
+            value = 'domestic shorthair'
+            return value
+
+        wat = self.query(value, 'BIRNLEX')  # FIXME
+        yield wat
 
     def sex(self, value):
         nv = nml.NormSex(value)
