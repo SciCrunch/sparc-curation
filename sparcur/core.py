@@ -17,7 +17,7 @@ from scibot.utils import resolution_chain
 from scibot.extract import normalizeDoi
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.utils import isoformat, TZLOCAL
-from pyontutils.namespaces import OntCuries, TEMP, sparc
+from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
@@ -472,18 +472,30 @@ class RorInst(URIInstrumentation, RorId):
 
     _type_map = {
         'Education': TEMP.Institution,
+        'Healthcare': TEMP.Institution,
+        'Facility': TEMP.CoreFacility,
+        'Nonprofit': TEMP.Nonprofit,
+        'Other': TEMP.Institution,
     }
     @property
     def institutionTypes(self):
-        for t in self.data['types']:
-            yield self._type_map[t]
+        if 'types' in self.data:
+            for t in self.data['types']:
+                if t == 'Other':
+                    log.info(self.label)
+
+                yield self._type_map[t]
+
+        else:
+            log.critical(self.data)
+            raise TypeError('wat')
 
     @property
     def synonyms(self):
         d = self.data
         # FIXME how to deal with type conversion an a saner way ...
-        yield from [rdflib.Literal(a) for a in d['aliases']]
-        yield from [rdflib.Literal(a) for a in d['acronyms']]
+        yield from [rdflib.Literal(s) for s in d['aliases']]
+        yield from [rdflib.Literal(s) for s in d['acronyms']]
         yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
 
     @property
@@ -497,7 +509,7 @@ class RorInst(URIInstrumentation, RorId):
 
         yield s, rdfs.label, rdflib.Literal(self.label)
         for o in self.synonyms:
-            yield s, a, rdflib.Literal(o)
+            yield s, NIFRID.synonym, o  # FIXME this looses information about synonym type
 
         # TODO also yeild all the associated grid identifiers
 
