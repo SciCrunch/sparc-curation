@@ -3,6 +3,7 @@ import json
 import shutil
 import itertools
 from pathlib import Path
+from datetime import datetime
 from functools import wraps
 from collections import deque
 import rdflib
@@ -15,8 +16,9 @@ from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from scibot.utils import resolution_chain
 from scibot.extract import normalizeDoi
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
+from pyontutils.utils import isoformat, TZLOCAL
 from pyontutils.namespaces import OntCuries, TEMP, sparc
-from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl
+from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, cache, sparc, FileSize, python_identifier  # FIXME fix other imports
@@ -149,6 +151,16 @@ class DoiId(OntId):
 
 
 class URIInstrumentation(oq.terms.InstrumentedIdentifier):
+
+    @property
+    def headers(self):
+        """ request headers """
+        if not hasattr(self, '_headers'):
+            resp = requests.head(self.iri)  # TODO status handling for all these
+            self._headers = resp.headers
+
+        return self._headers
+
     @property
     def resolution_chain(self):
         # FIXME what should an identifier object represent?
@@ -188,11 +200,35 @@ class DoiInst(URIInstrumentation, DoiId):
     @property
     def metadata(self):
         # e.g. crossref, datacite, etc.
-        pass
+        # so this stuff isnt quite to the spec that is doccumented here
+        # https://crosscite.org/docs.html
+        # nor here
+        # https://support.datacite.org/docs/datacite-content-resolver
+        accept = (
+            'application/vnd.datacite.datacite+json, '  # first so it can fail
+            'application/json, '  # undocumented fallthrough for crossref ?
+        )
+        resp = requests.get(self, headers={'Accept': accept})
+        if resp.ok:
+            return resp.json()
+        else:
+            resp.raise_for_status()  # TODO see if this is really a good idea or not
+
+    @property
+    def ttl(self):
+        # both datacite and crossref produce in turtle
+        resp = requests.get(self, headers={'Accept': 'text/turtle'})
+        return resp.text
 
     @property
     def data(self):
-        pass
+        # FIXME TODO should the data associated with the doi
+        # be the metadata about the object or the object itself?
+        # from a practical standpoint derefercing the doi is
+        # required before you can content negotiate on the
+        # actual document itself, which is a practical necessity
+        # if somewhat confusing
+        return self.metadata
 
 
 class OrcidPrefixes(oq.OntCuries):
@@ -245,26 +281,41 @@ PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
              'pio.edit': 'https://www.protocols.io/edit/',  # sigh
              'pio.private': 'https://www.protocols.io/private/',
              'pio.fileman': 'https://www.protocols.io/file-manager/',
+             'pio.api': 'https://www.protocols.io/api/v3/protocols/',
 })
 
 
 class PioId(OntId):
     _namespaces = PioPrefixes
 
-    def __new__(cls, curie_or_iri=None, iri=None):
+    def __new__(cls, curie_or_iri=None, iri=None, prefix=None, suffix=None):
         if curie_or_iri is None and iri:
             curie_or_iri = iri
-        normalized = curie_or_iri.replace('://protocols.io', '://www.protocols.io')
-        self = super().__new__(cls, curie_or_iri=normalized, iri=iri)
-        self._unnormalized = curie_or_iri
+
+        if curie_or_iri is not None:
+            # FIXME trailing nonsense for abstract etc
+            normalized = curie_or_iri.replace('://protocols.io', '://www.protocols.io')
+        else:
+            normalized = None
+
+        self = super().__new__(cls, curie_or_iri=normalized, iri=iri,
+                               prefix=prefix, suffix=suffix)
+
+        self._unnormalized = curie_or_iri if curie_or_iri else self.iri
         return self
         
+    @property
+    def uri_api(self):
+        return self.__class__(prefix='pio.api', suffix=self.slug)
+
     def normalize(self):
         return self
 
     @property
     def slug(self):
-        return self.suffix.rsplit('/', 1)[0]
+        if self.suffix is None:
+            breakpoint()
+        return self.suffix.rsplit('/', 1)[0] if '/' in self.suffix else self.suffix
 
 
 class PioInst(URIInstrumentation, PioId):
@@ -278,20 +329,102 @@ class PioInst(URIInstrumentation, PioId):
     def doi(self):
         data = self.data
         if data:
-            doi = data['protocol']['doi']
+            doi = data['doi']
             if doi:
                 return DoiId(doi)
-        
+
+    @property
+    def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
+        """ the not-private uri """
+        data = self.data
+        if data:
+            uri = data['uri']
+            if uri:
+                return self.__class__(prefix='pio.view', suffix=uri)
+
     @property
     def data(self):
-        json = self._protocol_data.protocol(self.iri)
-        return json
+        if not hasattr(self, '_data'):
+            blob = self._protocol_data.protocol(self.iri)
+            self._status_code = blob['status_code']
+            self._data = blob['protocol']
+
+        return self._data
+
+    @property
+    def hasVersions(self):
+        return bool(self.data['has_versions'])
+
+    @property
+    def versions(self):
+        yield from self.data['versions']  # TODO ...
+
+    @property
+    def created(self):
+        # FIXME I don't think this is TZLOCAL for any reason beyond accident of circumstances
+        # I think this is PDT i.e. the location of the protocols.io servers
+        tzl = TZLOCAL()
+        return datetime.fromtimestamp(self.data['created_on'], tz=tzl)
+
+    @property
+    def updated(self):
+        tzl = TZLOCAL()
+        return datetime.fromtimestamp(self.data['changed_on'], tz=tzl)
+
+    @property
+    def creator(self):
+        return PioUserInst('pio.user:' + self.data['creator']['username'])
+
+    @property
+    def authors(self):
+        for u in self.data['authors']:
+            yield PioUserInst(prefix='pio.user', suffix=u['username'])
+
+
+class _PioUserPrefixes(oq.OntCuries): pass
+PioUserPrefixes = _PioUserPrefixes.new()
+PioUserPrefixes({'pio.user': 'https://www.protocols.io/researchers/',
+                 'pio.api.user': 'https://www.protocols.io/api/v3/researchers/',
+})
+
+
+class PioUserId(OntId):
+    _namespaces = PioUserPrefixes
+
+
+class PioUserInst(URIInstrumentation, PioUserId):
+    _wants_instance = '.protocols.ProtocolData'  # this is an awful pattern
+
+    @property
+    def uri_human(self):
+        return self.__class__(prefix='pio.user', suffix=self.suffix)
+
+    @property
+    def uri_api(self):
+        return self.__class__(prefix='pio.api.user', suffix=self.suffix)
+
+    @property
+    def data(self):
+        if not hasattr(self, '_data'):
+            uri = self.uri_api + '?with_extras=1'
+            # FIXME this is a dumb an convoluted way to get authed api access
+            blob = self._protocol_data.get(uri)
+            self._status_code = blob['status_code']
+            self._data = blob['researcher']
+
+        return self._data
+
+    @property
+    def orcid(self):
+        orcid = self.data['orcid']
+        if orcid is not None:
+            return OrcidId(prefix='orcid', suffix=orcid)
 
 
 class _RorPrefixes(oq.OntCuries): pass
 RorPrefixes = _RorPrefixes.new()
 RorPrefixes({'ror': 'https://ror.org/',
-             'rorapi': 'https://api.ror.org/organizations/',
+             'ror.api': 'https://api.ror.org/organizations/',
 })
 
 
@@ -312,7 +445,7 @@ class RorInst(URIInstrumentation, RorId):
     @cache(Path(config.cache_dir, 'ror_json'))
     def _data(self, suffix):
         # TODO data endpoint prefix ?? vs data endpoint pattern ...
-        resp = requests.get(RorId(prefix='rorapi', suffix=suffix))
+        resp = requests.get(RorId(prefix='ror.api', suffix=suffix))
         if resp.ok:
             return resp.json()
 
@@ -362,7 +495,7 @@ class RorInst(URIInstrumentation, RorId):
         for o in self.institutionTypes:
             yield s, a, o
 
-        yield s, rdfs.label, rdflib.Literal(value.label)
+        yield s, rdfs.label, rdflib.Literal(self.label)
         for o in self.synonyms:
             yield s, a, rdflib.Literal(o)
 
@@ -371,6 +504,7 @@ class RorInst(URIInstrumentation, RorId):
 
 class IsniId(OntId):  # TODO
     prefix = 'http://isni.org/isni/'
+    _ror_key = 'ISNI'
 
 
 class AutoId:
@@ -394,6 +528,11 @@ class AutoId:
         return OntId(something)
 
 
+class AutoInst:
+    def __new__(cls, something):
+        return AutoId(something).asInstrumented()
+
+
 def get_right_id(uri):
     # FIXME this is a bad way to do this ...
     if isinstance(uri, DoiId) or 'doi' in uri:
@@ -405,7 +544,10 @@ def get_right_id(uri):
         pi = di.resolve(PioId)
 
     else:
-        pi = PioId(uri).normalize()
+        if not isinstance(uri, PioId):
+            pi = PioId(uri)  #.normalize()
+        else:
+            pi = uri
 
     return pi
 

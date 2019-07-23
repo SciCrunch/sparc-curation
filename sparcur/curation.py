@@ -975,6 +975,7 @@ class Integrator(PathData, OntologyData):
                 award_manual = lambda v: None
                 byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
                 techniques = lambda v: []
+                protocol_uris = lambda v: []
 
             cls.organs_sheet = FakeOrganSheet
         else:

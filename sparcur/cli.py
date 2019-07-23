@@ -1151,6 +1151,7 @@ class Main(Dispatcher):
         fix = Fix(self)
         fix()
 
+
 class Report(Dispatcher):
 
     paths = Main.paths
@@ -1456,6 +1457,7 @@ class Shell(Dispatcher):
     stash = Main.stash
 
     def default(self):
+        from sparcur.core import AutoId, AutoInst
         datasets = list(self.datasets)
         datasets_local = list(self.datasets_local)
         dsd = {d.meta.id:d for d in datasets}
@@ -1474,6 +1476,10 @@ class Shell(Dispatcher):
         except:
             pass
 
+        p = AutoInst('https://www.protocols.io/private/648B128F515D9A42A2EB41F92D11D352')
+        hrm = p.uri_human.uri_api
+        hrm.uri_api
+        hrm.uri_human
         embed()
 
     def affil(self):
@@ -1489,7 +1495,7 @@ class Shell(Dispatcher):
     def protocols(self):
         """ test protocol identifier functionality """
         org = Integrator(self.project_path)
-        from sparcur.core import get_right_id, AutoId, DoiId, PioId
+        from sparcur.core import get_right_id, AutoId, DoiId, PioId, PioInst
         from pyontutils.utils import Async, deferred
         skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, '
         asdf = [us for us in sorted(org.organs_sheet.byCol.protocol_url_1)

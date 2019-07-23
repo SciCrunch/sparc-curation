@@ -14,7 +14,7 @@ from sparcur.utils import log, logd, cache
 from sparcur.paths import Path
 from sparcur.config import config
 from sparcur.core import log, logd, OntTerm, OntId, OrcidId, PioId, sparc
-from sparcur.core import get_right_id, DoiId, DoiInst, PioInst
+from sparcur.core import get_right_id, DoiId, DoiInst, PioInst, PioUserInst
 
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
@@ -111,7 +111,7 @@ class ProtcurData:
 class ProtocolData(dat.HasErrors):
     # this class is best used as a helper class not as a __call__ class
 
-    _instance_wanted_by = PioInst,
+    _instance_wanted_by = PioInst, PioUserInst
 
     def __init__(self, id=None):  # FIXME lots of ways to use this class ...
         self.id = id  # still needed for the converters use case :/
@@ -170,6 +170,35 @@ class ProtocolData(dat.HasErrors):
             yield self._get_protocol_json(uri)
 
     @cache(Path(config.cache_dir, 'protocol_json'))
+    def get(self, uri):
+         #juri = uri + '.json'
+        logd.info(uri)
+        log.debug('going to network for protocols')
+        resp = requests.get(uri, headers=self._pio_header)
+        #log.info(str(resp.request.headers))
+        if resp.ok:
+            try:
+                j = resp.json()  # the api is reasonably consistent
+            except BaseException as e:
+                log.exception(e)
+                breakpoint()
+                raise e
+            return j
+        else:
+            try:
+                j = resp.json()
+                sc = j['status_code']
+                em = j['error_message']
+                msg = f'protocol issue {uri} {resp.status_code} {sc} {em} {self.id!r}'
+                logd.error(msg)
+                self.addError(msg)
+                # can't return here because of the cache
+            except BaseException as e:
+                log.exception(e)
+
+            logd.error(f'protocol no access {uri} {self.id!r}')
+
+    @cache(Path(config.cache_dir, 'protocol_json'))
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
         logd.info(uri)
@@ -184,7 +213,7 @@ class ProtocolData(dat.HasErrors):
             return
 
         #uri_path = uri.rsplit('/', 1)[-1]
-        apiuri = 'https://protocols.io/api/v3/protocols/' + pioid
+        apiuri = 'https://www.protocols.io/api/v3/protocols/' + pioid
         #'https://www.protocols.io/api/v3/groups/sparc/protocols'
         #apiuri = 'https://www.protocols.io/api/v3/filemanager/folders?top'
         #print(apiuri, header)
