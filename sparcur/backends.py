@@ -8,7 +8,7 @@ from pexpect import pxssh
 from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
-from sparcur.core import BlackfynnId
+from sparcur.core import BlackfynnId, DoiId
 from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, SshCache, BlackfynnCache
 from sparcur.paths import StatResult, _bind_sysid_
 
@@ -607,6 +607,13 @@ class BlackfynnRemote(RemotePath):
             raise TypeError(self._seed)
 
         return BlackfynnId(id)
+
+    @property
+    def doi(self):
+        blob = self.bfobject.doi
+        print(blob)
+        if blob:
+            return DoiId(blob['doi'])
 
     @property
     def size(self):

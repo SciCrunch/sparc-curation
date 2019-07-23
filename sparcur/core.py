@@ -597,6 +597,15 @@ class BlackfynnId(str):
         return self  # TODO
 
 
+class BlackfynnInst(BlackfynnId):
+    # This isn't equivalent to BlackfynnRemote
+    # because it needs to be able to obtain the
+    # post pipeline data about that identifier
+    @property
+    def uri_human(self):
+        pass
+
+
 class JTList:
     pass
 

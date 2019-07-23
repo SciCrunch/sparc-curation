@@ -506,6 +506,21 @@ Dataset.teams = teams
 
 
 @property
+def doi(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/doi')
+    if resp.ok:
+        return resp.json()
+    else:
+        if resp.status_code != 404:
+            log.warning(f'{self} doi {resp.status_code}')
+
+
+# monkey patch Dataset to implement doi endpoint
+Dataset.doi = doi
+
+
+@property
 def teams(self):
     session = self._api.session
     resp = session.get(f'https://api.blackfynn.io/organizations/{self.id}/teams')
