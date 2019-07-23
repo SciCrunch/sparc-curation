@@ -13,6 +13,7 @@ Usage:
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
     spc report [completeness filetypes pathids keywords subjects errors test] [options]
+    spc report [contributors] [options]
     spc shell [affil integration protocols] [options]
     spc server [options]
     spc tables [<directory>...]
@@ -170,7 +171,7 @@ from sparcur import config
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, JPointer
+from sparcur.core import JT, log, logd, JPointer, lj
 from sparcur.core import OntId, OntTerm, get_all_errors, DictTransformer as DT, adops
 from sparcur.utils import FileSize, python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
@@ -291,6 +292,7 @@ class Main(Dispatcher):
         elif (self.options.pull or
               self.options.mismatch or
               self.options.stash or
+              self.options.contributors or
               self.options.missing):
             Integrator.no_google = True
 
@@ -1168,6 +1170,33 @@ class Report(Dispatcher):
             return lambda kv: -kv[-1]
         else:
             return lambda kv: kv
+
+    def contributors(self, ext=None):
+        data = self.latest_export if self.options.latest else self.summary.data
+        datasets = data['datasets']
+        unique = {c['id']:c for d in datasets
+                  if 'contributors' in d
+                  for c in d['contributors']}
+        contribs = sorted(unique.values(),
+                          key=lambda c: c['last_name'] if 'last_name' in c else c['name'])
+        #contribs = sorted((dict(c) for c in
+                           #set(frozenset({k:tuple(v) if isinstance(v, list) else
+                                          #(frozenset(v.items()) if isinstance(v, dict) else v)
+                                          #for k, v in c.items()}.items())
+                               #for d in datasets
+                               #if 'contributors' in d
+                               #for c in d['contributors']
+                               #if not log.info(lj(c)))),
+                          #key=lambda c: c['last_name'] if 'last_name' in c else c['name'])
+        rows = [['id', 'last', 'first', 'PI', 'No Orcid']] + [[
+            c['id'],
+            c['last_name'],
+            c['first_name'],
+            'x' if 'contributor_role' in c and 'PrincipalInvestigator' in c['contributor_role'] else '',
+            'x' if 'orcid' not in c['id'] else '']
+            for c in contribs]
+
+        return self._print_table(rows, title='Contributors Report', ext=ext)
 
     def tofetch(self, dirs=None):
         if dirs is None:
