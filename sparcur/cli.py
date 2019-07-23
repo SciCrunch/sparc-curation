@@ -1476,10 +1476,6 @@ class Shell(Dispatcher):
         except:
             pass
 
-        p = AutoInst('https://www.protocols.io/private/648B128F515D9A42A2EB41F92D11D352')
-        hrm = p.uri_human.uri_api
-        hrm.uri_api
-        hrm.uri_human
         embed()
 
     def affil(self):
