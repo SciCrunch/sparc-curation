@@ -887,17 +887,31 @@ class BFLocal:
         # no changing local storage prefix in the middle of things
         # if you want to do that create a new class
 
-        try:
-            self.bf = Blackfynn(api_token=devconfig.secrets('blackfynn', project_id, 'key'),
-                                api_secret=devconfig.secrets('blackfynn', project_id, 'secret'))
-        except KeyError as e:
-            raise exc.MissingSecretError from e
+        self._project_id = project_id
+        bf = self._get_connection(self._project_id)
+
         self.organization = self.bf.context
         self.project_name = self.bf.context.name
 
         if anchor is not None:  # FIXME decouple
             self.project_path = anchor.local
             self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
+
+    def _get_connection(self, project_id):
+        try:
+            return Blackfynn(api_token=devconfig.secrets('blackfynn', self._project_id, 'key'),
+                             api_secret=devconfig.secrets('blackfynn', self._project_id, 'secret'))
+        except KeyError as e:
+            raise exc.MissingSecretError from e
+
+    def __getstate__(self):
+        state =self.__dict__
+        state.pop('bf')  # does not picle well due to connection
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.bf = self._get_connection(self._project_id)
 
     @property
     def root(self):

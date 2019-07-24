@@ -38,6 +38,11 @@ from sparcur import pipelines as pipes
 from sparcur import sheets
 from pysercomb.pyr.units import Expr, _Quant as Quantity
 
+from joblib import Parallel, delayed
+# TODO RemotePath and any other objects that maintain session
+# information need to use __getstate__ and __setstate__ to wipe
+# and reconnect to their authenticated session
+
 a = rdf.type
 
 
@@ -1518,7 +1523,9 @@ class Summary(Integrator, ExporterSummarizer):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
-            self._data_cache = self.make_json(d.data for d in self.iter_datasets)
+            gen = Parallel()(deplayed(lambda : d.data)() for d in self.iter_datasets)
+            self._data_cache = self.make_json(gen)
+            #self._data_cache = self.make_json(d.data for d in self.iter_datasets)
 
         return self._data_cache
 

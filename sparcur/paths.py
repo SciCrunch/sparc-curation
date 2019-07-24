@@ -1232,7 +1232,10 @@ class CachePath(AugmentedPath):
 
     def refresh(self, update_data=False, size_limit_mb=2, force=False):
         if self.meta is None:
-            breakpoint()
+            log.error('Why does this have no meta? '
+                      f'Was it deleted and this is stale or what?\n{self}')
+            log.critical('YOU MUST RUN PULL AGAIN')
+
         limit = (size_limit_mb if
                  not self.meta.size or (size_limit_mb > self.meta.size.mb)
                  else self.meta.size.mb + 1)
@@ -1900,6 +1903,7 @@ class BlackfynnCache(PrimaryCache, XattrCache):
     def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
         # bootstrap the rest if we told it to
         if self.id.startswith('N:organization:'):  # FIXME :/
+            # TODO use joblib ...
             yield from self.remote.children_pull(self.children, only=only, skip=skip)
 
         else:
