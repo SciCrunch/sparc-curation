@@ -187,6 +187,15 @@ class MetaConverter(TripleConverter):
             _, s = self.c.award_number(value)
             yield s, a, owl.NamedIndividual
             yield s, a, TEMP.FundedResearchProject
+            o = self.integrator.organ(value)
+            if o:
+                if o != 'othertargets':
+                    o = OntId(o)
+                    if o.prefix == 'FMA':
+                        ot = OntTerm(o)
+                        o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+
+                    yield s, isAbout, o.u
 
         def protocol_url_or_doi(self, value):
             _, s = self.c.protocol_url_or_doi(value)

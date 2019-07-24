@@ -705,7 +705,8 @@ class PipelineExtras(JSONPipeline):
             if m:
                 data['meta']['modality'] = m
 
-        if 'organ' not in data['meta']:
+        if False and 'organ' not in data['meta']:
+            # skip here, now attached directly to award
             if 'award_number' in data['meta']:
                 an = data['meta']['award_number']
                 o = self.lifters.organ(an)
