@@ -770,7 +770,7 @@ class TriplesExportSummary(TriplesExport):
     @property
     def triples(self):
         for dataset_blob in self:
-            yield from TriplesExportDataset(dataset_blob).triples
+            yield from TriplesExportDataset(dataset_blob, lifters=self.lifters).triples
 
 
 class TriplesExportDataset(TriplesExport):
@@ -1101,13 +1101,14 @@ class Integrator(PathData, OntologyData):
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            if not hasattr(self, 'lifters'):
+            if not hasattr(self, 'lifters') or self.lifters is None:
                 datasetdata = self.datasetdata
                 dsc = datasetdata.cache.dataset
                 if dsc is None:
                     raise exc.NotInDatasetError
 
                 self._make_lifters(dsc)
+
             self._triples_exporter = TriplesExportDataset(self.data, lifters=self.lifters)
 
         return self._triples_exporter

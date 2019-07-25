@@ -6,7 +6,7 @@ from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from sparcur import datasets as dat
-from sparcur.core import OntId, OntTerm, lj, get_right_id
+from sparcur.core import OntId, OntTerm, lj, get_right_id, RorInst
 from sparcur.utils import log, logd, sparc
 from sparcur.protocols import ProtocolData
 
@@ -131,6 +131,8 @@ class ContributorConverter(TripleConverter):
 
         def affiliation(self, value):
             #_, s = self.c.affiliation(value)
+            if isinstance(value, str):
+                value = RorInst(value)  # FIXME load ids back in a consistent way from latest
             yield from value.triples_gen
                
 
@@ -187,6 +189,9 @@ class MetaConverter(TripleConverter):
             _, s = self.c.award_number(value)
             yield s, a, owl.NamedIndividual
             yield s, a, TEMP.FundedResearchProject
+            if not hasattr(self.integrator, 'lifters') or self.integrator.lifters is None:
+                breakpoint()
+
             o = self.integrator.lifters.organ(value)  # FIXME violates the direct derrivation boundary
             log.warning('EVIL: find the correct way to do the previous line')
             if o:
