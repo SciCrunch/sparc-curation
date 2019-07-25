@@ -57,7 +57,17 @@
                                    popd\""
         su - root -c "${CMD}"
     else
-        echo ssh todo ...
+        scigraph_host="${SERVER}-deploy"  # by convention
+        scigraph_host_admin=${SERVER}
+        scp ${ZIPPATH} ${scigraph_host}:
+        ssh ${scigraph_host} "unzip ${ZIPPATH}"
+
+        ssh ${scigraph_host_admin} "sudo systemctl stop scigraph"
+
+        ssh ${scigraph_host} "unlink /var/lib/scigraph/graph
+                              ln -sT /var/lib/scigraph/${STAMPED} /var/lib/scigraph/graph"
+
+        ssh ${scigraph_host_admin} "sudo systemctl start scigraph"
     fi
   #+end_src
 
@@ -66,7 +76,7 @@
   #+HEADER: :eval never :noweb yes :tangle deploy :tangle-mode (identity #o755)
   #+begin_src bash
     #!/usr/bin/env bash
-    SERVER=localhost
+    : ${SERVER:=localhost}
     SVC_USER=scigraph
     RUNTIME_LOCATION=/var/lib/scigraph
     BUILD_LOCATION=<<blf()>>
