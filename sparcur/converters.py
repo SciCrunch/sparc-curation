@@ -192,16 +192,17 @@ class MetaConverter(TripleConverter):
             if not hasattr(self.integrator, 'lifters') or self.integrator.lifters is None:
                 breakpoint()
 
-            o = self.integrator.lifters.organ(value)  # FIXME violates the direct derrivation boundary
-            log.warning('EVIL: find the correct way to do the previous line')
-            if o:
-                if o != 'othertargets':
-                    o = OntId(o)
-                    if o.prefix == 'FMA':
-                        ot = OntTerm(o)
-                        o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+            if self.integrator.lifters is not None:
+                o = self.integrator.lifters.organ(value)  # FIXME violates the direct derrivation boundary
+                log.warning('EVIL: find the correct way to do the previous line')
+                if o:
+                    if o != 'othertargets':
+                        o = OntId(o)
+                        if o.prefix == 'FMA':
+                            ot = OntTerm(o)
+                            o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
 
-                    yield s, isAbout, o.u
+                        yield s, isAbout, o.u
 
         def protocol_url_or_doi(self, value):
             _, s = self.c.protocol_url_or_doi(value)
