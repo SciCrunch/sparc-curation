@@ -189,8 +189,8 @@ class MetaConverter(TripleConverter):
             _, s = self.c.award_number(value)
             yield s, a, owl.NamedIndividual
             yield s, a, TEMP.FundedResearchProject
-            if not hasattr(self.integrator, 'lifters') or self.integrator.lifters is None:
-                breakpoint()
+            #if not hasattr(self.integrator, 'lifters') or self.integrator.lifters is None:
+                #breakpoint()
 
             if self.integrator.lifters is not None:
                 o = self.integrator.lifters.organ(value)  # FIXME violates the direct derrivation boundary
