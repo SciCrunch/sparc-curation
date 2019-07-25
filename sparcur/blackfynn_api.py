@@ -888,7 +888,7 @@ class BFLocal:
         # if you want to do that create a new class
 
         self._project_id = project_id
-        bf = self._get_connection(self._project_id)
+        self.bf = self._get_connection(self._project_id)
 
         self.organization = self.bf.context
         self.project_name = self.bf.context.name

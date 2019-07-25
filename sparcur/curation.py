@@ -682,13 +682,14 @@ class LThing:
 
 class TriplesExport(ProtcurData):
 
-    def __init__(self, data_json, *args, **kwargs):
+    def __init__(self, data_json, *args, lifters=None, **kwargs):
         self.data = data_json
         self.id = self.data['id']
         self.uri_api = self.data['meta']['uri_api']
         self.uri_human = self.data['meta']['uri_human']
         self.folder_name = self.data['meta']['folder_name']
-        #self.title = self.data['meta']['title'] if 
+        self.lifters = lifters  # FIXME evil evil evil
+        #self.title = self.data['meta']['title'] if
 
     @property
     def protocol_uris(self):  # FIXME this needs to be pipelined
@@ -1099,7 +1100,13 @@ class Integrator(PathData, OntologyData):
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            self._triples_exporter = TriplesExportDataset(self.data)
+            # just to serverly confuse matters ...
+            # ugh this pattern is horrible
+            class Lifters:
+                organs = self.organs
+
+            lifters = Lifters()  # FIXME DELETE THIS :(
+            self._triples_exporter = TriplesExportDataset(self.data, lifters=lifters)
 
         return self._triples_exporter
 
@@ -1523,7 +1530,7 @@ class Summary(Integrator, ExporterSummarizer):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
-            gen = Parallel()(deplayed(lambda : d.data)() for d in self.iter_datasets)
+            gen = Parallel()(delayed(lambda : d.data)() for d in self.iter_datasets)
             self._data_cache = self.make_json(gen)
             #self._data_cache = self.make_json(d.data for d in self.iter_datasets)
 

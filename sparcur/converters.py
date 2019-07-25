@@ -187,7 +187,8 @@ class MetaConverter(TripleConverter):
             _, s = self.c.award_number(value)
             yield s, a, owl.NamedIndividual
             yield s, a, TEMP.FundedResearchProject
-            o = self.integrator.organ(value)
+            o = self.integrator.lifters.organ(value)  # FIXME violates the direct derrivation boundary
+            log.warning('EVIL: find the correct way to do the previous line')
             if o:
                 if o != 'othertargets':
                     o = OntId(o)
