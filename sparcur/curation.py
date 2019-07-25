@@ -1000,11 +1000,11 @@ class Integrator(PathData, OntologyData):
     def triples(self):
         # convenience property that ttl doesn't use directly
         # but is here in case we want to access the triples
-        yield from self.triples_class(self.data).triples
+        yield from self.triples_class(self.data, lifters=self.lifters).triples
 
     @property
     def ttl(self):
-        return self.triples_class(self.data).ttl
+        return self.triples_class(self.data, lifters=self.lifters).ttl
 
     @property
     def name(self):
@@ -1022,6 +1022,27 @@ class Integrator(PathData, OntologyData):
 
         dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
 
+        class RuntimeContext:
+            """ utility for logging etc. """
+            id = dsc.id  # TODO can we eliminate the need for lifters this way?
+            uri_api = dsc.uri_api  # FIXME black blackfynn ids their own thing
+            uri_human = dsc.uri_human  # so uri_api and uri_human can be computed from them ...
+            path = self.path
+
+        self._make_lifters(dsc)
+        #sources = dataset.data
+        # helper key was bad because it means that pipelines have to
+        # know the structure of their helper pipelines and maintain them
+        # across changes, better to use the lifters as other pipelines that
+        # can start from a single piece of data and return a formatted result
+        # and track their own provenance, the concept of a helper that holds
+        # all the prior existing data is not a bad one, it just just that it
+        # is better to create objects that can take the information already
+        # in the data for the current pipeline and return an expanded verion
+        self._pipeline = pipes.PipelineEnd(dataset, self.lifters, RuntimeContext())
+        return self._pipeline
+
+    def _make_lifters(self, thing):
         class ProtocolHelper(ProtocolData):  # FIXME so ... bad ...
             @property
             def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
@@ -1035,10 +1056,10 @@ class Integrator(PathData, OntologyData):
         # FIXME except for the adds, everything here should be a pipeline
         class Lifters:  # do this to prevent accidental data leaks
             # context
-            id = dsc.id  # in case we are somewhere else
-            folder_name = dsc.name
-            uri_api = dsc.uri_api
-            uri_human = dsc.uri_human
+            id = thing.id  # in case we are somewhere else
+            folder_name = thing.name
+            uri_api = thing.uri_api
+            uri_human = thing.uri_human
             # dataset metadata
             #submission = property(lambda s: (_ for _ in dataset.submission))
             #dataset_description = property(lambda s: (_ for _ in dataset.dataset_description))
@@ -1060,27 +1081,7 @@ class Integrator(PathData, OntologyData):
             #sheets
             organ_term = self.organs_sheet.organ_term(id)
 
-        class RuntimeContext:
-            """ utility for logging etc. """
-            id = dsc.id  # TODO can we eliminate the need for lifters this way?
-            uri_api = dsc.uri_api  # FIXME black blackfynn ids their own thing
-            uri_human = dsc.uri_human  # so uri_api and uri_human can be computed from them ...
-            path = self.path
-
-        helpers = {}
-        helper_key = object()
-        lifters = Lifters()
-        #sources = dataset.data
-        # helper key was bad because it means that pipelines have to
-        # know the structure of their helper pipelines and maintain them
-        # across changes, better to use the lifters as other pipelines that
-        # can start from a single piece of data and return a formatted result
-        # and track their own provenance, the concept of a helper that holds
-        # all the prior existing data is not a bad one, it just just that it
-        # is better to create objects that can take the information already
-        # in the data for the current pipeline and return an expanded verion
-        self._pipeline = pipes.PipelineEnd(dataset, lifters, RuntimeContext())
-        return self._pipeline
+        self.lifters = Lifters()  # FIXME TODO
 
     @property
     def data(self):
@@ -1100,13 +1101,14 @@ class Integrator(PathData, OntologyData):
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            # just to serverly confuse matters ...
-            # ugh this pattern is horrible
-            class Lifters:
-                organs = self.organs
+            if not hasattr(self, 'lifters'):
+                datasetdata = self.datasetdata
+                dsc = datasetdata.cache.dataset
+                if dsc is None:
+                    raise exc.NotInDatasetError
 
-            lifters = Lifters()  # FIXME DELETE THIS :(
-            self._triples_exporter = TriplesExportDataset(self.data, lifters=lifters)
+                self._make_lifters(dsc)
+            self._triples_exporter = TriplesExportDataset(self.data, lifters=self.lifters)
 
         return self._triples_exporter
 
@@ -1170,8 +1172,9 @@ class ErrorObject(JsonObject):
         return [['Key', 'Value']] + [[key, ex(key)] for key in self._keys]
 
 class ExporterSummarizer:
-    def __init__(self, data_json):
+    def __init__(self, data_json, lifters=None):
         self.data = data_json
+        self.lifters = lifters  # FIXME MAKE IT STOP
 
     def __iter__(self):
         for dataset_blob in self.data['datasets']:
@@ -1447,7 +1450,15 @@ class ExporterSummarizer:
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            self._triples_exporter = TriplesExportSummary(self.data)
+            if not hasattr(self, 'lifters'):  # FIXME this is for the Summary use case
+                if hasattr(self, '_make_lifters'):  # ExportSummarizer is also used directly
+                    org = self.path.cache.organization
+                    if org is None:
+                        raise BaseException
+
+                    self._make_lifters(org)
+
+            self._triples_exporter = TriplesExportSummary(self.data, lifters=self.lifters)
 
         return self._triples_exporter
 
@@ -1475,6 +1486,8 @@ class Summary(Integrator, ExporterSummarizer):
         # not sure if this is kosher ... but it works
         super().__init__(self.anchor.path)
  
+    triples_exporter = ExporterSummarizer.triples_exporter   # ARE YOU KIDDING ME
+
     @property
     def iter_datasets(self):
         """ Return the list of datasets for the organization

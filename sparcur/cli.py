@@ -773,13 +773,17 @@ class Main(Dispatcher):
 
         filepath = dump_path / filename
 
+        # FIXME hack
+        s = Summary(self.project_path)
+        s._make_lifters(self.project_path.cache.organization)
+
         data = self.latest_export if self.options.latest else self.summary.data
 
         # FIXME we still create a new export folder every time even if the json didn't change ...
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
 
-        es = ExporterSummarizer(data)
+        es = ExporterSummarizer(data, lifters=s.lifters)
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
             f.write(es.ttl)
