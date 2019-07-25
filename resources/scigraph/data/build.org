@@ -51,7 +51,7 @@
     if [ "${SERVER}" = "localhost" ]; then
         CMD="su - ${SVC_USER} -c \"cp ${ZIPPATH} ${RUNTIME_LOCATION};
                                    pushd ${RUNTIME_LOCATION};
-                                   unzip ${ZIPPATH};
+                                   unzip ${ZIPNAME};
                                    unlink ${BASENAME};
                                    ln -sT ${STAMPED} ${BASENAME};
                                    popd\""
@@ -59,8 +59,9 @@
     else
         scigraph_host="${SERVER}-deploy"  # by convention
         scigraph_host_admin=${SERVER}
+
         scp ${ZIPPATH} ${scigraph_host}:
-        ssh ${scigraph_host} "unzip ${ZIPPATH}"
+        ssh ${scigraph_host} "unzip ${ZIPNAME}"
 
         ssh ${scigraph_host_admin} "sudo systemctl stop scigraph"
 
