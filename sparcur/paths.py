@@ -1699,6 +1699,7 @@ class PrimaryCache(CachePath):
 
     @property
     def rchildren(self):
+        # FIXME cached rchildren vs local (working tree) rchildren vs remote rchildren
         # have to express the generator to build the index
         # otherwise child.parents will not work correctly (annoying)
         for child_remote in self.remote.rchildren:
@@ -2232,11 +2233,27 @@ class LocalPath(XattrPath):
     @property
     def children(self):
         if self.is_dir():
-            yield from self.iterdir()
+            if self.cache is not None and self == self.cache.anchor.local:
+                # implemented this way we can still use Path to navigate
+                # once we are inside local data dir, though all files there
+                # are skip_cache -> True
+                for path in self.iterdir():
+                    if path.stem == LOCAL_DATA_DIR:
+                        continue
+
+                    yield path
+            else:
+                yield from self.iterdir()
 
     @property
     def rchildren(self):
-        yield from self.rglob('*')
+        if self.is_dir() and self.cache is not None and self == self.cache.anchor.local:
+            for path in self.children:
+                yield path
+                yield from path.rchildren
+
+        else:
+            yield from self.rglob('*')
 
     def content_different(self):
         cmeta = self.cache.meta

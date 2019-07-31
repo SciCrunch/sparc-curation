@@ -313,10 +313,10 @@ class Main(Dispatcher):
         # we can configure
         local = Path(path_string).resolve()
         try:
-            path = local.cache  # FIXME project vs subfolder
-            if path is None:
+            _cpath = local.cache  # FIXME project vs subfolder
+            if _cpath is None:
                 raise exc.NoCachedMetadataError  # FIXME somehow we decided not to raise this!??!
-            self.anchor = path.anchor
+            self.anchor = _cpath.anchor
         except exc.NoCachedMetadataError as e:
             root = local.find_cache_root()
             if root is not None:
@@ -545,7 +545,7 @@ class Main(Dispatcher):
                         if oc is None and cd.skip_cache:
                             continue
 
-                        nc = oc.refresh()
+                        nc = oc.refresh()  # FIXME can't we just build an index off datasets here??
                         if nc != oc:
                             log.info(f'Dataset moved!\n{oc} -> {nc}')
                             # FIXME FIXME FIXME
@@ -1505,6 +1505,10 @@ class Shell(Dispatcher):
         except:
             pass
 
+        rcs = list(datasets[-1].rchildren)
+        asdf = rcs[-1]
+        urg = list(asdf.data)
+        resp = asdf.data_headers
         embed()
 
     def affil(self):

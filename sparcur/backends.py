@@ -533,6 +533,7 @@ class BlackfynnRemote(RemotePath):
         elif isinstance(self.bfobject, Organization):
             return ''
         else:
+            raise NotImplementedError('should not be needed anymore when using packages')
             if hasattr(self.bfobject, 'type'):
                 type = self.bfobject.type.lower()  # FIXME ... can we match s3key?
             else:
@@ -584,7 +585,10 @@ class BlackfynnRemote(RemotePath):
 
     @property
     def name(self):
-        return self.stem + self.suffix
+        if isinstance(self.bfobject, File) and self.from_packages:
+            return self.bfobject.filename
+        else:
+            return self.stem + self.suffix
 
     @property
     def id(self):
