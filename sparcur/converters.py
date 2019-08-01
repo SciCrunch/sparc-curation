@@ -187,6 +187,7 @@ class MetaConverter(TripleConverter):
             _, s = self.c.award_number(value)
             yield s, a, owl.NamedIndividual
             yield s, a, TEMP.FundedResearchProject
+            return
             o = self.integrator.organ(value)
             if o:
                 if o != 'othertargets':

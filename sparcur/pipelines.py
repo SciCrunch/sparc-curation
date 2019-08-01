@@ -162,6 +162,18 @@ class PathPipeline(PrePipeline):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
+class DatasetMetadataPipeline(PathPipeline):
+
+    data_transformer_class = dat.DatasetMetadata
+
+    #@hasSchema(sc.DatasetMetadataSchema)
+    @property
+    def data(self):
+        return super().data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class DatasetStructurePipeline(PathPipeline):
 
     data_transformer_class = dat.DatasetStructure
@@ -215,6 +227,23 @@ class SamplesFilePipeline(PathPipeline):
         return super().data
 
 
+class Merge(Pipeline):
+
+    def __init__(self, pipelines):
+        self.pipelines = pipelines
+
+    @property
+    def data(self):
+        data = {}
+        for pipeline in self.pipelines:
+            try:
+                data.update(pipeline.data)
+            except TypeError as e:
+                raise TypeError(f'Issue in {pipeline}.data') from e
+
+        return data
+
+
 hasSchema = sc.HasSchema()
 @hasSchema.mark
 class JSONPipeline(Pipeline):
@@ -222,11 +251,14 @@ class JSONPipeline(Pipeline):
     # by subclassing and then using super().previous_step to insert another
     # step along the way
 
-    previous_pipeline_class = None
-    # If previous_pipeline_class is set then this pipeline is run on the previous_pipeline given
+    previous_pipeline_classes = tuple()
+    # If previous_pipeline_classes is set then this pipeline is run on the previous_pipeline given
     # to this class at init. It might be more accurate to call this the previous pipeline processor.
     # basically this is the 'intervening' pipeline between the previous pipeline and this pipeline
-    # need a better name for it ...
+    # need a better name for it ... if an instance of the previous pipeline class is passed to the
+    # constructor then it is used as is
+    # if there is more than one class any overlapping keys will match the output
+    # of the last class in the pipeline FIXME duplicate keys should probably error loudly ...
 
     subpipelines = []
     copies = []
@@ -249,12 +281,14 @@ class JSONPipeline(Pipeline):
     def __init__(self, previous_pipeline, lifters=None, runtime_context=None):
         """ sources stay, helpers are tracked for prov and then disappear """
         #log.debug(lj(sources))
-        if self.previous_pipeline_class is not None:
-            previous_pipeline = self.previous_pipeline_class(previous_pipeline,
-                                                             lifters,
-                                                             runtime_context)
+
+        if self.previous_pipeline_classes:
+            #not isinstance(previous_pipeline, self.previous_pipeline_classes)):
+            previous_pipeline = Merge([p(previous_pipeline, lifters, runtime_context)
+                                       for p in self.previous_pipeline_classes])
 
         if not isinstance(previous_pipeline, Pipeline):
+            breakpoint()
             raise TypeError(f'{previous_pipeline} is not a Pipeline!')
 
         self.previous_pipeline = previous_pipeline
@@ -353,7 +387,10 @@ class LoadJSON(Pipeline):
     @property
     def data(self):
         with open(self.path, 'rt') as f:
-            return json.load(f)
+            blob = json.load(f)
+
+        # TODO convert various things back to internal representation
+        return blob
 
 
 class ExportPipeline(Pipeline):
@@ -374,7 +411,7 @@ class RdfPipeline(ExportPipeline):
     object_class = lambda g: g
 
     # previous pipeline and converter should match
-    previous_pipeline_class = None
+    previous_pipeline_classes = tuple()
     converter_class = None
 
     @property
@@ -432,7 +469,7 @@ hasSchema = sc.HasSchema()
 @hasSchema.mark
 class ApiNATOMY(JSONPipeline):
 
-    previous_pipeline_class = LoadJSON
+    previous_pipeline_classes = LoadJSON,
 
     #@hasSchema(sc.ApiNATOMYSchema, fail=True)  # resourceMap fails
     @hasSchema(sc.ApiNATOMYSchema)
@@ -503,7 +540,8 @@ hasSchema = sc.HasSchema()
 @hasSchema.mark
 class SPARCBIDSPipeline(JSONPipeline):
 
-    previous_pipeline_class = DatasetStructurePipeline
+    previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
+    # metadata should come first since structure can fail, error handling sigh
 
     subpipelines = [
         [[[['submission_file'], ['path']]],
@@ -600,6 +638,7 @@ class SPARCBIDSPipeline(JSONPipeline):
             [['meta', 'folder_name'], lambda lifters: lifters.folder_name],
             [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
             [['meta', 'uri_api'], lambda lifters: lifters.uri_api],]
+    adds = []  # replace lifters with proper upstream pipelines
 
     def subpipeline_errors(self, errors):
         paths = []
@@ -658,7 +697,8 @@ class SPARCBIDSPipeline(JSONPipeline):
             data = super().pipeline_end
         except self.SkipPipelineError as e:
             data = e.data
-            data['meta'] = {}
+            if 'meta' not in data:
+                data['meta'] = {}
             data['status'] = {}
             si = 5555
             ci = 4444
@@ -681,7 +721,7 @@ class PipelineExtras(JSONPipeline):
     # subclassing allows us to pop additional steps
     # before or after their super()'s name
 
-    previous_pipeline_class = SPARCBIDSPipeline
+    previous_pipeline_classes = SPARCBIDSPipeline,
 
     subpipelines = [
         [[[['contributors'], None]],
@@ -694,6 +734,9 @@ class PipelineExtras(JSONPipeline):
     @property
     def added(self):
         data = super().added
+        if data['meta'] == {'techniques': []}:
+            breakpoint()
+
         # FIXME conditional lifts ...
         if 'award_number' not in data['meta']:
             am = self.lifters.award_manual
@@ -766,7 +809,7 @@ class PipelineEnd(JSONPipeline):
     """ This is the final pipeline, it computes post processing stats
         such as errors it it does not validate itself """
 
-    previous_pipeline_class = PipelineExtras
+    previous_pipeline_classes = PipelineExtras,
 
     # FIXME HasErrors needs to require a level specification
     # and not define these here because they have to be maintained
@@ -842,6 +885,35 @@ class PipelineEnd(JSONPipeline):
     @hasSchema(sc.PostSchema, fail=True)
     def data(self):
         return super().data
+
+
+class ListAllDatasetsPipeline(Pipeline):
+    def __init__(self, base_path):
+        self.base_path = base_path
+
+    @property
+    def data(self):
+        return list(self.base_path.children)
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class SummaryPipeline(JSONPipeline):
+    #previous_pipeline_classes = ListAllDatasetsPipeline
+
+    @property
+    def pipeline_end(self):
+        if not hasattr(self, '_data_cache'):
+            # FIXME validating in vs out ...
+            # return self.make_json(d.validate_out() for d in self)
+            self._data_cache = self.make_json(d.data for d in self.iter_datasets)
+
+        return self._data_cache
+
+    @hasSchema(sc.SummarySchema, fail=True)
+    def data(self):
+        data = self.pipeline_end
+        return data
 
 
 SPARCBIDSPipeline.check()

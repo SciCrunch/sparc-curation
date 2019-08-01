@@ -1014,7 +1014,7 @@ class Integrator(PathData, OntologyData):
         if dsc is None:
             raise exc.NotInDatasetError
 
-        dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
+        #dataset = dat.DatasetStructure(dsc)  # FIXME should be able to go back
 
         class ProtocolHelper(ProtocolData):  # FIXME so ... bad ...
             @property
@@ -1033,10 +1033,6 @@ class Integrator(PathData, OntologyData):
             folder_name = dsc.name
             uri_api = dsc.uri_api
             uri_human = dsc.uri_human
-            # dataset metadata
-            #submission = property(lambda s: (_ for _ in dataset.submission))
-            #dataset_description = property(lambda s: (_ for _ in dataset.dataset_description))
-            #subjects = property(lambda s: (_ for _ in dataset.subjects))
 
             # protocols
             protocol = ph.protocol
@@ -1045,11 +1041,12 @@ class Integrator(PathData, OntologyData):
             # aux
             organ = self.organ
             member = self.member
+            affiliations = self.affiliations
+
             modality = self.organs_sheet.modality(id)
             award_manual = self.organs_sheet.award_manual(id)
             techniques = self.organs_sheet.techniques(id)
             protocol_uris = self.organs_sheet.protocol_uris(id)
-            affiliations = self.affiliations
 
             #sheets
             organ_term = self.organs_sheet.organ_term(id)
@@ -1061,10 +1058,7 @@ class Integrator(PathData, OntologyData):
             uri_human = dsc.uri_human  # so uri_api and uri_human can be computed from them ...
             path = self.path
 
-        helpers = {}
-        helper_key = object()
         lifters = Lifters()
-        #sources = dataset.data
         # helper key was bad because it means that pipelines have to
         # know the structure of their helper pipelines and maintain them
         # across changes, better to use the lifters as other pipelines that
@@ -1073,7 +1067,7 @@ class Integrator(PathData, OntologyData):
         # all the prior existing data is not a bad one, it just just that it
         # is better to create objects that can take the information already
         # in the data for the current pipeline and return an expanded verion
-        self._pipeline = pipes.PipelineEnd(dataset, lifters, RuntimeContext())
+        self._pipeline = pipes.PipelineEnd(self.path, lifters, RuntimeContext())
         return self._pipeline
 
     @property

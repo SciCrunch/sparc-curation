@@ -99,6 +99,24 @@ class HasErrors:
                 data['errors'] = el
 
 
+class DatasetMetadata(Path, HasErrors):
+
+    @property
+    def data(self):
+        if self.cache is not None:
+            return dict(id=self.cache.id,
+                        meta=dict(folder_name=self.name,
+                                  uri_human=self.cache.uri_human,
+                                  uri_api=self.cache.uri_human,
+                        ))
+        else:
+            return dict(id=self.id,
+                        meta=dict(folder_name=self.name,
+                                  uri_human=None,
+                                  uri_api=None,
+                        ))
+
+
 class DatasetStructure(Path, HasErrors):
     sections = ('submission', 'dataset_description', 'subjects', 'samples', 'manifest')
     rglobs = 'manifest',
