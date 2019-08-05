@@ -488,7 +488,7 @@ class ApiNATOMY_rdf(RdfPipeline):
         mid = self.pipeline_start['id'].replace(' ', '-')
         return mid
         # FIXME this seems wrong ...
-        # the pipelines are separate from the objects they maniuplate or output
+        # the pipelines are separate from the objects they manipulate or output
         return self._pipeline_start.object.id
 
     @property
