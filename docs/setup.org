@@ -242,7 +242,7 @@
       git config --global user.email "MY_NAME@example.com"
     #+END_SRC
 
-*** Bootstrapping [[./setup.org][this =setup.org= file]]
+*** TODO Bootstrapping [[./setup.org][this =setup.org= file]]
     You can run all the code in [[./setup.org][this =setup.org= file]] automatically
     using emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
     install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit for scientists and
@@ -286,9 +286,13 @@
       # if you have not configured git prior to this step you will be prompted to set your name and email
       popd
       ln -sT ~/opt/scimax.sh ~/bin/scimax  # TODO windows emacs -l opt/scimax/init.el setup.org
-      # scimax user config
-      # Needed to get sane behavior for executing this file out of the box.
-      { cat <<EOL
+    #+END_SRC
+
+    Tangle the following block with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
+    [[file:${HOME}/opt/scimax/user/user.el][user.el]] directly.
+    #+NAME: scimax-user-config
+    #+CAPTION: Needed to get sane behavior for executing this file out of the box.
+    #+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
       ;; org goto heading
       (defun org-goto-section (heading)
         "\`heading' should be a string matching the desired heading"
@@ -323,7 +327,7 @@
       (use-package racket-mode
         :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
         :bind (:map racket-mode-map
-              ("<f5>" . recompile-quietly))
+                    ("<f5>" . recompile-quietly))
         :init
         (defun my/buffer-local-tab-complete ()
           "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
@@ -339,12 +343,14 @@
         (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
 
       ;; vim bindings if you need them
-      ;;(setq evil-want-keybinding nil)
-      ;;(require 'scimax-evil)
-      EOL
-      } > ~/opt/scimax/user/user.el
-      scimax
+      ;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
+      ;; to manually install, mega gnu elpa weirdness
+      ;; (setq evil-want-keybinding nil)
+      ;; (require 'scimax-evil)
+    #+END_SRC
 
+    #+BEGIN_SRC bash :exports code :eval never
+      scimax
     #+END_SRC
 
     After running the next command you should have a version of this file open locally.
