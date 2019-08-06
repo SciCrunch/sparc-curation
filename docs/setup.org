@@ -158,7 +158,7 @@
 **** old :noexport:
      add to PATH so we can just link everything there
      =%HOMEPATH%\bin=
-     =%ProgramFiles%\Racket\=
+     =%APPDATA%\Python\Python37\Scripts=
 
      TODO =-l %HOMEPATH%/opt/scimax/init.el setup.org= in the shortcut ...
      also =%HOMEPATH%= for the start in ...
@@ -266,7 +266,6 @@
       source .profile
       git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation
       ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
-
     #+END_SRC
 
     When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
@@ -392,6 +391,7 @@
     #+CAPTION: You can run them all at once from this block.
     #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
     #+BEGIN_SRC bash :results output :noweb yes :exports none :eval no-export
+      <<environment-sanity-checks>>
       <<clone-repos>>
       <<python-setup>>
       <<racket-ontology>>
@@ -400,6 +400,17 @@
 
     *If you run the block above you do not need to run the rest of this section*
     *and you can move on to the [[#configuration-files][Configuration files]] section.*
+
+    #+NAME: environment-sanity-checks
+    #+BEGIN_SRC bash :results output :eval no-export
+      # implicit check for bash by being able to run this block at all
+
+      # git check on the off chance that we made it here without cloning this repo
+      git --version || exit 1
+
+      # python version check
+      python -c "'ok' if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
+    #+END_SRC
 
     #+NAME: clone-repos
     #+CAPTION: Clone all required git repositories.
@@ -587,9 +598,14 @@
       create credentials -> OAuth client ID
       Fill in the consent screen, you only need the Application name field.
       Download JSON
+      Add the name of the downloaded JSON file to [[file:${HOME}/.config/pyontutils/secrets.yaml][secrets.yaml]]
+      =(-> google api creds-file)=. Then run
+      =python ~/git/pyontutils/pyontutils/sheets.py auth sheets= and
+      =python ~/git/pyontutils/pyontutils/sheets.py auth sheets --readonly=.
+      Those commands will run the auth workflow and create the file specified at =(-> google api store-file)= for you.
+
       Get the document ids for =(-> google sheets sparc-master)= and =(-> google sheets sparc-consistency)=.
       Document id matches this pattern https://docs.google.com/spreadsheets/d/{document_id}/edit.
-
 **** Protocol annotation set up
 ***** Hypothes.is
       #+CAPTION: as your user Install the hypothesis client in chrome.
