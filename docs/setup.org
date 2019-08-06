@@ -67,7 +67,7 @@
       apt install build-essential lib64readline-dev rxvt-unicode htop attr tree sqlite curl git
       apt install emacs26 vim-gtk3 texlive-full pandoc hunspell
       apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev
-      apt install inkscape gimp google-chrome-stable xfce4
+      apt install inkscape gimp krita google-chrome-stable xfce4
       apt install nginx
       update-alternatives --install /usr/bin/python python /usr/bin/python3 10
       update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
@@ -99,54 +99,125 @@
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 *** Windows
-    # TODO download everything to ~/opt
-    git
-    https://git-scm.com/download/win
-    All the default options in the wizard are fine except for one.
-    You need to choose the last option to use all unix tools from the
-    git bash prompt.
+**** ssh                                                           :optional:
+     You can skip this if you will only be using the windows computer locally.
+     In a local administrator powershell install OpenSSH. The rest can then be done remotely.
+     #+begin_src powershell
+       Get-WindowsCapability -Online | ? Name -like 'OpenSSH*'
+       Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+       Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+       Set-Service sshd -StartupType Automatic
+       Start-Service sshd
+       # add your ssh key to %programdata%\ssh\administrators_authorized_keys
+       # disable password login in %programdata%\ssh\sshd_config
+       Restart-Service sshd
+     #+end_src
+**** Package manager
+     For managing a windows development/curation environment I highly recommend using
+     the [[https://chocolatey.org/][chocolatey]] package manager.
+     [[https://chocolatey.org/install#install-with-powershellexe][Install chocolatey]].
 
-    python
-    https://www.anaconda.com/distribution
-    Download the python 3.7 version.
-    Anaconda is more bloated than I like, but it is the simplest way forward
-    for most users. When installing you DO want to anaconda to add itself to PATH
-    Start -> All programs -> Anaconda3 -> Anaconda Powershell Prompt
+     #+begin_src powershell :exports code :eval never
+       choco install git --params "/GitAndUnixToolsOnPath"
+       choco install `
+       autohotkey `
+       clisp `
+       emacs `
+       firefox `
+       GoogleChrome `
+       poshgit `
+       python `
+       racket `
+       vim
+     #+end_src
 
-    add to PATH so we can just link everything there
-    =%HOMEPATH%\bin;%ProgramData%\Anaconda3\Scripts;%APPDATA%\Python\Python37\Scripts=
-    =;%ProgramFiles%\Racket\;%HOMEPATH%\Downloads\redland-1.0.3-Win32;%HOMEPATH%\Downloads\emacs-26.2-x86_64\bin=
+     Update system Path to include packages that don't add themselves.
+     This needs to be run as administrator.
+     #+begin_src powershell :exports code :eval never
+       [Environment]::SetEnvironmentVariable("Path",
+           [Environment]::GetEnvironmentVariable("Path",
+               [EnvironmentVariableTarget]::Machine) + ";C:\Program Files\Racket",
+               [EnvironmentVariableTarget]::Machine)
+     #+end_src
 
-    racket
-    install the latest x86_64 racket from https://racket-lang.org/download/
-    e.g. https://mirror.racket-lang.org/installers/7.3/racket-7.3-x86_64-win32.exe
-    add  to PATH
+     If you are logged in remotely restarting sshd is the easiest way to refresh
+     the environment so commands are in PATH. This is because new shells inherit the
+     environment of sshd at the time that it was started.
+     #+begin_src powershell :exports code :eval never
+       Restart-Service sshd
+     #+end_src
+     You will need to reconnect to a new ssh session in order to have access to git and other
+     newly installed commands.
 
-    emacs
-    Grab the latest x86_64 emacs from http://ftp.gnu.org/gnu/emacs/windows/
-    e.g. http://ftp.gnu.org/gnu/emacs/windows/emacs-26/emacs-26.2-x86_64.zip
-    extract the zip, and add =${unzipped-folder}/bin/runemacs= to your taskbar
-    desktop, or wherever you usually put your program links
-    You will also need to add =${unzipped-folder}/bin= to the windows
-    PATH environment variable under User variables.
-    start -> type: edit environment -> edit environment variables for your account -> new
-    Variable name: PATH
-    Variable value: =${unzipped-folder}/bin= with the ${unzipped-folder} expanded
-    to wherever you installed/unzipped emacs. This will allow you to launch emacs
-    from a terminal window
-    TODO =-l %HOMEPATH%/opt/scimax/init.el setup.org= in the shortcut ...
-    also =%HOMEPATH%= for the start in ...
+**** Manual install
+     redland rdf tools
+     http://librdf.org/raptor/INSTALL.html
+     https://github.com/dajobe/raptor
+     Unfortunately to get the latest version of these it seems you have to build them yourself.
 
-    rapper
-    http://download.librdf.org/binaries/win32/1.0.3/redland-1.0.3-Win32.zip
-    download unzip, path should deal with it, except that there seems to be
-    a shared object file that is missing
+**** old :noexport:
+     add to PATH so we can just link everything there
+     =%HOMEPATH%\bin=
+     =%ProgramFiles%\Racket\=
 
+     TODO =-l %HOMEPATH%/opt/scimax/init.el setup.org= in the shortcut ...
+     also =%HOMEPATH%= for the start in ...
 *** OS X
-    emacs
-    emacs script
-    homebrew
-    relink python3
+**** ssh                                                           :optional:
+     You can skip this if you will only be using the osx computer locally.
+     #+begin_src bash
+       sudo systemsetup -setremotelogin on
+       # scp your key over to ~/.ssh/authorized_keys
+       # set PasswordAuthentication no in /etc/ssh/sshd_config
+       # set ChallengeResponseAuthentication no in /etc/ssh/sshd_config
+       sudo launchctl unload  /System/Library/LaunchDaemons/ssh.plist
+       sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+     #+end_src
+     
+**** Package manager
+     [[https://brew.sh/][Install homebrew]].
+
+     #+begin_src bash :exports code :eval never
+       /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/5ecca39372cffdc4c9fbacee6e22328a0dc61eac/install)"
+       brew cask install \
+       emacs \
+       firefox \
+       gimp \
+       google-chrome \
+       inkscape \
+       krita \
+       mactex \
+       macvim \
+       protege \
+       racket
+
+       brew install \
+       curl \
+       git \
+       htop \
+       hunspell \
+       pandoc \
+       python \
+       redland \
+       rxvt-unicode \
+       sbcl \
+       sqlite \
+       tree
+     #+end_src
+
+     #+CAPTION: .bash_profile
+     #+begin_src bash :exports code :eval never
+       # This file is sourced by bash for login shells.  The following line
+       # runs your .bashrc and is recommended by the bash info pages.
+       [[ -f ~/.bashrc ]] && . ~/.bashrc
+     #+end_src
+
+     #+CAPTION: .bashrc
+     #+begin_src bash :exports code :eval never
+       alias python=/usr/local/bin/python3
+       alias pip=/usr/local/bin/pip3
+     #+end_src
+
 ** User
    :PROPERTIES:
    :CUSTOM_ID: user-start-here
