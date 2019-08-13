@@ -589,6 +589,12 @@
       +While you are there you should also connect your ORCiD.+ Broken at the moment.
 **** Human workflows
 ***** Google
+      Enable the [[https://console.developers.google.com/apis/library/sheets.googleapis.com][google sheets API]]
+      from the [[https://console.developers.google.com][google api dashboard]]. If you need other APIs
+      you can enable them via the [[https://console.developers.google.com/apis/library][library page]].
+
+      *If you do not do this then at the end of the client flow you will receive a =invalid_clientUnauthorized= error.*
+
       =(-> google api creds-file)=
       https://developers.google.com/identity/protocols/OAuth2
       https://developers.google.com/api-client-library/python/guide/aaa_oauth
