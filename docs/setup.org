@@ -603,6 +603,9 @@
       =python ~/git/pyontutils/pyontutils/sheets.py auth sheets= and
       =python ~/git/pyontutils/pyontutils/sheets.py auth sheets --readonly=.
       Those commands will run the auth workflow and create the file specified at =(-> google api store-file)= for you.
+      If something goes wrong and you cannot open a browser the program should suggest
+      that you run it with =--noauth_local_webserver= but that message may be hidden if
+      other programs dump garbage in the terminal.
 
       Get the document ids for =(-> google sheets sparc-master)= and =(-> google sheets sparc-consistency)=.
       Document id matches this pattern https://docs.google.com/spreadsheets/d/{document_id}/edit.
