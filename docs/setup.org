@@ -831,6 +831,32 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
 
 ** Developer
+*** Releases
+**** DatasetTemplate
+Commit any changes and push to master.
+
+#+begin_src bash
+  make-template-zip () {
+      local CLEANROOM=/tmp/cleanroom/
+      mkdir ${CLEANROOM} &&
+      pushd ${CLEANROOM}
+      git clone https://github.com/SciCrunch/sparc-curation.git &&
+      pushd ${CLEANROOM}/sparc-curation/resources
+      zip -r DatasetTemplate.zip DatasetTemplate
+      mv DatasetTemplate.zip ${CLEANROOM}
+      popd
+      rm -rf ${CLEANROOM}/sparc-curation
+      popd
+  }
+  make-template-zip
+#+end_src
+
+Create the GitHub release. The tag name should have the format =dataset-template-1.1= where
+the version number should match the metadata version embedded in
+[[file:../resources/DatasetTemplate/dataset_description.xlsx][dataset_description.xlsx]].
+Attach =${CLEANROOM}/DatasetTemplate.zip= as a release asset.
+Update https://github.com/Blackfynn/docs.sparc.science/blob/master/pages/data_submission/submit_data.md
+with the new link.
 *** Getting to know the codebase
     Use =inspect.getclasstree= along with =pyontutils.utils.subclasses=
     to display hierarchies of classes.
