@@ -613,7 +613,11 @@
       that you run it with =--noauth_local_webserver= but that message may be hidden if
       other programs dump garbage in the terminal.
 
-      Get the document ids for =(-> google sheets sparc-master)= and =(-> google sheets sparc-consistency)=.
+      Get the document ids for the following.
+      - =(-> google sheets sparc-master)=
+      - =(-> google sheets sparc-consistency)=
+      - =(-> google sheets sparc-affiliations)=
+      - =(-> google sheets sparc-field-alignment)=
       Document id matches this pattern https://docs.google.com/spreadsheets/d/{document_id}/edit.
 **** Protocol annotation set up
 ***** Hypothes.is
