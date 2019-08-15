@@ -1,0 +1,18 @@
+#+TITLE: sparcur developer guide
+#+AUTHOR: Tom Gillespie
+#+OPTIONS: num:nil ^:nil
+#+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
+#+STARTUP: showall
+
+* Demos
+** Remote only connection
+   This is the simplest way to get a remote only connection to Blackfynn
+   #+BEGIN_SRC python
+     from sparcur.paths import BlackfynnCache, Path
+     from sparcur.backends import BlackfynnRemote
+     organization_id = 'N:organization:FILL-ME-IN'
+     BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+     BlackfynnRemote.init(organization_id)
+     root = BlackfynnRemote(BlackfynnRemote.root)
+     datasets = list(root.children)
+   #+END_SRC
