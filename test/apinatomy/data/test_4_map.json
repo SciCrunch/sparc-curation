@@ -1,0 +1,2128 @@
+{
+  "id": "mainGraph",
+  "resources": {
+    "waitingList": {},
+    "mainGraph": {
+      "id": "mainGraph",
+      "class": "Graph",
+      "assign": [
+        {
+          "path": "$.nodes[*]",
+          "value": {
+            "layout": {
+              "z": 0
+            }
+          }
+        },
+        {
+          "path": "$.links[?(@.conveyingLyph && @.conveyingLyph.supertype && @.conveyingLyph.supertype.id == 'bg0')]",
+          "value": {
+            "length": 1
+          }
+        }
+      ],
+      "nodes": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "e1_a",
+        "e1_b",
+        "e2_a",
+        "e2_b",
+        "e3_a",
+        "e3_b",
+        "e4_a",
+        "e4_b",
+        "e5_a",
+        "e5_b"
+      ],
+      "links": [
+        "ab",
+        "cd",
+        "ef",
+        "gh",
+        "jk",
+        "lm",
+        "no",
+        "pq",
+        "rs",
+        "bc",
+        "gf",
+        "kl",
+        "op",
+        "qr",
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5"
+      ],
+      "lyphs": [
+        "bg0",
+        "bg1",
+        "bg2",
+        "bg3",
+        "AB",
+        "CD",
+        "EF",
+        "GH",
+        "JK",
+        "LM",
+        "NO",
+        "PQ",
+        "RS",
+        "m",
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "bg1_AB",
+        "bg2_AB",
+        "bg3_AB",
+        "bg1_CD",
+        "bg2_CD",
+        "bg3_CD",
+        "bg1_EF",
+        "bg2_EF",
+        "bg3_EF",
+        "bg1_GH",
+        "bg2_GH",
+        "bg3_GH",
+        "bg1_JK",
+        "bg2_JK",
+        "bg3_JK",
+        "bg1_LM",
+        "bg2_LM",
+        "bg3_LM",
+        "bg1_NO",
+        "bg2_NO",
+        "bg3_NO",
+        "bg1_PQ",
+        "bg2_PQ",
+        "bg3_PQ",
+        "bg1_RS",
+        "bg2_RS",
+        "bg3_RS"
+      ],
+      "coalescences": [
+        "cl1",
+        "cl2",
+        "cl3"
+      ],
+      "groups": []
+    },
+    "A": {
+      "id": "A",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "sourceOf": [
+        "ab"
+      ]
+    },
+    "B": {
+      "id": "B",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "bc"
+      ],
+      "targetOf": [
+        "ab"
+      ]
+    },
+    "C": {
+      "id": "C",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "cd",
+        "bc"
+      ]
+    },
+    "D": {
+      "id": "D",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "sourceOf": [
+        "cd"
+      ]
+    },
+    "E": {
+      "id": "E",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "targetOf": [
+        "ef"
+      ]
+    },
+    "F": {
+      "id": "F",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "ef",
+        "gf"
+      ]
+    },
+    "G": {
+      "id": "G",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "gh"
+      ],
+      "targetOf": [
+        "gf"
+      ]
+    },
+    "H": {
+      "id": "H",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "targetOf": [
+        "gh"
+      ]
+    },
+    "J": {
+      "id": "J",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "targetOf": [
+        "jk"
+      ]
+    },
+    "K": {
+      "id": "K",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "jk"
+      ],
+      "targetOf": [
+        "kl"
+      ]
+    },
+    "L": {
+      "id": "L",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "lm",
+        "kl"
+      ]
+    },
+    "M": {
+      "id": "M",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "targetOf": [
+        "lm"
+      ]
+    },
+    "N": {
+      "id": "N",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "targetOf": [
+        "no"
+      ]
+    },
+    "O": {
+      "id": "O",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "no",
+        "op"
+      ]
+    },
+    "P": {
+      "id": "P",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "pq"
+      ],
+      "targetOf": [
+        "op"
+      ]
+    },
+    "Q": {
+      "id": "Q",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "qr"
+      ],
+      "targetOf": [
+        "pq"
+      ]
+    },
+    "R": {
+      "id": "R",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "rs"
+      ],
+      "targetOf": [
+        "qr"
+      ]
+    },
+    "S": {
+      "id": "S",
+      "class": "Node",
+      "layout": {
+        "z": 0
+      },
+      "val": 1,
+      "offset": 0.1,
+      "collide": 5,
+      "targetOf": [
+        "rs"
+      ]
+    },
+    "e1_a": {
+      "id": "e1_a",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": -160,
+        "y": 160,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "e1"
+      ]
+    },
+    "e1_b": {
+      "id": "e1_b",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": -320,
+        "y": 160,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "e1"
+      ]
+    },
+    "e2_a": {
+      "id": "e2_a",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": 320,
+        "y": 160,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "e2"
+      ]
+    },
+    "e2_b": {
+      "id": "e2_b",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": 160,
+        "y": 160,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "e2"
+      ]
+    },
+    "e3_a": {
+      "id": "e3_a",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": 80,
+        "y": 0,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "e3"
+      ]
+    },
+    "e3_b": {
+      "id": "e3_b",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": -80,
+        "y": 0,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "e3"
+      ]
+    },
+    "e4_a": {
+      "id": "e4_a",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": 80,
+        "y": -160,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "e4"
+      ]
+    },
+    "e4_b": {
+      "id": "e4_b",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": -80,
+        "y": -160,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "e4"
+      ]
+    },
+    "e5_a": {
+      "id": "e5_a",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": 320,
+        "y": -80,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "e5"
+      ]
+    },
+    "e5_b": {
+      "id": "e5_b",
+      "class": "Node",
+      "skipLabel": true,
+      "layout": {
+        "x": 160,
+        "y": -80,
+        "z": 0
+      },
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "e5"
+      ]
+    },
+    "ab": {
+      "id": "ab",
+      "class": "Link",
+      "color": "#000",
+      "source": "A",
+      "target": "B",
+      "conveyingLyph": "AB",
+      "length": 128,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "cd": {
+      "id": "cd",
+      "class": "Link",
+      "color": "#000",
+      "source": "D",
+      "target": "C",
+      "conveyingLyph": "CD",
+      "length": 128,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "ef": {
+      "id": "ef",
+      "class": "Link",
+      "color": "#000",
+      "source": "F",
+      "target": "E",
+      "conveyingLyph": "EF",
+      "length": 128,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "gh": {
+      "id": "gh",
+      "class": "Link",
+      "color": "#000",
+      "source": "G",
+      "target": "H",
+      "conveyingLyph": "GH",
+      "length": 128,
+      "geometry": "link",
+      "reversed": true,
+      "lineWidth": "0.003"
+    },
+    "jk": {
+      "id": "jk",
+      "class": "Link",
+      "color": "#000",
+      "source": "K",
+      "target": "J",
+      "conveyingLyph": "JK",
+      "length": 128,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "lm": {
+      "id": "lm",
+      "class": "Link",
+      "color": "#000",
+      "source": "L",
+      "target": "M",
+      "conveyingLyph": "LM",
+      "length": 128,
+      "geometry": "link",
+      "reversed": true,
+      "lineWidth": "0.003"
+    },
+    "no": {
+      "id": "no",
+      "class": "Link",
+      "color": "#000",
+      "source": "O",
+      "target": "N",
+      "conveyingLyph": "NO",
+      "length": 128,
+      "geometry": "link",
+      "reversed": true,
+      "lineWidth": "0.003"
+    },
+    "pq": {
+      "id": "pq",
+      "class": "Link",
+      "color": "#000",
+      "source": "P",
+      "target": "Q",
+      "conveyingLyph": "PQ",
+      "length": 128,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "rs": {
+      "id": "rs",
+      "class": "Link",
+      "color": "#000",
+      "source": "R",
+      "target": "S",
+      "conveyingLyph": "RS",
+      "length": 128,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "bc": {
+      "id": "bc",
+      "class": "Link",
+      "color": "#000",
+      "source": "B",
+      "target": "C",
+      "length": 64,
+      "geometry": "spline",
+      "stroke": "dashed",
+      "lineWidth": "0.003"
+    },
+    "gf": {
+      "id": "gf",
+      "class": "Link",
+      "color": "#000",
+      "source": "F",
+      "target": "G",
+      "length": 64,
+      "geometry": "spline",
+      "stroke": "dashed",
+      "lineWidth": "0.003"
+    },
+    "kl": {
+      "id": "kl",
+      "class": "Link",
+      "color": "#000",
+      "source": "L",
+      "target": "K",
+      "length": 64,
+      "geometry": "spline",
+      "stroke": "dashed",
+      "lineWidth": "0.003"
+    },
+    "op": {
+      "id": "op",
+      "class": "Link",
+      "color": "#000",
+      "source": "O",
+      "target": "P",
+      "length": 64,
+      "geometry": "spline",
+      "stroke": "dashed",
+      "lineWidth": "0.003"
+    },
+    "qr": {
+      "id": "qr",
+      "class": "Link",
+      "color": "#000",
+      "source": "Q",
+      "target": "R",
+      "length": 64,
+      "geometry": "spline",
+      "stroke": "dashed",
+      "lineWidth": "0.003"
+    },
+    "e1": {
+      "id": "e1",
+      "class": "Link",
+      "color": "#000",
+      "source": "e1_a",
+      "target": "e1_b",
+      "conveyingLyph": "m1",
+      "length": 160,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "e2": {
+      "id": "e2",
+      "class": "Link",
+      "color": "#000",
+      "source": "e2_a",
+      "target": "e2_b",
+      "conveyingLyph": "m2",
+      "length": 160,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "e3": {
+      "id": "e3",
+      "class": "Link",
+      "color": "#000",
+      "source": "e3_a",
+      "target": "e3_b",
+      "conveyingLyph": "m3",
+      "length": 160,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "e4": {
+      "id": "e4",
+      "class": "Link",
+      "color": "#000",
+      "source": "e4_a",
+      "target": "e4_b",
+      "conveyingLyph": "m4",
+      "length": 160,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "e5": {
+      "id": "e5",
+      "class": "Link",
+      "color": "#000",
+      "source": "e5_a",
+      "target": "e5_b",
+      "conveyingLyph": "m5",
+      "length": 160,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "bg0": {
+      "id": "bg0",
+      "class": "Lyph",
+      "inactive": true,
+      "color": "#a6cee3",
+      "border": "bg0_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "isTemplate": true,
+      "subtypes": [
+        "AB",
+        "CD",
+        "EF",
+        "GH",
+        "JK",
+        "LM",
+        "NO",
+        "PQ",
+        "RS"
+      ],
+      "layers": [
+        "bg1",
+        "bg2",
+        "bg3"
+      ],
+      "inCoalescences": [],
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "bg0_border": {
+      "id": "bg0_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg0"
+    },
+    "bg1": {
+      "id": "bg1",
+      "class": "Lyph",
+      "color": "#00aeef",
+      "clones": [
+        "bg1_AB",
+        "bg1_CD",
+        "bg1_EF",
+        "bg1_GH",
+        "bg1_JK",
+        "bg1_LM",
+        "bg1_NO",
+        "bg1_PQ",
+        "bg1_RS"
+      ],
+      "border": "bg1_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layerIn": "bg0",
+      "inCoalescences": [],
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "bg1_border": {
+      "id": "bg1_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1"
+    },
+    "bg2": {
+      "id": "bg2",
+      "class": "Lyph",
+      "color": "#6c6d70",
+      "clones": [
+        "bg2_AB",
+        "bg2_CD",
+        "bg2_EF",
+        "bg2_GH",
+        "bg2_JK",
+        "bg2_LM",
+        "bg2_NO",
+        "bg2_PQ",
+        "bg2_RS"
+      ],
+      "border": "bg2_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layerIn": "bg0",
+      "inCoalescences": [],
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "bg2_border": {
+      "id": "bg2_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2"
+    },
+    "bg3": {
+      "id": "bg3",
+      "class": "Lyph",
+      "color": "#8bc63e",
+      "clones": [
+        "bg3_AB",
+        "bg3_CD",
+        "bg3_EF",
+        "bg3_GH",
+        "bg3_JK",
+        "bg3_LM",
+        "bg3_NO",
+        "bg3_PQ",
+        "bg3_RS"
+      ],
+      "border": "bg3_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layerIn": "bg0",
+      "inCoalescences": [],
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "bg3_border": {
+      "id": "bg3_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3"
+    },
+    "AB": {
+      "id": "AB",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#1f78b4",
+      "border": "AB_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "ab",
+      "layers": [
+        "bg1_AB",
+        "bg2_AB",
+        "bg3_AB"
+      ],
+      "internalIn": "m1",
+      "inCoalescences": [],
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "AB_border": {
+      "id": "AB_border",
+      "class": "Border",
+      "borders": [],
+      "host": "AB"
+    },
+    "CD": {
+      "id": "CD",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#b2df8a",
+      "border": "CD_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "cd",
+      "layers": [
+        "bg1_CD",
+        "bg2_CD",
+        "bg3_CD"
+      ],
+      "internalIn": "m3",
+      "inCoalescences": [
+        "cl1"
+      ],
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "CD_border": {
+      "id": "CD_border",
+      "class": "Border",
+      "borders": [],
+      "host": "CD"
+    },
+    "EF": {
+      "id": "EF",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#33a02c",
+      "border": "EF_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "ef",
+      "layers": [
+        "bg1_EF",
+        "bg2_EF",
+        "bg3_EF"
+      ],
+      "internalIn": "m2",
+      "inCoalescences": [
+        "cl2"
+      ],
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "EF_border": {
+      "id": "EF_border",
+      "class": "Border",
+      "borders": [],
+      "host": "EF"
+    },
+    "GH": {
+      "id": "GH",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#fb9a99",
+      "border": "GH_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "gh",
+      "layers": [
+        "bg1_GH",
+        "bg2_GH",
+        "bg3_GH"
+      ],
+      "internalIn": "m3",
+      "inCoalescences": [
+        "cl1"
+      ],
+      "angle": 180,
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "GH_border": {
+      "id": "GH_border",
+      "class": "Border",
+      "borders": [],
+      "host": "GH"
+    },
+    "JK": {
+      "id": "JK",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#e31a1c",
+      "border": "JK_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "jk",
+      "layers": [
+        "bg1_JK",
+        "bg2_JK",
+        "bg3_JK"
+      ],
+      "internalIn": "m3",
+      "inCoalescences": [
+        "cl1"
+      ],
+      "angle": 180,
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "JK_border": {
+      "id": "JK_border",
+      "class": "Border",
+      "borders": [],
+      "host": "JK"
+    },
+    "LM": {
+      "id": "LM",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#fdbf6f",
+      "border": "LM_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "lm",
+      "layers": [
+        "bg1_LM",
+        "bg2_LM",
+        "bg3_LM"
+      ],
+      "internalIn": "m4",
+      "inCoalescences": [
+        "cl3"
+      ],
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "LM_border": {
+      "id": "LM_border",
+      "class": "Border",
+      "borders": [],
+      "host": "LM"
+    },
+    "NO": {
+      "id": "NO",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#ff7f00",
+      "border": "NO_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "no",
+      "layers": [
+        "bg1_NO",
+        "bg2_NO",
+        "bg3_NO"
+      ],
+      "internalIn": "m2",
+      "inCoalescences": [
+        "cl2"
+      ],
+      "angle": 180,
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "NO_border": {
+      "id": "NO_border",
+      "class": "Border",
+      "borders": [],
+      "host": "NO"
+    },
+    "PQ": {
+      "id": "PQ",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#cab2d6",
+      "border": "PQ_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "pq",
+      "layers": [
+        "bg1_PQ",
+        "bg2_PQ",
+        "bg3_PQ"
+      ],
+      "internalIn": "m5",
+      "inCoalescences": [],
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "PQ_border": {
+      "id": "PQ_border",
+      "class": "Border",
+      "borders": [],
+      "host": "PQ"
+    },
+    "RS": {
+      "id": "RS",
+      "name": "undefined (clone)",
+      "class": "Lyph",
+      "color": "#6a3d9a",
+      "border": "RS_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "supertype": "bg0",
+      "conveyedBy": "rs",
+      "layers": [
+        "bg1_RS",
+        "bg2_RS",
+        "bg3_RS"
+      ],
+      "internalIn": "m4",
+      "inCoalescences": [
+        "cl3"
+      ],
+      "angle": 180,
+      "width": 51.2,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "RS_border": {
+      "id": "RS_border",
+      "class": "Border",
+      "borders": [],
+      "host": "RS"
+    },
+    "m": {
+      "id": "m",
+      "class": "Lyph",
+      "assign": [
+        {
+          "path": "$.subtypes[*]",
+          "value": {
+            "color": "#bcbdc0"
+          }
+        }
+      ],
+      "color": "#ffff99",
+      "border": "m_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "subtypes": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5"
+      ],
+      "inCoalescences": [],
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "m_border": {
+      "id": "m_border",
+      "class": "Border",
+      "borders": [],
+      "host": "m"
+    },
+    "m1": {
+      "id": "m1",
+      "class": "Lyph",
+      "color": "#bcbdc0",
+      "border": "m1_border",
+      "internalLyphColumns": 1,
+      "internalLyphs": [
+        "AB"
+      ],
+      "thickness": {},
+      "length": {},
+      "supertype": "m",
+      "conveyedBy": "e1",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "m1_border": {
+      "id": "m1_border",
+      "class": "Border",
+      "borders": [],
+      "host": "m1"
+    },
+    "m2": {
+      "id": "m2",
+      "class": "Lyph",
+      "color": "#bcbdc0",
+      "border": "m2_border",
+      "internalLyphColumns": 1,
+      "internalLyphs": [
+        "EF",
+        "NO"
+      ],
+      "thickness": {},
+      "length": {},
+      "supertype": "m",
+      "conveyedBy": "e2",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "m2_border": {
+      "id": "m2_border",
+      "class": "Border",
+      "borders": [],
+      "host": "m2"
+    },
+    "m3": {
+      "id": "m3",
+      "class": "Lyph",
+      "color": "#bcbdc0",
+      "border": "m3_border",
+      "internalLyphColumns": 1,
+      "internalLyphs": [
+        "CD",
+        "JK",
+        "GH"
+      ],
+      "thickness": {},
+      "length": {},
+      "supertype": "m",
+      "conveyedBy": "e3",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "m3_border": {
+      "id": "m3_border",
+      "class": "Border",
+      "borders": [],
+      "host": "m3"
+    },
+    "m4": {
+      "id": "m4",
+      "class": "Lyph",
+      "color": "#bcbdc0",
+      "border": "m4_border",
+      "internalLyphColumns": 1,
+      "internalLyphs": [
+        "RS",
+        "LM"
+      ],
+      "thickness": {},
+      "length": {},
+      "supertype": "m",
+      "conveyedBy": "e4",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "m4_border": {
+      "id": "m4_border",
+      "class": "Border",
+      "borders": [],
+      "host": "m4"
+    },
+    "m5": {
+      "id": "m5",
+      "class": "Lyph",
+      "color": "#bcbdc0",
+      "border": "m5_border",
+      "internalLyphColumns": 1,
+      "internalLyphs": [
+        "PQ"
+      ],
+      "thickness": {},
+      "length": {},
+      "supertype": "m",
+      "conveyedBy": "e5",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "m5_border": {
+      "id": "m5_border",
+      "class": "Border",
+      "borders": [],
+      "host": "m5"
+    },
+    "bg1_AB": {
+      "id": "bg1_AB",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_AB_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "AB",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_AB_border": {
+      "id": "bg1_AB_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_AB"
+    },
+    "bg2_AB": {
+      "id": "bg2_AB",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_AB_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "AB",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_AB_border": {
+      "id": "bg2_AB_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_AB"
+    },
+    "bg3_AB": {
+      "id": "bg3_AB",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_AB_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "AB",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_AB_border": {
+      "id": "bg3_AB_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_AB"
+    },
+    "bg1_CD": {
+      "id": "bg1_CD",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_CD_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "CD",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_CD_border": {
+      "id": "bg1_CD_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_CD"
+    },
+    "bg2_CD": {
+      "id": "bg2_CD",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_CD_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "CD",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_CD_border": {
+      "id": "bg2_CD_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_CD"
+    },
+    "bg3_CD": {
+      "id": "bg3_CD",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_CD_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "CD",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_CD_border": {
+      "id": "bg3_CD_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_CD"
+    },
+    "bg1_EF": {
+      "id": "bg1_EF",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_EF_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "EF",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_EF_border": {
+      "id": "bg1_EF_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_EF"
+    },
+    "bg2_EF": {
+      "id": "bg2_EF",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_EF_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "EF",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_EF_border": {
+      "id": "bg2_EF_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_EF"
+    },
+    "bg3_EF": {
+      "id": "bg3_EF",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_EF_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "EF",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_EF_border": {
+      "id": "bg3_EF_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_EF"
+    },
+    "bg1_GH": {
+      "id": "bg1_GH",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_GH_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "GH",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_GH_border": {
+      "id": "bg1_GH_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_GH"
+    },
+    "bg2_GH": {
+      "id": "bg2_GH",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_GH_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "GH",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_GH_border": {
+      "id": "bg2_GH_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_GH"
+    },
+    "bg3_GH": {
+      "id": "bg3_GH",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_GH_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "GH",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_GH_border": {
+      "id": "bg3_GH_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_GH"
+    },
+    "bg1_JK": {
+      "id": "bg1_JK",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_JK_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "JK",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_JK_border": {
+      "id": "bg1_JK_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_JK"
+    },
+    "bg2_JK": {
+      "id": "bg2_JK",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_JK_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "JK",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_JK_border": {
+      "id": "bg2_JK_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_JK"
+    },
+    "bg3_JK": {
+      "id": "bg3_JK",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_JK_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "JK",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_JK_border": {
+      "id": "bg3_JK_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_JK"
+    },
+    "bg1_LM": {
+      "id": "bg1_LM",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_LM_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "LM",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_LM_border": {
+      "id": "bg1_LM_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_LM"
+    },
+    "bg2_LM": {
+      "id": "bg2_LM",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_LM_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "LM",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_LM_border": {
+      "id": "bg2_LM_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_LM"
+    },
+    "bg3_LM": {
+      "id": "bg3_LM",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_LM_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "LM",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_LM_border": {
+      "id": "bg3_LM_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_LM"
+    },
+    "bg1_NO": {
+      "id": "bg1_NO",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_NO_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "NO",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_NO_border": {
+      "id": "bg1_NO_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_NO"
+    },
+    "bg2_NO": {
+      "id": "bg2_NO",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_NO_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "NO",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_NO_border": {
+      "id": "bg2_NO_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_NO"
+    },
+    "bg3_NO": {
+      "id": "bg3_NO",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_NO_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "NO",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_NO_border": {
+      "id": "bg3_NO_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_NO"
+    },
+    "bg1_PQ": {
+      "id": "bg1_PQ",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_PQ_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "PQ",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_PQ_border": {
+      "id": "bg1_PQ_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_PQ"
+    },
+    "bg2_PQ": {
+      "id": "bg2_PQ",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_PQ_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "PQ",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_PQ_border": {
+      "id": "bg2_PQ_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_PQ"
+    },
+    "bg3_PQ": {
+      "id": "bg3_PQ",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_PQ_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "PQ",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_PQ_border": {
+      "id": "bg3_PQ_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_PQ"
+    },
+    "bg1_RS": {
+      "id": "bg1_RS",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#00aeef",
+      "cloneOf": "bg1",
+      "border": "bg1_RS_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "RS",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg1_RS_border": {
+      "id": "bg1_RS_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg1_RS"
+    },
+    "bg2_RS": {
+      "id": "bg2_RS",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#6c6d70",
+      "cloneOf": "bg2",
+      "border": "bg2_RS_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "RS",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg2_RS_border": {
+      "id": "bg2_RS_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg2_RS"
+    },
+    "bg3_RS": {
+      "id": "bg3_RS",
+      "name": "? in undefined (clone)",
+      "class": "Lyph",
+      "generated": true,
+      "color": "#8bc63e",
+      "cloneOf": "bg3",
+      "border": "bg3_RS_border",
+      "internalLyphColumns": 1,
+      "thickness": {},
+      "length": {},
+      "layers": [],
+      "layerIn": "RS",
+      "inCoalescences": [],
+      "width": 17.06666666666667,
+      "height": 102.4,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 33.333333333333336
+    },
+    "bg3_RS_border": {
+      "id": "bg3_RS_border",
+      "class": "Border",
+      "borders": [],
+      "host": "bg3_RS"
+    },
+    "cl1": {
+      "id": "cl1",
+      "class": "Coalescence",
+      "topology": "CONNECTING",
+      "lyphs": [
+        "CD",
+        "JK",
+        "GH"
+      ]
+    },
+    "cl2": {
+      "id": "cl2",
+      "class": "Coalescence",
+      "topology": "CONNECTING",
+      "lyphs": [
+        "EF",
+        "NO"
+      ]
+    },
+    "cl3": {
+      "id": "cl3",
+      "class": "Coalescence",
+      "topology": "CONNECTING",
+      "lyphs": [
+        "LM",
+        "RS"
+      ]
+    }
+  }
+}

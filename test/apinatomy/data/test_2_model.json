@@ -1,0 +1,826 @@
+{
+  "id": "mainGraph",
+  "class": "Graph",
+  "external": [],
+  "nodes": [
+    {
+      "id": "a",
+      "name": "a",
+      "class": "Node",
+      "color": "#808080",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "fixed": true,
+      "val": 10,
+      "collide": 5
+    },
+    {
+      "id": "c",
+      "name": "c",
+      "class": "Node",
+      "color": "#D2691E",
+      "layout": {
+        "x": 800,
+        "y": 0,
+        "z": 0
+      },
+      "val": 5,
+      "collide": 5,
+      "sourceOf": [
+        "cn"
+      ]
+    },
+    {
+      "id": "n",
+      "name": "n",
+      "class": "Node",
+      "color": "#D2691E",
+      "layout": {
+        "x": -800,
+        "y": 0,
+        "z": 0
+      },
+      "val": 5,
+      "collide": 5,
+      "targetOf": [
+        "cn"
+      ]
+    },
+    {
+      "id": "L",
+      "name": "L",
+      "class": "Node",
+      "color": "#ff0000",
+      "layout": {
+        "x": 0,
+        "y": -600,
+        "z": 0
+      },
+      "val": 10,
+      "collide": 5,
+      "sourceOf": [
+        "LR"
+      ],
+      "targetOf": [
+        "RL"
+      ]
+    },
+    {
+      "id": "R",
+      "name": "R",
+      "class": "Node",
+      "color": "#7B68EE",
+      "layout": {
+        "x": 0,
+        "y": 600,
+        "z": 0
+      },
+      "val": 10,
+      "collide": 5,
+      "sourceOf": [
+        "RL"
+      ],
+      "targetOf": [
+        "LR"
+      ]
+    },
+    {
+      "id": "nLR00",
+      "class": "Node",
+      "color": "#ff4444",
+      "hostedBy": "LR",
+      "layout": {},
+      "val": 1,
+      "offset": 0.25,
+      "collide": 5,
+      "sourceOf": [
+        "LR00"
+      ]
+    },
+    {
+      "id": "nLR01",
+      "class": "Node",
+      "color": "#ff4444",
+      "skipLabel": true,
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "LR01"
+      ],
+      "targetOf": [
+        "LR00"
+      ]
+    },
+    {
+      "id": "nLR02",
+      "class": "Node",
+      "color": "#ff4444",
+      "skipLabel": true,
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "LR02"
+      ],
+      "targetOf": [
+        "LR01"
+      ]
+    },
+    {
+      "id": "nLR03",
+      "class": "Node",
+      "color": "#ff4444",
+      "skipLabel": true,
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "LR03"
+      ],
+      "targetOf": [
+        "LR02"
+      ]
+    },
+    {
+      "id": "nLR04",
+      "class": "Node",
+      "color": "#ff4444",
+      "skipLabel": true,
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "LR04"
+      ],
+      "targetOf": [
+        "LR03"
+      ]
+    },
+    {
+      "id": "nLR05",
+      "class": "Node",
+      "color": "#ff4444",
+      "skipLabel": true,
+      "hostedBy": "cn",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "LR04"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "id": "RL",
+      "name": "Pulmonary",
+      "class": "Link",
+      "color": "#000",
+      "source": "R",
+      "target": "L",
+      "length": 1200,
+      "geometry": "semicircle",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "LR",
+      "name": "Systemic",
+      "class": "Link",
+      "color": "#000",
+      "source": "L",
+      "target": "R",
+      "hostedNodes": [
+        "nLR00"
+      ],
+      "length": 1200,
+      "geometry": "semicircle",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "cn",
+      "class": "Link",
+      "color": "#000",
+      "source": "c",
+      "target": "n",
+      "hostedNodes": [
+        "nLR05"
+      ],
+      "length": 1600,
+      "geometry": "link",
+      "stroke": "dashed",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "LR00",
+      "class": "Link",
+      "color": "#ff4444",
+      "source": "nLR00",
+      "target": "nLR01",
+      "conveyingLyph": "99",
+      "length": 48,
+      "geometry": "link",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "LR01",
+      "class": "Link",
+      "color": "#ff4444",
+      "source": "nLR01",
+      "target": "nLR02",
+      "conveyingLyph": "114",
+      "length": 48,
+      "geometry": "link",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "LR02",
+      "class": "Link",
+      "color": "#ff4444",
+      "source": "nLR02",
+      "target": "nLR03",
+      "conveyingLyph": "51",
+      "length": 48,
+      "geometry": "link",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "LR03",
+      "class": "Link",
+      "color": "#ff4444",
+      "source": "nLR03",
+      "target": "nLR04",
+      "conveyingLyph": "54",
+      "length": 48,
+      "geometry": "link",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    },
+    {
+      "id": "LR04",
+      "class": "Link",
+      "color": "#ff4444",
+      "source": "nLR04",
+      "target": "nLR05",
+      "conveyingLyph": "57",
+      "length": 48,
+      "geometry": "link",
+      "stroke": "thick",
+      "lineWidth": "0.003"
+    }
+  ],
+  "lyphs": [
+    {
+      "id": "51",
+      "name": "Interlobar Artery",
+      "class": "Lyph",
+      "color": "rgb(230, 53, 42)",
+      "border": {
+        "id": "51_border",
+        "class": "Border",
+        "borders": [],
+        "host": "51"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "conveyedBy": "LR02",
+      "layers": [
+        "52",
+        "53"
+      ],
+      "inCoalescences": [],
+      "width": 19.200000000000003,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    {
+      "id": "52",
+      "name": "Lumen of Interlobar Artery",
+      "class": "Lyph",
+      "color": "#a6cee3",
+      "border": {
+        "id": "52_border",
+        "class": "Border",
+        "borders": [],
+        "host": "52"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "layerIn": "51",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "53",
+      "name": "Wall of Interlobar Artery",
+      "class": "Lyph",
+      "color": "#1f78b4",
+      "border": {
+        "id": "53_border",
+        "class": "Border",
+        "borders": [],
+        "host": "53"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "layerIn": "51",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "54",
+      "name": "Arcuate Artery",
+      "class": "Lyph",
+      "color": "rgb(171, 16, 23)",
+      "border": {
+        "id": "54_border",
+        "class": "Border",
+        "borders": [],
+        "host": "54"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "conveyedBy": "LR03",
+      "layers": [
+        "55",
+        "56"
+      ],
+      "inCoalescences": [],
+      "width": 19.200000000000003,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    {
+      "id": "55",
+      "name": "Lumen of Arcuate Artery",
+      "class": "Lyph",
+      "color": "#b2df8a",
+      "border": {
+        "id": "55_border",
+        "class": "Border",
+        "borders": [],
+        "host": "55"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "layerIn": "54",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "56",
+      "name": "Wall of Arcuate Artery",
+      "class": "Lyph",
+      "color": "#33a02c",
+      "border": {
+        "id": "56_border",
+        "class": "Border",
+        "borders": [],
+        "host": "56"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "layerIn": "54",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "57",
+      "name": "Cortical Artery",
+      "class": "Lyph",
+      "color": "rgb(103, 0, 13)",
+      "border": {
+        "id": "57_border",
+        "class": "Border",
+        "borders": [],
+        "host": "57"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "conveyedBy": "LR04",
+      "layers": [
+        "58",
+        "59"
+      ],
+      "inCoalescences": [],
+      "width": 19.200000000000003,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    {
+      "id": "58",
+      "name": "Lumen of Cortical Artery",
+      "class": "Lyph",
+      "color": "#fb9a99",
+      "border": {
+        "id": "58_border",
+        "class": "Border",
+        "borders": [],
+        "host": "58"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "layerIn": "57",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "59",
+      "name": "Wall of Cortical Artery",
+      "class": "Lyph",
+      "color": "#e31a1c",
+      "border": {
+        "id": "59_border",
+        "class": "Border",
+        "borders": [],
+        "host": "59"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 6,
+        "max": 6
+      },
+      "length": {
+        "min": 5,
+        "max": 5
+      },
+      "layerIn": "57",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "99",
+      "name": "Renal Artery",
+      "class": "Lyph",
+      "color": "rgb(252, 186, 161)",
+      "border": {
+        "id": "99_border",
+        "class": "Border",
+        "borders": [],
+        "host": "99"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 2,
+        "max": 3
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "conveyedBy": "LR00",
+      "layers": [
+        "100",
+        "101"
+      ],
+      "inCoalescences": [],
+      "width": 19.200000000000003,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    {
+      "id": "100",
+      "name": "Lumen of Renal Artery",
+      "class": "Lyph",
+      "color": "#fdbf6f",
+      "border": {
+        "id": "100_border",
+        "class": "Border",
+        "borders": [],
+        "host": "100"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 2,
+        "max": 3
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "99",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "101",
+      "name": "Wall of Renal Artery",
+      "class": "Lyph",
+      "color": "#ff7f00",
+      "border": {
+        "id": "101_border",
+        "class": "Border",
+        "borders": [],
+        "host": "101"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 2,
+        "max": 3
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "99",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "114",
+      "name": "Segmental Artery",
+      "class": "Lyph",
+      "color": "rgb(251, 122, 90)",
+      "border": {
+        "id": "114_border",
+        "class": "Border",
+        "borders": [],
+        "host": "114"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 3,
+        "max": 3
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "conveyedBy": "LR01",
+      "layers": [
+        "115",
+        "116"
+      ],
+      "inCoalescences": [],
+      "width": 19.200000000000003,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    {
+      "id": "115",
+      "name": "Lumen of Segmental Artery",
+      "class": "Lyph",
+      "color": "#cab2d6",
+      "border": {
+        "id": "115_border",
+        "class": "Border",
+        "borders": [],
+        "host": "115"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 3,
+        "max": 3
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "114",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    {
+      "id": "116",
+      "name": "Wall of Segmental Artery",
+      "class": "Lyph",
+      "color": "#6a3d9a",
+      "border": {
+        "id": "116_border",
+        "class": "Border",
+        "borders": [],
+        "host": "116"
+      },
+      "internalLyphColumns": 1,
+      "topology": "TUBE",
+      "thickness": {
+        "min": 3,
+        "max": 3
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "114",
+      "inCoalescences": [],
+      "width": 9.600000000000001,
+      "height": 38.400000000000006,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    }
+  ],
+  "materials": [],
+  "regions": [],
+  "references": [],
+  "coalescences": [],
+  "channels": [],
+  "chains": [],
+  "trees": [],
+  "groups": [
+    {
+      "id": "arterial",
+      "name": "Arterial",
+      "class": "Group",
+      "assign": [
+        {
+          "path": "$.nodes[*]",
+          "value": {
+            "color": "#ff4444"
+          }
+        },
+        {
+          "path": "$.links[*]",
+          "value": {
+            "color": "#ff4444",
+            "length": 3,
+            "stroke": "thick"
+          }
+        }
+      ],
+      "interpolate": [
+        {
+          "path": "$.links[*].conveyingLyph",
+          "color": {
+            "scheme": "interpolateReds",
+            "offset": 0.25
+          }
+        }
+      ],
+      "nodes": [
+        "nLR00",
+        "nLR01",
+        "nLR02",
+        "nLR03",
+        "nLR04",
+        "nLR05"
+      ],
+      "links": [
+        "LR00",
+        "LR01",
+        "LR02",
+        "LR03",
+        "LR04"
+      ],
+      "lyphs": [
+        "99",
+        "114",
+        "51",
+        "54",
+        "57"
+      ],
+      "coalescences": [],
+      "groups": []
+    }
+  ],
+  "generatedFrom": []
+}

@@ -1,0 +1,166 @@
+{
+  "id": "mainGraph",
+  "resources": {
+    "5": {
+      "id": "5",
+      "name": "Kidney Lobus",
+      "class": "Lyph",
+      "color": "#a6cee3",
+      "border": "5_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "conveyedBy": "k_l",
+      "layers": [
+        "7",
+        "6"
+      ],
+      "inCoalescences": [],
+      "width": 320,
+      "height": 320,
+      "scale": {
+        "width": 50,
+        "height": 50
+      }
+    },
+    "6": {
+      "id": "6",
+      "name": "Cortex of Kidney Lobus",
+      "class": "Lyph",
+      "color": "#1f78b4",
+      "border": "6_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "5",
+      "inCoalescences": [],
+      "width": 160,
+      "height": 320,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    "7": {
+      "id": "7",
+      "name": "Medulla of Kidney Lobus",
+      "class": "Lyph",
+      "color": "#b2df8a",
+      "border": "7_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "5",
+      "inCoalescences": [],
+      "width": 160,
+      "height": 320,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    "waitingList": {},
+    "mainGraph": {
+      "id": "mainGraph",
+      "class": "Graph",
+      "nodes": [
+        "k",
+        "l"
+      ],
+      "links": [
+        "k_l"
+      ],
+      "lyphs": [
+        "5",
+        "6",
+        "7"
+      ],
+      "coalescences": [],
+      "groups": []
+    },
+    "k": {
+      "id": "k",
+      "name": "k",
+      "class": "Node",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "fixed": true,
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "k_l"
+      ]
+    },
+    "l": {
+      "id": "l",
+      "name": ";",
+      "class": "Node",
+      "layout": {
+        "x": 0,
+        "y": 560,
+        "z": 200
+      },
+      "fixed": true,
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "k_l"
+      ]
+    },
+    "k_l": {
+      "id": "k_l",
+      "class": "Link",
+      "color": "#000",
+      "source": "k",
+      "target": "l",
+      "conveyingLyph": "5",
+      "length": 640,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "5_border": {
+      "id": "5_border",
+      "class": "Border",
+      "borders": [],
+      "host": "5"
+    },
+    "6_border": {
+      "id": "6_border",
+      "class": "Border",
+      "borders": [],
+      "host": "6"
+    },
+    "7_border": {
+      "id": "7_border",
+      "class": "Border",
+      "borders": [],
+      "host": "7"
+    }
+  }
+}

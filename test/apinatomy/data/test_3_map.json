@@ -1,0 +1,324 @@
+{
+  "id": "mainGraph",
+  "resources": {
+    "3": {
+      "id": "3",
+      "name": "Renal Parenchyma",
+      "class": "Lyph",
+      "color": "#a6cee3",
+      "border": "3_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 1,
+        "max": 1
+      },
+      "conveyedBy": "k_l",
+      "inCoalescences": [],
+      "width": 256,
+      "height": 512,
+      "scale": {
+        "width": 40,
+        "height": 80
+      }
+    },
+    "5": {
+      "id": "5",
+      "name": "Kidney Lobus",
+      "class": "Lyph",
+      "color": "#1f78b4",
+      "border": "5_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "conveyedBy": "3_border_3",
+      "layers": [
+        "7",
+        "6"
+      ],
+      "inCoalescences": [],
+      "width": 128,
+      "height": 128,
+      "scale": {
+        "width": 50,
+        "height": 50
+      }
+    },
+    "6": {
+      "id": "6",
+      "name": "Cortex of Kidney Lobus",
+      "class": "Lyph",
+      "color": "#b2df8a",
+      "border": "6_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "5",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    "7": {
+      "id": "7",
+      "name": "Medulla of Kidney Lobus",
+      "class": "Lyph",
+      "color": "#33a02c",
+      "border": "7_border",
+      "internalLyphColumns": 1,
+      "topology": "BAG",
+      "thickness": {
+        "min": 2,
+        "max": 2
+      },
+      "length": {
+        "min": 2,
+        "max": 2
+      },
+      "layerIn": "5",
+      "inCoalescences": [],
+      "width": 64,
+      "height": 128,
+      "scale": {
+        "width": 40,
+        "height": 80
+      },
+      "layerWidth": 50
+    },
+    "waitingList": {},
+    "mainGraph": {
+      "id": "mainGraph",
+      "class": "Graph",
+      "nodes": [
+        "k",
+        "l"
+      ],
+      "links": [
+        "k_l"
+      ],
+      "lyphs": [
+        "3",
+        "5",
+        "6",
+        "7"
+      ],
+      "coalescences": [],
+      "groups": []
+    },
+    "k": {
+      "id": "k",
+      "name": "k",
+      "class": "Node",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "fixed": true,
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "k_l"
+      ]
+    },
+    "l": {
+      "id": "l",
+      "name": ";",
+      "class": "Node",
+      "layout": {
+        "x": 0,
+        "y": 560,
+        "z": 200
+      },
+      "fixed": true,
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "k_l"
+      ]
+    },
+    "k_l": {
+      "id": "k_l",
+      "class": "Link",
+      "color": "#000",
+      "source": "k",
+      "target": "l",
+      "conveyingLyph": "3",
+      "length": 640,
+      "geometry": "link",
+      "lineWidth": "0.003"
+    },
+    "3_border": {
+      "id": "3_border",
+      "class": "Border",
+      "borders": [
+        "3_border_0",
+        "3_border_1",
+        "3_border_2",
+        "3_border_3"
+      ],
+      "host": "3"
+    },
+    "3_border_0": {
+      "id": "3_border_0",
+      "class": "Link",
+      "source": "s_3_border_0",
+      "target": "t_3_border_0",
+      "onBorder": "3_border",
+      "length": 512,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "s_3_border_0": {
+      "id": "s_3_border_0",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "3_border_0"
+      ]
+    },
+    "t_3_border_0": {
+      "id": "t_3_border_0",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "3_border_0"
+      ]
+    },
+    "3_border_1": {
+      "id": "3_border_1",
+      "class": "Link",
+      "source": "s_3_border_1",
+      "target": "t_3_border_1",
+      "onBorder": "3_border",
+      "length": 256,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "s_3_border_1": {
+      "id": "s_3_border_1",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "3_border_1"
+      ]
+    },
+    "t_3_border_1": {
+      "id": "t_3_border_1",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "3_border_1"
+      ]
+    },
+    "3_border_2": {
+      "id": "3_border_2",
+      "class": "Link",
+      "source": "s_3_border_2",
+      "target": "t_3_border_2",
+      "onBorder": "3_border",
+      "length": 512,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "s_3_border_2": {
+      "id": "s_3_border_2",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "3_border_2"
+      ]
+    },
+    "t_3_border_2": {
+      "id": "t_3_border_2",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "3_border_2"
+      ]
+    },
+    "3_border_3": {
+      "id": "3_border_3",
+      "class": "Link",
+      "source": "s_3_border_3",
+      "target": "t_3_border_3",
+      "conveyingLyph": "5",
+      "onBorder": "3_border",
+      "length": 256,
+      "geometry": "invisible",
+      "lineWidth": "0.003"
+    },
+    "s_3_border_3": {
+      "id": "s_3_border_3",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "sourceOf": [
+        "3_border_3"
+      ]
+    },
+    "t_3_border_3": {
+      "id": "t_3_border_3",
+      "class": "Node",
+      "layout": {},
+      "val": 1,
+      "collide": 5,
+      "targetOf": [
+        "3_border_3"
+      ]
+    },
+    "5_border": {
+      "id": "5_border",
+      "class": "Border",
+      "borders": [],
+      "host": "5"
+    },
+    "6_border": {
+      "id": "6_border",
+      "class": "Border",
+      "borders": [],
+      "host": "6"
+    },
+    "7_border": {
+      "id": "7_border",
+      "class": "Border",
+      "borders": [],
+      "host": "7"
+    }
+  }
+}
