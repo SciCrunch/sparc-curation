@@ -40,7 +40,11 @@ from pathlib import PosixPath, PurePosixPath
 from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
-import magic  # from sys-apps/file consider python-magic ?
+try:
+    import magic  # from sys-apps/file consider python-magic ?
+except ImportError:
+    pass
+
 import xattr
 import psutil
 from git import Repo
@@ -1888,7 +1892,7 @@ class BlackfynnCache(PrimaryCache, XattrCache):
         try:
             self.data_headers = next(gen)
         except exc.NoRemoteFileWithThatIdError as e:
-            log.error(str(e))
+            log.error(f'{self} {e}')
             raise e  # have to raise so that we don't overwrite the file
 
         log.debug(self.data_headers)
