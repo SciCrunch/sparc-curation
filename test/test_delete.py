@@ -59,6 +59,12 @@ class TestDelete(TestOperation):
     def test(self):
         pass
 
+    def test_1_case(self):
+        # this is an old scenario that happens because of how the old system worked
+        # local working directory | x
+        # local cache directory | o
+        # remote | o
+        pass
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestUpdate(TestOperation):
