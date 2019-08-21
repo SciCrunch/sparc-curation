@@ -137,6 +137,8 @@ class JSONSchema(object):
 
     schema = {}
 
+    validator_class = jsonschema.Draft6Validator
+
     def __init__(self):
         format_checker = jsonschema.FormatChecker()
         #format_checker = ConvertingChecker()
@@ -148,9 +150,19 @@ class JSONSchema(object):
                              OntId,
                              OntTerm,
                              Expr,))
-        self.validator = jsonschema.Draft6Validator(self.schema,
-                                                    format_checker=format_checker,
-                                                    types=types)
+        self.validator = self.validator_class(self.schema,
+                                              format_checker=format_checker,
+                                              types=types)
+
+    @classmethod
+    def _add_meta(cls, blob):
+        """ In place modification of a schema blob to add schema level metadata """
+        # TODO schema metadata, I don't know enough to do this correctly yet
+        #schema_version = cls.validator_class.ID_OF(cls.validator_class.META_SCHEMA)
+        #schema['$schema'] = schema_version
+
+        #schema_id = '#/temp/' + cls.__name__ + '.json'  # FIXME version ...
+        #schema['$id'] = schema_id
 
     @classmethod
     def export(cls, base_path):
@@ -164,6 +176,8 @@ class JSONSchema(object):
 
         schema = copy.deepcopy(cls.schema)
         pop_errors(schema)
+        cls._add_meta(schema)
+
         with open((base_path / cls.__name__).with_suffix('.json'), 'wt') as f:
             json.dump(schema, f, sort_keys=True, indent=2)
 
@@ -353,7 +367,8 @@ class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
-        'required': ['name',
+        'required': ['version',
+                     'name',
                      'description',
                      'funding',
                      'protocol_url_or_doi',
@@ -362,6 +377,7 @@ class DatasetDescriptionSchema(JSONSchema):
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
             'errors': ErrorSchema.schema,
+            'version': {'type': 'string'},
             'name': {'type': 'string'},
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
@@ -459,7 +475,7 @@ class SubjectsSchema(JSONSchema):
                                             'software_version': {'type': 'string'},
                                             'software_vendor': {'type': 'string'},
                                             'software_url': {'type': 'string'},
-                                            'software_rri': {'type': 'string'},
+                                            'software_rrid': {'type': 'string'},
                                         },},}}}
 
     # FIXME not implemented
@@ -516,7 +532,7 @@ class SamplesFileSchema(JSONSchema):
                                             'software_version': {'type': 'string'},
                                             'software_vendor': {'type': 'string'},
                                             'software_url': {'type': 'string'},
-                                            'software_rri': {'type': 'string'},
+                                            'software_rrid': {'type': 'string'},
                                         },},}}}
 
     # FIXME not implemented
