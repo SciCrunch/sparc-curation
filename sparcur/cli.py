@@ -8,7 +8,7 @@ Usage:
     spc find [options] --name=<PAT>...
     spc status [options]
     spc meta [options] [--uri] [--browser] [--human] [--diff] [<path>...]
-    spc export [ttl json datasets] [options]
+    spc export [ttl json datasets schemas] [options]
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
@@ -709,6 +709,18 @@ class Main(Dispatcher):
     def export(self):
         """ export output of curation workflows to file """
         #org_id = Integrator(self.project_path).organization.id
+
+        if self.options.schemas:
+            schemas = (sc.DatasetDescriptionSchema,
+                       sc.SubjectsSchema,
+                       sc.SamplesFileSchema,
+                       sc.SubmissionSchema,)
+
+            sb = self.project_path.parent / 'export' / 'schemas'  # FIXME run without having to be in a project
+            for s in schemas:
+                s.export(sb)
+
+            return
 
         cwd = Path.cwd()
         timestamp = NOWDANGER(implicit_tz='PST PDT')

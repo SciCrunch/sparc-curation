@@ -152,6 +152,21 @@ class JSONSchema(object):
                                                     format_checker=format_checker,
                                                     types=types)
 
+    @classmethod
+    def export(cls, base_path):
+        """ write schema to file with """
+        def pop_errors(dict_):
+            if 'errors' in dict_:
+                dict_.pop('errors')
+            for v in dict_.values():
+                if isinstance(v, dict):
+                    pop_errors(v)
+
+        schema = copy.deepcopy(cls.schema)
+        pop_errors(schema)
+        with open((base_path / cls.__name__).with_suffix('.json'), 'wt') as f:
+            json.dump(schema, f, sort_keys=True, indent=2)
+
     def validate_strict(self, data):
         # Take a copy to ensure we don't modify what we were passed.
         #appstruct = copy.deepcopy(data)
