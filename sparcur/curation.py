@@ -977,13 +977,17 @@ class Integrator(PathData, OntologyData):
                 techniques = lambda v: []
                 protocol_uris = lambda v: []
 
+            class FakeAffilSheet:
+                pass
+
             cls.organs_sheet = FakeOrganSheet
+            cls.affiliations = FakeAffilSheet
         else:
             cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
+            cls.affiliations = sheets.Affiliations()
 
         cls.organ = OrganData()
         cls.member = State.member
-        cls.affiliations = sheets.Affiliations()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
