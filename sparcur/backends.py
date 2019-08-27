@@ -643,6 +643,17 @@ class BlackfynnRemote(RemotePath):
     def old_id(self):
         return None
 
+    def exists(self):
+        try:
+            bfo = self.bfobject
+            if not isinstance(bfo, BaseNode):
+                _cache = bfo.refresh(force=True)
+                bf = _cache.remote.bfo
+
+            return bfo.exists
+        except exn.NoRemoteFileWithThatIdError as e:
+            return False
+
     def is_dir(self):
         bfo = self.bfobject
         return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
@@ -811,9 +822,14 @@ class BlackfynnRemote(RemotePath):
                 return newc
 
         existing = sname(existing_caches)
-        skipexisting = {e.id:e for e in
-                        Async(rate=self._async_rate)(deferred(refresh)(e) for e in existing)
-                        if e is not None}
+        if not self._debug:
+            skipexisting = {e.id:e for e in
+                            Async(rate=self._async_rate)(deferred(refresh)(e) for e in existing)
+                            if e is not None}
+        else:  # debug ...
+            skipexisting = {e.id:e for e in
+                            (refresh(e) for e in existing)
+                            if e is not None}
 
         # FIXME
         # in theory the remote could change betwee these two loops
@@ -821,14 +837,24 @@ class BlackfynnRemote(RemotePath):
         # a set of remotes and have them refresh existing files
         # in one shot
 
-        yield from (rc for d in Async(rate=self._async_rate)(
-            deferred(child.bootstrap)(recursive=True, only=only, skip=skip)
-            for child in sname(self.children)
-            #if child.id in skipexisting
-            # TODO when dataset's have a 'anything in me updated'
-            # field then we can use that to skip things that haven't
-            # changed (hello git ...)
-            ) for rc in d)
+        if not self._debug:
+            yield from (rc for d in Async(rate=self._async_rate)(
+                deferred(child.bootstrap)(recursive=True, only=only, skip=skip)
+                for child in sname(self.children)
+                #if child.id in skipexisting
+                # TODO when dataset's have a 'anything in me updated'
+                # field then we can use that to skip things that haven't
+                # changed (hello git ...)
+                ) for rc in d)
+        else:  # debug
+             yield from (rc for d in (
+                child.bootstrap(recursive=True, only=only, skip=skip)
+                for child in sname(self.children))
+                #if child.id in skipexisting
+                # TODO when dataset's have a 'anything in me updated'
+                # field then we can use that to skip things that haven't
+                # changed (hello git ...)
+                for rc in d)
 
     def isinstance_bf(self, *types):
         return [t for t in types if isinstance(self.bfobject, t)]

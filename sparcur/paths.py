@@ -161,6 +161,7 @@ class RemotePath:
     """ Remote data about a remote object. """
 
     _cache_class = None
+    _debug = False
 
     # we use a PurePath becuase we still want to key off this being local path
     # but we don't want any of the local file system operations to work by accident
@@ -489,6 +490,7 @@ class AugmentedPath(PosixPath):
 
     _stack = []  # pushd and popd
     count = 0
+    _debug = False  # sigh
 
     def exists(self):
         """ Turns out that python doesn't know how to stat symlinks that point
@@ -1668,10 +1670,15 @@ class PrimaryCache(CachePath):
         original = self.meta
         file_is_different, updated = self._update_meta(original, pathmeta)
         must_fetch = file_is_different and self.is_file() and self.exists()
+
         if must_fetch:
-            # FIXME performance, and pathmeta.checksum is None case
-            if self.local.content_different() and self.local.meta.checksum != pathmeta.checksum:
-                raise exc.LocalChangesError(f'not fetching {self}')
+            try:
+                # FIXME performance, and pathmeta.checksum is None case
+                if self.local.content_different() and self.local.meta.checksum != pathmeta.checksum:
+                    raise exc.LocalChangesError(f'not fetching {self}')
+
+            except exc.NoRemoteFileWithThatIdError as e:
+                log.warning('cant fetch remote file there may be untracked local changes for\n{self}')
 
             log.info(f'crumpling to preserve existing metadata\n{self}')
             trashed = self.crumple()

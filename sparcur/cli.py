@@ -175,6 +175,7 @@ from sparcur.core import JT, log, logd, JPointer, lj
 from sparcur.core import OntId, OntTerm, get_all_errors, DictTransformer as DT, adops
 from sparcur.utils import FileSize, python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
+from sparcur.paths import RemotePath, AugmentedPath  # for debug
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory
@@ -299,6 +300,10 @@ class Main(Dispatcher):
         self._setup()  # if this isn't run up here the internal state of the program get's wonky
 
     def _setup(self):
+        # pass debug along (sigh)
+        AugmentedPath._debug = True
+        RemotePath._debug = True
+
         # set our local class TODO probably ok to do this by default
         # but needs testing to make sure there aren't things that only
         # work correctly because they encounter _local_class = None ...
