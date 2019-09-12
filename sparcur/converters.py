@@ -470,7 +470,7 @@ class ApiNATOMYConverter(TripleConverter):
                     if 'external' in cd and cd['external']:
                         oid = OntId(cd['external'][0])
                         yield s_cd, a, oid.u
-                        ot = oid.asTerm
+                        ot = oid.asTerm()
                         if ot.label:
                             yield oid.u, rdfs.label, ot.label
 
@@ -486,7 +486,7 @@ class ApiNATOMYConverter(TripleConverter):
                             if 'external' in dcd and dcd['external']:
                                 oid = OntId(dcd['external'][0])
                                 yield s_icd, a, oid.u
-                                ot = oid.asTerm
+                                ot = oid.asTerm()
                                 if ot.label:
                                     yield oid.u, rdfs.label, ot.label
 

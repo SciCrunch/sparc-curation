@@ -139,7 +139,7 @@ class Organs(FieldAlignment):
                     #return OntTerm(curie=f'lex:{quote(cell.value)}')
                 #else:
 
-                return oid.asTerm
+                return oid.asTerm()
 
             else:
                 logd.warning(f'unhandled technique {cell.value}')
