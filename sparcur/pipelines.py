@@ -758,7 +758,7 @@ class PipelineExtras(JSONPipeline):
                         o = OntId(o)
                         if o.prefix == 'FMA':
                             ot = OntTerm(o)
-                            o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+                            o = next(OntTerm.query(label=ot.label, prefix='UBERON'))
 
                     data['meta']['organ'] = o
 
@@ -773,7 +773,7 @@ class PipelineExtras(JSONPipeline):
                     _o = OntId(_o)
                     if _o.prefix == 'FMA':
                         ot = OntTerm(_o)
-                        _o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+                        _o = next(OntTerm.query(label=ot.label, prefix='UBERON'))
 
                     out += (_o,)
 

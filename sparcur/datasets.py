@@ -466,7 +466,7 @@ class Version1Header(HasErrors):
     @staticmethod
     def query(value, prefix):
         for query_type in ('term', 'search'):
-            terms = [q.OntTerm for q in OntTerm.query(prefix=prefix, **{query_type:value})]
+            terms = list(OntTerm.query(prefix=prefix, **{query_type:value}))
             if terms:
                 #print('matching', terms[0], value)
                 #print('extra terms for', value, terms[1:])

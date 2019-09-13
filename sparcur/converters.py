@@ -194,7 +194,7 @@ class MetaConverter(TripleConverter):
                     o = OntId(o)
                     if o.prefix == 'FMA':
                         ot = OntTerm(o)
-                        o = next(OntTerm.query(label=ot.label, prefix='UBERON')).OntTerm
+                        o = next(OntTerm.query(label=ot.label, prefix='UBERON'))
 
                     yield s, isAbout, o.u
 
