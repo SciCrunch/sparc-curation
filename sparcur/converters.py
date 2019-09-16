@@ -325,6 +325,7 @@ class SampleConverter(TripleConverter):
         return TEMP.wasDerivedFromSubject, self._subject_id(value)
 SampleConverter.setup()
 
+
 class ApiNATOMYConverter(TripleConverter):
     @staticmethod
     def apinatbase():
