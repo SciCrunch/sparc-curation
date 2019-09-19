@@ -2345,6 +2345,13 @@ class Path(LocalPath):  # NOTE this is a hack to keep everything consistent
         else:
             return self.parent.repo
 
+    @property
+    def repo_relative_path(self):
+        """ working directory relative path """
+        repo = self.repo
+        if repo is not None:
+            return self.relative_to(repo.working_dir)
+
     def xopen(self):
         """ open file using xdg-open """
         process = subprocess.Popen(['xdg-open', self.as_posix()],
