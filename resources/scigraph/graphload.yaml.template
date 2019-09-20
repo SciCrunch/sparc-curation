@@ -19,7 +19,15 @@ graphConfiguration:
 
 ontologies:
   - url: http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl
+    reasonerConfiguration:
+      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
+      addDirectInferredEdges: true
+      removeUnsatisfiableClasses: true
   - url: http://ontology.neuinfo.org/NIF/extra.ttl
+    reasonerConfiguration:
+      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
+      addDirectInferredEdges: true
+      removeUnsatisfiableClasses: true
   - url: http://ontology.neuinfo.org/NIF/ttl/nif.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
