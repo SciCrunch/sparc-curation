@@ -1131,6 +1131,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
     #+RESULTS:
     #+begin_src bash
       export REPOS='
+      https://github.com/tgbugs/augpathlib
       https://github.com/tgbugs/hyputils
       https://github.com/tgbugs/ontquery
       https://github.com/tgbugs/parsercomb
@@ -1146,6 +1147,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
       https://github.com/zussitarze/qrcode
       '
       export PYROOTS='
+      augpathlib
       pyontutils/htmlfn
       pyontutils/ttlser
       hyputils

@@ -161,6 +161,8 @@ from collections import Counter, defaultdict
 import requests
 import htmlfn as hfn
 import ontquery as oq
+from augpathlib import FileSize
+from augpathlib import RemotePath, AugmentedPath  # for debug
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit
 from pyontutils.utils import NOWDANGER, NOWISO, UTCNOWISO
@@ -173,9 +175,8 @@ from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, log, logd, JPointer, lj
 from sparcur.core import OntId, OntTerm, get_all_errors, DictTransformer as DT, adops
-from sparcur.utils import FileSize, python_identifier, want_prefixes
+from sparcur.utils import python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
-from sparcur.paths import RemotePath, AugmentedPath  # for debug
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemoteFactory

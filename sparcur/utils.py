@@ -4,12 +4,17 @@ import hashlib
 import inspect
 from pathlib import Path
 from functools import wraps
+from augpathlib.utils import log as _alog
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
 from sparcur.config import config
 
 
 log = makeSimpleLogger('sparcur')
 logd = log.getChild('data')
+
+# set augpathlib log format to pyontutils (also sets all child logs)
+_alog.removeHandler(_alog.handlers[0])
+_alog.addHandler(log.handlers[0])
 
 
 class _log:
