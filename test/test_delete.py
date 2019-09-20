@@ -1,8 +1,8 @@
 import os
 import shutil
 import unittest
-from sparcur.utils import FileSize
-from sparcur.paths import AugmentedPath, BlackfynnCache as BFC, LocalPath
+from augpathlib import AugmentedPath, FileSize
+from sparcur.paths import BlackfynnCache as BFC, LocalPath
 from sparcur.backends import BlackfynnRemote
 from sparcur.blackfynn_api import BFLocal
 import pytest

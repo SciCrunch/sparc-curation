@@ -9,12 +9,13 @@ from terminaltables import AsciiTable
 from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
-from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
+from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from pysercomb.pyr import units as pyru
+from augpathlib import FileSize
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, sparc, FileSize, PioId
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, PioId
 from sparcur.paths import Path
 
 a = rdf.type

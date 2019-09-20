@@ -21,7 +21,7 @@ from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, cache, sparc, FileSize, python_identifier  # FIXME fix other imports
+from sparcur.utils import log, logd, cache, python_identifier  # FIXME fix other imports
 from sparcur.config import config
 
 

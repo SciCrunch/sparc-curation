@@ -9,8 +9,9 @@ from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
 from sparcur.core import BlackfynnId, DoiId
-from sparcur.paths import PathMeta, RemotePath, CachePath, LocalPath, Path, SshCache, BlackfynnCache
-from sparcur.paths import StatResult, _bind_sysid_
+from sparcur.paths import PathMeta, RemotePath, LocalPath, Path, SshCache, BlackfynnCache
+from augpathlib import StatResult
+from augpathlib.utils import _bind_sysid_
 
 from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File
@@ -18,14 +19,6 @@ from blackfynn import Dataset
 from blackfynn.models import BaseNode
 
 from ast import literal_eval
-
-
-class ReflectiveCachePath(CachePath):
-    """ Oh, it's me. """
-
-    @property
-    def meta(self):
-        return self.local.meta
 
 
 class RemoteFactory:

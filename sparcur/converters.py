@@ -1,13 +1,13 @@
 from types import GeneratorType
 import rdflib
 from pyontutils import combinators as cmb
-from pyontutils.namespaces import TEMP, TEMPRAW, isAbout
-from pyontutils.closed_namespaces import rdf, rdfs, owl, dc
+from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc
+from pyontutils.namespaces import rdf, rdfs, owl, dc
 from scibot.extract import normalizeDoi
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from sparcur import datasets as dat
 from sparcur.core import OntId, OntTerm, lj, get_right_id
-from sparcur.utils import log, logd, sparc
+from sparcur.utils import log, logd
 from sparcur.protocols import ProtocolData
 
 a = rdf.type
