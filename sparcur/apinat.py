@@ -2,15 +2,25 @@ import rdflib
 from pyontutils.core import OntGraph, OntId
 from pyontutils.namespaces import rdf, rdfs, owl
 import sparcur.schemas as sc
+from sparcur.utils import log, logd
 
 elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 readable = rdflib.Namespace('https://apinatomy.org/uris/readable/')
+
+
+class NoIdError(Exception):
+    """ blob has no id """
+
 
 class Base:
     def __init__(self, blob, context=None):
         self.blob = blob
         self.context = context
-        self.id = blob['id']
+        try:
+            self.id = blob['id']
+        except KeyError as e:
+            raise NoIdError(f'id not in {blob}') from e
+
         if context is not None:
             self.s = context[self.id]
         else:
@@ -37,7 +47,10 @@ class Graph(Base):
             if cls.key in self.blob:
                 # FIXME trees not in all blobs
                 for blob in self.blob[cls.key]:
-                    yield from cls(blob, context).triples()
+                    try:
+                        yield from cls(blob, context).triples()
+                    except NoIdError as e:
+                        logd.exception(e)
 
     def populate(self, graph):
         [graph.add(t) for t in self.triples]
@@ -57,7 +70,7 @@ class BaseElement(Base):
 
     def triples(self):
         s = self.s
-        yield s, rdf.type, owl.Class
+        yield s, rdf.type, owl.NamedIndividual
         yield s, rdf.type, elements[f'{self.cname}']
         yield s, rdfs.label, rdflib.Literal(self.name)
         yield from self.triples_external()
@@ -66,16 +79,20 @@ class BaseElement(Base):
         yield from self.triples_objects()
         yield from self.triples_objects_multi()
 
-    def triples_generics(self):
-        for key in self.generics:
-            # FIXME has + key.capitalize()?
-            yield self.s, readable[key], readable[self.blob[key]]
-
     def triples_annotations(self):
         for key in self.annotations:
             if key in self.blob:
                 value = self.blob[key]
                 yield self.s, readable[key], rdflib.Literal(value)
+
+    def triples_generics(self):
+        for key in self.generics:
+            # FIXME has + key.capitalize()?
+            if key in self.blob:
+                value = self.blob[key]
+                yield self.s, readable[key], readable[value]
+            else:
+                log.warning(f'{key} not in {self.blob}')
 
     def triples_objects(self):
         for key in self.objects:
@@ -119,6 +136,7 @@ class Lyph(BaseElement):
 
 class Link(BaseElement):
     key = 'links'
+    generics = 'conveyingType',
 
 
 class Coalescence(BaseElement):
@@ -143,8 +161,11 @@ class Group(BaseElement):
     def triples(self):
         yield from super().triples()
         for element_class in self.elements:
-            for value_local_id in self.blob[element_class.key]:
-                c = element_class({'id':value_local_id}, context=self.context)
-                yield self.s, readable.hasElement, c.s
+            if element_class.key in self.blob:
+                for value_local_id in self.blob[element_class.key]:
+                    c = element_class({'id':value_local_id}, context=self.context)
+                    yield self.s, readable.hasElement, c.s
+            else:
+                log.warning(f'{element_class.key} not in {self.blob}')
 
 Group.elements += (Group,)

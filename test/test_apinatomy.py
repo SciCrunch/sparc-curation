@@ -30,7 +30,7 @@ class TestApiNATToRDF(unittest.TestCase):
         assert False
 
     def test_bolew(self):
-        with open((Path('~/').expanduser() / 'downloads/bolser-lewis-model.json'), 'rt') as f:
+        with open((Path('~/').expanduser() / 'downloads/bolser-lewis-generated.json'), 'rt') as f:
             j = json.load(f)
 
         apin = Graph(j)
