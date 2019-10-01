@@ -23,7 +23,6 @@ PathData.project_path = project_path
 osk = Version1Header.skip_cols  # save original skips
 Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')  # use the example values for tests
 
-ds_folders = 'ds1', 'ds2', 'ds3', 'ds4'
 ds_roots = (
     'ds1',
     'ds2/ds2',
@@ -35,6 +34,8 @@ ds_roots = (
     'ds5/multi',
     'ds5/level/wat',
 )
+ds_folders = set(Path(d).parts[0] for d in ds_roots)
+
 
 def mk_fldr_meta(fldr_path, ftype='collection', id=None):
     _meta = fldr_path.meta

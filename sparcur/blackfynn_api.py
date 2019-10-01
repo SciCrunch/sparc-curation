@@ -893,10 +893,6 @@ class BFLocal:
         self.organization = self.bf.context
         self.project_name = self.bf.context.name
 
-        if anchor is not None:  # FIXME decouple
-            self.project_path = anchor.local
-            self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
-
     def _get_connection(self, project_id):
         try:
             return Blackfynn(api_token=devconfig.secrets('blackfynn', self._project_id, 'key'),
@@ -916,42 +912,6 @@ class BFLocal:
     @property
     def root(self):
         return self.organization.id
-
-    @property
-    def error_meta(self):
-        for path in list(self.project_path.rglob('*ERROR')):
-            yield self.get_file_meta(path)
-
-    @property
-    def fake_files(self):
-        yield from self.project_path.rglob('*.fake.*')
-
-    def populate_metastore(self):
-        """ This should be run after find_missing_meta. """
-        # FIXME need a way to delete files
-        all_attrs = {path:norm_xattrs(path.xattrs()) for path in self.project_path.rglob('*')
-                     if '.git' not in path.as_posix()}
-        bad = [path for path, attrs in all_attrs.items() if not attrs]
-        if bad:
-            log.warning(f'{bad} is missing meta, run find_missing_meta')
-            all_attrs = {p:a for p, a in all_attrs.items() if a}
-
-        self.metastore.bulk(all_attrs)
-
-    def find_missing_meta(self):
-        for path in self.project_path.rglob('*'):
-            if '.git' in path.as_posix():
-                continue
-            attrs = norm_xattrs(path.xattrs())
-            if not attrs:
-                log.warning(f'Found path with missing metadata {path}')
-                attrs = self.metastore.xattrs(path)
-                if not attrs:
-                    log.error('No local metadata was found for {path}')
-                    attrs = self.recover_meta(path)
-
-                path.setxattrs(attrs)
-                # TODO checksum may no longer match since we changed it
 
     def get(self, id, attempt=1, retry_limit=3):
         log.debug('We have gone to the network!')
@@ -1002,13 +962,6 @@ class BFLocal:
         except KeyError as e:
             log.debug(lj(resp_json))
             raise e
-
-    #def get_homogenous(self, id):
-        #return HomogenousBF(self.get(id))
-
-    #def datasets(self):
-        #for d in self.bf.datasets():
-            #yield HomogenousBF(d)
 
     def recover_meta(self, path):
         pattrs = norm_xattrs(path.parent.xattrs())
@@ -1076,6 +1029,35 @@ class BFLocal:
                 for folder_path, files in
                 Async()(deferred(gfiles)(package, path) for package, path in packages)
                 for file in files}
+
+
+class OldStuff:
+    def populate_metastore(self):
+        """ This should be run after find_missing_meta. """
+        # FIXME need a way to delete files
+        all_attrs = {path:norm_xattrs(path.xattrs()) for path in self.project_path.rglob('*')
+                     if '.git' not in path.as_posix()}
+        bad = [path for path, attrs in all_attrs.items() if not attrs]
+        if bad:
+            log.warning(f'{bad} is missing meta, run find_missing_meta')
+            all_attrs = {p:a for p, a in all_attrs.items() if a}
+
+        self.metastore.bulk(all_attrs)
+
+    def find_missing_meta(self):
+        for path in self.project_path.rglob('*'):
+            if '.git' in path.as_posix():
+                continue
+            attrs = norm_xattrs(path.xattrs())
+            if not attrs:
+                log.warning(f'Found path with missing metadata {path}')
+                attrs = self.metastore.xattrs(path)
+                if not attrs:
+                    log.error('No local metadata was found for {path}')
+                    attrs = self.recover_meta(path)
+
+                path.setxattrs(attrs)
+                # TODO checksum may no longer match since we changed it
 
 
 class FakeBFLocal(BFLocal):

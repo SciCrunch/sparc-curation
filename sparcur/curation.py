@@ -265,11 +265,11 @@ class PathData:
     def anchor(self):
         return self.__class__(self.path.cache.anchor.local)
 
-        #if hasattr(self, 'project_path'):
-            #if self.path == self.project_path:
-                #return self
+        if hasattr(self, 'project_path'):
+            if self.path == self.project_path:
+                return self
 
-            #return self.__class__(self.project_path)
+            return self.__class__(self.project_path)
 
 
 class DatasetStructureH(PathData, dat.DatasetStructure):

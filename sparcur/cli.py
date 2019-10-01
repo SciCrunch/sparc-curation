@@ -275,10 +275,14 @@ class Main(Dispatcher):
             log.setLevel('INFO')
             logd.setLevel('INFO')
 
+        if self.options.project_path:
+            self.cwd = Path(self.options.project_path).resolve()
+        else:
+            self.cwd = Path.cwd()
+
         Integrator.rate = self.options.rate
         Integrator.no_google = self.options.no_google
 
-        self.cwd = Path.cwd()
         self.cwdintr = Integrator(self.cwd)
 
         # FIXME populate this via decorator
@@ -311,14 +315,10 @@ class Main(Dispatcher):
         # work correctly because they encounter _local_class = None ...
         BlackfynnCache._local_class = Path
 
-        if self.options.project_path:
-            path_string = self.options.project_path
-        else:
-            path_string = '.'
+        local = self.cwd
 
         # we have to start from the cache class so that
         # we can configure
-        local = Path(path_string).resolve()
         try:
             _cpath = local.cache  # FIXME project vs subfolder
             if _cpath is None:
@@ -409,7 +409,7 @@ class Main(Dispatcher):
         # but breaks lots of asusmptions elsehwere
         paths = self.paths
         if not paths:
-            paths = Path.cwd(),
+            paths = self.cwd,  # don't call Path.cwd() because it may have been set from --project-path
 
         if self.options.only_meta:
             paths = (mp.absolute() for p in paths for mp in dat.DatasetStructureLax(p).meta_paths)
@@ -508,7 +508,7 @@ class Main(Dispatcher):
         only = tuple()
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         dirs = self.directories
-        cwd = Path.cwd()
+        cwd = self.cwd
         if self.project_path.parent.name == 'big':
             skip = self.skip
             only = self.skip_big
@@ -611,7 +611,7 @@ class Main(Dispatcher):
 
     def refresh(self):
         paths = self.paths
-        cwd = Path.cwd()
+        cwd = self.cwd
         if not paths:
             paths = cwd,
 
@@ -729,7 +729,7 @@ class Main(Dispatcher):
 
             return
 
-        cwd = Path.cwd()
+        cwd = self.cwd
         timestamp = NOWDANGER(implicit_tz='PST PDT')
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
         if cwd != cwd.cache.anchor and format_specified:
@@ -998,7 +998,8 @@ class Main(Dispatcher):
         #self.bfl.find_missing_meta()
 
     def xattrs(self):
-        self.bfl.populate_metastore()
+        raise NotImplementedError('This used to populate the metastore, '
+                                  'but currently does nothing.')
 
     def meta(self):
         if self.options.browser:

@@ -47,7 +47,7 @@ mains = {'cli':[['spc', 'clone'],  # TODO
 
                 ['spc', 'tables'],
                 ['spc', 'missing'],
-                ['spc', 'xattrs'],
+                #['spc', 'xattrs'],  # deprecated
                 ['spc', 'annos'],
                 ['spc', 'annos', 'export'],
 ],
