@@ -58,6 +58,7 @@ def make_app(self, name='spc-server'):
             'filetypes',
             'pathids',
             'keywords',
+            'samples',
             'subjects',
             'errors',
             'terms',
@@ -99,6 +100,11 @@ def make_app(self, name='spc-server'):
     @app.route(f'{bp}/reports/keywords<ext>')
     def route_reports_keywords(ext=wrap_tables):
         return self.report.keywords(ext=ext)
+
+    @app.route(f'{bp}/reports/samples')
+    @app.route(f'{bp}/reports/samples<ext>')
+    def route_reports_samples(ext=wrap_tables):
+        return self.report.samples(ext=ext)
 
     @app.route(f'{bp}/reports/subjects')
     @app.route(f'{bp}/reports/subjects<ext>')

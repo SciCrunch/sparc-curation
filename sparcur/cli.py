@@ -12,7 +12,7 @@ Usage:
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
-    spc report [completeness filetypes pathids keywords subjects errors test] [options]
+    spc report [completeness filetypes pathids keywords subjects samples errors test] [options]
     spc report [contributors] [options]
     spc shell [affil integration protocols] [options]
     spc server [options]
@@ -1086,7 +1086,7 @@ class Main(Dispatcher):
                 else:
                     yield f, lmeta, cmeta
 
-    def server(self):
+    def server(self, *, run=True):
         from sparcur.server import make_app, url_for
         self.report = Report(self)
         self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
@@ -1097,7 +1097,10 @@ class Main(Dispatcher):
         app, *_ = make_app(self)
         self.app = app
         app.debug = False
-        app.run(host='localhost', port=self.options.port, threaded=True)
+        if run:
+            app.run(host='localhost', port=self.options.port, threaded=True)
+        else:
+            return app
 
     def stash(self, paths=None, stashmetafunc=lambda v:v):
         if paths is None:
@@ -1302,6 +1305,22 @@ class Report(Dispatcher):
         return self._print_table((header, *all_counts),
                                  title='All types aligned (has duplicates)',
                                  ext=ext)
+
+    def samples(self, ext=None):
+        data = self.latest_export if self.options.latest else self.summary.data
+        datasets = data['datasets']
+        key = self._sort_key
+        # FIXME we need the blob wrapper in addition to the blob generator
+        # FIXME these are the normalized ones ...
+        samples_headers = tuple(k for dataset_blob in datasets
+                                 if 'samples' in dataset_blob  # FIXME inputs?
+                                 for samples_blob in dataset_blob['samples']
+                                 for k in samples_blob)
+        counts = tuple(kv for kv in sorted(Counter(samples_headers).items(),
+                                            key=key))
+
+        rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
+        return self._print_table(rows, title='Samples Report', ext=ext)
 
     def subjects(self, ext=None):
         data = self.latest_export if self.options.latest else self.summary.data
