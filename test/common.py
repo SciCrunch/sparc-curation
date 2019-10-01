@@ -15,10 +15,10 @@ this_file = Path(__file__)
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
 project_path = this_file.parent / 'test_local/test_project'
+fake_organization = 'N:organization:fake-organization-id'
+project_path_real = this_file.parent / 'test_local/UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
-
-PathData.project_path = project_path
 
 osk = Version1Header.skip_cols  # save original skips
 Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')  # use the example values for tests
@@ -82,7 +82,7 @@ def mk_required_files(path, suffix='.csv'):
 
 if not project_path.exists() or not list(project_path.iterdir()):
     project_path.mkdir(parents=True, exist_ok=True)
-    attrs = mk_fldr_meta(project_path, 'organization', id=test_organization)
+    attrs = mk_fldr_meta(project_path, 'organization', id=fake_organization)
     project_path.setxattrs(attrs)
     for ds in ds_folders:
         dsp = project_path / ds

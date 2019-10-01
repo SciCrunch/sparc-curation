@@ -5,10 +5,8 @@ from augpathlib import AugmentedPath, FileSize
 from sparcur.paths import BlackfynnCache as BFC, LocalPath
 from sparcur.backends import BlackfynnRemote
 from sparcur.blackfynn_api import BFLocal
+from common import test_organization, test_dataset
 import pytest
-
-test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
-test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
 
 
 @pytest.mark.skip()

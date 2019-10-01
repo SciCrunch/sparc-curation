@@ -1,4 +1,3 @@
-import augpathlib as aug
 from docopt import parse_defaults
 from sparcur import exceptions as exc
 from sparcur.cli import Report, Options, __doc__ as clidoc

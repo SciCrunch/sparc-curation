@@ -292,7 +292,8 @@ class Main(Dispatcher):
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
-            self.options.pretend):
+            self.options.pretend or
+            (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
             return
@@ -927,7 +928,7 @@ class Main(Dispatcher):
         paths = []
         if self.options.name:
             patterns = self.options.name
-            path = Path('.').resolve()
+            path = self.cwd
             for pattern in patterns:
                 # TODO filesize mismatches on non-fake
                 # no longer needed due to switching to symlinks
@@ -1009,7 +1010,7 @@ class Main(Dispatcher):
         Path._cache_class = BlackfynnCache
         paths = self.paths
         if not paths:
-            paths = Path('.').resolve(),
+            paths = self.cwd,
 
         old_level = log.level
         if not self.options.verbose:
@@ -1097,8 +1098,7 @@ class Main(Dispatcher):
             # FIXME ...
             self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
 
-        report = Report(self.options)
-
+        report = Report(self)
         app, *_ = make_app(report, self.project_path)
         self.app = app  # debug only
         app.debug = False
@@ -1227,7 +1227,7 @@ class Report(Dispatcher):
         if dirs is None:
             dirs = self.options.directory
             if not dirs:
-                dirs.append('.')
+                dirs.append(self.cwd.as_posix())
 
         data = []
 
@@ -1288,7 +1288,7 @@ class Report(Dispatcher):
 
     def filetypes(self, ext=None):
         key = self._sort_key
-        paths = self.paths if self.paths else (Path('.').resolve(),)
+        paths = self.paths if self.paths else (self.cwd,)
         paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
 
         def count(thing):

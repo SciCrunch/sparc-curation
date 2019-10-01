@@ -198,8 +198,6 @@ class MetaMaker:
 
 class PathData:
     def __new__(cls, path):
-        #cls.schema = cls.schema_class()
-        #cls.schema_out = cls.schema_out_class()
         return super().__new__(cls)
 
     def __init__(self, path):
@@ -222,10 +220,6 @@ class PathData:
     def uri_api(self):
         return self.path.cache.uri_api
 
-    #@property
-    #def name(self):
-        #return self.path.name
-
     @property
     def _meta(self):
         """ pathmeta NOT json meta (confusingly) """
@@ -233,43 +227,9 @@ class PathData:
         if cache is not None:
             return self.path.cache.meta
 
-    """
-    @property
-    def parent(self):
-        if self == self.anchor:
-            return None
-
-        #log.debug(f'{self} {self.anchor}')
-        if self.path.parent.cache:
-            pp = self.__class__(self.path.parent)
-            if pp.id is not None:
-                return pp
-
-    @property
-    def parents(self):
-        parent = self.parent
-        parents = []
-        while parent is not None:
-            parents.append(parent)
-            parent = parent.parent
-
-        yield from reversed(parents)
-
-    @property
-    def children(self):
-        for child in self.path.children:
-            yield self.__class__(child)
-
-    """
     @property
     def anchor(self):
         return self.__class__(self.path.cache.anchor.local)
-
-        if hasattr(self, 'project_path'):
-            if self.path == self.project_path:
-                return self
-
-            return self.__class__(self.project_path)
 
 
 class DatasetStructureH(PathData, dat.DatasetStructure):
@@ -603,73 +563,6 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
 
     def __repr__(self):
         return f'{self.__class__.__name__}(\'{self.path}\')'
-
-
-class __Old:
-
-    @property
-    def __protocol_uris(self):
-        """ property needed for protocol helper to help us """
-        #if not hasattr(self, '_puri_cache'):
-        p = 'protocol_url_or_doi'
-        for dd in self.dataset_description:
-            dwe = dd.data_with_errors
-            if p in dwe:
-                for uri in dwe[p]:
-                    if uri.startswith('http'):
-                        # TODO normalize
-                        yield uri
-                    else:
-                        log.warning(f"protocol not uri {uri} '{self.id}'")
-
-    @property
-    def __keywords(self):
-        for dd in self.dataset_description:
-            # FIXME this pattern leads to continually recomputing values
-            # we need to be deriving all of this from a checkpoint on the fully
-            # normalized and transformed data
-            data = dd.data_with_errors
-            if 'keywords' in data:  # already logged error ...
-                yield from data['keywords']
-
-    @property
-    def __species(self):
-        """ generate this value from the underlying data """
-        if not hasattr(self, '_species'):
-            out = set()
-            for subject_file in self.subjects:
-                data = subject_file.data_with_errors
-                if 'subjects' in data:
-                    subjects = data['subjects']
-                    for subject in subjects:
-                        if 'species' in subject:
-                            out.add(subject['species'])
-
-            self._species = tuple(out)
-
-        return self._species
-
-    @property
-    def __organ(self):
-        # yield 'Unknown'
-        return
-        organs = ('Lung',
-                  'Heart',
-                  'Liver',
-                  'Pancreas',
-                  'Kidney',
-                  'Stomach',
-                  'Spleen',
-                  'Colon',
-                  'Large intestine',
-                  'Small intestine',
-                  'Urinary bladder',
-                  'Lower urinary tract',
-                  'Spinal cord',)
-        org_lower = (o.lower() for o in organs)
-        for kw in self.keywords:
-            if kw.lower() in organs:
-                yield kw
 
 
 class LThing:

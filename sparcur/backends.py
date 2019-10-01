@@ -749,12 +749,3 @@ class BlackfynnRemoteFactory(RemoteFactory, BlackfynnRemote):  # XXX soon to be 
         self._errors = []
         self.root = self._api.root
         return self
-
-
-def main():
-    from IPython import embed
-    embed()
-
-
-if __name__ == '__main__':
-    main()
