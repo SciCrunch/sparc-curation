@@ -17,7 +17,7 @@ command="/usr/bin/gunicorn"
 command_args="--bind ${socket}
 --daemon
 --pid ${pidfile}
---name protcur
+--name ${SVCNAME}
 --workers 4
 --worker-class gevent
 --timeout 30
@@ -52,7 +52,7 @@ start_pre() {
 }
 
 start() {
-    ebegin "Starting protcur"
+    ebegin "Starting ${SVCNAME}"
 	start-stop-daemon --start --pidfile ${pidfile} \
 		--group ${SVCGROUP} --user ${SVCUSER} \
 		--wait 1000 \
@@ -60,5 +60,5 @@ start() {
 		--env LOG_LOC=${LOG_LOC} \
 		--env PYTHONPATH=${PYTHONPATH} \
 		--exec ${command} -- ${command_args}
-    eend $? "Failed to start protcur"
+    eend $? "Failed to start ${SVCNAME}"
 }
