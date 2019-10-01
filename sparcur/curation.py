@@ -263,11 +263,13 @@ class PathData:
     """
     @property
     def anchor(self):
-        if hasattr(self, 'project_path'):
-            if self.path == self.project_path:
-                return self
+        return self.__class__(self.path.cache.anchor.local)
 
-            return self.__class__(self.project_path)
+        #if hasattr(self, 'project_path'):
+            #if self.path == self.project_path:
+                #return self
+
+            #return self.__class__(self.project_path)
 
 
 class DatasetStructureH(PathData, dat.DatasetStructure):
@@ -1459,7 +1461,9 @@ class Summary(Integrator, ExporterSummarizer):
     def __init__(self, path):
         super().__init__(path)
         # not sure if this is kosher ... but it works
-        super().__init__(self.anchor.path)
+
+        # avoid infinite recursion of calling self.anchor.path
+        super().__init__(self.path.cache.anchor.local) # FIXME ugh
  
     @property
     def iter_datasets(self):

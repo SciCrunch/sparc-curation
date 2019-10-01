@@ -3,11 +3,14 @@ from flask import Flask, request, url_for
 import htmlfn as hfn
 from htmlfn import htmldoc, atag
 from htmlfn import table_style, navbar_style
+from pyontutils import clifun as clif
 from sparcur import pipelines as pipes
 from sparcur.curation import Integrator
 from sparcur.utils import log
 
 log = log.getChild('server')
+
+clif.Dispatcher.url_for = staticmethod(url_for)
 
 
 def nowrap(class_, tag=''):
@@ -21,8 +24,11 @@ def wrap_tables(*tables, title=None):
                    title=title)
 
 
-def make_app(self, name='spc-server'):
-    """ self is a sparcur.cli.Main """
+def get_dataset_index(project_path):
+    {c.cache.id:c for c in project_path.children}
+
+    
+def make_app(report, project_path, name='spc-server'):
     app = Flask(name)
     yield app
 
@@ -30,19 +36,20 @@ def make_app(self, name='spc-server'):
 
     @app.route(f'{bp}/datasets')
     def route_datasets(id):
-        table, title = self._print_paths(self.project_path.children)
+        table, title = report._print_paths(project_path.children)
         return wrap_tables(table, title=title)
 
     @app.route(f'{bp}/datasets/<id>')
     def route_datasets_id(id):
-        if id not in self.dataset_index:
+        dataset_index = get_dataset_index(project_path)
+        if id not in dataset_index:
             return abort(404)
 
-        dataset = self.dataset_index[id]
+        dataset = dataset_index[id]
         tables = []
         try:
             ddt = [['TO', 'DO'], [id, 'derive tables from curation export!']]
-            table, _ = self._print_table(ddt)
+            table, _ = report._print_table(ddt)
             tables.append(table)
         except StopIteration:
             return abort(404)  # FIXME ... no data instead plus iterate
@@ -72,12 +79,12 @@ def make_app(self, name='spc-server'):
     @app.route(f'{bp}/reports/completeness')
     @app.route(f'{bp}/reports/completeness<ext>')
     def route_reports_completeness(ext=wrap_tables):
-        return self.report.completeness(ext=ext)
+        return report.completeness(ext=ext)
 
     @app.route(f'{bp}/reports/size')
     @app.route(f'{bp}/reports/size<ext>')
     def route_reports_size(ext=wrap_tables):
-        return self.report.size(dirs=self.project_path.children, ext=ext)
+        return report.size(dirs=project_path.children, ext=ext)
 
     @app.route(f'{bp}/reports/filetypes')
     @app.route(f'{bp}/reports/filetypes<ext>')
@@ -86,7 +93,7 @@ def make_app(self, name='spc-server'):
             return 'Not found', 404
 
         tables = []
-        for table, title in self.report.filetypes():
+        for table, title in report.filetypes():
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Filetypes')
@@ -94,34 +101,34 @@ def make_app(self, name='spc-server'):
     @app.route(f'{bp}/reports/pathids')
     @app.route(f'{bp}/reports/pathids<ext>')
     def route_reports_pathids(ext=wrap_tables):
-        return self.report.pathids(ext=ext)
+        return report.pathids(ext=ext)
 
     @app.route(f'{bp}/reports/keywords')
     @app.route(f'{bp}/reports/keywords<ext>')
     def route_reports_keywords(ext=wrap_tables):
-        return self.report.keywords(ext=ext)
+        return report.keywords(ext=ext)
 
     @app.route(f'{bp}/reports/samples')
     @app.route(f'{bp}/reports/samples<ext>')
     def route_reports_samples(ext=wrap_tables):
-        return self.report.samples(ext=ext)
+        return report.samples(ext=ext)
 
     @app.route(f'{bp}/reports/subjects')
     @app.route(f'{bp}/reports/subjects<ext>')
     def route_reports_subjects(ext=wrap_tables):
-        return self.report.subjects(ext=ext)
+        return report.subjects(ext=ext)
 
     @app.route(f'{bp}/reports/errors')
     @app.route(f'{bp}/reports/errors<ext>')
     def route_reports_errors(ext=wrap_tables):
         return 'TODO'
-        table, title = self.report.errors()
+        table, title = report.errors()
         return wrap_tables(table, title=title)
 
     @app.route(f'{bp}/reports/errors/<id>')
     @app.route(f'{bp}/reports/errors/<id>.<ext>')
     def route_reports_errors_id(id, ext=wrap_tables):
-        tables, formatted_title, title = self.report.errors(id=id)
+        tables, formatted_title, title = report.errors(id=id)
         log.info(id)
         if tables is None:
             return 'Not found', 404
@@ -134,7 +141,7 @@ def make_app(self, name='spc-server'):
             return 'Not found', 404
 
         tables = []
-        for table, title in self.report.terms():
+        for table, title in report.terms():
             tables.append(hfn.h2tag(title) + '<br>\n')
             tables.append(table + '<br>\n')
 

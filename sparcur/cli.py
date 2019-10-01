@@ -275,28 +275,20 @@ class Main(Dispatcher):
             log.setLevel('INFO')
             logd.setLevel('INFO')
 
-        if self.options.server and self.options.latest:
-            # shortcircuit server
-            Integrator.no_google = True
-        else:
-            Integrator.rate = self.options.rate
-            Integrator.no_google = self.options.no_google
+        Integrator.rate = self.options.rate
+        Integrator.no_google = self.options.no_google
 
         self.cwd = Path.cwd()
         self.cwdintr = Integrator(self.cwd)
 
-        if self.options.server and self.options.latest:
-            # shortcircuit server
-            pass
-
         # FIXME populate this via decorator
-        elif (self.options.clone or
-              self.options.meta or
-              self.options.goto or
-              self.options.tofetch or  # size does need a remote but could do it lazily
-              self.options.filetypes or
-              self.options.status or  # eventually this should be able to query whether there is new data since the last check
-              self.options.pretend):
+        if (self.options.clone or
+            self.options.meta or
+            self.options.goto or
+            self.options.tofetch or  # size does need a remote but could do it lazily
+            self.options.filetypes or
+            self.options.status or  # eventually this should be able to query whether there is new data since the last check
+            self.options.pretend):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
             return
@@ -348,27 +340,26 @@ class Main(Dispatcher):
         self.project_path = self.anchor.local
 
         BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        PathData.project_path = self.project_path
+        PathData.project_path = self.project_path  # FIXME bad ...
 
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
 
-        if not self.options.server and not self.options.latest:  # FIXME BAD
-            self.anchor.remote  # trigger creation of _remote_class
-            BlackfynnRemote = BlackfynnCache._remote_class
-            BlackfynnRemote._async_rate = self.options.rate
-            self.bfl = BlackfynnRemote._api
-            State.bind_blackfynn(self.bfl)
-            ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
-            Integrator.setup(self.bfl)
+        self.anchor.remote  # trigger creation of _remote_class
+        BlackfynnRemote = BlackfynnCache._remote_class
+        BlackfynnRemote._async_rate = self.options.rate
+        self.bfl = BlackfynnRemote._api
+        State.bind_blackfynn(self.bfl)
+        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
+        Integrator.setup(self.bfl)
 
-            # pull in additional graphs for query that aren't loaded properly
-            RDFL = oq.plugin.get('rdflib')
-            olr = Path(devconfig.ontology_local_repo)
-            branch = 'methods'
-            for fn in ('methods', 'methods-helper', 'methods-core'):
-                org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
-                OntTerm.query.ladd(RDFL(org.graph, OntId))
+        # pull in additional graphs for query that aren't loaded properly
+        RDFL = oq.plugin.get('rdflib')
+        olr = Path(devconfig.ontology_local_repo)
+        branch = 'methods'
+        for fn in ('methods', 'methods-helper', 'methods-core'):
+            org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
+            OntTerm.query.ladd(RDFL(org.graph, OntId))
 
     @property
     def project_name(self):
@@ -1096,9 +1087,8 @@ class Main(Dispatcher):
                 else:
                     yield f, lmeta, cmeta
 
-    def server(self, *, run=True):
-        from sparcur.server import make_app, url_for
-        self.report = Report(self)
+    def server(self):
+        from sparcur.server import make_app
         if self.options.latest:
             data = self.latest_export
             self.dataset_index = {d['id']:d for d in data['datasets']}
@@ -1106,16 +1096,12 @@ class Main(Dispatcher):
             # FIXME ...
             self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
 
-        Report.url_for = staticmethod(url_for)
-        self.__class__.url_for = staticmethod(url_for)
+        report = Report(self.options)
 
-        app, *_ = make_app(self)
-        self.app = app
+        app, *_ = make_app(report, self.project_path)
+        self.app = app  # debug only
         app.debug = False
-        if run:
-            app.run(host='localhost', port=self.options.port, threaded=True)
-        else:
-            return app
+        app.run(host='localhost', port=self.options.port, threaded=True)
 
     def stash(self, paths=None, stashmetafunc=lambda v:v):
         if paths is None:
@@ -1199,6 +1185,8 @@ class Report(Dispatcher):
     LATEST = Main.LATEST
     latest_export = Main.latest_export
     latest_export_ttl_populate = Main.latest_export_ttl_populate
+
+    _print_table = Main._print_table
 
     @property
     def _sort_key(self):
