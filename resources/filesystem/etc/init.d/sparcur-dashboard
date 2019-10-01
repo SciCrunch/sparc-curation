@@ -1,0 +1,64 @@
+#!/sbin/openrc-run
+# Copyright 1999-2018 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+
+: ${LOG_LEVEL:=info}
+: ${SVCGROUP:=servers}
+: ${SVCUSER:=servers}
+: ${LOG_LOC:="/var/log/sparcur/dashboard"}
+
+run_dir=${run_dir:-/run}
+LOG="${LOG_LOC}/sysout.log"
+directory=${SPARCDATA}
+
+socket="unix:/run/${SVCNAME}/socket"
+pidfile="${run_dir}/${SVCNAME}/pid"
+command="/usr/bin/gunicorn"
+command_args="--bind ${socket}
+--daemon
+--pid ${pidfile}
+--name protcur
+--workers 4
+--worker-class gevent
+--timeout 30
+--group ${SVCGROUP}
+--user ${SVCUSER}
+--log-level ${LOG_LEVEL}
+--log-file ${LOG}
+sparcur.dashboard_server:app"
+retry='TERM/30/KILL/5'
+start_stop_daemon_args="--group ${SVCGROUP} --user ${SVCUSER}"
+
+command_owner="${SVCUSER}:${SVCGROUP}"
+
+depend() {
+    after net
+}
+
+start_pre() {
+    OOPS=0
+    if [ -z "${SPARCDATA}" ]; then
+        eend 1 "SPARCDATA not set in /etc/conf.d/${SVCNAME}"
+        OOPS=1
+    elif [ ! -d "${SPARCDATA}" ]; then
+        eend 1 "SPARCDATA does not exist at ${SPARCDATA}"
+        OOPS=1
+    fi
+    if [ ${OOPS} -ne 0 ]; then
+        return 1
+    fi
+    checkpath --directory --owner ${command_owner} --mode 0775 "/run/${SVCNAME}"
+    checkpath --directory --owner ${command_owner} --mode 0775 "${LOG_LOC}"
+}
+
+start() {
+    ebegin "Starting protcur"
+	start-stop-daemon --start --pidfile ${pidfile} \
+		--group ${SVCGROUP} --user ${SVCUSER} \
+		--wait 1000 \
+		--env SPARCDATA=${SPARCDATA} \
+		--env LOG_LOC=${LOG_LOC} \
+		--env PYTHONPATH=${PYTHONPATH} \
+		--exec ${command} -- ${command_args}
+    eend $? "Failed to start protcur"
+}

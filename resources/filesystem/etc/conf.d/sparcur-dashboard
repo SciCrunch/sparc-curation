@@ -1,0 +1,6 @@
+# path to sparc data, often /var/lib/sparc/files/blackfynn_local/SPARC Consortium
+SPARCDATA=
+# log location
+LOG_LOC=/var/log/sparcur/dashboard
+# development settings
+PYTHONPATH=
