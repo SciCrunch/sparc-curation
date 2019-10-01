@@ -30,11 +30,10 @@ class TestApiNATToRDF(unittest.TestCase):
         assert False
 
     def test_bolew(self):
-        with open((Path('~/').expanduser() / 'downloads/bolser-lewis-generated.json'), 'rt') as f:
+        with open((Path(__file__).parent / 'apinatomy/data/bolser-lewis-generated.json'), 'rt') as f:
             j = json.load(f)
 
         apin = Graph(j)
-        print(apin.graph().ttl)
         assert False
 
 
