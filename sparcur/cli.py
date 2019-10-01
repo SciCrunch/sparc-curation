@@ -275,19 +275,28 @@ class Main(Dispatcher):
             log.setLevel('INFO')
             logd.setLevel('INFO')
 
-        Integrator.rate = self.options.rate
-        Integrator.no_google = self.options.no_google
+        if self.options.server and self.options.latest:
+            # shortcircuit server
+            Integrator.no_google = True
+        else:
+            Integrator.rate = self.options.rate
+            Integrator.no_google = self.options.no_google
+
         self.cwd = Path.cwd()
         self.cwdintr = Integrator(self.cwd)
 
+        if self.options.server and self.options.latest:
+            # shortcircuit server
+            pass
+
         # FIXME populate this via decorator
-        if (self.options.clone or
-            self.options.meta or
-            self.options.goto or
-            self.options.tofetch or  # size does need a remote but could do it lazily
-            self.options.filetypes or
-            self.options.status or  # eventually this should be able to query whether there is new data since the last check
-            self.options.pretend):
+        elif (self.options.clone or
+              self.options.meta or
+              self.options.goto or
+              self.options.tofetch or  # size does need a remote but could do it lazily
+              self.options.filetypes or
+              self.options.status or  # eventually this should be able to query whether there is new data since the last check
+              self.options.pretend):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
             return
@@ -344,21 +353,22 @@ class Main(Dispatcher):
         # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
 
-        self.anchor.remote  # trigger creation of _remote_class
-        BlackfynnRemote = BlackfynnCache._remote_class
-        BlackfynnRemote._async_rate = self.options.rate
-        self.bfl = BlackfynnRemote._api
-        State.bind_blackfynn(self.bfl)
-        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
-        Integrator.setup(self.bfl)
+        if not self.options.server and not self.options.latest:  # FIXME BAD
+            self.anchor.remote  # trigger creation of _remote_class
+            BlackfynnRemote = BlackfynnCache._remote_class
+            BlackfynnRemote._async_rate = self.options.rate
+            self.bfl = BlackfynnRemote._api
+            State.bind_blackfynn(self.bfl)
+            ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
+            Integrator.setup(self.bfl)
 
-        # pull in additional graphs for query that aren't loaded properly
-        RDFL = oq.plugin.get('rdflib')
-        olr = Path(devconfig.ontology_local_repo)
-        branch = 'methods'
-        for fn in ('methods', 'methods-helper', 'methods-core'):
-            org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
-            OntTerm.query.ladd(RDFL(org.graph, OntId))
+            # pull in additional graphs for query that aren't loaded properly
+            RDFL = oq.plugin.get('rdflib')
+            olr = Path(devconfig.ontology_local_repo)
+            branch = 'methods'
+            for fn in ('methods', 'methods-helper', 'methods-core'):
+                org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
+                OntTerm.query.ladd(RDFL(org.graph, OntId))
 
     @property
     def project_name(self):
@@ -383,7 +393,7 @@ class Main(Dispatcher):
 
     @property
     def datasets_local(self):
-        for d in self.datasets:
+        for d in self.anchor.local.children: #self.datasets:
             if d.local.exists():
                 yield d.local
 
@@ -1089,7 +1099,12 @@ class Main(Dispatcher):
     def server(self, *, run=True):
         from sparcur.server import make_app, url_for
         self.report = Report(self)
-        self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
+        if self.options.latest:
+            data = self.latest_export
+            self.dataset_index = {d['id']:d for d in data['datasets']}
+        else:
+            # FIXME ...
+            self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
 
         Report.url_for = staticmethod(url_for)
         self.__class__.url_for = staticmethod(url_for)
