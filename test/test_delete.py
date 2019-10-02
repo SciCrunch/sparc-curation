@@ -1,6 +1,7 @@
 import os
 import unittest
 from augpathlib import AugmentedPath, FileSize
+from sparcur import exceptions as exc
 from sparcur.paths import BlackfynnCache as BFC, LocalPath
 from sparcur.backends import BlackfynnRemote
 from sparcur.blackfynn_api import BFLocal
@@ -96,13 +97,13 @@ class TestClone(_TestOperation, unittest.TestCase):
 
         if expect_error_type:
             try:
-                anchor = BFR.dropAnchor(target)
+                anchor = BFR.dropAnchor(target.parent)
                 raise AssertionError(f'should have failed with a {expect_error_type}')
             except expect_error_type as e:
                 pass
 
         else:
-            anchor = BFR.dropAnchor(target)
+            anchor = BFR.dropAnchor(target.parent)
 
     def test_1_in_project(self):
         target = self.project_path / 'some-new-folder'
@@ -111,26 +112,26 @@ class TestClone(_TestOperation, unittest.TestCase):
 
     def test_2_project_top_level(self):
         target = self.project_path
-        self._do_target(target, ValueError)
+        self._do_target(target, exc.DirectoryNotEmptyError)
 
     def test_3_existing_empty(self):
         target = self.alt_project_path
-        self._do_target(target, ValueError)
+        self._do_target(target)
 
     def test_4_existing_has_folder(self):
         target = self.alt_project_path
         child = target / 'a-folder'
         child.mkdir(parents=True)
-        self._do_target(target, ValueError)
+        self._do_target(target, exc.DirectoryNotEmptyError)
 
     def test_5_existing_has_file(self):
         target = self.alt_project_path
         child = target / 'a-file'
         child.touch()
-        self._do_target(target, ValueError)
+        self._do_target(target, exc.DirectoryNotEmptyError)
 
     def test_6_existing_has_local_data_dir(self):
         target = self.alt_project_path
         child = target / self.anchor._local_data_dir
         child.mkdir()
-        self._do_target(target, ValueError)
+        self._do_target(target, exc.DirectoryNotEmptyError)
