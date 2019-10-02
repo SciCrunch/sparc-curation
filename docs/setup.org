@@ -1014,7 +1014,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
   :END:
   GitHub repositories
   #+NAME: tgbugs-repos
-  | hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap |
+  | augpathlib hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap |
   #+NAME: sci-repos
   | NIF-Ontology scibot sparc-curation |
   #+NAME: other-repos
@@ -1045,7 +1045,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
 
    #+NAME: repos
    #+RESULTS: repos-code
-   | https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
+   | https://github.com/tgbugs/augpathlib https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
 
 ** Variables testing
    #+CAPTION: testing
@@ -1125,6 +1125,8 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
 *** Remote exports
     Paste the results of this block into your shell if you are running
     the code from this file by pasting it into a terminal.
+
+    NOTE: DO NOT EDIT THE CODE BELOW IT WILL BE OVERWRITTEN.
     #+CALL: remote-exports-code()
 
     #+NAME: remote-exports
@@ -1147,7 +1149,6 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
       https://github.com/zussitarze/qrcode
       '
       export PYROOTS='
-      augpathlib
       pyontutils/htmlfn
       pyontutils/ttlser
       hyputils
