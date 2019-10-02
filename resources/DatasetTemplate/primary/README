@@ -1,1 +1,1 @@
-Optional folder that contains data prior to conversion - i.e. data prior to that contained in either the samples or subjects folders.
+Required folder that contains the primary data to be used for further analysis after any initial transformations from raw source data. The structure of this folder must match the subjects, samples, and pools described in the top level metadata files (e.g., subjects.xlsx, and samples.xlsx).
