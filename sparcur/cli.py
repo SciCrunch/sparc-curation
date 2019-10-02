@@ -84,7 +84,7 @@ Commands:
                 subjects        all headings from subjects files
                 errors          list of all errors per dataset
 
-                options: --latest   run reports on latest json export
+                options: --raw  run reports on live data without export
                        : --tab-table
                        : --sort-count-desc
                        : --debug
@@ -95,7 +95,7 @@ Commands:
 
     server      reporting server
 
-                options: --latest   run server from latest json export
+                options: --raw  run server on live data without export
 
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
@@ -132,7 +132,8 @@ Options:
     --project-path=<PTH>    set the project path manually
 
     -t --tab-table          print simple table using tabs for copying
-    -A --latest             run reporting on the latest export
+    -A --latest             run further export states from the latest primary export
+    -W --raw                run reporting on live data without export
 
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
@@ -179,7 +180,7 @@ from sparcur.utils import python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
-from sparcur.backends import BlackfynnRemoteFactory
+from sparcur.backends import BlackfynnRemote
 from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer, DatasetObject
 from sparcur.curation import JEncode, TriplesExportDataset, TriplesExportSummary
 from sparcur.protocols import ProtocolData
@@ -297,6 +298,7 @@ class Main(Dispatcher):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
             return
+
         elif (self.options.pull or
               self.options.mismatch or
               self.options.stash or
@@ -304,17 +306,23 @@ class Main(Dispatcher):
               self.options.missing):
             Integrator.no_google = True
 
-        self._setup()  # if this isn't run up here the internal state of the program get's wonky
+        self._setup_local()  # if this isn't run up here the internal state of the program get's wonky
 
-    def _setup(self):
+        if self.options.report and not self.options.raw:
+            Integrator.setup(local_only=True)  # FIXME sigh
+        else:
+            self._setup_bfl()
+
+        if self.options.export or self.options.shell:
+            self._setup_export()
+            self._setup_ontquery()
+
+    def _setup_local(self):
         # pass debug along (sigh)
         AugmentedPath._debug = True
         RemotePath._debug = True
-
-        # set our local class TODO probably ok to do this by default
-        # but needs testing to make sure there aren't things that only
-        # work correctly because they encounter _local_class = None ...
-        BlackfynnCache._local_class = Path
+        self.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+        self.BlackfynnRemote._async_rate = self.options.rate
 
         local = self.cwd
 
@@ -339,21 +347,21 @@ class Main(Dispatcher):
                 sys.exit(111)
 
         self.project_path = self.anchor.local
-
-        BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        PathData.project_path = self.project_path  # FIXME bad ...
-
-        # the way this works now the project should always exist
         self.summary = Summary(self.project_path)
 
-        self.anchor.remote  # trigger creation of _remote_class
-        BlackfynnRemote = BlackfynnCache._remote_class
-        BlackfynnRemote._async_rate = self.options.rate
-        self.bfl = BlackfynnRemote._api
-        State.bind_blackfynn(self.bfl)
-        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
-        Integrator.setup(self.bfl)
+    def _setup_bfl(self):
+        self.BlackfynnRemote.init(self.anchor.id)
 
+        self.bfl = self.BlackfynnRemote._api
+        State.bind_blackfynn(self.bfl)
+
+    def _setup_export(self):
+        #PathData.project_path = self.project_path  # FIXME bad ...
+        Integrator.setup()
+        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
+
+    def _setup_ontquery(self):
+        # FIXME this should be in its own setup method
         # pull in additional graphs for query that aren't loaded properly
         RDFL = oq.plugin.get('rdflib')
         olr = Path(devconfig.ontology_local_repo)
@@ -1091,12 +1099,12 @@ class Main(Dispatcher):
 
     def server(self):
         from sparcur.server import make_app
-        if self.options.latest:
-            data = self.latest_export
-            self.dataset_index = {d['id']:d for d in data['datasets']}
-        else:
+        if self.options.raw:
             # FIXME ...
             self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
+        else:
+            data = self.latest_export
+            self.dataset_index = {d['id']:d for d in data['datasets']}
 
         report = Report(self)
         app, *_ = make_app(report, self.project_path)
@@ -1197,7 +1205,7 @@ class Report(Dispatcher):
             return lambda kv: kv
 
     def contributors(self, ext=None):
-        data = self.latest_export if self.options.latest else self.summary.data
+        data = self.summary.data if self.options.raw else self.latest_export
         datasets = data['datasets']
         unique = {c['id']:c for d in datasets
                   if 'contributors' in d
@@ -1311,7 +1319,7 @@ class Report(Dispatcher):
                                  ext=ext)
 
     def samples(self, ext=None):
-        data = self.latest_export if self.options.latest else self.summary.data
+        data = self.summary.data if self.options.raw else self.latest_export
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -1327,7 +1335,7 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Samples Report', ext=ext)
 
     def subjects(self, ext=None):
-        data = self.latest_export if self.options.latest else self.summary.data
+        data = self.summary.data if self.options.raw else self.latest_export
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -1343,12 +1351,11 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Subjects Report', ext=ext)
 
     def completeness(self, ext=None):
-        if self.options.latest:
+        if self.options.raw:
+            raw = self.summary.completeness
+        else:
             datasets = self.latest_export['datasets']
             raw = [self.summary._completeness(data) for data in datasets]
-
-        else:
-            raw = self.summary.completeness
 
         def rformat(i, si, ci, ei, name, id, award, organ):
             if self.options.server and isinstance(ext, types.FunctionType):
@@ -1383,7 +1390,7 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Completeness Report', ext=ext)
 
     def keywords(self, ext=None):
-        data = self.latest_export if self.options.latest else self.summary.data
+        data = self.summary.data if self.options.raw else self.latest_export
         datasets = data['datasets']
         _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])), key=lambda v: -len(v))
                     for dataset_blob in datasets]
@@ -1412,10 +1419,10 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Report Test', ext=ext)
 
     def errors(self, *, id=None, ext=None):
-        if self.options.latest:
-            datasets = self.latest_export['datasets']
-        else:
+        if self.options.raw:
             self.summary.data['datasets']
+        else:
+            datasets = self.latest_export['datasets']
 
         if self.cwd != self.anchor:
             id = self.cwd.cache.dataset.id
@@ -1460,11 +1467,11 @@ class Report(Dispatcher):
         # subcelluar
         import rdflib
         # FIXME cache these results and only recompute if latest changes?
-        if self.options.latest:
+        if self.options.raw:
+            graph = self.summary.triples_exporter.graph
+        else:
             graph = rdflib.Graph()
             self.latest_export_ttl_populate(graph)
-        else:
-            graph = self.summary.triples_exporter.graph
 
         objects = set()
         skipped_prefixes = set()

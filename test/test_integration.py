@@ -28,10 +28,15 @@ mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
                       ['spc', 'refresh'],
                       ['spc', 'fetch']],
          'cli': [['spc', 'find', '--name', '*.xlsx'],
-                 ['spc', 'find', '--level', '3'],
+                 ['spc', 'find', '--limit', '3'],
 
                  ['spc', 'status'],
                  ['spc', 'meta'],
+
+                 ['spc', 'export'],
+                 ['spc', 'export', 'datasets'],
+                 ['spc', 'export', 'ttl'],
+                 ['spc', 'export', 'json'],
 
                  ['spc', 'report', 'completeness'],
                  ['spc', 'report', 'contributors'],
@@ -44,13 +49,6 @@ mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
                  ['spc', 'report', 'stats'],
                  ['spc', 'report', 'size'],
                  ['spc', 'report', 'test'],
-
-                 ['spc', 'export'],
-                 ['spc', 'export', 'datasets'],
-                 ['spc', 'export', 'ttl'],
-                 ['spc', 'export', 'json'],
-
-                 ['spc', 'report', 'completeness', '--latest'],
 
                  ['spc', 'tables'],
                  ['spc', 'missing'],

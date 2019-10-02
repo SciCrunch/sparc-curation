@@ -850,7 +850,8 @@ class Integrator(PathData, OntologyData):
     triples_class = TriplesExportDataset
 
     @classmethod
-    def setup(cls, blackfynn_local_instance):
+    def setup(cls, *, local_only=False):
+        # FIXME this is a mess
         """ make sure we have all datasources
             calling this again will refresh helpers
         """
@@ -862,7 +863,7 @@ class Integrator(PathData, OntologyData):
         dat.DatasetStructure.rate = cls.rate
 
         # unanchored helpers
-        if cls.no_google:
+        if cls.no_google or local_only:
             log.critical('no google no organ data')
             class FakeOrganSheet:
                 modality = lambda v: None
@@ -881,8 +882,12 @@ class Integrator(PathData, OntologyData):
             cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
             cls.affiliations = sheets.Affiliations()
 
-        cls.organ = OrganData()
-        cls.member = State.member
+        if local_only:
+            cls.organ = lambda award: None
+            cls.member = lambda first, last: None
+        else:
+            cls.organ = OrganData()
+            cls.member = State.member
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
