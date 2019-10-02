@@ -15,11 +15,7 @@ if working_dir is None:
     working_dir = Path(__file__).parent.parent
 
 post_load = lambda : None
-
-
-def post_main():
-    if project_path_real.exists():
-        project_path_real.remove_recursive()
+post_main = lambda : None
 
 
 mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
@@ -65,6 +61,11 @@ _cli_real = mains.pop('cli-real')
 if 'CI' not in os.environ:
     mains['cli'].extend([args + ['--project-path', project_path_real.as_posix(), '-N']
                          for args in _cli_real])
+
+    # if the real project path exists then remove it so that we can test cloning
+    # and keep the cloned directory around until the next time we run the tests
+    if project_path_real.exists():
+        project_path_real.remove_recursive()
 
 print(skip)
 TestScripts.populate_tests(sparcur, working_dir, mains, skip=skip,

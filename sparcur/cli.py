@@ -346,11 +346,12 @@ class Main(Dispatcher):
                 print(f'{local} is not in a project!')
                 sys.exit(111)
 
+        self.anchor.anchorClassHere()  # replace a bottom up anchoring rule with top down
         self.project_path = self.anchor.local
         self.summary = Summary(self.project_path)
 
     def _setup_bfl(self):
-        self.BlackfynnRemote.init(self.anchor.id)
+        self.BlackfynnRemote.anchorTo(self.anchor)
 
         self.bfl = self.BlackfynnRemote._api
         State.bind_blackfynn(self.bfl)
@@ -394,8 +395,8 @@ class Main(Dispatcher):
     @property
     def datasets_local(self):
         for d in self.anchor.local.children: #self.datasets:
-            if d.local.exists():
-                yield d.local
+            if d.exists():
+                yield d
 
     ###
     ## vars
@@ -482,27 +483,29 @@ class Main(Dispatcher):
             print('no remote project id listed')
             sys.exit(4)
         # given that we are cloning it makes sense to _not_ catch a connection error here
+        self.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
         try:
-            project_name = BFLocal(project_id).project_name  # FIXME reuse this somehow??
+            self.BlackfynnRemote.init(project_id)
         except exc.MissingSecretError:
             print(f'missing api secret entry for {project_id}')
             sys.exit(11)
-        BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        meta = PathMeta(id=project_id)
 
         # make sure that we aren't in a project already
-        anchor_local = Path(project_name).absolute()
-        root = anchor_local.find_cache_root()
-        if root is not None:
+        existing_root = self.cwd.find_cache_root()
+        if existing_root is not None:
             message = f'fatal: already in project located at {root.resolve()!r}'
             print(message)
             sys.exit(3)
 
-        anchor = BlackfynnCache(project_name, meta=meta).resolve()
-        if anchor.exists():
-            if list(anchor.local.children):
-                message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
-                sys.exit(2)
+        try:
+            anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
+        except exc.NotEmptyError:
+            message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
+            print(message)
+            sys.exit(2)
+        except BaseException as e:
+            log.exception(e)
+            sys.exit(11111)
 
         anchor.local_data_dir.mkdir()
         anchor.local_objects_dir.mkdir()
@@ -510,6 +513,7 @@ class Main(Dispatcher):
         self.anchor = anchor
         self.project_path = self.anchor.local
         with anchor:
+            self.cwd = Path.cwd()  # have to update self.cwd so pull sees the right thing
             self.pull()
 
     def pull(self):
