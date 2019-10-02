@@ -46,7 +46,7 @@ class _TestOperation:
                 for i in range(100):
                     yield b'0' * 1000
 
-        wat = asdf.bfobject.upload(Fun())
+        wat = asdf.bfobject.upload(Fun(), use_agent=False)
         #breakpoint()
 
 
@@ -79,41 +79,58 @@ class TestClone(_TestOperation, unittest.TestCase):
     # and consider whether testing for and
     # existing root should be done in dropAnchor
 
-    def _do_target(self, target):
-        BlackfynnRemote = BlackfynnRemote._new(LocalPath, BlackfynnCache)
-        BlackfynnRemote.init(test_organization)
-        anchor = BlackfynnRemote.dropAnchor(target)
+    def setUp(self):
+        super().setUp()
+        self.alt_project_path = self.project_path.parent / 'alt' / self.project_path.name
+        if self.alt_project_path.parent.exists():
+            self.alt_project_path.parent.rmtree()
 
-    def test_in_project(self):
+        self.alt_project_path.mkdir(parents=True)
+
+    def _do_target(self, target, expect_error_type=None):
+        class BlackfynnCache(BFC):
+            pass
+
+        BFR = BlackfynnRemote._new(LocalPath, BlackfynnCache)
+        BFR.init(test_organization)
+
+        if expect_error_type:
+            try:
+                anchor = BFR.dropAnchor(target)
+                raise AssertionError(f'should have failed with a {expect_error_type}')
+            except expect_error_type as e:
+                pass
+
+        else:
+            anchor = BFR.dropAnchor(target)
+
+    def test_1_in_project(self):
         target = self.project_path / 'some-new-folder'
         target.mkdir()
-        self._do_target(target)
+        self._do_target(target)  # FIXME succeeds for now, but probably should not?
 
-    def test_project_top_level(self):
+    def test_2_project_top_level(self):
         target = self.project_path
-        self._do_target(target)
+        self._do_target(target, ValueError)
 
-    def test_existing_empty(self):
-        target = self.project_path.parent / 'a-folder'
-        target.mkdir()
-        self._do_target(target)
+    def test_3_existing_empty(self):
+        target = self.alt_project_path
+        self._do_target(target, ValueError)
 
-    def test_existing_has_folder(self):
-        target = self.project_path.parent / 'a-folder'
-        child = self.project_path.parent / 'a-folder' / 'a-folder'
+    def test_4_existing_has_folder(self):
+        target = self.alt_project_path
+        child = target / 'a-folder'
         child.mkdir(parents=True)
-        self._do_target(target)
+        self._do_target(target, ValueError)
 
-    def test_existing_has_file(self):
-        target = self.project_path.parent / 'a-folder'
-        target.mkdir()
-        child = self.project_path.parent / 'a-folder' / 'a-file'
+    def test_5_existing_has_file(self):
+        target = self.alt_project_path
+        child = target / 'a-file'
         child.touch()
-        self._do_target(target)
+        self._do_target(target, ValueError)
 
-    def test_existing_has_local_data_dir(self):
-        target = self.project_path.parent / 'a-folder'
-        target.mkdir()
-        child = self.project_path.parent / 'a-folder' / self.anchor._local_data_dir
+    def test_6_existing_has_local_data_dir(self):
+        target = self.alt_project_path
+        child = target / self.anchor._local_data_dir
         child.mkdir()
-        self._do_target(target)
+        self._do_target(target, ValueError)
