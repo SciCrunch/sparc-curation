@@ -11,6 +11,7 @@ if not (project_path / Path._cache_class._local_data_dir).exists():
 
 defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(clidoc)}
 args = {'server': True,
+        '--raw': False,
         '--latest': True,
         '--sort-count-desc': True,
         '--project-path': project_path,
