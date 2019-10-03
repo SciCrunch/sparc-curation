@@ -19,7 +19,8 @@
   Setup takes about 3 hours.
   [[#one-shot][OS level setup]] takes about and hour, and [[#user-start-here][user setup]] takes about two hours. \\
 
-  *If you do not have root or sudo access or do not administer the computer you are setting this up on you should start at [[#user-start-here][user setup]]*
+  *If you do not have root or sudo access or do not administer the computer*
+  *you are following this guide on you should start at [[#user-start-here][user setup]]*
 ** One shot
    :PROPERTIES:
    :CUSTOM_ID: one-shot
