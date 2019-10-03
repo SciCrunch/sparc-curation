@@ -119,7 +119,6 @@
      [[https://chocolatey.org/install#install-with-powershellexe][Install chocolatey]].
 
      #+begin_src powershell :exports code :eval never
-       choco install git --params "/GitAndUnixToolsOnPath"
        choco install `
        autohotkey `
        clisp `
@@ -135,10 +134,11 @@
      Update system Path to include packages that don't add themselves.
      This needs to be run as administrator.
      #+begin_src powershell :exports code :eval never
-       [Environment]::SetEnvironmentVariable("Path",
-           [Environment]::GetEnvironmentVariable("Path",
-               [EnvironmentVariableTarget]::Machine) + ";C:\Program Files\Racket",
-               [EnvironmentVariableTarget]::Machine)
+     $path = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine)
+     $prefix_path = "C:\Program Files\Racket;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;"
+     [Environment]::SetEnvironmentVariable("Path",
+                                           $prefix_path + $path,
+                                           [EnvironmentVariableTarget]::Machine)
      #+end_src
 
      If you are logged in remotely restarting sshd is the easiest way to refresh
