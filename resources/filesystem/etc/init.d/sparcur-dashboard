@@ -1,20 +1,22 @@
 #!/sbin/openrc-run
-# Copyright 1999-2018 Gentoo Foundation
+# Copyright 1999-2019 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
 : ${LOG_LEVEL:=info}
-: ${SVCGROUP:=servers}
-: ${SVCUSER:=servers}
+: ${SVCGROUP:=sparc}
+: ${SVCUSER:=sparc}
 : ${LOG_LOC:="/var/log/sparcur/dashboard"}
 
 run_dir=${run_dir:-/run}
 LOG="${LOG_LOC}/sysout.log"
-directory=${SPARCDATA}
+directory="\"${SPARCDATA}\""  # spaces are evil
 
 socket="unix:/run/${SVCNAME}/socket"
 pidfile="${run_dir}/${SVCNAME}/pid"
 command="/usr/bin/gunicorn"
-command_args="--bind ${socket}
+
+command_args="
+--bind ${socket}
 --daemon
 --pid ${pidfile}
 --name ${SVCNAME}
@@ -26,8 +28,17 @@ command_args="--bind ${socket}
 --log-level ${LOG_LEVEL}
 --log-file ${LOG}
 sparcur.dashboard_server:app"
+
 retry='TERM/30/KILL/5'
-start_stop_daemon_args="--group ${SVCGROUP} --user ${SVCUSER}"
+
+start_stop_daemon_args="
+--pidfile ${pidfile}
+--group ${SVCGROUP}
+--user ${SVCUSER}
+--wait 1000
+--env LOG_LOC=${LOG_LOC}
+--env PYTHONPATH=${PYTHONPATH}
+"
 
 command_owner="${SVCUSER}:${SVCGROUP}"
 
@@ -49,16 +60,4 @@ start_pre() {
     fi
     checkpath --directory --owner ${command_owner} --mode 0775 "/run/${SVCNAME}"
     checkpath --directory --owner ${command_owner} --mode 0775 "${LOG_LOC}"
-}
-
-start() {
-    ebegin "Starting ${SVCNAME}"
-	start-stop-daemon --start --pidfile ${pidfile} \
-		--group ${SVCGROUP} --user ${SVCUSER} \
-		--wait 1000 \
-		--env SPARCDATA=${SPARCDATA} \
-		--env LOG_LOC=${LOG_LOC} \
-		--env PYTHONPATH=${PYTHONPATH} \
-		--exec ${command} -- ${command_args}
-    eend $? "Failed to start ${SVCNAME}"
 }
