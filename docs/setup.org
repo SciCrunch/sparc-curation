@@ -1025,7 +1025,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
   
   Repository local roots. The ordering of the entries matters.
   #+NAME: py-roots
-  | pyontutils/htmlfn pyontutils/ttlser hyputils ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
+  | augpathlib pyontutils/htmlfn pyontutils/ttlser hyputils ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
   #+NAME: rkt-roots
   | qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ |
   
