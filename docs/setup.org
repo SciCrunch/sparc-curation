@@ -852,6 +852,9 @@ make-template-zip () {
 make-template-zip
 #+end_src
 
+Once that is done open /tmp/cleanroom/DatasetTemplate.zip in =file-roller= or similar
+and make sure everything is as expected.
+
 Create the GitHub release. The tag name should have the format =dataset-template-1.1= where
 the version number should match the metadata version embedded in
 [[file:../resources/DatasetTemplate/dataset_description.xlsx][dataset_description.xlsx]].
@@ -859,7 +862,7 @@ Minor versions such as =dataset-template-1.2.1= are allowed.
 
 Attach =${CLEANROOM}/DatasetTemplate.zip= as a release asset.
 Update https://github.com/Blackfynn/docs.sparc.science/blob/master/pages/data_submission/submit_data.md
-with the new link.
+with the new link. [[file:../../docs.sparc.science/pages/data_submission/submit_data.md][Link to the local copy.]]
 *** Getting to know the codebase
     Use =inspect.getclasstree= along with =pyontutils.utils.subclasses=
     to display hierarchies of classes.
