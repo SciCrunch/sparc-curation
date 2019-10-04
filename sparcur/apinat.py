@@ -2,14 +2,98 @@ import rdflib
 from pyontutils.core import OntGraph, OntId
 from pyontutils.namespaces import rdf, rdfs, owl
 import sparcur.schemas as sc
+from sparcur.core import adops
 from sparcur.utils import log, logd
 
 elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 readable = rdflib.Namespace('https://apinatomy.org/uris/readable/')
 
 
+
 class NoIdError(Exception):
     """ blob has no id """
+
+
+apinscm = sc.ApiNATOMYSchema()
+
+
+def make_classes(schema):
+    types = {}
+
+    def ref_to_list(ref):
+        _jpath = ref.split('/')
+        if _jpath[0] != '#':
+            raise ValueError(ref)
+        else:
+            jpath = _jpath[1:]
+
+        return jpath
+
+    def deref(ref):
+        return adops.get(schema, ref_to_list(ref))
+
+    def allOf(obj):
+        for o in obj['allOf']:
+            if '$ref' in o:
+                ref = o['$ref']
+                if ref in types:
+                    yield types[ref]
+                else:
+                    jpath = ref_to_list(ref)
+                    no = adops.get(schema, jpath)
+                    yield top(jpath[-1], no)
+            else:
+                log.debug(f'{obj}')
+
+    def properties(obj):
+        props = obj['properties']
+        out = {}
+        for name, vobj in props.items():
+            @property
+            def f(self, n=name):
+                return self.blob[n]
+
+            out[name] = f
+
+        return out
+
+    def top(cname, obj):
+        deref, allOf, ref_to_list, schema, types  # python is dumb
+        type_ = None
+        if 'type' in obj:
+            type_ = obj['type']
+            parents = (Base,)
+
+        elif 'allOf' in v:
+            parents = tuple(allOf(obj))
+            for c in parents:
+                if hasattr(c, 'type'):
+                    type_ = c.type
+
+        if type_ is None:
+            raise TypeError('wat')
+
+        cd = {'type': type_,
+              '_schema': obj,
+        }
+
+        if type_ == 'object':
+            props = properties(obj)
+            for n, f in props.items():
+                cd[n] = f
+
+        return type(cname, parents, cd)
+
+    cs = []
+    d = schema['definitions']
+    for k, v in d.items():
+        c = top(k, v)
+        ref = f'#/definitions/{k}'
+        types[ref] = c
+        cs.append(c)
+
+    #breakpoint()
+    return cs
 
 
 class Base:
@@ -20,12 +104,19 @@ class Base:
             self.id = blob['id']
         except KeyError as e:
             raise NoIdError(f'id not in {blob}') from e
+        except AttributeError:
+            pass  # new impl uses properties to access the blob
 
         if context is not None:
             self.s = context[self.id]
         else:
             self.s = None
-        self.name = blob['name'] if 'name' in blob else self.id
+
+        try:
+            self.name = blob['name'] if 'name' in blob else self.id
+        except AttributeError:
+            pass  # new impl uses properties to access the blob
+
         if 'class' in blob:
             assert self.__class__.__name__ == blob['class']
 
@@ -34,7 +125,6 @@ class Base:
         return self.__class__.__name__
 
 
-apinscm = sc.ApiNATOMYSchema()
 class Graph(Base):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -43,7 +133,7 @@ class Graph(Base):
     @property
     def triples(self):
         context = rdflib.Namespace(f'https://apinatomy.org/uris/models/{self.id}/ids/')
-        for cls in [Node, Link, Lyph, Tree, Group]:
+        for cls in [Node, Link, Lyph, Tree, Group, Material]:
             if cls.key in self.blob:
                 # FIXME trees not in all blobs
                 for blob in self.blob[cls.key]:
@@ -58,6 +148,8 @@ class Graph(Base):
     def graph(self):
         g = OntGraph()
         self.populate(g)
+        g.bind('readable', readable)  # FIXME populate from store
+        g.bind('elements', elements)
         return g
 
 
@@ -168,4 +260,13 @@ class Group(BaseElement):
             else:
                 log.warning(f'{element_class.key} not in {self.blob}')
 
+
+class Material(BaseElement):
+    key = 'materials'
+    objects_multi = 'materials', 'inMaterials'
+
+
 Group.elements += (Group,)
+
+
+hrm = make_classes(apinscm.schema)
