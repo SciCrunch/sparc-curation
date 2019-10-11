@@ -17,10 +17,10 @@
   [[https://github.com/SciCrunch/sparc-curation/issues][issue tracker]].
 * Setup
   Setup takes about 3 hours.
-  [[#one-shot][OS level setup]] takes about and hour, and [[#user-start-here][user setup]] takes about two hours. \\
+  [[#one-shot][OS level setup]] takes about and hour, and [[#user][user setup]] takes about two hours. \\
 
   *If you do not have root or sudo access or do not administer the computer*
-  *you are following this guide on you should start at [[#user-start-here][user setup]]*
+  *you are following this guide on you should start at [[#user][user setup]]*
 ** One shot
    :PROPERTIES:
    :CUSTOM_ID: one-shot
@@ -221,7 +221,7 @@
 
 ** User
    :PROPERTIES:
-   :CUSTOM_ID: user-start-here
+   :CUSTOM_ID: user
    :END:
 
    If you are already on a system that has the [[#one-shot][prerequisites]]
@@ -832,6 +832,7 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
 
 ** Developer
+See also the [[file:./developer-guide.org][sparcur developer guild]]
 *** Releases
 **** DatasetTemplate
 Commit any changes and push to master.
