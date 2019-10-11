@@ -1,13 +1,31 @@
 import rdflib
-from pyontutils.core import OntGraph, OntId
-from pyontutils.namespaces import rdf, rdfs, owl
+from ontquery.utils import mimicArgs
+from pyontutils.core import OntGraph, OntId, OntTerm
+from pyontutils.namespaces import rdf, rdfs, owl, OntCuries
 import sparcur.schemas as sc
 from sparcur.core import adops
 from sparcur.utils import log, logd
+from ttlser import CustomTurtleSerializer
+
 
 elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 readable = rdflib.Namespace('https://apinatomy.org/uris/readable/')
 
+# add apinatomy:Graph to ttlser topClasses
+tc = CustomTurtleSerializer.topClasses
+if readable.Graph not in tc:
+    sec = CustomTurtleSerializer.SECTIONS
+    CustomTurtleSerializer.topClasses = [readable.Graph] + tc
+    CustomTurtleSerializer.SECTIONS = ('',) + sec
+
+# add apinatomy:Graph as a header section marker
+OntGraph.metadata_type_markers.append(readable.Graph)
+
+
+OntCuries({'apinatomy': str(readable),
+           'elements': str(elements),  # FIXME guranteed name collisions ...
+           # also just read this from the embedded local conventions
+})
 
 
 class NoIdError(Exception):
@@ -97,11 +115,54 @@ def make_classes(schema):
 
 
 class Base:
+
+    @classmethod
+    def fromRdf(cls, uri, graph, context=None):
+        _, id = uri.rsplit('/', 1)
+        blob = {'id': id}
+        for p, o in graph[uri]:
+            if p == rdf.type:
+                if o != owl.NamedIndividual:
+                    key = 'class'
+                    _, value = o.rsplit('/', 1)
+                else:
+                    continue  # TODO s rdf:type apinatomy:External ??
+            else:
+                if p == rdfs.label:
+                    key = 'name'
+                else:
+                    _, key = p.rsplit('/', 1)
+
+                if isinstance(o, rdflib.Literal):
+                    value = o.toPython()
+                elif isinstance(o, rdflib.URIRef):
+                    oid = OntId(o)
+                    if oid.prefix == 'local':
+                        value = oid.suffix
+                    elif oid.prefix == 'apinatomy':  # FIXME hrm?
+                        value = oid.suffix
+                    else:
+                        value = oid.curie  # FIXME external is tricky
+                        log.warning(f'{oid!r}')
+                else:
+                    raise NotImplementedError(f'{o}')
+                
+            if key in cls.objects_multi:
+                if key in blob:
+                    blob[key].append(value)
+                else:
+                    blob[key] = [value]
+
+            else:
+                blob[key] = value
+            
+        return cls(blob, context)
+
     def __init__(self, blob, context=None):
         self.blob = blob
         self.context = context
         try:
-            self.id = blob['id']
+            self.id = blob['id'].replace(' ', '-')  #FIXME
         except KeyError as e:
             raise NoIdError(f'id not in {blob}') from e
         except AttributeError:
@@ -126,12 +187,66 @@ class Base:
 
 
 class Graph(Base):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        apinscm.validate(self.blob)
+
+    @classmethod
+    def fromRdf(cls, graph):
+        iri = graph.boundIdentifier
+        context = rdflib.Namespace(iri + '/ids/')
+        # TODO removing things from the trie is not implemented ...
+        #d = OntCuries._dict
+        #d.pop('local', None)
+        #d['local'] = str(context)
+        #OntCuries.reset()
+        OntCuries({'local': str(context)})
+        _, id = iri.rsplit('/', 1)
+        resources = {}
+        for s in graph[:rdf.type:owl.NamedIndividual]:
+            for element in graph[s:rdf.type]:
+                if element != owl.NamedIndividual:
+                    _, class_ = element.rsplit('/', 1)
+                    resource = getattr(cls, class_).fromRdf(s, graph, context)
+                    # FIXME we should really keep the internal representation
+                    # around instead of just throwing it away
+                    resources[resource.id] = resource.blob
+
+        for s in graph[:rdf.type:owl.Class]:
+            # FIXME s rdf:type elements:External ??
+            resource = External.fromRdf(s, graph, context)
+            resources[resource.id] = resource.blob
+
+        map = {'id': id,
+               'resources': resources}
+        
+        return cls(map, {})
+
+    def __init__(self, map, blob):
+        self.map = map
+        self.resources = map['resources']
+        self.prefixes = {}  # TODO curie mapping
+        self.id = self.map['id'].replace(' ', '-')  # FIXME
+        self.blob = blob
+        #apinscm.validate(self.blob)  # TODO
+
+    @property
+    def context(self):
+        return rdflib.Namespace(f'{self.iri}/ids/')
 
     @property
     def triples(self):
+        self.iri = rdflib.URIRef(f'https://apinatomy.org/uris/models/{self.id}')
+        yield self.iri, rdf.type, readable.Graph
+        for id, blob in self.resources.items():
+            if 'class' not in blob:
+                logd.warning(f'no class in\n{blob!r}')
+                continue
+            elif blob['class'] == 'Graph':
+                log.warning('Graph is in resources itself')
+                continue
+
+            yield from getattr(self, blob['class'])(blob, self.context).triples()
+
+    @property
+    def triples_generated(self):
         context = rdflib.Namespace(f'https://apinatomy.org/uris/models/{self.id}/ids/')
         for cls in [Node, Link, Lyph, Tree, Group, Material]:
             if cls.key in self.blob:
@@ -143,12 +258,20 @@ class Graph(Base):
                         logd.exception(e)
 
     def populate(self, graph):
-        [graph.add(t) for t in self.triples]
+        #[graph.add(t) for t in self.triples]
+        for t in self.triples:
+            s, p, o = t
+            if s is None:
+                raise BaseException(f'{t}')
+
+            graph.add(t)
 
     def graph(self):
         g = OntGraph()
+        OntCuries.populate(g)
         self.populate(g)
-        g.bind('readable', readable)  # FIXME populate from store
+        g.bind('local', self.context)
+        g.bind('apinatomy', readable)  # FIXME populate from store
         g.bind('elements', elements)
         return g
 
@@ -161,15 +284,17 @@ class BaseElement(Base):
     objects_multi = tuple()
 
     def triples(self):
-        s = self.s
-        yield s, rdf.type, owl.NamedIndividual
-        yield s, rdf.type, elements[f'{self.cname}']
-        yield s, rdfs.label, rdflib.Literal(self.name)
+        yield from self.triples_class()
         yield from self.triples_external()
         yield from self.triples_annotations()
         yield from self.triples_generics()
         yield from self.triples_objects()
         yield from self.triples_objects_multi()
+
+    def triples_class(self):
+        yield self.s, rdf.type, owl.NamedIndividual
+        yield self.s, rdf.type, elements[f'{self.cname}']
+        yield self.s, rdfs.label, rdflib.Literal(self.name)
 
     def triples_annotations(self):
         for key in self.annotations:
@@ -190,6 +315,7 @@ class BaseElement(Base):
         for key in self.objects:
             if key in self.blob:
                 value = self.blob[key]
+                value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                 yield self.s, readable[key], self.context[value]
 
     def triples_objects_multi(self):
@@ -197,55 +323,67 @@ class BaseElement(Base):
             if key in self.blob:
                 values = self.blob[key]
                 for value in values:
+                    value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                     yield self.s, readable[key], self.context[value]
 
     def triples_external(self):
         if 'externals' in self.blob:
             for external in self.blob['externals']:
-                yield self.s, rdf.type, OntId(external).u
+                yield self.s, rdf.type, OntId(external).URIRef
 
 
 class Node(BaseElement):
     key = 'nodes'
+    annotations = 'skipLabel', 'color'
     objects = tuple()
     objects_multi = 'sourceOf', 'targetOf'
-    annotations = 'skipLabel', 'color'
 
     def triples(self):
         yield from super().triples()
 
-
+Graph.Node = Node
 class Lyph(BaseElement):
     key = 'lyphs'
-    objects = 'layerIn', 'conveyedBy',
-    objects_multi = 'inCoalescences',
     generics = 'topology',
-    annotations = 'width', 'height', 'layerWidth'
+    annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate'
+    objects = 'layerIn', 'conveyedBy', 'border'
+    objects_multi = 'inCoalescences', 'subtypes', 'layers'
 
     def triples(self):
         yield from super().triples()
+Graph.Lyph = Lyph
 
 
 class Link(BaseElement):
     key = 'links'
     generics = 'conveyingType',
+    objects = 'source', 'target', 'conveyingLyph'
+    objects_multi = 'conveyingMaterials',
 
 
+Graph.Link = Link
 class Coalescence(BaseElement):
     key = 'coalescences'
+    generics = 'topology',
+    annotations = 'generated',
+    objects = 'generatedFrom',
+    objects_multi = 'lyphs',
 
 
+Graph.Coalescence = Coalescence
 class Border(BaseElement):
     # FIXME class is Link ?
     key = 'borders'
 
 
+Graph.Border = Border
 class Tree(BaseElement):
     key = 'trees'
     objects = 'root', 'lyphTemplate'
     objects_multi = 'housingLyphs',
 
 
+Graph.Tree = Tree
 class Group(BaseElement):
     key = 'groups'
     elements = Node, Link, Lyph, Coalescence  # Group  # ah class scope
@@ -261,12 +399,77 @@ class Group(BaseElement):
                 log.warning(f'{element_class.key} not in {self.blob}')
 
 
+Group.elements += (Group,)
+Graph.Group = Group
 class Material(BaseElement):
     key = 'materials'
     objects_multi = 'materials', 'inMaterials'
 
 
-Group.elements += (Group,)
+Graph.Material = Material
+class External(BaseElement):
+    externals = 'id',
+    annotations = 'generated', 'uri', 'type',  # FIXME should be classes
+    objects_multi = 'externalTo',
+
+    @classmethod
+    def fromRdf(cls, uri, graph, context=None):
+        oid = OntId(uri)
+        id = oid.curie
+        blob = {'id': id}
+        for p, o in graph[uri]:
+            if p == rdf.type:
+                key = 'class'
+                value = 'External'
+            else:
+                if p == rdfs.label:
+                    key = 'name'
+                else:
+                    _, key = p.rsplit('/', 1)
+
+                if isinstance(o, rdflib.Literal):
+                    value = o.toPython()
+                elif isinstance(o, rdflib.URIRef):
+                    oid = OntId(o)
+                    if oid.prefix == 'local':
+                        value = oid.suffix
+                    elif oid.prefix == 'apinatomy':  # FIXME hrm?
+                        value = oid.suffix
+                    else:
+                        value = oid.curie  # FIXME external is tricky
+                        log.warning(f'{oid!r}')
+
+            if key in cls.objects_multi:
+                if key in blob:
+                    blob[key].append(value)
+                else:
+                    blob[key] = [value]
+
+            else:
+                blob[key] = value
+            
+        return cls(blob, context)
+
+
+    @mimicArgs(BaseElement.__init__)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._term = OntTerm(self.id)
+        self.s = self._term.URIRef
+
+    def triples_class(self):
+        yield self.s, rdf.type, owl.Class
+        yield self.s, rdfs.label, rdflib.Literal(self._term.label)
+        # TODO triples simple?
+
+
+Graph.External = External
+class Channel(BaseElement):
+    pass
+
+
+Graph.Channel = Channel
+
 
 
 hrm = make_classes(apinscm.schema)
