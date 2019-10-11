@@ -1709,7 +1709,7 @@
       "name": "Myocyte",
       "class": "Lyph",
       "external": [
-        "CL_0002098"
+        "CL:0002098"
       ],
       "inactive": true,
       "color": "#b2df8a",
@@ -1788,7 +1788,7 @@
         "UBERON:0012240",
         "UBERON:0000074",
         "UBERON:0005751",
-        "CL_0002098",
+        "CL:0002098",
         "GO:0016528",
         "GO:0042383",
         "GO:0016529",
@@ -15057,8 +15057,8 @@
         "40_lnk21"
       ]
     },
-    "CL_0002098": {
-      "id": "CL_0002098",
+    "CL:0002098": {
+      "id": "CL:0002098",
       "class": "External",
       "generated": true,
       "externalTo": [

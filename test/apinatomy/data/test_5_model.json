@@ -59,7 +59,7 @@
       ]
     },
     {
-      "id": "CL_0002098",
+      "id": "CL:0002098",
       "class": "External",
       "generated": true,
       "externalTo": [
@@ -1989,7 +1989,7 @@
       "name": "Myocyte",
       "class": "Lyph",
       "external": [
-        "CL_0002098"
+        "CL:0002098"
       ],
       "inactive": true,
       "color": "#b2df8a",
