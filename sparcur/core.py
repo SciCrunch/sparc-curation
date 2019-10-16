@@ -8,8 +8,9 @@ from functools import wraps
 from collections import deque
 import rdflib
 import htmlfn as hfn
-import ontquery as oq
 import requests
+import ontquery as oq
+import augpathlib as aug
 #from joblib import Memory
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -149,6 +150,10 @@ class DoiId(OntId):
     def asInstrumented(self):
         return DoiInst(self)
 
+    @property
+    def handle(self):
+        return self.suffix
+
 
 class URIInstrumentation(oq.terms.InstrumentedIdentifier):
 
@@ -229,6 +234,25 @@ class DoiInst(URIInstrumentation, DoiId):
         # actual document itself, which is a practical necessity
         # if somewhat confusing
         return self.metadata
+
+    @property
+    def metadata_events(self):
+        """ metadata about dois from the crossref events api """
+        events_endpoint = 'https://api.eventdata.crossref.org/v1/events'
+        rp = aug.RepoPath(__file__)
+        try:
+            email = rp.repo.config_reader().get_value('user', 'email')
+            log.warning(f'your email {email} is being sent to crossref as part of the friendly way to use their api')
+            mailto = f'mailto={email}'
+        except aug.exceptions.NotInRepoError:
+            # TODO failover to the git repo api?
+            mailto = 'tgbugs+sparcur-no-git@gmail.com'
+
+        resp_obj = requests.get(f'{events_endpoint}?{mailto}&obj-id={self.handle}')
+        resp_sub = requests.get(f'{events_endpoint}?{mailto}&subj-id={self.handle}')
+        # TODO if > 1000 get the rest using the pagination token
+        yield from resp_sub.json()['message']['events']
+        yield from resp_obj.json()['message']['events']
 
 
 class OrcidPrefixes(oq.OntCuries):

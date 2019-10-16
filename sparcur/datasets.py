@@ -307,6 +307,9 @@ class DatasetStructure(Path, HasErrors):
         return out
 
 
+DatasetStructure._bind_flavours(auto=True)
+
+
 class DatasetStructureLax(DatasetStructure):
     default_glob = 'rglob'
 

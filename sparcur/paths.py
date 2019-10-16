@@ -1,4 +1,5 @@
 import hashlib
+import pathlib
 from functools import wraps
 from itertools import chain
 try:
@@ -205,11 +206,17 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             yield from super()._bootstrap_recursive()
 
 
+BlackfynnCache._bind_flavours(auto=True)
+
+
 class Path(XopenPath, RepoPath, LocalPath):  # NOTE this is a hack to keep everything consistent
     """ An augmented path for all the various local
         needs of the curation process. """
 
     _cache_class = BlackfynnCache
+
+
+Path._bind_flavours(auto=True)
 
 
 class StashCache(BlackfynnCache):
