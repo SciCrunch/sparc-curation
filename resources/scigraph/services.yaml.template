@@ -9,9 +9,17 @@ cypherResources:
            description: ontology id of the organ
            paramType: path
     query: |
+            // all parts of and directly connected to organ or parts of organ
             MATCH path = (start:Class{iri: "${id}"})
             -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
-            -[:fma:arterial_supply|fma:nerve_supply*0..1]->(sup)
+            -[:fma:arterial_supply|fma:nerve_supply|fma:connected_to*0..1]->(sup)
+            RETURN path
+            UNION
+            // return the major artery for any arteries supplying the organ directly
+            MATCH path = (start:Class{iri: "${id}"})
+            -[:fma:arterial_supply]->(artery)
+            -[:fma:branch_of]->(more_artery)
+            -[:fma:branch_of|fma:regional_part_of]->(even_more_artery)
             RETURN path
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
@@ -247,10 +255,12 @@ cypherResources:
                     "http://purl.org/sig/ont/fma/fma14543",
                     "http://purl.org/sig/ont/fma/fma7201",
                     "http://purl.org/sig/ont/fma/fma7200",
+                    "http://purl.org/sig/ont/fma/fma7199",
                     "http://purl.org/sig/ont/fma/fma15900",
                     "http://purl.org/sig/ont/fma/fma45659",
                     "http://purl.org/sig/ont/fma/fma7157",
                     "http://purl.org/sig/ont/fma/fma9903",
+                    "http://purl.org/sig/ont/fma/fma9906",
                     "http://purl.org/sig/ont/fma/fma7647",
                     "http://purl.org/sig/ont/fma/fma50801"]
             RETURN n
