@@ -12,14 +12,14 @@ cypherResources:
             // all parts of and directly connected to organ or parts of organ
             MATCH path = (start:Class{iri: "${id}"})
             -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
-            -[:fma:arterial_supply|fma:nerve_supply|fma:connected_to*0..1]->(sup)
+            -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage*0..1]->(sup)
             RETURN path
             UNION
-            // return the major artery for any arteries supplying the organ directly
+            // return the major vessles for any arteries supplying the organ directly
             MATCH path = (start:Class{iri: "${id}"})
-            -[:fma:arterial_supply]->(artery)
-            -[:fma:branch_of]->(more_artery)
-            -[:fma:branch_of|fma:regional_part_of]->(even_more_artery)
+            -[:fma:arterial_supply|fma:venous_drainage]->(vessel)
+            -[:fma:branch_of|fma:tributary_of]->(more_vessel)
+            -[:fma:branch_of|fma:tributary_of|fma:regional_part_of]->(even_more_vessel)
             RETURN path
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
