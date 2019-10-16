@@ -12,7 +12,8 @@ cypherResources:
             // all parts of and directly connected to organ or parts of organ
             MATCH path = (start:Class{iri: "${id}"})
             -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
-            -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage*0..1]->(sup)
+            -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage|fma:continuous_with*0..1]->(sup)
+            -[:fma:constitutional_part*0..1]->(a_bit_more)
             RETURN path
             UNION
             // return the major vessles for any arteries supplying the organ directly
