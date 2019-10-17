@@ -118,6 +118,9 @@ class DatasetMetadata(Path, HasErrors):
                         ))
 
 
+DatasetMetadata._bind_flavours()
+
+
 class DatasetStructure(Path, HasErrors):
     sections = ('submission', 'dataset_description', 'subjects', 'samples', 'manifest')
     rglobs = 'manifest',
