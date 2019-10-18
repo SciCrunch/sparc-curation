@@ -118,7 +118,7 @@ class DatasetMetadata(Path, HasErrors):
                         ))
 
 
-DatasetMetadata._bind_flavours()
+DatasetMetadata._bind_flavours(auto=True)
 
 
 class DatasetStructure(Path, HasErrors):
