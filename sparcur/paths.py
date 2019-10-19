@@ -188,7 +188,7 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             self.data_headers = next(gen)
         except exc.NoRemoteFileWithThatIdError as e:
             log.error(f'{self} {e}')
-            raise e  # have to raise so that we don't overwrite the file
+            raise FileNotFoundError(f'{self}') from e  # have to raise so that we don't overwrite the file
 
         log.debug(self.data_headers)
         if self.local_object_cache_path.exists():

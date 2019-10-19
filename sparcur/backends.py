@@ -36,7 +36,7 @@ class BlackfynnRemote(RemotePath):
 
     @property
     def state(self):
-        if not self.is_dir():
+        if hasattr(self.bfobject, 'state'):
             return self.bfobject.state
 
     @staticmethod
@@ -479,9 +479,19 @@ class BlackfynnRemote(RemotePath):
                 yield child
                 yield from child.rchildren
         elif isinstance(self.bfobject, Dataset):
+            deleted = []
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
                 if child.is_dir() or child.is_file():
+                    state = child.bfobject.state
+                    if state != 'READY':
+                        log.debug (f'{state} {child.name} {child.id}')
+                        if state == 'DELETING' or state == 'PARENT-DELETING':
+                            deleted.append(child)
+                            continue
+                        if state == 'UPLOADED':
+                            continue
+
                     if child.is_file():
                         cid = child.id
                         existing = [c for c in self.cache.local.children
@@ -504,6 +514,10 @@ class BlackfynnRemote(RemotePath):
                 else:
                     # probably a package that has files
                     log.debug(f'skipping {child} becuase it is neither a directory nor a file')
+
+            else:  # for loop else
+                self._deleted = deleted
+
         else:
             raise exc.UnhandledTypeError  # TODO
 
@@ -638,7 +652,11 @@ class BlackfynnRemote(RemotePath):
             return
 
         gen = self.get_file_by_url(file.url)
-        self.data_headers = next(gen)
+        try:
+            self.data_headers = next(gen)
+        except exc.NoRemoteFileWithThatIdError as e:
+            raise FileNotFoundError(f'{self}') from e
+
         yield from gen
 
     @data.setter

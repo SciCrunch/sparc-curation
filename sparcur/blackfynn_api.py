@@ -439,6 +439,13 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         # that is a bfobject, this ensures that you can always
                         # recurse to base once you get an object from this function
                         index[bfobject.id] = bfobject
+                        if parent.state == 'DELETING':
+                            if not bfobject.state == 'DELETING':
+                                bfobject.state = 'PARENT-DELETING'
+                        elif parent.state == 'PARENT-DELETING':
+                            if not bfobject.state == 'DELETING':
+                                bfobject.state = 'PARENT-DELETING'
+
                         yield bfobject  # only yield if we can get a parent
                     elif bfobject.parent is None:
                         # both collections and packages can be at the top level

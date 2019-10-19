@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import rdflib
 from pyontutils.core import OntRes, OntGraph
-from pyontutils.utils import utcnowtz, isoformat
+from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from sparcur import schemas as sc
@@ -816,7 +816,7 @@ class PipelineEnd(JSONPipeline):
     # and of course my workaround was simply to error on unhandled
     # which is an entirely reasonable approach, if astoundingly
     # inefficient
-    _submission = (
+    _submission = [
         'DatasetStructure',
         'DatasetStructurePipeline.data',
         'Tabular',  # FIXME which Tabular
@@ -832,14 +832,29 @@ class PipelineEnd(JSONPipeline):
         'SubjectsFilePipeline._transformer',
         'SamplesFilePipeline._transformer',
         'SamplesFilePipeline.data',
-    )
-    _curation = (
+    ]
+    _curation = [
         'DatasetStructure.curation-error',
         'SubjectsFile.curation-error',
         'SPARCBIDSPipeline.data',
         'PipelineExtras.data',
         'ProtocolData',  # FIXME this is here as a placeholder
-    )
+    ]
+
+    @classmethod
+    def _expand_stages(cls):
+        ocs = {c.__name__:c for c in subclasses(object)}
+        for type_ in (cls._submission, cls._curation):
+            for name in type_:
+                cname, *rest = name.split('.', 1)
+                c = ocs[cname]
+                suffix = ''
+                if rest:
+                    suffix = '.' + ''.join(rest)
+
+                for sc in subclasses(c):
+                    type_.append(sc.__name__ + suffix)
+
 
     @classmethod
     def _indexes(cls, data):
@@ -919,3 +934,4 @@ class SummaryPipeline(JSONPipeline):
 SPARCBIDSPipeline.check()
 PipelineExtras.check()
 PipelineEnd.check()
+PipelineEnd._expand_stages()
