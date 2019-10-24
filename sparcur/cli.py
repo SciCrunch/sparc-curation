@@ -150,6 +150,7 @@ Options:
     --log-location=PATH     folder into which logs are saved [default: ${SPARC_EXPORTS}/log/]
 """
 
+import re
 import sys
 import csv
 import json
@@ -534,6 +535,7 @@ class Main(Dispatcher):
         dirs = sorted(dirs, key=lambda d: d.name)
 
         existing_locals = set(rc for d in dirs for rc in d.rchildren)
+        # FIXME don't parse the fucking dates unless someone needs them you idiot
         existing_d = {c.cache.id:c for c in existing_locals if c.cache is not None}  # yay null cache
         existing_ids = set(existing_d)
 
@@ -1302,6 +1304,10 @@ class Report(Dispatcher):
         key = self._sort_key
         paths = self.paths if self.paths else (self.cwd,)
         paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
+        rex = re.compile('^\.[0-9][0-9][0-9A-Z]$')
+        rex_paths = [p for p in paths if re.match(rex, p.suffix)]
+        paths = [p for p in paths if not re.match(rex, p.suffix)]
+
 
         def count(thing):
             return sorted([(k if k else '', v) for k, v in
@@ -1309,6 +1315,7 @@ class Report(Dispatcher):
                                      for f in paths]).items()], key=key)
 
         each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
+        each[rex.pattern] = len(rex_paths), rex_paths
 
         for title, rows in each.items():
             yield self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
