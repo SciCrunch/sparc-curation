@@ -1308,14 +1308,13 @@ class Report(Dispatcher):
         rex_paths = [p for p in paths if re.match(rex, p.suffix)]
         paths = [p for p in paths if not re.match(rex, p.suffix)]
 
-
         def count(thing):
             return sorted([(k if k else '', v) for k, v in
                             Counter([getattr(f, thing)
                                      for f in paths]).items()], key=key)
 
         each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
-        each[rex.pattern] = len(rex_paths), rex_paths
+        each['suffix'].append((rex.pattern, len(rex_paths)))
 
         for title, rows in each.items():
             yield self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
