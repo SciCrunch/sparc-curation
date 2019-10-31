@@ -4,6 +4,8 @@ from pathlib import Path
 from sparcur.apinat import *
 import pytest
 
+debug = False
+
 
 class TestApiNATToRDF(unittest.TestCase):
     def test_1(self):
@@ -17,9 +19,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
-        print(rdfg.ttl)
-        print(rtmap)
-        assert False
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
 
     def test_2(self):
         with open((Path(__file__).parent / 'apinatomy/data/test_2_map.json'), 'rt') as f:
@@ -32,9 +35,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
-        print(rdfg.ttl)
-        print(rtmap)
-        assert False
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
 
     def test_3(self):
         with open((Path(__file__).parent / 'apinatomy/data/test_3_map.json'), 'rt') as f:
@@ -47,9 +51,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
-        print(rdfg.ttl)
-        print(rtmap)
-        assert False
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
 
     def test_4(self):
         with open((Path(__file__).parent / 'apinatomy/data/test_4_map.json'), 'rt') as f:
@@ -62,9 +67,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
-        print(rdfg.ttl)
-        print(rtmap)
-        assert False
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
 
     def test_5(self):
         with open((Path(__file__).parent / 'apinatomy/data/test_5_map.json'), 'rt') as f:
@@ -78,9 +84,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
-        print(rdfg.ttl)
-        print(rtmap)
-        assert False
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
 
     @pytest.mark.skip('not ready')
     def test_bolew(self):
@@ -93,9 +100,10 @@ class TestApiNATToRDF(unittest.TestCase):
         apin = Graph(m, g)
         rdfg = apin.graph()
         rtmap = Graph.fromRdf(rdfg).map
-        print(rdfg.ttl)
-        print(rtmap)
-        assert False
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
 
 
 class TestRDFToOWL2(unittest.TestCase):
