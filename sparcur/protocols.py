@@ -1,23 +1,22 @@
-import requests
 import rdflib
-from scibot.utils import resolution_chain
-from pyontutils import combinators as cmb
-from pyontutils.config import devconfig, QuietDict
-from hyputils.hypothesis import HypothesisHelper, group_to_memfile
-from pysercomb.pyr import units as pyru
+import requests
+from idlib.utils import resolution_chain
 from protcur import namespace_mappings as nm
 from protcur.core import annoSync
 from protcur.analysis import Hybrid, protc
+from hyputils.hypothesis import HypothesisHelper, group_to_memfile
+from pysercomb.pyr import units as pyru
+from pyontutils import combinators as cmb
+from pyontutils.config import devconfig, QuietDict
+from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
+from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from sparcur import datasets as dat
-from sparcur.protocols_io_api import get_protocols_io_auth
-from sparcur.utils import log, logd, cache
-from sparcur.paths import Path
-from sparcur.config import config
 from sparcur.core import log, logd, OntTerm, OntId, OrcidId, PioId, sparc
 from sparcur.core import get_right_id, DoiId, DoiInst, PioInst, PioUserInst
-
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
-from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
+from sparcur.paths import Path
+from sparcur.utils import log, logd, cache
+from sparcur.config import config
+from sparcur.protocols_io_api import get_protocols_io_auth
 
 
 class ProtcurData:

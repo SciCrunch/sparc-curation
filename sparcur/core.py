@@ -6,21 +6,21 @@ from pathlib import Path
 from datetime import datetime
 from functools import wraps
 from collections import deque
+import idlib
 import rdflib
 import htmlfn as hfn
 import requests
 import ontquery as oq
 import augpathlib as aug
 #from joblib import Memory
+from idlib.utils import resolution_chain
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from scibot.utils import resolution_chain
-from scibot.extract import normalizeDoi
+from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.utils import isoformat, TZLOCAL
 from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
-from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, cache, python_identifier  # FIXME fix other imports
 from sparcur.config import config
@@ -139,7 +139,8 @@ class DoiId(OntId):
         if doi_in_various_states_of_mangling is None and iri is not None:
             doi_in_various_states_of_mangling = iri
 
-        self = super().__new__(cls, prefix='doi', suffix=normalizeDoi(doi_in_various_states_of_mangling))
+        normalize = idlib.Doi.normalize(doi_in_various_states_of_mangling)
+        self = super().__new__(cls, prefix='doi', suffix=normalize)
         self._unnormalized = doi_in_various_states_of_mangling
         return self
 

@@ -6,7 +6,6 @@ from itertools import chain
 from collections import Counter
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
-from scibot.extract import normalizeDoi
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
@@ -315,6 +314,9 @@ DatasetStructure._bind_flavours(auto=True)
 
 class DatasetStructureLax(DatasetStructure):
     default_glob = 'rglob'
+
+
+DatasetStructureLax._bind_flavours(auto=True)
 
 
 class Tabular(HasErrors):
@@ -719,7 +721,6 @@ class DatasetDescriptionFile(Version1Header):
             doi = True
 
         if doi:
-            #value = DoiId(prefix='doi', suffix=normalizeDoi(value))
             value = DoiId(value)
         else:
             value = PioId(value).normalize()

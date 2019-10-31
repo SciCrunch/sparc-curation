@@ -14,6 +14,8 @@ class _TestOperation:
         class BlackfynnCache(BFC):
             pass
 
+        BlackfynnCache._bind_flavours(auto=True)
+
         base = AugmentedPath(__file__).parent / 'test-operation'
 
         if base.exists():
@@ -91,6 +93,8 @@ class TestClone(_TestOperation, unittest.TestCase):
     def _do_target(self, target, expect_error_type=None):
         class BlackfynnCache(BFC):
             pass
+
+        BlackfynnCache._bind_flavours(auto=True)
 
         BFR = BlackfynnRemote._new(LocalPath, BlackfynnCache)
         BFR.init(test_organization)
