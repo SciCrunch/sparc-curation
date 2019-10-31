@@ -17,16 +17,32 @@ root = BlackfynnRemote(BlackfynnRemote.root)
 datasets = list(root.children)
 #+END_SRC
 ** Validate a dataset
-#+BEGIN_SRC python :results output
+You can run this example block and it will validate the DatasetTemplate.
+You can =from pprint import pprint= and change the last line to ==pprint(data)==
+to see the full results.
+#+BEGIN_SRC python :results output :exports both
 from sparcur import pipelines as pipes
 from sparcur.paths import Path
-path_to_dataset = Path('../resources/DatasetTemplate')
 
-lifters = None
-class context:
-    path = path_to_dataset
 
-pipeline = pipes.SPARCBIDSPipeline(path_to_dataset, lifters, context)
+def makeValidator(dataset_path):
+    class context:
+        path = dataset_path.resolve()
+        id = path.id
+        uri_api = path.as_uri()
+        uri_human = path.as_uri()
+
+    class lifters:
+        id = context.id
+        folder_name = context.path.name
+        uri_api = context.uri_api
+        uri_human = context.uri_human
+
+    return pipes.SPARCBIDSPipeline(dataset_path, lifters, context)
+
+
+path = Path('../resources/DatasetTemplate')
+pipeline = makeValidator(path)
 data = pipeline.data
 print(sorted(data.keys()))
 #+END_SRC
