@@ -1028,7 +1028,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
 
   GitHub repositories
   #+NAME: tgbugs-repos
-  | augpathlib hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap |
+  | augpathlib idlib hyputils ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap |
   #+NAME: sci-repos
   | NIF-Ontology scibot sparc-curation |
   #+NAME: other-repos
@@ -1036,7 +1036,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
   
   Repository local roots. The ordering of the entries matters.
   #+NAME: py-roots
-  | augpathlib pyontutils/htmlfn pyontutils/ttlser hyputils ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
+  | augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
   #+NAME: rkt-roots
   | qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ |
   
@@ -1059,7 +1059,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
 
    #+NAME: repos
    #+RESULTS: repos-code
-   | https://github.com/tgbugs/augpathlib https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
+   | https://github.com/tgbugs/augpathlib https://github.com/tgbugs/idlib https://github.com/tgbugs/hyputils https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
 
 ** Variables testing
    #+CAPTION: testing
@@ -1094,6 +1094,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
    #+begin_src bash
    export REPOS='
    https://github.com/tgbugs/augpathlib
+   https://github.com/tgbugs/idlib
    https://github.com/tgbugs/hyputils
    https://github.com/tgbugs/ontquery
    https://github.com/tgbugs/parsercomb
@@ -1110,6 +1111,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
    '
    export PYROOTS='
    augpathlib
+   idlib
    pyontutils/htmlfn
    pyontutils/ttlser
    hyputils
@@ -1142,7 +1144,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
     Paste the results of this block into your shell if you are running
     the code from this file by pasting it into a terminal.
 
-    NOTE: DO NOT EDIT THE CODE BELOW IT WILL BE OVERWRITTEN.
+    _*NOTE: DO NOT EDIT THE CODE BELOW IT WILL BE OVERWRITTEN.*_
     #+CALL: remote-exports-code()
 
     #+NAME: remote-exports
@@ -1150,6 +1152,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
     #+begin_src bash
     export REPOS='
     https://github.com/tgbugs/augpathlib
+    https://github.com/tgbugs/idlib
     https://github.com/tgbugs/hyputils
     https://github.com/tgbugs/ontquery
     https://github.com/tgbugs/parsercomb
@@ -1166,6 +1169,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
     '
     export PYROOTS='
     augpathlib
+    idlib
     pyontutils/htmlfn
     pyontutils/ttlser
     hyputils
