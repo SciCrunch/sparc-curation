@@ -17,9 +17,9 @@ root = BlackfynnRemote(BlackfynnRemote.root)
 datasets = list(root.children)
 #+END_SRC
 ** Validate a dataset
-You can run this example block and it will validate the DatasetTemplate.
-You can =from pprint import pprint= and change the last line to ==pprint(data)==
-to see the full results.
+You can run this example block and it will validate the DatasetTemplate. \\
+To see the full results =from pprint import pprint=
+and change the last line to =pprint(data)=.
 #+BEGIN_SRC python :results output :exports both
 from sparcur import pipelines as pipes
 from sparcur.paths import Path
