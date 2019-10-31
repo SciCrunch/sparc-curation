@@ -6,13 +6,30 @@
 
 * Demos
 ** Remote only connection
-   This is the simplest way to get a remote only connection to Blackfynn
-   #+BEGIN_SRC python
-     from sparcur.paths import BlackfynnCache, Path
-     from sparcur.backends import BlackfynnRemote
-     organization_id = 'N:organization:FILL-ME-IN'
-     BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
-     BlackfynnRemote.init(organization_id)
-     root = BlackfynnRemote(BlackfynnRemote.root)
-     datasets = list(root.children)
-   #+END_SRC
+This is the simplest way to get a remote only connection to Blackfynn
+#+BEGIN_SRC python
+from sparcur.paths import BlackfynnCache, Path
+from sparcur.backends import BlackfynnRemote
+organization_id = 'N:organization:FILL-ME-IN'
+BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+BlackfynnRemote.init(organization_id)
+root = BlackfynnRemote(BlackfynnRemote.root)
+datasets = list(root.children)
+#+END_SRC
+** Validate a dataset
+#+BEGIN_SRC python :results output
+from sparcur import pipelines as pipes
+from sparcur.paths import Path
+path_to_dataset = Path('../resources/DatasetTemplate')
+
+lifters = None
+class context:
+    path = path_to_dataset
+
+pipeline = pipes.SPARCBIDSPipeline(path_to_dataset, lifters, context)
+data = pipeline.data
+print(sorted(data.keys()))
+#+END_SRC
+
+#+RESULTS:
+: ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'samples', 'size', 'subjects']
