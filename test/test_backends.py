@@ -1,22 +1,30 @@
 import os
 import unittest
 import pytest
-from sparcur.paths import Path, BlackfynnCache
+from sparcur.paths import Path, BlackfynnCache as BFC
 from sparcur.blackfynn_api import BFLocal
-from sparcur.backends import BlackfynnRemoteFactory
-from .common import project_path
+from sparcur.backends import BlackfynnRemote
+from .common import test_organization, project_path_real
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestBlackfynnRemote(unittest.TestCase):
     # FIXME skip in CI?
     def setUp(self):
-        Path._cache_class = BlackfynnCache
-        self.project_path = Path(project_path)  # FIXME common overwrites?
-        self.anchor = self.project_path.cache
-        BlackfynnCache.setup(Path, BlackfynnRemoteFactory)
-        self.anchor.remote  # trigger creation of _remote_class
-        self.BlackfynnRemote = BlackfynnCache._remote_class
+        class BlackfynnCache(BFC):
+            pass
+
+        BlackfynnCache._bind_flavours()
+
+        self.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+        self.BlackfynnRemote.init(test_organization)
+        if not project_path_real.exists():
+            self.anchor = self.BlackfynnRemote.dropAnchor(project_path_real.parent)
+        else:
+            self.anchor = project_path_real.cache
+            self.BlackfynnRemote.anchorTo(self.anchor)
+
+        self.project_path = self.anchor.local
 
     def test_org(self):
         self.project_path.meta
