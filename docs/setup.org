@@ -174,7 +174,6 @@
        sudo launchctl unload  /System/Library/LaunchDaemons/ssh.plist
        sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
      #+end_src
-     
 **** Package manager
      [[https://brew.sh/][Install homebrew]].
 
@@ -252,7 +251,7 @@
     *All the code blocks in this Bootstrapping section need to be pasted into a terminal (shell) where you are logged in as your user.*
     *Run every code block in the order that they appear on this page. Do not skip any blocks.*
     *Read all the text between blocks. It will tell you what to do next.*
-    
+
     When pasting blocks into the terminal (middles mouse, or =C-V= =control-shift-v= in the ubuntu terminal)
     if you do not copy the last newline of the blocks then you will have to hit enter to run the last command.
     #+NAME: setup-folders
@@ -387,12 +386,15 @@
     If an error window appears when running this block just run
     it again.
 
+    You can also run this block to update an existing installation.
+
     # FIXME why no output on first run? too many errors?
     # ANSWER i think it is because raco pkg install runs in alphabetical order
     #+CAPTION: You can run them all at once from this block.
     #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
     #+BEGIN_SRC bash :results output :noweb yes :exports none :eval no-export
       <<environment-sanity-checks>>
+      <<git-pull-all>>
       <<clone-repos>>
       <<python-setup>>
       <<racket-ontology>>
@@ -686,15 +688,14 @@
 
 * Workflows
 ** General
-*** Staying up to date
-
-    #+CAPTION: new features that you want to use?
-    #+BEGIN_SRC bash :results output :var REPOS=repos
-      pushd ~/git
-      for d in $(ls); do if [ -d $d/.git ]; then pushd $d; git pull || break; popd; fi; done
-      popd
-    #+END_SRC
-
+*** Updating an installation
+#+NAME: git-pull-all
+#+CAPTION: new features that you want to use? aka git pull all or =gpa= if implemented as a function
+#+BEGIN_SRC bash :results output :var REPOS=repos
+pushd ~/git
+for d in $(ls); do if [ -d $d/.git ]; then pushd $d; git pull || break; popd; fi; done
+popd
+#+END_SRC
 ** SPARC
 *** WARNINGS
     1. *DO NOT USE* =cp -a= copy files with xattrs! \\
@@ -952,7 +953,7 @@ with the new link.
     #+begin_src bash
     alias less='less -R'
     #+end_src
-   
+
 *** Debugging terminal pipeline errors
     You have an error!
     #+begin_src python
@@ -1033,13 +1034,13 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
   | NIF-Ontology scibot sparc-curation |
   #+NAME: other-repos
   | Ophirr33/pda zussitarze/qrcode |
-  
+
   Repository local roots. The ordering of the entries matters.
   #+NAME: py-roots
   | augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
   #+NAME: rkt-roots
   | qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ |
-  
+
 ** Make repos
    #+NAME: repos-code
    #+HEADER: :var trl=tgbugs-repos srl=sci-repos orl=other-repos
