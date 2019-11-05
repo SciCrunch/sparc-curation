@@ -9,7 +9,7 @@ except ImportError:
 
 from dateutil import parser
 from augpathlib import PrimaryCache, XattrCache, SqliteCache, SymlinkCache
-from augpathlib import XopenPath, RepoPath, LocalPath, XattrHelper
+from augpathlib import XopenPath, RepoPath, LocalPath, ADSHelper, XattrHelper
 from augpathlib import RemotePath  # FIXME just for reimport
 from sparcur import exceptions as exc
 from sparcur.utils import log
@@ -206,16 +206,20 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             yield from super()._bootstrap_recursive()
 
 
+class BlackfynnCacheWindows(ADSHelper, BlackfynnCache, pathlib.WindowsPath): pass
+class BlackfynnCachePosix(XattrHelper, BlackfynnCache, pathlib.PosixPath): pass
 BlackfynnCache._bind_flavours(auto=True)
 
 
-class Path(XopenPath, XattrHelper, RepoPath, LocalPath):  # NOTE this is a hack to keep everything consistent
+class Path(XopenPath, RepoPath, LocalPath):  # NOTE this is a hack to keep everything consistent
     """ An augmented path for all the various local
         needs of the curation process. """
 
     _cache_class = BlackfynnCache
 
 
+class PathWindows(ADSHelper, Path, pathlib.WindowsPath): pass
+class PathPosix(XattrHelper, Path, pathlib.PosixPath): pass
 Path._bind_flavours(auto=True)
 
 
