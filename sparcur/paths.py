@@ -208,7 +208,7 @@ class BlackfynnCache(PrimaryCache, XattrCache):
 
 class BlackfynnCacheWindows(ADSHelper, BlackfynnCache, pathlib.WindowsPath): pass
 class BlackfynnCachePosix(XattrHelper, BlackfynnCache, pathlib.PosixPath): pass
-BlackfynnCache._bind_flavours(auto=True)
+BlackfynnCache._bind_flavours()
 
 
 class Path(XopenPath, RepoPath, LocalPath):  # NOTE this is a hack to keep everything consistent
@@ -220,7 +220,7 @@ class Path(XopenPath, RepoPath, LocalPath):  # NOTE this is a hack to keep every
 
 class PathWindows(ADSHelper, Path, pathlib.WindowsPath): pass
 class PathPosix(XattrHelper, Path, pathlib.PosixPath): pass
-Path._bind_flavours(auto=True)
+Path._bind_flavours()
 
 
 class StashCache(BlackfynnCache):
