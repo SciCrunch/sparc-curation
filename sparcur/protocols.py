@@ -5,9 +5,10 @@ from protcur import namespace_mappings as nm
 from protcur.core import annoSync
 from protcur.analysis import Hybrid, protc
 from hyputils.hypothesis import HypothesisHelper, group_to_memfile
+from orthauth.utils import QuietDict
 from pysercomb.pyr import units as pyru
 from pyontutils import combinators as cmb
-from pyontutils.config import devconfig, QuietDict
+from pyontutils.config import devconfig
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from sparcur import datasets as dat
