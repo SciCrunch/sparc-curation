@@ -1,4 +1,4 @@
-# https://travis-ci.org/tgbugs/hyputils
+# https://travis-ci.org/tgbugs/sparc-curation
 sudo: false
 language: python
 env:
@@ -13,6 +13,7 @@ branches:
 
 python:
   - 3.6
+  - 3.7
 
 install:
   - pip install --upgrade pytest pytest-cov
@@ -21,11 +22,11 @@ install:
   - pipenv install --system --skip-lock --deploy
 
 script:
-  - PYTHONWARNINGS=ignore pipenv run pytest --verbose --cov=sparcur
+  - pipenv run pytest --cov=sparcur
 
 after_success:
-  - if [[ $HAS_COVERALLS ]] ; then coveralls ; fi
+  - if [[ $HAS_COVERALLS && TRAVIS_PYTHON_VERSION == 3.7 ]] ; then coveralls ; fi
 
 after_failure:
   # for now we want converage even if things fail
-  - if [[ $HAS_COVERALLS ]] ; then coveralls ; fi
+  - if [[ $HAS_COVERALLS && TRAVIS_PYTHON_VERSION == 3.7 ]] ; then coveralls ; fi
