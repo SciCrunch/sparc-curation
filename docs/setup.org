@@ -100,6 +100,99 @@
     - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 *** Windows
+**** Symlinks
+=augpathlib= makes extensive use of symlinks to store metadata for remote files
+that have not been downloaded. By default normal users cannot create symlinks on
+windows. The best way to fix this is by granting the user that will run sparcur
+permission to create symlinks (NOT to run the process as Administrator).
+
+Three relevant links:
+[[https://stackoverflow.com/questions/6260149/os-symlink-support-in-windows][stackoverflow]]
+[[https://superuser.com/questions/104845/permission-to-make-symbolic-links-in-windows-7][superuser]]
+[[https://dbondarchuk.com/2016/09/23/adding-permission-for-creating-symlink-using-powershell/][powershell script source]].
+
+*You will need to log out and log back in for the setting to take effect.*
+
+You can use =gpedit.msc= to grant these permissions by adding the user
+by navigating the menu tree below. You can run =gpedit.msc= directly
+with =Win-r= or often =Win gpedit enter=.
+
+#+begin_example
+Computer configuration
+└── Windows Settings
+    └── Security Settings
+        └── Local Policies
+            └── User Rights Assignment
+                Create symbolic links
+#+end_example
+
+Alternately you can define and run the function below as Administrator.
+Run it as =addSymLinkPermissions("user-to-add")=.
+
+#+begin_src powershell
+function addSymLinkPermissions($accountToAdd){
+    Write-Host "Checking SymLink permissions.."
+    $sidstr = $null
+    try {
+        $ntprincipal = new-object System.Security.Principal.NTAccount "$accountToAdd"
+        $sid = $ntprincipal.Translate([System.Security.Principal.SecurityIdentifier])
+        $sidstr = $sid.Value.ToString()
+    } catch {
+        $sidstr = $null
+    }
+    Write-Host "Account: $($accountToAdd)" -ForegroundColor DarkCyan
+    if( [string]::IsNullOrEmpty($sidstr) ) {
+        Write-Host "Account not found!" -ForegroundColor Red
+        exit -1
+    }
+    Write-Host "Account SID: $($sidstr)" -ForegroundColor DarkCyan
+    $tmp = [System.IO.Path]::GetTempFileName()
+    Write-Host "Export current Local Security Policy" -ForegroundColor DarkCyan
+    secedit.exe /export /cfg "$($tmp)" 
+    $c = Get-Content -Path $tmp 
+    $currentSetting = ""
+    foreach($s in $c) {
+        if( $s -like "SECreateSymbolicLinkPrivilege*") {
+            $x = $s.split("=",[System.StringSplitOptions]::RemoveEmptyEntries)
+            $currentSetting = $x[1].Trim()
+        }
+    }
+    if( $currentSetting -notlike "*$($sidstr)*" ) {
+        Write-Host "Need to add permissions to SymLink" -ForegroundColor Yellow
+        
+        Write-Host "Modify Setting ""Create SymLink""" -ForegroundColor DarkCyan
+
+        if( [string]::IsNullOrEmpty($currentSetting) ) {
+            $currentSetting = "*$($sidstr)"
+        } else {
+            $currentSetting = "*$($sidstr),$($currentSetting)"
+        }
+        Write-Host "$currentSetting"
+    $outfile = @"
+[Unicode]
+Unicode=yes
+[Version]
+signature="`$CHICAGO`$"
+Revision=1
+[Privilege Rights]
+SECreateSymbolicLinkPrivilege = $($currentSetting)
+"@
+    $tmp2 = [System.IO.Path]::GetTempFileName()
+        Write-Host "Import new settings to Local Security Policy" -ForegroundColor DarkCyan
+        $outfile | Set-Content -Path $tmp2 -Encoding Unicode -Force
+        Push-Location (Split-Path $tmp2)
+        try {
+            secedit.exe /configure /db "secedit.sdb" /cfg "$($tmp2)" /areas USER_RIGHTS 
+        } finally { 
+            Pop-Location
+        }
+    } else {
+        Write-Host "NO ACTIONS REQUIRED! Account already in ""Create SymLink""" -ForegroundColor DarkCyan
+        Write-Host "Account $accountToAdd already has permissions to SymLink" -ForegroundColor Green
+        return $true;
+    }
+}
+#+end_src
 **** ssh                                                           :optional:
      You can skip this if you will only be using the windows computer locally.
      In a local administrator powershell install OpenSSH. The rest can then be done remotely.
