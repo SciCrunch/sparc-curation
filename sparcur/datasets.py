@@ -117,7 +117,7 @@ class DatasetMetadata(Path, HasErrors):
                         ))
 
 
-DatasetMetadata._bind_flavours(auto=True)
+DatasetMetadata._bind_flavours()
 
 
 class DatasetStructure(Path, HasErrors):
@@ -309,14 +309,14 @@ class DatasetStructure(Path, HasErrors):
         return out
 
 
-DatasetStructure._bind_flavours(auto=True)
+DatasetStructure._bind_flavours()
 
 
 class DatasetStructureLax(DatasetStructure):
     default_glob = 'rglob'
 
 
-DatasetStructureLax._bind_flavours(auto=True)
+DatasetStructureLax._bind_flavours()
 
 
 class Tabular(HasErrors):

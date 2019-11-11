@@ -14,7 +14,7 @@ class _TestOperation:
         class BlackfynnCache(BFC):
             pass
 
-        BlackfynnCache._bind_flavours(auto=True)
+        BlackfynnCache._bind_flavours()
 
         base = AugmentedPath(__file__).parent / 'test-operation'
 
@@ -94,7 +94,7 @@ class TestClone(_TestOperation, unittest.TestCase):
         class BlackfynnCache(BFC):
             pass
 
-        BlackfynnCache._bind_flavours(auto=True)
+        BlackfynnCache._bind_flavours()
 
         BFR = BlackfynnRemote._new(LocalPath, BlackfynnCache)
         BFR.init(test_organization)

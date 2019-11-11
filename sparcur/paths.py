@@ -8,8 +8,8 @@ except ImportError:
     pass
 
 from dateutil import parser
-from augpathlib import PrimaryCache, XattrCache, SqliteCache, SymlinkCache
-from augpathlib import XopenPath, RepoPath, LocalPath, ADSHelper, XattrHelper
+from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
+from augpathlib import XopenPath, RepoPath, LocalPath
 from augpathlib import RemotePath  # FIXME just for reimport
 from sparcur import exceptions as exc
 from sparcur.utils import log
@@ -36,7 +36,7 @@ def cleanup(func):
     return inner
 
 
-class BlackfynnCache(PrimaryCache, XattrCache):
+class BlackfynnCache(PrimaryCache, EatCache):
     xattr_prefix = 'bf'
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
@@ -206,8 +206,6 @@ class BlackfynnCache(PrimaryCache, XattrCache):
             yield from super()._bootstrap_recursive()
 
 
-class BlackfynnCacheWindows(ADSHelper, BlackfynnCache, pathlib.WindowsPath): pass
-class BlackfynnCachePosix(XattrHelper, BlackfynnCache, pathlib.PosixPath): pass
 BlackfynnCache._bind_flavours()
 
 
@@ -218,8 +216,6 @@ class Path(XopenPath, RepoPath, LocalPath):  # NOTE this is a hack to keep every
     _cache_class = BlackfynnCache
 
 
-class PathWindows(ADSHelper, Path, pathlib.WindowsPath): pass
-class PathPosix(XattrHelper, Path, pathlib.PosixPath): pass
 Path._bind_flavours()
 
 
