@@ -2,13 +2,15 @@ import json
 import itertools
 from collections import defaultdict
 from urllib.parse import urlparse, parse_qs
+import rdflib
 import requests
+from pyontutils.config import auth as pauth
 from pyontutils.core import OntId
 from pyontutils.utils import byCol
 from sparcur import normalization as nml
 from sparcur.core import log, logd
 from sparcur.paths import Path
-from sparcur.config import config
+from sparcur.config import config, auth
 from bs4 import BeautifulSoup
 
 # ontology files
@@ -16,7 +18,8 @@ class OntologyData:
 
     def _mis_graph(self):
         """ for now easier to just get a fresh one, they are small """
-        olr = Path(devconfig.git_local_base) / 'duplicates' / 'sparc-NIF-Ontology'
+        glb = pauth.get_path('git-local-base')
+        olr = Path(glb / 'duplicates' / 'sparc-NIF-Ontology')
         graph = (rdflib.ConjunctiveGraph()
             .parse((olr / 'ttl/sparc-methods.ttl').as_posix(), format='turtle')
             #.parse((olr / 'ttl/methods-core.ttl').as_posix(), format='turtle')
@@ -32,7 +35,7 @@ class OntologyData:
          for t in self.triples()]
         closure = rdfc.OWLRL_Semantics
         rdfc.DeductiveClosure(closure).expand(expanded_graph)
-        with open(Path(config.cache_dir, 'reasoned-curation-export.ttl'), 'wb') as f:
+        with open(auth.get_path('cache-path') / 'reasoned-curation-export.ttl', 'wb') as f:
             f.write(expanded_graph.serialize(format='nifttl'))
 
 
@@ -73,8 +76,8 @@ class OrganData:
                     '': None,
     }
 
-    cache = Path(config.cache_dir, 'sparc-award-by-organ.json')
-    old_cache = Path(config.cache_dir, 'award-mappings-old-to-new.json')
+    cache = auth.get_path('cache-path') / 'sparc-award-by-organ.json'
+    old_cache = auth.get_path('cache-path') / 'award-mappings-old-to-new.json'
 
     def __init__(self, path=config.organ_html_path, organs_sheet=None):  # FIXME bad passing in organs
         self.path = path
@@ -116,7 +119,8 @@ class OrganData:
         self.raw = {}
         self.former_to_current = {}
         for bsoup in soup.find_all('div', {'id':lambda v: v and v.endswith('-bubble')}):
-            organ, _ = bsoup['id'].split('-')
+            organ, *_rest = bsoup['id'].split('-')
+            logd.debug(_rest)
             award_list = self.raw[organ] = []
             for asoup in bsoup.find_all('a'):
                 href = asoup['href']

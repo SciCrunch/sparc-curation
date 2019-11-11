@@ -1,35 +1,3 @@
-"""Accessing files via the blackfynn api
-
-# Install these python packages.
-``` bash
-pip install blackfynn nibabel pydicom
-git clone https://github.com/tgbugs/pyontutils.git
-pushd pyontutils
-python setup.py develop --user
-ontutils devconfig --write
-# you can edit ./pyontutils/devconfig.yaml to match your system if needs be
-touch ${HOME}/pyontutils-secrets.yaml
-chmod 0600 ${HOME}/pyontutils-secrets.yaml
-```
-
-# Get a blackfynn api key and api secret
-navigate to https://app.blackfynn.io/${blackfynn_organization}/profile/
-You have to find your way through the UI if you don't know your org id :/
-
-SPARC MVP is at
-https://app.blackfynn.io/N:organization:89dfbdad-a451-4941-ad97-4b8479ed3de4/profile/
-SPARC Consortium is at
-https://app.blackfynn.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/profile/
-
-add the following lines to your secrets.yaml file from the blackfynn site
-you can (and should) save those keys elsewhere as well
-```
-blackfynn-mvp-key: ${apikey}
-blackfynn-mvp-secret: ${apisecret}
-```
-
-"""
-
 import io
 import os
 import json
@@ -55,12 +23,12 @@ from blackfynn import base as bfb
 from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
-from pyontutils.config import devconfig
 from werkzeug.contrib.iterio import IterIO
 from sparcur import exceptions as exc
 from sparcur.core import log, lj
 from sparcur.paths import Path
 from sparcur.metastore import MetaStore
+from .config import auth
 
 
 def upload_fileobj(
@@ -902,8 +870,8 @@ class BFLocal:
 
     def _get_connection(self, project_id):
         try:
-            return Blackfynn(api_token=devconfig.secrets('blackfynn', self._project_id, 'key'),
-                             api_secret=devconfig.secrets('blackfynn', self._project_id, 'secret'))
+            return Blackfynn(api_token=auth.dynamic_config.secrets('blackfynn', self._project_id, 'key'),
+                             api_secret=auth.dynamic_config.secrets('blackfynn', self._project_id, 'secret'))
         except KeyError as e:
             raise exc.MissingSecretError from e
 
@@ -1111,8 +1079,8 @@ def mvp():
         to get all the packages first and then async retrieve all the files
     """
     local_storage_prefix = Path('~/files/blackfynn_local/').expanduser()
-    bf = Blackfynn(api_token=devconfig.secrets('blackfynn-mvp-key'),
-                    api_secret=devconfig.secrets('blackfynn-mvp-secret'))
+    bf = Blackfynn(api_token=auth.dynamic_config.secrets('blackfynn-mvp-key'),
+                    api_secret=auth.dynamic_config.secrets('blackfynn-mvp-secret'))
 
 
     ds = bf.datasets()

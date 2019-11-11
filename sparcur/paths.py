@@ -55,6 +55,10 @@ class BlackfynnCache(PrimaryCache, EatCache):
         return self.organization
 
     @property
+    def trash(self):
+        return self.local_data_dir / 'trash'
+
+    @property
     def organization(self):
         """ organization represents a permissioning boundary
             for blackfynn, so above this we would have to know

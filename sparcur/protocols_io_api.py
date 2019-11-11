@@ -5,7 +5,7 @@ from pathlib import Path
 from getpass import getpass
 from argparse import Namespace
 from oauth2client import file, client
-from pyontutils.config import devconfig
+from .config import auth
 
 
 def get_auth_code(url):
@@ -67,25 +67,17 @@ def run_flow(flow, storage):
     return credential
 
 
-def _store_file():
-    try:
-        return devconfig.secrets('protocols-io', 'api', 'store-file')
-    except KeyError:
-        return 'protocols-io-api-token-rw.json'
-
-
 def get_protocols_io_auth(creds_file,
-                          store_file=_store_file()):
+                          store_file=auth.get_path('protocols-io-api-store-file')):
     flags = Namespace(noauth_local_webserver=True,
                       logging_level='INFO')
-    spath = Path(devconfig.secrets_file).parent
-    sfile = spath / store_file
+    sfile = store_file
     store = file.Storage(sfile.as_posix())
     creds = store.get()
     SCOPES = 'readwrite'
     if not creds or creds.invalid:
-        cfile = spath / creds_file
-        with open(cfile) as f:
+        cfile = creds_file
+        with open(cfile, 'rt') as f:
             redirect_uri, *_ = json.load(f)['installed']['redirect_uris']
         client.OOB_CALLBACK_URN = redirect_uri  # hack to get around google defaults
         flow = client.flow_from_clientsecrets(cfile.as_posix(),

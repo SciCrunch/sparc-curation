@@ -23,7 +23,7 @@ from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, cache, python_identifier  # FIXME fix other imports
-from sparcur.config import config
+from sparcur.config import config, auth
 
 
 # disk cache decorator
@@ -467,7 +467,7 @@ class RorInst(URIInstrumentation, RorId):
     def data(self):
         return self._data(self.suffix)
 
-    @cache(Path(config.cache_dir, 'ror_json'))
+    @cache(Path(auth.get_path('cache-path'), 'ror_json'), create=True)
     def _data(self, suffix):
         # TODO data endpoint prefix ?? vs data endpoint pattern ...
         resp = requests.get(RorId(prefix='ror.api', suffix=suffix))

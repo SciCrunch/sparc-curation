@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from pyontutils.utils import get_working_dir
 from pyontutils.integration_test_helper import _TestScriptsBase as TestScripts
-from test.common import project_path, project_path_real, test_organization
+from .common import project_path, project_path_real, test_organization, onerror
 import sparcur
 
 only = tuple()
@@ -65,7 +65,7 @@ if 'CI' not in os.environ:
     # if the real project path exists then remove it so that we can test cloning
     # and keep the cloned directory around until the next time we run the tests
     if project_path_real.exists():
-        project_path_real.remove_recursive()
+        project_path_real.rmtree(onerror=onerror)
 
 print(skip)
 TestScripts.populate_tests(sparcur, working_dir, mains, skip=skip,

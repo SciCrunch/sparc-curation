@@ -168,7 +168,7 @@ from augpathlib import RemotePath, AugmentedPath  # for debug
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit
 from pyontutils.utils import NOWDANGER, NOWISO, UTCNOWISO
-from pyontutils.config import devconfig
+from pyontutils.config import auth as pauth
 from pysercomb.pyr import units as pyru
 from terminaltables import AsciiTable
 from sparcur import config
@@ -366,7 +366,7 @@ class Main(Dispatcher):
         # FIXME this should be in its own setup method
         # pull in additional graphs for query that aren't loaded properly
         RDFL = oq.plugin.get('rdflib')
-        olr = Path(devconfig.ontology_local_repo)
+        olr = Path(pauth.get_path('ontology-local-repo'))
         branch = 'methods'
         for fn in ('methods', 'methods-helper', 'methods-core'):
             org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
@@ -510,6 +510,7 @@ class Main(Dispatcher):
 
         anchor.local_data_dir.mkdir()
         anchor.local_objects_dir.mkdir()
+        anchor.trash.mkdir()
 
         self.anchor = anchor
         self.project_path = self.anchor.local

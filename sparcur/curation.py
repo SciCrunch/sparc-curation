@@ -12,7 +12,6 @@ from urllib.parse import quote
 import rdflib
 import dicttoxml
 from pyontutils.utils import byCol as _byCol, isoformat, utcnowtz
-from pyontutils.config import devconfig
 from pyontutils.namespaces import makeNamespaces, TEMP, isAbout, sparc
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from protcur.analysis import parameter_expression

@@ -8,7 +8,6 @@ from hyputils.hypothesis import HypothesisHelper, group_to_memfile
 from orthauth.utils import QuietDict
 from pysercomb.pyr import units as pyru
 from pyontutils import combinators as cmb
-from pyontutils.config import devconfig
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from sparcur import datasets as dat
@@ -16,7 +15,7 @@ from sparcur.core import log, logd, OntTerm, OntId, OrcidId, PioId, sparc
 from sparcur.core import get_right_id, DoiId, DoiInst, PioInst, PioUserInst
 from sparcur.paths import Path
 from sparcur.utils import log, logd, cache
-from sparcur.config import config
+from sparcur.config import config, auth
 from sparcur.protocols_io_api import get_protocols_io_auth
 
 
@@ -93,9 +92,9 @@ class ProtcurData:
     def populate_annos(group_name='sparc-curation'):
         from hyputils import hypothesis as hyp
         if hyp.api_token == 'TOKEN':  # FIXME does not work
-            hyp.api_token = devconfig.secrets('hypothesis', 'api', devconfig.hypothesis_api_user)
+            hyp.api_token = auth.get('hypothesis-api-key')
 
-        group = devconfig.secrets('hypothesis', 'group', group_name)
+        group = auth.get('hypothesis-group')
         get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group + 'sparcur'),
                                                               helpers=(HypothesisHelper, Hybrid, protc),
                                                               group=group,
@@ -128,7 +127,7 @@ class ProtocolData(dat.HasErrors):
     def setup(cls, creds_file=None):
         if creds_file is None:
             try:
-                creds_file = devconfig.secrets('protocols-io', 'api', 'creds-file')
+                creds_file = auth.get_path('protocols-io-api-creds-file')
             except KeyError as e:
                 raise TypeError('creds_file is a required argument'
                                 ' unless you have it in secrets') from e
@@ -169,7 +168,7 @@ class ProtocolData(dat.HasErrors):
         for uri in self.protocol_uris_resolved:
             yield self._get_protocol_json(uri)
 
-    @cache(Path(config.cache_dir, 'protocol_json'))
+    @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
     def get(self, uri):
          #juri = uri + '.json'
         logd.info(uri)
@@ -198,7 +197,7 @@ class ProtocolData(dat.HasErrors):
 
             logd.error(f'protocol no access {uri} {self.id!r}')
 
-    @cache(Path(config.cache_dir, 'protocol_json'))
+    @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
         logd.info(uri)
