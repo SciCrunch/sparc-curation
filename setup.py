@@ -46,7 +46,7 @@ setup(name='sparcur',
           'idlib',
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'nibabel',
-          'orthauth>=0.0.4',
+          'orthauth>=0.0.3',
           'protcur',
           'pydicom',
           'pyontutils>=0.1.5',
