@@ -268,49 +268,57 @@ SECreateSymbolicLinkPrivilege = $($currentSetting)
        sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
      #+end_src
 **** Package manager
-     [[https://brew.sh/][Install homebrew]].
+[[https://brew.sh/][Install homebrew]].
 
-     #+begin_src bash :exports code :eval never
-       /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/5ecca39372cffdc4c9fbacee6e22328a0dc61eac/install)"
-       brew cask install \
-       emacs \
-       firefox \
-       gimp \
-       google-chrome \
-       inkscape \
-       krita \
-       mactex \
-       macvim \
-       protege \
-       racket
+#+begin_src bash :exports code :eval never
+/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/5ecca39372cffdc4c9fbacee6e22328a0dc61eac/install)"
+brew cask install \
+emacs \
+firefox \
+gimp \
+google-chrome \
+inkscape \
+krita \
+mactex \
+macvim \
+protege \
+racket
 
-       brew install \
-       curl \
-       git \
-       htop \
-       hunspell \
-       pandoc \
-       python \
-       redland \
-       rxvt-unicode \
-       sbcl \
-       sqlite \
-       tree
-     #+end_src
+brew install \
+curl \
+git \
+htop \
+hunspell \
+pandoc \
+postgres \
+python \
+redland \
+rxvt-unicode \
+sbcl \
+sqlite \
+tree
+#+end_src
 
-     #+CAPTION: .bash_profile
-     #+begin_src bash :exports code :eval never
-       # This file is sourced by bash for login shells.  The following line
-       # runs your .bashrc and is recommended by the bash info pages.
-       [[ -f ~/.bashrc ]] && . ~/.bashrc
-     #+end_src
+Add the following to your ~/.bash_profile
+#+CAPTION: .bash_profile
+#+begin_src bash :exports code :eval never
+# This file is sourced by bash for login shells.  The following line
+# runs your .bashrc and is recommended by the bash info pages.
+[[ -f ~/.bashrc ]] && . ~/.bashrc
+#+end_src
 
-     #+CAPTION: .bashrc
-     #+begin_src bash :exports code :eval never
-       alias python=/usr/local/bin/python3
-       alias pip=/usr/local/bin/pip3
-     #+end_src
+Add the following to your ~/.bashrc
+#+CAPTION: .bashrc
+#+begin_src bash :exports code :eval never
+export PATH=${HOME}/bin:${HAOME}/Library/Python/3.7/bin:${PATH}
+#+end_src
 
+Run the following to symlink python3 to python
+#+begin_src bash :eval never
+mkdir ~/bin
+ln -s /usr/local/bin/python3 ~/bin/python
+ln -s /usr/local/bin/pip3 ~/bin/pip
+#+end_src
 ** User
    :PROPERTIES:
    :CUSTOM_ID: user
@@ -506,6 +514,7 @@ SECreateSymbolicLinkPrivilege = $($currentSetting)
 
       # python version check
       python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
+      pip --version || exit 3
     #+END_SRC
 
     #+NAME: clone-repos
