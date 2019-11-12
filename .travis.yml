@@ -25,8 +25,8 @@ script:
   - pipenv run pytest --cov=sparcur
 
 after_success:
-  - if [[ $HAS_COVERALLS && TRAVIS_PYTHON_VERSION == 3.7 ]] ; then coveralls ; fi
+  - if [[ $HAS_COVERALLS && $TRAVIS_PYTHON_VERSION == 3.7 ]] ; then coveralls ; fi
 
 after_failure:
   # for now we want converage even if things fail
-  - if [[ $HAS_COVERALLS && TRAVIS_PYTHON_VERSION == 3.7 ]] ; then coveralls ; fi
+  - if [[ $HAS_COVERALLS && $TRAVIS_PYTHON_VERSION == 3.7 ]] ; then coveralls ; fi
