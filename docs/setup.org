@@ -285,6 +285,7 @@ protege \
 racket
 
 brew install \
+coreutils \
 curl \
 git \
 htop \
