@@ -1,0 +1,18 @@
+* Graph load and deployment
+
+To load the graph run the following from the folder of this readme.
+
+#+BEGIN_SRC bash
+ontload graph NIF-Ontology NIF -z /tmp/test1 -l /tmp/test1 -b dev -p -t ./graphload.yaml
+#+END_SRC
+
+To create services.yaml run the following from the folder of this
+readme.
+
+#+BEGIN_SRC bash
+scigraph-deploy config --local --services-config ./services.yaml --services-user ec2-user --zip-location ./ localhost scigraph.scicrunch.io
+#+END_SRC
+
+See the [[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.md#rpm-builds][RPM Builds]] section of the
+[[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.md][the pyontutils scigraph readme]] for the rest
+of the instructions for deployment.
