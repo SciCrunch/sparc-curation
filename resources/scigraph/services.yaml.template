@@ -11,7 +11,7 @@ cypherResources:
     query: |
             // all parts of and directly connected to organ or parts of organ
             MATCH path = (start:Class{iri: "${id}"})
-            -[:fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
+            -[:ILX:0738400|fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
             -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage|fma:continuous_with*0..1]->(sup)
             -[:fma:constitutional_part|fma:branch_of|fma:tributary_of|fma:branch*0..1]->(a_bit_more)
             RETURN path
