@@ -3,14 +3,27 @@
 To load the graph run the following from the folder of this readme.
 
 #+BEGIN_SRC bash
-ontload graph NIF-Ontology NIF -z /tmp/test1 -l /tmp/test1 -b dev -p -t ./graphload.yaml
+ontload graph \
+--org SciCrunch \  # github organization
+NIF-Ontology \  # repo name
+NIF \  # remote base http:// pattern to swap with local file://, NIF automatically expands to http://ontology.neuinfo.org/NIF
+--zip-location /tmp/test1 \  # output folder where the loaded graph zip will be exported
+--git-local /tmp/test1 \  # location where git repo will be cloned
+--branch dev \  # git ref (branch, commit, etc.) from which to build
+--patch \  # do apply patches
+--graphload-config ./graphload.yaml  # path to the graphload config (only graphload.yaml.template needs to exist)
 #+END_SRC
 
-To create services.yaml run the following from the folder of this
-readme.
+To create services.yaml run the following from the folder of this readme.
 
 #+BEGIN_SRC bash
-scigraph-deploy config --local --services-config ./services.yaml --services-user ec2-user --zip-location ./ localhost scigraph.scicrunch.io
+scigraph-deploy config \
+localhost \  # build host
+scigraph.scicrunch.io \  # services host
+--services-user ec2-user \  # user on the services host
+--zip-location ./ \  # local path to build files (not sure why we need this for deploying the config)
+--local \  # run all commands locally
+--services-config ./services.yaml  # path to services config (only services.yaml.template needs to exist)
 #+END_SRC
 
 See the [[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.md#rpm-builds][RPM Builds]] section of the
