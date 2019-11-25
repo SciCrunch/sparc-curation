@@ -102,7 +102,10 @@ class Organs(FieldAlignment):
         """ tuple of modalities """
         row = self._lookup(dataset_id)
         if row:
-            return tuple(_ for _ in (row.modality, row.modality_2) if _)
+            try:
+                return tuple(_ for _ in (row.modality1, row.modality2) if _)
+            except AttributeError as e:
+                raise ValueError(f'issue in {self.name} {self.sheet_name}') from e
 
     def organ_term(self, dataset_id):
         row = self._lookup(dataset_id)
