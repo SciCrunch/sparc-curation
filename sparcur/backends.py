@@ -613,7 +613,9 @@ class BlackfynnRemote(RemotePath):
         # update the cache first
         # then move to the new name if relevant
         # prevents moving partial metadata onto existing files
-        if self.cache.name != self.name or self._bfobject.parent != self.cache.parent.id:  # this is localy correct
+        parent_changed = (hasattr(self._bfobject, 'parent') and
+                          self._bfobject.parent != self.cache.parent.id)
+        if self.cache.name != self.name or parent_changed:  # this is localy correct
             # the issue is that move is now smarter
             # and will detect if a parent path has changed
             try:
