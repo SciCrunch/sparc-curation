@@ -112,7 +112,7 @@ class Organs(FieldAlignment):
         if row:
             ot = row.organ_term if row.organ_term else None
             if ot:
-                ts = tuple(OntId(t) for t in ot.split(' ') if t)
+                ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
                 return ts
 
     def award(self, dataset_id):
@@ -153,7 +153,9 @@ class Organs(FieldAlignment):
             return [mkval(self.cell_object(row_index, column_index))
                     for column_index, (field, value)
                     in enumerate(zip(row._fields, row))
-                    if field.startswith('technique') and value]
+                    if field.startswith('technique') and
+                    value and
+                    value.lower() != 'na']
         else:
             return []
 

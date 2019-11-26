@@ -361,16 +361,19 @@ class Tabular(HasErrors):
             'skip_empty_lines' : True,
             'outputencoding': 'utf-8',
         }
-        sheetid = 0
+        sheetid = 1
         xlsx2csv = Xlsx2csv(self.path.as_posix(), **kwargs)
+        ns = len(xlsx2csv.workbook.sheets)
+        if ns > 1:
+            message = f'too many sheets ({ns}) in {self.path.as_posix()!r}'
+            self.addError(exc.EncodingError(message))
+            logd.error(message)
 
         f = io.StringIO()
         try:
             xlsx2csv.convert(f, sheetid)
             f.seek(0)
             gen = csv.reader(f, delimiter='\t')
-            # avoid first row sheet line
-            next(gen)
             yield from gen
         except SheetNotFoundException as e:
             log.warning(f'Sheet weirdness in{self.path}')

@@ -876,7 +876,7 @@ class BFLocal:
             raise exc.MissingSecretError from e
 
     def __getstate__(self):
-        state =self.__dict__
+        state = self.__dict__
         state.pop('bf')  # does not picle well due to connection
         return state
 

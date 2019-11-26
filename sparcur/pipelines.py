@@ -37,7 +37,13 @@ class DatasourcePipeline(Pipeline):
 class ContributorsPipeline(DatasourcePipeline):
 
     def __init__(self, previous_pipeline, lifters, runtime_context):
-        self.member = State.member
+        if hasattr(State, 'member'):
+            self.member = State.member
+        else:
+            log.error('State missing member, using State seems '
+                      'like a good idea until you go to multiprocessing')
+            self.member = lambda first, last: None
+
         self.contributors = previous_pipeline.data
         self.runtime_context = runtime_context
         self.dataset_id = runtime_context.id

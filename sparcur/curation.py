@@ -11,7 +11,8 @@ from collections import defaultdict, deque
 from urllib.parse import quote
 import rdflib
 import dicttoxml
-from pyontutils.utils import byCol as _byCol, isoformat, utcnowtz
+from joblib import Parallel, delayed
+from pyontutils.utils import byCol as _byCol, isoformat, utcnowtz, Async, deferred
 from pyontutils.namespaces import makeNamespaces, TEMP, isAbout, sparc
 from pyontutils.closed_namespaces import rdf, rdfs, owl, skos, dc
 from protcur.analysis import parameter_expression
@@ -35,6 +36,7 @@ from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
 from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
+from pysercomb.pyr import units as pyru
 from pysercomb.pyr.units import Expr, _Quant as Quantity
 
 a = rdf.type
@@ -854,6 +856,11 @@ class Integrator(PathData, OntologyData):
         """ make sure we have all datasources
             calling this again will refresh helpers
         """
+        if hasattr(Integrator, '__setup') and Integrator.__setup:
+            return  # already setup
+
+        Integrator.__setup = True
+
         for _cls in cls.mro():
             if _cls != cls:
                 if hasattr(_cls, 'setup'):
@@ -873,20 +880,29 @@ class Integrator(PathData, OntologyData):
                 protocol_uris = lambda v: []
 
             class FakeAffilSheet:
-                pass
+                def __call__(self, *args, **kwargs):
+                    return
 
             cls.organs_sheet = FakeOrganSheet
-            cls.affiliations = FakeAffilSheet
+            cls.affiliations = FakeAffilSheet()
         else:
             cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
             cls.affiliations = sheets.Affiliations()
+
+        if cls.no_google:
+            cls.organ = lambda award: None
 
         if local_only:
             cls.organ = lambda award: None
             cls.member = lambda first, last: None
         else:
             cls.organ = OrganData()
-            cls.member = State.member
+            if hasattr(State, 'member'):
+                cls.member = State.member
+            else:
+                log.error('State missing member, using State seems '
+                          'like a good idea until you go to multiprocessing')
+                cls.member = lambda first, last: None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -994,6 +1010,20 @@ class Integrator(PathData, OntologyData):
             self._triples_exporter = TriplesExportDataset(self.data)
 
         return self._triples_exporter
+
+    def __getnewargs_ex__(self):
+        return (self.path,), {}
+
+    def __getstate__(self):
+        state = self.__dict__
+        state['no_google'] = self.no_google
+        return state
+
+    def __setstate__(self, state):
+        pyru.UnitsHelper.setup()
+        self.__class__.no_google = state['no_google']
+        self.__class__.setup()
+        self.__dict__.update(state)
 
 
 class JsonObject:
@@ -1417,6 +1447,9 @@ class Summary(Integrator, ExporterSummarizer):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
+            #hrm = Parallel(n_jobs=9)(delayed(datame)(d) for d in self.iter_datasets)
+            #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
+            #self._data_cache = self.make_json(hrm)
             self._data_cache = self.make_json(d.data for d in self.iter_datasets)
 
         return self._data_cache
@@ -1425,6 +1458,11 @@ class Summary(Integrator, ExporterSummarizer):
     def data(self):
         data = self.pipeline_end
         return data  # FIXME we want objects that wrap the output rather than generate it ...
+
+
+def datame(d):
+    """ sigh, pickles """
+    return d.data
 
 
 def express_or_return(thing):
