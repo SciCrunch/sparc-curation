@@ -322,7 +322,7 @@ class Main(Dispatcher):
         # pass debug along (sigh)
         AugmentedPath._debug = True
         RemotePath._debug = True
-        self.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+        self.BlackfynnRemote = BlackfynnCache._remote_class
         self.BlackfynnRemote._async_rate = self.options.rate
 
         local = self.cwd

@@ -1020,7 +1020,6 @@ class Integrator(PathData, OntologyData):
         return state
 
     def __setstate__(self, state):
-        pyru.UnitsHelper.setup()
         self.__class__.no_google = state['no_google']
         self.__class__.setup()
         self.__dict__.update(state)
@@ -1411,8 +1410,6 @@ class Summary(Integrator, ExporterSummarizer):
                 continue
 
             yield self.__class__.__base__(path)
-            #if i > 4:
-                #break
 
     def __iter__(self):
         for ds in self.iter_datasets:
@@ -1445,12 +1442,13 @@ class Summary(Integrator, ExporterSummarizer):
     @property
     def pipeline_end(self):
         if not hasattr(self, '_data_cache'):
+            ca = self.path._cache_class._remote_class._cache_anchor
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
-            #hrm = Parallel(n_jobs=9)(delayed(datame)(d) for d in self.iter_datasets)
+            hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca) for d in self.iter_datasets)
             #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
-            #self._data_cache = self.make_json(hrm)
-            self._data_cache = self.make_json(d.data for d in self.iter_datasets)
+            self._data_cache = self.make_json(hrm)
+            #self._data_cache = self.make_json(d.data for d in self.iter_datasets)
 
         return self._data_cache
 
@@ -1460,8 +1458,12 @@ class Summary(Integrator, ExporterSummarizer):
         return data  # FIXME we want objects that wrap the output rather than generate it ...
 
 
-def datame(d):
+def datame(d, ca):
     """ sigh, pickles """
+    rc = d.path._cache_class._remote_class
+    if not hasattr(rc, '_cache_anchor'):
+        rc.anchorTo(ca)
+
     return d.data
 
 

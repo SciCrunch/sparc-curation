@@ -11,6 +11,7 @@ from dateutil import parser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import XopenPath, RepoPath, LocalPath
 from augpathlib import RemotePath  # FIXME just for reimport
+from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log
 from augpathlib import PathMeta
@@ -41,6 +42,9 @@ class BlackfynnCache(PrimaryCache, EatCache):
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
     cypher = hashlib.sha256  # set the remote hash cypher on the cache class
+
+    uri_human = backends.BlackfynnRemote.uri_human
+    uri_api = backends.BlackfynnRemote.uri_api
 
     @classmethod
     def decode_value(cls, field, value):
@@ -122,44 +126,6 @@ class BlackfynnCache(PrimaryCache, EatCache):
     @property
     def cache_key(self):
         return f'{self.id}-{self.file_id}'
-
-    @property
-    def uri_human(self):
-        # org /datasets/ N:dataset /files/ N:collection
-        # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
-        # org /datasets/ N:dataset /viewer/ N:package
-
-        id = self.id
-        N, type, suffix = id.split(':')
-        if id.startswith('N:package:'):
-            prefix = '/viewer/'
-        elif id.startswith('N:collection:'):
-            prefix = '/files/'
-        elif id.startswith('N:dataset:'):
-            prefix = '/'  # apparently organization needs /datasets after it
-            return self.parent.uri_human + prefix + id
-        elif id.startswith('N:organization:'):
-            return f'https://app.blackfynn.io/{id}/datasets'
-        else:
-            raise exc.UnhandledTypeError(type)
-
-        if self.dataset_id is None:
-            raise exc.NotInProjectError(f'{self}')
-
-        return self.dataset.uri_human + prefix + id
-
-    @property
-    def uri_api(self):
-        if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
-            endpoint = 'datasets/' + self.id
-        elif self.is_organization:
-            endpoint = 'organizations/' + self.id
-        elif self.file_id is not None:
-            endpoint = f'packages/{self.id}/files/{self.file_id}'
-        else:
-            endpoint = 'packages/' + self.id
-
-        return 'https://api.blackfynn.io/' + endpoint
 
     @property
     def data(self):
@@ -244,3 +210,4 @@ class StashPath(Path):
 # assign defaults
 
 BlackfynnCache._local_class = Path
+backends.BlackfynnRemote._new(Path, BlackfynnCache)

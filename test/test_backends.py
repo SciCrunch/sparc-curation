@@ -44,14 +44,6 @@ class TestBlackfynnRemote(unittest.TestCase):
         b = next(self.project_path.remote.children)
         b.name
 
-    def __test_boot(self):
-        # TODO change local storage prefix on bfl
-        # and then do a smallish bootstrap
-        bfl = BFLocal(local_storage_prefix='/tmp/test_bf_boot')
-        BlackfynnRemote = BlackfynnRemoteFactory(Path, BlackfynnCache, bfl)
-        project_path = bfl.project_path
-        list(project_path.remote.rchildren)
-
     def test_parts_relative_to(self):
         root = self.BlackfynnRemote(self.BlackfynnRemote.root)
         assert root.id == self.BlackfynnRemote.root

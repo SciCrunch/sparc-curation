@@ -47,7 +47,7 @@ setup(name='sparcur',
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'protcur>=0.0.2',
           'pyontutils>=0.1.8',
-          'pysercomb>=0.0.2',
+          'pysercomb>=0.0.3',
           'terminaltables',
           'xlsx2csv',
       ],

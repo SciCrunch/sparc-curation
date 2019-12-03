@@ -6,9 +6,9 @@ from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
 from sparcur.core import BlackfynnId, DoiId
-from sparcur.paths import RemotePath, LocalPath, Path, BlackfynnCache
-from augpathlib import StatResult, PathMeta
-from augpathlib.remotes import RemotePath, RemoteFactory
+import augpathlib as aug
+from augpathlib import PathMeta
+from augpathlib.remotes import RemoteFactory
 from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File
 from blackfynn import Dataset
@@ -17,12 +17,48 @@ from blackfynn.models import BaseNode
 from ast import literal_eval
 
 
-class BlackfynnRemote(RemotePath):
+class BlackfynnRemote(aug.RemotePath):
 
-    uri_human = BlackfynnCache.uri_human
-    uri_api = BlackfynnCache.uri_api
     _api_class = BFLocal
     _async_rate = None
+
+    @property
+    def uri_human(self):
+        # org /datasets/ N:dataset /files/ N:collection
+        # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
+        # org /datasets/ N:dataset /viewer/ N:package
+
+        id = self.id
+        N, type, suffix = id.split(':')
+        if id.startswith('N:package:'):
+            prefix = '/viewer/'
+        elif id.startswith('N:collection:'):
+            prefix = '/files/'
+        elif id.startswith('N:dataset:'):
+            prefix = '/'  # apparently organization needs /datasets after it
+            return self.parent.uri_human + prefix + id
+        elif id.startswith('N:organization:'):
+            return f'https://app.blackfynn.io/{id}/datasets'
+        else:
+            raise exc.UnhandledTypeError(type)
+
+        if self.dataset_id is None:
+            raise exc.NotInProjectError(f'{self}')
+
+        return self.dataset.uri_human + prefix + id
+
+    @property
+    def uri_api(self):
+        if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
+            endpoint = 'datasets/' + self.id
+        elif self.is_organization:
+            endpoint = 'organizations/' + self.id
+        elif self.file_id is not None:
+            endpoint = f'packages/{self.id}/files/{self.file_id}'
+        else:
+            endpoint = 'packages/' + self.id
+
+        return 'https://api.blackfynn.io/' + endpoint
 
     @property
     def errors(self):
@@ -747,25 +783,3 @@ class BlackfynnRemote(RemotePath):
     def __repr__(self):
         file_id = f', file_id={self.file_id}' if self.file_id else ''
         return f'{self.__class__.__name__}({self.id!r}{file_id})'
-
-
-class BlackfynnRemoteFactory(RemoteFactory, BlackfynnRemote):  # XXX soon to be deprecated
-    # FIXME helper index should try to cooperate with the packages index?
-    def __new__(cls, cache_anchor, local_class):
-        if isinstance(cache_anchor, BlackfynnCache):
-            try:
-                blackfynn_local_instance = BFLocal(cache_anchor.id)
-            except (requests.exceptions.ConnectionError, exc.MissingSecretError) as e:
-                log.critical(f'Could not connect to blackfynn {e!r}')
-                #blackfynn_local_instance = FakeBFLocal(anchor.id, anchor)  # WARNING polutes things!
-                blackfynn_local_instance = 'CONNECTION ERROR'
-
-        else:
-            raise TypeError(f'{type(cache_anchor)} is not BFLocal or BlackfynnCache!')
-
-        cache_class = cache_anchor.__class__
-        self = super().__new__(cls, local_class, cache_class, _api=blackfynn_local_instance)
-        cls._cache_anchor = cache_anchor
-        self._errors = []
-        self.root = self._api.root
-        return self

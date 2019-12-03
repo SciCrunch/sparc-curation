@@ -26,7 +26,6 @@ from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from werkzeug.contrib.iterio import IterIO
 from sparcur import exceptions as exc
 from sparcur.core import log, lj
-from sparcur.paths import Path
 from sparcur.metastore import MetaStore
 from .config import auth
 
@@ -1078,7 +1077,8 @@ def mvp():
     """ In order to be performant for large numbers of packages we have
         to get all the packages first and then async retrieve all the files
     """
-    local_storage_prefix = Path('~/files/blackfynn_local/').expanduser()
+    from sparcur import paths
+    local_storage_prefix = paths.Path('~/files/blackfynn_local/').expanduser()
     bf = Blackfynn(api_token=auth.dynamic_config.secrets('blackfynn-mvp-key'),
                     api_secret=auth.dynamic_config.secrets('blackfynn-mvp-secret'))
 
