@@ -470,9 +470,8 @@ class Version1Header(HasErrors):
 
             if isinstance(self._data_raw, dict):
                 # FIXME this breaks downstream assumptions
-                self._data_cache = {self.rename_key(k):tos(nv)
-                                    for k, v in self._data_raw.items()
-                                    for nv in self.normalize(k, v) if nv}
+                self._data_cache = {self.rename_key(k):tos(self.normalize(k, v))  # FIXME FIXME
+                                    for k, v in self._data_raw.items()}
 
             return
 
