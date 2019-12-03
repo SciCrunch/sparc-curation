@@ -332,7 +332,7 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
                 miss = dat.SubmissionFile(p)
                 if miss.data:
                     yield miss
-            except dat.SubmissionFile.NoDataError as e:
+            except exc.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -359,7 +359,7 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
                 dd = dat.DatasetDescriptionFile(p)
                 if dd.data:
                     yield dd
-            except dat.DatasetDescriptionFile.NoDataError as e:
+            except exc.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -380,7 +380,7 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
                 sf = dat.SubjectsFile(path)
                 if sf.data:
                     yield sf
-            except dat.DatasetDescriptionFile.NoDataError as e:
+            except exc.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -394,7 +394,7 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
                 sf = dat.SamplesFile(path)
                 if sf.data:
                     yield sf
-            except dat.DatasetDescriptionFile.NoDataError as e:
+            except exc.NoDataError as e:
                 self._errors.append(e)  # NOTE we treat empty file as no file
             except AttributeError as e:
                 log.warning(f'unhandled metadata type {e!r}')
@@ -1378,6 +1378,7 @@ class Summary(Integrator, ExporterSummarizer):
     schema_class = SummarySchema
     schema_out_class = SummarySchema
     triples_class = TriplesExportSummary
+    _debug = False
 
     def __new__(cls, path):
         #cls.schema = cls.schema_class()
@@ -1409,7 +1410,8 @@ class Summary(Integrator, ExporterSummarizer):
                 # handling the None case doesn't spread througout the codebase :/
                 continue
 
-            yield self.__class__.__base__(path)
+            if path.cache.id == 'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded':
+                yield self.__class__.__base__(path)
 
     def __iter__(self):
         for ds in self.iter_datasets:
@@ -1445,10 +1447,12 @@ class Summary(Integrator, ExporterSummarizer):
             ca = self.path._cache_class._remote_class._cache_anchor
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
-            hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca) for d in self.iter_datasets)
-            #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
-            self._data_cache = self.make_json(hrm)
-            #self._data_cache = self.make_json(d.data for d in self.iter_datasets)
+            if not self._debug:
+                hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca) for d in self.iter_datasets)
+                #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
+                self._data_cache = self.make_json(hrm)
+            else:
+                self._data_cache = self.make_json(d.data for d in self.iter_datasets)
 
         return self._data_cache
 

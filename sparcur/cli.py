@@ -350,6 +350,8 @@ class Main(Dispatcher):
         self.anchor.anchorClassHere()  # replace a bottom up anchoring rule with top down
         self.project_path = self.anchor.local
         self.summary = Summary(self.project_path)
+        if self.options.debug:
+            Summary._debug = True
 
     def _setup_bfl(self):
         self.BlackfynnRemote.anchorTo(self.anchor)

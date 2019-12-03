@@ -2,6 +2,9 @@ import io
 import ast
 import csv
 import copy
+import json
+import numbers
+from types import GeneratorType
 from itertools import chain
 from collections import Counter
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -18,6 +21,21 @@ from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, PioId
 from sparcur.paths import Path
 
 a = rdf.type
+
+
+# FIXME review this :/ it is not a good implementation at all
+def tos(hrm):
+    if isinstance(hrm, GeneratorType):
+        t = tuple(hrm)
+        if not t:
+            return
+        elif len(t) == 1:
+            return t[0]
+        else:
+            return t
+    else:
+        return hrm
+
 
 # FIXME this whole file needs to be properly converted into pipelines
 
@@ -440,6 +458,24 @@ class Version1Header(HasErrors):
     def __init__(self, path):
         super().__init__()
         self.path = path
+        if self._is_json:
+            with open(self.path, 'rt') as f:
+                try:
+                    self._data_raw = json.load(f)
+                except json.decoder.JSONDecodeError as e:
+                    if not f.buffer.tell():
+                        raise exc.NoDataError(self.path)
+                    else:
+                        raise exc.BadDataError(self.path) from e
+
+            if isinstance(self._data_raw, dict):
+                # FIXME this breaks downstream assumptions
+                self._data_cache = {self.rename_key(k):tos(nv)
+                                    for k, v in self._data_raw.items()
+                                    for nv in self.normalize(k, v) if nv}
+
+            return
+
         tabular = Tabular(self.path)
         self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
         self.t = tabular
@@ -462,9 +498,17 @@ class Version1Header(HasErrors):
             try:
                 self.bc = byCol(rest, header)
             except ValueError as e:
-                raise exc.BadDataError from e
+                raise exc.BadDataError(self.path) from e
         else:
             self.bc = byCol(rest, header, to_index=self.to_index)
+
+    @property
+    def _is_json(self):
+        # impl detail, sigh
+        # FIXME this should not be done here
+        # json should conform directly to the schemas and should be loaded
+        # directly via the object loader
+        return self.path.suffix == '.json'
 
     def xopen(self):
         """ open file using xdg-open """
@@ -472,7 +516,9 @@ class Version1Header(HasErrors):
 
     @property
     def _errors(self):
-        yield from self.t._errors
+        if hasattr(self, 't'):
+            yield from self.t._errors
+
         yield from super()._errors
 
     @staticmethod
@@ -494,14 +540,20 @@ class Version1Header(HasErrors):
         yield value
 
     def normalize(self, key, value):
-        v = value.replace('\ufeff', '')  # FIXME utf-16 issue
-        if v != value:  # TODO can we decouple encoding from value normalization?
-            message = f"encoding feff error in '{self.path}'"
-            log.error(message)
-            self.addError(exc.EncodingError(message))
+        if isinstance(value, str):
+            v = value.replace('\ufeff', '')  # FIXME utf-16 issue
+            if v != value:  # TODO can we decouple encoding from value normalization?
+                message = f"encoding feff error in '{self.path}'"
+                log.error(message)
+                self.addError(exc.EncodingError(message))
 
-        if v.lower().strip() not in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
-            yield from getattr(self, key, self.default)(v)
+            if v.lower().strip() in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
+                return
+
+        else:
+            v = value
+
+        yield from getattr(self, key, self.default)(v)
 
     def rename_key(self, key, *parent_keys):
         """ modify this in your class if you need to rename a key """
@@ -520,6 +572,10 @@ class Version1Header(HasErrors):
     def data(self):  # TODO candidate for memory.cache
         if hasattr(self, '_data_cache'):
             return self._data_cache
+
+        if self._is_json:
+            self._data_cache = {k:v for k, v in self}
+            return self.data
 
         index_col, *_ = self.to_index
         out = {}
@@ -552,7 +608,7 @@ class Version1Header(HasErrors):
 
                     if normk in self.max_one:  # schema will handle this ..
                         if not value:
-                            #log.warning(f"missing value for {normk} '{self.t.path}'")
+                            #log.warning(f"missing value for {normk} '{self.path}'")
                             pass
                         elif len(value) > 1:
                             msg = f'too many values for {normk} {value} {self.path.as_posix()!r}'
@@ -654,6 +710,12 @@ class DatasetDescriptionFile(Version1Header):
     def data(self):
         return super().data
 
+    def contributors(self, value):
+        for d in value:
+            yield {self.rename_key(k):tos(nv)
+                   for k, v in d.items()
+                   for nv in self.normalize(k, v) if nv}
+
     def contributor_orcid_id(self, value):
         # FIXME use schema
         v = value.replace(' ', '')
@@ -669,7 +731,7 @@ class DatasetDescriptionFile(Version1Header):
             elif v == '0':  # FIXME ? someone using strange conventions ...
                 return
             elif len(v) != 19:
-                msg = f'orcid wrong length {value!r} {self.t.path.as_posix()!r}'
+                msg = f'orcid wrong length {value!r} {self.path.as_posix()!r}'
                 self.addError(OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
@@ -685,17 +747,17 @@ class DatasetDescriptionFile(Version1Header):
             if not len(numeric):
                 return
             elif len(numeric) != 19:
-                msg = f'orcid wrong length {value!r} {self.t.path.as_posix()!r}'
+                msg = f'orcid wrong length {value!r} {self.path.as_posix()!r}'
                 self.addError(OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
         try:
-            #log.debug(f"{v} '{self.t.path}'")
+            #log.debug(f"{v} '{self.path}'")
             orcid = OrcidId(v)
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
-                msg = f'orcid failed checksum {value!r} {self.t.path.as_posix()!r}'
+                msg = f'orcid failed checksum {value!r} {self.path.as_posix()!r}'
                 self.addError(OrcidId.OrcidChecksumError(msg))
                 logd.error(msg)
                 return
@@ -703,7 +765,7 @@ class DatasetDescriptionFile(Version1Header):
             yield orcid
 
         except (OntId.BadCurieError, OrcidId.OrcidMalformedError) as e:
-            msg = f'orcid malformed {value!r} {self.t.path.as_posix()!r}'
+            msg = f'orcid malformed {value!r} {self.path.as_posix()!r}'
             self.addError(OrcidId.OrcidMalformedError(msg))
             logd.error(msg)
             yield value
@@ -713,7 +775,8 @@ class DatasetDescriptionFile(Version1Header):
         yield tuple(sorted(set(nml.NormContributorRole(e.strip()) for e in value.split(','))))
 
     def is_contact_person(self, value):
-        yield value.lower() == 'yes'
+        # no truthy values only True itself
+        yield value is True or isinstance(value, str) and value.lower() == 'yes'
 
     def _protocol_url_or_doi(self, value):
         doi = False
@@ -807,9 +870,15 @@ class SubjectsFile(Version1Header):
         #notunique = (len([r for r in self.bc.subject_id if r]) !=
                      #len([k for k in self.bc._byCol__indexes['subject_id']
                           #if k != 'subject_id' and k]))
-        sids = Counter(r for r in self.bc.subject_id if r)
+        if self._is_json:
+            # FIXME ... only if it is a json list ???
+            sids = Counter(r['subject_id'] for r in self._data_raw if r)
+            values = self._data_raw
+        else:
+            sids = Counter(r for r in self.bc.subject_id if r)
+            values = list(self)
+
         notunique = {s:c for s, c in sids.items() if c > 1}
-        values = list(self)
 
         if notunique:
             msg = f'subject_ids are not unique for {self.path}\n{notunique}'
@@ -817,34 +886,39 @@ class SubjectsFile(Version1Header):
             self.addError(msg)
 
         out = {self.dict_key: values}
-        for k, heads in self.horizontals.items():
-            # TODO make sure we actually check that the horizontal
-            # isn't used by someone else already ... shouldn't be
-            # it should be skipped but maybe not?
-            tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
-                                               # FIXME one [] drops whole horiz group ...
-                                               for head in heads))
-                              if any(_)))
-            if tups:
-                out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
+        if not self._is_json:
+            for k, heads in self.horizontals.items():
+                # TODO make sure we actually check that the horizontal
+                # isn't used by someone else already ... shouldn't be
+                # it should be skipped but maybe not?
+                tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
+                                                # FIXME one [] drops whole horiz group ...
+                                                for head in heads))
+                                if any(_)))
+                if tups:
+                    out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
 
         self.embedErrors(out)
         return out
 
     def __init__(self, path):
         super().__init__(path)
+        if self._is_json:
+            header = [d.keys() for d in self._data_raw]  # FIXME max may have wrong top level schema
+        else:
+            header = self.bc.header
 
         # units merging
         # TODO pull the units in the parens out
-        self.h_unit = [k for k in self.bc.header if '_unit' in k]
+        self.h_unit = [k for k in header if '_unit' in k]
         h_value = [k.replace('_units', '').replace('_unit', '') for k in self.h_unit]
-        no_unit = [k for k in self.bc.header if '_unit' not in k]
+        no_unit = [k for k in header if '_unit' not in k]
         #self.h_value = [k for k in self.bc.header if '_units' not in k and any(k.startswith(hv) for hv in h_value)]
         self.h_value = [k for hv in h_value
                         for k in no_unit
                         if k.startswith(hv) or k.endswith(hv)]
-        err = f'Problem! {self.h_unit} {self.h_value} {self.bc.header} \'{self.t.path}\''
-        #assert all(v in self.bc.header for v in self.h_value), err
+        err = f'Problem! {self.h_unit} {self.h_value} {header} \'{self.path}\''
+        #assert all(v in header for v in self.h_value), err
         assert len(self.h_unit) == len(self.h_value), err
         self.skip = self.h_unit + self.h_value
 
@@ -871,6 +945,9 @@ class SubjectsFile(Version1Header):
         yield from self.sex(value)
 
     def _param(self, value):
+        if isinstance(value, numbers.Number):
+            return pyru.ur.Quantity(value)
+
         try:
             pv = pyru.UnitsParser(value).asPython()
         except pyru.UnitsParser.ParseFailure as e:
@@ -955,10 +1032,16 @@ class SubjectsFile(Version1Header):
 
     def __iter__(self):
         """ this is still used """
-        yield from (self.process_dict({k:nv for k, v in zip(r._fields, r) if v
-                                       and k not in self.skip_cols
-                                       for nv in self.normalize(k, v) if nv})
-                    for r in self.bc.rows)
+        if self._is_json:
+            yield from (self.process_dict({k:nv for k, v in d.items()
+                                           for nv in self.normalize(k, v) if nv})
+                        for d in self._data_raw)
+
+        else:
+            yield from (self.process_dict({k:nv for k, v in zip(r._fields, r) if v
+                                           and k not in self.skip_cols
+                                           for nv in self.normalize(k, v) if nv})
+                        for r in self.bc.rows)
 
     def triples_gen(self, prefix_func):
         """ NOTE the subject is LOCAL """
@@ -978,7 +1061,11 @@ class SamplesFile(SubjectsFile):
                      #len([k for k in self.bc._byCol__indexes['sample_id']
                           #if k != 'sample_id' and k]))
 
-        sids = Counter(r for r in self.bc.sample_id if r)
+        if self._is_json:
+            sids = Counter(r['sample_id'] for r in self._data_raw if r)
+        else:
+            sids = Counter(r for r in self.bc.sample_id if r)
+
         notunique = {s:c for s, c in sids.items() if c > 1}
         values = list(self)
         if notunique:

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from collections import deque
 import rdflib
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
@@ -790,8 +791,14 @@ class PipelineExtras(JSONPipeline):
                 data['meta']['protocol_url_or_doi'] = tuple(self.lifters.protocol_uris)
 
         else:
-            data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
-            data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
+            if not isinstance(data['meta']['protocol_url_or_doi'], tuple):
+                _test_path = deque(['meta', 'protocol_url_or_doi'])
+                if not [e for e in data['errors'] if e['path'] == _test_path]:
+                    raise ext.ShouldNotHappenError('urg')
+
+            else:
+                data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
+                data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
 
         return data
 

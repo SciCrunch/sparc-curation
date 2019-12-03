@@ -436,7 +436,7 @@ class SubmissionSchema(JSONSchema):
 
 
 class UnitSchema(JSONSchema):
-    schema = {'oneOf': [{'type': 'string'},
+    schema = {'oneOf': [{'type': ['number', 'string']},
                         {'type': 'object',
                          # TODO enum on the allowed values here
                          'properties': {'type': {'type': 'string'},
