@@ -21,6 +21,7 @@ class TestApiNATToRDF(unittest.TestCase):
         assert rtmap['resources']
         if debug:
             print(rdfg.ttl)
+            rdfg.write(Path('test-1.ttl'))
             print(rtmap)
             assert False
 
@@ -37,6 +38,7 @@ class TestApiNATToRDF(unittest.TestCase):
         assert rtmap['resources']
         if debug:
             print(rdfg.ttl)
+            rdfg.write(Path('test-2.ttl'))
             print(rtmap)
             assert False
 
@@ -53,6 +55,7 @@ class TestApiNATToRDF(unittest.TestCase):
         assert rtmap['resources']
         if debug:
             print(rdfg.ttl)
+            rdfg.write(Path('test-3.ttl'))
             print(rtmap)
             assert False
 
@@ -69,6 +72,7 @@ class TestApiNATToRDF(unittest.TestCase):
         assert rtmap['resources']
         if debug:
             print(rdfg.ttl)
+            rdfg.write(Path('test-4.ttl'))
             print(rtmap)
             assert False
 
@@ -86,6 +90,7 @@ class TestApiNATToRDF(unittest.TestCase):
         assert rtmap['resources']
         if debug:
             print(rdfg.ttl)
+            rdfg.write(Path('test-5.ttl'))
             print(rtmap)
             assert False
 
@@ -102,6 +107,7 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = Graph.fromRdf(rdfg).map
         if debug:
             print(rdfg.ttl)
+            rdfg.write(Path('test-bolew.ttl'))
             print(rtmap)
             assert False
 
