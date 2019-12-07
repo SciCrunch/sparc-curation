@@ -1,7 +1,7 @@
 import json
 import unittest
 from pathlib import Path
-from sparcur.apinat import *
+from sparcur import apinat
 import pytest
 
 debug = False
@@ -14,9 +14,9 @@ class TestApiNATToRDF(unittest.TestCase):
         with open((Path(__file__).parent / 'apinatomy/data/test_1_generated.json'), 'rt') as f:
             g = json.load(f)
 
-        apin = Graph(m, g)
+        apin = apinat.Graph(m, g)
         rdfg = apin.graph()
-        rtmap = Graph.fromRdf(rdfg).map
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
         if debug:
@@ -31,9 +31,9 @@ class TestApiNATToRDF(unittest.TestCase):
         with open((Path(__file__).parent / 'apinatomy/data/test_2_generated.json'), 'rt') as f:
             g = json.load(f)
 
-        apin = Graph(m, g)
+        apin = apinat.Graph(m, g)
         rdfg = apin.graph()
-        rtmap = Graph.fromRdf(rdfg).map
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
         if debug:
@@ -48,9 +48,9 @@ class TestApiNATToRDF(unittest.TestCase):
         with open((Path(__file__).parent / 'apinatomy/data/test_3_generated.json'), 'rt') as f:
             g = json.load(f)
 
-        apin = Graph(m, g)
+        apin = apinat.Graph(m, g)
         rdfg = apin.graph()
-        rtmap = Graph.fromRdf(rdfg).map
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
         if debug:
@@ -65,9 +65,9 @@ class TestApiNATToRDF(unittest.TestCase):
         with open((Path(__file__).parent / 'apinatomy/data/test_4_generated.json'), 'rt') as f:
             g = json.load(f)
 
-        apin = Graph(m, g)
+        apin = apinat.Graph(m, g)
         rdfg = apin.graph()
-        rtmap = Graph.fromRdf(rdfg).map
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
         if debug:
@@ -83,9 +83,9 @@ class TestApiNATToRDF(unittest.TestCase):
         with open((Path(__file__).parent / 'apinatomy/data/test_5_model.json'), 'rt') as f:
             g = json.load(f)
 
-        apin = Graph(m, g)
+        apin = apinat.Graph(m, g)
         rdfg = apin.graph()
-        rtmap = Graph.fromRdf(rdfg).map
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
         if debug:
@@ -102,9 +102,9 @@ class TestApiNATToRDF(unittest.TestCase):
         with open((Path(__file__).parent / 'apinatomy/data/bolser-lewis-generated.json'), 'rt') as f:
             g = json.load(f)
 
-        apin = Graph(m, g)
+        apin = apinat.Graph(m, g)
         rdfg = apin.graph()
-        rtmap = Graph.fromRdf(rdfg).map
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         if debug:
             print(rdfg.ttl)
             rdfg.write(Path('test-bolew.ttl'))

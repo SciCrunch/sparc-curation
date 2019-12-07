@@ -112,4 +112,4 @@ if not project_path.exists() or not list(project_path.iterdir()):
 
 fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
 State.bind_blackfynn(fbfl)
-Integrator.setup()
+#Integrator.setup()  # not needed for tests it seems
