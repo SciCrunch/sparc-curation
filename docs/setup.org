@@ -564,7 +564,9 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
     :CUSTOM_ID: configuration-files
     :END:
 
-    This section creates and populates [[file:${HOME}/devconfig.yaml][~/devconfig.yaml]]
+    This section will create and populate
+    [[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]],
+    [[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]],
     and [[file:${HOME}/secrets.yaml][~/secrets.yaml]]. They are used to configure the
     various programs that are used by the SPARC curation workflow, and
     store the API keys and semi private information such as hypothes.is
@@ -574,27 +576,45 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
 
     # TODO improve the error messages (there are loads of them)
     #+NAME: config-setup
-    #+CAPTION: Make =devconfig.yaml= and =secrets.yaml= available in the home directory.
+    #+CAPTION: Make =config.yaml= and =secrets.yaml= available in the home directory.
     #+CAPTION: *If you don't run this block you will get some really fun errors.*
     #+BEGIN_SRC bash :eval no-export
       cd ~/
-      ontutils devconfig --write &&
       chmod 0700 ~/.config/pyontutils
-      ln -s ~/.config/pyontutils/devconfig.yaml
+      ln -s ~/.config/pyontutils/config.yaml
       touch ~/.config/pyontutils/secrets.yaml
       chmod 0600 ~/.config/pyontutils/secrets.yaml
       ln -s ~/.config/pyontutils/secrets.yaml
     #+END_SRC
 
-    #+NAME: set-devconfig-paths
-    #+CAPTION: Set default paths in devconfig.yaml \\
+    #+NAME: set-config-paths
+    #+CAPTION: Set default paths in config.yaml \\
     #+BEGIN_SRC python :results value :cache yes :eval no-export
-      from pathlib import Path
-      from pyontutils.config import devconfig
-      devconfig.scigraph_api = 'http://scigraph.olympiangods.org/scigraph'
-      devconfig.secrets_file = Path('~/.config/pyontutils/secrets.yaml').expanduser()
-      devconfig.git_local_base = Path('~/git').expanduser()
-      return devconfig
+      from pyontutils.config import auth
+      dc = auth.dynamic_config
+      blob = dc.load()
+      blob['auth-stores']['secrets']['path'] = 'secrets.yaml'
+      blob['auth-variables']['scigraph-api'] = 'http://scigraph.olympiangods.org/scigraph'
+      blob['auth-variables']['git-local-base'] = '~/git'
+      blob['auth-variables']['google-api-creds-file'] = {'path': 'google api creds-file'}
+      blob['auth-variables']['google-api-store-file'] = {'path': 'google api store-file'}
+      blob['auth-variables']['google-api-store-file-readonly'] = {'path': 'google api store-file-readonly'}
+      dc.dump(blob)
+      pblob = blob
+
+      from sparcur.config import auth
+      dc = auth.dynamic_config
+      blob = dc.load()
+      blob['auth-stores']['secrets']['path'] = 'secrets.yaml'
+      blob['auth-variables']['hypothesis-api-key'] = {'path': 'hypothesis api *replace-me-with-:your-user-name*'}
+      blob['auth-variables']['hypothesis-group'] = {'path': 'hypothesis group sparc-curation'}
+      blob['auth-variables']['protocols-io-api-creds-file'] = {'path': 'protocols-io api creds-file'}
+      blob['auth-variables']['protocols-io-api-store-file'] = {'path': 'protocols-io api store-file'}
+      dc.dump(blob)
+
+      sblob = blob
+
+      return pblob, sblob
     #+END_SRC
 
     If everything works then you should be able to run =scig t brain= and get results.
@@ -606,20 +626,21 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
       import yaml
       spath = Path('~/.config/pyontutils/secrets.yaml').expanduser()
       with open(spath, 'rt') as f:
-          sec = yaml.load(f)
+          sec = yaml.safe_load(f)
+
       if not sec:
           secrets_template = {
-              'hypothesis': {'api':{'replace-me-with-your-user-name': 'fake-api-key'},
-                             'group':{'sparc-curation': 'FakeId12'}},
-              'blackfynn': {'sparc':{'key': 'fake-api-key',
-                                     'secret': 'fake-api-secret'}},
+              'hypothesis': {'api':   {'*replace-me-with-:your-user-name*': 'fake-api-key'},
+                             'group': {'sparc-curation': 'FakeId12'}},
+              'blackfynn':  {'sparc': {'key':    'fake-api-key',
+                                       'secret': 'fake-api-secret'}},
               'protocols-io': {'api': {'creds-file': '/path/to/creds-file.json',
                                        'store-file': 'protocols-io-api-token-rw.json'}},
-              'google': {'api': {'creds-file': '/path/to/creds-file.json',
-                                 'store-file': 'google-api-token-rw.json',  # store files created in the same folder as secrets.yaml by default
-                                 'store-file-readonly': 'google-api-token.json'},
-                         'sheets':{'sparc-master': 'document-hash-id',
-                                   'sparc-consistency': 'document-hash-id'},},}
+              'google': {'api': {'creds-file':       '/path/to/creds-file.json',
+                                 'store-file':       'google-api-token-rw.pickle',  # store files created in the same folder as secrets.yaml by default
+                                 'store-file-readonly': 'google-api-token.pickle'},
+                         'sheets': {'sparc-master':        'document-hash-id',
+                                    'sparc-consistency':   'document-hash-id'},},}
 
           with open(spath, 'wt') as f:
               yaml.dump(secrets_template, f, default_flow_style=False)
@@ -633,8 +654,9 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
     #+END_SRC
 
     You can move your [[file:${HOME}/.config/pyontutils/secrets.yaml][~/.config/pyontutils/secrets.yaml]]
-    to live where ever you want, but you will need to update the =secrets_file= entry in
-    [[file:${HOME}/.config/pyontutils/devconfig.yaml][~/.config/pyontutils/devconfig.yaml]].
+    to live where ever you want, but you will need to update the =auth-stores: secrets: path:= entry in
+    [[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]] and
+    [[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]].
 
     At this point installation is complete. Congratulations!
 
@@ -683,8 +705,8 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
       For some use cases you will need access to the SciCrunch production SciGraph endpoint.
       [[https://scicrunch.org/register][Register for an account]] and
       [[https://scicrunch.org/account/developer][get an api key]].
-      Edit [[file:${HOME}/.config/pyontutils/devconfig.yaml][devconfig.yaml]]
-      and update the =scigraph_api_user: name-of-user-or-name-for-the-key= entry.
+      Edit [[file:${HOME}/.config/pyontutils/config.yaml][config.yaml]]
+      and update the =scigraph-api-key: path:= entry to point to =scicrunch api name-of-user-or-name-for-the-key=.
       Edit [[file:${HOME}/.config/pyontutils/secrets.yaml][secrets.yaml]]
       and add the api key to =(-> scicrunch api name-of-user-or-name-for-the-key)=.
 **** Data
