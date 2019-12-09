@@ -1,11 +1,32 @@
 import sys
-import json
+import pickle
 from urllib import parse
-from pathlib import Path
 from getpass import getpass
-from argparse import Namespace
-from oauth2client import file, client
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from .config import auth
+
+
+class InstalledAppFlowConsole(InstalledAppFlow):
+    def run_console_only(self,
+                         uri_to_url=True,
+                         **kwargs):
+        kwargs.setdefault("prompt", "consent")
+
+        try:
+            self.redirect_uri = self.client_config['redirect_uris'][0]
+        except IndexError as e:
+            raise ValueError('No redirect uris were provided in your client config!') from e
+
+        auth_url, _ = self.authorization_url(**kwargs)
+        if uri_to_url:
+            auth_url = auth_url.replace('redirect_uri', 'redirect_url')
+
+        code = get_auth_code(auth_url)
+        self.fetch_token(code=code, include_client_id=True)
+        creds = self.credentials
+        print('Authentication successful.')
+        return creds
 
 
 def get_auth_code(url):
@@ -42,48 +63,30 @@ def get_auth_code(url):
     return code
 
 
-class MyOA2WSF(client.OAuth2WebServerFlow):
-    """ monkey patch to fix protocols.io non compliance with the oauth standard """
-    def step1_get_authorize_url(self):
-        value = super().step1_get_authorize_url()
-        return value.replace('redirect_uri', 'redirect_url')
-
-
-client.OAuth2WebServerFlow = MyOA2WSF
-
-
-def run_flow(flow, storage):
-    url = flow.step1_get_authorize_url()
-    code = get_auth_code(url)
-    try:
-        credential = flow.step2_exchange(code)
-    except client.FlowExchangeError as e:
-        sys.exit('Authentication has failed: {0}'.format(e))
-
-    storage.put(credential)
-    credential.set_store(storage)
-    print('Authentication successful.')
-
-    return credential
-
-
 def get_protocols_io_auth(creds_file,
-                          store_file=auth.get_path('protocols-io-api-store-file')):
-    flags = Namespace(noauth_local_webserver=True,
-                      logging_level='INFO')
-    sfile = store_file
-    store = file.Storage(sfile.as_posix())
-    creds = store.get()
-    SCOPES = 'readwrite'
-    if not creds or creds.invalid:
-        cfile = creds_file
-        with open(cfile, 'rt') as f:
-            redirect_uri, *_ = json.load(f)['installed']['redirect_uris']
-        client.OOB_CALLBACK_URN = redirect_uri  # hack to get around google defaults
-        flow = client.flow_from_clientsecrets(cfile.as_posix(),
-                                              scope=SCOPES,
-                                              redirect_uri=redirect_uri)
+                          store_file=auth.get_path('protocols-io-api-store-file'),
+                          SCOPES = 'readwrite'):
 
-        creds = run_flow(flow, store)
+    if store_file.exists():
+        with open(store_file, 'rb') as f:
+            try:
+                creds = pickle.load(f)
+            except pickle.UnpicklingError as e:
+                # FIXME need better way to trace errors in a way
+                # that won't leak secrets by default
+                log.error(f'problem in file at path for {_auth_var}')
+                raise e
+    else:
+        creds = None
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlowConsole.from_client_secrets_file(creds_file.as_posix(), SCOPES)
+            creds = flow.run_console_only()
+
+        with open(store_file, 'wb') as f:
+            pickle.dump(creds, f)
 
     return creds

@@ -132,7 +132,7 @@ class ProtocolData(dat.HasErrors):
                 raise TypeError('creds_file is a required argument'
                                 ' unless you have it in secrets') from e
         _pio_creds = get_protocols_io_auth(creds_file)
-        cls._pio_header = QuietDict({'Authorization': 'Bearer ' + _pio_creds.access_token})
+        cls._pio_header = QuietDict({'Authorization': 'Bearer ' + _pio_creds.token})
         _inst = cls()
         for wants in cls._instance_wanted_by:
             wants._protocol_data = _inst
