@@ -67,7 +67,7 @@
       apt update
       apt install build-essential lib64readline-dev rxvt-unicode htop attr tree sqlite curl git
       apt install emacs26 vim-gtk3 texlive-full pandoc hunspell
-      apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev
+      apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev maven
       apt install inkscape gimp krita graphviz firefox google-chrome-stable xfce4
       apt install nginx
       update-alternatives --install /usr/bin/python python /usr/bin/python3 10
