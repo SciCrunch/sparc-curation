@@ -5,6 +5,9 @@ from getpass import getpass
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from .config import auth
+from .utils import log as _log
+
+log = _log.getChild('protocols_io_api')
 
 
 class InstalledAppFlowConsole(InstalledAppFlow):

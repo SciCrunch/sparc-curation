@@ -693,7 +693,9 @@ class DatasetDescriptionFile(Version1Header):
 
         'completeness_of_data_set',
         'prior_batch_number',
-        'title_for_complete_data_set')
+        'title_for_complete_data_set',
+        'version'
+    )
     verticals = {'contributors': ('contributors',
                                   'contributor_orcid_id',
                                   'contributor_affiliation',
@@ -710,10 +712,13 @@ class DatasetDescriptionFile(Version1Header):
         return super().data
 
     def contributors(self, value):
-        for d in value:
-            yield {self.rename_key(k):tos(nv)
-                   for k, v in d.items()
-                   for nv in self.normalize(k, v) if nv}
+        if isinstance(value, list):
+            for d in value:
+                yield {self.rename_key(k):tos(nv)
+                    for k, v in d.items()
+                    for nv in self.normalize(k, v) if nv}
+        else:
+            return value
 
     def contributor_orcid_id(self, value):
         # FIXME use schema
@@ -873,6 +878,12 @@ class SubjectsFile(Version1Header):
             # FIXME ... only if it is a json list ???
             sids = Counter(r['subject_id'] for r in self._data_raw if r)
             values = self._data_raw
+        elif not hasattr(self.bc, 'subject_id'):
+            sids = {}
+            values = list(self)
+            msg = f'subject_id column missing! for {self.path}'
+            logd.critical(msg)
+            self.addError(msg)
         else:
             sids = Counter(r for r in self.bc.subject_id if r)
             values = list(self)

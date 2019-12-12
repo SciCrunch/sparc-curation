@@ -1410,8 +1410,8 @@ class Summary(Integrator, ExporterSummarizer):
                 # handling the None case doesn't spread througout the codebase :/
                 continue
 
-            if path.cache.id == 'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded':
-                yield self.__class__.__base__(path)
+            #if path.cache.id == 'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded':
+            yield self.__class__.__base__(path)
 
     def __iter__(self):
         for ds in self.iter_datasets:
