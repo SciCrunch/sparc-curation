@@ -572,7 +572,7 @@ class AutoInst:
 
 def get_right_id(uri):
     # FIXME this is a bad way to do this ...
-    if isinstance(uri, DoiId) or 'doi' in uri:
+    if isinstance(uri, DoiId) or 'doi' in uri and '/doi/' not in uri:
         if isinstance(uri, DoiId):
             di = uri.asInstrumented()
         elif 'doi' in uri:

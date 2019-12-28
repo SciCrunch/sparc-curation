@@ -1,3 +1,4 @@
+import idlib
 import rdflib
 import requests
 from idlib.utils import resolution_chain
@@ -155,10 +156,13 @@ class ProtocolData(dat.HasErrors):
         # FIXME quite slow ...
         for start_uri in self.protocol_uris:
             log.debug(start_uri)
-            for end_uri in resolution_chain(start_uri):
-                pass
-            else:
-                yield end_uri
+            try:
+                for end_uri in resolution_chain(start_uri):
+                    pass
+                else:
+                    yield end_uri
+            except idlib.exceptions.ResolutionError as e:
+                pass  # FIXME I think we already log this error?
 
     @property
     def protocol_annotations(self):

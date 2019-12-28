@@ -1423,6 +1423,19 @@ class Summary(Integrator, ExporterSummarizer):
         for dataset_blob in self:
             yield self._completeness(dataset_blob)
 
+    def protocols(self, iterthing):
+        class ProtocolHelper(ProtocolData):  # FIXME so ... bad ...
+            @property
+            def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
+                for d in iterthing:
+                    try:
+                        yield from adops.get(d, ['meta', 'protocol_url_or_doi'])
+                    except exc.NoSourcePathError:
+                        pass
+
+        ph = ProtocolHelper()
+        yield from ph.protocol_jsons
+
     def make_json(self, gen):
         # FIXME this and the datasets is kind of confusing ...
         # might be worth moving those into a reporting class
@@ -1436,10 +1449,11 @@ class Summary(Integrator, ExporterSummarizer):
                 'uri_api': self.uri_api,
                 'uri_human': self.uri_human,
                 'count': count,}
-
+        ps = list(self.protocols(ds))
         return {'id': self.id,
                 'meta': meta,
-                'datasets': ds}
+                'datasets': ds,
+                'protocols': ps,}
 
     @property
     def pipeline_end(self):

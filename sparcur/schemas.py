@@ -690,7 +690,10 @@ class SummarySchema(JSONSchema):
                              'datasets': {'type': 'array',
                                           'minItems': 1,
                                           'items': {'type': 'object'},  # DatasetOutSchema already validated
-                             }}}
+                             'protocols': {'type': 'array',
+                                           'minItems': 1,
+                                           'items': {'type': 'object'},  # TODO protocols io json schema
+                             }}}}
 
 
 class HeaderSchema(JSONSchema):
