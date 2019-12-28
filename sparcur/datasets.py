@@ -372,6 +372,11 @@ class Tabular(HasErrors):
                 return
             except UnicodeDecodeError:
                 continue
+            except csv.Error as e:
+                logd.exception(e)
+                message = f'WHAT HAVE YOU DONE {e!r} {self.path.as_posix()!r}'
+                self.addError(message)
+                logd.error(message)
 
     def xlsx(self):
         kwargs = {
@@ -776,7 +781,10 @@ class DatasetDescriptionFile(Version1Header):
 
     def contributor_role(self, value):
         # FIXME normalizing here momentarily to squash annoying errors
-        yield tuple(sorted(set(nml.NormContributorRole(e.strip()) for e in value.split(','))))
+        if isinstance(value, list):
+            yield tuple(sorted(set(nml.NormContributorRole(e.strip()) for e in value)))
+        else:
+            yield tuple(sorted(set(nml.NormContributorRole(e.strip()) for e in value.split(','))))
 
     def is_contact_person(self, value):
         # no truthy values only True itself
@@ -1073,6 +1081,12 @@ class SamplesFile(SubjectsFile):
 
         if self._is_json:
             sids = Counter(r['sample_id'] for r in self._data_raw if r)
+        elif not hasattr(self.bc, 'sample_id'):
+            sids = {}
+            values = list(self)
+            msg = f'sample_id column missing! for {self.path}'
+            logd.critical(msg)
+            self.addError(msg)
         else:
             sids = Counter(r for r in self.bc.sample_id if r)
 
@@ -1087,9 +1101,12 @@ class SamplesFile(SubjectsFile):
             logd.critical(msg)
             self.addError(msg)
             # FIXME this needs to be pipelined so we can do the diff ??
-            for v in values:
+            for i, v in enumerate(values):
                 v['local_sample_id'] = v['sample_id']
-                v['sample_id'] = v['subject_id'] + '-' + v['sample_id']  # FIXME '/' gets quoted ...
+                if 'subject_id' in v:
+                    v['sample_id'] = v['subject_id'] + '-' + v['sample_id']  # FIXME '/' gets quoted ...
+                else:
+                    v['sample_id'] = f'ERROR-{i}-' + v['sample_id']
 
         out = {self.dict_key: values}
         for k, heads in self.horizontals.items():
