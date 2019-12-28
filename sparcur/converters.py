@@ -6,6 +6,7 @@ from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc
 from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
 from sparcur.core import OntId, OntTerm, lj, get_right_id
+from sparcur.core import RorInst
 from sparcur.utils import log, logd
 from sparcur.protocols import ProtocolData
 
@@ -131,7 +132,10 @@ class ContributorConverter(TripleConverter):
 
         def affiliation(self, value):
             #_, s = self.c.affiliation(value)
-            yield from value.triples_gen
+            if isinstance(value, str):  # FIXME json conv
+                yield from RorInst(value).triples_gen
+            else:
+                yield from value.triples_gen
                
 
 ContributorConverter.setup()
