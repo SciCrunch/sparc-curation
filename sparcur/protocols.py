@@ -1,10 +1,6 @@
 import rdflib
 import requests
 from idlib.utils import resolution_chain
-from protcur import namespace_mappings as nm
-from protcur.core import annoSync
-from protcur.analysis import Hybrid, protc
-from hyputils.hypothesis import HypothesisHelper, group_to_memfile
 from orthauth.utils import QuietDict
 from pysercomb.pyr import units as pyru
 from pyontutils import combinators as cmb
@@ -31,7 +27,7 @@ class ProtcurData:
     def _protcur(self, protocol_uri, filter=lambda p: True):
         self.lazy_setup()
         protocol_uri = get_right_id(protocol_uri)
-        gen = (p for p in protc if p.uri.startswith(protocol_uri) and filter(p))
+        gen = (p for p in self.protc if p.uri.startswith(protocol_uri) and filter(p))
 
         try:
             p = next(gen)
@@ -43,7 +39,7 @@ class ProtcurData:
 
         if p.document.otherVersionUri:  # FIXME also maybe check /abstract?
             other_uri = p.document.otherVersionUri
-            yield from (p for p in protc if p.uri.startswith(other_uri) and filter(p))
+            yield from (p for p in self.protc if p.uri.startswith(other_uri) and filter(p))
 
     @property
     def protcur(self):
@@ -89,16 +85,22 @@ class ProtcurData:
             cls._setup_ok = True
 
     @staticmethod
-    def populate_annos(group_name='sparc-curation'):
+    def populate_annos():
+        from protcur.core import annoSync
+        from protcur.analysis import Hybrid, protc
+        from hyputils.hypothesis import HypothesisHelper, group_to_memfile
         from hyputils import hypothesis as hyp
-        if hyp.api_token == 'TOKEN':  # FIXME does not work
-            hyp.api_token = auth.get('hypothesis-api-key')
-
+        ProtcurData.protc = protc
         group = auth.get('hypothesis-group')
         get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group + 'sparcur'),
                                                               helpers=(HypothesisHelper, Hybrid, protc),
                                                               group=group,
                                                               sync=False)
+
+        # FIXME hack to workaround bad api key init for hyutils until we can integrate orthauth
+        get_annos.api_token = auth.get('hypothesis-api-key')
+        annos.clear()
+        annos.extend(get_annos())
 
         [protc(a, annos) for a in annos]
         [Hybrid(a, annos) for a in annos]
@@ -161,7 +163,7 @@ class ProtocolData(dat.HasErrors):
     @property
     def protocol_annotations(self):
         for uri in self.protocol_uris_resolved:
-            yield from protc.byIri(uri, prefix=True)
+            yield from self.protc.byIri(uri, prefix=True)
 
     @property
     def protocol_jsons(self):
