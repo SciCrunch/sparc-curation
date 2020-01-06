@@ -8,7 +8,7 @@ cypherResources:
          - name: id
            description: ontology id of the organ
            paramType: path
-    query: |
+    query: &organParts |
             // all parts of and directly connected to organ or parts of organ
             MATCH path = (start:Class{iri: "${id}"})
             -[:ILX:0738400|fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
@@ -30,20 +30,7 @@ cypherResources:
          - name: id
            description: ontology id of the organ
            paramType: path
-    query: |
-            // all parts of and directly connected to organ or parts of organ
-            MATCH path = (start:Class{iri: "${id}"})
-            -[:ILX:0738400|fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
-            -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage|fma:continuous_with*0..1]->(sup)
-            -[:fma:constitutional_part|fma:branch_of|fma:tributary_of|fma:branch*0..1]->(a_bit_more)
-            RETURN path
-            UNION
-            // return the major vessles for any arteries supplying the organ directly
-            MATCH path = (start:Class{iri: "${id}"})
-            -[:fma:arterial_supply|fma:venous_drainage]->(vessel)
-            -[:fma:branch_of|fma:tributary_of]->(more_vessel)
-            -[:fma:branch_of|fma:tributary_of|fma:regional_part_of]->(even_more_vessel)
-            RETURN path
+    query: *organParts
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
     operations:
@@ -106,7 +93,7 @@ cypherResources:
          - name: root-id
            description: ontology id of the parcellation label root
            paramType: path
-    query: |
+    query: &rootLabels |
             MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
             WITH label
             MATCH path = (label)-[relation*0..1]-(maybe)
@@ -122,14 +109,7 @@ cypherResources:
          - name: root-id
            description: ontology id of the parcellation label root
            paramType: path
-    query: |
-            MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
-            WITH label
-            MATCH path = (label)-[relation*0..1]-(maybe)
-            WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
-                  AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
-                  AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
+    query: *rootLabels
 
   - path: /dynamic/prod/sparc/parcellationRoots
     operations:
@@ -216,7 +196,7 @@ cypherResources:
          - name: fma-id
            description: ontology id of the anatomical region
            paramType: path
-    query: |
+    query: &parcellationRootsFMA |
             MATCH (fma:Class{iri: "${fma-id}"})
             WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
             MATCH (region)
@@ -267,46 +247,7 @@ cypherResources:
          - name: fma-id
            description: ontology id of the anatomical region
            paramType: path
-    query: |
-            MATCH (fma:Class{iri: "${fma-id}"})
-            WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
-            MATCH (region)
-            -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
-            WHERE any(x IN
-                      region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
-                      WHERE x =~ curie)
-            WITH region
-            MATCH
-            (region)
-            <-[:ilxtr:isDefinedInRegion]-
-            (parent)
-            -[:ilxtr:isDefinedInTaxon]->
-            (species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
-            UNION
-            MATCH (fma:Class{iri: "${fma-id}"})
-            WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
-            MATCH (region)
-            -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
-            WHERE any(x IN
-                      region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
-                      WHERE x =~ curie)
-            WITH region
-            MATCH
-            (region)
-            <-[:ilxtr:isDefinedInRegion]-
-            (parent)
-            -[:ilxtr:isDefinedInTaxon]->
-            (species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(artifact)
-            -[:subClassOf*0..2]->(parent)
-            RETURN path
+    query: *parcellationRootsFMA
 
   - path: /dynamic/prod/sparc/parcellationGraph
     operations:
@@ -332,7 +273,7 @@ cypherResources:
   - path: /dynamic/prod/sparc/organList
     operations:
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
-    query: |
+    query: &organList |
             MATCH (n)
             WHERE n.iri IN [
                     "http://purl.org/sig/ont/fma/fma7195",  // lung
@@ -359,34 +300,12 @@ cypherResources:
   - path: /dynamic/test/sparc/organList
     operations:
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
-    query: |
-            MATCH (n)
-            WHERE n.iri IN [
-                    "http://purl.org/sig/ont/fma/fma7195",  // lung
-                    "http://purl.org/sig/ont/fma/fma7088",  // heart
-                    "http://purl.org/sig/ont/fma/fma7197",  // liver
-                    "http://purl.org/sig/ont/fma/fma7198",  // pancreas
-                    "http://purl.org/sig/ont/fma/fma7203",  // kidney
-                    "http://purl.org/sig/ont/fma/fma7148",  // stomach
-                    "http://purl.org/sig/ont/fma/fma7196",  // spleen
-                    "http://purl.org/sig/ont/fma/fma14543", // colon
-                    "http://purl.org/sig/ont/fma/fma7201",  // large intestine
-                    "http://purl.org/sig/ont/fma/fma7200",  // small intestine
-                    "http://purl.org/sig/ont/fma/fma7199",  // intestine
-                    "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
-                    "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
-                    "http://purl.org/sig/ont/fma/fma7157",  // nervous system
-                    "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
-                    "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
-                    "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
-                    "http://purl.org/sig/ont/fma/fma50801"  // brain
-                    ]
-            RETURN n
+    query: *organList
 
   - path: /dynamic/prod/sparc/speciesList
     operations:
       - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
-    query: |
+    query: &speciesList |
             MATCH (n)
             WHERE n.iri IN [
                     "http://purl.obolibrary.org/obo/NCBITaxon_9378",
@@ -400,16 +319,7 @@ cypherResources:
   - path: /dynamic/test/sparc/speciesList
     operations:
       - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
-    query: |
-            MATCH (n)
-            WHERE n.iri IN [
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9378",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9606",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9685",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9823",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_10090",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
-            RETURN n
+    query: *speciesList
 
   - path: /dynamic/shortestSimple
     query: |
@@ -541,4 +451,3 @@ apiConfiguration:
   defaultApikey: default
   permissionQuery: select PERMISSION from ROLES where ROLE = ?
   roleQuery: select ROLES from USERS where APIKEY = ?
-
