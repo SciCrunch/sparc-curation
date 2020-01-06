@@ -4,13 +4,14 @@ To load the graph run the following from the folder of this readme.
 
 #+BEGIN_SRC bash
 ontload graph \
---org SciCrunch \  # github organization
-NIF-Ontology \  # repo name
-NIF \  # remote base http:// pattern to swap with local file://, NIF automatically expands to http://ontology.neuinfo.org/NIF
---zip-location /tmp/test1 \  # output folder where the loaded graph zip will be exported
---git-local /tmp/test1 \  # location where git repo will be cloned
---branch dev \  # git ref (branch, commit, etc.) from which to build
---patch \  # do apply patches
+--org SciCrunch  ${IFS# github organization} \
+NIF-Ontology     ${IFS# repo name} \
+NIF              ${IFS# remote base http:// pattern to swap with local file://,
+                   NIF automatically expands to http://ontology.neuinfo.org/NIF} \
+--zip-location /tmp/test1  ${IFS# output folder where the loaded graph zip will be exported} \
+--git-local /tmp/test1     ${IFS# location where git repo will be cloned} \
+--branch dev               ${IFS# git ref (branch, commit, etc.) from which to build} \
+--patch                    ${IFS# do apply patches} \
 --graphload-config ./graphload.yaml  # path to the graphload config (only graphload.yaml.template needs to exist)
 #+END_SRC
 
@@ -18,11 +19,12 @@ To create services.yaml run the following from the folder of this readme.
 
 #+BEGIN_SRC bash
 scigraph-deploy config \
-localhost \  # build host
-scigraph.scicrunch.io \  # services host
---services-user ec2-user \  # user on the services host
---zip-location ./ \  # local path to build files (not sure why we need this for deploying the config)
---local \  # run all commands locally
+localhost                 ${IFS# build host} \
+scigraph.scicrunch.io     ${IFS# services host} \
+--services-user ec2-user  ${IFS# user on the services host} \
+--zip-location ./         ${IFS# local path to build files (not sure why
+                            we need this for deploying the config)} \
+--local                   ${IFS# run all commands locally} \
 --services-config ./services.yaml  # path to services config (only services.yaml.template needs to exist)
 #+END_SRC
 
