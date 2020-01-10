@@ -46,6 +46,10 @@ class Affiliations(Sheet):
     index_columns = 'affiliation_string',
 
     def __call__(self, affiliation_string):
+        if not isinstance(affiliation_string, str):
+            logd.critical()
+            return self(affiliation_string[0] + 'ERROR ERROR')
+
         m = self.mapping
         if affiliation_string in m:
             return m[affiliation_string]
