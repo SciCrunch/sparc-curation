@@ -47,7 +47,7 @@ class Affiliations(Sheet):
 
     def __call__(self, affiliation_string):
         if not isinstance(affiliation_string, str):
-            logd.critical()
+            logd.critical(str(affiliation_string))
             return self(affiliation_string[0] + 'ERROR ERROR')
 
         m = self.mapping
