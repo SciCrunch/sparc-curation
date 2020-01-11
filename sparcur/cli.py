@@ -163,6 +163,7 @@ from collections import Counter, defaultdict
 import requests
 import htmlfn as hfn
 import ontquery as oq
+import augpathlib as aug
 from augpathlib import FileSize
 from augpathlib import RemotePath, AugmentedPath  # for debug
 from pyontutils import clifun as clif
@@ -1550,6 +1551,7 @@ class Shell(Dispatcher):
     def default(self):
         from sparcur.core import AutoId, AutoInst
         datasets = list(self.datasets)
+        datas = [Integrator(d).datasetdata for d in datasets]
         datasets_local = list(self.datasets_local)
         dsd = {d.meta.id:d for d in datasets}
         ds = datasets
@@ -1560,6 +1562,7 @@ class Shell(Dispatcher):
         if p.cache.is_dataset():
             intr = Integrator(p)
             j = JT(intr.data)
+            dd = i.datasetdata.dataset_description.object  # finally
             #triples = list(f.triples)
 
         try:

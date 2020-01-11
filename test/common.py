@@ -1,5 +1,6 @@
 import os
 import shutil
+from tempfile import gettempdir
 from pathlib import PurePosixPath
 from datetime import datetime
 from augpathlib import PathMeta
@@ -21,6 +22,7 @@ fake_organization = 'N:organization:fake-organization-id'
 project_path_real = this_file.parent / 'test_local/UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
+temp_path = Path(gettempdir(), f'.sparcur-testing-base-{os.getpid()}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
 

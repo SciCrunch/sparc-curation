@@ -69,6 +69,10 @@ class Header:
     def data(self):
         return self.normalized
 
+    @property
+    def lut(self):
+        return {n:h for n, h in zip(self.data, self.pipeline_start)}
+
 
 class HasErrors:
     def __init__(self, *args, pipeline_stage=None, **kwargs):
@@ -139,12 +143,30 @@ DatasetMetadata._bind_flavours()
 
 
 class DatasetStructure(Path, HasErrors):
-    sections = ('submission', 'dataset_description', 'subjects', 'samples', 'manifest')
+    sections = None  # NOTE assigned in at end of file
     rglobs = 'manifest',
     default_glob = 'glob'
     max_childs = 40
     rate = 8  # set by Integrator from cli
     _refresh_on_missing = True
+
+    @classmethod
+    def _bind_sections(cls):
+        for section, _sec_class in cls.sections.items():
+            @property
+            def sec(self, sec_class=_sec_class, name='_cache_' + _sec_class.__name__):
+                if not hasattr(self, name):
+                    mp = [p for p in self.meta_paths if isinstance(p, sec_class)]
+                    if len(mp) == 1:
+                        setattr(self, name, mp[0])
+                    elif not mp:
+                        setattr(self, name, None)
+                    else:
+                        setattr(self, name, mp)
+
+                return getattr(self, name)
+
+            setattr(cls, section, sec)
 
     @property
     def counts(self):
@@ -276,8 +298,10 @@ class DatasetStructure(Path, HasErrors):
         gen = glob(cased_np + '*.*')
 
         try:
+            path_class = self.sections[name_prefix]
             path = next(gen)
             for path in chain((path,), gen):
+                path = path_class(path)
                 if path.is_broken_symlink():
                     log.info(f'fetching unretrieved metadata path {path.as_posix()!r}'
                              '\nFIXME batch these using async in cli export ...')
@@ -337,6 +361,16 @@ class DatasetStructureLax(DatasetStructure):
 DatasetStructureLax._bind_flavours()
 
 
+class ObjectPath(Path):
+    obj = None
+    @property
+    def object(self):
+        return self.obj(self)
+
+
+ObjectPath._bind_flavours()
+
+
 class Tabular(HasErrors):
 
     def __init__(self, path):
@@ -383,6 +417,7 @@ class Tabular(HasErrors):
             'delimiter' : '\t',
             'skip_empty_lines' : True,
             'outputencoding': 'utf-8',
+            'hyperlinks': True,
         }
         sheetid = 1
         xlsx2csv = Xlsx2csv(self.path.as_posix(), **kwargs)
@@ -424,9 +459,20 @@ class Tabular(HasErrors):
             if not all(not(c) for c in n_row):  # skip totally empty rows
                 yield n_row
 
-    def __iter__(self):
+    @property
+    def normalized(self):
         try:
             yield from self.normalize(getattr(self, self.file_extension)())
+        except UnicodeDecodeError as e:
+            log.error(f'{self.path.as_posix()!r} {e}')
+
+    @property
+    def T(self):
+        yield from zip(*self)
+
+    def __iter__(self):
+        try:
+            yield from getattr(self, self.file_extension)()
         except UnicodeDecodeError as e:
             log.error(f'{self.path.as_posix()!r} {e}')
 
@@ -438,7 +484,11 @@ class Tabular(HasErrors):
     @property
     def title(self):
         path = Path(self.path)
-        return f'{path.name} {path.cache.dataset.name[:30]} ...'
+        out = path.name
+        if path.cache is not None and path.cache.dataset is not None:
+            out += ' ' + path.cache.dataset.name[:30] + ' ...'
+
+        return out
 
     def __repr__(self):
         limit = 30
@@ -678,7 +728,250 @@ class SubmissionFile(Version1Header):
         return d
 
 
-class DatasetDescriptionFile(Version1Header):
+class SubmissionFilePath(ObjectPath):
+    obj = SubmissionFile
+
+
+SubmissionFilePath._bind_flavours()
+
+ROW_TYPE = object()
+COLUMN_TYPE = object()
+N = object()
+
+
+class Better(HasErrors):
+    default_record_type = ROW_TYPE
+    alt_groups = {}
+    record_type_key = None
+    missing_add = {}
+    header_ignore = tuple()
+
+    def __new__(cls, path):
+        return super().__new__(cls)
+
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+
+    def xopen(self):
+        self.path.xopen()
+
+    def _data(self):
+        if self.path.suffix == 'json':
+            return RawJson(self.path).data
+
+        else:
+            return self._cull_rtk()
+
+    def _cull_rtk(self):
+        normalized = self._normalize_values()
+        def crtk(thing):
+            if isinstance(thing, dict):
+                out = {}
+                for k, v in thing.items():
+                    if k != self.record_type_key:
+                        nv = crtk(v)
+                        if nv is not None:
+                            out[k] = nv
+
+                if out:
+                    return out
+
+            else:
+                return thing
+
+        crv = crtk(normalized)
+        return crv
+
+    def _normalize_values(self):
+        nk = self._normalize_keys()
+        def normv(thing, key=None, path=tuple()):
+            print(path)
+            if isinstance(thing, dict):
+                out = {}
+                for k, v in thing.items():
+                    if k == self.record_type_key:
+                        out[k] = v
+                    elif k in self.norm_to_orig_header:
+                        out[k] = normv(v, key, path)
+                    elif k in self.norm_to_orig_alt:
+                        out[k] = normv(v, k, path + (k,))
+                    elif k in self.alt_groups:
+                        out[k] = normv(v, k, path + (k,))
+                    else:
+                        raise ValueError(f'what is going on here?! {k} {v}')
+
+                return out
+
+            else:
+                # TODO make use of path
+                # FIXME I do NOT like this pattern :/
+                if key is not None and hasattr(self, key):
+                    return getattr(self, key)(thing)
+
+                return thing
+
+        nv = normv(nk)
+        return nv
+
+    def _normalize_keys(self):
+        cleaned = self._clean()
+
+        def normb(k):
+            if k in self.orig_to_norm_header:
+                nk = self.orig_to_norm_header[k]
+            elif k in self.orig_to_norm_alt:
+                nk = self.orig_to_norm_alt[k]
+            else:
+                nk = k
+
+            return nk
+
+        def normk(thing, is_rtk=False):
+            if isinstance(thing, dict):
+                out = {}
+                for k, v in thing.items():
+                    nk = normb(k)
+                    out[nk] = normk(v, nk == self.record_type_key or is_rtk)
+
+                return out
+            elif is_rtk:
+                return normb(thing)  # FIXME should this be done in normv or no?
+            else:
+                return thing
+
+        return normk(cleaned)
+
+    def _clean(self):
+        culled, nrtk = self._cull()
+        def clean(thing):
+            if isinstance(thing, dict):
+                out = {}
+                for k, v in thing.items():
+                    cv = clean(v)
+                    if cv is not None:
+                        out[k] = cv
+
+                if out:
+                    return out
+
+            elif thing == '' or thing == {}:
+                return None
+
+            else:
+                return thing
+
+        cleaned = clean(culled)
+        return cleaned
+
+    def _cull(self):
+        transformed, nrtk, remove = self._reshape()
+        # FIXME deeper nesting might break this?
+        culled = {k:{k:v for k, v in v.items()
+                     if k not in remove}
+                  for k, v in transformed.items()}
+        return culled, nrtk
+
+    def _reshape(self):
+        t = Tabular(self.path)
+        print(t)
+
+        if self.default_record_type == ROW_TYPE:
+            agen = iter(t)
+            gen = iter(t.T)
+        else:
+            agen = iter(t.T)
+            gen = iter(t)
+
+        alt_header = next(agen)
+        self.norm_to_orig_alt = Header(alt_header).lut
+        self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
+        header = next(gen)
+        self.norm_to_orig_header = Header(header).lut
+        self.orig_to_norm_header = {v:k for k, v in self.norm_to_orig_header.items()}
+        nrtk = self.norm_to_orig_header[self.record_type_key]
+        remove = [self.norm_to_orig_header[hn] for hn in self.header_ignore
+                  if hn in self.norm_to_orig_alt]
+        _objects = [{k:v for k, v in zip(header, r)} for r in gen]
+
+        # add missing items, mostly needed for missing verions required for later steps
+
+        for nah, (value, number) in self.missing_add.items():
+            if nah not in self.norm_to_orig_alt:
+                self.norm_to_orig_alt[nah] = nah
+                cant_go_wrong = {}
+                i = 0
+                for h in header:
+                    if (number == N or i < number) and h != nrtk and h not in remove:
+                        v = value
+                        i += 1
+                    else:
+                        v = ''
+
+                    cant_go_wrong[h] = v
+
+                {h:(value if number == N or i <= number else '')
+                                 for i, h in enumerate(header) if h != nrtk}
+                print(cant_go_wrong)
+                cant_go_wrong[nrtk] = nah
+                _objects.append(cant_go_wrong)
+
+        breakpoint()
+        # end add missing items
+
+        keyed = {o[nrtk]:o for o in _objects}
+
+        transformed = {}
+        for key, alt_grouped_norm in self.alt_groups.items():
+            grouped = [self.norm_to_orig_alt[ahn] for ahn in alt_grouped_norm]
+            records = [keyed[h] for h in grouped]
+            #print(alt_grouped_norm, self.norm_to_orig_alt, grouped, records)
+            objected = {h:{record[nrtk]:record[h] for record in records} for h in header}
+            transformed[key] = objected
+
+        nunaccounted = (set(self.norm_to_orig_alt) -
+                        (set(e for g in self.alt_groups.values()
+                             for e in g) | {self.record_type_key}))
+        unaccounted = [self.norm_to_orig_alt[nah] for nah in nunaccounted]
+
+        for ah in unaccounted: 
+            transformed[ah] = keyed[ah]
+
+        return transformed, nrtk, remove
+
+    @property
+    def data(self):
+        return self._data()
+
+
+class DatasetDescriptionFile(Better):
+    default_record_type = COLUMN_TYPE
+    alt_groups = {'contributors': ('contributors',
+                                   'contributor_orcid_id',
+                                   'contributor_affiliation',
+                                   'contributor_role',
+                                   'is_contact_person',),
+                  'links': ('additional_links', 'link_description'),
+                  'examples': ('example_image_filename',
+                               'example_image_locator',
+                               'example_image_description'),}
+
+    record_type_key = 'metadata_element'
+    missing_add = {'metadata_version_do_not_change': ('1.0', 1)}
+    header_ignore = 'example', 'description'
+
+    def metadata_version_do_not_change(self, value):
+        return 'lolololol'
+
+
+class DatasetDescriptionFilePath(ObjectPath):
+    obj = DatasetDescriptionFile
+
+
+DatasetDescriptionFilePath._bind_flavours()
+
+
+class _DatasetDescriptionFile(Version1Header):
     to_index = 'metadata_element',
     skip_cols = 'metadata_element', 'description', 'example'
     max_one = (  # FIXME we probably want to write this as json schema or something ...
@@ -714,7 +1007,8 @@ class DatasetDescriptionFile(Version1Header):
 
     @property
     def data(self):
-        return super().data
+        d = copy.deepcopy(super().data)
+        return d
 
     def contributors(self, value):
         if isinstance(value, list):
@@ -847,6 +1141,9 @@ class DatasetDescriptionFile(Version1Header):
                 yield match
             else:
                 yield value
+
+    #def metadata_version_do_not_change(self, value):
+    #def version(self, value):
 
     def rename_key(self, key, *parent_keys):
         # FIXME multiple parent keys...
@@ -1065,6 +1362,13 @@ class SubjectsFile(Version1Header):
         """ NOTE the subject is LOCAL """
 
 
+class SubjectsFilePath(ObjectPath):
+    obj = SubjectsFile
+
+
+SubjectsFilePath._bind_flavours()
+
+
 class SamplesFile(SubjectsFile):
     """ TODO ... """
     to_index = 'sample_id', 'subject_id'
@@ -1135,3 +1439,31 @@ class SamplesFile(SubjectsFile):
 
         else:
             return self.query(value, 'UBERON')
+
+
+class SamplesFilePath(ObjectPath):
+    obj = SamplesFile
+
+
+SamplesFilePath._bind_flavours()
+
+
+class ManifestFile:
+    def __init__(self, path):
+        self.path = path
+
+
+class ManifestFilePath(ObjectPath):
+    obj = ManifestFile
+
+
+ManifestFilePath._bind_flavours()
+
+
+DatasetStructure.sections = {'submission': SubmissionFilePath,
+                             'dataset_description': DatasetDescriptionFilePath,
+                             'subjects': SubjectsFilePath,
+                             'samples': SamplesFilePath,
+                             'manifest': ManifestFilePath,}
+
+DatasetStructure._bind_sections()
