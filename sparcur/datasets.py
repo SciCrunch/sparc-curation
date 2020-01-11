@@ -756,12 +756,43 @@ class Better(HasErrors):
     def xopen(self):
         self.path.xopen()
 
+    @property
+    def data(self):
+        return self._data()
+
     def _data(self):
         if self.path.suffix == 'json':
             return RawJson(self.path).data
 
         else:
-            return self._cull_rtk()
+            # TODO if this passes we can just render backward from _normalize
+            return self._condense()
+
+    def _condense(self):
+        crtk = self._cull_rtk()
+        def condense(thing):
+            if isinstance(thing, dict):
+                hrm = []
+                out = {}
+                for k, v in thing.items():
+                    nv = condense(v)
+                    # bah bloody description appearing twice >_<
+                    if k in self.norm_to_orig_header and k not in self.norm_to_orig_alt:
+                        hrm.append(nv)
+                    else:
+                        out[k] = nv
+
+                if out and hrm:
+                    raise ValueError(f'how!?\n{hrm}\n{out}')
+                elif out:
+                    return out
+                elif hrm:
+                    return tuple(hrm)
+
+            else:
+                return thing
+
+        return condense(crtk)
 
     def _cull_rtk(self):
         normalized = self._normalize_values()
@@ -815,7 +846,10 @@ class Better(HasErrors):
         return nv
 
     def _normalize_keys(self):
+        # NOTE: this is essentially a dead step now since
+        # all the headers are normalized ASAP
         cleaned = self._clean()
+        return cleaned
 
         def normb(k):
             if k in self.orig_to_norm_header:
@@ -843,7 +877,7 @@ class Better(HasErrors):
         return normk(cleaned)
 
     def _clean(self):
-        culled, nrtk = self._cull()
+        culled = self._cull()
         def clean(thing):
             if isinstance(thing, dict):
                 out = {}
@@ -865,14 +899,81 @@ class Better(HasErrors):
         return cleaned
 
     def _cull(self):
-        transformed, nrtk, remove = self._reshape()
+        transformed = self._reshape()
         # FIXME deeper nesting might break this?
         culled = {k:{k:v for k, v in v.items()
-                     if k not in remove}
+                     if k not in self.header_ignore}
                   for k, v in transformed.items()}
-        return culled, nrtk
+        return culled
 
     def _reshape(self):
+        gen = self._norm_headers()
+        # WARNING assumes dict order
+        _objects = [{k:v for k, v in zip(self.norm_to_orig_header, r)} for r in gen]
+
+        for nah, (value, number) in self.missing_add.items():
+            if nah not in self.norm_to_orig_alt:
+                self.norm_to_orig_alt[nah] = nah
+                cant_go_wrong = {}
+                i = 0
+                for nh in self.norm_to_orig_header:
+                    if ((number == N or i < number) and
+                        nh != self.record_type_key and
+                        nh not in self.header_ignore):
+                        v = value
+                        i += 1
+                    else:
+                        v = ''
+
+                    cant_go_wrong[nh] = v
+
+                {nh:(value if number == N or i <= number else '')
+                 for i, nh in enumerate(self.norm_to_orig_header)
+                 if nh != self.record_type_key}
+                print(cant_go_wrong)
+                cant_go_wrong[self.record_type_key] = nah
+                _objects.append(cant_go_wrong)
+
+        # end add missing items
+
+        keyed = {o[self.record_type_key]:o for o in _objects}
+
+        transformed = {}
+        for key, alt_grouped_norm in self.alt_groups.items():
+            records = [keyed[nh] for nh in alt_grouped_norm]
+            objected = {nh:{record[self.record_type_key]:record[nh]
+                            for record in records}
+                        for nh in self.norm_to_orig_header}
+            transformed[key] = objected
+
+        nunaccounted = (set(self.norm_to_orig_alt) -
+                        (set(e for g in self.alt_groups.values()
+                             for e in g) | {self.record_type_key}))
+
+        for nah in nunaccounted: 
+            transformed[nah] = keyed[nah]
+
+        return transformed
+
+    def _norm_headers(self):
+        # headers MUST be normalized as early as possible due to the fact that
+        # there are very likely to be duplicate keys
+        gen = self._headers()
+
+        def normb(k):
+            if k in self.orig_to_norm_header:
+                nk = self.orig_to_norm_header[k]
+            elif k in self.orig_to_norm_alt:
+                nk = self.orig_to_norm_alt[k]
+            else:
+                nk = k
+
+            return nk
+
+        for row in gen:
+            yield (normb(row[0]), *row[1:])
+
+    def _headers(self):
         t = Tabular(self.path)
         print(t)
 
@@ -883,65 +984,13 @@ class Better(HasErrors):
             agen = iter(t.T)
             gen = iter(t)
 
-        alt_header = next(agen)
-        self.norm_to_orig_alt = Header(alt_header).lut
+        self.alt_header = next(agen)
+        self.norm_to_orig_alt = Header(self.alt_header).lut
         self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
-        header = next(gen)
-        self.norm_to_orig_header = Header(header).lut
+        self.header = next(gen)
+        self.norm_to_orig_header = Header(self.header).lut
         self.orig_to_norm_header = {v:k for k, v in self.norm_to_orig_header.items()}
-        nrtk = self.norm_to_orig_header[self.record_type_key]
-        remove = [self.norm_to_orig_header[hn] for hn in self.header_ignore
-                  if hn in self.norm_to_orig_alt]
-        _objects = [{k:v for k, v in zip(header, r)} for r in gen]
-
-        # add missing items, mostly needed for missing verions required for later steps
-
-        for nah, (value, number) in self.missing_add.items():
-            if nah not in self.norm_to_orig_alt:
-                self.norm_to_orig_alt[nah] = nah
-                cant_go_wrong = {}
-                i = 0
-                for h in header:
-                    if (number == N or i < number) and h != nrtk and h not in remove:
-                        v = value
-                        i += 1
-                    else:
-                        v = ''
-
-                    cant_go_wrong[h] = v
-
-                {h:(value if number == N or i <= number else '')
-                                 for i, h in enumerate(header) if h != nrtk}
-                print(cant_go_wrong)
-                cant_go_wrong[nrtk] = nah
-                _objects.append(cant_go_wrong)
-
-        breakpoint()
-        # end add missing items
-
-        keyed = {o[nrtk]:o for o in _objects}
-
-        transformed = {}
-        for key, alt_grouped_norm in self.alt_groups.items():
-            grouped = [self.norm_to_orig_alt[ahn] for ahn in alt_grouped_norm]
-            records = [keyed[h] for h in grouped]
-            #print(alt_grouped_norm, self.norm_to_orig_alt, grouped, records)
-            objected = {h:{record[nrtk]:record[h] for record in records} for h in header}
-            transformed[key] = objected
-
-        nunaccounted = (set(self.norm_to_orig_alt) -
-                        (set(e for g in self.alt_groups.values()
-                             for e in g) | {self.record_type_key}))
-        unaccounted = [self.norm_to_orig_alt[nah] for nah in nunaccounted]
-
-        for ah in unaccounted: 
-            transformed[ah] = keyed[ah]
-
-        return transformed, nrtk, remove
-
-    @property
-    def data(self):
-        return self._data()
+        return gen
 
 
 class DatasetDescriptionFile(Better):
