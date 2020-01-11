@@ -708,32 +708,6 @@ class Version1Header(HasErrors):
         return out
 
 
-class SubmissionFile(Version1Header):
-    to_index = 'submission_item',  # FIXME normalized in version 2
-    skip_cols = 'submission_item', 'definition'  # FIXME normalized in version 2
-
-    verticals = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
-
-    @property
-    def data(self):
-        """ lift list with single element to object """
-
-        d = copy.deepcopy(super().data)
-        if d and 'submission' in d:
-            if d['submission']:
-                d['submission'] = d['submission'][0]
-            else:
-                d['submission'] = {}
-
-        return d
-
-
-class SubmissionFilePath(ObjectPath):
-    obj = SubmissionFile
-
-
-SubmissionFilePath._bind_flavours()
-
 ROW_TYPE = object()
 COLUMN_TYPE = object()
 N = object()
@@ -747,6 +721,9 @@ class Better(HasErrors):
     header_ignore = tuple()
 
     def __new__(cls, path):
+        if cls.record_type_key is None:
+            raise TypeError(f'record_type_key should not be None on {cls.__name__}')
+
         return super().__new__(cls)
 
     def __init__(self, path):
@@ -993,6 +970,33 @@ class Better(HasErrors):
         return gen
 
 
+class SubmissionFile(Better):
+    default_record_type = COLUMN_TYPE
+    alt_groups = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
+    record_type_key = 'submission_item'
+    header_ignore = 'definition',
+
+    @property
+    def data(self):
+        """ lift list with single element to object """
+
+        d = copy.deepcopy(super().data)
+        if d and 'submission' in d:
+            if d['submission']:
+                d['submission'] = d['submission'][0]
+            else:
+                d['submission'] = {}
+
+        return d
+
+
+class SubmissionFilePath(ObjectPath):
+    obj = SubmissionFile
+
+
+SubmissionFilePath._bind_flavours()
+
+
 class DatasetDescriptionFile(Better):
     default_record_type = COLUMN_TYPE
     alt_groups = {'contributors': ('contributors',
@@ -1020,7 +1024,7 @@ class DatasetDescriptionFilePath(ObjectPath):
 DatasetDescriptionFilePath._bind_flavours()
 
 
-class _DatasetDescriptionFile(Version1Header):
+class NormDatasetDescriptionFile(Version1Header):
     to_index = 'metadata_element',
     skip_cols = 'metadata_element', 'description', 'example'
     max_one = (  # FIXME we probably want to write this as json schema or something ...
