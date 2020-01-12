@@ -7,6 +7,7 @@ import numbers
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
+from html.parser import HTMLParser
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
@@ -70,8 +71,13 @@ class Header:
         return self.normalized
 
     @property
-    def lut(self):
+    def _lut(self):
         return {n:h for n, h in zip(self.data, self.pipeline_start)}
+
+    def lut(self, **renames):
+        """ do any renames beyond the specific normalization """
+        return {renames[n] if n in renames else n:h
+                for n, h in zip(self.data, self.pipeline_start)}
 
 
 class HasErrors:
@@ -708,6 +714,74 @@ class Version1Header(HasErrors):
         return out
 
 
+class NormValues:
+    """ Base class with an open dir to avoid name collisions """
+    def __init__(self, obj_inst):
+        self._bind(obj_inst._normalize_keys(),
+                   obj_inst.record_type_key,
+                   obj_inst.norm_to_orig_alt,
+                   obj_inst.norm_to_orig_header,
+                   obj_inst.groups_alt)
+
+    def _bind(self, blob, record_type_key, norm_to_orig_alt, norm_to_orig_header, groups_alt):
+        self._blob = blob
+        self._record_type_key = record_type_key
+        self._norm_to_orig_alt = norm_to_orig_alt
+        self._norm_to_orig_header = norm_to_orig_header
+        self._groups_alt = groups_alt
+
+    @staticmethod
+    def _query(value, prefix):
+        for query_type in ('term', 'search'):
+            terms = list(OntTerm.query(prefix=prefix, **{query_type:value}))
+            if terms:
+                #print('matching', terms[0], value)
+                #print('extra terms for', value, terms[1:])
+                return terms[0]
+            else:
+                continue
+
+        else:
+            log.warning(f'No ontology id found for {value}')
+            return value
+
+    def _normv(self, thing, key=None, path=tuple()):
+        print(path)
+        if isinstance(thing, dict):
+            out = {}
+            for k, v in thing.items():
+                if k == self._record_type_key:
+                    out[k] = v
+                elif k in self._norm_to_orig_header:
+                    out[k] = self._normv(v, key, path)
+                elif k in self._norm_to_orig_alt:
+                    out[k] = self._normv(v, k, path + (k,))
+                elif k in self._groups_alt:
+                    out[k] = self._normv(v, k, path + (k,))
+                else:
+                    raise ValueError(f'what is going on here?! {k} {v}')
+
+            return out
+
+        else:
+            # TODO make use of path
+            # FIXME I do NOT like this pattern :/
+            if key is not None and hasattr(self, key):
+                out = getattr(self, key)(thing)
+                if isinstance(out, GeneratorType):
+                    out = tuple(out)
+                    if len(out) == 1:  # FIXME find the actual source of double packing
+                        out = out[0]
+
+                return out
+
+            return thing
+
+    @property
+    def data(self):
+        return self._normv(self._blob)
+
+
 ROW_TYPE = object()
 COLUMN_TYPE = object()
 N = object()
@@ -715,10 +789,15 @@ N = object()
 
 class Better(HasErrors):
     default_record_type = ROW_TYPE
-    alt_groups = {}
     record_type_key = None
     missing_add = {}
-    header_ignore = tuple()
+    renames_alt = {}     # renames first since all following
+    renames_header = {}  # refs look for the renamed form
+    groups_alt = {}
+    groups_header = {}
+    ignore_alt = tuple()
+    ignore_header = tuple()
+    normalization_class = NormValues
 
     def __new__(cls, path):
         if cls.record_type_key is None:
@@ -792,35 +871,8 @@ class Better(HasErrors):
         return crv
 
     def _normalize_values(self):
-        nk = self._normalize_keys()
-        def normv(thing, key=None, path=tuple()):
-            print(path)
-            if isinstance(thing, dict):
-                out = {}
-                for k, v in thing.items():
-                    if k == self.record_type_key:
-                        out[k] = v
-                    elif k in self.norm_to_orig_header:
-                        out[k] = normv(v, key, path)
-                    elif k in self.norm_to_orig_alt:
-                        out[k] = normv(v, k, path + (k,))
-                    elif k in self.alt_groups:
-                        out[k] = normv(v, k, path + (k,))
-                    else:
-                        raise ValueError(f'what is going on here?! {k} {v}')
-
-                return out
-
-            else:
-                # TODO make use of path
-                # FIXME I do NOT like this pattern :/
-                if key is not None and hasattr(self, key):
-                    return getattr(self, key)(thing)
-
-                return thing
-
-        nv = normv(nk)
-        return nv
+        nc = self.normalization_class(self)  # calls _normalize_keys internally
+        return nc.data
 
     def _normalize_keys(self):
         # NOTE: this is essentially a dead step now since
@@ -879,7 +931,7 @@ class Better(HasErrors):
         transformed = self._reshape()
         # FIXME deeper nesting might break this?
         culled = {k:{k:v for k, v in v.items()
-                     if k not in self.header_ignore}
+                     if k not in self.ignore_header}
                   for k, v in transformed.items()}
         return culled
 
@@ -896,7 +948,7 @@ class Better(HasErrors):
                 for nh in self.norm_to_orig_header:
                     if ((number == N or i < number) and
                         nh != self.record_type_key and
-                        nh not in self.header_ignore):
+                        nh not in self.ignore_header):
                         v = value
                         i += 1
                     else:
@@ -916,17 +968,20 @@ class Better(HasErrors):
         keyed = {o[self.record_type_key]:o for o in _objects}
 
         transformed = {}
-        for key, alt_grouped_norm in self.alt_groups.items():
-            records = [keyed[nh] for nh in alt_grouped_norm]
+        for key, alt_grouped_norm in self.groups_alt.items():
+            records = [keyed[nh] for nh in alt_grouped_norm
+                       # FIXME versioning ... schema will take care of missing values later
+                       if nh in keyed]
             objected = {nh:{record[self.record_type_key]:record[nh]
                             for record in records}
                         for nh in self.norm_to_orig_header}
             transformed[key] = objected
 
         nunaccounted = (set(self.norm_to_orig_alt) -
-                        (set(e for g in self.alt_groups.values()
+                        (set(e for g in self.groups_alt.values()
                              for e in g) | {self.record_type_key}))
 
+        #breakpoint()
         for nah in nunaccounted: 
             transformed[nah] = keyed[nah]
 
@@ -962,19 +1017,28 @@ class Better(HasErrors):
             gen = iter(t)
 
         self.alt_header = next(agen)
-        self.norm_to_orig_alt = Header(self.alt_header).lut
+        self._alt_header = Header(self.alt_header)
+        self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
         self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
         self.header = next(gen)
-        self.norm_to_orig_header = Header(self.header).lut
+        self._header = Header(self.header)
+        self.norm_to_orig_header = self._header.lut(**self.renames_header)
         self.orig_to_norm_header = {v:k for k, v in self.norm_to_orig_header.items()}
         return gen
 
 
+class NormSubmissionFile(NormValues):
+
+    def sparc_award_number(self, value):
+        return 'HAH'
+
+
 class SubmissionFile(Better):
     default_record_type = COLUMN_TYPE
-    alt_groups = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
     record_type_key = 'submission_item'
-    header_ignore = 'definition',
+    groups_alt = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
+    ignore_header = 'definition',
+    normalization_class = NormSubmissionFile
 
     @property
     def data(self):
@@ -997,71 +1061,41 @@ class SubmissionFilePath(ObjectPath):
 SubmissionFilePath._bind_flavours()
 
 
-class DatasetDescriptionFile(Better):
-    default_record_type = COLUMN_TYPE
-    alt_groups = {'contributors': ('contributors',
-                                   'contributor_orcid_id',
-                                   'contributor_affiliation',
-                                   'contributor_role',
-                                   'is_contact_person',),
-                  'links': ('additional_links', 'link_description'),
-                  'examples': ('example_image_filename',
-                               'example_image_locator',
-                               'example_image_description'),}
+class ATag(HTMLParser):
+    text = None
+    href = None
+    def handle_starttag(self, tag, attrs):
+        if tag == 'a':
+            for attr, value in attrs:
+                if attr == 'href':
+                    self.href = value
 
-    record_type_key = 'metadata_element'
-    missing_add = {'metadata_version_do_not_change': ('1.0', 1)}
-    header_ignore = 'example', 'description'
+    def handle_endtag(self, tag):
+        #print("Encountered an end tag :", tag)
+        pass
 
-    def metadata_version_do_not_change(self, value):
+    def handle_data(self, data):
+        self.text = data
+        #print("Encountered some data  :", data)
+
+    def asJson(self, input):
+        self.feed(input)
+        if self.text is not None:
+            return {'href': self.href, 'text': self.text}
+        else:
+            return self.href
+
+
+class NormDatasetDescriptionFile(NormValues):
+
+    def additional_links(self, value):
+        if value.startswith('<a') and value.endswith('</a>'):
+            return ATag().asJson(value)
+
+        return value
+
+    def _metadata_version_do_not_change(self, value):
         return 'lolololol'
-
-
-class DatasetDescriptionFilePath(ObjectPath):
-    obj = DatasetDescriptionFile
-
-
-DatasetDescriptionFilePath._bind_flavours()
-
-
-class NormDatasetDescriptionFile(Version1Header):
-    to_index = 'metadata_element',
-    skip_cols = 'metadata_element', 'description', 'example'
-    max_one = (  # FIXME we probably want to write this as json schema or something ...
-        'name',
-        'description',
-        'acknowledgements',
-        'funding',
-        #'originating_article_doi',  # and sometimes they comma separate them! >_< derp
-        #'protocol_url_or_doi',
-
-        #'additional_links',
-        #'link_description',
-
-        #'example_image_filename',
-        #'example_image_locator',
-        #'example_image_description',
-
-        'completeness_of_data_set',
-        'prior_batch_number',
-        'title_for_complete_data_set',
-        'version'
-    )
-    verticals = {'contributors': ('contributors',
-                                  'contributor_orcid_id',
-                                  'contributor_affiliation',
-                                  'contributor_role',
-                                  'is_contact_person',),
-                 'links': ('additional_links', 'link_description'),
-                 'examples': ('example_image_filename',
-                              'example_image_locator',
-                              'example_image_description'),
-    }
-
-    @property
-    def data(self):
-        d = copy.deepcopy(super().data)
-        return d
 
     def contributors(self, value):
         if isinstance(value, list):
@@ -1189,45 +1223,42 @@ class NormDatasetDescriptionFile(Version1Header):
 
         #log.debug(f'{values}')
         for value in values:
-            match = self.query(value, prefix=None)
+            match = self._query(value, prefix=None)
             if match and False:  # this is incredibly broken at the moment
                 yield match
             else:
                 yield value
 
-    #def metadata_version_do_not_change(self, value):
-    #def version(self, value):
 
-    def rename_key(self, key, *parent_keys):
-        # FIXME multiple parent keys...
-        if parent_keys == ('contributors',):
-            if key == 'contributors':
-                return 'name'
+class DatasetDescriptionFile(Better):
+    default_record_type = COLUMN_TYPE
+    record_type_key = 'metadata_element'
+    missing_add = {'metadata_version_do_not_change': ('1.0', 1)}
+    renames_alt = {'contributors': 'name'}
+    renames_header = {'description': 'description_header'}
+    groups_alt = {'contributors': ('contributors',
+                                   'contributor_orcid_id',
+                                   'contributor_affiliation',
+                                   'contributor_role',
+                                   'is_contact_person',),
+                  'links': ('additional_links', 'link_description'),
+                  'examples': ('example_image_filename',
+                               'example_image_locator',
+                               'example_image_description'),}
 
-        return key
+    ignore_header = 'example', 'description_header'
+    normalization_class = NormDatasetDescriptionFile
 
 
-class SubjectsFile(Version1Header):
-    to_index = 'subject_id',  # the zeroth is what is used for unique rows by default  # FIXME doesn't work
-    # subject id varies, so we have to do something a bit different here
-    skip_cols = tuple()
-    horizontals = {'software':('software',
-                               'software_version',
-                               'software_vendor',
-                               'software_url',
-                               'software_rrid')}
+class DatasetDescriptionFilePath(ObjectPath):
+    obj = DatasetDescriptionFile
 
-    dict_key = 'subjects'
 
-    @property
-    def _data(self):
-        return super().data
+DatasetDescriptionFilePath._bind_flavours()
 
-    @property
-    def data(self):
-        return self._data()
 
-    def _data(self):
+class NormSubjectsFile(NormValues):
+    def __data(self):
         # sigh
         #notunique = (len([r for r in self.bc.subject_id if r]) !=
                      #len([k for k in self.bc._byCol__indexes['subject_id']
@@ -1269,7 +1300,7 @@ class SubjectsFile(Version1Header):
         self.embedErrors(out)
         return out
 
-    def __init__(self, path):
+    def ___init__(self, path):
         super().__init__(path)
         if self._is_json:
             header = [d.keys() for d in self._data_raw]  # FIXME max may have wrong top level schema
@@ -1294,19 +1325,19 @@ class SubjectsFile(Version1Header):
 
     def species(self, value):
         nv = nml.NormSpecies(value)
-        yield self.query(nv, 'NCBITaxon')
+        yield self._query(nv, 'NCBITaxon')
 
     def strain(self, value):
         if value == 'DSH':
             value = 'domestic shorthair'
             return value
 
-        wat = self.query(value, 'BIRNLEX')  # FIXME
+        wat = self._query(value, 'BIRNLEX')  # FIXME
         yield wat
 
     def sex(self, value):
         nv = nml.NormSex(value)
-        yield self.query(nv, 'PATO')
+        yield self._query(nv, 'PATO')
 
     def gender(self, value):
         # FIXME gender -> sex for animals, requires two pass normalization ...
@@ -1344,7 +1375,7 @@ class SubjectsFile(Version1Header):
         yield from self._param_unit(value, 'years')
 
     def age_category(self, value):
-        yield self.query(value, 'UBERON')
+        yield self._query(value, 'UBERON')
 
     def age_range_min(self, value):
         yield from self._param(value)
@@ -1372,7 +1403,7 @@ class SubjectsFile(Version1Header):
     #def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
         #yield value
 
-    def process_dict(self, dict_):
+    def _process_dict(self, dict_):
         """ deal with multiple fields """
         out = {k:v for k, v in dict_.items() if k not in self.skip}
         for h_unit, h_value in zip(self.h_unit, self.h_value):
@@ -1398,21 +1429,33 @@ class SubjectsFile(Version1Header):
 
         return out
 
-    def __iter__(self):
+    def ___iter__(self):
         """ this is still used """
         if self._is_json:
-            yield from (self.process_dict({k:nv for k, v in d.items()
+            yield from (self._process_dict({k:nv for k, v in d.items()
                                            for nv in self.normalize(k, v) if nv})
                         for d in self._data_raw)
 
         else:
-            yield from (self.process_dict({k:nv for k, v in zip(r._fields, r) if v
+            yield from (self._process_dict({k:nv for k, v in zip(r._fields, r) if v
                                            and k not in self.skip_cols
                                            for nv in self.normalize(k, v) if nv})
                         for r in self.bc.rows)
 
     def triples_gen(self, prefix_func):
         """ NOTE the subject is LOCAL """
+
+
+class SubjectsFile(Better):
+    #default_record_type = COLUMN_TYPE
+    record_type_key = 'subject_id'
+    groups_alt = {'software':('software',
+                              'software_version',
+                              'software_vendor',
+                              'software_url',
+                              'software_rrid')}
+    #ignore_header = 'definition',  # TODO
+    normalization_class = NormSubjectsFile
 
 
 class SubjectsFilePath(ObjectPath):
@@ -1422,16 +1465,8 @@ class SubjectsFilePath(ObjectPath):
 SubjectsFilePath._bind_flavours()
 
 
-class SamplesFile(SubjectsFile):
-    """ TODO ... """
-    to_index = 'sample_id', 'subject_id'
-    dict_key = 'samples'
-
-    @property
-    def data(self):
-        return self._data()
-
-    def _data(self):
+class NormSamplesFile(NormSubjectsFile):
+    def __data(self):
         #notunique = (len([r for r in self.bc.sample_id if r]) !=
                      #len([k for k in self.bc._byCol__indexes['sample_id']
                           #if k != 'sample_id' and k]))
@@ -1486,12 +1521,19 @@ class SamplesFile(SubjectsFile):
             if sep in value:
                 for v in value.split(sep):
                     if v:
-                        yield self.query(v, 'UBERON')
+                        yield self._query(v, 'UBERON')
 
                 return
 
         else:
-            return self.query(value, 'UBERON')
+            return self._query(value, 'UBERON')
+
+
+class SamplesFile(SubjectsFile):
+    """ TODO ... """
+
+    record_type_key = 'sample_id'  # FIXME + subject_id
+    normalization_class = NormSamplesFile
 
 
 class SamplesFilePath(ObjectPath):
