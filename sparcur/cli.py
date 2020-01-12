@@ -14,7 +14,7 @@ Usage:
     spc report terms [anatomy cells subcelluar] [options]
     spc report [completeness filetypes pathids keywords subjects samples errors test] [options]
     spc report [contributors] [options]
-    spc shell [affil integration protocols] [options]
+    spc shell [affil integration protocols exit] [options]
     spc server [options]
     spc tables [<directory>...]
     spc annos [export shell]
@@ -146,9 +146,13 @@ Options:
     --port=PORT             server port [default: 7250]
 
     -d --debug              drop into a shell after running a step
+    --profile               profile startup performance
     -v --verbose            print extra information
     --log-location=PATH     folder into which logs are saved [default: ${SPARC_EXPORTS}/log/]
 """
+
+from time import time
+start = time()
 
 import re
 import sys
@@ -163,31 +167,41 @@ from collections import Counter, defaultdict
 import requests
 import htmlfn as hfn
 import ontquery as oq
+start_middle = time()
 import augpathlib as aug
 from augpathlib import FileSize
 from augpathlib import RemotePath, AugmentedPath  # for debug
+
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit
 from pyontutils.utils import NOWDANGER, NOWISO, UTCNOWISO
 from pyontutils.config import auth as pauth
-from pysercomb.pyr import units as pyru
 from terminaltables import AsciiTable
+
 from sparcur import config
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, JPointer, lj
-from sparcur.core import OntId, OntTerm, get_all_errors, DictTransformer as DT, adops
+from sparcur.core import JT, log, logd, JPointer, lj, DictTransformer as DT
+from sparcur.core import OntId, OntTerm, get_all_errors, adops
 from sparcur.utils import python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemote
-from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer, DatasetObject
+from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer
 from sparcur.curation import JEncode, TriplesExportDataset, TriplesExportSummary
+from sparcur.curation import DatasetObject
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
+
+slow = False
+if slow:
+    # this sucker takes .4 seconds to start up and isn't used
+    from pysercomb.pyr import units as pyru
+
+stop = time()
 
 
 class Options(clif.Options):
@@ -227,8 +241,10 @@ class Dispatcher(clif.Dispatcher):
                 if ext == '.tsv':
                     nowish = UTCNOWISO('seconds')
                     fn = json.dumps(f'{title} {nowish}')
-                    return simple_tsv(rows), 200, {'Content-Type': 'text/tsv; charset=utf-8',
-                                                   'Content-Disposition': f'attachment; filename={fn}'}
+                    return (
+                        simple_tsv(rows), 200,
+                        {'Content-Type': 'text/tsv; charset=utf-8',
+                         'Content-Disposition': f'attachment; filename={fn}'})
                 if isinstance(ext, types.FunctionType):
                     return ext(hfn.render_table(rows[1:], *rows[0]), title=title)
                 else:
@@ -242,7 +258,9 @@ class Dispatcher(clif.Dispatcher):
                 assert len(align) == len(rows[0])
                 table.justify_columns = {i:('left' if v == 'l'
                                             else ('center' if v == 'c'
-                                                  else ('right' if v == 'r' else 'left')))
+                                                  else ('right'
+                                                        if v == 'r' else
+                                                        'left')))
                                          for i, v in enumerate(align)}
             print(table.table)
 
@@ -253,10 +271,14 @@ class Dispatcher(clif.Dispatcher):
             key = lambda ps: ps
 
         rows = [['Path', 'size', '?'],
-                *((p, s.hr if isinstance(s, FileSize) else s, 'x' if p.exists() else '')
+                *((p, s.hr
+                   if isinstance(s, FileSize) else
+                   s, 'x' if p.exists() else '')
                   for p, s in
                   sorted(([p, ('/' if p.is_dir() else
-                               (p.cache.meta.size if p.cache.meta.size else '??')
+                               (p.cache.meta.size
+                                if p.cache.meta.size else
+                                '??')
                                if p.cache.meta else '_')]
                           for p in paths), key=key))]
         self._print_table(rows, title)
@@ -408,11 +430,13 @@ class Main(Dispatcher):
 
     @property
     def directories(self):
-        return [Path(string_dir).absolute() for string_dir in self.options.directory]
+        return [Path(string_dir).absolute()
+                for string_dir in self.options.directory]
 
     @property
     def paths(self):
-        return [Path(string_path).absolute() for string_path in self.options.path]
+        return [Path(string_path).absolute()
+                for string_path in self.options.path]
 
     @property
     def _paths(self):
@@ -426,7 +450,9 @@ class Main(Dispatcher):
             paths = self.cwd,  # don't call Path.cwd() because it may have been set from --project-path
 
         if self.options.only_meta:
-            paths = (mp.absolute() for p in paths for mp in dat.DatasetStructureLax(p).meta_paths)
+            paths = (mp.absolute()
+                     for p in paths
+                     for mp in dat.DatasetStructureLax(p).meta_paths)
             yield from paths
             return
 
@@ -504,7 +530,8 @@ class Main(Dispatcher):
         try:
             anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
         except exc.DirectoryNotEmptyError:
-            message = f'fatal: destination path {anchor} already exists and is not an empty directory.'
+            message = (f'fatal: destination path {anchor} already '
+                       'exists and is not an empty directory.')
             print(message)
             sys.exit(2)
         except BaseException as e:
@@ -540,7 +567,8 @@ class Main(Dispatcher):
 
         existing_locals = set(rc for d in dirs for rc in d.rchildren)
         # FIXME don't parse the fucking dates unless someone needs them you idiot
-        existing_d = {c.cache.id:c for c in existing_locals if c.cache is not None}  # yay null cache
+        existing_d = {c.cache.id:c for c in existing_locals
+                      if c.cache is not None}  # yay null cache
         existing_ids = set(existing_d)
 
         log.debug(dirs)
@@ -575,7 +603,8 @@ class Main(Dispatcher):
                         if nc != oc:
                             log.info(f'Dataset moved!\n{oc} -> {nc}')
                             # FIXME FIXME FIXME
-                            with open(self.anchor.local_data_dir / 'renames.log', 'at') as f:
+                            rnl = self.anchor.local_data_dir / 'renames.log'
+                            with open(rnl, 'at') as f:
                                 f.write(f'{oc} -> {nc} -> {nc.id}\n')
 
             # FIXME something after this point is retaining stale filepaths on dataset rename ...
@@ -591,7 +620,8 @@ class Main(Dispatcher):
             from pyontutils.utils import Async, deferred
             from pathlib import PurePath
             maybe_removed = [existing_d[id] for id in maybe_removed_ids]
-            maybe_removed_stems = {PurePath(p.parent) / p.stem:p for p in maybe_removed}  # FIXME still a risk of collisions?
+            maybe_removed_stems = {PurePath(p.parent) / p.stem:p
+                                   for p in maybe_removed}  # FIXME still a risk of collisions?
             maybe_new = [new_ids[id] for id in maybe_new_ids]
             maybe_new_stems = {PurePath(p.parent) / p.stem:p for p in maybe_new}
             for pstem, p in maybe_new_stems.items():
@@ -609,7 +639,8 @@ class Main(Dispatcher):
                     if new_new_path == mr_path:
                         maybe_removed.remove(mr_path)
 
-            Async(rate=self.options.rate)(deferred(l.cache.refresh)() for l in maybe_removed
+            Async(rate=self.options.rate)(deferred(l.cache.refresh)()
+                                          for l in maybe_removed
                                           # FIXME deal with untracked files
                                           if l.cache)
 
@@ -657,8 +688,10 @@ class Main(Dispatcher):
         drs = [d.remote for d in chain(to_root, self._dirs)]
 
         if not self.options.debug:
-            refreshed = Async(rate=hz)(deferred(r.refresh)(update_data_on_cache=r.cache.is_file() and
-                                                           r.cache.exists()) for r in drs)
+            refreshed = Async(rate=hz)(deferred(r.refresh)(
+                update_data_on_cache=r.cache.is_file() and
+                r.cache.exists())
+                                       for r in drs)
         else:
             refreshed = [r.refresh(update_data_on_cache=r.cache.is_file() and
                                    r.cache.exists()) for r in drs]
@@ -697,8 +730,8 @@ class Main(Dispatcher):
             self._print_paths(parent_moved, title='Parent moved')
 
         if not self.options.debug:
-            refreshed = Async(rate=hz)(deferred(path.cache.refresh)(update_data=fetch,
-                                                                    size_limit_mb=limit)
+            refreshed = Async(rate=hz)(deferred(path.cache.refresh)(
+                update_data=fetch, size_limit_mb=limit)
                                        for path in self._not_dirs)
 
         else:
@@ -713,7 +746,8 @@ class Main(Dispatcher):
 
         from pyontutils.utils import Async, deferred
         hz = self.options.rate
-        Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=self.options.limit)
+        Async(rate=hz)(deferred(path.cache.fetch)(
+            size_limit_mb=self.options.limit)
                        for path in paths)
 
     @property
@@ -731,7 +765,8 @@ class Main(Dispatcher):
 
     def latest_export_ttl_populate(self, graph):
         # intentionally fail if the ttl export failed
-        return graph.parse((self.LATEST / 'curation-export.ttl').as_posix(), format='ttl')
+        lce = (self.LATEST / 'curation-export.ttl').as_posix()
+        return graph.parse(lce, format='ttl')
 
     def export(self):
         """ export output of curation workflows to file """
@@ -794,7 +829,8 @@ class Main(Dispatcher):
 
             if latest_path.exists():
                 if not latest_path.is_symlink():
-                    raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
+                    raise TypeError('Why is LATEST not a symlink? '
+                                    f'{latest_path!r}')
 
                 latest_path.unlink()
 
@@ -865,12 +901,14 @@ class Main(Dispatcher):
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
-        all_blackfynn_uris = set(u for d in self.summary for u in d.protocol_uris_resolved)
+        all_blackfynn_uris = set(u for d in self.summary
+                                 for u in d.protocol_uris_resolved)
         all_hypotehsis_uris = set(a.uri for a in protc)
         if self.options.shell or self.options.debug:
             p, *rest = self._paths
             f = Integrator(p)
-            all_annos = [list(protc.byIri(uri)) for uri in f.protocol_uris_resolved]
+            all_annos = [list(protc.byIri(uri))
+                         for uri in f.protocol_uris_resolved]
             embed()
 
     def demos(self):
@@ -905,8 +943,12 @@ class Main(Dispatcher):
             dowe = summary.data
 
             # show all the errors from export everything
-            error_id_messages = [(d['id'], e['message']) for d in dowe['datasets'] for e in d['errors']]
-            error_messages = [e['message'] for d in dowe['datasets'] for e in d['errors']]
+            error_id_messages = [(d['id'], e['message'])
+                                 for d in dowe['datasets']
+                                 for e in d['errors']]
+            error_messages = [e['message']
+                              for d in dowe['datasets']
+                              for e in d['errors']]
 
         #rchilds = list(datasets[0].rchildren)
         #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
@@ -921,7 +963,9 @@ class Main(Dispatcher):
         DatasetStructure._refresh_on_missing = False
         summary = self.summary
         tables = []
-        datasets = self.summary.iter_datasets if self.cwd.cache.is_organization() else (Integrator(self.cwd.cache.dataset.local),)
+        datasets = (self.summary.iter_datasets
+                    if self.cwd.cache.is_organization() else
+                    (Integrator(self.cwd.cache.dataset.local),))
         for intr in datasets:
             pipe = intr.pipeline
             while not isinstance(pipe, pipes.SPARCBIDSPipeline):
@@ -965,13 +1009,15 @@ class Main(Dispatcher):
                 paths = [p for p in paths
                          if p.cache.meta.size is None or  # if we have no known size don't limit it
                          search_exists or
-                         not p.exists() and p.cache.meta.size.mb < self.options.limit
-                         or p.exists() and p.size != p.cache.meta.size and
+                         not p.exists() and
+                         p.cache.meta.size.mb < self.options.limit or
+                         p.exists() and p.size != p.cache.meta.size and
                          (not log.info(f'Truncated transfer detected for {p}\n'
                                        f'{p.size} != {p.cache.meta.size}'))
                          and p.cache.meta.size.mb < self.options.limit]
 
-                n_skipped = len(set(p for p in old_paths if p.is_broken_symlink()) - set(paths))
+                n_skipped = len(set(p for p in old_paths
+                                    if p.is_broken_symlink()) - set(paths))
 
             if self.options.pretend:
                 self._print_paths(paths)
@@ -988,11 +1034,12 @@ class Main(Dispatcher):
                 limit = self.options.limit
                 fetch = self.options.fetch
                 if self.options.refresh:
-                    Async(rate=hz)(deferred(path.remote.refresh)
-                                   (update_cache=True, update_data=fetch, size_limit_mb=limit)
+                    Async(rate=hz)(deferred(path.remote.refresh)(
+                        update_cache=True, update_data=fetch, size_limit_mb=limit)
                                    for path in paths)
                 elif fetch:
-                    Async(rate=hz)(deferred(path.cache.fetch)(size_limit_mb=limit)
+                    Async(rate=hz)(deferred(path.cache.fetch)(
+                        size_limit_mb=limit)
                                    for path in paths)
 
             else:
@@ -1056,9 +1103,11 @@ class Main(Dispatcher):
                         # id and file_id are fake in this instance
                         setattr(lmeta, 'id', None)
                         setattr(lmeta, 'file_id', None)
-                        print(lmeta.as_pretty_diff(cmeta, pathobject=path, human=self.options.human))
+                        print(lmeta.as_pretty_diff(cmeta, pathobject=path,
+                                                   human=self.options.human))
                     else:
-                        print(cmeta.as_pretty(pathobject=path, human=self.options.human))
+                        print(cmeta.as_pretty(pathobject=path,
+                                              human=self.options.human))
 
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
@@ -1104,7 +1153,8 @@ class Main(Dispatcher):
             setattr(lmeta, 'file_id', None)
             if lmeta.content_different(cmeta):
                 if self.options.status:
-                    print(lmeta.as_pretty_diff(cmeta, pathobject=f, human=self.options.human))
+                    print(lmeta.as_pretty_diff(cmeta, pathobject=f,
+                                               human=self.options.human))
                 else:
                     yield f, lmeta, cmeta
 
@@ -1112,7 +1162,8 @@ class Main(Dispatcher):
         from sparcur.server import make_app
         if self.options.raw:
             # FIXME ...
-            self.dataset_index = {d.meta.id:Integrator(d) for d in self.datasets}
+            self.dataset_index = {d.meta.id:Integrator(d)
+                                  for d in self.datasets}
         else:
             data = self.latest_export
             self.dataset_index = {d['id']:d for d in data['datasets']}
@@ -1134,7 +1185,8 @@ class Main(Dispatcher):
 
         if self.options.restore:
             # horribly inefficient, maybe build on a default dict?
-            rcs = sorted((c for c in stash_base.rchildren if not c.is_dir()), key=lambda p:p.as_posix(), reverse=True)
+            rcs = sorted((c for c in stash_base.rchildren if not c.is_dir()),
+                         key=lambda p:p.as_posix(), reverse=True)
             for path in paths:
                 relpath = path.relative_to(self.anchor)
                 for p in rcs:
@@ -1322,7 +1374,8 @@ class Report(Dispatcher):
         each['suffix'].append((rex.pattern, len(rex_paths)))
 
         for title, rows in each.items():
-            yield self._print_table(((title, 'count'), *rows), title=title.replace('_', ' ').strip())
+            yield self._print_table(((title, 'count'), *rows),
+                                    title=title.replace('_', ' ').strip())
 
         all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
                                 Counter([(f.suffix, f.mimetype, f._magic_mimetype)
@@ -1382,8 +1435,10 @@ class Report(Dispatcher):
                 ei = hfn.atag(errors_url + '#total', ei)
                 name = hfn.atag(dataset_dash_url, name)
                 id = hfn.atag(dataset_dash_url, id[:10] + '...')
-                award = hfn.atag(('https://scicrunch.org/scicrunch/data/source/'
-                                  f'nif-0000-10319-1/search?q={award}'), award) if award else 'MISSING'
+                award = (
+                    hfn.atag(('https://scicrunch.org/scicrunch/data/source/'
+                              f'nif-0000-10319-1/search?q={award}'), award)
+                    if award else 'MISSING')
                 organ = organ if organ else ''
                 if isinstance(organ, list) or isinstance(organ, tuple):
                     organ = ' '.join([o.atag() for o in organ])
@@ -1391,7 +1446,8 @@ class Report(Dispatcher):
                     organ = organ.atag()
             else:
                 award = award if award else ''
-                organ = (repr(organ) if isinstance(organ, OntTerm) else organ) if organ else ''
+                organ = ((repr(organ) if isinstance(organ, OntTerm) else organ)
+                         if organ else '')
                 if isinstance(organ, list):
                     organ = ' '.join([repr(o) for o in organ])
                     
@@ -1399,18 +1455,20 @@ class Report(Dispatcher):
             return (i + 1, si, ci, ei, name, id, award, organ)
 
         rows = [('', 'SI', 'CI', 'EI', 'name', 'id', 'award', 'organ')]
-        rows += [rformat(i, *cols) for i, cols in
-                 enumerate(sorted(raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
+        rows += [rformat(i, *cols) for i, cols in enumerate(sorted(
+            raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
 
         return self._print_table(rows, title='Completeness Report', ext=ext)
 
     def keywords(self, ext=None):
         data = self.summary.data if self.options.raw else self.latest_export
         datasets = data['datasets']
-        _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])), key=lambda v: -len(v))
+        _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
+                        key=lambda v: -len(v))
                     for dataset_blob in datasets]
-        rows = [list(r) for r in sorted(set(tuple(r) for r in _rows if r),
-                                        key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
+        rows = [list(r) for r in sorted(
+            set(tuple(r) for r in _rows if r),
+            key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
         header = [[f'{i + 1}' for i, _ in enumerate(rows[-1])]]
         rows = header + rows
         return self._print_table(rows, title='Keywords Report')
@@ -1427,7 +1485,8 @@ class Report(Dispatcher):
                          for d in intrs
                          for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
 
-        return self._print_table(rows, title='Size Report', align=['l', 'l', 'r', 'r', 'r', 'r'], ext=ext)
+        return self._print_table(rows, title='Size Report',
+                                 align=['l', 'l', 'r', 'r', 'r', 'r'], ext=ext)
 
     def test(self, ext=None):
         rows = [['hello', 'world'], [1, 2]]
@@ -1501,11 +1560,17 @@ class Report(Dispatcher):
 
         if self.options.server and isinstance(ext, types.FunctionType):
             def reformat(ot):
-                return [ot.label if hasattr(ot, 'label') and ot.label else '', ot.atag(curie=True)]
+                return [ot.label
+                        if hasattr(ot, 'label') and ot.label else
+                        '',
+                        ot.atag(curie=True)]
 
         else:
             def reformat(ot):
-                return [ot.label if hasattr(ot, 'label') and ot.label else '', ot.curie]
+                return [ot.label
+                        if hasattr(ot, 'label') and ot.label else
+                        '',
+                        ot.curie]
 
         log.info(' '.join(sorted(skipped_prefixes)))
         objs = [OntTerm(o) if o.prefix not in ('TEMP', 'sparc') or
@@ -1523,7 +1588,8 @@ class Report(Dispatcher):
                       ('TEMP', 'Suggested terms'),
                      )}
 
-        term_sets['Other'] = set(objs) - set(ot for v in term_sets.values() for ot in v)
+        term_sets['Other'] = set(objs) - set(ot for v in term_sets.values()
+                                             for ot in v)
 
         for title, terms in term_sets.items():
             header = [['Label', 'CURIE']]
@@ -1547,6 +1613,11 @@ class Shell(Dispatcher):
     latest_export = Main.latest_export
     latest_export_ttl_populate = Main.latest_export_ttl_populate
     stash = Main.stash
+
+    def exit(self):
+        """ useful for profiling startup time issues """
+        print('Peace.')
+        return
 
     def default(self):
         from sparcur.core import AutoId, AutoInst
@@ -1574,6 +1645,14 @@ class Shell(Dispatcher):
         asdf = rcs[-1]
         urg = list(asdf.data)
         resp = asdf.data_headers
+
+        dsi = 1
+        ddf = datas[dsi].dataset_description.object
+        dd = ddf.data
+        smf = datas[dsi].submission.object
+        suf = datas[dsi].subjects.object
+        saf = datas[dsi].samples.object
+
         embed()
 
     def affil(self):
@@ -1671,7 +1750,8 @@ class Fix(Shell):
         deduped = [a.dedupe(b, pretend=True) for a, b, *c in dv
                    if (not log.warning(c) if c else not c)
         ]  # FIXME assumes a single dupe...
-        to_remove = [d for paths, new in zip(dv, deduped) for d in paths if d != new]
+        to_remove = [d for paths, new in zip(dv, deduped)
+                     for d in paths if d != new]
         to_remove_size = [p for p in to_remove if p.cache.meta.size is not None]
         #[p.unlink() for p in to_remove if p.cache.meta.size is None] 
         breakpoint()
@@ -1703,6 +1783,15 @@ def main():
 
     main()
 
+    if options.profile:
+        exit = time()
+        a = start_middle - start
+        b = (stop - start_middle)
+        c = (stop - start)
+        d = (exit - stop)
+        e = (exit - start)
+        s = f'{a} + {b} = {c}\n{c} + {d} = {e}'
+        print(s)
 
 if __name__ == '__main__':
     main()
