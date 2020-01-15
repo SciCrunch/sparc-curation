@@ -11,10 +11,10 @@ from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from augpathlib import FileSize
-from sparcur import schemas as sc
-from sparcur import raw_json as rj
-from sparcur import exceptions as exc
-from sparcur import normalization as nml
+from . import schemas as sc
+from . import raw_json as rj
+from . import exceptions as exc
+from . import normalization as nml
 from .core import log, logd, HasErrors
 from .paths import Path
 from .utils import is_list_or_tuple
@@ -571,6 +571,7 @@ class MetadataFile(HasErrors):
     normalization_class = nml.NormValues
     normalize_alt = True
     normalize_header = True
+    _expect_string = tuple()
 
     def __new__(cls, path):
         if cls.record_type_key_header is None or cls.record_type_key_alt is None:
@@ -608,12 +609,12 @@ class MetadataFile(HasErrors):
 
     def _condense(self):
         crtk = self._cull_rtk()
-        def condense(thing):
+        def condense(thing, key=None):
             if isinstance(thing, dict):
                 hrm = []
                 out = {}
                 for k, v in thing.items():
-                    nv = condense(v)
+                    nv = condense(v, k)
                     # bah bloody description appearing twice >_<
                     if k in self.norm_to_orig_header and k not in self.norm_to_orig_alt:
                         hrm.append(nv)
@@ -625,7 +626,11 @@ class MetadataFile(HasErrors):
                 elif out:
                     return out
                 elif hrm:
-                    return tuple(hrm)
+                    if (key in self._expect_string and
+                        len(hrm) == 1):
+                        return hrm[0]
+                    else:
+                        return tuple(hrm)
 
             else:
                 return thing
@@ -896,12 +901,16 @@ class SubmissionFilePath(ObjectPath):
 SubmissionFilePath._bind_flavours()
 
 
+_props = sc.DatasetDescriptionSchema.schema['properties']
+_nddfes = [k for k, v in _props.items() if isinstance(v, dict) and
+ 'type' in v and v['type'] == 'string']
+
 class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     renames_alt = {'contributors': 'contributor_name',  # watch out for name collisions (heu heu heu)
-                   'metadata_version_do_not_change': 'version'}
+                   'metadata_version_do_not_change': 'schema_version'}
     renames_header = {'description': 'description_header'}
-    missing_add = {'version': ('1.0', 1)}
+    missing_add = {'schema_version': ('1.0', 1)}
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
     groups_alt = {'contributors': ('contributor_name',
@@ -916,6 +925,7 @@ class DatasetDescriptionFile(MetadataFile):
 
     ignore_header = 'metadata_element', 'example', 'description_header'
     normalization_class = nml.NormDatasetDescriptionFile
+    _expect_string = _nddfes
 
 
 class DatasetDescriptionFilePath(ObjectPath):

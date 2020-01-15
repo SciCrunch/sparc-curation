@@ -341,7 +341,7 @@ class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
-        'required': ['version',
+        'required': ['schema_version',
                      'name',
                      'description',
                      'funding',
@@ -351,7 +351,7 @@ class DatasetDescriptionSchema(JSONSchema):
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
             'errors': ErrorSchema.schema,
-            'version': {'type': 'string'},
+            'schema_version': {'type': 'string'},
             'name': {'type': 'string'},
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
@@ -529,6 +529,7 @@ class MetaOutSchema(JSONSchema):
                       'size',
                       'folder_name',
                       'title',
+                      'schema_version',
                       #'subject_count',
                       #'sample_count',
     ]
@@ -560,6 +561,7 @@ class MetaOutSchema(JSONSchema):
                              'minItems': 1,
                              'items': {'type': 'string'}},
         'species': {'type': 'string'},
+        'schema_version': {'type': 'string'},
         'organ': {'type': 'string'},
         'modality': {'type': 'array',
                      'minItems': 1,

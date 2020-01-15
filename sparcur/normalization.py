@@ -278,6 +278,7 @@ class NormValues(HasErrors):
 
                 try:
                     out[k] = gnv()
+
                 except exc.NotApplicableError:
                     pass
 
@@ -304,9 +305,11 @@ class NormValues(HasErrors):
 
                         out = None
 
-                return out
+            else:
+                out = thing
 
-            return thing
+            return out
+
 
     @property
     def data(self):
