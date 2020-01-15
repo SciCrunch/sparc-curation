@@ -72,7 +72,8 @@ class ContributorsPipeline(DatasourcePipeline):
                 fn, mn = fn.split(' ', 1)
                 mn, _mn = mn.rstrip('.'), mn
                 if mn != _mn:
-                    he.addError(f'Middle initials don\'t need periods :) {name!r}', logfunc=logd.error)
+                    he.addError(f'Middle initials don\'t need periods :) {name!r}',
+                                logfunc=logd.error)
                 contributor['middle_name'] = mn
                 contributor['first_name'] = fn
 
@@ -153,7 +154,7 @@ class PathPipeline(PrePipeline):
 
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
             logd.exception(e)  # FIXME isn't this were we should accumulate errors?
-            he.addError(e)
+            he.addError(e, path=self.path)
             he.embedErrors(NoData.data)
             return NoData
 
@@ -167,7 +168,7 @@ class PathPipeline(PrePipeline):
             data = {}
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.transformer')
             logd.exception(e)  # FIXME isn't this were we should accumulate errors?
-            he.addError(e)
+            he.addError(e, path=self.path)
             he.embedErrors(data)
             return data
 
@@ -854,26 +855,41 @@ class PipelineEnd(JSONPipeline):
         'DatasetStructurePipeline.data',
 
         'Tabular',  # FIXME which Tabular
-        'RawJsonSubjects.data',
+
 
         'SubmissionFile',
-        'SubjectsFile',
-        'SamplesFile',
 
         'SubmissionFilePipeline._transformer',
         'SubmissionFilePipeline.transformer',
         'SubmissionFilePipeline.data',
 
+
         'DatasetDescriptionFile',
-        'NormDatasetDescriptionFile.contributor_role',
-        'NormDatasetDescriptionFile.funding',
-        'NormDatasetDescriptionFile.protocol_url_or_doi',
+
+        'NormDatasetDescriptionFile',
+        #'NormDatasetDescriptionFile.contributor_orcid_id',
+        #'NormDatasetDescriptionFile.contributor_role',
+        #'NormDatasetDescriptionFile.funding',
+        #'NormDatasetDescriptionFile.originating_article_doi',
+        #'NormDatasetDescriptionFile.protocol_url_or_doi',
+
         'DatasetDescriptionFilePipeline._transformer',
+        'DatasetDescriptionFilePipeline.transformer',
         'DatasetDescriptionFilePipeline.data',
+
+
+        'SubjectsFile',
+        'RawJsonSubjects.data',
+
+        'NormSubjectsFile',
+        'NormSubjectsFile.age',
 
         'SubjectsFilePipeline._transformer',
         'SubjectsFilePipeline.transformer',
         'SubjectsFilePipeline.data',
+
+
+        'SamplesFile',
 
         'SamplesFilePipeline._transformer',
         'SamplesFilePipeline.transformer',
@@ -891,10 +907,15 @@ class PipelineEnd(JSONPipeline):
     _blame_stage = object()
     _blame_curation = object()
     _blame_submission = object()
+    _blame_everyone = object()
+    _blame_export = object()
     _blame = {
+        'submission': _blame_submission,
         'pipeline': _blame_curation,
         'debug': _blame_curation,
         'stage': _blame_stage,
+        'EVERYONE': _blame_everyone,
+        'export': _blame_export,
     }
 
     @classmethod
@@ -937,6 +958,10 @@ class PipelineEnd(JSONPipeline):
                     blame_target = cls._blame[blame]
                     if blame_target == cls._blame_stage:
                         pass
+                    elif blame_target == cls._blame_everyone:
+                        submission_errors.append(error)
+                        curation_errors.append(error)
+                        blamed = True
                     elif blame_target == cls._blame_submission:
                         submission_errors.append(error)
                         blamed = True
@@ -956,7 +981,8 @@ class PipelineEnd(JSONPipeline):
                 if not blamed:
                     curation_errors.append(error)
             else:
-                raise ValueError(f'Unhandled stage {stage}\n{message}')
+                if blame not in ('pipeline', 'submission', 'debug'):
+                    raise ValueError(f'Unhandled stage {stage}\n{message}')
 
         si = len(submission_errors)
         ci = len(curation_errors)

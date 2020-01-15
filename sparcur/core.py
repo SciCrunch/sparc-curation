@@ -89,22 +89,25 @@ class HasErrors:
         self._pipeline_stage = pipeline_stage
         self._errors_set = set()
 
-    def addError(self, error, pipeline_stage=None, logfunc=None, blame=None):
+    def addError(self, error, pipeline_stage=None, logfunc=None, blame=None, path=None):
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
         b = len(self._errors_set)
-        self._errors_set.add((error, stage, blame))
+        self._errors_set.add((error, stage, blame, path))
         a = len(self._errors_set)
         if logfunc is not None and a != b:  # only log on new errors
             logfunc(error)
 
     @property
     def _errors(self):
-        for e, stage, blame in self._errors_set:
+        for e, stage, blame, path in self._errors_set:
             o = {'pipeline_stage': stage,
                  'blame': blame,}  # FIXME
 
+            if path is not None:
+                o['path'] = path
+                
             if isinstance(e, str):
                 o['message'] = e
                 o['type'] = None  # FIXME probably wan our own?

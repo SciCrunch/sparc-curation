@@ -87,7 +87,8 @@ class Header:
         original = self.pipeline_start
         normalized = self.normalized
         if len(set(original)) != len(original):
-            msg = f'Original header is not unique in\n{original}'
+            dupes = [v for v, c in Counter(original).most_common() if c > 1]
+            msg = f'Original header is not unique.\nDuplicate entries: {dupes}'
             raise exc.MalformedHeaderError(msg)
 
         return {renames[n] if n in renames else n:h
@@ -282,12 +283,16 @@ class DatasetStructure(Path, HasErrors):
 
                 if path.suffix in path.stem:
                     msg = f'path has duplicate suffix {path.as_posix()!r}'
-                    self.addError(msg)
+                    self.addError(msg,
+                                  blame='submission',
+                                  path=path)
                     logd.error(msg)
 
                 if path.name[0].isupper():
                     msg = f'path has bad casing {path.as_posix()!r}'
-                    self.addError(msg)
+                    self.addError(msg,
+                                  blame='submission',
+                                  path=path)
                     logd.error(msg)
 
                 yield path
@@ -362,25 +367,35 @@ class Tabular(HasErrors):
         for encoding in ('utf-8', 'latin-1'):
             try:
                 with open(self.path, 'rt', encoding=encoding) as f:
-                    for row in csv.reader(f, delimiter=delimiter):
-                        if row:
-                            yield row
-                        else:
-                            message = f'empty row in {self.path.as_posix()!r}'
-                            self.addError(message)
-                            logd.error(message)
+                    rows_orig = list(csv.reader(f, delimiter=delimiter))
+
+                rows = [row for row in rows_orig if row and any(row)]
+                diff = len(rows_orig) - len(rows)
+                if diff:
+                    # LOL THE FILE WITH > 1 million empty rows, 8mb of commas
+                    # totally the maximum errors champion
+                    message = f'There are {diff} empty rows in {self.path.as_posix()!r}'
+                    self.addError(message,
+                                  logfunc=logd.error,
+                                  blame='submission',
+                                  path=self.path)
 
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
-                    self.addError(exc.EncodingError(message))
+                    self.addError(exc.EncodingError(message),
+                                  blame='submission',
+                                  path=self.path)
                     logd.error(message)
-                return
+
+                return rows
             except UnicodeDecodeError:
                 continue
             except csv.Error as e:
                 logd.exception(e)
                 message = f'WHAT HAVE YOU DONE {e!r} {self.path.as_posix()!r}'
-                self.addError(message)
+                self.addError(message,
+                              blame='EVERYONE',
+                              path=self.path)
                 logd.error(message)
 
     def xlsx(self):
@@ -395,7 +410,9 @@ class Tabular(HasErrors):
         ns = len(xlsx2csv.workbook.sheets)
         if ns > 1:
             message = f'too many sheets ({ns}) in {self.path.as_posix()!r}'
-            self.addError(exc.EncodingError(message))
+            self.addError(exc.EncodingError(message),
+                          blame='submission',
+                          path=self.path)
             logd.error(message)
 
         f = io.StringIO()
@@ -512,7 +529,12 @@ class PrimaryKey:
         # because we add the primary key to alt header we remove it again here
         # because the rest of the generator values don't have a blank prepended
         nalt_header_less_pk = [nah for nah in nalt_header if nah != name]
-        self.indexes = [nalt_header_less_pk.index(name) for name in column_names]
+        try:
+            self.indexes = [nalt_header_less_pk.index(name) for name in column_names]
+        except ValueError as e:
+            msg = f'Missing a primary key component {e}'
+            raise exc.MalformedHeaderError(msg) from e
+
         self.combine_function = combine_function
         self._agen = agen
         self._gen = gen
@@ -751,15 +773,11 @@ class MetadataFile(HasErrors):
         """ first chance we have to check sanity since
             the generators have to have run """
         objects = self._objectify()
-        for n, rtk, norm_dict in (('header', self.record_type_key_header, self.norm_to_orig_header),
-                                  *[('alt_header', name, self.norm_to_orig_alt)
-                                    for name in (self.record_type_key_alt,
-                                                 *(self.primary_key_rule[1]
-                                                  if self.primary_key_rule is not None else
-                                                   tuple()))]):
+        for n, rtk, norm_dict in (('alt_header', self.record_type_key_alt, self.norm_to_orig_alt),
+                                  ('header', self.record_type_key_header, self.norm_to_orig_header)):
             if rtk not in norm_dict:
-                msg = (f'Could not find record primary key for {n} in\n{self.path}\n'
-                       f'{rtk} not in {list(norm_dict)}')
+                msg = (f'Could not find record primary key for {n} in\n"{self.path}"\n\n'
+                       f'{rtk}\nnot in\n{list(norm_dict)}')
 
                 raise exc.MalformedHeaderError(msg)
 
@@ -801,11 +819,14 @@ class MetadataFile(HasErrors):
         agen = iter(alt)
         gen = iter(head)
 
-        if self.primary_key_rule is not None:
-            pk_name, combine_names, combine_function = self.primary_key_rule
-            self.alt_header = (pk_name, *next(agen))
-        else:
-            self.alt_header = next(agen)
+        try:
+            if self.primary_key_rule is not None:
+                pk_name, combine_names, combine_function = self.primary_key_rule
+                self.alt_header = (pk_name, *next(agen))
+            else:
+                self.alt_header = next(agen)
+        except StopIteration as e:
+            raise exc.NoDataError(f'{self.path}') from e
 
         self._alt_header = Header(self.alt_header, normalize=self.normalize_alt)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)

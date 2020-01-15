@@ -13,6 +13,14 @@ BLANK_VALUE = object()
 NOT_APPLICABLE = object()
 
 
+class _Unknown(str):
+    def __new__(cls, value=None):
+        return str.__new__(cls, 'UNKNOWN')
+
+
+UNKNOWN = _Unknown()
+
+
 class NormSimple(str):
 
     data = tuple()  # really dict
@@ -225,7 +233,8 @@ class NormValues(HasErrors):
     def _error_on_na(self, value):
         """ N/A -> raise for cases where it should just be removed """
         v = value.strip()
-        if v == 'n/a' or v == 'N/A':
+        if v in ('NA', 'n/a', 'N/A',):
+            # TODO consider double checking these cases ?
             raise exc.NotApplicableError()
 
     def _deatag(self, value):
@@ -279,17 +288,20 @@ class NormValues(HasErrors):
             # FIXME I do NOT like this pattern :/
 
             if isinstance(key, str) and hasattr(self, key):
+                #self._error_on_na(thing, key)  # TODO see if this makes sense
                 out = getattr(self, key)(thing)
                 if isinstance(out, GeneratorType):
                     out = tuple(out)
                     if len(out) == 1:  # FIXME find the actual source of double packing
                         out = out[0]
                     elif not out:
-                        msg = f'Normalization {key} returned None for input {thing}'
-                        self.addError(msg,
-                                      pipeline_stage=f'{self.__class__.__name__}.{key}',
-                                      logfunc=log.critical,
-                                      blame='pipeline',)
+                        if thing.strip():  # sigh
+                            msg = f'Normalization {key} returned None for input "{thing}"'
+                            self.addError(msg,
+                                          pipeline_stage=f'{self.__class__.__name__}.{key}',
+                                          logfunc=log.critical,
+                                          blame='pipeline',)
+
                         out = None
 
                 return out
@@ -349,10 +361,10 @@ class NormDatasetDescriptionFile(NormValues):
 
     def contributor_orcid_id(self, value):
         # FIXME use schema
-
+        self._error_on_na(value)
         value, _j = self._deatag(value)
 
-        v = value.replace(' ', '')
+        v = value.replace(' ', '').strip().rstrip()  # ah the rando tabs in a csv
         if not v:
             return
         if v.startswith('http:'):
@@ -410,7 +422,9 @@ class NormDatasetDescriptionFile(NormValues):
             if value.startswith('ERROR VALUE:'):
                 self.addError(value.split(':', 1)[-1].strip(),
                               pipeline_stage=f'{self.__class__.__name__}.contributor_role',
-                              logfunc=logd.error)
+                              logfunc=logd.error,
+                              blame='submission',
+                              path=self._path)
                 return original
             else:
                 return value
@@ -440,6 +454,7 @@ class NormDatasetDescriptionFile(NormValues):
         return value
 
     def protocol_url_or_doi(self, value):
+        self._error_on_na(value)
         value, _j = self._deatag(value)
 
         for val in value.split(','):
@@ -459,6 +474,8 @@ class NormDatasetDescriptionFile(NormValues):
                     # TODO raise exc.BadDataError from e
 
     def originating_article_doi(self, value):
+        self._error_on_na(value)
+        #self._error_on_tbd(value)  # TODO?
         value, _j = self._deatag(value)
 
         for val in value.split(','):
@@ -524,9 +541,9 @@ class NormSubjectsFile(NormValues):
             pv = pyru.UnitsParser(value).asPython()
         except pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
-            msg = f'Unexpected and unhandled value {value} for {caller_name}'
+            msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
             log.error(msg)
-            self.addError(msg, pipeline_stage=self.__class__.__name__ + '.curation-error')
+            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline')
             return value
 
         #if not pv[0] == 'param:parse-failure':
@@ -537,9 +554,20 @@ class NormSubjectsFile(NormValues):
             yield value
 
     def _param_unit(self, value, unit):
-        yield from self._param(value + unit)
+        if value.strip().lower() in ('unknown', 'uknown'):
+            yield UNKNOWN
+        else:
+            yield from self._param(value + unit)
 
     def age(self, value):
+        if value in ('adult',):
+            msg = (f'Bad value for age: {value}\ndid you want to put that in age_cagegory instead?\n'
+                   f'"{self._path}"')
+            logd.error(msg)
+            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
+                          path=self._path)
+            return value
+
         yield from self._param(value)
 
     def age_years(self, value):
@@ -554,6 +582,15 @@ class NormSubjectsFile(NormValues):
         yield from self._param(value)
 
     def age_range_max(self, value):
+        if value in ('Normal',):
+            msg = (f'Bad value for age_range_max: {value}\n'
+                   'did you want to put that in age_cagegory instead?\n'
+                   f'"{self._path}"')
+            logd.error(msg)
+            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
+                          path=self._path)
+            return value
+
         yield from self._param(value)
 
     def mass(self, value):

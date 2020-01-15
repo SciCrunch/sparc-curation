@@ -1633,7 +1633,7 @@ class Shell(Dispatcher):
         if p.cache.is_dataset():
             intr = Integrator(p)
             j = JT(intr.data)
-            ddf = intr.datasetdata.dataset_description.object  # finally
+            iddf = intr.datasetdata.dataset_description.object  # finally
             #triples = list(f.triples)
 
         try:
