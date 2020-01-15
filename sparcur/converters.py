@@ -210,7 +210,7 @@ class MetaConverter(TripleConverter):
             # FIXME needs to be a pipeline so that we can export errors
             try:
                 pj = pd(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
-            except oq.OntId.BadCurieError as e:
+            except OntId.BadCurieError as e:
                 logd.error(e)  # FIXME export errors ...
                 pj = None
 
