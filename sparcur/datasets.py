@@ -45,8 +45,9 @@ hasSchema = sc.HasSchema()
 class Header:
     """ generic header normalization for python """
     # FIXME this is a really a pipeline stage
-    def __init__(self, first_row_or_column):
+    def __init__(self, first_row_or_column, normalize=True):
         self.pipeline_start = first_row_or_column
+        self._normalize = normalize
 
     @property
     def normalized(self):
@@ -75,9 +76,24 @@ class Header:
         return {n:h for n, h in zip(self.data, self.pipeline_start)}
 
     def lut(self, **renames):
+        if self._normalize:
+            return self._lut_normalize(renames)
+        else:
+            return self._lut_original(renames)
+
+    def _lut_normalize(self, renames):
         """ do any renames beyond the specific normalization """
         return {renames[n] if n in renames else n:h
                 for n, h in zip(self.data, self.pipeline_start)}
+
+    def _lut_original(self, renames):
+        original = self.pipeline_start
+        normalized = self.normalized
+        if len(set(original)) != len(original):
+            raise ValueError(f'Original header is not unique!\n{original}')
+
+        return {renames[n] if n in renames else n:h
+                for n, h in zip(original, original)}
 
 
 class HasErrors:
@@ -90,20 +106,23 @@ class HasErrors:
         self._pipeline_stage = pipeline_stage
         self._errors_set = set()
 
-    def addError(self, error, pipeline_stage=None, logfunc=None):
+    def addError(self, error, pipeline_stage=None, logfunc=None, blame=None):
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
         b = len(self._errors_set)
-        self._errors_set.add((error, stage))
+        self._errors_set.add((error, stage, blame))
         a = len(self._errors_set)
         if logfunc is not None and a != b:  # only log on new errors
             logfunc(error)
 
     @property
     def _errors(self):
-        for e, stage in self._errors_set:
+        for e, stage, blame in self._errors_set:
             o = {'pipeline_stage': stage}  # FIXME
+
+            if blame is not None:
+                o['blame'] = blame
 
             if isinstance(e, str):
                 o['message'] = e
@@ -394,6 +413,10 @@ class Tabular(HasErrors):
         return self.csv(delimiter='\t')
 
     def csv(self, delimiter=','):
+        # FIXME if the number of delimiters in a row other than the header
+        # is greater than the number of delimiters in the header then any
+        # columns beyond the number in the header will be truncated and
+        # I'm not sure that this loading routine detects that
         for encoding in ('utf-8', 'latin-1'):
             try:
                 with open(self.path, 'rt', encoding=encoding) as f:
@@ -714,21 +737,25 @@ class Version1Header(HasErrors):
         return out
 
 
-class NormValues:
+class NormValues(HasErrors):
     """ Base class with an open dir to avoid name collisions """
     def __init__(self, obj_inst):
+        super().__init__()
         self._bind(obj_inst._normalize_keys(),
-                   obj_inst.record_type_key,
+                   obj_inst.record_type_key_header,
                    obj_inst.norm_to_orig_alt,
                    obj_inst.norm_to_orig_header,
-                   obj_inst.groups_alt)
+                   obj_inst.groups_alt,
+                   obj_inst.path)
 
-    def _bind(self, blob, record_type_key, norm_to_orig_alt, norm_to_orig_header, groups_alt):
+    def _bind(self, blob, record_type_key_header, norm_to_orig_alt, norm_to_orig_header,
+              groups_alt, path):
         self._blob = blob
-        self._record_type_key = record_type_key
+        self._record_type_key_header = record_type_key_header
         self._norm_to_orig_alt = norm_to_orig_alt
         self._norm_to_orig_header = norm_to_orig_header
         self._groups_alt = groups_alt
+        self._path = path
 
     @staticmethod
     def _query(value, prefix):
@@ -746,11 +773,11 @@ class NormValues:
             return value
 
     def _normv(self, thing, key=None, path=tuple()):
-        print(path)
+        #print(path)
         if isinstance(thing, dict):
             out = {}
             for k, v in thing.items():
-                if k == self._record_type_key:
+                if k == self._record_type_key_header:
                     out[k] = v
                 elif k in self._norm_to_orig_header:
                     out[k] = self._normv(v, key, path)
@@ -772,6 +799,13 @@ class NormValues:
                     out = tuple(out)
                     if len(out) == 1:  # FIXME find the actual source of double packing
                         out = out[0]
+                    elif not out:
+                        msg = f'Normalization {key} returned None for input {thing}'
+                        self.addError(msg,
+                                      pipeline_stage=f'{self.__class__.__name__}.{key}',
+                                      logfunc=log.critical,
+                                      blame='pipeline',)
+                        out = None
 
                 return out
 
@@ -779,29 +813,62 @@ class NormValues:
 
     @property
     def data(self):
-        return self._normv(self._blob)
+        data = self._normv(self._blob)
+        self.embedErrors(data)
+        return data
 
 
 ROW_TYPE = object()
 COLUMN_TYPE = object()
-N = object()
+numberN = object()
+GROUP_ALL = object()
+BLANK_VALUE = object()
+NOT_APPLICABLE = object()
+
+
+def remove_rule(blob, rule):
+    # FIXME this should be in _DictTransformer
+    previous_target = blob
+    target = blob
+    previous_element = None
+    for path_element in rule:
+        if isinstance(path_element, str):
+            if path_element in target:
+                previous_target = target
+                target = previous_target[path_element]
+            else:
+                return  # target not found
+
+        elif isinstance(path_element, dict):
+            if all([(k in target and target[k] == v)
+                    for k, v in path_element.items()]):
+                previous_target.pop(previous_element)
+                return  # we're done here
+
+        else:
+            raise ValueError(f'what are you doing with {rule}')
+
+        previous_element = path_element
 
 
 class Better(HasErrors):
     default_record_type = ROW_TYPE
-    record_type_key = None
     missing_add = {}
     renames_alt = {}     # renames first since all following
     renames_header = {}  # refs look for the renamed form
+    record_type_key_header = None  # record type key is affected by renames
     groups_alt = {}
     groups_header = {}
     ignore_alt = tuple()
     ignore_header = tuple()
+    ignore_match = tuple()
     normalization_class = NormValues
+    normalize_alt = True
+    normalize_header = True
 
     def __new__(cls, path):
-        if cls.record_type_key is None:
-            raise TypeError(f'record_type_key should not be None on {cls.__name__}')
+        if cls.record_type_key_header is None:
+            raise TypeError(f'record_type_key_header should not be None on {cls.__name__}')
 
         return super().__new__(cls)
 
@@ -856,7 +923,7 @@ class Better(HasErrors):
             if isinstance(thing, dict):
                 out = {}
                 for k, v in thing.items():
-                    if k != self.record_type_key:
+                    if k != self.record_type_key_header:
                         nv = crtk(v)
                         if nv is not None:
                             out[k] = nv
@@ -880,33 +947,8 @@ class Better(HasErrors):
         cleaned = self._clean()
         return cleaned
 
-        def normb(k):
-            if k in self.orig_to_norm_header:
-                nk = self.orig_to_norm_header[k]
-            elif k in self.orig_to_norm_alt:
-                nk = self.orig_to_norm_alt[k]
-            else:
-                nk = k
-
-            return nk
-
-        def normk(thing, is_rtk=False):
-            if isinstance(thing, dict):
-                out = {}
-                for k, v in thing.items():
-                    nk = normb(k)
-                    out[nk] = normk(v, nk == self.record_type_key or is_rtk)
-
-                return out
-            elif is_rtk:
-                return normb(thing)  # FIXME should this be done in normv or no?
-            else:
-                return thing
-
-        return normk(cleaned)
-
     def _clean(self):
-        culled = self._cull()
+        filtered = self._filter()
         def clean(thing):
             if isinstance(thing, dict):
                 out = {}
@@ -924,30 +966,72 @@ class Better(HasErrors):
             else:
                 return thing
 
-        cleaned = clean(culled)
+        cleaned = clean(filtered)
         return cleaned
 
+    def _filter(self):
+        # FIXME does in place modification
+        culled = self._cull()
+        for rule in self.ignore_match:
+            remove_rule(culled, rule)
+
+        return culled
+
     def _cull(self):
-        transformed = self._reshape()
+        transformed = self._transformed()
         # FIXME deeper nesting might break this?
         culled = {k:{k:v for k, v in v.items()
                      if k not in self.ignore_header}
                   for k, v in transformed.items()}
         return culled
 
-    def _reshape(self):
-        gen = self._norm_headers()
-        # WARNING assumes dict order
-        _objects = [{k:v for k, v in zip(self.norm_to_orig_header, r)} for r in gen]
+    def _transformed(self):
+        keyed = self._keyed()
+        naccounted_baseline = set(e for g in self.groups_alt.values()
+                                  if g != GROUP_ALL for e in g)
 
+        # TODO how to flag exclude the header fields ?
+        transformed = {}
+        for key, alt_grouped_norm in self.groups_alt.items():
+            merge = alt_grouped_norm == GROUP_ALL
+            if merge:
+                alt_grouped_norm = tuple(k for k in self.norm_to_orig_alt
+                                         if k not in naccounted_baseline)
+                naccounted_baseline.update(set(alt_grouped_norm))
+
+            records = [keyed[nh] for nh in alt_grouped_norm
+                       # FIXME versioning ... schema will take care of missing values later
+                       if nh in keyed]
+
+            objected = {nh:{record[self.record_type_key_header]:record[nh]
+                            for record in records}
+                        for nh in self.norm_to_orig_header}
+
+            transformed[key] = {k:v for k, v in objected.items()
+                                if v is not None and v != {}}
+
+        nunaccounted = (set(self.norm_to_orig_alt) - naccounted_baseline)
+
+        for nah in nunaccounted: 
+            transformed[nah] = keyed[nah]
+
+        return transformed
+
+    def _keyed(self):
+        objects = self._add_missing()
+        keyed = {o[self.record_type_key_header]:o for o in objects}
+        return keyed
+
+    def _add_missing(self):
+        objects = self._objectify()
         for nah, (value, number) in self.missing_add.items():
             if nah not in self.norm_to_orig_alt:
                 self.norm_to_orig_alt[nah] = nah
                 cant_go_wrong = {}
                 i = 0
                 for nh in self.norm_to_orig_header:
-                    if ((number == N or i < number) and
-                        nh != self.record_type_key and
+                    if ((number == numberN or i < number) and
+                        nh != self.record_type_key_header and
                         nh not in self.ignore_header):
                         v = value
                         i += 1
@@ -956,46 +1040,29 @@ class Better(HasErrors):
 
                     cant_go_wrong[nh] = v
 
-                {nh:(value if number == N or i <= number else '')
+                {nh:(value if number == numberN or i <= number else '')
                  for i, nh in enumerate(self.norm_to_orig_header)
-                 if nh != self.record_type_key}
-                print(cant_go_wrong)
-                cant_go_wrong[self.record_type_key] = nah
-                _objects.append(cant_go_wrong)
+                 if nh != self.record_type_key_header_header}
+                #print(cant_go_wrong)
+                cant_go_wrong[self.record_type_key_header] = nah
+                objects.append(cant_go_wrong)
 
         # end add missing items
+        return objects
 
-        keyed = {o[self.record_type_key]:o for o in _objects}
+    def _objectify(self):
+        gen = self._norm_alt_headers()
+        # WARNING assumes dict order
+        objects = [{k:v for k, v in zip(self.norm_to_orig_header, r)} for r in gen]
+        return objects
 
-        transformed = {}
-        for key, alt_grouped_norm in self.groups_alt.items():
-            records = [keyed[nh] for nh in alt_grouped_norm
-                       # FIXME versioning ... schema will take care of missing values later
-                       if nh in keyed]
-            objected = {nh:{record[self.record_type_key]:record[nh]
-                            for record in records}
-                        for nh in self.norm_to_orig_header}
-            transformed[key] = objected
-
-        nunaccounted = (set(self.norm_to_orig_alt) -
-                        (set(e for g in self.groups_alt.values()
-                             for e in g) | {self.record_type_key}))
-
-        #breakpoint()
-        for nah in nunaccounted: 
-            transformed[nah] = keyed[nah]
-
-        return transformed
-
-    def _norm_headers(self):
+    def _norm_alt_headers(self):
         # headers MUST be normalized as early as possible due to the fact that
         # there are very likely to be duplicate keys
         gen = self._headers()
 
         def normb(k):
-            if k in self.orig_to_norm_header:
-                nk = self.orig_to_norm_header[k]
-            elif k in self.orig_to_norm_alt:
+            if k in self.orig_to_norm_alt:
                 nk = self.orig_to_norm_alt[k]
             else:
                 nk = k
@@ -1017,14 +1084,17 @@ class Better(HasErrors):
             gen = iter(t)
 
         self.alt_header = next(agen)
-        self._alt_header = Header(self.alt_header)
+        self._alt_header = Header(self.alt_header, normalize=self.normalize_alt)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
         self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
+
         self.header = next(gen)
-        self._header = Header(self.header)
+        self._header = Header(self.header, normalize=self.normalize_header)
         self.norm_to_orig_header = self._header.lut(**self.renames_header)
         self.orig_to_norm_header = {v:k for k, v in self.norm_to_orig_header.items()}
-        return gen
+
+        yield self.header
+        yield from gen
 
 
 class NormSubmissionFile(NormValues):
@@ -1034,10 +1104,15 @@ class NormSubmissionFile(NormValues):
 
 
 class SubmissionFile(Better):
+    __internal_id_1 = object()
     default_record_type = COLUMN_TYPE
-    record_type_key = 'submission_item'
+    renames_alt = {'submission_item': __internal_id_1}
+    renames_header = {'definition': 'definition_header'}
+    record_type_key_alt = 'submission_item'
+    record_type_key_header = record_type_key_alt
     groups_alt = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
-    ignore_header = 'definition',
+    ignore_alt = __internal_id_1,
+    ignore_header = 'definition_header',
     normalization_class = NormSubmissionFile
 
     @property
@@ -1121,7 +1196,7 @@ class NormDatasetDescriptionFile(NormValues):
             elif v == '0':  # FIXME ? someone using strange conventions ...
                 return
             elif len(v) != 19:
-                msg = f'orcid wrong length {value!r} {self.path.as_posix()!r}'
+                msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
                 self.addError(OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
@@ -1137,7 +1212,7 @@ class NormDatasetDescriptionFile(NormValues):
             if not len(numeric):
                 return
             elif len(numeric) != 19:
-                msg = f'orcid wrong length {value!r} {self.path.as_posix()!r}'
+                msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
                 self.addError(OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
@@ -1147,7 +1222,7 @@ class NormDatasetDescriptionFile(NormValues):
             orcid = OrcidId(v)
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
-                msg = f'orcid failed checksum {value!r} {self.path.as_posix()!r}'
+                msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
                 self.addError(OrcidId.OrcidChecksumError(msg))
                 logd.error(msg)
                 return
@@ -1155,17 +1230,26 @@ class NormDatasetDescriptionFile(NormValues):
             yield orcid
 
         except (OntId.BadCurieError, OrcidId.OrcidMalformedError) as e:
-            msg = f'orcid malformed {value!r} {self.path.as_posix()!r}'
+            msg = f'orcid malformed {value!r} {self._path.as_posix()!r}'
             self.addError(OrcidId.OrcidMalformedError(msg))
             logd.error(msg)
             yield value
 
     def contributor_role(self, value):
         # FIXME normalizing here momentarily to squash annoying errors
+        def echeck(value, original):
+            if value.startswith('ERROR VALUE:'):
+                self.addError(value.split(':', 1)[-1].strip(),
+                              pipeline_stage=f'{self.__class__.__name__}.contributor_role',
+                              logfunc=logd.error)
+                return original
+            else:
+                return value
+
         if isinstance(value, list):
-            yield tuple(sorted(set(nml.NormContributorRole(e.strip()) for e in value)))
+            yield tuple(sorted(set(echeck(nml.NormContributorRole(e.strip()), e) for e in value)))
         else:
-            yield tuple(sorted(set(nml.NormContributorRole(e.strip()) for e in value.split(','))))
+            yield tuple(sorted(set(echeck(nml.NormContributorRole(e.strip()), e) for e in value.split(','))))
 
     def is_contact_person(self, value):
         # no truthy values only True itself
@@ -1193,12 +1277,14 @@ class NormDatasetDescriptionFile(NormValues):
                 try:
                     yield  self._protocol_url_or_doi(v)
                 except BaseException as e:
+                    yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     self.addError(e,
                                   pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
                                   logfunc=logd.error)
-                    self.addError(self.path.as_posix(),
+                    self.addError(self._path.as_posix(),
                                   pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.critical)
+                                  logfunc=logd.critical,
+                                  blame='debug')
                     # TODO raise exc.BadDataError from e
 
     def originating_article_doi(self, value):
@@ -1232,11 +1318,12 @@ class NormDatasetDescriptionFile(NormValues):
 
 class DatasetDescriptionFile(Better):
     default_record_type = COLUMN_TYPE
-    record_type_key = 'metadata_element'
     missing_add = {'metadata_version_do_not_change': ('1.0', 1)}
-    renames_alt = {'contributors': 'name'}
+    renames_alt = {'contributors': 'contributor_name'}  # watch out for name collisions (heu heu heu)
     renames_header = {'description': 'description_header'}
-    groups_alt = {'contributors': ('contributors',
+    record_type_key_alt = 'metadata_element'
+    record_type_key_header = record_type_key_alt
+    groups_alt = {'contributors': ('contributor_name',
                                    'contributor_orcid_id',
                                    'contributor_affiliation',
                                    'contributor_role',
@@ -1246,7 +1333,7 @@ class DatasetDescriptionFile(Better):
                                'example_image_locator',
                                'example_image_description'),}
 
-    ignore_header = 'example', 'description_header'
+    ignore_header = 'metadata_element', 'example', 'description_header'
     normalization_class = NormDatasetDescriptionFile
 
 
@@ -1448,14 +1535,26 @@ class NormSubjectsFile(NormValues):
 
 class SubjectsFile(Better):
     #default_record_type = COLUMN_TYPE
-    record_type_key = 'subject_id'
+    __internal_id_1 = object()
+    renames_header = {'subject_id': 'metadata_element',
+                      ('Lab-based schema for identifying each subject, '
+                       'should match folder names'): __internal_id_1,}
+    record_type_key_alt = 'subject_id'
+    record_type_key_header = 'metadata_element'
     groups_alt = {'software':('software',
                               'software_version',
                               'software_vendor',
                               'software_url',
-                              'software_rrid')}
-    #ignore_header = 'definition',  # TODO
+                              'software_rrid'),
+                  'subjects': GROUP_ALL}
+    ignore_header = __internal_id_1,
+    ignore_alt = 'additional_fields_e_g__minds',
+    ignore_match = [['subjects', 'sub-1', {'subject_id': 'sub-1',
+                                           'pool_id': 'pool-1',
+                                           'reference_atlas': 'Paxinos Rat V3',
+                                           'handedness': 'right',}]]
     normalization_class = NormSubjectsFile
+    normalize_header = False
 
 
 class SubjectsFilePath(ObjectPath):
@@ -1532,7 +1631,10 @@ class NormSamplesFile(NormSubjectsFile):
 class SamplesFile(SubjectsFile):
     """ TODO ... """
 
-    record_type_key = 'sample_id'  # FIXME + subject_id
+    # TODO merge
+    renames_header = {'subject_id': 'metadata_element'}
+    record_type_key_header = 'metadata_element'  # FIXME + subject_id
+    groups_alt = {'samples': GROUP_ALL}
     normalization_class = NormSamplesFile
 
 

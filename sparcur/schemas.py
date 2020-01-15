@@ -202,40 +202,6 @@ class JSONSchema(object):
         except exc.ValidationError as e:
             return False, e, data  # FIXME better format
 
-    @property
-    def total_possible_errors(self):
-        # TODO the structure for actual_errors is where we have to recurse
-        # this could be applied recursivley now, though using it requires unpacking the output
-        total_possible_errors = 0
-        if self.schema['type'] == 'object':
-            if 'required' in self.schema:
-                required = self.schema['required']
-            else:
-                required = []
-
-            total_possible_errors += len(required)
-
-            # this makes each error matter less the more values you have
-            # 
-            #for prop, value in self.schema['properties'].items():
-                #if prop not in required and len(value) > 1 and prop in instance:
-
-            if 'additionalProperties' in self.schema and not self.schema['additionalProperties']:
-                total_possible_errors += 1
-
-        elif self.schema['type'] == 'array' and 'contains' in schema:
-            total_possible_errors += 1
-
-        return total_possible_errors
-    
-        # optional fields means that the total
-        # possible errors cannot be known until runtime
-        # but what that means is that we assume that optional fields
-        # should always be correct and thus that only the static
-        # information in the schema will be used to generate the score
-        # FIXME the above doesn't actually work because missing optional
-        # fields do need to be added at runtime, we'll do that next time
-
 
 class RemoteSchema(JSONSchema):
     schema = ''
@@ -263,24 +229,28 @@ class ErrorSchema(JSONSchema):
 
 
 class DatasetStructureSchema(JSONSchema):
-    schema = {'type': 'object',
-              'required': ['submission_file', 'dataset_description_file', 'subjects_file'],
-              'properties': {'submission_file': {'type': 'string',
+    __schema = {'type': 'object',
+                'required': ['submission_file', 'dataset_description_file'],
+                'properties': {'submission_file': {'type': 'string',
+                                                   'pattern': metadata_filename_pattern},
+                               'dataset_description_file': {'type': 'string',
+                                                            'pattern': metadata_filename_pattern},
+                               'subjects_file': {'type': 'string',
                                                  'pattern': metadata_filename_pattern},
-                             'dataset_description_file': {'type': 'string',
-                                                          'pattern': metadata_filename_pattern},
-                             'subjects_file': {'type': 'string',
-                                               'pattern': metadata_filename_pattern},
-                             'samples_file': {'type': 'string',
-                                              'pattern': metadata_filename_pattern},
-                             'dirs': {'type': 'integer',
-                                      'minimum': 0},
-                             'files': {'type': 'integer',
-                                       'minimum': 0},
-                             'size': {'type': 'integer',
-                                      'minimum': 0},
-                             'errors': ErrorSchema.schema,
-              }}
+                               'samples_file': {'type': 'string',
+                                                'pattern': metadata_filename_pattern},
+                               'dirs': {'type': 'integer',
+                                        'minimum': 0},
+                               'files': {'type': 'integer',
+                                         'minimum': 0},
+                               'size': {'type': 'integer',
+                                        'minimum': 0},
+                               'errors': ErrorSchema.schema,
+                }}
+    schema = {'allOf': [__schema,
+                        {'anyOf': [
+                            {'required': ['subjects_file']},
+                            {'required': ['samples_files']}]}]}
 
 
 class ContributorSchema(JSONSchema):
@@ -290,7 +260,7 @@ class ContributorSchema(JSONSchema):
                   'first_name': {'type': 'string'},
                   'last_name': {'type': 'string'},
                   'contributor_orcid_id': {'type': 'string',
-                                           'pattern': ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
+                                           'pattern': ('^https://orcid.org/0000-000(1-[5-9]|2-n[0-9]|3-'
                                                        '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')},
                   'contributor_affiliation': {'type': 'string'},
                   'contributor_role': {
@@ -618,7 +588,7 @@ class DatasetOutSchema(JSONSchema):
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
 
-    __schema = copy.deepcopy(DatasetStructureSchema.schema)
+    __schema = copy.deepcopy(DatasetStructureSchema.schema['allOf'][0])
     __schema['required'] = ['id', 'meta', 'contributors']
     __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},

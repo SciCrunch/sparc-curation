@@ -51,6 +51,11 @@ class Affiliations(Sheet):
             return self(affiliation_string[0] + 'ERROR ERROR')
 
         m = self.mapping
+
+        if not isinstance(affiliation_string, str):
+            log.critical('sigh')
+            return None
+
         if affiliation_string in m:
             return m[affiliation_string]
         else:

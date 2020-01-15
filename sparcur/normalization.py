@@ -154,5 +154,12 @@ class NormContributorRole(str):
         # a hilariously slow way to do this
         # also not really normalization ... more, best guess for what people were shooting for
         if value:
-            return sorted((cls.levenshteinDistance(value, v), v) for v in cls.values)[0][1]
+            best = sorted((cls.levenshteinDistance(value, v), v) for v in cls.values)[0]
+            distance = best[0]
+            normalized = best[1]
+            cutoff = len(value) / 2
+            if distance > cutoff:
+                normalized = (f'ERROR VALUE: "{value}" could not be normalized, best was {normalized} '
+                              f'with distance {distance} cutoff was {cutoff}')
 
+            return normalized
