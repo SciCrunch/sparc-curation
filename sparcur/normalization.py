@@ -448,71 +448,6 @@ class NormDatasetDescriptionFile(NormValues):
 
 
 class NormSubjectsFile(NormValues):
-    def __data(self):
-        # sigh
-        #notunique = (len([r for r in self.bc.subject_id if r]) !=
-                     #len([k for k in self.bc._byCol__indexes['subject_id']
-                          #if k != 'subject_id' and k]))
-        if self._is_json:
-            # FIXME ... only if it is a json list ???
-            sids = Counter(r['subject_id'] for r in self._data_raw if r)
-            values = self._data_raw
-        elif not hasattr(self.bc, 'subject_id'):
-            sids = {}
-            values = list(self)
-            msg = f'subject_id column missing! for {self.path}'
-            logd.critical(msg)
-            self.addError(msg)
-        else:
-            sids = Counter(r for r in self.bc.subject_id if r)
-            values = list(self)
-
-        notunique = {s:c for s, c in sids.items() if c > 1}
-
-        if notunique:
-            msg = f'subject_ids are not unique for {self.path}\n{notunique}'
-            logd.critical(msg)
-            self.addError(msg)
-
-        out = {self.dict_key: values}
-        if not self._is_json:
-            for k, heads in self.horizontals.items():
-                # TODO make sure we actually check that the horizontal
-                # isn't used by someone else already ... shouldn't be
-                # it should be skipped but maybe not?
-                tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
-                                                # FIXME one [] drops whole horiz group ...
-                                                for head in heads))
-                                if any(_)))
-                if tups:
-                    out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
-
-        self.embedErrors(out)
-        return out
-
-    def ___init__(self, path):
-        super().__init__(path)
-        if self._is_json:
-            header = [d.keys() for d in self._data_raw]  # FIXME max may have wrong top level schema
-        else:
-            header = self.bc.header
-
-        # units merging
-        # TODO pull the units in the parens out
-        self.h_unit = [k for k in header if '_unit' in k]
-        h_value = [k.replace('_units', '').replace('_unit', '') for k in self.h_unit]
-        no_unit = [k for k in header if '_unit' not in k]
-        #self.h_value = [k for k in self.bc.header if '_units' not in k and any(k.startswith(hv) for hv in h_value)]
-        self.h_value = [k for hv in h_value
-                        for k in no_unit
-                        if k.startswith(hv) or k.endswith(hv)]
-        err = f'Problem! {self.h_unit} {self.h_value} {header} \'{self.path}\''
-        #assert all(v in header for v in self.h_value), err
-        assert len(self.h_unit) == len(self.h_value), err
-        self.skip = self.h_unit + self.h_value
-
-        self.skip_cols += tuple(set(_ for v in self.horizontals.values() for _ in v))
-
     def species(self, value):
         nv = nml.NormSpecies(value)
         #yield self._query(nv, 'NCBITaxon')
@@ -639,55 +574,6 @@ class NormSubjectsFile(NormValues):
 
 
 class NormSamplesFile(NormSubjectsFile):
-    def __data(self):
-        #notunique = (len([r for r in self.bc.sample_id if r]) !=
-                     #len([k for k in self.bc._byCol__indexes['sample_id']
-                          #if k != 'sample_id' and k]))
-
-        if self._is_json:
-            sids = Counter(r['sample_id'] for r in self._data_raw if r)
-        elif not hasattr(self.bc, 'sample_id'):
-            sids = {}
-            values = list(self)
-            msg = f'sample_id column missing! for {self.path}'
-            logd.critical(msg)
-            self.addError(msg)
-        else:
-            sids = Counter(r for r in self.bc.sample_id if r)
-
-        notunique = {s:c for s, c in sids.items() if c > 1}
-        values = list(self)
-        if notunique:
-            if not values or 'sample_id' not in values[0]:
-                # [] [{}], caused by a bunch of N/A or missing rows
-                breakpoint()
-
-            msg = f'sample_ids are not unique for {self.path}\n{notunique}'
-            logd.critical(msg)
-            self.addError(msg)
-            # FIXME this needs to be pipelined so we can do the diff ??
-            for i, v in enumerate(values):
-                v['local_sample_id'] = v['sample_id']
-                if 'subject_id' in v:
-                    v['sample_id'] = v['subject_id'] + '-' + v['sample_id']  # FIXME '/' gets quoted ...
-                else:
-                    v['sample_id'] = f'ERROR-{i}-' + v['sample_id']
-
-        out = {self.dict_key: values}
-        for k, heads in self.horizontals.items():
-            # TODO make sure we actually check that the horizontal
-            # isn't used by someone else already ... shouldn't be
-            # it should be skipped but maybe not?
-            tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
-                                               # FIXME one [] drops whole horiz group ...
-                                               for head in heads))
-                              if any(_)))
-            if tups:
-                out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
-
-        self.embedErrors(out)
-        return out
-
     def specimen_anatomical_location(self, value):
         seps = '|', ';'
         #skip = (

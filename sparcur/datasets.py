@@ -37,8 +37,6 @@ def tos(hrm):
         return hrm
 
 
-# FIXME this whole file needs to be properly converted into pipelines
-
 hasSchema = sc.HasSchema()
 @hasSchema.mark
 class Header:
@@ -329,13 +327,6 @@ class DatasetStructure(Path, HasErrors):
 DatasetStructure._bind_flavours()
 
 
-class DatasetStructureLax(DatasetStructure):
-    default_glob = 'rglob'
-
-
-DatasetStructureLax._bind_flavours()
-
-
 class ObjectPath(Path):
     obj = None
     @property
@@ -483,215 +474,6 @@ class Tabular(HasErrors):
         return table.table
 
 
-class Version1Header(HasErrors):
-    to_index = tuple()  # first element indexes row based data
-    skip_cols = 'metadata_element', 'description', 'example'
-    max_one = tuple()
-    verticals = dict()  # FIXME should really be immutable
-    #schema_class = sc.JSONSchema
-
-    def __new__(cls, path):
-        #cls.schema = cls.schema_class()
-        return super().__new__(cls)
-
-    def __init__(self, path):
-        super().__init__()
-        self.path = path
-        if self._is_json:
-            with open(self.path, 'rt') as f:
-                try:
-                    self._data_raw = json.load(f)
-                except json.decoder.JSONDecodeError as e:
-                    if not f.buffer.tell():
-                        raise exc.NoDataError(self.path)
-                    else:
-                        raise exc.BadDataError(self.path) from e
-
-            if isinstance(self._data_raw, dict):
-                # FIXME this breaks downstream assumptions
-                self._data_cache = {self.rename_key(k):tos(self.normalize(k, v))  # FIXME FIXME
-                                    for k, v in self._data_raw.items()}
-
-            return
-
-        tabular = Tabular(self.path)
-        self.skip_rows = tuple(key for keys in self.verticals.values() for key in keys)
-        self.t = tabular
-        l = list(tabular)
-        if not l:
-            # FIXME bad design, this try block is a workaround for bad handling of empty lists
-            raise exc.NoDataError(self.path)
-
-        self.orig_header, *rest = l
-        header = Header(self.orig_header).data
-
-        self.fail = False
-        if self.to_index:
-            for head in self.to_index:
-                if head not in header:
-                    log.error(f'\'{self.t.path}\' malformed header!')
-                    self.fail = True
-
-        if self.fail:
-            try:
-                self.bc = byCol(rest, header)
-            except ValueError as e:
-                raise exc.BadDataError(self.path) from e
-        else:
-            self.bc = byCol(rest, header, to_index=self.to_index)
-
-    @property
-    def _is_json(self):
-        # impl detail, sigh
-        # FIXME this should not be done here
-        # json should conform directly to the schemas and should be loaded
-        # directly via the object loader
-        return self.path.suffix == '.json'
-
-    def xopen(self):
-        """ open file using xdg-open """
-        self.path.xopen()
-
-    @property
-    def _errors(self):
-        if hasattr(self, 't'):
-            yield from self.t._errors
-
-        yield from super()._errors
-
-    @staticmethod
-    def query(value, prefix):
-        for query_type in ('term', 'search'):
-            terms = list(OntTerm.query(prefix=prefix, **{query_type:value}))
-            if terms:
-                #print('matching', terms[0], value)
-                #print('extra terms for', value, terms[1:])
-                return terms[0]
-            else:
-                continue
-
-        else:
-            log.warning(f'No ontology id found for {value}')
-            return value
-
-    def default(self, value):
-        yield value
-
-    def normalize(self, key, value):
-        if isinstance(value, str):
-            v = value.replace('\ufeff', '')  # FIXME utf-16 issue
-            if v != value:  # TODO can we decouple encoding from value normalization?
-                message = f"encoding feff error in '{self.path}'"
-                log.error(message)
-                self.addError(exc.EncodingError(message))
-
-            if v.lower().strip() in ('n/a', 'na', 'no'):  # FIXME explicit null vs remove from structure
-                return
-
-        else:
-            v = value
-
-        yield from getattr(self, key, self.default)(v)
-
-    def rename_key(self, key, *parent_keys):
-        """ modify this in your class if you need to rename a key """
-        # TODO parent key lists
-        return key
-
-    @property
-    def inverse(self):
-        """ back to the original format """
-        # self.to_index -> [(new_col, orig_col) ...]
-        # put all the required data in the second column
-        # align any data from verticals -> additional columns
-        # align any data from horizontals -> additional overlapping rows
-
-    @property
-    def data(self):  # TODO candidate for memory.cache
-        if hasattr(self, '_data_cache'):
-            return self._data_cache
-
-        if self._is_json:
-            self._data_cache = {k:v for k, v in self}
-            return self.data
-
-        index_col, *_ = self.to_index
-        out = {}
-        if not hasattr(self.bc, index_col):
-            msg = f'{self.path.as_posix()!r} maformed header!'
-            self.addError(msg)
-            logd.error(msg)
-            self.embedErrors(out)
-            self._data_cache = out
-            return out
-
-        ic = list(getattr(self.bc, index_col))
-        nme = Header(ic).data
-        nmed = {v:normk for normk, v in zip(nme, ic)}
-
-        for v, nt in self.bc._byCol__indexes[index_col].items():
-            if v != index_col:
-                normk = nmed[v]
-                if normk not in self.skip_rows:
-                    _value = tuple(normv for key, value in zip(nt._fields, nt)
-                                   if key not in self.skip_cols and value
-                                   for normv in self.normalize(normk, value)
-                                   if normv)
-                    value = tuple(set(_value))
-                    if len(value) != len(_value):
-                        # TODO counter to show the duplicate values
-                        msg = f'duplicate values in {normk} TODO {self.path.as_posix()!r}'
-                        self.addError(msg)
-                        logd.error(msg)
-
-                    if normk in self.max_one:  # schema will handle this ..
-                        if not value:
-                            #log.warning(f"missing value for {normk} '{self.path}'")
-                            pass
-                        elif len(value) > 1:
-                            msg = f'too many values for {normk} {value} {self.path.as_posix()!r}'
-                            self.addError(msg)
-                            logd.error(msg)
-                            # FIXME not selecting the zeroth element here breaks the schema assumptions
-                            #value = 'AAAAAAAAAAA' + '\n|AAAAAAAAAAA|\n'.join(value)
-                            #value = 'ERROR>>>' + ','.join(value)
-                            # just leave it
-                        else:
-                            value = value[0]  # FIXME error handling etc.
-
-                    if value:
-                        out[normk] = value
-
-        def merge(tup):
-            out = {}
-            for a, b in tup:
-                if a not in out:
-                    out[a] = b
-                elif a and not isinstance(b, tuple):
-                    out[a] = out[a], b
-                else:
-                    out[a] += b,
-
-            self._data_cache = out
-            return out
-
-        for key, keys in self.verticals.items():
-            gen = (merge([(self.rename_key(k, key), normv)
-                          for k, value in zip(nme, values)
-                          if k in keys and value
-                          for normv in self.normalize(k, value)
-                          if normv])
-                   for head, *values in self.bc.cols
-                   if head not in self.skip_cols)
-            value = tuple(_ for _ in gen if _)
-            if value:
-                out[key] = value
-
-        self.embedErrors(out)
-        self._data_cache = out
-        return out
-
-
 ROW_TYPE = object()
 COLUMN_TYPE = object()
 numberN = object()
@@ -749,7 +531,7 @@ class PrimaryKey:
         return iter(self)
 
 
-class Better(HasErrors):
+class MetadataFile(HasErrors):
     default_record_type = ROW_TYPE
     primary_key_rule = None  # name, the names of the alt_header columns to merge, function to merge tuple
     missing_add = {}
@@ -1027,7 +809,7 @@ class Better(HasErrors):
         yield from gen
 
 
-class SubmissionFile(Better):
+class SubmissionFile(MetadataFile):
     __internal_id_1 = object()
     default_record_type = COLUMN_TYPE
     renames_alt = {'submission_item': __internal_id_1}
@@ -1067,7 +849,7 @@ class SubmissionFilePath(ObjectPath):
 SubmissionFilePath._bind_flavours()
 
 
-class DatasetDescriptionFile(Better):
+class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     missing_add = {'metadata_version_do_not_change': ('1.0', 1)}
     renames_alt = {'contributors': 'contributor_name'}  # watch out for name collisions (heu heu heu)
@@ -1095,7 +877,7 @@ class DatasetDescriptionFilePath(ObjectPath):
 DatasetDescriptionFilePath._bind_flavours()
 
 
-class SubjectsFile(Better):
+class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE
     __internal_id_1 = object()
     renames_header = {'subject_id': 'metadata_element',
