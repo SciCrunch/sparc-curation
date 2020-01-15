@@ -387,7 +387,8 @@ class Tabular(HasErrors):
                                   path=self.path)
                     logd.error(message)
 
-                return rows
+                yield from rows
+                return
             except UnicodeDecodeError:
                 continue
             except csv.Error as e:
@@ -459,19 +460,21 @@ class Tabular(HasErrors):
         return self.__class__(self.path, rotate=True)
 
     def __iter__(self):
+        yield from self._iter_(normalize=True)
+
+    def _iter_(self, normalize=False):
         try:
-            gen = getattr(self, self.file_extension)()
+            if normalize:
+                gen = self.normalize(getattr(self, self.file_extension)())
+            else:
+                gen = getattr(self, self.file_extension)()
+
             if self._rotate:
                 yield from zip(*gen)
             else:
                 yield from gen
         except UnicodeDecodeError as e:
             log.error(f'{self.path.as_posix()!r} {e}')
-
-    #@property
-    #def title(self):
-        #path = Path(self.path)
-        #return f'{path.name:<39} ' + path.cache.dataset.id + ' ' + path.cache.dataset.name
 
     @property
     def title(self):
@@ -554,9 +557,9 @@ class PrimaryKey:
 class MetadataFile(HasErrors):
     default_record_type = ROW_TYPE
     primary_key_rule = None  # name, the names of the alt_header columns to merge, function to merge tuple
-    missing_add = {}
     renames_alt = {}     # renames first since all following
     renames_header = {}  # refs look for the renamed form
+    missing_add = {}  # missing also comes after renames
     record_type_key_alt = None  # record type key is affected by renames
     record_type_key_header = None  # record type key is affected by renames
     groups_alt = {}
@@ -732,7 +735,14 @@ class MetadataFile(HasErrors):
         nunaccounted = (set(self.norm_to_orig_alt) - naccounted_baseline)
 
         for nah in nunaccounted: 
+            #try:
+                #transformed[nah] = keyed[nah]
+            #except KeyError as e:
+                #breakpoint()
+                #'fuckyou'
+
             transformed[nah] = keyed[nah]
+
 
         return transformed
 
@@ -888,9 +898,10 @@ SubmissionFilePath._bind_flavours()
 
 class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
-    missing_add = {'metadata_version_do_not_change': ('1.0', 1)}
-    renames_alt = {'contributors': 'contributor_name'}  # watch out for name collisions (heu heu heu)
+    renames_alt = {'contributors': 'contributor_name',  # watch out for name collisions (heu heu heu)
+                   'metadata_version_do_not_change': 'version'}
     renames_header = {'description': 'description_header'}
+    missing_add = {'version': ('1.0', 1)}
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
     groups_alt = {'contributors': ('contributor_name',

@@ -230,12 +230,12 @@ class NormValues(HasErrors):
         self._groups_alt = self._obj_inst.groups_alt
         self._path = self._obj_inst.path
 
-    def _error_on_na(self, value):
+    def _error_on_na(self, value, key=None):
         """ N/A -> raise for cases where it should just be removed """
         v = value.strip()
         if v in ('NA', 'n/a', 'N/A',):
             # TODO consider double checking these cases ?
-            raise exc.NotApplicableError()
+            raise exc.NotApplicableError(key)
 
     def _deatag(self, value):
         if value.startswith('<a') and value.endswith('</a>'):
@@ -288,7 +288,7 @@ class NormValues(HasErrors):
             # FIXME I do NOT like this pattern :/
 
             if isinstance(key, str) and hasattr(self, key):
-                #self._error_on_na(thing, key)  # TODO see if this makes sense
+                self._error_on_na(thing, key)  # TODO see if this makes sense
                 out = getattr(self, key)(thing)
                 if isinstance(out, GeneratorType):
                     out = tuple(out)
@@ -319,6 +319,10 @@ class NormValues(HasErrors):
 
 
 class NormSubmissionFile(NormValues):
+
+    def milestone_achieved(self, value):
+        # TODO and trigger na
+        return value
 
     def sparc_award_number(self, value):
         return NormAward(value)
@@ -425,7 +429,8 @@ class NormDatasetDescriptionFile(NormValues):
                               logfunc=logd.error,
                               blame='submission',
                               path=self._path)
-                return original
+                return ''  # can't return None or sorting errors occur
+
             else:
                 return value
 
@@ -463,7 +468,8 @@ class NormDatasetDescriptionFile(NormValues):
                 try:
                     yield  self._protocol_url_or_doi(v)
                 except BaseException as e:
-                    yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
+                    #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
+                    # it is not ...
                     self.addError(e,
                                   pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
                                   logfunc=logd.error)
@@ -531,6 +537,19 @@ class NormSubjectsFile(NormValues):
         # FIXME gender -> sex for animals, requires two pass normalization ...
         yield from self.sex(value)
 
+    def group(self, value):
+        # trigger n/a
+        return value
+
+    def pool_id(self, value):
+        # trigger n/a
+        return value
+
+    def handedness(self, value):
+        # needed to tirgger n/a fixes I think
+        # TODO
+        return value
+
     def _param(self, value):
         self._error_on_na(value)
 
@@ -578,6 +597,9 @@ class NormSubjectsFile(NormValues):
     #def age_category(self, value):
         #yield self._query(value, 'UBERON')
 
+    def experimental_log_file_name(self, value):
+        return value
+
     def age_range_min(self, value):
         yield from self._param(value)
 
@@ -592,6 +614,8 @@ class NormSubjectsFile(NormValues):
             return value
 
         yield from self._param(value)
+
+    age_range_max_disease = age_range_max # FIXME pretty sure these are a bad merge?
 
     def mass(self, value):
         yield from self._param(value)
@@ -657,6 +681,7 @@ class NormSubjectsFile(NormValues):
 
 
 class NormSamplesFile(NormSubjectsFile):
+
     def specimen_anatomical_location(self, value):
         seps = '|', ';'
         for sep in seps:

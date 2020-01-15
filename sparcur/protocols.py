@@ -161,8 +161,11 @@ class ProtocolData(dat.HasErrors):
                     pass
                 else:
                     yield end_uri
+
             except idlib.exceptions.ResolutionError as e:
                 pass  # FIXME I think we already log this error?
+            except requests.exceptions.MissingSchema as e:
+                self.addError(e, blame='submission')
 
     @property
     def protocol_annotations(self):

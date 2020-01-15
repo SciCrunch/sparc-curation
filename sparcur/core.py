@@ -64,8 +64,8 @@ class OntId(OIDB):
 
 
 class OntTerm(OTB, OntId):
-    _known_no_label = 'dataset',
-    pass
+    _known_no_label = 'dataset', 'pio.private'
+
     #def atag(self, curie=False, **kwargs):
         #return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 

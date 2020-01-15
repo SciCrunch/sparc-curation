@@ -346,8 +346,8 @@ class DatasetDescriptionSchema(JSONSchema):
                      'description',
                      'funding',
                      'protocol_url_or_doi',
-                     'contributors',
-                     'completeness_of_data_set'],
+                     #'completeness_of_data_set'  # TODO versioned schema validation
+                     'contributors',],
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
             'errors': ErrorSchema.schema,

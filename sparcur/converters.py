@@ -208,7 +208,12 @@ class MetaConverter(TripleConverter):
             yield s, a, sparc.Protocol
             pd = ProtocolData(self.integrator.id)
             # FIXME needs to be a pipeline so that we can export errors
-            pj = pd(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
+            try:
+                pj = pd(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
+            except oq.OntId.BadCurieError as e:
+                logd.error(e)  # FIXME export errors ...
+                pj = None
+
             if pj:
                 label = pj['protocol']['title']
                 yield s, rdfs.label, rdflib.Literal(label)
