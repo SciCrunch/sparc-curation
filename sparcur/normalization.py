@@ -507,7 +507,8 @@ class NormDatasetDescriptionFile(NormValues):
         else:
             values = value,
 
-        return values
+        yield from values
+        #return values
         #log.debug(f'{values}')
         #for value in values:
             #match = self._query(value, prefix=None)

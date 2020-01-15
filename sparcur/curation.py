@@ -639,7 +639,9 @@ class TriplesExport(ProtcurData):
                 if (not (isinstance(element, rdflib.URIRef) or
                          isinstance(element, rdflib.BNode) or
                          isinstance(element, rdflib.Literal)) or
-                    (hasattr(element, '_value') and isinstance(element._value, dict))):
+                    (hasattr(element, '_value') and (isinstance(element._value, dict) or
+                                                     isinstance(element._value, list) or
+                                                     isinstance(element._value, tuple)))):
                     log.critical(element)
 
             return triple
