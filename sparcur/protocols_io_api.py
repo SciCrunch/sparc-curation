@@ -77,7 +77,7 @@ def get_protocols_io_auth(creds_file,
             except pickle.UnpicklingError as e:
                 # FIXME need better way to trace errors in a way
                 # that won't leak secrets by default
-                log.error(f'problem in file at path for {_auth_var}')
+                log.error(f'problem in file at path for "protocols-io-api-store-file"')
                 raise e
     else:
         creds = None
