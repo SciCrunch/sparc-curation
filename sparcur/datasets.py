@@ -2,12 +2,10 @@ import io
 import ast
 import csv
 import copy
-import json
 import numbers
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
-from html.parser import HTMLParser
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
@@ -16,9 +14,10 @@ from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from pysercomb.pyr import units as pyru
 from augpathlib import FileSize
 from sparcur import schemas as sc
+from sparcur import raw_json as rj
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, PioId
+from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, PioId, HasErrors
 from sparcur.paths import Path
 
 a = rdf.type
@@ -57,6 +56,7 @@ class Header:
             if c:
                 c = python_identifier(c)
                 c = nml.NormHeader(c)
+
             if not c:
                 c = f'TEMP_{i}'
 
@@ -94,56 +94,6 @@ class Header:
 
         return {renames[n] if n in renames else n:h
                 for n, h in zip(original, original)}
-
-
-class HasErrors:
-    def __init__(self, *args, pipeline_stage=None, **kwargs):
-        try:
-            super().__init__(*args, **kwargs)
-        except TypeError as e:  # this is so dumb
-            super().__init__()
-
-        self._pipeline_stage = pipeline_stage
-        self._errors_set = set()
-
-    def addError(self, error, pipeline_stage=None, logfunc=None, blame=None):
-        stage = (pipeline_stage if pipeline_stage is not None
-                 else (self._pipeline_stage if self._pipeline_stage
-                       else self.__class__.__name__))
-        b = len(self._errors_set)
-        self._errors_set.add((error, stage, blame))
-        a = len(self._errors_set)
-        if logfunc is not None and a != b:  # only log on new errors
-            logfunc(error)
-
-    @property
-    def _errors(self):
-        for e, stage, blame in self._errors_set:
-            o = {'pipeline_stage': stage}  # FIXME
-
-            if blame is not None:
-                o['blame'] = blame
-
-            if isinstance(e, str):
-                o['message'] = e
-
-            elif isinstance(e, BaseException):
-                o['message'] = str(e)
-                o['type'] = str(type(e))
-
-            else:
-                raise TypeError(repr(e))
-
-            log.debug(o)
-            yield o
-
-    def embedErrors(self, data):
-        el = list(self._errors)
-        if el:
-            if 'errors' in data:
-                data['errors'].extend(el)
-            elif el:
-                data['errors'] = el
 
 
 class DatasetMetadata(Path, HasErrors):
@@ -398,9 +348,10 @@ ObjectPath._bind_flavours()
 
 class Tabular(HasErrors):
 
-    def __init__(self, path):
+    def __init__(self, path, rotate=False):
         super().__init__()
         self.path = path
+        self._rotate = rotate
 
     @property
     def file_extension(self):
@@ -497,11 +448,15 @@ class Tabular(HasErrors):
 
     @property
     def T(self):
-        yield from zip(*self)
+        return self.__class__(self.path, rotate=True)
 
     def __iter__(self):
         try:
-            yield from getattr(self, self.file_extension)()
+            gen = getattr(self, self.file_extension)()
+            if self._rotate:
+                yield from zip(*gen)
+            else:
+                yield from gen
         except UnicodeDecodeError as e:
             log.error(f'{self.path.as_posix()!r} {e}')
 
@@ -737,87 +692,6 @@ class Version1Header(HasErrors):
         return out
 
 
-class NormValues(HasErrors):
-    """ Base class with an open dir to avoid name collisions """
-    def __init__(self, obj_inst):
-        super().__init__()
-        self._bind(obj_inst._normalize_keys(),
-                   obj_inst.record_type_key_header,
-                   obj_inst.norm_to_orig_alt,
-                   obj_inst.norm_to_orig_header,
-                   obj_inst.groups_alt,
-                   obj_inst.path)
-
-    def _bind(self, blob, record_type_key_header, norm_to_orig_alt, norm_to_orig_header,
-              groups_alt, path):
-        self._blob = blob
-        self._record_type_key_header = record_type_key_header
-        self._norm_to_orig_alt = norm_to_orig_alt
-        self._norm_to_orig_header = norm_to_orig_header
-        self._groups_alt = groups_alt
-        self._path = path
-
-    @staticmethod
-    def _query(value, prefix):
-        for query_type in ('term', 'search'):
-            terms = list(OntTerm.query(prefix=prefix, **{query_type:value}))
-            if terms:
-                #print('matching', terms[0], value)
-                #print('extra terms for', value, terms[1:])
-                return terms[0]
-            else:
-                continue
-
-        else:
-            log.warning(f'No ontology id found for {value}')
-            return value
-
-    def _normv(self, thing, key=None, path=tuple()):
-        #print(path)
-        if isinstance(thing, dict):
-            out = {}
-            for k, v in thing.items():
-                if k == self._record_type_key_header:
-                    out[k] = v
-                elif k in self._norm_to_orig_header:
-                    out[k] = self._normv(v, key, path)
-                elif k in self._norm_to_orig_alt:
-                    out[k] = self._normv(v, k, path + (k,))
-                elif k in self._groups_alt:
-                    out[k] = self._normv(v, k, path + (k,))
-                else:
-                    raise ValueError(f'what is going on here?! {k} {v}')
-
-            return out
-
-        else:
-            # TODO make use of path
-            # FIXME I do NOT like this pattern :/
-            if key is not None and hasattr(self, key):
-                out = getattr(self, key)(thing)
-                if isinstance(out, GeneratorType):
-                    out = tuple(out)
-                    if len(out) == 1:  # FIXME find the actual source of double packing
-                        out = out[0]
-                    elif not out:
-                        msg = f'Normalization {key} returned None for input {thing}'
-                        self.addError(msg,
-                                      pipeline_stage=f'{self.__class__.__name__}.{key}',
-                                      logfunc=log.critical,
-                                      blame='pipeline',)
-                        out = None
-
-                return out
-
-            return thing
-
-    @property
-    def data(self):
-        data = self._normv(self._blob)
-        self.embedErrors(data)
-        return data
-
-
 ROW_TYPE = object()
 COLUMN_TYPE = object()
 numberN = object()
@@ -851,24 +725,54 @@ def remove_rule(blob, rule):
         previous_element = path_element
 
 
+class PrimaryKey:
+    def __init__(self, name, column_names, combine_function,
+                 nalt_header, agen, gen):
+        self.name = name
+        # because we add the primary key to alt header we remove it again here
+        # because the rest of the generator values don't have a blank prepended
+        nalt_header_less_pk = [nah for nah in nalt_header if nah != name]
+        self.indexes = [nalt_header_less_pk.index(name) for name in column_names]
+        self.combine_function = combine_function
+        self._agen = agen
+        self._gen = gen
+
+    def compute_primary(self, arecord):
+        return self.combine_function(tuple(arecord[index] for index in self.indexes))
+
+    def __iter__(self):
+        yield (self.name, *[self.compute_primary(ar) for ar in self._agen])
+        yield from self._gen
+
+    @property
+    def generator(self):
+        return iter(self)
+
+
 class Better(HasErrors):
     default_record_type = ROW_TYPE
+    primary_key_rule = None  # name, the names of the alt_header columns to merge, function to merge tuple
     missing_add = {}
     renames_alt = {}     # renames first since all following
     renames_header = {}  # refs look for the renamed form
+    record_type_key_alt = None  # record type key is affected by renames
     record_type_key_header = None  # record type key is affected by renames
     groups_alt = {}
     groups_header = {}
     ignore_alt = tuple()
     ignore_header = tuple()
     ignore_match = tuple()
-    normalization_class = NormValues
+    raw_json_class = rj.RawJson
+    normalization_class = nml.NormValues
     normalize_alt = True
     normalize_header = True
 
     def __new__(cls, path):
-        if cls.record_type_key_header is None:
-            raise TypeError(f'record_type_key_header should not be None on {cls.__name__}')
+        if cls.record_type_key_header is None or cls.record_type_key_alt is None:
+            raise TypeError(f'record_type_key_? should not be None on {cls.__name__}')
+
+        # TODO check for renames that didn't get picked up
+        # especially from the 0, 0 cell
 
         return super().__new__(cls)
 
@@ -881,11 +785,17 @@ class Better(HasErrors):
 
     @property
     def data(self):
-        return self._data()
+        data = self._data()
+
+        condition = False
+        if condition:
+            breakpoint()
+
+        return data
 
     def _data(self):
-        if self.path.suffix == 'json':
-            return RawJson(self.path).data
+        if self.path.suffix == '.json':
+            return self.raw_json_class(self.path).data
 
         else:
             # TODO if this passes we can just render backward from _normalize
@@ -915,7 +825,13 @@ class Better(HasErrors):
             else:
                 return thing
 
-        return condense(crtk)
+        cond = condense(crtk)
+        if cond is None:
+            # None breaks further pipelines
+            # yes types would help here
+            return {}
+        else:
+            return cond
 
     def _cull_rtk(self):
         normalized = self._normalize_values()
@@ -923,7 +839,8 @@ class Better(HasErrors):
             if isinstance(thing, dict):
                 out = {}
                 for k, v in thing.items():
-                    if k != self.record_type_key_header:
+                    if (k != self.record_type_key_header and
+                        k != self.record_type_key_alt):
                         nv = crtk(v)
                         if nv is not None:
                             out[k] = nv
@@ -1042,7 +959,7 @@ class Better(HasErrors):
 
                 {nh:(value if number == numberN or i <= number else '')
                  for i, nh in enumerate(self.norm_to_orig_header)
-                 if nh != self.record_type_key_header_header}
+                 if nh != self.record_type_key_header}
                 #print(cant_go_wrong)
                 cant_go_wrong[self.record_type_key_header] = nah
                 objects.append(cant_go_wrong)
@@ -1074,19 +991,32 @@ class Better(HasErrors):
 
     def _headers(self):
         t = Tabular(self.path)
-        print(t)
+        self.t = t
 
         if self.default_record_type == ROW_TYPE:
-            agen = iter(t)
-            gen = iter(t.T)
+            alt = t
+            head = t.T
         else:
-            agen = iter(t.T)
-            gen = iter(t)
+            alt = t.T
+            head = t
 
-        self.alt_header = next(agen)
+        agen = iter(alt)
+        gen = iter(head)
+
+        if self.primary_key_rule is not None:
+            pk_name, combine_names, combine_function = self.primary_key_rule
+            self.alt_header = (pk_name, *next(agen))
+        else:
+            self.alt_header = next(agen)
+
         self._alt_header = Header(self.alt_header, normalize=self.normalize_alt)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
         self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
+
+        if self.primary_key_rule is not None:
+            nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
+            gen = PrimaryKey(pk_name, combine_names, combine_function,
+                             nalt_header, agen, gen).generator
 
         self.header = next(gen)
         self._header = Header(self.header, normalize=self.normalize_header)
@@ -1097,23 +1027,18 @@ class Better(HasErrors):
         yield from gen
 
 
-class NormSubmissionFile(NormValues):
-
-    def sparc_award_number(self, value):
-        return 'HAH'
-
-
 class SubmissionFile(Better):
     __internal_id_1 = object()
     default_record_type = COLUMN_TYPE
     renames_alt = {'submission_item': __internal_id_1}
     renames_header = {'definition': 'definition_header'}
-    record_type_key_alt = 'submission_item'
-    record_type_key_header = record_type_key_alt
-    groups_alt = {'submission':('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
+    record_type_key_alt = __internal_id_1
+    record_type_key_header = 'submission_item'
+    groups_alt = {'submission': ('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
     ignore_alt = __internal_id_1,
     ignore_header = 'definition_header',
-    normalization_class = NormSubmissionFile
+    raw_json_class = rj.RawJsonSubmission
+    normalization_class = nml.NormSubmissionFile
 
     @property
     def data(self):
@@ -1121,8 +1046,14 @@ class SubmissionFile(Better):
 
         d = copy.deepcopy(super().data)
         if d and 'submission' in d:
-            if d['submission']:
-                d['submission'] = d['submission'][0]
+            sub = d['submission']
+            if sub:
+                if isinstance(sub, list):
+                    d['submission'] = sub[0]
+                elif isinstance(sub, dict):
+                    return d
+                else:
+                    raise TypeError(f'What is a {type(sub)} {sub}?')
             else:
                 d['submission'] = {}
 
@@ -1134,186 +1065,6 @@ class SubmissionFilePath(ObjectPath):
 
 
 SubmissionFilePath._bind_flavours()
-
-
-class ATag(HTMLParser):
-    text = None
-    href = None
-    def handle_starttag(self, tag, attrs):
-        if tag == 'a':
-            for attr, value in attrs:
-                if attr == 'href':
-                    self.href = value
-
-    def handle_endtag(self, tag):
-        #print("Encountered an end tag :", tag)
-        pass
-
-    def handle_data(self, data):
-        self.text = data
-        #print("Encountered some data  :", data)
-
-    def asJson(self, input):
-        self.feed(input)
-        if self.text is not None:
-            return {'href': self.href, 'text': self.text}
-        else:
-            return self.href
-
-
-class NormDatasetDescriptionFile(NormValues):
-
-    def additional_links(self, value):
-        if value.startswith('<a') and value.endswith('</a>'):
-            return ATag().asJson(value)
-
-        return value
-
-    def _metadata_version_do_not_change(self, value):
-        return 'lolololol'
-
-    def contributors(self, value):
-        if isinstance(value, list):
-            for d in value:
-                yield {self.rename_key(k):tos(nv)
-                    for k, v in d.items()
-                    for nv in self.normalize(k, v) if nv}
-        else:
-            return value
-
-    def contributor_orcid_id(self, value):
-        # FIXME use schema
-        v = value.replace(' ', '')
-        if not v:
-            return
-        if v.startswith('http:'):
-            v = v.replace('http:', 'https:', 1)
-
-        if not (v.startswith('ORCID:') or v.startswith('https:')):
-            v = v.strip()
-            if not len(v):
-                return
-            elif v == '0':  # FIXME ? someone using strange conventions ...
-                return
-            elif len(v) != 19:
-                msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(OrcidId.OrcidLengthError(msg))
-                logd.error(msg)
-                return
-
-            v = 'ORCID:' + v
-
-        else:
-            if v.startswith('https:'):
-                _, numeric = v.rsplit('/', 1)
-            elif v.startswith('ORCID:'):
-                _, numeric = v.rsplit(':', 1)
-
-            if not len(numeric):
-                return
-            elif len(numeric) != 19:
-                msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(OrcidId.OrcidLengthError(msg))
-                logd.error(msg)
-                return
-
-        try:
-            #log.debug(f"{v} '{self.path}'")
-            orcid = OrcidId(v)
-            if not orcid.checksumValid:
-                # FIXME json schema can't do this ...
-                msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
-                self.addError(OrcidId.OrcidChecksumError(msg))
-                logd.error(msg)
-                return
-
-            yield orcid
-
-        except (OntId.BadCurieError, OrcidId.OrcidMalformedError) as e:
-            msg = f'orcid malformed {value!r} {self._path.as_posix()!r}'
-            self.addError(OrcidId.OrcidMalformedError(msg))
-            logd.error(msg)
-            yield value
-
-    def contributor_role(self, value):
-        # FIXME normalizing here momentarily to squash annoying errors
-        def echeck(value, original):
-            if value.startswith('ERROR VALUE:'):
-                self.addError(value.split(':', 1)[-1].strip(),
-                              pipeline_stage=f'{self.__class__.__name__}.contributor_role',
-                              logfunc=logd.error)
-                return original
-            else:
-                return value
-
-        if isinstance(value, list):
-            yield tuple(sorted(set(echeck(nml.NormContributorRole(e.strip()), e) for e in value)))
-        else:
-            yield tuple(sorted(set(echeck(nml.NormContributorRole(e.strip()), e) for e in value.split(','))))
-
-    def is_contact_person(self, value):
-        # no truthy values only True itself
-        yield value is True or isinstance(value, str) and value.lower() == 'yes'
-
-    def _protocol_url_or_doi(self, value):
-        doi = False
-        if 'doi' in value:
-            doi = True
-        elif value.startswith('10.'):
-            value = 'doi:' + value
-            doi = True
-
-        if doi:
-            value = DoiId(value)
-        else:
-            value = PioId(value).normalize()
-
-        return value
-
-    def protocol_url_or_doi(self, value):
-        for val in value.split(','):
-            v = val.strip()
-            if v:
-                try:
-                    yield  self._protocol_url_or_doi(v)
-                except BaseException as e:
-                    yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
-                    self.addError(e,
-                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.error)
-                    self.addError(self._path.as_posix(),
-                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.critical,
-                                  blame='debug')
-                    # TODO raise exc.BadDataError from e
-
-    def originating_article_doi(self, value):
-        for val in value.split(','):
-            v = val.strip()
-            if v:
-                doi = DoiId(v)
-                if doi.valid:
-                    # TODO make sure they resolve as well
-                    # probably worth implementing this as part of OntId
-                    yield doi
-
-    def keywords(self, value):
-        if ';' in value:
-            # FIXME error for this
-            values = [v.strip() for v in value.split(';') if v]
-        elif ',' in value:
-            # FIXME error for this
-            values = [v.strip() for v in value.split(',') if v]
-        else:
-            values = value,
-
-        #log.debug(f'{values}')
-        for value in values:
-            match = self._query(value, prefix=None)
-            if match and False:  # this is incredibly broken at the moment
-                yield match
-            else:
-                yield value
 
 
 class DatasetDescriptionFile(Better):
@@ -1334,7 +1085,7 @@ class DatasetDescriptionFile(Better):
                                'example_image_description'),}
 
     ignore_header = 'metadata_element', 'example', 'description_header'
-    normalization_class = NormDatasetDescriptionFile
+    normalization_class = nml.NormDatasetDescriptionFile
 
 
 class DatasetDescriptionFilePath(ObjectPath):
@@ -1342,195 +1093,6 @@ class DatasetDescriptionFilePath(ObjectPath):
 
 
 DatasetDescriptionFilePath._bind_flavours()
-
-
-class NormSubjectsFile(NormValues):
-    def __data(self):
-        # sigh
-        #notunique = (len([r for r in self.bc.subject_id if r]) !=
-                     #len([k for k in self.bc._byCol__indexes['subject_id']
-                          #if k != 'subject_id' and k]))
-        if self._is_json:
-            # FIXME ... only if it is a json list ???
-            sids = Counter(r['subject_id'] for r in self._data_raw if r)
-            values = self._data_raw
-        elif not hasattr(self.bc, 'subject_id'):
-            sids = {}
-            values = list(self)
-            msg = f'subject_id column missing! for {self.path}'
-            logd.critical(msg)
-            self.addError(msg)
-        else:
-            sids = Counter(r for r in self.bc.subject_id if r)
-            values = list(self)
-
-        notunique = {s:c for s, c in sids.items() if c > 1}
-
-        if notunique:
-            msg = f'subject_ids are not unique for {self.path}\n{notunique}'
-            logd.critical(msg)
-            self.addError(msg)
-
-        out = {self.dict_key: values}
-        if not self._is_json:
-            for k, heads in self.horizontals.items():
-                # TODO make sure we actually check that the horizontal
-                # isn't used by someone else already ... shouldn't be
-                # it should be skipped but maybe not?
-                tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
-                                                # FIXME one [] drops whole horiz group ...
-                                                for head in heads))
-                                if any(_)))
-                if tups:
-                    out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
-
-        self.embedErrors(out)
-        return out
-
-    def ___init__(self, path):
-        super().__init__(path)
-        if self._is_json:
-            header = [d.keys() for d in self._data_raw]  # FIXME max may have wrong top level schema
-        else:
-            header = self.bc.header
-
-        # units merging
-        # TODO pull the units in the parens out
-        self.h_unit = [k for k in header if '_unit' in k]
-        h_value = [k.replace('_units', '').replace('_unit', '') for k in self.h_unit]
-        no_unit = [k for k in header if '_unit' not in k]
-        #self.h_value = [k for k in self.bc.header if '_units' not in k and any(k.startswith(hv) for hv in h_value)]
-        self.h_value = [k for hv in h_value
-                        for k in no_unit
-                        if k.startswith(hv) or k.endswith(hv)]
-        err = f'Problem! {self.h_unit} {self.h_value} {header} \'{self.path}\''
-        #assert all(v in header for v in self.h_value), err
-        assert len(self.h_unit) == len(self.h_value), err
-        self.skip = self.h_unit + self.h_value
-
-        self.skip_cols += tuple(set(_ for v in self.horizontals.values() for _ in v))
-
-    def species(self, value):
-        nv = nml.NormSpecies(value)
-        yield self._query(nv, 'NCBITaxon')
-
-    def strain(self, value):
-        if value == 'DSH':
-            value = 'domestic shorthair'
-            return value
-
-        wat = self._query(value, 'BIRNLEX')  # FIXME
-        yield wat
-
-    def sex(self, value):
-        nv = nml.NormSex(value)
-        yield self._query(nv, 'PATO')
-
-    def gender(self, value):
-        # FIXME gender -> sex for animals, requires two pass normalization ...
-        yield from self.sex(value)
-
-    def _param(self, value):
-        if isinstance(value, numbers.Number):
-            return pyru.ur.Quantity(value)
-
-        try:
-            pv = pyru.UnitsParser(value).asPython()
-        except pyru.UnitsParser.ParseFailure as e:
-            caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
-            msg = f'Unexpected and unhandled value {value} for {caller_name}'
-            log.error(msg)
-            self.addError(msg, pipeline_stage=self.__class__.__name__ + '.curation-error')
-            return value
-
-        #if not pv[0] == 'param:parse-failure':
-        if pv is not None:  # parser failure  # FIXME check on this ...
-            yield pv  # this one needs to be a string since it is combined below
-        else:
-            # TODO warn
-            yield value
-
-    def _param_unit(self, value, unit):
-        yield from self._param(value + unit)
-
-    def age(self, value):
-        yield from self._param(value)
-
-    def age_years(self, value):
-        # FIXME the proper way to do this is to detect
-        # the units and lower them to the data, and leave the aspect
-        yield from self._param_unit(value, 'years')
-
-    def age_category(self, value):
-        yield self._query(value, 'UBERON')
-
-    def age_range_min(self, value):
-        yield from self._param(value)
-
-    def age_range_max(self, value):
-        yield from self._param(value)
-
-    def mass(self, value):
-        yield from self._param(value)
-
-    body_mass = mass
-
-    def weight(self, value):
-        yield from self._param(value)
-
-    def weight_kg(self, value):  # TODO populate this?
-        yield from self._param_unit(value, 'kg')
-
-    def height_inches(self, value):
-        yield from self._param_unit(value, 'in')
-
-    def rrid_for_strain(self, value):
-        yield value
-
-    #def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
-        #yield value
-
-    def _process_dict(self, dict_):
-        """ deal with multiple fields """
-        out = {k:v for k, v in dict_.items() if k not in self.skip}
-        for h_unit, h_value in zip(self.h_unit, self.h_value):
-            if h_value not in dict_:  # we drop null cells so if one of these was null then we have to skip it here too
-                continue
-
-            dhv = dict_[h_value]
-            if isinstance(dhv, str):
-                try:
-                    dhv = ast.literal_eval(dhv)
-                except ValueError as e:
-                    raise exc.UnhandledTypeError(f'{h_value} {dhv!r} was not parsed!') from e
-
-            compose = dhv * pyru.ur.parse_units(dict_[h_unit])
-            #_, v, rest = parameter_expression(compose)
-            #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
-            #breakpoint()
-            out[h_value] = compose #UnitsParser(compose).asPython()
-
-        if 'gender' in out and 'species' in out:
-            if out['species'] != OntTerm('NCBITaxon:9606'):
-                out['sex'] = out.pop('gender')
-
-        return out
-
-    def ___iter__(self):
-        """ this is still used """
-        if self._is_json:
-            yield from (self._process_dict({k:nv for k, v in d.items()
-                                           for nv in self.normalize(k, v) if nv})
-                        for d in self._data_raw)
-
-        else:
-            yield from (self._process_dict({k:nv for k, v in zip(r._fields, r) if v
-                                           and k not in self.skip_cols
-                                           for nv in self.normalize(k, v) if nv})
-                        for r in self.bc.rows)
-
-    def triples_gen(self, prefix_func):
-        """ NOTE the subject is LOCAL """
 
 
 class SubjectsFile(Better):
@@ -1541,19 +1103,20 @@ class SubjectsFile(Better):
                        'should match folder names'): __internal_id_1,}
     record_type_key_alt = 'subject_id'
     record_type_key_header = 'metadata_element'
-    groups_alt = {'software':('software',
+    groups_alt = {'subjects': GROUP_ALL,
+                  'software':('software',
                               'software_version',
                               'software_vendor',
                               'software_url',
-                              'software_rrid'),
-                  'subjects': GROUP_ALL}
+                              'software_rrid'),}
     ignore_header = __internal_id_1,
     ignore_alt = 'additional_fields_e_g__minds',
     ignore_match = [['subjects', 'sub-1', {'subject_id': 'sub-1',
                                            'pool_id': 'pool-1',
                                            'reference_atlas': 'Paxinos Rat V3',
                                            'handedness': 'right',}]]
-    normalization_class = NormSubjectsFile
+    raw_json_class = rj.RawJsonSubjects
+    normalization_class = nml.NormSubjectsFile
     normalize_header = False
 
 
@@ -1564,78 +1127,35 @@ class SubjectsFilePath(ObjectPath):
 SubjectsFilePath._bind_flavours()
 
 
-class NormSamplesFile(NormSubjectsFile):
-    def __data(self):
-        #notunique = (len([r for r in self.bc.sample_id if r]) !=
-                     #len([k for k in self.bc._byCol__indexes['sample_id']
-                          #if k != 'sample_id' and k]))
-
-        if self._is_json:
-            sids = Counter(r['sample_id'] for r in self._data_raw if r)
-        elif not hasattr(self.bc, 'sample_id'):
-            sids = {}
-            values = list(self)
-            msg = f'sample_id column missing! for {self.path}'
-            logd.critical(msg)
-            self.addError(msg)
-        else:
-            sids = Counter(r for r in self.bc.sample_id if r)
-
-        notunique = {s:c for s, c in sids.items() if c > 1}
-        values = list(self)
-        if notunique:
-            if not values or 'sample_id' not in values[0]:
-                # [] [{}], caused by a bunch of N/A or missing rows
-                breakpoint()
-
-            msg = f'sample_ids are not unique for {self.path}\n{notunique}'
-            logd.critical(msg)
-            self.addError(msg)
-            # FIXME this needs to be pipelined so we can do the diff ??
-            for i, v in enumerate(values):
-                v['local_sample_id'] = v['sample_id']
-                if 'subject_id' in v:
-                    v['sample_id'] = v['subject_id'] + '-' + v['sample_id']  # FIXME '/' gets quoted ...
-                else:
-                    v['sample_id'] = f'ERROR-{i}-' + v['sample_id']
-
-        out = {self.dict_key: values}
-        for k, heads in self.horizontals.items():
-            # TODO make sure we actually check that the horizontal
-            # isn't used by someone else already ... shouldn't be
-            # it should be skipped but maybe not?
-            tups = sorted(set(_ for _ in zip(*(getattr(self.bc, head, [])
-                                               # FIXME one [] drops whole horiz group ...
-                                               for head in heads))
-                              if any(_)))
-            if tups:
-                out[k] = [{k:v for k, v in zip(heads, t) if v} for t in tups]
-
-        self.embedErrors(out)
-        return out
-
-    def specimen_anatomical_location(self, value):
-        seps = '|',
-        for sep in seps:
-            if sep in value:
-                for v in value.split(sep):
-                    if v:
-                        yield self._query(v, 'UBERON')
-
-                return
-
-        else:
-            return self._query(value, 'UBERON')
-
-
 class SamplesFile(SubjectsFile):
     """ TODO ... """
 
     # TODO merge
-    renames_header = {'subject_id': 'metadata_element'}
-    record_type_key_header = 'metadata_element'  # FIXME + subject_id
-    groups_alt = {'samples': GROUP_ALL}
-    normalization_class = NormSamplesFile
+    __internal_id_1 = object()
+    __primary_key = 'primary_key'
+    primary_key_rule = __primary_key, ('subject_id', 'sample_id'), '_'.join
+    __rename_1 = primary_key_rule[2](('Lab-based schema for identifying each subject',
+                                      ('Lab-based schema for identifying each sample, must '
+                                       'be unique')))
+    renames_header = {__primary_key: 'metadata_element',
+                      __rename_1: __internal_id_1,}
+    record_type_key_alt = __primary_key
+    record_type_key_header = 'metadata_element'
+    groups_alt = {'samples': GROUP_ALL,
+                  'software':('software',
+                              'software_version',
+                              'software_vendor',
+                              'software_url',
+                              'software_rrid'),}
+    ignore_header = __internal_id_1,
+    ignore_alt = 'additional_fields_e_g__minds',
+    ignore_match = [['samples', primary_key_rule[2](('sub-1', 'sub-1_sam-2')),
+                     {'subject_id': 'sub-1',
+                      'pool_id': 'pool-1',
+                      'reference_atlas': 'Paxinos Rat V3',
+                      'handedness': 'right',}]]
+    normalization_class = nml.NormSamplesFile
+    normalize_header = False
 
 
 class SamplesFilePath(ObjectPath):

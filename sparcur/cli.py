@@ -1647,11 +1647,18 @@ class Shell(Dispatcher):
         resp = asdf.data_headers
 
         dsi = 1
-        ddf = datas[dsi].dataset_description.object
-        dd = ddf.data
+
         smf = datas[dsi].submission.object
+        smd = smf.data
+
+        ddf = datas[dsi].dataset_description.object
+        ddd = ddf.data
+
         suf = datas[dsi].subjects.object
+        sud = suf.data
+
         saf = datas[dsi].samples.object
+        sad = saf.data
 
         embed()
 

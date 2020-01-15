@@ -164,7 +164,15 @@ class PathPipeline(PrePipeline):
     # @hasSchema(sc.TransformerSchema)
     @property  # transformer out schema goes here
     def data(self):
-        return self.transformed
+        data = self.transformed
+
+        condition = False
+        # condition = data is not None and [k for k in data if not isinstance(k, str)]
+        if condition:
+            qf = self._transformer
+            breakpoint()
+
+        return data
 
 
 hasSchema = sc.HasSchema()
@@ -846,6 +854,8 @@ class PipelineEnd(JSONPipeline):
         'SubjectsFilePipeline.data',
         'SamplesFilePipeline._transformer',
         'SamplesFilePipeline.data',
+
+        'NormDatasetDescriptionFile.contributor_role',
     ]
     _curation = [
         'DatasetStructure.curation-error',

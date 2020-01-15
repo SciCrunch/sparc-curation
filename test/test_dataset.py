@@ -61,6 +61,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         obj = self.urg(tf)
         value = obj.data
         pprint.pprint(value)
+        assert not [k for k in value if not isinstance(k, 'str')]
 
     def test_versions(self):
         self._versions()

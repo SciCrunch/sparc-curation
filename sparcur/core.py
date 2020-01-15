@@ -79,6 +79,56 @@ class OntTerm(OTB, OntId):
         return self.label + sep + self.curie
 
 
+class HasErrors:
+    def __init__(self, *args, pipeline_stage=None, **kwargs):
+        try:
+            super().__init__(*args, **kwargs)
+        except TypeError as e:  # this is so dumb
+            super().__init__()
+
+        self._pipeline_stage = pipeline_stage
+        self._errors_set = set()
+
+    def addError(self, error, pipeline_stage=None, logfunc=None, blame=None):
+        stage = (pipeline_stage if pipeline_stage is not None
+                 else (self._pipeline_stage if self._pipeline_stage
+                       else self.__class__.__name__))
+        b = len(self._errors_set)
+        self._errors_set.add((error, stage, blame))
+        a = len(self._errors_set)
+        if logfunc is not None and a != b:  # only log on new errors
+            logfunc(error)
+
+    @property
+    def _errors(self):
+        for e, stage, blame in self._errors_set:
+            o = {'pipeline_stage': stage}  # FIXME
+
+            if blame is not None:
+                o['blame'] = blame
+
+            if isinstance(e, str):
+                o['message'] = e
+
+            elif isinstance(e, BaseException):
+                o['message'] = str(e)
+                o['type'] = str(type(e))
+
+            else:
+                raise TypeError(repr(e))
+
+            log.debug(o)
+            yield o
+
+    def embedErrors(self, data):
+        el = list(self._errors)
+        if el:
+            if 'errors' in data:
+                data['errors'].extend(el)
+            elif el:
+                data['errors'] = el
+
+
 def lj(j):
     """ use with log to format json """
     return '\n' + json.dumps(j, indent=2, cls=JEncode)
@@ -1150,7 +1200,20 @@ class _DictTransformer:
         for target_path, pc, *args in prepared:
             p = pc(*args)
             if target_path is not None:
-                function(data, target_path, p.data)
+                try:
+                    function(data, target_path, p.data)
+                except BaseException as e:
+                    import inspect
+                    __file = inspect.getsourcefile(pc)
+                    __line = inspect.getsourcelines(pc)[-1]
+                    if hasattr(p, 'path'):
+                        __path = f'"{p.path}"'
+                    else:
+                        __path = 'unknown input'
+
+                    raise e.__class__(f'Error while processing {p}.data for\n{__path}\n'
+                                      f'{__file} line {__line}') from e
+
             else:
                 p.data  # trigger the pipeline since it is stateful
 
