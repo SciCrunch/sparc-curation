@@ -220,7 +220,10 @@ class MetaConverter(TripleConverter):
                 nsteps = len(pj['protocol']['steps'])
                 yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
 
-            yield from self.integrator.triples_protcur(s)
+            try:
+                yield from self.integrator.triples_protcur(s)
+            except OntId.BadCurieError as e:
+                logd.error(e)  # FIXME export errors ...
 MetaConverter.setup()  # box in so we don't forget
 
 
