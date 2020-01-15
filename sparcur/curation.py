@@ -757,6 +757,10 @@ class TriplesExportDataset(TriplesExport):
         yield from self.triples_samples
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
+        if isinstance(v, int):
+            log.critical('darn it max normlize your ids!')
+            v = str(v)
+
         v = quote(v, safe=tuple())
         s = rdflib.URIRef(self.dsid + '/subjects/' + v)
         return s
@@ -1450,6 +1454,7 @@ class Summary(Integrator, ExporterSummarizer):
                 'uri_human': self.uri_human,
                 'count': count,}
         ps = list(self.protocols(ds))
+        breakpoint()
         return {'id': self.id,
                 'meta': meta,
                 'datasets': ds,
