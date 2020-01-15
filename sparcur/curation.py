@@ -1454,7 +1454,6 @@ class Summary(Integrator, ExporterSummarizer):
                 'uri_human': self.uri_human,
                 'count': count,}
         ps = list(self.protocols(ds))
-        breakpoint()
         return {'id': self.id,
                 'meta': meta,
                 'datasets': ds,
