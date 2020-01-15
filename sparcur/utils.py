@@ -36,6 +36,10 @@ want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr', 'sparc',
                  'BIRNLEX', 'tech', 'unit', 'ILX', 'lex',)
 
 
+def is_list_or_tuple(obj):
+    return isinstance(obj, list) or isinstance(obj, tuple)
+
+
 _type_order = (
     bool, int, float, bytes, str, tuple, list, set, dict, object, type, None
 )

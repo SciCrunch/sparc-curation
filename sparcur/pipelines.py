@@ -159,7 +159,19 @@ class PathPipeline(PrePipeline):
 
     @property
     def transformed(self):
-        return self._transformer.data
+        try:
+            return self._transformer.data
+        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
+            # these errors mostly happen after __init__ now
+            # since they are properly pipelined
+            data = {}
+            he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.transformer')
+            logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+            he.addError(e)
+            he.embedErrors(data)
+            return data
+
+
 
     # @hasSchema(sc.TransformerSchema)
     @property  # transformer out schema goes here
@@ -840,22 +852,33 @@ class PipelineEnd(JSONPipeline):
     _submission = [
         'DatasetStructure',
         'DatasetStructurePipeline.data',
+
         'Tabular',  # FIXME which Tabular
+        'RawJsonSubjects.data',
+
         'SubmissionFile',
         'SubjectsFile',
         'SamplesFile',
+
         'SubmissionFilePipeline._transformer',
+        'SubmissionFilePipeline.transformer',
         'SubmissionFilePipeline.data',
+
         'DatasetDescriptionFile',
-        'DatasetDescriptionFile.protocol_url_or_doi',
+        'NormDatasetDescriptionFile.contributor_role',
+        'NormDatasetDescriptionFile.funding',
+        'NormDatasetDescriptionFile.protocol_url_or_doi',
         'DatasetDescriptionFilePipeline._transformer',
         'DatasetDescriptionFilePipeline.data',
+
         'SubjectsFilePipeline._transformer',
+        'SubjectsFilePipeline.transformer',
         'SubjectsFilePipeline.data',
+
         'SamplesFilePipeline._transformer',
+        'SamplesFilePipeline.transformer',
         'SamplesFilePipeline.data',
 
-        'NormDatasetDescriptionFile.contributor_role',
     ]
     _curation = [
         'DatasetStructure.curation-error',
@@ -864,6 +887,15 @@ class PipelineEnd(JSONPipeline):
         'PipelineExtras.data',
         'ProtocolData',  # FIXME this is here as a placeholder
     ]
+
+    _blame_stage = object()
+    _blame_curation = object()
+    _blame_submission = object()
+    _blame = {
+        'pipeline': _blame_curation,
+        'debug': _blame_curation,
+        'stage': _blame_stage,
+    }
 
     @classmethod
     def _expand_stages(cls):
@@ -892,14 +924,39 @@ class PipelineEnd(JSONPipeline):
                           'subsequent occurances' + lj(error))
                 continue
 
+            if 'blame' not in error:
+                breakpoint()
+
+            blame = error['blame']
             stage = error['pipeline_stage']
             message = error['message']
+
+            blamed = False
+            if blame is not None:
+                if blame in cls._blame:
+                    blame_target = cls._blame[blame]
+                    if blame_target == cls._blame_stage:
+                        pass
+                    elif blame_target == cls._blame_submission:
+                        submission_errors.append(error)
+                        blamed = True
+                    elif blame_target == cls._blame_curation:
+                        curation_errors.append(error)
+                        blamed = True
+                    else:
+                        raise ValueError(f'Unhandled blame target {blame_target}\n{message}')
+
+                else:
+                    raise ValueError(f'Unhandled blame type {blame}\n{message}')
+
             if stage in cls._submission:
-                submission_errors.append(error)
+                if not blamed:
+                    submission_errors.append(error)
             elif stage in cls._curation:
-                curation_errors.append(error)
+                if not blamed:
+                    curation_errors.append(error)
             else:
-                raise ValueError(f'Unhandled stage {stage} {message}')
+                raise ValueError(f'Unhandled stage {stage}\n{message}')
 
         si = len(submission_errors)
         ci = len(curation_errors)

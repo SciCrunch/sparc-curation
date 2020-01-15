@@ -1,22 +1,36 @@
 """ string normalizers, strings that change their content to match a standard """
 
+import numbers
+from types import GeneratorType
 from html.parser import HTMLParser
-from sparcur.core import log, HasErrors
+from pysercomb.pyr import units as pyru
+from . import exceptions as exc
+from .core import log, logd, HasErrors
+from .core import OntId, OrcidId, DoiId, PioId
+
+
+BLANK_VALUE = object()
+NOT_APPLICABLE = object()
 
 
 class NormSimple(str):
+
+    data = tuple()  # really dict
+
     def __new__(cls, value):
         return str.__new__(cls, cls.normalize(value))
 
     @classmethod
     def normalize(cls, value, preserve_case=False):
         v = value if preserve_case else value.lower()
+
         if v in cls.data:
             return cls.data[v]
         elif preserve_case:
             return value
         else:
             return v
+
 
 class NormAward(NormSimple):
     data = {
@@ -96,11 +110,11 @@ class NormSex(NormSimple):
 
 
 class NormHeader(NormSimple):
-    armi = 'age_range_min'
-    arma = 'age_range_max'
+    __armi = 'age_range_min'
+    __arma = 'age_range_max'
     data = {
-        'age_range_minimum': armi,
-        'age_range_maximum': arma,
+        'age_range_minimum': __armi,
+        'age_range_maximum': __arma,
         'protocol_io_location': 'protocol_url_or_doi',
     }
 
@@ -208,6 +222,12 @@ class NormValues(HasErrors):
         self._groups_alt = self._obj_inst.groups_alt
         self._path = self._obj_inst.path
 
+    def _error_on_na(self, value):
+        """ N/A -> raise for cases where it should just be removed """
+        v = value.strip()
+        if v == 'n/a' or v == 'N/A':
+            raise exc.NotApplicableError()
+
     def _deatag(self, value):
         if value.startswith('<a') and value.endswith('</a>'):
             at = ATag()
@@ -237,15 +257,20 @@ class NormValues(HasErrors):
             out = {}
             for k, v in thing.items():
                 if k == self._record_type_key_header:
-                    out[k] = v
+                    gnv = lambda : v
                 elif k in self._norm_to_orig_header:
-                    out[k] = self._normv(v, key, path)
+                    gnv = lambda : self._normv(v, key, path)
                 elif k in self._norm_to_orig_alt:
-                    out[k] = self._normv(v, k, path + (k,))
+                    gnv = lambda : self._normv(v, k, path + (k,))
                 elif k in self._groups_alt:
-                    out[k] = self._normv(v, k, path + (k,))
+                    gnv = lambda : self._normv(v, k, path + (k,))
                 else:
                     raise ValueError(f'what is going on here?! {k} {v}')
+
+                try:
+                    out[k] = gnv()
+                except exc.NotApplicableError:
+                    pass
 
             return out
 
@@ -284,7 +309,7 @@ class NormValues(HasErrors):
 class NormSubmissionFile(NormValues):
 
     def sparc_award_number(self, value):
-        return nml.NormAward(value)
+        return NormAward(value)
 
 
 class NormDatasetDescriptionFile(NormValues):
@@ -298,6 +323,21 @@ class NormDatasetDescriptionFile(NormValues):
     def _metadata_version_do_not_change(self, value):
         return 'lolololol'
 
+    def funding(self, value):
+        if 'OT' in value:
+            return NormAward(value)
+
+        seps = '|', ';', ','  # order in priority
+        for sep in seps:
+            if sep in value:
+                out = tuple()
+                for funding in value.split(sep):
+                    out += (funding,)
+
+                return out
+
+        return value.strip()
+
     def contributors(self, value):
         if isinstance(value, list):
             for d in value:
@@ -309,6 +349,9 @@ class NormDatasetDescriptionFile(NormValues):
 
     def contributor_orcid_id(self, value):
         # FIXME use schema
+
+        value, _j = self._deatag(value)
+
         v = value.replace(' ', '')
         if not v:
             return
@@ -373,9 +416,9 @@ class NormDatasetDescriptionFile(NormValues):
                 return value
 
         if isinstance(value, list):
-            yield tuple(sorted(set(echeck(nml.NormContributorRole(e.strip()), e) for e in value)))
+            yield tuple(sorted(set(echeck(NormContributorRole(e.strip()), e) for e in value)))
         else:
-            yield tuple(sorted(set(echeck(nml.NormContributorRole(e.strip()), e) for e in value.split(','))))
+            yield tuple(sorted(set(echeck(NormContributorRole(e.strip()), e) for e in value.split(','))))
 
     def is_contact_person(self, value):
         # no truthy values only True itself
@@ -449,7 +492,7 @@ class NormDatasetDescriptionFile(NormValues):
 
 class NormSubjectsFile(NormValues):
     def species(self, value):
-        nv = nml.NormSpecies(value)
+        nv = NormSpecies(value)
         #yield self._query(nv, 'NCBITaxon')
         return nv
 
@@ -461,8 +504,9 @@ class NormSubjectsFile(NormValues):
         #wat = self._query(value, 'BIRNLEX')  # FIXME
         #yield wat
 
+    sex = NormSex
     def sex(self, value):
-        nv = nml.NormSex(value)
+        nv = NormSex(value)
         #yield self._query(nv, 'PATO')
         return nv
 
@@ -471,6 +515,8 @@ class NormSubjectsFile(NormValues):
         yield from self.sex(value)
 
     def _param(self, value):
+        self._error_on_na(value)
+
         if isinstance(value, numbers.Number):
             return pyru.ur.Quantity(value)
 
@@ -576,29 +622,13 @@ class NormSubjectsFile(NormValues):
 class NormSamplesFile(NormSubjectsFile):
     def specimen_anatomical_location(self, value):
         seps = '|', ';'
-        #skip = (
-            #'UBERON:0000465',  # material anatomical entity
-        #)
         for sep in seps:
             if sep in value:
                 for v in value.split(sep):
                     v = v.strip()
                     if v:
                         yield v
-                        #out = self._query(v, 'UBERON')
-                        #if out and out.curie not in skip:
-                            #yield out
-                        #else:
-                            #yield v
-
                 return
 
         else:
             yield value.strip()
-            #out = self._query(value, 'UBERON')
-            #if out and out.curie not in skip:
-                #yield out
-            #else:
-                #yield value
-
-

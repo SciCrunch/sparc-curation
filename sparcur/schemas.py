@@ -107,15 +107,15 @@ class HasSchema:
                 if not ok:
                     if fail:
                         logd.error('schema validation has failed and fail=True')
-                        breakpoint()
                         raise norm_or_error
 
                     try:
                         if 'errors' not in data:
                             data['errors'] = []
                     except BaseException as e:
-                        raise e.__class__(f'Error from {_self.__class__.__name__}.'
-                                          f'{function.__name__}') from e
+                        raise exc.SparCurError(
+                            f'Error from {_self.__class__.__name__}.'
+                            f'{function.__name__}') from e
                         
                     data['errors'] += norm_or_error.json(pipeline_stage_name)
                     # TODO make sure the step is noted even if the schema is the same

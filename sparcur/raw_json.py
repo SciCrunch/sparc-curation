@@ -44,11 +44,10 @@ class RawJsonSubjects(RawJson):
 
         rss = RawSubjectsSchema()
         blob = super().data
-        try:
-            rss.validate_strict(blob)
+        if isinstance(blob, list):
             # TODO this needs to be an error with an easy fix
+
+            # try to do the right thing
             blob = {'subjects': blob}
-        except:
-            pass
 
         return blob

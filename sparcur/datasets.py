@@ -2,7 +2,6 @@ import io
 import ast
 import csv
 import copy
-import numbers
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
@@ -11,14 +10,14 @@ from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
-from pysercomb.pyr import units as pyru
 from augpathlib import FileSize
 from sparcur import schemas as sc
 from sparcur import raw_json as rj
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, DoiId, PioId, HasErrors
-from sparcur.paths import Path
+from .core import log, logd, HasErrors
+from .paths import Path
+from .utils import is_list_or_tuple
 
 a = rdf.type
 
@@ -88,7 +87,8 @@ class Header:
         original = self.pipeline_start
         normalized = self.normalized
         if len(set(original)) != len(original):
-            raise ValueError(f'Original header is not unique!\n{original}')
+            msg = f'Original header is not unique in\n{original}'
+            raise exc.MalformedHeaderError(msg)
 
         return {renames[n] if n in renames else n:h
                 for n, h in zip(original, original)}
@@ -478,8 +478,6 @@ ROW_TYPE = object()
 COLUMN_TYPE = object()
 numberN = object()
 GROUP_ALL = object()
-BLANK_VALUE = object()
-NOT_APPLICABLE = object()
 
 
 def remove_rule(blob, rule):
@@ -722,7 +720,7 @@ class MetadataFile(HasErrors):
         return keyed
 
     def _add_missing(self):
-        objects = self._objectify()
+        objects = self._sanity_check()
         for nah, (value, number) in self.missing_add.items():
             if nah not in self.norm_to_orig_alt:
                 self.norm_to_orig_alt[nah] = nah
@@ -747,6 +745,24 @@ class MetadataFile(HasErrors):
                 objects.append(cant_go_wrong)
 
         # end add missing items
+        return objects
+
+    def _sanity_check(self):
+        """ first chance we have to check sanity since
+            the generators have to have run """
+        objects = self._objectify()
+        for n, rtk, norm_dict in (('header', self.record_type_key_header, self.norm_to_orig_header),
+                                  *[('alt_header', name, self.norm_to_orig_alt)
+                                    for name in (self.record_type_key_alt,
+                                                 *(self.primary_key_rule[1]
+                                                  if self.primary_key_rule is not None else
+                                                   tuple()))]):
+            if rtk not in norm_dict:
+                msg = (f'Could not find record primary key for {n} in\n{self.path}\n'
+                       f'{rtk} not in {list(norm_dict)}')
+
+                raise exc.MalformedHeaderError(msg)
+
         return objects
 
     def _objectify(self):
@@ -830,7 +846,7 @@ class SubmissionFile(MetadataFile):
         if d and 'submission' in d:
             sub = d['submission']
             if sub:
-                if isinstance(sub, list):
+                if is_list_or_tuple(sub):
                     d['submission'] = sub[0]
                 elif isinstance(sub, dict):
                     return d

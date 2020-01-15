@@ -17,11 +17,13 @@ class ValidationError(SparCurError):
     def __str__(self):
         return repr(self)
 
-    def json(self, pipeline_stage_name=None):
+    def json(self, pipeline_stage_name=None, blame='stage'):
         """ update this to change how errors appear in the validation pipeline """
         skip = 'schema', 'instance', 'context'  # have to skip context because it has unserializable content
         return [{k:v if k not in skip else k + ' REMOVED'
-                 for k, v in chain(e._contents().items(), (('pipeline_stage', pipeline_stage_name),))
+                 for k, v in chain(e._contents().items(),
+                                   (('pipeline_stage', pipeline_stage_name),
+                                    ('blame', blame)))
                  # TODO see if it makes sense to drop these because the parser did know ...
                  if v and k not in skip}
                 for e in self.errors]
@@ -80,9 +82,23 @@ class BadDataError(SparCurError):
     """ something went wrong """
 
 
+class MalformedHeaderError(BadDataError):
+    """ Bad header """
+
+
 class LengthMismatchError(SparCurError):
     """ lenghts of iterators for a zipeq do not match """
 
 
 class LengthMismatchError(SparCurError):
     """ lenghts of iterators for a zipeq do not match """
+
+
+class NotApplicableError(SparCurError):
+    """ There are a number of cases where N/A values should
+        be treated as errors that need to be caugt so that
+        the values can be cut out entirely. """
+
+
+class SubPipelineError(SparCurError):
+    """ There was an error in a subpipeline. """

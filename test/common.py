@@ -11,7 +11,7 @@ from sparcur.paths import Path
 from sparcur.paths import LocalPath, PrimaryCache, RemotePath
 from sparcur.paths import SymlinkCache
 from sparcur.state import State
-from sparcur.datasets import Version1Header
+from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
 from sparcur.blackfynn_api import FakeBFLocal
 this_file = Path(__file__)
@@ -27,8 +27,8 @@ temp_path = Path(gettempdir(), f'.sparcur-testing-base-{os.getpid()}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
 
-osk = Version1Header.skip_cols  # save original skips
-Version1Header.skip_cols = tuple(_ for _ in osk if _ != 'example')  # use the example values for tests
+ddih = DatasetDescriptionFile.ignore_header  # save original skips
+DatasetDescriptionFile.ignore_header = tuple(_ for _ in ddih if _ != 'example')  # use the example values for tests
 
 ds_roots = (
     'ds1',

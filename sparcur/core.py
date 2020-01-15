@@ -102,13 +102,12 @@ class HasErrors:
     @property
     def _errors(self):
         for e, stage, blame in self._errors_set:
-            o = {'pipeline_stage': stage}  # FIXME
-
-            if blame is not None:
-                o['blame'] = blame
+            o = {'pipeline_stage': stage,
+                 'blame': blame,}  # FIXME
 
             if isinstance(e, str):
                 o['message'] = e
+                o['type'] = None  # FIXME probably wan our own?
 
             elif isinstance(e, BaseException):
                 o['message'] = str(e)
@@ -1211,8 +1210,9 @@ class _DictTransformer:
                     else:
                         __path = 'unknown input'
 
-                    raise e.__class__(f'Error while processing {p}.data for\n{__path}\n'
-                                      f'{__file} line {__line}') from e
+                    raise exc.SubPipelineError(
+                        f'Error while processing {p}.data for\n{__path}\n'
+                        f'{__file} line {__line}') from e
 
             else:
                 p.data  # trigger the pipeline since it is stateful
