@@ -332,7 +332,11 @@ class NormDatasetDescriptionFile(NormValues):
 
     def additional_links(self, value):
         if value.startswith('<a') and value.endswith('</a>'):
-            return ATag().asJson(value)
+            #return ATag().asJson(value)  # TODO not ready
+            at = ATag()
+            j = at.asJson(value)
+            #return at.href, j
+            return at.href
 
         return value
 
