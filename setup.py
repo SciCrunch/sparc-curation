@@ -38,7 +38,7 @@ setup(name='sparcur',
       python_requires='>=3.6',
       tests_require=tests_require,
       install_requires=[
-          'augpathlib>=0.0.4',
+          'augpathlib>=0.0.6',
           'beautifulsoup4',
           'blackfynn',
           'dicttoxml',
