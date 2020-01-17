@@ -406,6 +406,11 @@ class Material(BaseElement):
     objects_multi = 'materials', 'inMaterials'
 
 
+class fake:
+    """ filler """
+    label = 'sigh'
+
+
 Graph.Material = Material
 class External(BaseElement):
     externals = 'id',
@@ -454,6 +459,13 @@ class External(BaseElement):
     @mimicArgs(BaseElement.__init__)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # PLEASE DO NOT PUT PMIDs as external ids!!!
+        # FIXME idlib PMID(thing) urg the regex state machine is so simple ;_;
+        if self.id.startswith('PMID:'):
+            log.warning('PMIDs should never be External IDs!')
+            self._term = fake
+            return
+
         self._term = OntTerm(self.id)
         self.s = self._term.URIRef
 
@@ -469,7 +481,13 @@ class Channel(BaseElement):
 
 
 Graph.Channel = Channel
+class Chain(BaseElement):
+    objects = 'start', 'end'
+    objects_multi = 'conveyingLyphs',
+    annotations = 'length',
 
+
+Graph.Chain = Chain
 
 
 hrm = make_classes(apinscm.schema)

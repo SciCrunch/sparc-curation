@@ -94,11 +94,11 @@ class TestApiNATToRDF(unittest.TestCase):
             print(rtmap)
             assert False
 
-    @pytest.mark.skip('not ready')
+    #@pytest.mark.skip('not ready')
     def test_bolew(self):
-        #with open((Path(__file__).parent / 'apinatomy/data/bolser-lewis-map.json'), 'rt') as f:
-            #m = json.load(f)
-        m = {'id':'null', 'resources':{}}
+        with open((Path(__file__).parent / 'apinatomy/data/bolser-lewis-map.json'), 'rt') as f:
+            m = json.load(f)
+        #m = {'id':'null', 'resources':{}}
         with open((Path(__file__).parent / 'apinatomy/data/bolser-lewis-generated.json'), 'rt') as f:
             g = json.load(f)
 
