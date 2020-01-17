@@ -427,6 +427,10 @@ class TriplesExport(ProtcurData):
         #self.title = self.data['meta']['title'] if 
 
     @property
+    def timestamp_export(self):
+        return adops.get(self.data, ['meta', 'timestamp_export'])
+
+    @property
     def protocol_uris(self):  # FIXME this needs to be pipelined
         try:
             yield from adops.get(self.data, ['meta', 'protocol_url_or_doi'])
@@ -460,6 +464,7 @@ class TriplesExport(ProtcurData):
             (rdfs.label, rdflib.Literal(f'{self.folder_name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
+            (TEMP.TimestampExport, rdflib.Literal(self.timestamp_export)),
         )
         for p, o in pos:
             yield ontid, p, o
@@ -767,7 +772,7 @@ class Integrator(PathData, OntologyData):
         yield from self.triples_class(self.data).triples
 
     @property
-    def ttl(self):
+    def ttl(self):  # FIXME BAD PATTERN IS BAD
         return self.triples_class(self.data).ttl
 
     @property
@@ -847,6 +852,12 @@ class Integrator(PathData, OntologyData):
 
         self._data = self.pipeline.data
         return self._data
+
+    def data_for_export(self, timestamp):
+        data = self.data
+        # NOTE this timestamps the cached data AS INTENDED
+        data['meta']['timestamp_export'] = timestamp
+        return data
 
     @property
     def keywords(self):

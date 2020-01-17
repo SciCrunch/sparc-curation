@@ -9,7 +9,7 @@ from sparcur.core import BlackfynnId, DoiId
 import augpathlib as aug
 from augpathlib import PathMeta
 from augpathlib.remotes import RemoteFactory
-from sparcur.blackfynn_api import BFLocal, FakeBFLocal  # FIXME there should be a better way ...
+from sparcur.blackfynn_api import BFLocal, FakeBFLocal, id_to_type  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File
 from blackfynn import Dataset
 from blackfynn.models import BaseNode
@@ -21,6 +21,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     _api_class = BFLocal
     _async_rate = None
+    _local_dataset_name = object()
 
     @property
     def uri_human(self):
@@ -108,7 +109,7 @@ class BlackfynnRemote(aug.RemotePath):
             if chunk:
                 yield chunk
 
-    def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None):
+    def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None, local_only=False):
         self._seed = id_bfo_or_bfr
         self._file_id = file_id
         if not [type_ for type_ in (self.__class__,
@@ -123,6 +124,21 @@ class BlackfynnRemote(aug.RemotePath):
 
         self._errors = []
 
+        self._local_only = local_only
+
+    def bfobject_retry(self):
+        """ try to load a local only id again """
+        if hasattr(self, '_bfobject') and self._bfobject.id == self._local_dataset_name:
+            stored = self._bfobject
+            delattr(self, '_bfobject')
+            try:
+                self.bfobject
+            except BaseException as e:
+                self._bfobject = stored
+                raise e
+
+        return self._bfobject
+
     @property
     def bfobject(self):
         if hasattr(self, '_bfobject'):
@@ -135,7 +151,18 @@ class BlackfynnRemote(aug.RemotePath):
             bfobject = self._seed
 
         elif isinstance(self._seed, str):
-            bfobject = self._api.get(self._seed)
+            try:
+                bfobject = self._api.get(self._seed)
+            except Exception as e:  # sigh
+                if self._local_only:
+                    _class = id_to_type(self._seed)
+                    if issubclass(_class, Dataset):
+                        bfobject = _class(self._local_dataset_name)
+                        bfobject.id = self._seed
+                    else:
+                        raise NotImplementedError(f'{_class}') from e
+                else:
+                    raise e
 
         elif isinstance(self._seed, PathMeta):
             bfobject = self._api.get(self._seed.id)

@@ -2,6 +2,7 @@ import io
 import json
 import hashlib
 import inspect
+import logging
 from pathlib import Path
 from functools import wraps
 from augpathlib.utils import log as _alog
@@ -15,6 +16,25 @@ logd = log.getChild('data')
 # set augpathlib log format to pyontutils (also sets all child logs)
 _alog.removeHandler(_alog.handlers[0])
 _alog.addHandler(log.handlers[0])
+
+
+class SimpleFileHandler:
+    _FIRST = object()
+    def __init__(self, log_file_path, *logs, mimic=_FIRST):
+        self.log_file_handler = logging.FileHandler(log_file_path.as_posix())
+        if mimic is self._FIRST and logs:
+            self.mimic(logs[0])
+        elif mimic:
+            self.mimic(mimic)
+
+        for log in logs:
+            self(log)
+
+    def __call__(self, log_to_handle):
+        log_to_handle.addHandler(self.log_file_handler)
+
+    def mimic(self, log):
+        self.log_file_handler.setFormatter(log.handlers[0].formatter)
 
 
 class _log:

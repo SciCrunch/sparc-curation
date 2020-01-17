@@ -159,3 +159,8 @@ def make_app(report, project_path, name='spc-server'):
         return hfn.htmldoc(r.data.ttl_html,
                            styles=(hfn.ttl_html_style,),
                            title='ApiNATOMY demo')
+
+    @app.route(f'{bp}/reports/access')
+    @app.route(f'{bp}/reports/access<ext>')
+    def route_reports_access(ext=wrap_tables):
+        return report.access(ext=ext)

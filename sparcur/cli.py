@@ -1,5 +1,7 @@
 #!/usr/bin/env python3.7
-""" SPARC curation cli for fetching, validating datasets, and reporting.
+from config import auth
+__doc__ = f"""
+SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
     spc clone <project-id>
     spc pull [options] [<directory>...]
@@ -12,7 +14,8 @@ Usage:
     spc report size [options] [<path>...]
     spc report tofetch [options] [<directory>...]
     spc report terms [anatomy cells subcelluar] [options]
-    spc report [completeness filetypes pathids keywords subjects samples errors test] [options]
+    spc report [access filetypes pathids test] [options]
+    spc report [completeness keywords subjects samples errors] [options]
     spc report [contributors] [options]
     spc shell [affil integration protocols exit] [options]
     spc server [options]
@@ -146,9 +149,12 @@ Options:
     --port=PORT             server port [default: 7250]
 
     -d --debug              drop into a shell after running a step
-    --profile               profile startup performance
     -v --verbose            print extra information
-    --log-location=PATH     folder into which logs are saved [default: ${SPARC_EXPORTS}/log/]
+    --profile               profile startup performance
+
+    --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
+    --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
+    --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
 """
 
 from time import time
@@ -161,7 +167,6 @@ import json
 import errno
 import types
 import pprint
-import logging
 from itertools import chain
 from collections import Counter, defaultdict
 import requests
@@ -174,7 +179,7 @@ from augpathlib import RemotePath, AugmentedPath  # for debug
 
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit
-from pyontutils.utils import NOWDANGER, NOWISO, UTCNOWISO
+from pyontutils.utils import NOWDANGER, TZLOCAL, UTCNOWISO, utcnowtz, isoformat, isoformat_safe
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
@@ -182,8 +187,9 @@ from sparcur import config
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import JT, log, logd, JPointer, lj, DictTransformer as DT
+from sparcur.core import JT, JPointer, lj, DictTransformer as DT
 from sparcur.core import OntId, OntTerm, get_all_errors, adops
+from sparcur.utils import log, logd, SimpleFileHandler
 from sparcur.utils import python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
@@ -195,6 +201,14 @@ from sparcur.curation import DatasetObject
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
 from IPython import embed
+
+_start_time = utcnowtz()
+_start_local_tz = TZLOCAL()  # usually PST PDT
+_start_time_local = _start_time.astimezone(_start_local_tz)
+START_TIMESTAMP = isoformat(_start_time)
+START_TIMESTAMP_SAFE = isoformat_safe(_start_time)
+START_TIMESTAMP_LOCAL = isoformat(_start_time_local)
+START_TIMESTAMP_LOCAL_SAFE = isoformat_safe(_start_time_local)
 
 slow = False
 if slow:
@@ -291,7 +305,15 @@ class Main(Dispatcher):
                         'bfl',
                         'summary',
                         'cwd',
-                        'cwdintr')
+                        'cwdintr',
+                        '_timestamp')
+
+    # any attr forced on children must be set before super().__init__ is called
+    # set timestamp early so that the loggers can use it
+    # I don't think this will cause too much trouble ...
+    _timestamp = START_TIMESTAMP
+    _folder_timestamp = START_TIMESTAMP_LOCAL
+
     # things all children should have
     # kind of like a non optional provides you WILL have these in your namespace
     def __init__(self, options):
@@ -332,7 +354,7 @@ class Main(Dispatcher):
 
         self._setup_local()  # if this isn't run up here the internal state of the program get's wonky
 
-        if self.options.report and not self.options.raw:
+        if self.options.report and not self.options.raw and not self.options.access:
             Integrator.setup(local_only=True)  # FIXME sigh
         else:
             self._setup_bfl()
@@ -768,6 +790,52 @@ class Main(Dispatcher):
         lce = (self.LATEST / 'curation-export.ttl').as_posix()
         return graph.parse(lce, format='ttl')
 
+    def _export_single_dataset(self, path):
+        intr = Integrator(path)
+        dump_path = self.export_base / 'datasets' / intr.id / self._folder_timestamp
+        latest_path = self.export_base / 'datasets' / intr.id / 'LATEST'
+        if not dump_path.exists():
+            dump_path.mkdir(parents=True)
+
+        functions = []
+        suffixes = []
+        modes = []
+        data = intr.data_for_export(self._timestamp)  # build and cache the data
+        if self.options.json:  # json first since we can cache dowe
+            j = lambda f: json.dump(data, f,
+                                    sort_keys=True, indent=2, cls=JEncode)
+            functions.append(j)
+            suffixes.append('.json')
+            modes.append('wt')
+
+        if self.options.ttl:
+            t = lambda f: f.write(TriplesExportDataset(data).ttl)
+            functions.append(t)
+            suffixes.append('.ttl')
+            modes.append('wb')
+
+        filename = 'curation-export'
+        filepath = dump_path / filename
+
+        for function, suffix, mode in zip(functions, suffixes, modes):
+            out = filepath.with_suffix(suffix)
+            with open(out, mode) as f:
+                function(f)
+
+            log.info(f'dataset graph exported to {out}')
+
+            if self.options.open:
+                out.xopen()
+
+        if latest_path.exists():
+            if not latest_path.is_symlink():
+                raise TypeError('Why is LATEST not a symlink? '
+                                f'{latest_path!r}')
+
+            latest_path.unlink()
+
+        latest_path.symlink_to(dump_path)
+
     def export(self):
         """ export output of curation workflows to file """
         #org_id = Integrator(self.project_path).organization.id
@@ -785,70 +853,28 @@ class Main(Dispatcher):
             return
 
         cwd = self.cwd
-        timestamp = NOWDANGER(implicit_tz='PST PDT')
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
         if cwd != cwd.cache.anchor and format_specified:
             if not cwd.cache.is_dataset:
                 print(f'{cwd.cache} is not at dataset level!')
                 sys.exit(123)
 
-            intr = Integrator(cwd)
-            dump_path = self.export_base / 'datasets' / intr.id / timestamp
-            latest_path = self.export_base / 'datasets' / intr.id / 'LATEST'
-            if not dump_path.exists():
-                dump_path.mkdir(parents=True)
-
-            functions = []
-            suffixes = []
-            modes = []
-            if self.options.json:  # json first since we can cache dowe
-                j = lambda f: json.dump(intr.data, f,
-                                        sort_keys=True, indent=2, cls=JEncode)
-                functions.append(j)
-                suffixes.append('.json')
-                modes.append('wt')
-
-            if self.options.ttl:
-                t = lambda f: f.write(intr.ttl)
-                functions.append(t)
-                suffixes.append('.ttl')
-                modes.append('wb')
-
-            filename = 'curation-export'
-            filepath = dump_path / filename
-
-            for function, suffix, mode in zip(functions, suffixes, modes):
-                out = filepath.with_suffix(suffix)
-                with open(out, mode) as f:
-                    function(f)
-
-                log.info(f'dataset graph exported to {out}')
-
-                if self.options.open:
-                    out.xopen()
-
-            if latest_path.exists():
-                if not latest_path.is_symlink():
-                    raise TypeError('Why is LATEST not a symlink? '
-                                    f'{latest_path!r}')
-
-                latest_path.unlink()
-
-            latest_path.symlink_to(dump_path)
-
+            self._export_single_dataset(cwd)
             return
 
         # start time not end time ...
         # obviously not transactional ...
         filename = 'curation-export'
-        dump_path = self.export_base / timestamp
+        dump_path = self.export_base / self._folder_timestamp
         latest_path = self.LATEST
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
 
         filepath = dump_path / filename
 
-        data = self.latest_export if self.options.latest else self.summary.data
+        data = (self.latest_export if
+                self.options.latest else
+                self.summary.data_for_export(self._timestamp))
 
         # FIXME we still create a new export folder every time even if the json didn't change ...
         with open(filepath.with_suffix('.json'), 'wt') as f:
@@ -1198,8 +1224,7 @@ class Main(Dispatcher):
             breakpoint()
 
         else:
-            timestamp = NOWDANGER(implicit_tz='PST PDT')
-            stash = StashPath(stash_base, timestamp)
+            stash = StashPath(stash_base, self._folder_timestamp)
             new_anchor = stash / self.anchor.name
             new_anchor.mkdir(parents=True)
             new_anchor.cache_init(self.anchor.meta, anchor=True)
@@ -1266,6 +1291,28 @@ class Report(Dispatcher):
             return lambda kv: -kv[-1]
         else:
             return lambda kv: kv
+
+    def access(self, ext=None):
+        """ Report on datasets that are in the master sheet but which the
+            automated pipelines do not have access to. """
+        from sparcur.sheets import Overview
+        o = Overview()
+        remote = self.anchor.remote
+        remote_datasets = remote.children
+
+        master_sheet_ids = o.dataset_ids()
+        bf_api_ids = set(d.id for d in remote_datasets)
+
+        missing_from_api = sorted(master_sheet_ids - bf_api_ids)
+        missing_datasets = [self.parent.BlackfynnRemote(i, local_only=True) for i in missing_from_api]
+        missing_uris = [d.uri_human for d in missing_datasets]
+        rows = [['', ''],
+                ['Master Count', len(master_sheet_ids)],
+                ['BF API Count', len(bf_api_ids)],
+                ['No API Count', len(missing_from_api)],
+                *[[i, u] for i, u in zip(missing_from_api, missing_uris)]
+        ]
+        return self._print_table(rows, title='Access Report', ext=ext)
 
     def contributors(self, ext=None):
         data = self.summary.data if self.options.raw else self.latest_export
@@ -1764,24 +1811,32 @@ class Fix(Shell):
         breakpoint()
 
 
+def bind_file_handler(log_path):
+    from protcur.core import log as prlog
+    from orthauth.utils import log as oalog
+    from ontquery.utils import log as oqlog
+    from augpathlib.utils import log as alog
+    from pyontutils.utils import log as pylog
+
+    log_file = log_path / START_TIMESTAMP_SAFE  # FIXME configure and switch
+    bind_file_handler = SimpleFileHandler(log_file, log, logd)
+
+    #log_file_handler = logging.FileHandler(log_file.as_posix())
+    #log_file_handler.setFormatter(log.handlers[0].formatter)
+    #log.addHandler(log_file_handler)
+    #logd.addHandler(log_file_handler)
+
+
 def main():
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
 
-    # set logging to file before anything else is done
-    # FIXME remove this hardcoded nonsense
-    from pyontutils.utils import isoformat_safe, utcnowtz
-    sparc_export = Path('~/files/blackfynn_local/export').expanduser()  # no s for maximum confusion
-    ll = Path(args['--log-location'].replace('${SPARC_EXPORTS}', sparc_export.as_posix()))
-    if not ll.exists():
-        ll.mkdir(parents=True)  # FIXME switch to a .local folder or something
+    log_path = Path(args['--log-path'])
+    if not log_path.exists():
+        log_path.mkdir(parents=True)
 
-    lf = ll / isoformat_safe(utcnowtz())
-    lfh = logging.FileHandler(lf.as_posix())
-    lfh.setFormatter(log.handlers[0].formatter)
-    log.addHandler(lfh)
-    logd.addHandler(lfh)
+    bind_file_handler(log_path)
 
     options = Options(args, defaults)
     main = Main(options)

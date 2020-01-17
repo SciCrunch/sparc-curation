@@ -10,6 +10,15 @@ class Master(Sheet):
     name = 'sparc-master'
 
 
+class Overview(Master):
+    sheet_name = 'July18_2019'
+
+    def dataset_ids(self):
+        header, *rows = self.values
+        index = header.index('identifier')
+        return set(i for i in [row[index]for row in rows] if i)
+
+
 class Progress(Master):
     sheet_name = 'Curation Progess (OT Only)'
 
