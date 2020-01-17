@@ -872,7 +872,8 @@ class BFLocal:
             return Blackfynn(api_token=auth.dynamic_config.secrets('blackfynn', self._project_id, 'key'),
                              api_secret=auth.dynamic_config.secrets('blackfynn', self._project_id, 'secret'))
         except KeyError as e:
-            raise exc.MissingSecretError from e
+            msg = f'need record in secrets for blackfynn organization {self._project_id}'
+            raise exc.MissingSecretError(msg) from e
 
     def __getstate__(self):
         state = self.__dict__

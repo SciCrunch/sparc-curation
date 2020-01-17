@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.7
-from config import auth
+from sparcur.config import auth
 __doc__ = f"""
 SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
@@ -774,11 +774,11 @@ class Main(Dispatcher):
 
     @property
     def export_base(self):
-        return self.project_path.parent / 'export' / self.project_id
+        return Path(self.options.export_path, self.project_id)
 
     @property
     def LATEST(self):
-        return self.project_path.parent / 'export' / self.project_id / 'LATEST'
+        return self.export_base / 'LATEST'
 
     @property
     def latest_export(self):
@@ -846,7 +846,7 @@ class Main(Dispatcher):
                        sc.SamplesFileSchema,
                        sc.SubmissionSchema,)
 
-            sb = self.project_path.parent / 'export' / 'schemas'  # FIXME run without having to be in a project
+            sb = self.options.export_path / 'schemas'
             for s in schemas:
                 s.export(sb)
 
@@ -1811,20 +1811,15 @@ class Fix(Shell):
         breakpoint()
 
 
-def bind_file_handler(log_path):
+def bind_file_handler(log_file):
     from protcur.core import log as prlog
     from orthauth.utils import log as oalog
     from ontquery.utils import log as oqlog
     from augpathlib.utils import log as alog
     from pyontutils.utils import log as pylog
 
-    log_file = log_path / START_TIMESTAMP_SAFE  # FIXME configure and switch
-    bind_file_handler = SimpleFileHandler(log_file, log, logd)
-
-    #log_file_handler = logging.FileHandler(log_file.as_posix())
-    #log_file_handler.setFormatter(log.handlers[0].formatter)
-    #log.addHandler(log_file_handler)
-    #logd.addHandler(log_file_handler)
+    sfh = SimpleFileHandler(log_file, log, logd)
+    sfh(alog, oalog, oqlog, prlog, pylog)
 
 
 def main():
@@ -1836,14 +1831,19 @@ def main():
     if not log_path.exists():
         log_path.mkdir(parents=True)
 
-    bind_file_handler(log_path)
+    try:
+        log_file = log_path / START_TIMESTAMP_SAFE  # FIXME configure and switch
+        bind_file_handler(log_file)
 
-    options = Options(args, defaults)
-    main = Main(options)
-    if main.options.debug:
-        print(main.options)
+        options = Options(args, defaults)
+        main = Main(options)
+        if main.options.debug:
+            print(main.options)
 
-    main()
+        main()
+    finally:
+        if log_file.size == 0:
+            log_file.unlink()
 
     if options.profile:
         exit = time()

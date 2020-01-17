@@ -30,8 +30,9 @@ class SimpleFileHandler:
         for log in logs:
             self(log)
 
-    def __call__(self, log_to_handle):
-        log_to_handle.addHandler(self.log_file_handler)
+    def __call__(self, *logs_to_handle):
+        for log in logs_to_handle:
+            log.addHandler(self.log_file_handler)
 
     def mimic(self, log):
         self.log_file_handler.setFormatter(log.handlers[0].formatter)

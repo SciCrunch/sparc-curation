@@ -370,6 +370,10 @@ class NormDatasetDescriptionFile(NormValues):
         else:
             return value
 
+    def contributor_affiliation(self, value):
+        value, _j = self._deatag(value)
+        return value
+
     def contributor_orcid_id(self, value):
         # FIXME use schema
         self._error_on_na(value)
