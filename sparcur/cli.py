@@ -303,6 +303,7 @@ class Main(Dispatcher):
                         'project_path',
                         'project_id',
                         'bfl',
+                        'BlackfynnRemote',
                         'summary',
                         'cwd',
                         'cwdintr',
@@ -1295,7 +1296,18 @@ class Report(Dispatcher):
     def access(self, ext=None):
         """ Report on datasets that are in the master sheet but which the
             automated pipelines do not have access to. """
-        from sparcur.sheets import Overview
+        from sparcur.sheets import Overview, Master
+        if self.options.server:
+            def fmt(d): return hfn.atag(d.uri_human, d.id, new_tab=True)
+        else:
+            def fmt(d): return d.uri_human
+
+        if self.options.server:
+            uri_human = Master._uri_human()
+            def fmtmc(s): return hfn.atag(uri_human, s, new_tab=True)
+        else:
+            def fmtmc(s): return s
+
         o = Overview()
         remote = self.anchor.remote
         remote_datasets = remote.children
@@ -1304,10 +1316,10 @@ class Report(Dispatcher):
         bf_api_ids = set(d.id for d in remote_datasets)
 
         missing_from_api = sorted(master_sheet_ids - bf_api_ids)
-        missing_datasets = [self.parent.BlackfynnRemote(i, local_only=True) for i in missing_from_api]
-        missing_uris = [d.uri_human for d in missing_datasets]
+        missing_datasets = [self.BlackfynnRemote(i, local_only=True) for i in missing_from_api]
+        missing_uris = [fmt(d) for d in missing_datasets]
         rows = [['', ''],
-                ['Master Count', len(master_sheet_ids)],
+                [fmtmc('Master Count'), len(master_sheet_ids)],
                 ['BF API Count', len(bf_api_ids)],
                 ['No API Count', len(missing_from_api)],
                 *[[i, u] for i, u in zip(missing_from_api, missing_uris)]

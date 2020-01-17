@@ -1,8 +1,9 @@
 from docopt import parse_defaults
 from sparcur import exceptions as exc
 from sparcur.cli import Report, Options, __doc__ as clidoc
-from sparcur.paths import Path
+from sparcur.paths import Path, BlackfynnCache
 from sparcur.server import make_app
+from sparcur.backends import BlackfynnRemote
 from sparcur.curation import Summary
 
 project_path = Path.cwd()
@@ -28,7 +29,12 @@ report = Report(options)
 report.cwd = options.project_path
 report.project_path = options.project_path
 report.project_id = project_path.cache.id  # FIXME should not have to do this manually?
+report.anchor = project_path.cache
 report.summary = Summary(options.project_path)
+
+# set up bfapi
+report.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+report.BlackfynnRemote.init(report.project_id)
 
 app, *_ = make_app(report, project_path)
 app.debug = False
