@@ -881,6 +881,16 @@ class Main(Dispatcher):
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
 
+        protocols = list(self.summary.protocols(data['datasets']))
+        blob_protocols = {
+            'meta': {'count': len(protocols)},
+            'prov': {'timestamp_export_start': self._timestamp},
+            'protocols': protocols,
+        }
+
+        with open(dump_path / 'protocols.json', 'wt') as f:
+            json.dump(protocols, f, sort_keys=True, indent=2, cls=JEncode)
+
         es = ExporterSummarizer(data)
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
@@ -1327,7 +1337,9 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Access Report', ext=ext)
 
     def contributors(self, ext=None):
-        data = self.summary.data if self.options.raw else self.latest_export
+        data = (self.summary.data_for_export(UTCNOWISO())
+                if self.options.raw else
+                self.latest_export)
         datasets = data['datasets']
         unique = {c['id']:c for d in datasets
                   if 'contributors' in d

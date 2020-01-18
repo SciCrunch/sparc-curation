@@ -314,10 +314,12 @@ class NormValues(HasErrors):
             # end for
             if cell_errors:
                 if len(cell_errors) != 1:
-                    breakpoint()
-                    raise BaseException('wat')
+                    e = exc.TabularCellError(str(cell_errors),
+                                             value=out,
+                                             location=[e.location for e in cell_errors])
+                else:
+                    e = cell_errors[0]
 
-                e = cell_errors[0]
                 raise e 
 
             return out
@@ -496,11 +498,13 @@ class NormDatasetDescriptionFile(NormValues):
                 return orig
 
         def elist(vl):
-            # have to filter out bad matches here because ???
-            rv = tuple(sorted([e for e in
-                               set(echeck(e)
-                                   for e in vl)
-                               if e]))
+            rv = tuple(sorted([o for o in set(echeck(e) for e in vl
+                                              # have to filter here ourselves
+                                              # since clean didn't function ...
+                                              # unless ... we add an expand lists step ...
+                                              # HRM, interesting
+                                              if e is not None and e is not '')
+                               if o]))
             nonlocal cell_error
             if cell_error:
                 rv = exc.TabularCellError(cell_error, value=rv)
@@ -580,6 +584,11 @@ class NormDatasetDescriptionFile(NormValues):
 
 
 class NormSubjectsFile(NormValues):
+
+    def software_url(self, value):
+        value, _j = self._deatag(value)
+        return value
+
     def species(self, value):
         nv = NormSpecies(value)
         #yield self._query(nv, 'NCBITaxon')

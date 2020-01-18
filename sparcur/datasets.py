@@ -625,7 +625,6 @@ class MetadataFile(HasErrors):
                         out[k] = nv
 
                 if out and hrm:
-                    breakpoint()
                     raise ValueError(f'how!?\n{hrm}\n{out}')
                 elif out:
                     return out
@@ -676,7 +675,7 @@ class MetadataFile(HasErrors):
         return nc.data
 
     def _clean(self):
-        data_in = self._filter()
+        data_in = self._expand_string_lists()
         def clean(thing):
             if isinstance(thing, dict):
                 out = {}
@@ -698,6 +697,18 @@ class MetadataFile(HasErrors):
                 return thing
 
         data_out = clean(data_in)
+        return data_out
+
+    def _expand_string_lists(self):
+        data_in = self._filter()
+        # TODO consider whether this step would be useful
+        # I think it would because it would vastly simplify
+        # the downstream implementation of things like
+        # normalizing the contributor roles
+        # TODO this might also go before filter?
+        # might need to blacklist or whitelist fields?
+        seps = '|', ';', ','
+        data_out = data_in
         return data_out
 
     def _filter(self):

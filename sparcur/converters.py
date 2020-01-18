@@ -126,7 +126,6 @@ class ContributorConverter(TripleConverter):
         )
  
     def contributor_role(self, value):
-        breakpoint()
         return TEMP.hasRole, TEMP[value]
 
     class Extra:

@@ -345,15 +345,6 @@ class JSONPipeline(Pipeline):
         errors = tuple(es for es in errors_subpipelines if isinstance(es, tuple))
         self.subpipeline_errors(errors)
         self.subpipeline_instances = tuple(es for es in errors_subpipelines if isinstance(es, Pipeline))
-        if 'errors' in data:
-            candidates_for_removal = [e for e in data['errors'] if 'path' in e]
-            not_input = [e for e in candidates_for_removal if e['path'][0] != 'inputs']
-            cand_paths = [e['path'] for e in not_input]
-            if 'contributors' in data:
-                # FIXME will have to sort these in reverse
-                hrm = list(DT.pop(data, [['contributors', 0, 'contributor_role', 1]]))
-                breakpoint()
-
         return data
 
     @property
@@ -587,10 +578,7 @@ class SPARCBIDSPipeline(JSONPipeline):
 
         [[[['dataset_description_file'], ['path']]],
          DatasetDescriptionFilePipeline,
-         ['dataset_description_file'],
-         lambda p: 'inputs' not in p and 'contributor_role' in p,
-         lambda p: 'inputs' not in p and 'contributor_orcid' in p,
-        ],
+         ['dataset_description_file']],
 
         [[[['subjects_file'], ['path']]],
          SubjectsFilePipeline,
@@ -771,6 +759,47 @@ class PipelineExtras(JSONPipeline):
     ]
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
+
+    filter_failures = (
+        lambda p: ('inputs' not in p and 'contributor_role' in p),
+        lambda p: ('inputs' not in p and 'contributor_orcid' in p),
+    )
+
+    @property
+    def cleaned(self):
+        """ extra cleaning (that could become standard like other stages)
+            to remove paths that do not pass the schema and that are thus
+            have a potential to break things during export """
+
+        data = super().cleaned
+
+        if 'errors' in data:
+            pop_paths = [tuple(p) for p in [e['path'] for e in data['errors']
+                                     if 'path' in e]
+                         if any(ff(p) for ff in self.filter_failures)]
+
+            if pop_paths:
+                # need to remove from the tail of a list so that indexes don't
+                # shift until after we have already passed them
+                safe_ordering = sorted(pop_paths, reverse=True)
+
+                garbage = [(p, tuple(DT.pop(data, [p]))) for p in safe_ordering]
+                msg = '\n\t'.join(str(t) for t in garbage)
+                logd.warning(f'Garbage truck says:\n{msg}')
+
+            # get all error paths
+            # filter the paths to remove
+            # pop the values at those paths
+
+            #candidates_for_removal = [e for e in data['errors'] if 'path' in e]
+            #not_input = [e for e in candidates_for_removal if e['path'][0] != 'inputs']
+            #cand_paths = [e['path'] for e in not_input]
+            #if 'contributors' in data:
+                # FIXME will have to sort these in reverse
+                #hrm = list(DT.pop(data, [['contributors', 0, 'contributor_role', 1]]))
+                #breakpoint()
+
+        return data
 
     @property
     def added(self):

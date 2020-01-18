@@ -94,15 +94,17 @@ class HasSchema:
 
         return cls
 
-    def __call__(self, schema_class, fail=False):
+    def f(self, schema_class, fail=False):
+        return self(schema_class, fail=fail, _property=False)
+
+    def __call__(self, schema_class, fail=False, _property=True):
         # TODO switch for normalized output if value passes?
         schema = schema_class()
         def decorator(function):
             pipeline_stage_name = function.__qualname__
-            @hproperty
             @wraps(function)
-            def schema_wrapped_property(_self):
-                data = function(_self)
+            def schema_wrapped_property(_self, *args, **kwargs):
+                data = function(_self, *args, **kwargs)
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
                     if fail:
@@ -123,6 +125,9 @@ class HasSchema:
                     return norm_or_error
 
                 return data
+
+            if _property:
+                schema_wrapped_property = hproperty(schema_wrapped_property)
 
             schema_wrapped_property.schema = schema
             return schema_wrapped_property
@@ -595,10 +600,11 @@ class DatasetOutSchema(JSONSchema):
         a key piece of information that we use to link everything together. """
 
     __schema = copy.deepcopy(DatasetStructureSchema.schema['allOf'][0])
-    __schema['required'] = ['id', 'meta', 'contributors']
+    __schema['required'] = ['id', 'meta', 'contributors', 'prov']
     __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
+                            'prov': {'type': 'object'},
                             'errors': ErrorSchema.schema,
                             'contributors': ContributorsOutSchema.schema,
                             'creators': CreatorsSchema.schema,
@@ -649,7 +655,7 @@ class PostSchema(JSONSchema):
 class SummarySchema(JSONSchema):
     # TODO add expected counts
     schema = {'type': 'object',
-              'required': ['id', 'meta'],
+              'required': ['id', 'meta', 'prov'],
               'properties': {'id': {'type': 'string',
                                     'pattern': '^N:organization:'},
                              'meta': {'type': 'object',
@@ -663,6 +669,7 @@ class SummarySchema(JSONSchema):
                                                                  'pattern': r'^https://api\.blackfynn\.io/organizations/N:organization:',
                                                      },
                                                      'count': {'type': 'integer'},},},
+                             'prov': {'type': 'object'},
                              'datasets': {'type': 'array',
                                           'minItems': 1,
                                           'items': {'type': 'object'},  # DatasetOutSchema already validated

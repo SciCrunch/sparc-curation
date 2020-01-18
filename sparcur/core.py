@@ -117,7 +117,7 @@ class HasErrors:
                 'blame': blame,}  # FIXME
 
         if path is not None:
-            o['path'] = path
+            o['file_path'] = path
 
         if isinstance(e, str):
             o['message'] = e
@@ -1213,9 +1213,7 @@ class _DictTransformer:
     def subpipeline(cls, data, runtime_context, subpipelines, update=True,
                     source_key_optional=True, lifters=None):
         """
-            [[[[get-path, add-path], ...], pipeline-class, target-path, filter-failure ...], ...]
-
-            filter-failure is a function to match on json schema error paths
+            [[[[get-path, add-path], ...], pipeline-class, target-path], ...]
 
             NOTE: this function is a generator, you have to express it!
         """
@@ -1225,7 +1223,7 @@ class _DictTransformer:
                 self.data = data
 
         prepared = []
-        for get_adds, pipeline_class, target_path, *filter_failures in subpipelines:
+        for get_adds, pipeline_class, target_path in subpipelines:
             selected_data = {}
             ok = True
             for get_path, add_path in get_adds:
@@ -1247,23 +1245,15 @@ class _DictTransformer:
                 continue
 
             log.debug(lj(selected_data))
-            prepared.append((target_path, pipeline_class, filter_failures,
-                             DataWrapper(selected_data), lifters, runtime_context))
+            prepared.append((target_path, pipeline_class, DataWrapper(selected_data),
+                             lifters, runtime_context))
 
         function = adops.update if update else adops.add
-        for target_path, pc, filter_failures, *args in prepared:
+        for target_path, pc, *args in prepared:
             p = pc(*args)
             if target_path is not None:
                 try:
-                    pipeline_data = p.data
-                    pop_paths = [p for p in [e['path'] for e in adops.get(pipeline_data, 'errors')
-                                             if 'path' in e]
-                                 if any(ff(p) for ff in filter_failures)]
-                    list()
-                    # get all error paths
-                    # filter the paths to remove
-                    # pop the values at those paths
-                    function(data, target_path, pipeline_data)
+                    function(data, target_path, p.data)
                 except BaseException as e:
                     import inspect
                     __file = inspect.getsourcefile(pc)

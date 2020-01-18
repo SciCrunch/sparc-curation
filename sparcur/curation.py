@@ -428,8 +428,8 @@ class TriplesExport(ProtcurData):
         #self.title = self.data['meta']['title'] if 
 
     @property
-    def timestamp_export(self):
-        return adops.get(self.data, ['meta', 'timestamp_export'])
+    def timestamp_export_start(self):
+        return adops.get(self.data, ['prov', 'timestamp_export_start'])
 
     @property
     def protocol_uris(self):  # FIXME this needs to be pipelined
@@ -465,7 +465,7 @@ class TriplesExport(ProtcurData):
             (rdfs.label, rdflib.Literal(f'{self.folder_name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
-            (TEMP.TimestampExport, rdflib.Literal(self.timestamp_export)),
+            (TEMP.TimestampExportStart, rdflib.Literal(self.timestamp_export_start)),
         )
         for p, o in pos:
             yield ontid, p, o
@@ -857,7 +857,8 @@ class Integrator(PathData, OntologyData):
     def data_for_export(self, timestamp):
         data = self.data
         # NOTE this timestamps the cached data AS INTENDED
-        data['meta']['timestamp_export'] = timestamp
+        data['prov'] = {}
+        data['prov']['timestamp_export_start'] = timestamp
         return data
 
     @property
@@ -998,6 +999,7 @@ class ExporterSummarizer:
 
     @property
     def xml(self):
+        import pathlib
         #datasets = []
         #contributors = []
         subjects = []
@@ -1018,6 +1020,8 @@ class ExporterSummarizer:
             if isinstance(v, Expr):
                 return str(v)  # FIXME for xml?
             if isinstance(v, Quantity):
+                return str(v)
+            elif isinstance(v, pathlib.Path):
                 return str(v)
             else:
                 #log.debug(repr(v))
@@ -1287,11 +1291,11 @@ class Summary(Integrator, ExporterSummarizer):
         for dataset_blob in self:
             yield self._completeness(dataset_blob)
 
-    def protocols(self, iterthing):
+    def protocols(self, dataset_blobs):
         class ProtocolHelper(ProtocolData):  # FIXME so ... bad ...
             @property
             def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
-                for d in iterthing:
+                for d in dataset_blobs:
                     try:
                         yield from adops.get(d, ['meta', 'protocol_url_or_doi'])
                     except exc.NoSourcePathError:
@@ -1313,24 +1317,28 @@ class Summary(Integrator, ExporterSummarizer):
                 'uri_api': self.uri_api,
                 'uri_human': self.uri_human,
                 'count': count,}
-        ps = list(self.protocols(ds))
         return {'id': self.id,
                 'meta': meta,
-                'datasets': ds,
-                'protocols': ps,}
+                'prov': {},
+                'datasets': ds,}
 
     @property
     def pipeline_end(self):
+        return self._pipeline_end()
+
+    def _pipeline_end(self, timestamp=None):
         if not hasattr(self, '_data_cache'):
             ca = self.path._cache_class._remote_class._cache_anchor
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
             if not self._debug:
-                hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca) for d in self.iter_datasets)
+                hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca, timestamp)
+                                         for d in self.iter_datasets)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
             else:
-                self._data_cache = self.make_json(d.data for d in self.iter_datasets)
+                self._data_cache = self.make_json(d.data_for_export(timestamp)
+                                                  for d in self.iter_datasets)
 
         return self._data_cache
 
@@ -1339,14 +1347,21 @@ class Summary(Integrator, ExporterSummarizer):
         data = self.pipeline_end
         return data  # FIXME we want objects that wrap the output rather than generate it ...
 
+    @hasSchema.f(sc.SummarySchema, fail=True)
+    def data_for_export(self, timestamp):
+        data = self._pipeline_end(timestamp)
+        # NOTE this timestamps the cached data AS INTENDED
+        data['prov']['timestamp_export_start'] = timestamp
+        return data
 
-def datame(d, ca):
+
+def datame(d, ca, timestamp):
     """ sigh, pickles """
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):
         rc.anchorTo(ca)
 
-    return d.data
+    return d.data_for_export(timestamp)
 
 
 def express_or_return(thing):
