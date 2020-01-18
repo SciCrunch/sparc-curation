@@ -182,8 +182,9 @@ class NormContributorRole(str):
             normalized = best[1]
             cutoff = len(value) / 2
             if distance > cutoff:
-                normalized = (f'ERROR VALUE: "{value}" could not be normalized, best was {normalized} '
-                              f'with distance {distance} cutoff was {cutoff}')
+                msg = (f'"{value}" could not be normalized, best was {normalized} '
+                       f'with distance {distance} cutoff was {cutoff}')
+                raise exc.CouldNotNormalizeError(msg)
 
             return normalized
 
@@ -218,6 +219,8 @@ class ATag(HTMLParser):
 
 class NormValues(HasErrors):
     """ Base class with an open dir to avoid name collisions """
+
+    embed_bad_key_message = False  # TODO probably don't want this, better to zap bad values in pipeline
 
     def __init__(self, obj_inst):
         super().__init__()
@@ -260,27 +263,62 @@ class NormValues(HasErrors):
             log.warning(f'No ontology id found for {value}')
             return value
 
-    def _normv(self, thing, key=None, path=tuple()):
-        #print(path)
+    def _normv(self, thing, key=None, rec=None, path=tuple()):
+        cell_errors = []
         if isinstance(thing, dict):
             out = {}
-            for k, v in thing.items():
+            for i, (k, v) in enumerate(thing.items()):
+                intermediate = k in self._norm_to_orig_header
+                process_group = k in self._groups_alt
                 if k == self._record_type_key_header:
                     gnv = lambda : v
-                elif k in self._norm_to_orig_header:
-                    gnv = lambda : self._normv(v, key, path)
+                elif intermediate:
+                    gnv = lambda : self._normv(v, key, rec, path)
                 elif k in self._norm_to_orig_alt:
-                    gnv = lambda : self._normv(v, k, path + (k,))
-                elif k in self._groups_alt:
-                    gnv = lambda : self._normv(v, k, path + (k,))
+                    gnv = lambda : self._normv(v, k, i, path + (k,))
+                elif process_group:
+                    gnv = lambda : self._normv(v, k, i, path + (k,))
                 else:
                     raise ValueError(f'what is going on here?! {k} {v}')
 
                 try:
-                    out[k] = gnv()
-
+                    nv = gnv()
+                    out[k] = nv
                 except exc.NotApplicableError:
                     pass
+                except exc.TabularCellError as e:
+                    # strip the error and log it
+                    out[k] = e.value
+                    # since out is mutable here it will continue to update
+                    if rec is None or process_group:  # aka rec is None
+                        if rec is None:
+                            kmsg = f'.{k}'
+                        else:
+                            kmsg = f'.{key}'
+
+                        self.addError(e,
+                                      pipeline_stage=f'{self.__class__.__name__}{kmsg}',
+                                      logfunc=log.critical,
+                                      blame='submission')
+                        #if isinstance(out[k], dict):
+                            #self.embedLastError(out[k])
+
+                    else:
+                        if not intermediate and self.embed_bad_key_message:
+                            self.errorInKey(out, k)
+
+                        location = rec, i
+                        new_e = exc.TabularCellError(str(e), value=out, location=location)
+                        cell_errors.append(new_e)
+
+            # end for
+            if cell_errors:
+                if len(cell_errors) != 1:
+                    breakpoint()
+                    raise BaseException('wat')
+
+                e = cell_errors[0]
+                raise e 
 
             return out
 
@@ -291,6 +329,7 @@ class NormValues(HasErrors):
             if isinstance(key, str) and hasattr(self, key):
                 self._error_on_na(thing, key)  # TODO see if this makes sense
                 out = getattr(self, key)(thing)
+
                 if isinstance(out, GeneratorType):
                     out = tuple(out)
                     if len(out) == 1:  # FIXME find the actual source of double packing
@@ -308,16 +347,19 @@ class NormValues(HasErrors):
             else:
                 out = thing
 
-            return out
+            if isinstance(out, exc.TabularCellError):
+                raise out
 
+            return out
 
     @property
     def data(self):
-        nk = self._obj_inst._normalize_keys()
+        #nk = self._obj_inst._normalize_keys()
+        data_in = self._obj_inst._clean()
         self._bind()
-        data = self._normv(nk)
-        self.embedErrors(data)
-        return data
+        data_out = self._normv(data_in)
+        self.embedErrors(data_out)
+        return data_out
 
 
 
@@ -361,7 +403,7 @@ class NormDatasetDescriptionFile(NormValues):
 
         return value.strip()
 
-    def contributors(self, value):
+    def __contributors(self, value):
         if isinstance(value, list):
             for d in value:
                 yield {self.rename_key(k):tos(nv)
@@ -433,22 +475,42 @@ class NormDatasetDescriptionFile(NormValues):
 
     def contributor_role(self, value):
         # FIXME normalizing here momentarily to squash annoying errors
-        def echeck(value, original):
-            if value.startswith('ERROR VALUE:'):
-                self.addError(value.split(':', 1)[-1].strip(),
-                              pipeline_stage=f'{self.__class__.__name__}.contributor_role',
-                              logfunc=logd.error,
-                              blame='submission',
-                              path=self._path)
-                return ''  # can't return None or sorting errors occur
+        cell_error = ''
+        def echeck(original):
+            orig = original.strip()
+            try:
+                return NormContributorRole(orig)
+            except exc.CouldNotNormalizeError as e:
+                #self.addError(e,
+                              #pipeline_stage=f'{self.__class__.__name__}.contributor_role',
+                              #logfunc=logd.error,
+                              #blame='submission',
+                              #path=self._path)
+                emsg = f'Bad value: "{orig}"'
+                nonlocal cell_error
+                if cell_error:
+                    cell_error = cell_error + ', ' + emsg
+                else:
+                    cell_error = emsg
 
-            else:
-                return value
+                return orig
+
+        def elist(vl):
+            # have to filter out bad matches here because ???
+            rv = tuple(sorted([e for e in
+                               set(echeck(e)
+                                   for e in vl)
+                               if e]))
+            nonlocal cell_error
+            if cell_error:
+                rv = exc.TabularCellError(cell_error, value=rv)
+
+            return rv
 
         if isinstance(value, list):
-            yield tuple(sorted(set(echeck(NormContributorRole(e.strip()), e) for e in value)))
+            yield elist(value)
         else:
-            yield tuple(sorted(set(echeck(NormContributorRole(e.strip()), e) for e in value.split(','))))
+            yield elist(value.split(','))
 
     def is_contact_person(self, value):
         # no truthy values only True itself
@@ -515,14 +577,6 @@ class NormDatasetDescriptionFile(NormValues):
             values = value,
 
         yield from values
-        #return values
-        #log.debug(f'{values}')
-        #for value in values:
-            #match = self._query(value, prefix=None)
-            #if match and False:  # this is incredibly broken at the moment
-                #yield match
-            #else:
-                #yield value
 
 
 class NormSubjectsFile(NormValues):

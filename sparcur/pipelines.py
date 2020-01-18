@@ -345,6 +345,15 @@ class JSONPipeline(Pipeline):
         errors = tuple(es for es in errors_subpipelines if isinstance(es, tuple))
         self.subpipeline_errors(errors)
         self.subpipeline_instances = tuple(es for es in errors_subpipelines if isinstance(es, Pipeline))
+        if 'errors' in data:
+            candidates_for_removal = [e for e in data['errors'] if 'path' in e]
+            not_input = [e for e in candidates_for_removal if e['path'][0] != 'inputs']
+            cand_paths = [e['path'] for e in not_input]
+            if 'contributors' in data:
+                # FIXME will have to sort these in reverse
+                hrm = list(DT.pop(data, [['contributors', 0, 'contributor_role', 1]]))
+                breakpoint()
+
         return data
 
     @property
@@ -578,7 +587,10 @@ class SPARCBIDSPipeline(JSONPipeline):
 
         [[[['dataset_description_file'], ['path']]],
          DatasetDescriptionFilePipeline,
-         ['dataset_description_file']],
+         ['dataset_description_file'],
+         lambda p: 'inputs' not in p and 'contributor_role' in p,
+         lambda p: 'inputs' not in p and 'contributor_orcid' in p,
+        ],
 
         [[[['subjects_file'], ['path']]],
          SubjectsFilePipeline,

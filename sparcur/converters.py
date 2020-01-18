@@ -64,7 +64,10 @@ class TripleConverter(dat.HasErrors):
         if not isinstance(subject, rdflib.URIRef):
             subject = rdflib.URIRef(subject)
 
+        #maybe_not_normalized = self.message_passing_key in self._source  # TODO maybe not here?
         for field, value in self._source.items():
+            #normalized = not (maybe_not_normalized and field in self._source)  # TODO
+
             #log.debug(f'{field}: {value}')
             if type(field) is object:
                 continue  # the magic helper key for Pipeline
@@ -123,6 +126,7 @@ class ContributorConverter(TripleConverter):
         )
  
     def contributor_role(self, value):
+        breakpoint()
         return TEMP.hasRole, TEMP[value]
 
     class Extra:

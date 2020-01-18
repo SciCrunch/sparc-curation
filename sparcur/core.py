@@ -23,6 +23,7 @@ from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, cache, python_identifier  # FIXME fix other imports
+from sparcur.utils import is_list_or_tuple
 from sparcur.config import config, auth
 
 
@@ -80,6 +81,8 @@ class OntTerm(OTB, OntId):
 
 
 class HasErrors:
+    message_passing_key = 'keys_with_errors'
+
     def __init__(self, *args, pipeline_stage=None, **kwargs):
         try:
             super().__init__(*args, **kwargs)
@@ -89,41 +92,59 @@ class HasErrors:
         self._pipeline_stage = pipeline_stage
         self._errors_set = set()
 
+    @staticmethod
+    def errorInKey(data, key):
+        mpk = HasErrors.message_passing_key
+        if mpk in data:
+            data[mpk].append(key)
+        else:
+            data[mpk] = [key]
+
     def addError(self, error, pipeline_stage=None, logfunc=None, blame=None, path=None):
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
         b = len(self._errors_set)
-        self._errors_set.add((error, stage, blame, path))
+        et = (error, stage, blame, path)
+        self._last_error = et
+        self._errors_set.add(et)
         a = len(self._errors_set)
         if logfunc is not None and a != b:  # only log on new errors
             logfunc(error)
 
+    def _render(self, e, stage, blame, path):
+        o = {'pipeline_stage': stage,
+                'blame': blame,}  # FIXME
+
+        if path is not None:
+            o['path'] = path
+
+        if isinstance(e, str):
+            o['message'] = e
+            o['type'] = None  # FIXME probably wan our own?
+
+        elif isinstance(e, BaseException):
+            o['message'] = str(e)
+            o['type'] = str(type(e))
+
+        else:
+            raise TypeError(repr(e))
+
+        log.debug(o)
+        return o
+
     @property
     def _errors(self):
-        for e, stage, blame, path in self._errors_set:
-            o = {'pipeline_stage': stage,
-                 'blame': blame,}  # FIXME
+        for et in self._errors_set:
+            yield self._render(*et)
 
-            if path is not None:
-                o['path'] = path
-                
-            if isinstance(e, str):
-                o['message'] = e
-                o['type'] = None  # FIXME probably wan our own?
+    def embedLastError(self, data):
+        self.embedErrors(data, el=[self._render(*self._last_error)])
 
-            elif isinstance(e, BaseException):
-                o['message'] = str(e)
-                o['type'] = str(type(e))
+    def embedErrors(self, data, el=tuple()):
+        if not el:
+            el = list(self._errors)
 
-            else:
-                raise TypeError(repr(e))
-
-            log.debug(o)
-            yield o
-
-    def embedErrors(self, data):
-        el = list(self._errors)
         if el:
             if 'errors' in data:
                 data['errors'].extend(el)
@@ -887,7 +908,16 @@ class AtomicDictOperations:
     def pop(cls, data, source_path):
         """ allows us to document removals """
         source_key, node_key, source = cls._get_source(data, source_path)
-        return source.pop(source_key)
+        if isinstance(source, tuple):
+            value = source[source_key]
+            new_node = tuple(v for i, v in enumerate(source) if i != source_key)
+            parent_source_key, parent_node_key, parent_source = cls._get_source(data, source_path[:-1])
+            assert node_key == parent_source_key
+            # FIXME will fail if parent_source is a tuple
+            parent_source[node_key] = new_node
+            return value
+        else:
+            return source.pop(source_key)
 
     @classmethod
     def copy(cls, data, source_path, target_path):
@@ -905,24 +935,43 @@ class AtomicDictOperations:
         yield source_key  # yield this because we don't know if move or copy
         source = data
         for node_key in source_prefixes:
-            if node_key in source:
-                source = source[node_key]
+            if isinstance(source, dict):
+                if node_key in source:
+                    source = source[node_key]
+                else:
+                    # don't move if no source
+                    msg = f'did not find {node_key!r} in {tuple(source.keys())}'
+                    raise exc.NoSourcePathError(msg)
+            elif is_list_or_tuple(source):
+                if not isinstance(node_key, int):
+                    raise TypeError(f'Wrong type for node_key {type(node_key)} {node_key}. '
+                                    'Expected int.')
+                source = source[node_key]  # good good let the index errors flow through you
             else:
-                # don't move if no source
-                msg = f'did not find {node_key!r} in {tuple(source.keys())}'
-                raise exc.NoSourcePathError(msg)
+                raise TypeError(f'Unsupported type {type(source)} for {lj(source)}')
 
         # for move
         yield (node_key if source_prefixes else
                AtomicDictOperations.__empty_node_key)
 
-        if source_key not in source:
+        if isinstance(source, dict):
+            if source_key not in source:
+                try:
+                    msg = f'did not find {source_key!r} in {tuple(source.keys())}'
+                    raise exc.NoSourcePathError(msg)
+                except AttributeError as e:
+                    raise TypeError(f'value at {source_path} has wrong type!{lj(source)}') from e
+                    #log.debug(f'{source_path}')
+
+        elif is_list_or_tuple(source):
             try:
-                msg = f'did not find {source_key!r} in {tuple(source.keys())}'
-                raise exc.NoSourcePathError(msg)
-            except AttributeError as e:
-                raise TypeError(f'value at {source_path} has wrong type!{lj(source)}') from e
-                #log.debug(f'{source_path}')
+                source[source_key]
+            except IndexError as e:
+                msg = f'There is not a {source_key}th value in {lj(source)}'
+                raise exc.NoSourcePathError(msg) from e
+
+        else:
+            raise TypeError(f'Unsupported type {type(source)} for {lj(source)}')
 
         yield source
 
@@ -1160,10 +1209,13 @@ class _DictTransformer:
                 #data.pop(temp)
 
 
-    @staticmethod
-    def subpipeline(data, runtime_context, subpipelines, update=True, source_key_optional=True, lifters=None):
+    @classmethod
+    def subpipeline(cls, data, runtime_context, subpipelines, update=True,
+                    source_key_optional=True, lifters=None):
         """
-            [[[[get-path, add-path], ...], pipeline-class, target-path], ...]
+            [[[[get-path, add-path], ...], pipeline-class, target-path, filter-failure ...], ...]
+
+            filter-failure is a function to match on json schema error paths
 
             NOTE: this function is a generator, you have to express it!
         """
@@ -1173,7 +1225,7 @@ class _DictTransformer:
                 self.data = data
 
         prepared = []
-        for get_adds, pipeline_class, target_path in subpipelines:
+        for get_adds, pipeline_class, target_path, *filter_failures in subpipelines:
             selected_data = {}
             ok = True
             for get_path, add_path in get_adds:
@@ -1195,15 +1247,23 @@ class _DictTransformer:
                 continue
 
             log.debug(lj(selected_data))
-            prepared.append((target_path, pipeline_class, DataWrapper(selected_data),
-                             lifters, runtime_context))
+            prepared.append((target_path, pipeline_class, filter_failures,
+                             DataWrapper(selected_data), lifters, runtime_context))
 
         function = adops.update if update else adops.add
-        for target_path, pc, *args in prepared:
+        for target_path, pc, filter_failures, *args in prepared:
             p = pc(*args)
             if target_path is not None:
                 try:
-                    function(data, target_path, p.data)
+                    pipeline_data = p.data
+                    pop_paths = [p for p in [e['path'] for e in adops.get(pipeline_data, 'errors')
+                                             if 'path' in e]
+                                 if any(ff(p) for ff in filter_failures)]
+                    list()
+                    # get all error paths
+                    # filter the paths to remove
+                    # pop the values at those paths
+                    function(data, target_path, pipeline_data)
                 except BaseException as e:
                     import inspect
                     __file = inspect.getsourcefile(pc)

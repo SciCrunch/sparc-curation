@@ -1853,6 +1853,10 @@ def main():
             print(main.options)
 
         main()
+    except BaseException as e:
+        log.exception(e)
+        print()
+        raise e
     finally:
         if log_file.size == 0:
             log_file.unlink()

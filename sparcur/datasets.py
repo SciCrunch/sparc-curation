@@ -608,7 +608,6 @@ class MetadataFile(HasErrors):
             return self._condense()
 
     def _condense(self):
-        crtk = self._cull_rtk()
         def condense(thing, key=None):
             if isinstance(thing, dict):
                 hrm = []
@@ -617,11 +616,16 @@ class MetadataFile(HasErrors):
                     nv = condense(v, k)
                     # bah bloody description appearing twice >_<
                     if k in self.norm_to_orig_header and k not in self.norm_to_orig_alt:
-                        hrm.append(nv)
+                        if is_list_or_tuple(nv):
+                            # at this stage there are no lists of lists
+                            hrm.extend(nv)
+                        else:
+                            hrm.append(nv)
                     else:
                         out[k] = nv
 
                 if out and hrm:
+                    breakpoint()
                     raise ValueError(f'how!?\n{hrm}\n{out}')
                 elif out:
                     return out
@@ -632,16 +636,19 @@ class MetadataFile(HasErrors):
                     else:
                         return tuple(hrm)
 
+            #elif is_list_or_tuple(thing):
+                #return thing
             else:
                 return thing
 
-        cond = condense(crtk)
-        if cond is None:
+        data_in = self._cull_rtk()
+        data_out = condense(data_in)
+        if data_out is None:
             # None breaks further pipelines
             # yes types would help here
             return {}
         else:
-            return cond
+            return data_out
 
     def _cull_rtk(self):
         normalized = self._normalize_values()
@@ -668,14 +675,8 @@ class MetadataFile(HasErrors):
         nc = self.normalization_class(self)  # calls _normalize_keys internally
         return nc.data
 
-    def _normalize_keys(self):
-        # NOTE: this is essentially a dead step now since
-        # all the headers are normalized ASAP
-        cleaned = self._clean()
-        return cleaned
-
     def _clean(self):
-        filtered = self._filter()
+        data_in = self._filter()
         def clean(thing):
             if isinstance(thing, dict):
                 out = {}
@@ -690,11 +691,14 @@ class MetadataFile(HasErrors):
             elif thing == '' or thing == {}:
                 return None
 
+            elif is_list_or_tuple(thing):
+                return [v for v in [clean(v) for v in thing] if v is not None]
+
             else:
                 return thing
 
-        cleaned = clean(filtered)
-        return cleaned
+        data_out = clean(data_in)
+        return data_out
 
     def _filter(self):
         # FIXME does in place modification
@@ -740,14 +744,7 @@ class MetadataFile(HasErrors):
         nunaccounted = (set(self.norm_to_orig_alt) - naccounted_baseline)
 
         for nah in nunaccounted: 
-            #try:
-                #transformed[nah] = keyed[nah]
-            #except KeyError as e:
-                #breakpoint()
-                #'fuckyou'
-
             transformed[nah] = keyed[nah]
-
 
         return transformed
 
@@ -926,6 +923,12 @@ class DatasetDescriptionFile(MetadataFile):
     ignore_header = 'metadata_element', 'example', 'description_header'
     normalization_class = nml.NormDatasetDescriptionFile
     _expect_string = _nddfes
+
+    @property
+    def data(self):
+        data = super().data
+        #breakpoint()
+        return data
 
 
 class DatasetDescriptionFilePath(ObjectPath):

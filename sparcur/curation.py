@@ -139,6 +139,7 @@ class DatasetStructureH(PathData, dat.DatasetStructure):
             award = next(iter(set(self.award)))  # FIXME len1? testing?
         except StopIteration:
             award = '?-no-award-?'
+
         pis = list(self.PI)
         if not pis:
             pis = '?-no-pi-?',
@@ -944,6 +945,7 @@ class ErrorObject(JsonObject):
                 return str(v)
 
         return [['Key', 'Value']] + [[key, ex(key)] for key in self._keys]
+
 
 class ExporterSummarizer:
     def __init__(self, data_json):

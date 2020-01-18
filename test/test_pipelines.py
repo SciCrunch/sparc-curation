@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 import pytest
 from sparcur import pipelines as pipes
+from .common import examples_root
 
 
 class TestApiNAT(unittest.TestCase):
@@ -31,3 +32,12 @@ class TestApiNAT(unittest.TestCase):
         r = pipes.ApiNATOMY_rdf(rm)  # FIXME ... should be able to pass the pipeline
         r.data
         #breakpoint()
+
+
+class TestDatasetDescription(unittest.TestCase):
+    source = examples_root / 'dd-pie.csv'
+
+    def test_dd_pie_p(self):
+        p = pipes.DatasetDescriptionFilePipeline(self.source, None, None)
+        data = p.data
+        # TODO test as subpipeline ?

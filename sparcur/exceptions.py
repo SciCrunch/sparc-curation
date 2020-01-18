@@ -86,6 +86,21 @@ class MalformedHeaderError(BadDataError):
     """ Bad header """
 
 
+class CouldNotNormalizeError(SparCurError):
+    """ signal that a value could not be normalized """
+
+
+class TabularCellError(SparCurError):
+    """ signal that an error has occured in a particular cell """
+    def __init__(self, msg, *, value=None, location=None):
+        self.value = value
+        self.location = location  # usually set after the fact
+        if location:
+            msg = f'{msg} at {location}'
+
+        super().__init__(msg)
+
+
 class LengthMismatchError(SparCurError):
     """ lenghts of iterators for a zipeq do not match """
 
