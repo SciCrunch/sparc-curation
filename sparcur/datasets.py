@@ -116,13 +116,23 @@ class DatasetMetadata(Path, HasErrors):
 DatasetMetadata._bind_flavours()
 
 
-class DatasetStructure(Path, HasErrors):
+class DatasetStructure(Path):
     sections = None  # NOTE assigned in at end of file
     rglobs = 'manifest',
     default_glob = 'glob'
     max_childs = 40
     rate = 8  # set by Integrator from cli
     _refresh_on_missing = True
+
+    @property
+    def children(self):
+        # for whatever reason the way pathlib constructs children
+        # skips calling init, iirc because they use object.__new__
+        # or something
+
+        for child in super().children:
+            child.__init__()
+            yield child
 
     @classmethod
     def _bind_sections(cls):
@@ -327,9 +337,6 @@ class DatasetStructure(Path, HasErrors):
 
         self.embedErrors(out)
         return out
-
-
-DatasetStructure._bind_flavours()
 
 
 class ObjectPath(Path):
@@ -829,8 +836,7 @@ class MetadataFile(HasErrors):
             yield (normb(row[0]), *row[1:])
 
     def _headers(self):
-        t = Tabular(self.path)
-        self.t = t
+        t = self._t()
 
         if self.default_record_type == ROW_TYPE:
             alt = t
@@ -867,6 +873,9 @@ class MetadataFile(HasErrors):
 
         yield self.header
         yield from gen
+
+    def _t(self):
+        return Tabular(self.path)
 
 
 class SubmissionFile(MetadataFile):
@@ -912,6 +921,7 @@ SubmissionFilePath._bind_flavours()
 _props = sc.DatasetDescriptionSchema.schema['properties']
 _nddfes = [k for k, v in _props.items() if isinstance(v, dict) and
  'type' in v and v['type'] == 'string']
+
 
 class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
@@ -1038,3 +1048,5 @@ DatasetStructure.sections = {'submission': SubmissionFilePath,
                              'manifest': ManifestFilePath,}
 
 DatasetStructure._bind_sections()
+DatasetStructure._pipeline_stage = DatasetStructure.__name__
+DatasetStructure._bind_flavours(pos_helpers=(HasErrors,), win_helpers=(HasErrors,))

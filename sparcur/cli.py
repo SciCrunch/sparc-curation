@@ -184,19 +184,19 @@ from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
 from sparcur import config
+from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
-from sparcur.core import OntId, OntTerm, get_all_errors, adops
+from sparcur.core import OntId, OntTerm, get_all_errors, adops, JEncode
 from sparcur.utils import log, logd, SimpleFileHandler
 from sparcur.utils import python_identifier, want_prefixes
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemote
-from sparcur.curation import PathData, Summary, Integrator, ExporterSummarizer
-from sparcur.curation import JEncode, TriplesExportDataset, TriplesExportSummary
+from sparcur.curation import Summary, Integrator, ExporterSummarizer
 from sparcur.curation import DatasetObject
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import BFLocal
@@ -406,7 +406,6 @@ class Main(Dispatcher):
         State.bind_blackfynn(self.bfl)
 
     def _setup_export(self):
-        #PathData.project_path = self.project_path  # FIXME bad ...
         Integrator.setup()
         ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
 
@@ -810,7 +809,7 @@ class Main(Dispatcher):
             modes.append('wt')
 
         if self.options.ttl:
-            t = lambda f: f.write(TriplesExportDataset(data).ttl)
+            t = lambda f: f.write(ex.TriplesExportDataset(data).ttl)
             functions.append(t)
             suffixes.append('.ttl')
             modes.append('wb')
@@ -881,7 +880,8 @@ class Main(Dispatcher):
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
 
-        protocols = list(self.summary.protocols(data['datasets']))
+        dataset_blobs = data['datasets']
+        protocols = list(self.summary.protocols(dataset_blobs))
         blob_protocols = {
             'meta': {'count': len(protocols)},
             'prov': {'timestamp_export_start': self._timestamp},
@@ -896,12 +896,12 @@ class Main(Dispatcher):
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
             f.write(es.ttl)
 
-        for xml_name, xml in es.xml:
+        for xml_name, xml in ex.xml(dataset_blobs):
             with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
                 f.write(xml)
 
         # datasets, contributors, subjects, samples, resources
-        for table_name, tabular in es.disco:
+        for table_name, tabular in ex.disco(dataset_blobs):
             with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
@@ -911,11 +911,11 @@ class Main(Dispatcher):
             dataset_dump_path.mkdir()
             suffix = '.ttl'
             mode = 'wb'
-            for dataset_blob in es:
+            for dataset_blob in dataset_blobs:
                 filepath = dataset_dump_path / dataset_blob['id']
                 out = filepath.with_suffix(suffix)
                 with open(out, 'wb') as f:
-                    f.write(TriplesExportDataset(dataset_blob).ttl)
+                    f.write(ex.TriplesExportDataset(dataset_blob).ttl)
 
                 log.info(f'dataset graph exported to {out}')
 
@@ -962,7 +962,7 @@ class Main(Dispatcher):
 
         # get package testing
         bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
-                    'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
+                   'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
         bfds = self.bfl.bf.datasets()
         packages = [list(d.packages) for d in bfds[:3]
                     if d.id not in bigskip]
@@ -994,28 +994,17 @@ class Main(Dispatcher):
 
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """
-        # TODO per dataset
-        from sparcur.datasets import DatasetStructure
-        from sparcur import pipelines as pipes
-        DatasetStructure._refresh_on_missing = False
-        summary = self.summary
-        tables = []
-        datasets = (self.summary.iter_datasets
-                    if self.cwd.cache.is_organization() else
-                    (Integrator(self.cwd.cache.dataset.local),))
-        for intr in datasets:
-            pipe = intr.pipeline
-            while not isinstance(pipe, pipes.SPARCBIDSPipeline):
-                pipe = pipe.previous_pipeline
 
-            try:
-                pipe.subpipelined
-            except pipe.SkipPipelineError:
-                continue
+        dat.DatasetStructure._refresh_on_missing = False
+        droot = dat.DatasetStructure(self.cwd)
+        if droot.cache.is_dataset():
+            datasetsdatas = droot,
+        elif droot.cache.is_organization():
+            datasetdatas = droot.children
+        else:
+            raise TypeError(f'whats a {type(droot)}? {droot}')
 
-            for sp in pipe.subpipeline_instances:
-                tabular = sp._transformer.t
-                tables.append(tabular)
+        tables = [d.dataset_description.object._t() for d in datasetdatas]
 
         [print(repr(t)) for t in tables]
         return
@@ -1764,7 +1753,7 @@ class Shell(Dispatcher):
         from protcur.analysis import protc, Hybrid
         from sparcur import sheets
         #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
-        from sparcur.protocols import ProtocolData, ProtcurData
+        from sparcur.protocols import ProtcurData
         p, *rest = self._paths
         intr = Integrator(p)
         j = JT(intr.data)

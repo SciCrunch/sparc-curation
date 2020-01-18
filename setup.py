@@ -34,7 +34,7 @@ setup(name='sparcur',
           'Programming Language :: Python :: 3.7',
       ],
       keywords='SPARC curation biocuration ontology blackfynn protc protocols hypothesis',
-      packages=['sparcur'],
+      packages=['sparcur', 'sparcur.export'],
       python_requires='>=3.6',
       tests_require=tests_require,
       install_requires=[
