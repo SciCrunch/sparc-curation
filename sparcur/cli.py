@@ -61,6 +61,7 @@ Commands:
                 options: --diff     diff the local and cached metadata
                        : --browser  navigate to the human uri for this file
                        : --human
+                       : --context  include context, e.g. dataset
 
     export      export extracted data to json (and everything else)
 
@@ -126,6 +127,7 @@ Options:
     -b --browser            open the uri in default browser
     -u --uri                print the human uri for the path in question
     -a --uri-api            print the api uri for the path in question
+    -c --context            include context for a file e.g. dataset
     -n --name=<PAT>         filename pattern to match (like find -name)
     -e --empty              only pull empty directories
     -x --exists             when searching include files that have already been pulled
@@ -1134,6 +1136,18 @@ class Main(Dispatcher):
                     else:
                         print(cmeta.as_pretty(pathobject=path,
                                               human=self.options.human))
+
+                    if self.options.context:
+                        pc = path.cache
+                        if not pc.is_organization():
+                            org = pc.organization.local
+                            if not pc.is_dataset():
+                                ds = pc.dataset.local
+                                inner(ds)
+                            elif self.options.verbose:
+                                inner(org)
+
+                        print()
 
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
