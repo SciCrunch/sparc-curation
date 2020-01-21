@@ -20,6 +20,7 @@ graphConfiguration:
 ontologies:
   - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl
   - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/Bolser-Lewis-Model2.ttl
+  - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/test-bolew.ttl
   - url: https://cassava.ucsd.edu/sparc/exports/curation-export.ttl
   - url: https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/neuron-development.ttl
   #- url: http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl
