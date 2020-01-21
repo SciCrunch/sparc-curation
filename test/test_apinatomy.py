@@ -4,6 +4,7 @@ from pathlib import Path
 from sparcur import apinat
 import pytest
 
+export = False
 debug = False
 
 
@@ -19,9 +20,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
+        if export:
+            rdfg.write(Path('test-1.ttl'))
         if debug:
             print(rdfg.ttl)
-            rdfg.write(Path('test-1.ttl'))
             print(rtmap)
             assert False
 
@@ -36,9 +38,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
+        if export:
+            rdfg.write(Path('test-2.ttl'))
         if debug:
             print(rdfg.ttl)
-            rdfg.write(Path('test-2.ttl'))
             print(rtmap)
             assert False
 
@@ -53,9 +56,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
+        if export:
+            rdfg.write(Path('test-3.ttl'))
         if debug:
             print(rdfg.ttl)
-            rdfg.write(Path('test-3.ttl'))
             print(rtmap)
             assert False
 
@@ -70,9 +74,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
+        if export:
+            rdfg.write(Path('test-4.ttl'))
         if debug:
             print(rdfg.ttl)
-            rdfg.write(Path('test-4.ttl'))
             print(rtmap)
             assert False
 
@@ -88,9 +93,10 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = apinat.Graph.fromRdf(rdfg).map
         assert list(rdfg)
         assert rtmap['resources']
+        if export:
+            rdfg.write(Path('test-5.ttl'))
         if debug:
             print(rdfg.ttl)
-            rdfg.write(Path('test-5.ttl'))
             print(rtmap)
             assert False
 
@@ -105,9 +111,10 @@ class TestApiNATToRDF(unittest.TestCase):
         apin = apinat.Graph(m, g)
         rdfg = apin.graph()
         rtmap = apinat.Graph.fromRdf(rdfg).map
+        if export:
+            rdfg.write(Path('test-bolew.ttl'))
         if debug:
             print(rdfg.ttl)
-            rdfg.write(Path('test-bolew.ttl'))
             print(rtmap)
             assert False
 
