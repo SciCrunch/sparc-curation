@@ -948,6 +948,7 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
 
 *** Other random commands
+**** Simplified error report
 #+CAPTION: simplified error report
 #+begin_src bash
   jq -r '[ .datasets[] |
@@ -957,6 +958,16 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
             ce: [ .status.curation_errors[].message   ] | unique } ]' curation-export.json
 #+end_src
 
+**** File extensions
+Get a list of all file extensions for symlinks (usually data)
+#+begin_src bash
+find -type l | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
+#+end_src
+
+Find datasets with unknown file types.
+#+begin_src bash
+find -name '*.roi' -exec spc meta --context --uri {} \+
+#+end_src
 ** Developer
 See also the [[file:./developer-guide.org][sparcur developer guild]]
 *** Releases
