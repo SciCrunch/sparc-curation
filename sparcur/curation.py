@@ -116,26 +116,56 @@ class Integrator(PathData, OntologyData):
 
         dat.DatasetStructure.rate = cls.rate
 
+        class FakeOrganSheet:
+            modality = lambda v: None
+            organ_term = lambda v: None
+            award_manual = lambda v: None
+            byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
+            techniques = lambda v: []
+            protocol_uris = lambda v: []
+
+        class FakeAffilSheet:
+            def __call__(self, *args, **kwargs):
+                return
+        class FakeOverviewSheet:
+            def __call__(self, *args, **kwargs):
+                return
+
         # unanchored helpers
         if cls.no_google or local_only:
             log.critical('no google no organ data')
-            class FakeOrganSheet:
-                modality = lambda v: None
-                organ_term = lambda v: None
-                award_manual = lambda v: None
-                byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
-                techniques = lambda v: []
-                protocol_uris = lambda v: []
-
-            class FakeAffilSheet:
-                def __call__(self, *args, **kwargs):
-                    return
-
             cls.organs_sheet = FakeOrganSheet
             cls.affiliations = FakeAffilSheet()
+            cls.overview_sheet = FakeOverviewSheet()
         else:
-            cls.organs_sheet = sheets.Organs()  # ipv6 resolution issues :/
+            # ipv6 resolution issues :/ also issues with pickling
+            #cls.organs_sheet = sheets.Organs(fetch_grid=True)  # this kills parallelism
+            cls.organs_sheet = sheets.Organs()  # if fetch_grid = False @ class level ok
             cls.affiliations = sheets.Affiliations()
+            cls.overview_sheet = sheets.Overview()
+
+            # zap all the services (apparently doesn't help)
+            # yep, its just the organ sheet, these go in and out just fine
+            #if hasattr(sheets.Sheet, '_Sheet__spreadsheet_service'):
+                #delattr(sheets.Sheet, '_Sheet__spreadsheet_service')
+            #if hasattr(sheets.Sheet, '_Sheet__spreadsheet_service_ro'):
+                #delattr(sheets.Sheet, '_Sheet__spreadsheet_service_ro')
+
+            #for s in (cls.organs_sheet, cls.affiliations, cls.overview_sheet):
+                #if hasattr(s, '_spreadsheet_service'):
+                    #delattr(s, '_spreadsheet_service')
+
+            # YOU THOUGHT IT WAS GOOGLE IT WAS ME ORGANS ALL ALONG!
+            #cls.organs_sheet = FakeOrganSheet  # organs is BAD
+
+            #cls.affiliations = FakeAffilSheet()  # affiliations is OK
+            #cls.overview_sheet = FakeOverviewSheet()  # overview is OK
+
+            #breakpoint()
+            # remove byCol which is unpickleable (super duper sigh)
+            #for s in (cls.organs_sheet, cls.affiliations, cls.overview_sheet):
+                #if hasattr(s, 'byCol'):
+                    #delattr(s, 'byCol')
 
         if cls.no_google:
             cls.organ = lambda award: None
@@ -210,13 +240,31 @@ class Integrator(PathData, OntologyData):
             member = self.member
             affiliations = self.affiliations
 
-            modality = self.organs_sheet.modality(id)
-            award_manual = self.organs_sheet.award_manual(id)
-            techniques = self.organs_sheet.techniques(id)
-            protocol_uris = self.organs_sheet.protocol_uris(id)
+            # hypothesis that the calling of methods was the issue
+            # also fails
+            _organs_sheet = self.organs_sheet
+            #modality = self.organs_sheet.modality(id)
+            #award_manual = self.organs_sheet.award_manual(id)
+            #techniques = self.organs_sheet.techniques(id)
+            #protocol_uris = self.organs_sheet.protocol_uris(id)
+            @property
+            def modality(self):
+                return self._organs_sheet.modality(self.id)
+            @property
+            def award_manual(self):
+                return self._organs_sheet.award_manual(self.id)
+            @property
+            def techniques(self):
+                return self._organs_sheet.techniques(self.id)
+            @property
+            def protocol_uris(self):
+                return self._organs_sheet.protocol_uris(self.id)
 
             #sheets
-            organ_term = self.organs_sheet.organ_term(id)
+            #organ_term = self.organs_sheet.organ_term(id)
+            @property
+            def organ_term(self):
+                return self._organs_sheet.organ_term(self.id)
 
         class RuntimeContext:
             """ utility for logging etc. """
@@ -277,6 +325,22 @@ class Integrator(PathData, OntologyData):
     def __setstate__(self, state):
         self.__class__.no_google = state['no_google']
         self.__class__.setup()
+        self.__dict__.update(state)
+
+
+class IntegratorSafe(Integrator):
+    """ bypass setup since we should already have the data """
+
+    def setup(cls, *, local_only=False):
+        """ make really sure that we aren't running setup """
+
+    def add_helpers(self, helpers):
+        for k, v in helpers.items():
+            setattr(self, k, v)
+
+    def __setstate__(self, state):
+        self.__class__.no_google = state['no_google']
+        #self.__class__.setup()  # NOPE
         self.__dict__.update(state)
 
 
@@ -419,6 +483,15 @@ class Summary(Integrator, ExporterSummarizer):
         super().__init__(self.path.cache.anchor.local) # FIXME ugh
  
     @property
+    def iter_datasets_safe(self):
+        for i, path in enumerate(self.anchor.path.iterdir()):
+            # FIXME non homogenous, need to find a better way ...
+            if path.cache is None and path.skip_cache:
+                continue
+
+            yield IntegratorSafe(path)
+
+    @property
     def iter_datasets(self):
         """ Return the list of datasets for the organization
             of the current Integrator regardless of whether that
@@ -489,14 +562,45 @@ class Summary(Integrator, ExporterSummarizer):
             ca = self.path._cache_class._remote_class._cache_anchor
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
+
+            helpers = {
+                'organ': self.organ,
+                'member': self.member,
+            }
+
+            # running Integrator.setup again here breaks the enforcment of single threads
+
+            helpers.update({
+                'organs_sheet': self.organs_sheet,
+                'affiliations': self.affiliations,
+                'overview_sheet': self.overview_sheet,
+            })
+
+            #self.organs_sheet.fetch_grid = False  # does not solve the issue by itself
+
+            # running setup again here does not
+            #Integrator.no_google = True
+            #Integrator.setup()
+            # HOWEVER: overwriting organs_sheet does
+            #helpers['organs_sheet'] = self.organs_sheet
+
             if not self._debug:
+                # this flies with no_google, so something is up with
+                # the reserialization of the Sheets classes I think
+                hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca, timestamp, helpers)
+                                         for d in self.iter_datasets_safe)
+                self._data_cache = self.make_json(hrm)
+            elif False:
                 hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca, timestamp)
                                          for d in self.iter_datasets)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
-            else:
+            elif False:
                 self._data_cache = self.make_json(d.data_for_export(timestamp)
                                                   for d in self.iter_datasets)
+            else:
+                self._data_cache = self.make_json(datame(d, ca, timestamp, helpers)
+                                                  for d in self.iter_datasets_safe)
 
         return self._data_cache
 
@@ -513,10 +617,13 @@ class Summary(Integrator, ExporterSummarizer):
         return data
 
 
-def datame(d, ca, timestamp):
+def datame(d, ca, timestamp, helpers=None):
     """ sigh, pickles """
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):
         rc.anchorTo(ca)
+
+    if helpers is not None:
+        d.add_helpers(helpers)
 
     return d.data_for_export(timestamp)

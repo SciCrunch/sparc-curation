@@ -98,10 +98,24 @@ class KeywordSets(FieldAlignment):
     sheet_name = 'Keyword sets'
 
 
+class _Organs(FieldAlignment):
+    # just having fetch_grid = True is enough to bolox everything
+    sheet_name = 'Organs'
+    index_columns = 'id',
+    fetch_grid = True  # THIS IS THE CULPRET
+    #fetch_grid = False  # THIS FLIES
+    def modality(self, dataset_id): None
+    def organ_term(self, dataset_id): None
+    def award_manual(self, dataset_id): None
+    def techniques(self, dataset_id): return []
+    def protocol_uris(self, dataset_id): return []
+
+
 class Organs(FieldAlignment):
     sheet_name = 'Organs'
     index_columns = 'id',
     fetch_grid = True
+    #fetch_grid = False
 
     def _lookup(self, dataset_id):
         try:
@@ -121,32 +135,39 @@ class Organs(FieldAlignment):
         row = self._lookup(dataset_id)
         if row:
             try:
-                return tuple(_ for _ in (row.modality1, row.modality2) if _)
+                m1 = self.byCol.header.index('modality1')
+                m2 = self.byCol.header.index('modality2')
+                return tuple(_ for _ in (row[m1], row[m2]) if _)
             except AttributeError as e:
                 raise ValueError(f'issue in {self.name} {self.sheet_name}') from e
 
     def organ_term(self, dataset_id):
         row = self._lookup(dataset_id)
+        organ_term = self.byCol.header.index('organ_term')
         if row:
-            ot = row.organ_term if row.organ_term else None
+            ot = row[organ_term] if row[organ_term] else None
             if ot:
                 ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
                 return ts
 
     def award(self, dataset_id):
         row = self._lookup(dataset_id)
+        award = self.byCol.header.index('award')
+        award_manual = self.byCol.header.index('award_manual')
         if row:
-            return row.award if row.award else (row.award_manual if row.award_manual else None)
+            return row[award] if row[award] else (row[award_manual] if row[award_manual] else None)
         
     def award_machine(self, dataset_id):
         row = self._lookup(dataset_id)
+        award = self.byCol.header.index('award')
         if row:
-            return row.award if row.award else None
+            return row[award] if row[award] else None
 
     def award_manual(self, dataset_id):
         row = self._lookup(dataset_id)
+        award_manual = self.byCol.header.index('award_manual')
         if row:
-            return row.award_manual if row.award_manual else None
+            return row[award_manual] if row[award_manual] else None
 
     def techniques(self, dataset_id):
         row = self._lookup(dataset_id)
@@ -170,7 +191,7 @@ class Organs(FieldAlignment):
             row_index = self._dataset_row_index(dataset_id)
             return [mkval(self.cell_object(row_index, column_index))
                     for column_index, (field, value)
-                    in enumerate(zip(row._fields, row))
+                    in enumerate(zip(self.byCol.header, row))
                     if field.startswith('technique') and
                     value and
                     value.lower() != 'na']
@@ -194,8 +215,33 @@ class Organs(FieldAlignment):
             row_index = self._dataset_row_index(dataset_id)
             return [mkval(self.cell_object(row_index, column_index))
                     for column_index, (field, value)
-                    in enumerate(zip(row._fields, row))
+                    in enumerate(zip(self.byCol.header, row))
                     if field.startswith('Protocol') and value and value not in skip]
         else:
             return []
 
+
+def mkval_tech(cell):
+    hl = cell.hyperlink
+    if hl is not None:
+        oid = OntId(hl)
+        if oid.prefix == 'TEMP':
+            logd.warning(f'{cell.value} -> {oid!r}')
+            #return OntTerm(curie=f'lex:{quote(cell.value)}')
+        #else:
+
+        return oid.asTerm()
+
+    else:
+        logd.warning(f'unhandled technique {cell.value}')
+        return cell.value
+
+
+def mkval_pu(cell):
+    hl = cell.hyperlink
+    if hl is not None:
+        return AutoId(hl)
+
+    else:
+        logd.warning(f'unhandled value {cell.value}')
+        return cell.value
