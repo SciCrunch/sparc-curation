@@ -1,5 +1,6 @@
+import idlib
 from pyontutils.sheets import Sheet
-from sparcur.core import OntId, OntTerm, AutoId
+from sparcur.core import OntId, OntTerm
 from sparcur.utils import log, logd
 from urllib.parse import quote
 
@@ -76,7 +77,7 @@ class Affiliations(Sheet):
 
     @property
     def mapping(self):
-        return {a:AutoId(r).asInstrumented() if r else None
+        return {a:idlib.Ror(r).asInstrumented() if r else None
                 for a, r in zip(self.byCol.affiliation_string,
                                 self.byCol.ror_id)}
 

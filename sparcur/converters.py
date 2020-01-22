@@ -1,12 +1,12 @@
 from types import GeneratorType
+import idlib
 import rdflib
 from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
 from pyontutils import combinators as cmb
 from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc
 from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
-from sparcur.core import OntId, OntTerm, lj, get_right_id
-from sparcur.core import RorInst
+from sparcur.core import OntId, OntTerm, lj
 from sparcur.utils import log, logd
 from sparcur.protocols import ProtocolData
 
@@ -132,7 +132,7 @@ class ContributorConverter(TripleConverter):
         def affiliation(self, value):
             #_, s = self.c.affiliation(value)
             if isinstance(value, str):  # FIXME json conv
-                yield from RorInst(value).triples_gen
+                yield from idlib.Ror(value).triples_gen
             else:
                 yield from value.triples_gen
                

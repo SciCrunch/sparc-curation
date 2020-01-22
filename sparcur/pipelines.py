@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from collections import deque
+import idlib
 import rdflib
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
@@ -11,7 +12,7 @@ from sparcur import datasets as dat
 from sparcur import converters as conv
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
-from sparcur.core import JT, JEncode, log, logd, lj, OntId, OrcidId, OntTerm, OntCuries
+from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
 from sparcur.state import State
 from sparcur.derives import Derives
 
@@ -118,9 +119,9 @@ class ContributorsPipeline(DatasourcePipeline):
         if 'contributor_orcid_id' in contributor:
             orcid = contributor['contributor_orcid_id']
             if type(orcid) == str and 'orcid.org' in orcid:
-                orcid = OrcidId(orcid)  # FIXME reloading from json
+                orcid = idlib.OrcidId(orcid)  # FIXME reloading from json
 
-            if isinstance(orcid, OrcidId):
+            if isinstance(orcid, idlib.OrcidId):
                 s = orcid
             else:  # it's not an orcid or its a bad orcid
                 orcid = None

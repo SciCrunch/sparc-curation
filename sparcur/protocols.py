@@ -8,8 +8,7 @@ from pyontutils import combinators as cmb
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from sparcur import datasets as dat
-from sparcur.core import log, logd, OntTerm, OntId, OrcidId, PioId, sparc
-from sparcur.core import get_right_id, DoiId, DoiInst, PioInst, PioUserInst
+from sparcur.core import log, logd, OntTerm, OntId, sparc
 from sparcur.paths import Path
 from sparcur.utils import log, logd, cache
 from sparcur.config import config, auth
@@ -27,7 +26,7 @@ class ProtcurData:
 
     def _protcur(self, protocol_uri, filter=lambda p: True):
         self.lazy_setup()
-        protocol_uri = get_right_id(protocol_uri)
+        protocol_uri = idlib.get_right_id(protocol_uri)
         gen = (p for p in self.protc if p.uri.startswith(protocol_uri) and filter(p))
 
         try:
@@ -113,7 +112,7 @@ class ProtcurData:
 class ProtocolData(dat.HasErrors):
     # this class is best used as a helper class not as a __call__ class
 
-    _instance_wanted_by = PioInst, PioUserInst
+    _instance_wanted_by = idlib.PioInst, idlib.PioUserInst
 
     def __init__(self, id=None):  # FIXME lots of ways to use this class ...
         self.id = id  # still needed for the converters use case :/
@@ -210,7 +209,7 @@ class ProtocolData(dat.HasErrors):
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
         logd.info(uri)
-        pi = get_right_id(uri)
+        pi = idlib.get_right_id(uri)
         if 'protocols.io' in pi:
             pioid = pi.slug  # FIXME normalize before we ever get here ...
             log.info(pioid)

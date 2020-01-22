@@ -3,10 +3,11 @@
 import numbers
 from types import GeneratorType
 from html.parser import HTMLParser
+import idlib
 from pysercomb.pyr import units as pyru
 from . import exceptions as exc
 from .core import log, logd, HasErrors
-from .core import OntId, OrcidId, DoiId, PioId
+from .core import OntId
 
 
 BLANK_VALUE = object()
@@ -437,7 +438,7 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(v) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(OrcidId.OrcidLengthError(msg))
+                self.addError(idlib.OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
@@ -453,25 +454,25 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(numeric) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(OrcidId.OrcidLengthError(msg))
+                self.addError(idlib.OrcidId.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
         try:
             #log.debug(f"{v} '{self.path}'")
-            orcid = OrcidId(v)
+            orcid = idlib.OrcidId(v)
             if not orcid.checksumValid:
                 # FIXME json schema can't do this ...
                 msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
-                self.addError(OrcidId.OrcidChecksumError(msg))
+                self.addError(idlib.OrcidId.OrcidChecksumError(msg))
                 logd.error(msg)
                 return
 
             yield orcid
 
-        except (OntId.BadCurieError, OrcidId.OrcidMalformedError) as e:
+        except (OntId.BadCurieError, idlib.OrcidId.OrcidMalformedError) as e:
             msg = f'orcid malformed {value!r} {self._path.as_posix()!r}'
-            self.addError(OrcidId.OrcidMalformedError(msg))
+            self.addError(idlib.OrcidId.OrcidMalformedError(msg))
             logd.error(msg)
             yield value
 
@@ -529,9 +530,9 @@ class NormDatasetDescriptionFile(NormValues):
             doi = True
 
         if doi:
-            value = DoiId(value)
+            value = idlib.Doi(value)
         else:
-            value = PioId(value).normalize()
+            value = idlib.PioId(value).normalize()
 
         return value
 
@@ -564,7 +565,7 @@ class NormDatasetDescriptionFile(NormValues):
         for val in value.split(','):
             v = val.strip()
             if v:
-                doi = DoiId(v)
+                doi = idlib.Doi(v)
                 if doi.valid:
                     # TODO make sure they resolve as well
                     # probably worth implementing this as part of OntId

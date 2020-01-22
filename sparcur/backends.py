@@ -1,11 +1,12 @@
 import os
 from pathlib import PurePosixPath, PurePath
 from datetime import datetime
+import idlib
 import requests
 from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
-from sparcur.core import BlackfynnId, DoiId
+from sparcur.core import BlackfynnId
 import augpathlib as aug
 from augpathlib import PathMeta
 from augpathlib.remotes import RemoteFactory
@@ -379,7 +380,7 @@ class BlackfynnRemote(aug.RemotePath):
         blob = self.bfobject.doi
         print(blob)
         if blob:
-            return DoiId(blob['doi'])
+            return idlib.Doi(blob['doi'])
 
     @property
     def size(self):
