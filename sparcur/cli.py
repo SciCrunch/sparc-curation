@@ -803,12 +803,12 @@ class Main(Dispatcher):
         suffixes = []
         modes = []
         data = intr.data_for_export(self._timestamp)  # build and cache the data
-        if self.options.json:  # json first since we can cache dowe
-            j = lambda f: json.dump(data, f,
-                                    sort_keys=True, indent=2, cls=JEncode)
-            functions.append(j)
-            suffixes.append('.json')
-            modes.append('wt')
+
+        # always dump the json
+        j = lambda f: json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
+        functions.append(j)
+        suffixes.append('.json')
+        modes.append('wt')
 
         if self.options.ttl:
             t = lambda f: f.write(ex.TriplesExportDataset(data).ttl)
@@ -1000,7 +1000,7 @@ class Main(Dispatcher):
         dat.DatasetStructure._refresh_on_missing = False
         droot = dat.DatasetStructure(self.cwd)
         if droot.cache.is_dataset():
-            datasetsdatas = droot,
+            datasetdatas = droot,
         elif droot.cache.is_organization():
             datasetdatas = droot.children
         else:
@@ -1348,7 +1348,7 @@ class Report(Dispatcher):
                   if 'contributors' in d
                   for c in d['contributors']}
         contribs = sorted(unique.values(),
-                          key=lambda c: c['last_name'] if 'last_name' in c else c['name'])
+                          key=lambda c: c['last_name'] if 'last_name' in c else (c['contributor_name'] if 'contributor_name' in c else 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz'))
         #contribs = sorted((dict(c) for c in
                            #set(frozenset({k:tuple(v) if isinstance(v, list) else
                                           #(frozenset(v.items()) if isinstance(v, dict) else v)
@@ -1358,10 +1358,11 @@ class Report(Dispatcher):
                                #for c in d['contributors']
                                #if not log.info(lj(c)))),
                           #key=lambda c: c['last_name'] if 'last_name' in c else c['name'])
+        breakpoint()
         rows = [['id', 'last', 'first', 'PI', 'No Orcid']] + [[
             c['id'],
-            c['last_name'],
-            c['first_name'],
+            c['last_name'] if 'last_name' in c else '',
+            c['first_name'] if 'first_name' in c else '',
             'x' if 'contributor_role' in c and 'PrincipalInvestigator' in c['contributor_role'] else '',
             'x' if 'orcid' not in c['id'] else '']
             for c in contribs]
