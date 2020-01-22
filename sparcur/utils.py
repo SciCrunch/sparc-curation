@@ -12,6 +12,7 @@ from sparcur.config import config
 
 log = makeSimpleLogger('sparcur')
 logd = log.getChild('data')
+loge = log.getChild('export')
 
 # set augpathlib log format to pyontutils (also sets all child logs)
 _alog.removeHandler(_alog.handlers[0])

@@ -12,6 +12,7 @@ from pyontutils.namespaces import (TEMP,
 from sparcur import converters as conv
 from sparcur.core import (adops,
                           OntCuries)
+from sparcur.utils import loge
 from sparcur.protocols import ProtcurData
 
 
@@ -91,7 +92,7 @@ class TriplesExport(ProtcurData):
                     (hasattr(element, '_value') and (isinstance(element._value, dict) or
                                                      isinstance(element._value, list) or
                                                      isinstance(element._value, tuple)))):
-                    log.critical(element)
+                    loge.critical(element)
 
             return triple
 
@@ -148,7 +149,7 @@ class TriplesExportDataset(TriplesExport):
         try:
             dsid = self.dsid  # FIXME json reload needs to deal with this
         except BaseException as e:  # FIXME ...
-            log.error(e)
+            loge.exception(e)
             return
 
         s = rdflib.URIRef(contributor['id'])  # FIXME json reload needs to deal with this
@@ -159,11 +160,24 @@ class TriplesExportDataset(TriplesExport):
 
         yield s, rdf.type, owl.NamedIndividual
         yield s, rdf.type, sparc.Researcher
-        yield s, TEMP.contributorTo, dsid
+        yield s, TEMP.contributorTo, dsid  # TODO other way around too? hasContributor
         converter = conv.ContributorConverter(contributor)
         yield from converter.triples_gen(s)
         if creator:
             yield s, TEMP.creatorOf, dsid
+
+        # dataset <-> contributor object
+        dcs = rdflib.BNode()
+
+        yield dcs, rdf.type, owl.NamedIndividual
+        yield dcs, rdf.type, TEMP.DatasetContributor
+        yield dcs, TEMP.aboutDataset, dsid  # FIXME forDataset?
+        yield dcs, TEMP.aboutContributor, s
+        dconverter = conv.DatasetContributorConverter(contributor)
+        for _s, p, o in dconverter.triples_gen(dcs):
+            if p == sparc.isContactPerson and o._value == True:
+                yield dsid, TEMP.hasContactPerson, s
+            yield _s, p, o
 
     @property
     def triples(self):
@@ -179,7 +193,13 @@ class TriplesExportDataset(TriplesExport):
             meta_converter = conv.MetaConverter(data['meta'], self)
             yield from meta_converter.triples_gen(dsid)
         else:
-            log.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
+            loge.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
+
+        if 'submission' in data:
+            submission_converter = conv.SubmissionConverter(data['submission'], self)
+            yield from submission_converter.triples_gen(dsid)
+        else:
+            loge.warning(f'{self} has no submission!')  # FIXME split logs into their problems, and our problems
 
         if 'status' not in data:
             breakpoint()
@@ -209,7 +229,7 @@ class TriplesExportDataset(TriplesExport):
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
         if isinstance(v, int):
-            log.critical('darn it max normlize your ids!')
+            loge.critical('darn it max normlize your ids!')
             v = str(v)
 
         v = quote(v, safe=tuple())
@@ -237,7 +257,7 @@ class TriplesExportDataset(TriplesExport):
                     if convert is not None:
                         yield (s, *convert(value))
                     elif field not in converter.known_skipped:
-                        log.warning(f'Unhandled subject field: {field}')
+                        loge.warning(f'Unhandled subject field: {field}')
 
         yield from triples_gen(self.subject_id, self.subjects)
 
@@ -271,7 +291,7 @@ class TriplesExportDataset(TriplesExport):
                     if convert is not None:
                         yield (s, *convert(value))
                     elif field not in converter.known_skipped:
-                        log.warning(f'Unhandled sample field: {field}')
+                        loge.warning(f'Unhandled sample field: {field}')
 
         yield from triples_gen(self.sample_id, self.samples)
 

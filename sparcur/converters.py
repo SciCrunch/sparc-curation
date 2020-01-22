@@ -61,7 +61,8 @@ class TripleConverter(dat.HasErrors):
             return rdflib.Literal(value)
 
     def triples_gen(self, subject):
-        if not isinstance(subject, rdflib.URIRef):
+        if not (isinstance(subject, rdflib.URIRef) or
+                isinstance(subject, rdflib.BNode)):
             subject = rdflib.URIRef(subject)
 
         #maybe_not_normalized = self.message_passing_key in self._source  # TODO maybe not here?
@@ -112,22 +113,17 @@ class TripleConverter(dat.HasErrors):
 
 
 class ContributorConverter(TripleConverter):
-    known_skipped = 'id', 'name'
+    known_skipped = 'id', 'contributor_name'
     mapping = (
         ('first_name', sparc.firstName),
         ('middle_name', TEMP.middleName),
         ('last_name', sparc.lastName),
         ('contributor_affiliation', TEMP.hasAffiliation),
         ('affiliation', TEMP.hasAffiliation),  # FIXME iri vs literal
-        ('is_contact_person', sparc.isContactPerson),
-        ('is_responsible_pi', sparc.isContactPerson),
         ('blackfynn_user_id', TEMP.hasBlackfynnUserId),
         ('contributor_orcid_id', sparc.hasORCIDId),
         )
  
-    def contributor_role(self, value):
-        return TEMP.hasRole, TEMP[value]
-
     class Extra:
         def __init__(self, converter):
             self.c = converter
@@ -143,6 +139,18 @@ class ContributorConverter(TripleConverter):
 
 ContributorConverter.setup()
 
+class DatasetContributorConverter(TripleConverter):
+    known_skipped = 'id', 'contributor_name', 'first_name', 'last_name'
+
+    mapping = (
+        ('is_contact_person', sparc.isContactPerson),
+        ('is_responsible_pi', sparc.isContactPerson),
+    )
+
+    def contributor_role(self, value):
+        return TEMP.hasRole, TEMP[value]
+
+DatasetContributorConverter.setup()
 
 class MetaConverter(TripleConverter):
     mapping = [
@@ -235,6 +243,13 @@ class DatasetConverter(TripleConverter):
     mapping = []
 DatasetConverter.setup()
 
+
+class SubmissionConverter(TripleConverter):
+    known_skipped = 'milestone_achieved', 'sparc_award_number'
+    mapping = [
+        ['milestone_completion_date', TEMP.milestoneCompletionDate],
+    ]
+SubmissionConverter.setup()
 
 class StatusConverter(TripleConverter):
     known_skipped = 'submission_errors', 'curation_errors'

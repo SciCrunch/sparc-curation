@@ -265,7 +265,7 @@ class DatasetStructureSchema(JSONSchema):
 class ContributorSchema(JSONSchema):
     schema = {'type': 'object',
               'properties': {
-                  'name': {'type': 'string'},
+                  'contributor_name': {'type': 'string'},
                   'first_name': {'type': 'string'},
                   'last_name': {'type': 'string'},
                   'contributor_orcid_id': {'type': 'string',
@@ -352,7 +352,9 @@ class DatasetDescriptionSchema(JSONSchema):
                      'funding',
                      'protocol_url_or_doi',
                      #'completeness_of_data_set'  # TODO versioned schema validation
-                     'contributors',],
+                     'contributors',
+                     'number_of_subjects',
+                     'number_of_samples',],
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
             'errors': ErrorSchema.schema,
@@ -407,7 +409,9 @@ class SubmissionSchema(JSONSchema):
             'errors': ErrorSchema.schema,
             'submission': {
                 'type': 'object',
-                'required': ['sparc_award_number', 'milestone_achieved', 'milestone_completion_date'],
+                'required': ['sparc_award_number',
+                             'milestone_achieved',
+                             'milestone_completion_date'],
                 # TODO allOf?
                 'properties': {'sparc_award_number': {'type': 'string'},
                                'milestone_achieved': {'type': 'string'},

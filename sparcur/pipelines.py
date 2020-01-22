@@ -35,6 +35,25 @@ class DatasourcePipeline(Pipeline):
     """ pipeline that sources complex data from somewhere else """
 
 
+class SubmissionPipeline(DatasourcePipeline):
+
+    def __init__(self, previous_pipeline, lifters, runtime_context):
+        self.submission = previous_pipeline.data
+
+    @property
+    def data(self):
+        # go look in the master sheet data
+        def fix(mcd):
+            log.debug(mcd)
+            return mcd
+
+        if 'milestone_completion_date' in self.submission:
+            mcd = self.submission['milestone_completion_date']
+            self.submission['milestone_completion_date'] = fix(mcd)
+
+        return self.submission
+
+
 class ContributorsPipeline(DatasourcePipeline):
 
     def __init__(self, previous_pipeline, lifters, runtime_context):
@@ -59,8 +78,8 @@ class ContributorsPipeline(DatasourcePipeline):
     def _process(self, contributor):
         # get member if we can find them
         he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.data')
-        if 'name' in contributor and 'first_name' in contributor:
-            name = contributor['name']
+        if 'contributor_name' in contributor and 'first_name' in contributor:
+            name = contributor['contributor_name']
             if ';' in name:
                 msg = f'Bad symbol in name {name!r}'
                 he.addError(msg)
@@ -591,6 +610,7 @@ class SPARCBIDSPipeline(JSONPipeline):
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
               [['subjects_file',], ['inputs', 'subjects_file']],
+              [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
               [['samples_file',], ['inputs', 'samples_file']],
               [['manifest_file',], ['inputs', 'manifest_file']],
@@ -630,7 +650,7 @@ class SPARCBIDSPipeline(JSONPipeline):
                 [['meta', 'award_number']]],
 
                [[['contributors']],
-                (lambda cs: [DT.derive(c, [[[['name']],  # FIXME [['name]] as missing a nesting level
+                (lambda cs: [DT.derive(c, [[[['contributor_name']],  # FIXME [['name]] as missing a nesting level
                                            De.contributor_name,  # and we got no warning ... :/
                                            [['first_name'], ['last_name']]]])
                             for c in cs]),
@@ -756,6 +776,9 @@ class PipelineExtras(JSONPipeline):
         [[[['contributors'], None]],
          ContributorsPipeline,
          None],
+        [[[['submission'], None]],
+         SubmissionPipeline,
+         ['submission']],
     ]
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
@@ -856,7 +879,8 @@ class PipelineExtras(JSONPipeline):
         else:
             if not isinstance(data['meta']['protocol_url_or_doi'], tuple):
                 _test_path = deque(['meta', 'protocol_url_or_doi'])
-                if not [e for e in data['errors'] if e['path'] == _test_path]:
+                if not [e for e in data['errors']
+                        if 'path' in e and e['path'] == _test_path]:
                     raise ext.ShouldNotHappenError('urg')
 
             else:
