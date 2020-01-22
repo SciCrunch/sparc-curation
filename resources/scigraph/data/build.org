@@ -20,7 +20,7 @@
 
   Tangle using =C-c C-v t= and run as =./build=
   #+NAME: build
-  #+HEADER: :eval never :noweb yes :tangle build :tangle-mode (identity #o755)
+  #+HEADER: :eval never :noweb yes :tangle ./build :tangle-mode (identity #o755)
   #+HEADER: :shebang "#!/usr/bin/env bash"
   #+HEADER: :var BUILD_LOCATION=build-location
   #+begin_src bash
