@@ -40,6 +40,8 @@ class TripleConverter(dat.HasErrors):
         self.extra = self.Extra(self)
 
     def l(self, value):
+        if isinstance(value, idlib.Stream):
+            return value.asType(rdflib.URIRef)
         if isinstance(value, OntId):
             return value.u
         if isinstance(value, Expr):
@@ -63,7 +65,10 @@ class TripleConverter(dat.HasErrors):
     def triples_gen(self, subject):
         if not (isinstance(subject, rdflib.URIRef) or
                 isinstance(subject, rdflib.BNode)):
-            subject = rdflib.URIRef(subject)
+            if isinstance(subject, idlib.Stream):
+                subject = subject.asType(rdflib.URIRef)
+            else:
+                subject = rdflib.URIRef(subject)
 
         #maybe_not_normalized = self.message_passing_key in self._source  # TODO maybe not here?
         for field, value in self._source.items():
@@ -190,7 +195,8 @@ class MetaConverter(TripleConverter):
     def principal_investigator(self, value):
         index = int(value.rsplit('/', 1)[-1])
         id = self.integrator.data['contributors'][index]['id']
-        return TEMP.hasResponsiblePrincialInvestigator, rdflib.URIRef(id)  # FIXME reload -> ir
+        o = self.l(id)
+        return TEMP.hasResponsiblePrincialInvestigator, o  # FIXME reload -> ir
 
     def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']
     class Extra:

@@ -1,4 +1,5 @@
 from urllib.parse import quote
+import idlib
 import rdflib
 from pyontutils.utils import isoformat, utcnowtz
 from pyontutils.namespaces import (TEMP,
@@ -91,14 +92,19 @@ class TriplesExport(ProtcurData):
                          isinstance(element, rdflib.Literal)) or
                     (hasattr(element, '_value') and (isinstance(element._value, dict) or
                                                      isinstance(element._value, list) or
-                                                     isinstance(element._value, tuple)))):
+                                                     isinstance(element._value, tuple))) or
+                    (isinstance(element, rdflib.URIRef) and element.startswith('<'))):
+                    #if (isinstance(element, rdflib.URIRef) and element.startswith('<')):
+                        #breakpoint()
                     loge.critical(element)
 
             return triple
 
         OntCuries.populate(graph)  # ah smalltalk thinking
         [graph.add(t) for t in self.triples_header if warn(t)]
-        [graph.add(t) for t in self.triples if warn(t)]
+        for t in self.triples:
+            if warn(t):
+                graph.add(t)
 
 
 class TriplesExportSummary(TriplesExport):
@@ -152,7 +158,11 @@ class TriplesExportDataset(TriplesExport):
             loge.exception(e)
             return
 
-        s = rdflib.URIRef(contributor['id'])  # FIXME json reload needs to deal with this
+        cid = contributor['id']
+        if isinstance(cid, idlib.Stream):  # FIXME nasty branch
+            s = cid.asType(rdflib.URIRef)
+        else:
+            s = rdflib.URIRef(cid)  # FIXME json reload needs to deal with this
 
         if 'blackfynn_user_id' in contributor:
             userid = rdflib.URIRef(contributor['blackfynn_user_id'])

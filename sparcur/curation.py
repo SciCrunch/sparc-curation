@@ -191,18 +191,17 @@ class Integrator(PathData, OntologyData):
     def triples(self):
         # convenience property that ttl doesn't use directly
         # but is here in case we want to access the triples
-        yield from self.triples_class(self.data).triples
+        yield from self.triples_class(self.data()).triples
 
     @property
     def ttl(self):  # FIXME BAD PATTERN IS BAD
-        return self.triples_class(self.data).ttl
+        return self.triples_class(self.data()).ttl
 
     @property
     def name(self):
         return self.path.name
 
-    @property
-    def pipeline(self):
+    def pipeline(self, timestamp):
         if hasattr(self, '_pipeline'):
             return self._pipeline
 
@@ -217,7 +216,7 @@ class Integrator(PathData, OntologyData):
             @property
             def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
                 try:
-                    yield from adops.get(outer_self.data, ['meta', 'protocol_url_or_doi'])
+                    yield from adops.get(outer_self.data(), ['meta', 'protocol_url_or_doi'])
                 except exc.NoSourcePathError:
                     pass
 
@@ -227,9 +226,10 @@ class Integrator(PathData, OntologyData):
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dsc.id  # in case we are somewhere else
-            folder_name = dsc.name
-            uri_api = dsc.uri_api
-            uri_human = dsc.uri_human
+            timestamp_export_start = timestamp
+            #folder_name = dsc.name
+            #uri_api = dsc.uri_api
+            #uri_human = dsc.uri_human
 
             # protocols
             protocol = ph.protocol
@@ -285,16 +285,15 @@ class Integrator(PathData, OntologyData):
         self._pipeline = pipes.PipelineEnd(self.path, lifters, RuntimeContext())
         return self._pipeline
 
-    @property
-    def data(self):
+    def data(self, timestamp=None):
         if hasattr(self, '_data'):
             return self._data
 
-        self._data = self.pipeline.data
+        self._data = self.pipeline(timestamp).data
         return self._data
 
     def data_for_export(self, timestamp):
-        data = self.data
+        data = self.data(timestamp)
         # NOTE this timestamps the cached data AS INTENDED
         data['prov'] = {}
         data['prov']['timestamp_export_start'] = timestamp
@@ -303,14 +302,14 @@ class Integrator(PathData, OntologyData):
     @property
     def keywords(self):
         try:
-            yield from adops.get(self.data, ['meta', 'keywords'])
+            yield from adops.get(self.data(), ['meta', 'keywords'])
         except exc.NoSourcePathError:
             pass
 
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            self._triples_exporter = TriplesExportDataset(self.data)
+            self._triples_exporter = TriplesExportDataset(self.data())
 
         return self._triples_exporter
 
@@ -365,7 +364,7 @@ class DatasetObject(JsonObject):
     @property
     def errors(self):
         for error_type in 'submission', 'curation':
-            for error_blob in self.data['status'][error_type + '_errors']:
+            for error_blob in self.data()['status'][error_type + '_errors']:
                 yield ErrorObject.from_json(error_blob)
 
 
@@ -382,8 +381,8 @@ class ErrorObject(JsonObject):
     def from_json(cls, json):
         self = super().from_json(json)
         for key in self._keys:
-            if key in self.data:
-                value = self.data[key]
+            if key in self.data():
+                value = self.data()[key]
             else:
                 value = None
 
@@ -392,7 +391,7 @@ class ErrorObject(JsonObject):
         return self
 
     def as_table(self):
-        d = self.data
+        d = self.data()
         def ex(k):
             v = getattr(self, k)
             if v is None:
@@ -408,7 +407,7 @@ class ExporterSummarizer:
         self.data = data_json
 
     def __iter__(self):
-        for dataset_blob in self.data['datasets']:
+        for dataset_blob in self.data()['datasets']:
             yield dataset_blob
 
     @property
@@ -451,7 +450,7 @@ class ExporterSummarizer:
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            self._triples_exporter = TriplesExportSummary(self.data)
+            self._triples_exporter = TriplesExportSummary(self.data())
 
         return self._triples_exporter
 

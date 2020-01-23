@@ -961,7 +961,7 @@ class Main(Dispatcher):
         # view all dataset descriptions call repr(tabular_view_demo)
         tabular_view_demo = [next(d.dataset_description).t
                                 for d in ds[:1]
-                                if 'dataset_description' in d.data]
+                                if 'dataset_description' in d.data]  # FIXME
 
         # get package testing
         bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
@@ -980,7 +980,7 @@ class Main(Dispatcher):
         if False:
             ### this is the equivalent of export, quite slow to run
             # export everything
-            dowe = summary.data
+            dowe = summary.data()
 
             # show all the errors from export everything
             error_id_messages = [(d['id'], e['message'])
@@ -1463,7 +1463,7 @@ class Report(Dispatcher):
                                  ext=ext)
 
     def samples(self, ext=None):
-        data = self.summary.data if self.options.raw else self.latest_export
+        data = self.summary.data() if self.options.raw else self.latest_export
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -1479,7 +1479,7 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Samples Report', ext=ext)
 
     def subjects(self, ext=None):
-        data = self.summary.data if self.options.raw else self.latest_export
+        data = self.summary.data() if self.options.raw else self.latest_export
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -1537,7 +1537,7 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Completeness Report', ext=ext)
 
     def keywords(self, ext=None):
-        data = self.summary.data if self.options.raw else self.latest_export
+        data = self.summary.data() if self.options.raw else self.latest_export
         datasets = data['datasets']
         _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
                         key=lambda v: -len(v))
@@ -1570,7 +1570,7 @@ class Report(Dispatcher):
 
     def errors(self, *, id=None, ext=None):
         if self.options.raw:
-            self.summary.data['datasets']
+            self.summary.data()['datasets']
         else:
             datasets = self.latest_export['datasets']
 

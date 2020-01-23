@@ -684,11 +684,8 @@ class SPARCBIDSPipeline(JSONPipeline):
 
     updates = []
 
-    adds = [[['id'], lambda lifters: lifters.id],
-            [['meta', 'folder_name'], lambda lifters: lifters.folder_name],
-            [['meta', 'uri_human'], lambda lifters: lifters.uri_human],
-            [['meta', 'uri_api'], lambda lifters: lifters.uri_api],]
-    adds = []  # replace lifters with proper upstream pipelines
+    # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
+    adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],]
 
     def subpipeline_errors(self, errors):
         paths = []
@@ -764,7 +761,8 @@ class SPARCBIDSPipeline(JSONPipeline):
 
     @hasSchema(sc.DatasetOutSchema)
     def data(self):
-        return super().data
+        data = super().data
+        return data
 
 
 class PipelineExtras(JSONPipeline):

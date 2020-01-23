@@ -5,6 +5,7 @@ import jsonschema
 
 # FIXME these imports should not be here types rules should be set in another way
 from pathlib import Path
+import idlib
 import rdflib
 import requests
 from pyontutils.core import OntId, OntTerm
@@ -148,17 +149,22 @@ class JSONSchema(object):
 
     validator_class = jsonschema.Draft6Validator
 
+    string_types = [  # add more types here
+        str,
+        Path,
+        idlib.Stream,
+        rdflib.URIRef,
+        rdflib.Literal,
+        OntId,
+        OntTerm,
+        Expr,
+    ]
+
     def __init__(self):
         format_checker = jsonschema.FormatChecker()
         #format_checker = ConvertingChecker()
         types = dict(array=(list, tuple),
-                     string=(str,
-                             Path,
-                             rdflib.URIRef,
-                             rdflib.Literal,
-                             OntId,
-                             OntTerm,
-                             Expr,))
+                     string=tuple(self.string_types))
         self.validator = self.validator_class(self.schema,
                                               format_checker=format_checker,
                                               types=types)
@@ -259,7 +265,7 @@ class DatasetStructureSchema(JSONSchema):
     schema = {'allOf': [__schema,
                         {'anyOf': [
                             {'required': ['subjects_file']},
-                            {'required': ['samples_files']}]}]}
+                            {'required': ['samples_file']}]}]}
 
 
 class ContributorSchema(JSONSchema):
@@ -531,12 +537,12 @@ class MetaOutSchema(JSONSchema):
                       'modality',
                       'techniques',
                       'contributor_count',
-                      'uri_human',
-                      'uri_api',
+                      'uri_human',  # from DatasetMetadat
+                      'uri_api',  # from DatasetMetadat
                       'files',
                       'dirs',
                       'size',
-                      'folder_name',
+                      'folder_name',  # from DatasetMetadat
                       'title',
                       'schema_version',
                       #'subject_count',
@@ -604,7 +610,10 @@ class DatasetOutSchema(JSONSchema):
         a key piece of information that we use to link everything together. """
 
     __schema = copy.deepcopy(DatasetStructureSchema.schema['allOf'][0])
-    __schema['required'] = ['id', 'meta', 'contributors', 'prov']
+    __schema['required'] = ['id',
+                            'meta',
+                            'contributors',
+                            'prov']
     __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
@@ -775,5 +784,3 @@ class MISDatasetSchema(JSONSchema):
                                      'items': MISSpecimenSchema.schema},
               }
               }
-
-

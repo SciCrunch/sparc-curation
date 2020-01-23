@@ -156,14 +156,31 @@ class ProtocolData(dat.HasErrors):
         for start_uri in self.protocol_uris:
             log.debug(start_uri)
             try:
-                yield idlib.StreamUri(start_uri).dereference()
+                if not hasattr(start_uri, 'dereference'):
+                    start_uri = idlib.StreamUri(start_uri)
+
+                end_uri = start_uri.dereference()
+                yield end_uri
+                sc = end_uri.progenitor.status_code
+                if sc > 400:
+                    msg = f'error accessing {end_uri} {sc}'
+                    self.addError(msg,
+                                  blame='submission',
+                                  logfunc=logd.error)
             except idlib.exceptions.ResolutionError as e:
                 pass  # FIXME I think we already log this error?
             except requests.exceptions.MissingSchema as e:
-                self.addError(e, blame='submission')
+                self.addError(e,
+                              blame='submission',
+                              logfunc=logd.error)
+            except OntId.BadCurieError as e:
+                self.addError(e,
+                              blame='submission',
+                              logfunc=logd.error)
             except BaseException as e:
-                breakpoint()
-                ''
+                #breakpoint()
+                log.exception(e)
+                log.critical('see exception above')
 
     @property
     def protocol_annotations(self):

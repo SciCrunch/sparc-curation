@@ -544,7 +544,7 @@ class NormDatasetDescriptionFile(NormValues):
             v = val.strip()
             if v:
                 try:
-                    yield  self._protocol_url_or_doi(v)
+                    yield self._protocol_url_or_doi(v)
                 except BaseException as e:
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...
