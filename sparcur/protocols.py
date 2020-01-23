@@ -27,7 +27,7 @@ class ProtcurData:
     def _protcur(self, protocol_uri, filter=lambda p: True):
         self.lazy_setup()
         protocol_uri = idlib.get_right_id(protocol_uri)
-        gen = (p for p in self.protc if p.uri.startswith(protocol_uri) and filter(p))
+        gen = (p for p in self.protc if p.uri.startswith(protocol_uri.identifier) and filter(p))
 
         try:
             p = next(gen)

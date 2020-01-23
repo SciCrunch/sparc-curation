@@ -404,10 +404,10 @@ class ErrorObject(JsonObject):
 
 class ExporterSummarizer:
     def __init__(self, data_json):
-        self.data = data_json
+        self.data_json = data_json
 
     def __iter__(self):
-        for dataset_blob in self.data()['datasets']:
+        for dataset_blob in self.data_json['datasets']:
             yield dataset_blob
 
     @property
@@ -450,7 +450,7 @@ class ExporterSummarizer:
     @property
     def triples_exporter(self):
         if not hasattr(self, '_triples_exporter'):
-            self._triples_exporter = TriplesExportSummary(self.data())
+            self._triples_exporter = TriplesExportSummary(self.data_json)
 
         return self._triples_exporter
 
@@ -586,26 +586,25 @@ class Summary(Integrator, ExporterSummarizer):
             if not self._debug:
                 # this flies with no_google, so something is up with
                 # the reserialization of the Sheets classes I think
-                hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca, timestamp, helpers)
+                # FIXME I suspect that the major bottleneck here is deserialization
+                # of the types back into this thread, once we have the json -> IR
+                # loader we should be able to simply write out the json for each
+                # dataset and then reload them all at once and possibly even do
+                # the per-dataset ttl conversion as well, parsing the ttl is probably
+                # a bad call though
+                hrm = Parallel(n_jobs=12)(delayed(datame)(d, ca, timestamp, helpers)
                                          for d in self.iter_datasets_safe)
-                self._data_cache = self.make_json(hrm)
-            elif False:
-                hrm = Parallel(n_jobs=9)(delayed(datame)(d, ca, timestamp)
-                                         for d in self.iter_datasets)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
-            elif False:
-                self._data_cache = self.make_json(d.data_for_export(timestamp)
-                                                  for d in self.iter_datasets)
             else:
                 self._data_cache = self.make_json(datame(d, ca, timestamp, helpers)
                                                   for d in self.iter_datasets_safe)
 
         return self._data_cache
 
-    @hasSchema(sc.SummarySchema, fail=True)
-    def data(self):
-        data = self.pipeline_end
+    @hasSchema.f(sc.SummarySchema, fail=True)
+    def data(self, timestamp=None):
+        data = self._pipeline_end(timestamp)
         return data  # FIXME we want objects that wrap the output rather than generate it ...
 
     @hasSchema.f(sc.SummarySchema, fail=True)

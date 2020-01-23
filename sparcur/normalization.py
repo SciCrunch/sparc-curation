@@ -388,6 +388,14 @@ class NormDatasetDescriptionFile(NormValues):
 
         return value
 
+    def link_description(self, value):
+        self._error_on_na(value)
+        return value
+
+    def prior_batch_number(self, value):
+        self._error_on_na(value)
+        return value
+
     def _metadata_version_do_not_change(self, value):
         return 'lolololol'
 

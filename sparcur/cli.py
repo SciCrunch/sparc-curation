@@ -1839,6 +1839,7 @@ class Fix(Shell):
 
 
 def bind_file_handler(log_file):
+    from idlib.utils import log as idlog
     from protcur.core import log as prlog
     from orthauth.utils import log as oalog
     from ontquery.utils import log as oqlog
@@ -1846,7 +1847,7 @@ def bind_file_handler(log_file):
     from pyontutils.utils import log as pylog
 
     sfh = SimpleFileHandler(log_file, log, logd)
-    sfh(alog, oalog, oqlog, prlog, pylog)
+    sfh(alog, idlog, oalog, oqlog, prlog, pylog)
 
 
 def main():

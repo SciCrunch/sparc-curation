@@ -5,6 +5,7 @@ import inspect
 import logging
 from pathlib import Path
 from functools import wraps
+from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
 from sparcur.config import config
@@ -17,6 +18,9 @@ loge = log.getChild('export')
 # set augpathlib log format to pyontutils (also sets all child logs)
 _alog.removeHandler(_alog.handlers[0])
 _alog.addHandler(log.handlers[0])
+# idlib logs TODO move to pyontutils probably?
+_ilog.removeHandler(_alog.handlers[0])
+_ilog.addHandler(log.handlers[0])
 
 
 class SimpleFileHandler:
