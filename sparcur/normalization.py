@@ -438,7 +438,7 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(v) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.OrcidId.OrcidLengthError(msg))
+                self.addError(idlib.Orcid._id_class.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
@@ -454,25 +454,25 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(numeric) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.OrcidId.OrcidLengthError(msg))
+                self.addError(idlib.Orcid._id_class.OrcidLengthError(msg))
                 logd.error(msg)
                 return
 
         try:
             #log.debug(f"{v} '{self.path}'")
-            orcid = idlib.OrcidId(v)
-            if not orcid.checksumValid:
+            orcid = idlib.Orcid(v)
+            if not orcid.identifier.checksumValid:  # FIXME should not handle this with ifs ...
                 # FIXME json schema can't do this ...
                 msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.OrcidId.OrcidChecksumError(msg))
+                self.addError(idlib.Orcid._id_class.OrcidChecksumError(msg))
                 logd.error(msg)
                 return
 
             yield orcid
 
-        except (OntId.BadCurieError, idlib.OrcidId.OrcidMalformedError) as e:
+        except (OntId.BadCurieError, idlib.Orcid._id_class.OrcidMalformedError) as e:
             msg = f'orcid malformed {value!r} {self._path.as_posix()!r}'
-            self.addError(idlib.OrcidId.OrcidMalformedError(msg))
+            self.addError(idlib.Orcid._id_class.OrcidMalformedError(msg))
             logd.error(msg)
             yield value
 

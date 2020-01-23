@@ -119,9 +119,9 @@ class ContributorsPipeline(DatasourcePipeline):
         if 'contributor_orcid_id' in contributor:
             orcid = contributor['contributor_orcid_id']
             if type(orcid) == str and 'orcid.org' in orcid:
-                orcid = idlib.OrcidId(orcid)  # FIXME reloading from json
+                orcid = idlib.Orcid(orcid)  # FIXME reloading from json
 
-            if isinstance(orcid, idlib.OrcidId):
+            if isinstance(orcid, idlib.Orcid):
                 s = orcid
             else:  # it's not an orcid or its a bad orcid
                 orcid = None
