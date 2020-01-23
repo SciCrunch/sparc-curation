@@ -14,6 +14,7 @@ import ontquery as oq
 import augpathlib as aug
 #from joblib import Memory
 from idlib.utils import resolution_chain
+from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
@@ -167,6 +168,8 @@ class JEncode(json.JSONEncoder):
             return obj.as_posix()
         elif isinstance(obj, Quantity):
             return obj.json()
+        elif isinstance(obj, idlib.Stream):
+            return obj.identifier
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)

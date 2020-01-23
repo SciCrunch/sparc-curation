@@ -565,11 +565,15 @@ class NormDatasetDescriptionFile(NormValues):
         for val in value.split(','):
             v = val.strip()
             if v:
-                doi = idlib.Doi(v)
-                if doi.valid:
+                try:
+                    yield idlib.Doi(v)
+                except idlib.exceptions.MalformedIdentifierError as e:
+                    logd.exception(e)
+                #doi = idlib.Doi(v)
+                #if doi.valid:
                     # TODO make sure they resolve as well
                     # probably worth implementing this as part of OntId
-                    yield doi
+                    #yield doi
 
     def keywords(self, value):
         if ';' in value:

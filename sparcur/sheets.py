@@ -77,7 +77,7 @@ class Affiliations(Sheet):
 
     @property
     def mapping(self):
-        return {a:idlib.Ror(r).asInstrumented() if r else None
+        return {a:idlib.Ror(r) if r else None
                 for a, r in zip(self.byCol.affiliation_string,
                                 self.byCol.ror_id)}
 

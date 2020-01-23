@@ -111,7 +111,7 @@ def argspector(function):
     return spector
 
 
-def cache(folder, ser='json', clear_cache=False, create=False):
+def cache(folder, ser='json', clear_cache=False, create=False, return_path=False):
     """ outer decorator to cache output of a function to a folder """
         
 
@@ -147,13 +147,16 @@ def cache(folder, ser='json', clear_cache=False, create=False):
             if filepath.exists():
                 log.debug(f'deserializing from {filepath}')
                 with open(filepath, read_mode) as f:
-                    return deserialize(f)
+                    output = deserialize(f)
             else:
                 output = function(*args, **kwargs)
                 if output is not None:
                     with open(filepath, write_mode) as f:
                         serialize(output, f)
 
+            if return_path:
+                return output, filepath
+            else:
                 return output
 
         return superinner

@@ -156,15 +156,14 @@ class ProtocolData(dat.HasErrors):
         for start_uri in self.protocol_uris:
             log.debug(start_uri)
             try:
-                for end_uri in resolution_chain(start_uri):
-                    pass
-                else:
-                    yield end_uri
-
+                yield idlib.StreamUri(start_uri).dereference()
             except idlib.exceptions.ResolutionError as e:
                 pass  # FIXME I think we already log this error?
             except requests.exceptions.MissingSchema as e:
                 self.addError(e, blame='submission')
+            except BaseException as e:
+                breakpoint()
+                ''
 
     @property
     def protocol_annotations(self):
