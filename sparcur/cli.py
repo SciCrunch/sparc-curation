@@ -171,6 +171,7 @@ import types
 import pprint
 from itertools import chain
 from collections import Counter, defaultdict
+import idlib
 import requests
 import htmlfn as hfn
 import ontquery as oq
@@ -1695,7 +1696,6 @@ class Shell(Dispatcher):
         return
 
     def default(self):
-        from sparcur.core import AutoId, AutoInst
         datasets = list(self.datasets)
         datas = [Integrator(d).datasetdata for d in datasets]
         datasets_local = list(self.datasets_local)
@@ -1750,15 +1750,14 @@ class Shell(Dispatcher):
     def protocols(self):
         """ test protocol identifier functionality """
         org = Integrator(self.project_path)
-        from sparcur.core import get_right_id, AutoId, DoiId, PioId, PioInst
         from pyontutils.utils import Async, deferred
-        skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, '
+        skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, ', 'na'
         asdf = [us for us in sorted(org.organs_sheet.byCol.protocol_url_1)
                 if us not in skip and us and ',' not in us]
-        wat = [AutoId(_) for _ in asdf]
-        inst = [i.asInstrumented() for i in wat]
-        res = Async(rate=5)(deferred(i.resolve)(AutoId) for i in inst)
-        pis = [i.asInstrumented() for i in res if isinstance(i, PioId)]
+        wat = [idlib.Auto(_) for _ in asdf]
+        inst = [i for i in wat]
+        res = Async(rate=5)(deferred(i.dereference)(idlib.Auto) for i in inst)
+        pis = [i for i in res if isinstance(i, idlib.Pio)]
         #dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
         #dois = [d['protocol']['doi'] for d in dat if d]
         dois = [p.doi for p in pis]

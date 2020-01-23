@@ -112,7 +112,7 @@ class ProtcurData:
 class ProtocolData(dat.HasErrors):
     # this class is best used as a helper class not as a __call__ class
 
-    _instance_wanted_by = idlib.PioInst, idlib.PioUserInst
+    _instance_wanted_by = idlib.Pio, idlib.PioUser
 
     def __init__(self, id=None):  # FIXME lots of ways to use this class ...
         self.id = id  # still needed for the converters use case :/

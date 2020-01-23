@@ -532,7 +532,7 @@ class NormDatasetDescriptionFile(NormValues):
         if doi:
             value = idlib.Doi(value)
         else:
-            value = idlib.PioId(value).normalize()
+            value = idlib.Pio(value)
 
         return value
 
