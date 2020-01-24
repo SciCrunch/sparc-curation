@@ -103,7 +103,7 @@ class DatasetMetadata(Path, HasErrors):
             return dict(id=self.cache.id,
                         meta=dict(folder_name=self.name,
                                   uri_human=self.cache.uri_human,
-                                  uri_api=self.cache.uri_human,
+                                  uri_api=self.cache.uri_api,
                         ))
         else:
             return dict(id=self.id,
