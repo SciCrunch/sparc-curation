@@ -325,7 +325,8 @@ class Main(Dispatcher):
                         'summary',
                         'cwd',
                         'cwdintr',
-                        '_timestamp')
+                        '_timestamp',
+                        '_folder_timestamp',)
 
     # any attr forced on children must be set before super().__init__ is called
     # set timestamp early so that the loggers can use it
