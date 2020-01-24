@@ -306,7 +306,7 @@ class ContributorSchema(JSONSchema):
                   'first_name': {'type': 'string'},
                   'last_name': {'type': 'string'},
                   'contributor_orcid_id': {'type': 'string',
-                                           'pattern': ('^https://orcid.org/0000-000(1-[5-9]|2-n[0-9]|3-'
+                                           'pattern': ('^https://orcid.org/0000-000([1-2]-[5-9]|2-n[0-9]|3-'
                                                        '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')},
                   'contributor_affiliation': {'type': 'string'},
                   'contributor_role': {
