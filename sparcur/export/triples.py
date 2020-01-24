@@ -122,7 +122,14 @@ class TriplesExportSummary(TriplesExport):
         if self.teds:
             # TODO conjuctive graph?
             for ted in self.teds:
-                yield from ted.graph  # FIXME BNode collision risk? Probably not?
+                # FIXME BNode collision risk? Probably not?
+                # FIXME yeah, figuring out conjuctive graph for header plus
+                sont = next(ted.graph[:rdf.type:owl.Ontology])
+                for s, p, o in ted.graph:
+                    if s == sont:
+                        continue
+
+                    yield s, p, o
 
         else:
             for dataset_blob in self:
