@@ -396,11 +396,15 @@ class NormDatasetDescriptionFile(NormValues):
         self._error_on_na(value)
         return value
 
-    def _metadata_version_do_not_change(self, value):
-        return 'lolololol'
-
     def number_of_subjects(self, value):
-        return int(value)
+        try:
+            return int(value)
+        except ValueError as e:
+            self.addError(e,
+                          pipeline_stage=f'{self.__class__.__name__}',
+                          logfunc=logd.exception,
+                          blame='submission',)
+            return value  # and let the schema sort them out
 
     number_of_samples = number_of_subjects
 
