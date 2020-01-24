@@ -5,10 +5,10 @@ import json
 from socket import gethostname
 from sparcur import export as ex
 from sparcur import schemas as sc
+from sparcur import curation as cur  # FIXME implicit state must be set in cli
 from sparcur.core import JEncode
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge
-from sparcur.curation import Integrator, Summary  # FIXME implicit state must be set in cli
 
 
 def export_schemas(export_path):
@@ -85,7 +85,7 @@ class Export:
         return graph.parse(lce, format='ttl')
 
     def export_single_dataset(self):
-        intr = Integrator(self.export_source_path)  # FIXME implicit state set by cli
+        intr = cur.Integrator(self.export_source_path)  # FIXME implicit state set by cli
         dump_path = self.export_base / 'datasets' / intr.id / self.folder_timestamp
         latest_path = self.export_base / 'datasets' / intr.id / 'LATEST'
         latest_partial_path = self.export_base / 'datasets' / intr.id / 'LATEST_PARTIAL'
@@ -221,7 +221,7 @@ class Export:
         filepath = dump_path / filename
 
         # data
-        summary = Summary(self.export_source_path)  # FIXME implicit state set by cli
+        summary = cur.Summary(self.export_source_path)  # FIXME implicit state set by cli
         blob_data = (self.latest_export if
                      self.latest else
                      summary.data_for_export(self.timestamp))
