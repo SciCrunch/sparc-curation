@@ -19,6 +19,7 @@ start_stop_daemon_args="
 --user ${SVCUSER}
 --wait 1000
 --env LOG_LOC=${LOG_LOC}
+--env SPARCUR_EXPORT_PATH=${SPARCUR_EXPORT_PATH}
 --env PYTHONPATH=${PYTHONPATH}
 "
 command="/usr/bin/gunicorn"

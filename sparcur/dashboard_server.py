@@ -19,9 +19,11 @@ args = {'server': True,
         '--project-path': project_path,
         '--tab-table': False,
         '<path>': [],
-        '--export-path': auth.get_path('export-path'),
-
         '--verbose': False,
+
+        '--export-path': auth.get_path('export-path'),
+        '--partial': False,
+        '--open': False,
 }
 
 options = Options(args, defaults)
@@ -33,6 +35,8 @@ report.project_path = options.project_path
 report.project_id = project_path.cache.id  # FIXME should not have to do this manually?
 report.anchor = project_path.cache
 report.summary = Summary(options.project_path)
+report._timestamp = None  # FIXME
+report._folder_timestamp = None  # FIXME
 
 # set up bfapi
 report.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
