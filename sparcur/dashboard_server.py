@@ -2,6 +2,7 @@ from docopt import parse_defaults
 from sparcur import exceptions as exc
 from sparcur.cli import Report, Options, __doc__ as clidoc
 from sparcur.paths import Path, BlackfynnCache
+from sparcur.config import auth
 from sparcur.server import make_app
 from sparcur.backends import BlackfynnRemote
 from sparcur.curation import Summary
@@ -18,6 +19,7 @@ args = {'server': True,
         '--project-path': project_path,
         '--tab-table': False,
         '<path>': [],
+        '--export-path': auth.get_path('export-path'),
 
         '--verbose': False,
 }
