@@ -171,6 +171,7 @@ import json
 import errno
 import types
 import pprint
+from socket import gethostname
 from itertools import chain
 from collections import Counter, defaultdict
 import idlib
@@ -875,69 +876,7 @@ class Main(Dispatcher):
         for s in schemas:
             s.export(sb)
 
-    def export(self):
-        """ export output of curation workflows to file """
-        #org_id = Integrator(self.project_path).organization.id
-
-        from socket import gethostname
-
-        if self.options.schemas:
-            return self.export_schemas()
-
-        cwd = self.cwd
-        format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
-        if cwd != cwd.cache.anchor and format_specified:
-            if not cwd.cache.is_dataset:
-                print(f'{cwd.cache} is not at dataset level!')
-                sys.exit(123)
-
-            self._export_single_dataset(cwd)
-            return
-
-        # start time not end time ...
-        # obviously not transactional ...
-        filename = 'curation-export'
-        dump_path = self.export_base / self._folder_timestamp
-        if not dump_path.exists():
-            dump_path.mkdir(parents=True)
-
-        symlink_latest(dump_path, self.LATEST_RUN)
-
-
-
-        filepath = dump_path / filename
-
-        data = (self.latest_export if
-                self.options.latest else
-                self.summary.data_for_export(self._timestamp))
-
-        # FIXME we still create a new export folder every time even if the json didn't change ...
-        with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
-
-        dataset_blobs = data['datasets']
-
-        if (self.options.latest and
-            self.latest_protocols_path.exists()):
-            blob_protocols = self.latest_protocols
-        else:
-            protocols = list(self.summary.protocols(dataset_blobs))
-            # FIXME regularize summary structure for discoverability
-            blob_protocols = {
-                'meta': {'count': len(protocols)},
-                'prov': {'timestamp_export_start': self._timestamp,
-                         'export_system_identifier': Path.sysid,
-                         'export_hostname': gethostname(),
-                         'export_project_path': self.anchor,},
-                'protocols': protocols,  # FIXME regularize elements ?
-            }
-
-        with open(dump_path / 'protocols.json', 'wt') as f:
-            json.dump(blob_protocols, f, sort_keys=True, indent=2, cls=JEncode)
-
-        symlink_latest(dump_path, self.LATEST_PARTIAL)
-
-        # rdf export
+    def export_rdf(self, dump_path, dataset_blobs):
         dataset_dump_path = dump_path / 'datasets'
         dataset_dump_path.mkdir()
         suffix = '.ttl'
@@ -964,21 +903,102 @@ class Main(Dispatcher):
 
             log.info(f'dataset graph exported to {filepsuf}')
 
-        tes = ex.TriplesExportSummary(data, teds=teds)
+        return teds
 
-        with open(filepath.with_suffix('.ttl'), 'wb') as f:
-            f.write(tes.ttl)
 
+    def export_protocols(self, dump_path, dataset_blobs):
+
+        if (self.options.latest and
+            self.latest_protocols_path.exists()):
+            blob_protocols = self.latest_protocols
+        else:
+            protocols = list(self.summary.protocols(dataset_blobs))
+            # FIXME regularize summary structure for discoverability
+            blob_protocols = {
+                'meta': {'count': len(protocols)},
+                'prov': {'timestamp_export_start': self._timestamp,
+                         'export_system_identifier': Path.sysid,
+                         'export_hostname': gethostname(),
+                         'export_project_path': self.anchor,},
+                'protocols': protocols,  # FIXME regularize elements ?
+            }
+
+        with open(dump_path / 'protocols.json', 'wt') as f:
+            json.dump(blob_protocols, f, sort_keys=True, indent=2, cls=JEncode)
+
+        return blob_protocols
+
+    @staticmethod
+    def export_xml(filepath, dataset_blobs):
         # xml export TODO paralleize
         for xml_name, xml in ex.xml(dataset_blobs):
             with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
                 f.write(xml)
 
+    @staticmethod
+    def export_disco(filepath, dataset_blobs, teds):
         # datasets, contributors, subjects, samples, resources
         for table_name, tabular in ex.disco(dataset_blobs, [t.graph for t in teds]):
             with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
+
+    def export(self):
+        """ export output of curation workflows to file """
+        #org_id = Integrator(self.project_path).organization.id
+
+        if self.options.schemas:
+            return self.export_schemas()
+
+        cwd = self.cwd
+        format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
+        if cwd != cwd.cache.anchor and format_specified:
+            if not cwd.cache.is_dataset:
+                print(f'{cwd.cache} is not at dataset level!')
+                sys.exit(123)
+
+            self._export_single_dataset(cwd)
+            return
+
+        # start time not end time ...
+        # obviously not transactional ...
+        filename = 'curation-export'
+        dump_path = self.export_base / self._folder_timestamp
+        if not dump_path.exists():
+            dump_path.mkdir(parents=True)
+
+        symlink_latest(dump_path, self.LATEST_RUN)
+
+        filepath = dump_path / filename
+
+        # data
+        blob_data = (self.latest_export if
+                     self.options.latest else
+                     self.summary.data_for_export(self._timestamp))
+
+        # FIXME we still create a new export folder every time even if the json didn't change ...
+        with open(filepath.with_suffix('.json'), 'wt') as f:
+            json.dump(blob_data, f, sort_keys=True, indent=2, cls=JEncode)
+
+        symlink_latest(dump_path, self.LATEST_PARTIAL)
+
+        dataset_blobs = blob_data['datasets']
+
+        # protocol
+        blob_protocol = self.export_protocols(dump_path, dataset_blobs)
+
+        # rdf
+        teds = self.export_rdf(dump_path, dataset_blobs)
+        tes = ex.TriplesExportSummary(blob_data, teds=teds)
+
+        with open(filepath.with_suffix('.ttl'), 'wb') as f:
+            f.write(tes.ttl)
+
+        # xml
+        self.export_xml(filepath, dataset_blobs)
+
+        # disco
+        self.export_disco(filepath, dataset_blobs, teds)
 
         symlink_latest(dump_path, self.LATEST)
         if self.options.debug:
