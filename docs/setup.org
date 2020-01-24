@@ -908,9 +908,10 @@ popd
     #+BEGIN_SRC bash :eval never
       # export vs exports, no wonder this is so confusing >_<
       function sparc-export-to-server () {
-          ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export/}
-          FULLPATH=$(readlink ${SPARC_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/LATEST)
-          FOLDERNAME=$(basename $FULLPATH)
+          : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export/}
+          EXPORT_BASE=${SPARC_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/
+          FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
+          FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
           pushd /var/www/sparc/sparc
           cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
           popd
