@@ -881,15 +881,27 @@ class Main(Dispatcher):
         else:
             raise TypeError(f'whats a {type(droot)}? {droot}')
 
+        def do_file(d, ft):
+            if hasattr(d, ft):
+                f = getattr(d, ft)
+                if hasattr(f, 'object'):
+                    return(f.object._t())
+                else:
+                    message = f'object missing on {ft} for {d}'
+                    log.warning(message)
+                    return message
+
+            else:
+                return f'{ft} missing on {d}'
+
         tables = [t for d in datasetdatas for t in
-                  (
-                      d.dataset_description.object._t() if hasattr(d, 'dataset_description') else 'Missing dataset_description',
-                      d.submission.object._t() if hasattr(d, 'submission') else 'Missing submission_file',
-                      d.subjects.object._t() if hasattr(d, 'subjects') else 'Missing subjects',
-                      d.samples.object._t() if hasattr(d, 'samples') else 'Missing samples',
-                      ('\n--------------------------------------------------\n'
-                         '=================================================='
-                       '\n--------------------------------------------------\n'))]
+                  (do_file(d, 'dataset_description'),
+                   do_file(d, 'submission'),
+                   do_file(d, 'subjects'),
+                   do_file(d, 'samples'),
+                   ('\n--------------------------------------------------\n'
+                      '=================================================='
+                    '\n--------------------------------------------------\n'))]
 
         [print(t if isinstance(t, str) else repr(t)) for t in tables]
         return

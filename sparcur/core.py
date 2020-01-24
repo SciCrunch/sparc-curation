@@ -674,8 +674,10 @@ class _DictTransformer:
                         if not empty(v)))
             except TypeError as e:
                 log.error('wat')
+                idmsg = data['id'] if 'id' in data else ''
                 raise TypeError(f'derive failed\n{source_paths}\n'
-                                f'{derive_function}\n{target_paths}\n') from e
+                                f'{derive_function}\n{target_paths}\n'
+                                f'{idmsg}\n') from e
 
     @staticmethod
     def _derive(data, derives, source_key_optional=True, allow_empty=False):

@@ -668,10 +668,14 @@ class MetadataFile(HasErrors):
                 out = {}
                 for k, v in thing.items():
                     if k in self.groups_alt and self.groups_alt[k] == GROUP_ALL:
-                        out[k] = crtk(v, only_index_alt=True)
+                        nv = crtk(v, only_index_alt=True)
+                        if nv is not None:
+                            out[k] = nv
                     elif k in self.groups_header and self.groups_header[k] == GROUP_ALL:
                         # this isn't used yet but putting it here for symmetry just in case
-                        out[k] = crtk(v, only_index_header=True)
+                        nv = crtk(v, only_index_header=True)
+                        if nv is not None:
+                            out[k] = nv
                     elif (only_index_alt and k == v == self.record_type_key_alt or
                           only_index_header and k == v == self.record_type_key_header):
                         continue

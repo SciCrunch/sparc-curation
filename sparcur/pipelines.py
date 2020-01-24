@@ -736,6 +736,7 @@ class SPARCBIDSPipeline(JSONPipeline):
 
                     assert 'Creator' not in c['contributor_role']
 
+        #breakpoint()
         return data
 
     @property
