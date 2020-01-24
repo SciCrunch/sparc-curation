@@ -70,6 +70,7 @@ Commands:
                 ttl             turtle for a single dataset
 
                 options: --latest   run derived pipelines from latest json
+                       : --partial  run derived pipelines from the latest partial json export
                        : --open     open the output file using xopen
 
     report      print a report on all datasets
@@ -137,7 +138,8 @@ Options:
     --project-path=<PTH>    set the project path manually
 
     -t --tab-table          print simple table using tabs for copying
-    -A --latest             run further export states from the latest primary export
+    -A --latest             run derived pipelines from latest json
+    -P --partial            run derived pipelines from the latest partial json export
     -W --raw                run reporting on live data without export
 
     -S --sort-size-desc     sort by file size, largest first
@@ -181,7 +183,7 @@ from augpathlib import FileSize
 from augpathlib import RemotePath, AugmentedPath  # for debug
 
 from pyontutils import clifun as clif
-from pyontutils.core import OntResGit
+from pyontutils.core import OntResGit, OntGraph
 from pyontutils.utils import NOWDANGER, TZLOCAL, UTCNOWISO, utcnowtz, isoformat, isoformat_safe
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
@@ -194,7 +196,7 @@ from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
 from sparcur.core import OntId, OntTerm, get_all_errors, adops, JEncode
 from sparcur.utils import log, logd, SimpleFileHandler
-from sparcur.utils import python_identifier, want_prefixes
+from sparcur.utils import python_identifier, want_prefixes, symlink_latest
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
@@ -780,23 +782,50 @@ class Main(Dispatcher):
         return Path(self.options.export_path, self.project_id)
 
     @property
+    def LATEST_PARTIAL(self):
+        return self.export_base / 'LATEST_PARTIAL'
+
+    @property
     def LATEST(self):
+        """ implicitly LATEST_SUCCESS """
         return self.export_base / 'LATEST'
 
     @property
+    def LATEST_RUN(self):
+        return self.export_base / 'LATEST_RUN'
+
+    @property
     def latest_export(self):
-        with open(self.LATEST / 'curation-export.json', 'rt') as f:
+        base_path = self.LATEST_PARTIAL if self.options.partial else self.LATEST
+        with open(base_path / 'curation-export.json', 'rt') as f:
             return json.load(f)
 
+    @property
+    def latest_protocols_path(self):
+        base_path = self.LATEST_PARTIAL if self.options.partial else self.LATEST
+        return base_path / 'protocols.json'
+
+    @property
+    def latest_protocols(self):
+        with open(self.latest_protocols_path, 'rt') as f:
+            return json.load(f)
+
+    @property
+    def latest_datasets_path(self):
+        base_path = self.LATEST_PARTIAL if self.options.partial else self.LATEST
+        return base_path / 'datasets'
+
     def latest_export_ttl_populate(self, graph):
+        base_path = self.LATEST_PARTIAL if self.options.partial else self.LATEST
         # intentionally fail if the ttl export failed
-        lce = (self.LATEST / 'curation-export.ttl').as_posix()
+        lce = (base_path / 'curation-export.ttl').as_posix()
         return graph.parse(lce, format='ttl')
 
     def _export_single_dataset(self, path):
         intr = Integrator(path)
         dump_path = self.export_base / 'datasets' / intr.id / self._folder_timestamp
         latest_path = self.export_base / 'datasets' / intr.id / 'LATEST'
+        latest_partial_path = self.export_base / 'datasets' / intr.id / 'LATEST_PARTIAL'
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
 
@@ -825,35 +854,35 @@ class Main(Dispatcher):
             with open(out, mode) as f:
                 function(f)
 
-            log.info(f'dataset graph exported to {out}')
+            if suffix == '.json':
+                symlink_latest(dump_path, latest_partial_path)
+
+            elif suffix == '.ttl':
+                log.info(f'dataset graph exported to {out}')
 
             if self.options.open:
                 out.xopen()
 
-        if latest_path.exists():
-            if not latest_path.is_symlink():
-                raise TypeError('Why is LATEST not a symlink? '
-                                f'{latest_path!r}')
+        symlink_latest(dump_path, latest_path)
 
-            latest_path.unlink()
+    def export_schemas(self):
+        schemas = (sc.DatasetDescriptionSchema,
+                    sc.SubjectsSchema,
+                    sc.SamplesFileSchema,
+                    sc.SubmissionSchema,)
 
-        latest_path.symlink_to(dump_path)
+        sb = self.options.export_path / 'schemas'
+        for s in schemas:
+            s.export(sb)
 
     def export(self):
         """ export output of curation workflows to file """
         #org_id = Integrator(self.project_path).organization.id
 
+        from socket import gethostname
+
         if self.options.schemas:
-            schemas = (sc.DatasetDescriptionSchema,
-                       sc.SubjectsSchema,
-                       sc.SamplesFileSchema,
-                       sc.SubmissionSchema,)
-
-            sb = self.options.export_path / 'schemas'
-            for s in schemas:
-                s.export(sb)
-
-            return
+            return self.export_schemas()
 
         cwd = self.cwd
         format_specified = self.options.ttl or self.options.json  # This is OR not XOR you dumdum
@@ -869,9 +898,12 @@ class Main(Dispatcher):
         # obviously not transactional ...
         filename = 'curation-export'
         dump_path = self.export_base / self._folder_timestamp
-        latest_path = self.LATEST
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
+
+        symlink_latest(dump_path, self.LATEST_RUN)
+
+
 
         filepath = dump_path / filename
 
@@ -884,52 +916,71 @@ class Main(Dispatcher):
             json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
 
         dataset_blobs = data['datasets']
-        protocols = list(self.summary.protocols(dataset_blobs))
-        blob_protocols = {
-            'meta': {'count': len(protocols)},
-            'prov': {'timestamp_export_start': self._timestamp},
-            'protocols': protocols,
-        }
+
+        if (self.options.latest and
+            self.latest_protocols_path.exists()):
+            blob_protocols = self.latest_protocols
+        else:
+            protocols = list(self.summary.protocols(dataset_blobs))
+            # FIXME regularize summary structure for discoverability
+            blob_protocols = {
+                'meta': {'count': len(protocols)},
+                'prov': {'timestamp_export_start': self._timestamp,
+                         'export_system_identifier': Path.sysid,
+                         'export_hostname': gethostname(),
+                         'export_project_path': self.anchor,},
+                'protocols': protocols,  # FIXME regularize elements ?
+            }
 
         with open(dump_path / 'protocols.json', 'wt') as f:
-            json.dump(protocols, f, sort_keys=True, indent=2, cls=JEncode)
+            json.dump(blob_protocols, f, sort_keys=True, indent=2, cls=JEncode)
 
-        es = ExporterSummarizer(data)
+        symlink_latest(dump_path, self.LATEST_PARTIAL)
+
+        # rdf export
+        dataset_dump_path = dump_path / 'datasets'
+        dataset_dump_path.mkdir()
+        suffix = '.ttl'
+        mode = 'wb'
+
+        teds = []
+        for dataset_blob in dataset_blobs:
+            filename = dataset_blob['id']
+            filepath = dataset_dump_path / filename
+            filepsuf = filepath.with_suffix(suffix)
+            lfilepath = self.latest_datasets_path / filename
+            lfilepsuf = lfilepath.with_suffix(suffix)
+
+            ted = ex.TriplesExportDataset(dataset_blob)
+            teds.append(ted)
+
+            if self.options.latest and lfilepsuf.exists():
+                breakpoint()
+                filepsuf.copy_from(lfilepsuf)
+                graph = OntGraph(path=lfilepsuf).parse()
+                ted._graph = graph
+            else:
+                ted.graph.write(filepsuf)  # yay OntGraph defaults
+
+            log.info(f'dataset graph exported to {filepsuf}')
+
+        tes = ex.TriplesExportSummary(data, teds=teds)
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
-            f.write(es.ttl)
+            f.write(tes.ttl)
 
+        # xml export TODO paralleize
         for xml_name, xml in ex.xml(dataset_blobs):
             with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
                 f.write(xml)
 
         # datasets, contributors, subjects, samples, resources
-        for table_name, tabular in ex.disco(dataset_blobs):
+        for table_name, tabular in ex.disco(dataset_blobs, [t.graph for t in teds]):
             with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
 
-        if self.options.datasets:
-            dataset_dump_path = dump_path / 'datasets'
-            dataset_dump_path.mkdir()
-            suffix = '.ttl'
-            mode = 'wb'
-            for dataset_blob in dataset_blobs:
-                filepath = dataset_dump_path / dataset_blob['id']
-                out = filepath.with_suffix(suffix)
-                with open(out, 'wb') as f:
-                    f.write(ex.TriplesExportDataset(dataset_blob).ttl)
-
-                log.info(f'dataset graph exported to {out}')
-
-        if latest_path.exists():
-            if not latest_path.is_symlink():
-                raise TypeError(f'Why is LATEST not a symlink? {latest_path!r}')
-
-            latest_path.unlink()
-
-        latest_path.symlink_to(dump_path)
-
+        symlink_latest(dump_path, self.LATEST)
         if self.options.debug:
             embed()
 

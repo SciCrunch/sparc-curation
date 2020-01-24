@@ -1,14 +1,15 @@
 import json
+import idlib
 import rdflib
 from sparcur import schemas as sc
 from .triples import TriplesExportDataset
 from pyontutils.namespaces import (TEMP,
                                    isAbout,)
 from sparcur.core import JEncode, OntId, OntTerm, get_all_errors
-from sparcur.utils import want_prefixes
+from sparcur.utils import want_prefixes, log, logd, loge
 
 
-def disco(dataset_blobs):
+def disco(dataset_blobs, graphs):
     #dsh = sorted(MetaOutSchema.schema['allOf'][0]['properties'])
     dsh = ['acknowledgements',
             'additional_links',
@@ -73,6 +74,13 @@ def disco(dataset_blobs):
             else:
                 return oid.iri
 
+        if isinstance(v, idlib.Stream):
+            if hasattr(v, 'asTabular'):
+                return v.asTabular()
+            else:
+                loge.debug(f'{type(v)} does not implement a tabular representation')
+                return v.asType(str)
+
         if isinstance(v, OntId):
             if not isinstance(v, OntTerm):
                 v = OntTerm(v)
@@ -80,11 +88,11 @@ def disco(dataset_blobs):
             v = v.tabular()
         if isinstance(v, list) or isinstance(v, tuple):
             v = ','.join(json.dumps(_, cls=JEncode)
-                            if isinstance(_, dict) else
-                            normv(_) for _ in v)
+                         if isinstance(_, dict) else
+                         normv(_)
+                         for _ in v)
             v = v.replace('\n', ' ').replace('\t', ' ')
-        elif any(isinstance(v, c) for c in
-                    (int, float, str)):
+        elif any(isinstance(v, c) for c in (int, float, str)):
             v = str(v)
             v = v.replace('\n', ' ').replace('\t', ' ')  # FIXME tests to catch this
 
@@ -93,11 +101,9 @@ def disco(dataset_blobs):
 
         return v
 
-    for dataset_blob in dataset_blobs:
+    for dataset_blob, graph in zip(dataset_blobs, graphs):
         id = dataset_blob['id']
         dowe = dataset_blob
-        graph = rdflib.Graph()
-        TriplesExportDataset(dataset_blob).populate(graph)
         is_about = [OntTerm(o) for s, o in graph[:isAbout:] if isinstance(o, rdflib.URIRef)]
         involves = [OntTerm(o) for s, o in graph[:TEMP.involvesAnatomicalRegion:]]
 

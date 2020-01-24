@@ -166,3 +166,20 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
         return superinner
 
     return inner
+
+
+def symlink_latest(dump_path, path, relative=True):
+    """ relative to allow moves of the containing folder
+        without breaking links """
+
+    if relative:
+        dump_path = dump_path.relative_path_from(path)
+
+    if path.exists():
+        if not path.is_symlink():
+            raise TypeError(f'Why is {path.name} not a symlink? '
+                            f'{path!r}')
+
+        path.unlink()
+
+    path.symlink_to(dump_path)

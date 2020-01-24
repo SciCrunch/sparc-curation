@@ -243,6 +243,34 @@ class ErrorSchema(JSONSchema):
               'items': {'type': 'object'},}
 
 
+class ProvSchema(JSONSchema):
+    schema = {'type': 'object',
+              'properties': {'timestamp_export_start': {'type': 'string'},  # TODO iso8601
+                             #'timestamp_export_end': {'type': 'string'},  # this isn't really possible
+                             'export_system_identifier': {'type': 'string'},
+                             'export_system_hostname': {'type': 'string'},
+                             'export_project_path': {'type': 'string'},
+                             'sparcur_version': {'type': 'string'},
+                             'sparcur_commit': {'type': 'string'},
+                             'ontology_mappings': {
+                                 'type': 'array',
+                                 'minItems': 1,
+                                 'items': {
+                                     'type': 'object',
+                                     'properties': {
+                                         'curie': {'type': 'string'},
+                                         'label': {'type': 'string'},
+                                         'matches': {
+                                             'type': 'array',
+                                             'minItems': 1,
+                                             'items': {
+                                                 'type': 'object',
+                                                 'properties': {
+                                                     'path': {'type': 'array'},
+                                                     'input': {'type': 'string'},
+                                                 },},},},},},},}
+
+
 class DatasetStructureSchema(JSONSchema):
     __schema = {'type': 'object',
                 'required': ['submission_file', 'dataset_description_file'],
@@ -604,6 +632,7 @@ class MetaOutSchema(JSONSchema):
                             {'required': ['sample_count']}
                         ]}]}
 
+
 class DatasetOutSchema(JSONSchema):
     """ Schema that adds the id field since investigators shouldn't need to know
         the id to check the integrity of their data. We need it because that is
@@ -617,7 +646,7 @@ class DatasetOutSchema(JSONSchema):
     __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                    'pattern': '^N:dataset:'},
                             'meta': MetaOutSchema.schema,
-                            'prov': {'type': 'object'},
+                            'prov': ProvSchema.schema,
                             'errors': ErrorSchema.schema,
                             'contributors': ContributorsOutSchema.schema,
                             'creators': CreatorsSchema.schema,

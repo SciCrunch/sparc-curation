@@ -1,6 +1,7 @@
 from urllib.parse import quote
 import idlib
 import rdflib
+from pyontutils.core import OntGraph
 from pyontutils.utils import isoformat, utcnowtz
 from pyontutils.namespaces import (TEMP,
                                    isAbout,
@@ -19,8 +20,9 @@ from sparcur.protocols import ProtcurData
 
 class TriplesExport(ProtcurData):
 
-    def __init__(self, data_json, *args, **kwargs):
+    def __init__(self, data_json, *args, teds=tuple(), **kwargs):
         self.data = data_json
+        self.teds = teds
         self.id = self.data['id']
         self.uri_api = self.data['meta']['uri_api']
         self.uri_human = self.data['meta']['uri_human']
@@ -74,7 +76,7 @@ class TriplesExport(ProtcurData):
     def graph(self):
         """ you can populate other graphs, but this one runs once """
         if not hasattr(self, '_graph'):
-            graph = rdflib.Graph()
+            graph = OntGraph()
             self.populate(graph)
             self._graph = graph
 
@@ -117,8 +119,15 @@ class TriplesExportSummary(TriplesExport):
 
     @property
     def triples(self):
-        for dataset_blob in self:
-            yield from TriplesExportDataset(dataset_blob).triples
+        if self.teds:
+            # TODO conjuctive graph?
+            for ted in self.teds:
+                yield from ted.graph  # FIXME BNode collision risk? Probably not?
+
+        else:
+            for dataset_blob in self:
+                ted = TriplesExportDataset(dataset_blob)
+                yield from ted.triples
 
 
 class TriplesExportDataset(TriplesExport):

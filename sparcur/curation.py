@@ -4,6 +4,7 @@ import json
 import math
 import hashlib
 from types import GeneratorType
+from socket import gethostname
 from datetime import datetime
 from functools import wraps
 from itertools import chain
@@ -295,7 +296,11 @@ class Integrator(PathData, OntologyData):
     def data_for_export(self, timestamp):
         data = self.data(timestamp)
         # NOTE this timestamps the cached data AS INTENDED
-        data['prov'] = {}
+        data['prov'] = {
+            'export_system_identifier': Path.sysid,
+            'export_hostname': gethostname(),
+            'export_project_path': self.path.cache.anchor.local,
+        }
         data['prov']['timestamp_export_start'] = timestamp
         return data
 
@@ -541,16 +546,18 @@ class Summary(Integrator, ExporterSummarizer):
         # file it is give?
 
         # TODO parallelize and stream this!
+        out = {'id': self.id,
+               'meta': {'folder_name': self.name,
+                        'uri_api': self.uri_api,
+                        'uri_human': self.uri_human,},
+               'prov': {'export_system_identifier': Path.sysid,
+                        'export_hostname': gethostname(),
+                        'export_project_path': self.path.cache.anchor.local,},}
         ds = list(gen)
         count = len(ds)
-        meta = {'folder_name': self.name,
-                'uri_api': self.uri_api,
-                'uri_human': self.uri_human,
-                'count': count,}
-        return {'id': self.id,
-                'meta': meta,
-                'prov': {},
-                'datasets': ds,}
+        out['datasets'] = ds
+        out['meta']['count'] = count
+        return out
 
     @property
     def pipeline_end(self):

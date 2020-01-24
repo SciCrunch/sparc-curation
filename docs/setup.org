@@ -907,8 +907,8 @@ popd
     #+CAPTION: copy export to server location, run as root
     #+BEGIN_SRC bash :eval never
       # export vs exports, no wonder this is so confusing >_<
-      # export SPARC_EXPORTS=~/files/blackfynn_local/export/  # set this manually
       function sparc-export-to-server () {
+          ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export/}
           FULLPATH=$(readlink ${SPARC_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/LATEST)
           FOLDERNAME=$(basename $FULLPATH)
           pushd /var/www/sparc/sparc
@@ -948,6 +948,13 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
 
 *** Other random commands
+**** Duplicate top level and ./.operations/objects
+# TODO upgrade this into backup and duplication
+#+begin_src bash
+rsync -ptgo -A -X -d --no-recursive --exclude=* SPARC\ Consortium_old/  SPARC\ Consortium
+mkdir SPARC\ Consortium/.operations
+rsync -X -u -v -r SPARC\ Consortium_old/.operations/objects SPARC\ Consortium/.operations/
+#+end_src
 **** Simplified error report
 #+CAPTION: simplified error report
 #+begin_src bash

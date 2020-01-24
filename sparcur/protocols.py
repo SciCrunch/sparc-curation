@@ -102,6 +102,7 @@ class ProtcurData:
         annos.clear()
         annos.extend(get_annos())
 
+        # FIXME this is expensive and slow to continually recompute
         [protc(a, annos) for a in annos]
         [Hybrid(a, annos) for a in annos]
 
@@ -190,7 +191,9 @@ class ProtocolData(dat.HasErrors):
     @property
     def protocol_jsons(self):
         for uri in self.protocol_uris_resolved:
-            yield self._get_protocol_json(uri)
+            j = self._get_protocol_json(uri)
+            if j:
+                yield j
 
     @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
     def get(self, uri):
@@ -224,7 +227,7 @@ class ProtocolData(dat.HasErrors):
     @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
-        logd.info(uri)
+        logd.info(uri.identifier if isinstance(uri, idlib.Stream) else uri)  # FIXME
         pi = idlib.get_right_id(uri)
         if 'protocols.io' in pi:
             pioid = pi.slug  # FIXME normalize before we ever get here ...
