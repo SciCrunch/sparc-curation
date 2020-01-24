@@ -870,6 +870,9 @@ class Main(Dispatcher):
         """ print summary view of raw metadata tables, possibly per dataset """
 
         dat.DatasetStructure._refresh_on_missing = False
+        dat.SubmissionFile._refresh_on_missing = False
+        dat.SubjectsFile._refresh_on_missing = False
+        dat.SamplesFile._refresh_on_missing = False
         droot = dat.DatasetStructure(self.cwd)
         if droot.cache.is_dataset():
             datasetdatas = droot,
@@ -878,9 +881,17 @@ class Main(Dispatcher):
         else:
             raise TypeError(f'whats a {type(droot)}? {droot}')
 
-        tables = [d.dataset_description.object._t() for d in datasetdatas]
+        tables = [t for d in datasetdatas for t in
+                  (
+                      d.dataset_description.object._t() if hasattr(d, 'dataset_description') else 'Missing dataset_description',
+                      d.submission.object._t() if hasattr(d, 'submission') else 'Missing submission_file',
+                      d.subjects.object._t() if hasattr(d, 'subjects') else 'Missing subjects',
+                      d.samples.object._t() if hasattr(d, 'samples') else 'Missing samples',
+                      ('\n--------------------------------------------------\n'
+                         '=================================================='
+                       '\n--------------------------------------------------\n'))]
 
-        [print(repr(t)) for t in tables]
+        [print(t if isinstance(t, str) else repr(t)) for t in tables]
         return
         tabular_view_demo = [next(d.dataset_description).t
                                 for d in summary
