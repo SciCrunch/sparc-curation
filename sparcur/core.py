@@ -170,6 +170,10 @@ class JEncode(json.JSONEncoder):
             return obj.json()
         elif isinstance(obj, idlib.Stream):
             return obj.identifier
+        elif isinstance(obj, datetime):
+            return isoformat(obj)
+        #else:
+            #log.critical(f'{type(obj)} -> {obj}')
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)

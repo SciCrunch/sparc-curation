@@ -100,16 +100,21 @@ class DatasetMetadata(Path, HasErrors):
     @property
     def data(self):
         if self.cache is not None:
+            cmeta = self.cache.meta
             return dict(id=self.cache.id,
                         meta=dict(folder_name=self.name,
                                   uri_human=self.cache.uri_human,
                                   uri_api=self.cache.uri_api,
+                                  timestamp_created=cmeta.created,
+                                  timestamp_updated=cmeta.updated,
                         ))
         else:
             return dict(id=self.id,
                         meta=dict(folder_name=self.name,
                                   uri_human=None,
                                   uri_api=None,
+                                  timestamp_created=None,
+                                  timestamp_updated=None,
                         ))
 
 
@@ -578,7 +583,7 @@ class MetadataFile(HasErrors):
     normalization_class = nml.NormValues
     normalize_alt = True
     normalize_header = True
-    _expect_string = tuple()
+    _expect_single = tuple()
 
     def __new__(cls, path):
         if cls.record_type_key_header is None or cls.record_type_key_alt is None:
@@ -636,7 +641,7 @@ class MetadataFile(HasErrors):
                 elif out:
                     return out
                 elif hrm:
-                    if (key in self._expect_string and
+                    if (key in self._expect_single and
                         len(hrm) == 1):
                         return hrm[0]
                     else:
@@ -658,13 +663,24 @@ class MetadataFile(HasErrors):
 
     def _cull_rtk(self):
         normalized = self._normalize_values()
-        def crtk(thing):
+        def crtk(thing, only_index_alt=False, only_index_header=False):
             if isinstance(thing, dict):
                 out = {}
                 for k, v in thing.items():
-                    if (k != self.record_type_key_header and
-                        k != self.record_type_key_alt):
-                        nv = crtk(v)
+                    if k in self.groups_alt and self.groups_alt[k] == GROUP_ALL:
+                        out[k] = crtk(v, only_index_alt=True)
+                    elif k in self.groups_header and self.groups_header[k] == GROUP_ALL:
+                        # this isn't used yet but putting it here for symmetry just in case
+                        out[k] = crtk(v, only_index_header=True)
+                    elif (only_index_alt and k == v == self.record_type_key_alt or
+                          only_index_header and k == v == self.record_type_key_header):
+                        continue
+                    elif (k != self.record_type_key_header and
+                          # FIXME requires that headers and alts be fully disjoint
+                          k != self.record_type_key_alt or
+                          only_index_alt and k == self.record_type_key_alt or
+                          only_index_header and k == self.record_type_key_header):
+                        nv = crtk(v, only_index_alt, only_index_header)
                         if nv is not None:
                             out[k] = nv
 
@@ -920,7 +936,7 @@ SubmissionFilePath._bind_flavours()
 
 _props = sc.DatasetDescriptionSchema.schema['properties']
 _nddfes = [k for k, v in _props.items() if isinstance(v, dict) and
- 'type' in v and v['type'] == 'string']
+ 'type' in v and v['type'] not in ('array',)]
 
 
 class DatasetDescriptionFile(MetadataFile):
@@ -943,7 +959,7 @@ class DatasetDescriptionFile(MetadataFile):
 
     ignore_header = 'metadata_element', 'example', 'description_header'
     normalization_class = nml.NormDatasetDescriptionFile
-    _expect_string = _nddfes
+    _expect_single = _nddfes
 
     @property
     def data(self):
@@ -982,6 +998,12 @@ class SubjectsFile(MetadataFile):
     raw_json_class = rj.RawJsonSubjects
     normalization_class = nml.NormSubjectsFile
     normalize_header = False
+
+    @property
+    def data(self):
+        data = super().data
+        #breakpoint()
+        return data
 
 
 class SubjectsFilePath(ObjectPath):

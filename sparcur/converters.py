@@ -183,6 +183,8 @@ class MetaConverter(TripleConverter):
         ['prior_batch_number', TEMP.Continues],  # see datacite relationType
 
         ['originating_article_doi', TEMP.IsDescribedBy],  # see relationType
+        ['timestamp_created', TEMP.wasCreatedAtTime],
+        ['timestamp_updated', TEMP.wasUpdatedAtTime],
 
         # TODO
         #['additional_links', ],

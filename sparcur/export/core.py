@@ -31,13 +31,14 @@ class Export:
                  timestamp,
                  latest=False,
                  partial=False,
-                 open=False,):
+                 open_when_done=False,):
         self.export_source_path = export_source_path
         self.export_base = Path(export_path, export_source_path.cache.anchor.id)
         self.latest = latest
         self.partial = partial
         self.folder_timestamp = folder_timestamp
         self.timestamp = timestamp
+        self.open_when_done = open_when_done
 
     @property
     def LATEST_PARTIAL(self):

@@ -399,6 +399,11 @@ class NormDatasetDescriptionFile(NormValues):
     def _metadata_version_do_not_change(self, value):
         return 'lolololol'
 
+    def number_of_subjects(self, value):
+        return int(value)
+
+    number_of_samples = number_of_subjects
+
     def funding(self, value):
         if 'OT' in value:
             return NormAward(value)

@@ -236,6 +236,8 @@ metadata_filename_pattern = r'^.+\/[a-z_\/]+\.(xlsx|csv|tsv|json)$'
 
 simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
+iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
+
 
 class ErrorSchema(JSONSchema):
     schema = {'type':'array',
@@ -245,7 +247,8 @@ class ErrorSchema(JSONSchema):
 
 class ProvSchema(JSONSchema):
     schema = {'type': 'object',
-              'properties': {'timestamp_export_start': {'type': 'string'},  # TODO iso8601
+              'properties': {'timestamp_export_start': {'type': 'string',
+                                                        'pattern': iso8601pattern,},
                              #'timestamp_export_end': {'type': 'string'},  # this isn't really possible
                              'export_system_identifier': {'type': 'string'},
                              'export_system_hostname': {'type': 'string'},
@@ -402,6 +405,9 @@ class DatasetDescriptionSchema(JSONSchema):
             'prior_batch_number': {'type': 'string'},
             'title_for_complete_data_set': {'type': 'string'},
             'originating_article_doi': {'type': 'array', 'items': {'type': 'string'}},  # TODO doi matching? maybe types?
+            'number_of_subjects': {'type': 'integer'},
+            'number_of_samples': {'type': 'integer'},
+            'parent_dataset_id': {'type': 'string'},  # blackfynn id
             'protocol_url_or_doi': {
                 'type': 'array',
                 'minItems': 1,
@@ -430,7 +436,7 @@ class DatasetDescriptionSchema(JSONSchema):
                     }
                 }
             },
-            'contributors': ContributorsSchema.schema
+            'contributors': ContributorsSchema.schema,
         }
     }
 
@@ -528,8 +534,8 @@ class SamplesFileSchema(JSONSchema):
 
                                             'age': UnitSchema.schema,
                                             'age_category': {'type': 'string'},  # TODO uberon
-                                            'age_range_min': {'type': 'string'},
-                                            'age_range_max': {'type': 'string'},
+                                            'age_range_min': UnitSchema.schema,
+                                            'age_range_max': UnitSchema.schema,
 
                                             'handedness': {'type': 'string'},
                                             'disease': {'type': 'string'},
@@ -573,6 +579,10 @@ class MetaOutSchema(JSONSchema):
                       'folder_name',  # from DatasetMetadat
                       'title',
                       'schema_version',
+                      'number_of_subjects',
+                      'number_of_samples',
+                      'timestamp_created',
+                      'timestamp_updated',
                       #'subject_count',
                       #'sample_count',
     ]
@@ -588,6 +598,10 @@ class MetaOutSchema(JSONSchema):
         'size': {'type': 'integer'},
         'folder_name': {'type': 'string'},
         'title': {'type': 'string'},
+        'timestamp_created': {'type': 'string',
+                              'pattern': iso8601pattern,},
+        'timestamp_updated': {'type': 'string',
+                              'pattern': iso8601pattern,},
         'uri_human': {'type': 'string',
                       'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
         },
@@ -628,6 +642,8 @@ class MetaOutSchema(JSONSchema):
 
     schema = {'allOf': [__schema,
                         {'anyOf': [
+                            #{'required': ['number_of_subjects']},
+                            #{'required': ['number_of_samples']},
                             {'required': ['subject_count']},  # FIXME extract subjects from samples ?
                             {'required': ['sample_count']}
                         ]}]}

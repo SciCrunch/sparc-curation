@@ -93,6 +93,7 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         obj = self.urg(tf)
         value = obj.data
         pprint.pprint(value)
+        assert [s for s in value if 'subject_id' in s]
 
     def test_versions(self):
         self._versions()
