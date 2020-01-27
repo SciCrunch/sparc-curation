@@ -929,6 +929,10 @@ popd
       spc server --latest --count
     #+END_SRC
 
+    #+begin_src python
+    keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
+                           for k in d['meta']['keywords']]))
+    #+end_src
 *** Archiving files with xattrs
 =tar= is the only one of the 'usual' suspects for file archiving that
 supports xattrs, =zip= cannot.
@@ -954,7 +958,12 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+begin_src bash
 rsync -ptgo -A -X -d --no-recursive --exclude=* SPARC\ Consortium_old/  SPARC\ Consortium
 mkdir SPARC\ Consortium/.operations
+mkdir SPARC\ Consortium/.operations/trash
 rsync -X -u -v -r SPARC\ Consortium_old/.operations/objects SPARC\ Consortium/.operations/
+pushd SPARC\ Consortium
+spc pull &&
+spc export
+popd
 #+end_src
 **** Simplified error report
 #+CAPTION: simplified error report
