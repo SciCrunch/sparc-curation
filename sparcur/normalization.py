@@ -416,6 +416,7 @@ class NormDatasetDescriptionFile(NormValues):
         for sep in seps:
             if sep in value:
                 out = tuple()
+                # FIXME duplicate values ?!
                 for funding in value.split(sep):
                     out += (funding,)
 
