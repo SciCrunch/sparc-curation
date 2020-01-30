@@ -956,14 +956,20 @@ find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 **** Duplicate top level and ./.operations/objects
 # TODO upgrade this into backup and duplication
 #+begin_src bash
-rsync -ptgo -A -X -d --no-recursive --exclude=* SPARC\ Consortium_old/  SPARC\ Consortium
-mkdir SPARC\ Consortium/.operations
-mkdir SPARC\ Consortium/.operations/trash
-rsync -X -u -v -r SPARC\ Consortium_old/.operations/objects SPARC\ Consortium/.operations/
-pushd SPARC\ Consortium
-spc pull &&
-spc export
-popd
+function sparc-copy-pull () {
+    : ${SPARC_PARENT:=${HOME}/files/blackfynn_local/}
+    local TODAY=$(date +%Y%m%d)
+    pushd ${SPARC_PARENT} &&
+        mv SPARC\ Consortium "SPARC Consortium_${TODAY}" &&
+        rsync -ptgo -A -X -d --no-recursive --exclude=* "SPARC Consortium_${TODAY}/"  SPARC\ Consortium &&
+        mkdir SPARC\ Consortium/.operations &&
+        mkdir SPARC\ Consortium/.operations/trash &&
+        rsync -X -u -v -r "SPARC Consortium_${TODAY}/.operations/objects" SPARC\ Consortium/.operations/ &&
+        pushd SPARC\ Consortium &&
+        spc pull || echo "spc pull failed"
+    popd
+    popd
+}
 #+end_src
 **** Simplified error report
 #+CAPTION: simplified error report
