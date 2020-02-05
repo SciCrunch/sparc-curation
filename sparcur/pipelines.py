@@ -890,6 +890,26 @@ class PipelineExtras(JSONPipeline):
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
                 data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
 
+        # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
+        local = self.previous_pipeline.pipelines[0].previous_pipeline.pipelines[0].path
+        remote = local.remote
+        if 'doi' not in data['meta']:
+            doi = remote.doi
+            if doi is not None:
+                try:
+                    metadata = doi.metadata()
+                    # TODO in theory we can embed this metadata if we want
+                    if metadata is not None:
+                        data['meta']['doi'] = doi.identifier
+                except requests.exceptions.HTTPError:
+                    pass
+
+        if 'status' not in data:
+            data['status'] = {}
+
+        if 'status_on_platform' not in data['status']:
+            data['status']['status_on_platform'] = remote.bfobject.status
+
         return data
 
     @hasSchema(sc.DatasetOutSchema)
@@ -1055,7 +1075,9 @@ class PipelineEnd(JSONPipeline):
 
         si = len(submission_errors)
         ci = len(curation_errors)
-        data['status'] = {}
+        if 'status' not in data:
+            data['status'] = {}
+
         data['status']['submission_index'] = si
         data['status']['curation_index'] = ci
         data['status']['error_index'] = si + ci

@@ -1599,7 +1599,7 @@ class Shell(Dispatcher):
         p, *rest = self._paths
         if p.cache.is_dataset():
             intr = Integrator(p)
-            j = JT(intr.data)
+            j = JT(intr.data())
             iddf = intr.datasetdata.dataset_description.object  # finally
             #triples = list(f.triples)
 
@@ -1613,19 +1613,29 @@ class Shell(Dispatcher):
         urg = list(asdf.data)
         resp = asdf.data_headers
 
-        dsi = 1
+        did = self.cwd.cache.id
+        r = self.cwd.remote
+        if did in dsd:
+            dsi = datas.index(dsd[did])
+        else:
+            dsi = 2
 
-        smf = datas[dsi].submission.object
-        smd = smf.data
+        d = datas[dsi]
+        try:
+            smf = d.submission.object
+            smd = smf.data
 
-        ddf = datas[dsi].dataset_description.object
-        ddd = ddf.data
+            ddf = d.dataset_description.object
+            ddd = ddf.data
 
-        suf = datas[dsi].subjects.object
-        sud = suf.data
+            suf = d.subjects.object
+            sud = suf.data
 
-        saf = datas[dsi].samples.object
-        sad = saf.data
+            saf = d.samples.object
+            sad = saf.data
+
+        except AttributeError as e:
+            logd.error(f'{d} is missing some file')
 
         embed()
 
