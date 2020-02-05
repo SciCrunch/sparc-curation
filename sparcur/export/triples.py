@@ -264,6 +264,12 @@ class TriplesExportDataset(TriplesExport):
 
     @property
     def triples_subjects(self):
+        try:
+            dsid = self.dsid  # FIXME json reload needs to deal with this
+        except BaseException as e:  # FIXME ...
+            loge.exception(e)
+            return
+
         def triples_gen(prefix_func, subjects):
 
             for i, subject in enumerate(subjects):
@@ -276,6 +282,8 @@ class TriplesExportDataset(TriplesExport):
                 s = prefix_func(s_local)
                 yield s, rdf.type, owl.NamedIndividual
                 yield s, rdf.type, sparc.Subject
+                yield s, TEMP.hasDerivedInformationAsParticipant, dsid
+                yield dsid, TEMP.isAboutParticipant, s
                 yield from converter.triples_gen(s)
                 continue
                 for field, value in subject.items():
@@ -295,6 +303,12 @@ class TriplesExportDataset(TriplesExport):
 
     @property
     def triples_samples(self):
+        try:
+            dsid = self.dsid  # FIXME json reload needs to deal with this
+        except BaseException as e:  # FIXME ...
+            loge.exception(e)
+            return
+
         conv.SampleConverter._subject_id = self.subject_id  # FIXME
         conv.SampleConverter.dsid = self.dsid  # FIXME FIXME very evil
         # yes this indicates that converters and exporters are
@@ -310,7 +324,16 @@ class TriplesExportDataset(TriplesExport):
                 s = prefix_func(s_local)
                 yield s, rdf.type, owl.NamedIndividual
                 yield s, rdf.type, sparc.Sample
+                yield s, TEMP.hasDerivedInformationAsParticipant, dsid  # domain particiant range information artifact
+                # specimen - participant: -> process instance - ilxtr:hasInformationOutput -> data files - partOf: -> dataset
+                # collapses to? specimen - hasInformationDerivedFromProce -> <- containsInformationAbout - dataset
+                yield dsid, TEMP.isAboutParticipant, s  # containsInformationAboutParticipant[Primary] TEMP.containsInformationAbout, isAbout is probably a better base
+                # could be further refined to isAboutParticiantPrimary, with a note that if multiple measurement processes happened, there can be multiple primaries for a dataset
                 yield from converter.triples_gen(s)
+                # see https://github.com/information-artifact-ontology/IAO/issues/60, there isn't a good inverse relation
+                # original though was subjectOfInformation, but that was confusing in the current terminology where subject already has 2 meanings
+                # hasInformationDerivedFromProcessWhereWasParticipant -> hasInformationDerivedFromProcessWhereWasPrimaryParticipant seems most correct, but is extremely verbose
+                # hasDerivedInformationAsParticipant -> hasDerivedInformationAsParticipantPrimary materialize the role into the predicate? seems reasonable
                 continue
                 for field, value in sample.items():
                     convert = getattr(converter, field, None)

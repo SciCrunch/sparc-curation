@@ -750,7 +750,10 @@ class SPARCBIDSPipeline(JSONPipeline):
             data = e.data
             if 'meta' not in data:
                 data['meta'] = {}
-            data['status'] = {}
+
+            if 'status' not in data:
+                data['status'] = {}
+
             si = 5555
             ci = 4444
             data['status']['submission_index'] = si
@@ -1090,7 +1093,7 @@ class PipelineEnd(JSONPipeline):
     def added(self):
         data = super().added
 
-        if 'status' not in data:
+        if 'status' not in data or 'error_index' not in data['status']:
             self._indexes(data)
 
         return data

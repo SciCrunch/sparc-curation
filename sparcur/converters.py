@@ -170,6 +170,7 @@ class MetaConverter(TripleConverter):
         ['techniques', TEMP.protocolEmploysTechnique],
         ['uri_api', TEMP.hasUriApi],
         ['uri_human', TEMP.hasUriHuman],
+        ['doi', TEMP.hasDoi],  # TODO portal page ?
         ['keywords', isAbout],
         ['description', dc.description],
         ['dirs', TEMP.hasNumberOfDirectories],
@@ -182,7 +183,7 @@ class MetaConverter(TripleConverter):
         ['title_for_complete_data_set', TEMP.collectionTitle],
         ['prior_batch_number', TEMP.Continues],  # see datacite relationType
 
-        ['originating_article_doi', TEMP.IsDescribedBy],  # see relationType
+        ['originating_article_doi', TEMP.isDescribedBy],  # see relationType  IsDescribedBy -> isDescribedBy
         ['timestamp_created', TEMP.wasCreatedAtTime],
         ['timestamp_updated', TEMP.wasUpdatedAtTime],
 
