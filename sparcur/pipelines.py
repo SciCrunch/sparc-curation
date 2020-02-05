@@ -3,6 +3,7 @@ from pathlib import Path
 from collections import deque
 import idlib
 import rdflib
+import requests
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
