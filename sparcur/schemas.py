@@ -238,6 +238,8 @@ simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
 
+# https://www.crossref.org/blog/dois-and-matching-regular-expressions/
+doi_pattern = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
 
 class ErrorSchema(JSONSchema):
     schema = {'type':'array',
@@ -585,6 +587,7 @@ class MetaOutSchema(JSONSchema):
                       'number_of_samples',
                       'timestamp_created',
                       'timestamp_updated',
+                      'doi',  # may be none
                       #'subject_count',
                       #'sample_count',
     ]
@@ -596,6 +599,9 @@ class MetaOutSchema(JSONSchema):
     __schema['properties'].update({
         'errors': ErrorSchema.schema,
         'dirs': {'type': 'integer'},
+        'doi': {'oneOf': [{'type': 'string',
+                           'pattern': doi_pattern,},
+                          {'type': 'null'},]},
         'files': {'type': 'integer'},
         'size': {'type': 'integer'},
         'folder_name': {'type': 'string'},
@@ -693,6 +699,7 @@ class StatusSchema(JSONSchema):
               'required': ['submission_index', 'curation_index', 'error_index',
                            'submission_errors', 'curation_errors'],
               'properties': {
+                  'status_on_platform': {'type': 'string'},
                   'submission_index': {'type': 'integer', 'minimum': 0},
                   'curation_index': {'type': 'integer', 'minimum': 0},
                   'error_index': {'type': 'integer', 'minimum': 0},
