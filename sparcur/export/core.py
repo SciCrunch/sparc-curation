@@ -3,6 +3,7 @@
 import csv
 import json
 from socket import gethostname
+from pyontutils.core import OntGraph
 from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
@@ -130,7 +131,7 @@ class Export:
         symlink_latest(dump_path, latest_path)
         return intr
 
-    def export_rdf(self, dump_path, dataset_blobs):
+    def export_rdf(self, dump_path, latest_path, dataset_blobs):
         dataset_dump_path = dump_path / 'datasets'
         dataset_dump_path.mkdir()
         suffix = '.ttl'
@@ -142,6 +143,7 @@ class Export:
             filepath = dataset_dump_path / filename
             filepsuf = filepath.with_suffix(suffix)
             lfilepath = self.latest_datasets_path / filename
+            lfilepath = latest_path / filename
             lfilepsuf = lfilepath.with_suffix(suffix)
 
             ted = ex.TriplesExportDataset(dataset_blob)
@@ -158,7 +160,6 @@ class Export:
             loge.info(f'dataset graph exported to {filepsuf}')
 
         return teds
-
 
     def export_protocols(self, dump_path, dataset_blobs, summary):
 
@@ -231,6 +232,7 @@ class Export:
         with open(filepath.with_suffix('.json'), 'wt') as f:
             json.dump(blob_data, f, sort_keys=True, indent=2, cls=JEncode)
 
+        previous_latest = self.latest_datasets_path.resolve()
         symlink_latest(dump_path, self.LATEST_PARTIAL)
 
         dataset_blobs = blob_data['datasets']
@@ -239,7 +241,7 @@ class Export:
         blob_protocol = self.export_protocols(dump_path, dataset_blobs, summary)
 
         # rdf
-        teds = self.export_rdf(dump_path, dataset_blobs)
+        teds = self.export_rdf(dump_path, previous_latest, dataset_blobs)
         tes = ex.TriplesExportSummary(blob_data, teds=teds)
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
