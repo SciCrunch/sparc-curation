@@ -7,7 +7,8 @@ from sparcur.datasets import (Tabular,
                               SubjectsFile,
                               SamplesFile,
                               remove_rule,)
-from .common import examples_root, template_root, project_path, temp_path
+from sparcur import pipelines as pipes
+from .common import examples_root, template_root, project_path, temp_path, ddih
 
 template_root = aug.RepoPath(template_root)
 
@@ -32,8 +33,11 @@ class Helper:
         temp_path.mkdir()
 
         self.file = template_root / self.template
+        self._ddih = DatasetDescriptionFile.ignore_header
+        DatasetDescriptionFile.ignore_header = ddih
 
     def tearDown(self):
+        DatasetDescriptionFile.ignore_header = self._ddih
         temp_path.rmtree()
 
     def _versions(self):
@@ -56,6 +60,7 @@ class Helper:
 class TestSubmissionFile(Helper, unittest.TestCase):
     template = 'submission.xlsx'
     urg = SubmissionFile
+    pipe = pipes.SubmissionFilePipeline
     def test_sm_ot(self):
         tf = examples_root / 'sm-ot.csv'
         obj = self.urg(tf)
@@ -70,6 +75,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
 class TestDatasetDescription(Helper, unittest.TestCase):
     template = 'dataset_description.xlsx'
     urg = DatasetDescriptionFile
+    pipe = pipes.DatasetDescriptionFilePipeline
     
     def test_dataset_description(self):
         pass
@@ -80,6 +86,12 @@ class TestDatasetDescription(Helper, unittest.TestCase):
         value = obj.data
         pprint.pprint(value)
 
+    def test_dd_pie_pipeline(self):
+        tf = examples_root / 'dd-pie.csv'
+        pipeline = self.pipe(tf, None, None)
+        data = pipeline.data
+        pprint.pprint(data)
+
     def test_versions(self):
         self._versions()
 
@@ -87,6 +99,7 @@ class TestDatasetDescription(Helper, unittest.TestCase):
 class TestSubjectsFile(Helper, unittest.TestCase):
     template = 'subjects.xlsx'
     urg = SubjectsFile
+    pipe = pipes.SubjectsFilePipeline
 
     def test_su_pie(self):
         tf = examples_root / 'su-pie.csv'
@@ -102,6 +115,7 @@ class TestSubjectsFile(Helper, unittest.TestCase):
 class TestSamplesFile(Helper, unittest.TestCase):
     template = 'samples.xlsx'
     urg = SamplesFile
+    pipe = pipes.SamplesFilePipeline
 
     def test_sa_pie(self):
         tf = examples_root / 'sa-pie.csv'

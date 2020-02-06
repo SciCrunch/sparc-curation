@@ -613,7 +613,7 @@ class MetadataFile(HasErrors):
 
     def _data(self):
         if self.path.suffix == '.json':
-            return self.raw_json_class(self.path).data
+            return self.normalization_class(self)  # FIXME incredible violation of encapsulation ...
 
         else:
             # TODO if this passes we can just render backward from _normalize

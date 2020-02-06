@@ -358,8 +358,12 @@ class NormValues(HasErrors):
     @property
     def data(self):
         #nk = self._obj_inst._normalize_keys()
-        data_in = self._obj_inst._clean()
-        self._bind()
+        if self._obj_inst.path.suffix == '.json':  # FIXME ick :/
+            data_in = self._obj_inst.raw_json_class(self._obj_inst.path).data
+        else:
+            data_in = self._obj_inst._clean()
+            self._bind()
+
         data_out = self._normv(data_in)
         self.embedErrors(data_out)
         return data_out
