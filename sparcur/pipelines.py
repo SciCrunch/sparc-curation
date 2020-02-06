@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from itertools import chain
 from collections import deque
 import idlib
 import rdflib
@@ -894,6 +895,7 @@ class PipelineExtras(JSONPipeline):
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
                 data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
 
+
         # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
         local = self.previous_pipeline.pipelines[0].previous_pipeline.pipelines[0].path
         remote = local.remote
@@ -902,7 +904,6 @@ class PipelineExtras(JSONPipeline):
             if doi is not None:
                 try:
                     metadata = doi.metadata()
-                    # TODO in theory we can embed this metadata if we want
                     if metadata is not None:
                         data['meta']['doi'] = doi.identifier
                 except requests.exceptions.HTTPError:
@@ -916,6 +917,20 @@ class PipelineExtras(JSONPipeline):
 
         if 'status_on_platform' not in data['status']:
             data['status']['status_on_platform'] = remote.bfobject.status
+
+        if 'resources' not in data:
+            data['resources'] = []
+
+        # retrieve doi metadata and materialize it in the dataset
+        for id in chain(data['meta']['protocol_url_or_doi'],
+                        data['meta']['originating_article_doi'],
+                        # TODO data["links"]?
+                        [data['meta']['doi']]):
+            if id:
+                if isinstance(id, idlib.Doi):
+                    metadata = id.metadata()
+                    metadata['id'] = id.identifier  # FIXME normalization ...
+                    data['resources'].append(metadata)  # FIXME metadata.asType(json)
 
         return data
 
