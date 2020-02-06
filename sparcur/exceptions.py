@@ -117,3 +117,7 @@ class NotApplicableError(SparCurError):
 
 class SubPipelineError(SparCurError):
     """ There was an error in a subpipeline. """
+
+
+class NoTripleError(SparCurError):
+    """ an evil hack to prevent export of a triple THANKS STUPID DOI DECISIONS """

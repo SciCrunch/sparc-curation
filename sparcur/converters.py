@@ -6,11 +6,10 @@ from pyontutils import combinators as cmb
 from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc
 from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
+from sparcur import exceptions as exc
 from sparcur.core import OntId, OntTerm, lj
 from sparcur.utils import log, logd
 from sparcur.protocols import ProtocolData
-
-a = rdf.type
 
 
 class TripleConverter(dat.HasErrors):
@@ -87,7 +86,11 @@ class TripleConverter(dat.HasErrors):
 
                 for v in values:
                     log.debug(f'{field} {v} {convert}')
-                    p, o = convert(v)
+                    try:
+                        p, o = convert(v)
+                    except exc.NoTripleError as e:
+                        continue
+
                     log.debug(o)
                     if isinstance(o, Expr) or isinstance(o, Quantity):
                         s = rdflib.BNode()
@@ -170,7 +173,6 @@ class MetaConverter(TripleConverter):
         ['techniques', TEMP.protocolEmploysTechnique],
         ['uri_api', TEMP.hasUriApi],
         ['uri_human', TEMP.hasUriHuman],
-        ['doi', TEMP.hasDoi],  # TODO portal page ?
         ['keywords', isAbout],
         ['description', dc.description],
         ['dirs', TEMP.hasNumberOfDirectories],
@@ -195,6 +197,12 @@ class MetaConverter(TripleConverter):
 
     ]
 
+    def doi(self, value):
+        if value is not None:
+            return TEMP.hasDoi, self.l(value)
+        else:
+            raise exc.NoTripleError('value was None')  # SIGH
+
     def principal_investigator(self, value):
         index = int(value.rsplit('/', 1)[-1])
         id = self.integrator.data['contributors'][index]['id']
@@ -209,8 +217,8 @@ class MetaConverter(TripleConverter):
 
         def award_number(self, value):
             _, s = self.c.award_number(value)
-            yield s, a, owl.NamedIndividual
-            yield s, a, TEMP.FundedResearchProject
+            yield s, rdf.type, owl.NamedIndividual
+            yield s, rdf.type, TEMP.FundedResearchProject
             return
             o = self.integrator.organ(value)
             if o:
@@ -224,8 +232,8 @@ class MetaConverter(TripleConverter):
 
         def protocol_url_or_doi(self, value):
             _, s = self.c.protocol_url_or_doi(value)
-            yield s, a, owl.NamedIndividual
-            yield s, a, sparc.Protocol
+            yield s, rdf.type, owl.NamedIndividual
+            yield s, rdf.type, sparc.Protocol
             pd = ProtocolData(self.integrator.id)
             # FIXME needs to be a pipeline so that we can export errors
             try:
@@ -369,32 +377,32 @@ class ApiNATOMYConverter(TripleConverter):
     @staticmethod
     def apinatbase():
         # TODO move it external file
-        yield TEMP.isAdvectivelyConnectedTo, a, owl.ObjectProperty
-        yield TEMP.isAdvectivelyConnectedTo, a, owl.SymmetricProperty
-        yield TEMP.isAdvectivelyConnectedTo, a, owl.TransitiveProperty
+        yield TEMP.isAdvectivelyConnectedTo, rdf.type, owl.ObjectProperty
+        yield TEMP.isAdvectivelyConnectedTo, rdf.type, owl.SymmetricProperty
+        yield TEMP.isAdvectivelyConnectedTo, rdf.type, owl.TransitiveProperty
 
-        yield TEMP.advectivelyConnects, a, owl.ObjectProperty
-        yield TEMP.advectivelyConnects, a, owl.TransitiveProperty
+        yield TEMP.advectivelyConnects, rdf.type, owl.ObjectProperty
+        yield TEMP.advectivelyConnects, rdf.type, owl.TransitiveProperty
 
-        yield TEMP.advectivelyConnectsFrom, a, owl.ObjectProperty
+        yield TEMP.advectivelyConnectsFrom, rdf.type, owl.ObjectProperty
         yield TEMP.advectivelyConnectsFrom, rdfs.subPropertyOf, TEMP.advectivelyConnects
 
-        yield TEMP.advectivelyConnectsTo, a, owl.ObjectProperty
+        yield TEMP.advectivelyConnectsTo, rdf.type, owl.ObjectProperty
         yield TEMP.advectivelyConnectsTo, rdfs.subPropertyOf, TEMP.advectivelyConnects
         yield TEMP.advectivelyConnectsTo, owl.inverseOf, TEMP.advectivelyConnectsFrom
 
         idct = TEMP.isDiffusivelyConnectedTo
-        yield idct, a, owl.ObjectProperty
-        yield idct, a, owl.SymmetricProperty
-        yield idct, a, owl.TransitiveProperty  # technically correct modulate the concentration gradient
+        yield idct, rdf.type, owl.ObjectProperty
+        yield idct, rdf.type, owl.SymmetricProperty
+        yield idct, rdf.type, owl.TransitiveProperty  # technically correct modulate the concentration gradient
 
-        yield TEMP.diffusivelyConnects, a, owl.ObjectProperty
-        yield TEMP.diffusivelyConnects, a, owl.TransitiveProperty
+        yield TEMP.diffusivelyConnects, rdf.type, owl.ObjectProperty
+        yield TEMP.diffusivelyConnects, rdf.type, owl.TransitiveProperty
 
-        yield TEMP.diffusivelyConnectsFrom, a, owl.ObjectProperty
+        yield TEMP.diffusivelyConnectsFrom, rdf.type, owl.ObjectProperty
         yield TEMP.diffusivelyConnectsFrom, rdfs.subPropertyOf, TEMP.advectivelyConnects
 
-        yield TEMP.diffusivelyConnectsTo, a, owl.ObjectProperty
+        yield TEMP.diffusivelyConnectsTo, rdf.type, owl.ObjectProperty
         yield TEMP.diffusivelyConnectsTo, rdfs.subPropertyOf, TEMP.advectivelyConnects
         yield TEMP.diffusivelyConnectsTo, owl.inverseOf, TEMP.advectivelyConnectsFrom
 
@@ -406,7 +414,7 @@ class ApiNATOMYConverter(TripleConverter):
             if 'external' in mat:
                 mat_s = OntTerm(mat['external'][0])
                 yield s, predicate, mat_s.u
-                yield mat_s.u, a, owl.Class
+                yield mat_s.u, rdf.type, owl.Class
                 yield mat_s.u, rdfs.label, rdflib.Literal(mat_s.label)
                 if 'materials' in mat:
                     for submat_id in mat['materials']:
@@ -478,7 +486,7 @@ class ApiNATOMYConverter(TripleConverter):
                 if 'external' in cd:
                     old_ot = ot
                     ot = OntTerm(cd['external'][0])
-                    yield ot.u, a, owl.Class
+                    yield ot.u, rdf.type, owl.Class
                     yield ot.u, TEMP.internalId, rdflib.Literal(conveying)
                     yield ot.u, rdfs.label, rdflib.Literal(ot.label)
 
@@ -488,12 +496,12 @@ class ApiNATOMYConverter(TripleConverter):
                         u, d = from_to
                         if st[0] == source:
                             yield u, rdfs.label, rdflib.Literal(OntTerm(u).label)
-                            yield u, a, owl.Class
+                            yield u, rdf.type, owl.Class
                             yield from cmb.restriction.serialize(ot.u, p_from, u)
 
                         if st[1] == target:
                             yield d, rdfs.label, rdflib.Literal(OntTerm(d).label)
-                            yield d, a, owl.Class
+                            yield d, rdf.type, owl.Class
                             yield from cmb.restriction.serialize(ot.u, p_to, d)
 
                     if old_ot is not None and old_ot != ot:
@@ -504,28 +512,28 @@ class ApiNATOMYConverter(TripleConverter):
                     # but it is not going to do exactly what is desired
                     s_link = TEMP[f'ApiNATOMY/{mid}/{link["id"]}']
                     s_cd = TEMP[f'ApiNATOMY/{mid}/{cd["id"]}']
-                    yield s_link, a, owl.NamedIndividual
-                    yield s_link, a, TEMP.diffusiveLink  # FIXME I'm not sure these go in the model ...
-                    yield s_cd, a, owl.NamedIndividual
+                    yield s_link, rdf.type, owl.NamedIndividual
+                    yield s_link, rdf.type, TEMP.diffusiveLink  # FIXME I'm not sure these go in the model ...
+                    yield s_cd, rdf.type, owl.NamedIndividual
                     if 'external' in cd and cd['external']:
                         oid = OntId(cd['external'][0])
-                        yield s_cd, a, oid.u
+                        yield s_cd, rdf.type, oid.u
                         ot = oid.asTerm()
                         if ot.label:
                             yield oid.u, rdfs.label, ot.label
 
                     else:
-                        yield s_cd, a, TEMP.conveyingLyph
+                        yield s_cd, rdf.type, TEMP.conveyingLyph
                         for icd in cd['inCoalescences']:
                             dcd = rm[icd]
                             log.info(lj(dcd))
                             s_icd = TEMP[f'ApiNATOMY/{mid}/{dcd["id"]}']
                             yield s_cd, TEMP.partOfCoalescence, s_icd
-                            yield s_icd, a, owl.NamedIndividual
-                            yield s_icd, a, TEMP['ApiNATOMY/Coalescence']
+                            yield s_icd, rdf.type, owl.NamedIndividual
+                            yield s_icd, rdf.type, TEMP['ApiNATOMY/Coalescence']
                             if 'external' in dcd and dcd['external']:
                                 oid = OntId(dcd['external'][0])
-                                yield s_icd, a, oid.u
+                                yield s_icd, rdf.type, oid.u
                                 ot = oid.asTerm()
                                 if ot.label:
                                     yield oid.u, rdfs.label, ot.label
@@ -541,7 +549,7 @@ class ApiNATOMYConverter(TripleConverter):
                     continue
 
                 for inid, e in zip(st, from_to):
-                    yield e.u, a, owl.Class
+                    yield e.u, rdf.type, owl.Class
                     yield e.u, rdfs.label, rdflib.Literal(OntTerm(e).label)
                     yield e.u, TEMP.internalId, rdflib.Literal(inid)
 

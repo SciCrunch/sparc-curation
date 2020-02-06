@@ -613,7 +613,24 @@ class MetadataFile(HasErrors):
 
     def _data(self):
         if self.path.suffix == '.json':
-            return self.normalization_class(self)  # FIXME incredible violation of encapsulation ...
+            data = self.raw_json_class(self.path).data
+            self._expand_string_lists = lambda : data  # FIXME hack
+            self.norm_to_orig_header = {}
+            def all_keys(d):
+                if isinstance(d, dict):
+                    for k, v in d.items():
+                        if k not in self.groups_alt:
+                            yield k
+
+                        yield from all_keys(v)
+
+                elif isinstance(d, list):
+                    for e in d:
+                        yield from all_keys(e)
+
+            self.norm_to_orig_alt = {k:k for k in all_keys(data)}
+            #return self.normalization_class(self).data  # FIXME incredible violation of encapsulation ...
+            return self._condense()
 
         else:
             # TODO if this passes we can just render backward from _normalize
@@ -895,7 +912,10 @@ class MetadataFile(HasErrors):
         yield from gen
 
     def _t(self):
-        return Tabular(self.path)
+        if self.path.suffix == '.json':
+            return  # TODO json -> tabular conversion
+        else:
+            return Tabular(self.path)
 
 
 class SubmissionFile(MetadataFile):
@@ -915,7 +935,9 @@ class SubmissionFile(MetadataFile):
     def data(self):
         """ lift list with single element to object """
 
-        d = copy.deepcopy(super().data)
+        data = super().data  # LOL PYTHON can't super in a debugger -- pointless
+        d = copy.deepcopy(data)
+
         if d and 'submission' in d:
             sub = d['submission']
             if sub:

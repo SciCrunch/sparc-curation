@@ -236,10 +236,11 @@ class NormValues(HasErrors):
 
     def _error_on_na(self, value, key=None):
         """ N/A -> raise for cases where it should just be removed """
-        v = value.strip()
-        if v in ('NA', 'n/a', 'N/A',):
-            # TODO consider double checking these cases ?
-            raise exc.NotApplicableError(key)
+        if isinstance(value, str):
+            v = value.strip()
+            if v in ('NA', 'n/a', 'N/A',):
+                # TODO consider double checking these cases ?
+                raise exc.NotApplicableError(key)
 
     def _deatag(self, value):
         if value.startswith('<a') and value.endswith('</a>'):
@@ -325,12 +326,19 @@ class NormValues(HasErrors):
 
             return out
 
+        elif isinstance(thing, list):  # normal json not the tabular conversion case
+            out = [self._normv(v, key, i, path) for i, v in enumerate(thing)]
+            return out
+
         else:
             # TODO make use of path
             # FIXME I do NOT like this pattern :/
 
-            if isinstance(key, str) and hasattr(self, key):
+            if isinstance(thing, str):
                 self._error_on_na(thing, key)  # TODO see if this makes sense
+
+            if isinstance(key, str) and hasattr(self, key):
+
                 out = getattr(self, key)(thing)
 
                 if isinstance(out, GeneratorType):
@@ -338,7 +346,10 @@ class NormValues(HasErrors):
                     if len(out) == 1:  # FIXME find the actual source of double packing
                         out = out[0]
                     elif not out:
-                        if thing.strip():  # sigh
+                        if isinstance(thing, str):
+                            thing = thing.strip() # sigh
+
+                        if thing is not None and thing != '':
                             msg = f'Normalization {key} returned None for input "{thing}"'
                             self.addError(msg,
                                           pipeline_stage=f'{self.__class__.__name__}.{key}',
@@ -358,12 +369,8 @@ class NormValues(HasErrors):
     @property
     def data(self):
         #nk = self._obj_inst._normalize_keys()
-        if self._obj_inst.path.suffix == '.json':  # FIXME ick :/
-            data_in = self._obj_inst.raw_json_class(self._obj_inst.path).data
-        else:
-            data_in = self._obj_inst._clean()
-            self._bind()
-
+        data_in = self._obj_inst._clean()
+        self._bind()
         data_out = self._normv(data_in)
         self.embedErrors(data_out)
         return data_out
@@ -535,9 +542,9 @@ class NormDatasetDescriptionFile(NormValues):
             return rv
 
         if isinstance(value, list):
-            yield elist(value)
+            yield from elist(value)
         else:
-            yield elist(value.split(','))
+            yield from elist(value.split(','))
 
     def is_contact_person(self, value):
         # no truthy values only True itself
@@ -556,6 +563,10 @@ class NormDatasetDescriptionFile(NormValues):
         else:
             value = idlib.Pio(value)
 
+        return value
+
+    def title_for_complete_data_set(self, value):
+        self._error_on_na(value)
         return value
 
     def protocol_url_or_doi(self, value):
@@ -612,6 +623,17 @@ class NormDatasetDescriptionFile(NormValues):
 
 class NormSubjectsFile(NormValues):
 
+    def subject_id(self, value):
+        if not isinstance(value, str):
+            msg = f'Bad type for subject_id: {type(value)}'
+            self.addError(msg,
+                          pipeline_stage=self.__class__.__name__,
+                          blame='submission',
+                          logfunc=logd.error,)
+            return str(value)
+        else:
+            return value
+
     def software_url(self, value):
         value, _j = self._deatag(value)
         return value
@@ -656,7 +678,8 @@ class NormSubjectsFile(NormValues):
         self._error_on_na(value)
 
         if isinstance(value, numbers.Number):
-            return pyru.ur.Quantity(value)
+            yield pyru.ur.Quantity(value)
+            return
 
         try:
             pv = pyru.UnitsParser(value).asPython()
@@ -665,7 +688,8 @@ class NormSubjectsFile(NormValues):
             msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
             log.error(msg)
             self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline')
-            return value
+            yield value
+            return
 
         #if not pv[0] == 'param:parse-failure':
         if pv is not None:  # parser failure  # FIXME check on this ...

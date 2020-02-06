@@ -886,7 +886,7 @@ class Main(Dispatcher):
             if hasattr(d, ft):
                 f = getattr(d, ft)
                 if hasattr(f, 'object'):
-                    return(f.object._t())
+                    return (f.object._t())
                 else:
                     message = f'object missing on {ft} for {d}'
                     log.warning(message)
