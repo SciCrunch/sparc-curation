@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from itertools import chain
 from collections import deque
 import idlib
 import rdflib
@@ -917,20 +916,6 @@ class PipelineExtras(JSONPipeline):
 
         if 'status_on_platform' not in data['status']:
             data['status']['status_on_platform'] = remote.bfobject.status
-
-        if 'resources' not in data:
-            data['resources'] = []
-
-        # retrieve doi metadata and materialize it in the dataset
-        for id in chain(data['meta']['protocol_url_or_doi'],
-                        data['meta']['originating_article_doi'],
-                        # TODO data["links"]?
-                        [data['meta']['doi']]):
-            if id:
-                if isinstance(id, idlib.Doi):
-                    metadata = id.metadata()
-                    metadata['id'] = id.identifier  # FIXME normalization ...
-                    data['resources'].append(metadata)  # FIXME metadata.asType(json)
 
         return data
 

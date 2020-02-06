@@ -3,11 +3,14 @@
 import csv
 import json
 from socket import gethostname
+from itertools import chain
+import idlib
 from pyontutils.core import OntGraph
+from pyontutils.utils import Async, deferred
 from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
-from sparcur.core import JEncode
+from sparcur.core import JEncode, adops
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge
 
@@ -73,6 +76,16 @@ class Export:
     @property
     def latest_protocols(self):
         with open(self.latest_protocols_path, 'rt') as f:
+            return json.load(f)
+
+    @property
+    def latest_id_met_path(self):
+        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
+        return base_path / 'identifier-metadata.json'
+
+    @property
+    def latest_id_met(self):
+        with open(self.latest_id_met_path, 'rt') as f:
             return json.load(f)
 
     @property
@@ -150,7 +163,6 @@ class Export:
             teds.append(ted)
 
             if self.latest and lfilepsuf.exists():
-                breakpoint()
                 filepsuf.copy_from(lfilepsuf)
                 graph = OntGraph(path=lfilepsuf).parse()
                 ted._graph = graph
@@ -182,6 +194,54 @@ class Export:
             json.dump(blob_protocols, f, sort_keys=True, indent=2, cls=JEncode)
 
         return blob_protocols
+
+    def export_identifier_metadata(self, dump_path, dataset_blobs):
+
+        if (self.latest and
+            self.latest_id_met_path.exists()):
+            blob_id_met = self.latest_id_met
+
+        else:
+            def fetch(id):  # FIXME error proof version ...
+                metadata = id.metadata()
+                metadata['id'] = id.identifier  # FIXME normalization ...
+                return metadata
+
+            # retrieve doi metadata and materialize it in the dataset
+            _dois = set([idlib.Auto(id) if not isinstance(id, idlib.Stream) else id
+                         for blob in dataset_blobs for id in
+                         chain(adops.get(blob, ['meta', 'protocol_url_or_doi'], on_failure=[]),
+                               adops.get(blob, ['meta', 'originating_article_doi'], on_failure=[]),
+                               # TODO data["links"]?
+                               [blob['meta']['doi']])
+                         if id is not None])
+
+            dois = [d for d in _dois if isinstance(d, idlib.Doi)]
+            metadatas = Async(rate=10)(deferred(fetch)(d) for d in dois)
+            bads = [{'id': d, 'reason': 'no metadata'}  # TODO more granular reporting e.g. 404
+                    for d, m in zip(dois, metadatas)
+                    if m is None]
+            metadatas = [m for m in metadatas if m is not None]
+            blob_id_met = {'id': 'identifier-metadata',  # TODO is this ok ?
+                           'identifier_metadata': metadatas,
+                           'errors': bads,
+                           'meta': {'count': len(metadatas)},
+                           'prov': {'timestamp_export_start': self.timestamp,
+                                    'export_system_identifier': Path.sysid,
+                                    'export_hostname': gethostname(),
+                                    'export_project_path': self.export_source_path.cache.anchor,},
+            }
+
+        with open(dump_path / 'identifier-metadata.json', 'wt') as f:
+            json.dump(blob_id_met, f, sort_keys=True, indent=2, cls=JEncode)
+
+        return blob_id_met
+
+    @staticmethod
+    def export_identifier_rdf(dump_path, identifier_metadata):
+        # FIXME not currently dumping ...
+        teim = ex.TriplesExportIdentifierMetadata(identifier_metadata)
+        return teim
 
     @staticmethod
     def export_xml(filepath, dataset_blobs):
@@ -237,12 +297,16 @@ class Export:
 
         dataset_blobs = blob_data['datasets']
 
+        # identifier metadata
+        blob_id_met = self.export_identifier_metadata(dump_path, dataset_blobs)
+        teim = self.export_identifier_rdf(dump_path, blob_id_met)
+
         # protocol
         blob_protocol = self.export_protocols(dump_path, dataset_blobs, summary)
 
         # rdf
         teds = self.export_rdf(dump_path, previous_latest, dataset_blobs)
-        tes = ex.TriplesExportSummary(blob_data, teds=teds)
+        tes = ex.TriplesExportSummary(blob_data, teds=teds + [teim])
 
         with open(filepath.with_suffix('.ttl'), 'wb') as f:
             f.write(tes.ttl)

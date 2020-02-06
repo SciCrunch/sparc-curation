@@ -49,6 +49,8 @@ OntCuries({'orcid':'https://orcid.org/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
+           'bibo': 'http://purl.org/ontology/bibo/',  # crossref
+           'prism.basic': 'http://prismstandard.org/namespaces/basic/2.1/',  # crossref
            'unit': str(unit),
            'dim': str(dim),
            'asp': str(asp),
@@ -429,15 +431,21 @@ class AtomicDictOperations:
         cls.add(data, target_path, value, update=True)
 
     @classmethod
-    def get(cls, data, source_path):
+    def get(cls, data, source_path, on_failure=None):
         """ get stops at lists because the number of possible issues explodes
             and we don't hand those here, if you encounter that, use this
             primitive to get the list, then use it again on the members in
             the function making the call where you have the information needed
             to figure out how to handle the error """
 
-        source_key, node_key, source = cls._get_source(data, source_path)
-        return source[source_key]
+        try:
+            source_key, node_key, source = cls._get_source(data, source_path)
+            return source[source_key]
+        except BaseException as e:
+            if on_failure is not None:
+                return on_failure
+            else:
+                raise e
 
     @classmethod
     def pop(cls, data, source_path):

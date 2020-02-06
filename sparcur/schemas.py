@@ -287,6 +287,8 @@ class DatasetStructureSchema(JSONSchema):
                                                  'pattern': metadata_filename_pattern},
                                'samples_file': {'type': 'string',
                                                 'pattern': metadata_filename_pattern},
+                               #'path_structure': {'type': 'array',
+                                                 # 'items': {'type': 'string', 'pattern': ''}}
                                'dirs': {'type': 'integer',
                                         'minimum': 0},
                                'files': {'type': 'integer',
@@ -587,7 +589,7 @@ class MetaOutSchema(JSONSchema):
                       'number_of_samples',
                       'timestamp_created',
                       'timestamp_updated',
-                      'doi',  # may be none
+                      'doi',  # may be none FIXME inconsistent
                       #'subject_count',
                       #'sample_count',
     ]
@@ -668,23 +670,23 @@ class DatasetOutSchema(JSONSchema):
                             'contributors',
                             'prov']
     __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
-                                   'pattern': '^N:dataset:'},
-                            'meta': MetaOutSchema.schema,
-                            'prov': ProvSchema.schema,
-                            'errors': ErrorSchema.schema,
-                            'contributors': ContributorsOutSchema.schema,
-                            'creators': CreatorsSchema.schema,
-                            # FIXME subjects_file might make the name overlap clearer
-                            'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
-                            'samples': SamplesFileSchema.schema['properties']['samples'],
-                            'resources': {'type':'array',
-                                          'items': {'type': 'object'},},
-                            'protocols': {'type':'array'},
-                            'inputs': {'type': 'object',
-                                       # TODO do we need errors at this level?
-                                       'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
-                                                      'submission_file': SubmissionSchema.schema,
-                                                      'subjects_file': SubjectsSchema.schema,},},}
+                                     'pattern': '^N:dataset:'},
+                              'meta': MetaOutSchema.schema,
+                              'prov': ProvSchema.schema,
+                              'errors': ErrorSchema.schema,
+                              'contributors': ContributorsOutSchema.schema,
+                              'creators': CreatorsSchema.schema,
+                              # FIXME subjects_file might make the name overlap clearer
+                              'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
+                              'samples': SamplesFileSchema.schema['properties']['samples'],
+                              # 'identifier_metadata': {'type': 'array'},  # FIXME temporary
+                              'resources': {'type':'array',
+                                            'items': {'type': 'object'},},
+                              'inputs': {'type': 'object',
+                                         # TODO do we need errors at this level?
+                                         'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
+                                                        'submission_file': SubmissionSchema.schema,
+                                                        'subjects_file': SubjectsSchema.schema,},},}
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
     schema = {'allOf': [__schema,
@@ -740,10 +742,7 @@ class SummarySchema(JSONSchema):
                              'datasets': {'type': 'array',
                                           'minItems': 1,
                                           'items': {'type': 'object'},  # DatasetOutSchema already validated
-                             'protocols': {'type': 'array',
-                                           'minItems': 1,
-                                           'items': {'type': 'object'},  # TODO protocols io json schema
-                             }}}}
+                             }}}
 
 
 class HeaderSchema(JSONSchema):
