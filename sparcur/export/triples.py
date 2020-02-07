@@ -382,7 +382,7 @@ class TriplesExportIdentifierMetadata(TriplesExport):
         if len(dp) == 3:
             y, m, d = dp
             return f'{y}-{m:0>2}-{d:0>2}'
-        elif len(dp) == 2
+        elif len(dp) == 2:
             y, m = dp
             return f'{y}-{m:0>2}'
         elif len(dp) == 1:
