@@ -572,7 +572,7 @@ class NormDatasetDescriptionFile(NormValues):
                                if o]))
             nonlocal cell_error
             if cell_error:
-                rv = (exc.TabularCellError(cell_error, value=rv),)
+                rv = tuple(exc.TabularCellError(cell_error, value=v) for v in rv)
 
             return rv
 
