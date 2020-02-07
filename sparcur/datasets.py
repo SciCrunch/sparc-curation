@@ -961,8 +961,9 @@ SubmissionFilePath._bind_flavours()
 
 
 _props = sc.DatasetDescriptionSchema.schema['properties']
-_nddfes = [k for k, v in _props.items() if isinstance(v, dict) and
- 'type' in v and v['type'] not in ('array',)]
+_props2 = sc.ContributorSchema.schema['properties']  # FIXME recurse ...
+_nddfes = [k for k, v in chain(_props.items(), _props2.items())
+           if isinstance(v, dict) and 'type' in v and v['type'] not in ('array',)]
 
 
 class DatasetDescriptionFile(MetadataFile):
@@ -1001,6 +1002,13 @@ class DatasetDescriptionFilePath(ObjectPath):
 DatasetDescriptionFilePath._bind_flavours()
 
 
+_props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
+_props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
+_nsffes = [k for k, v in chain(_props.items(), _props2.items())
+           if isinstance(v, dict) and ('type' in v and v['type'] not in ('array',)
+                                       # FIXME hack to get UnitsSchema in
+                                       or 'oneOf' in v)]
+
 class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE
     __internal_id_1 = object()
@@ -1024,6 +1032,7 @@ class SubjectsFile(MetadataFile):
     raw_json_class = rj.RawJsonSubjects
     normalization_class = nml.NormSubjectsFile
     normalize_header = False
+    _expect_single = _nsffes
 
     @property
     def data(self):

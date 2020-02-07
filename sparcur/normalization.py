@@ -328,7 +328,7 @@ class NormValues(HasErrors):
             return out
 
         elif isinstance(thing, list):  # normal json not the tabular conversion case
-            out = [self._normv(v, key, i, path) for i, v in enumerate(thing)]
+            out = [self._normv(v, key, i, path + (list,)) for i, v in enumerate(thing)]
             return out
 
         else:
@@ -344,7 +344,10 @@ class NormValues(HasErrors):
 
                 if isinstance(out, GeneratorType):
                     out = tuple(out)
-                    if len(out) == 1:  # FIXME find the actual source of double packing
+                    if len(out) == 1 and key in self._obj_inst._expect_single or path[-1] == list:
+                        # lists of lists might encounter issues here, but we almost never
+                        # encounter those cases with metadata, especially in the tabular conversion
+                        # but keep an eye out in which case we can check the schema type
                         out = out[0]
                     elif not out:
                         if isinstance(thing, str):

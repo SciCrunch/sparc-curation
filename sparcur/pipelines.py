@@ -805,15 +805,20 @@ class PipelineExtras(JSONPipeline):
 
         if 'errors' in data:
             pop_paths = [tuple(p) for p in [e['path'] for e in data['errors']
-                                     if 'path' in e]
+                                            if 'path' in e]
                          if any(ff(p) for ff in self.filter_failures)]
 
             if pop_paths:
                 # need to remove from the tail of a list so that indexes don't
                 # shift until after we have already passed them
-                safe_ordering = sorted(pop_paths, reverse=True)
+                # some paths may have more than one error so use set to avoid double remove issues
+                safe_ordering = sorted(set(pop_paths), reverse=True)
 
-                garbage = [(p, tuple(DT.pop(data, [p]))) for p in safe_ordering]
+                try:
+                    garbage = [(p, tuple(DT.pop(data, [p]))) for p in safe_ordering]
+                except exc.NoSourcePathError as e:
+                    raise exc.SparCurError(f'{self.runtime_context.path}') from e
+
                 msg = '\n\t'.join(str(t) for t in garbage)
                 logd.warning(f'Garbage truck says:\n{msg}')
 

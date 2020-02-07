@@ -5,6 +5,7 @@ import json
 from socket import gethostname
 from itertools import chain
 import idlib
+import requests
 from pyontutils.core import OntGraph
 from pyontutils.utils import Async, deferred
 from sparcur import export as ex
@@ -203,9 +204,12 @@ class Export:
 
         else:
             def fetch(id):  # FIXME error proof version ...
-                metadata = id.metadata()
-                metadata['id'] = id.identifier  # FIXME normalization ...
-                return metadata
+                try:
+                    metadata = id.metadata()
+                    metadata['id'] = id.identifier  # FIXME normalization ...
+                    return metadata
+                except requests.exceptions.HTTPError:
+                    return None
 
             # retrieve doi metadata and materialize it in the dataset
             _dois = set([idlib.Auto(id) if not isinstance(id, idlib.Stream) else id
