@@ -14,7 +14,7 @@ from pyontutils.namespaces import (TEMP,
 from sparcur import converters as conv
 from sparcur.core import (adops,
                           OntCuries)
-from sparcur.utils import loge
+from sparcur.utils import loge, log
 from sparcur.protocols import ProtcurData
 
 
