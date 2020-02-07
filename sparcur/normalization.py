@@ -327,8 +327,23 @@ class NormValues(HasErrors):
 
             return out
 
-        elif isinstance(thing, list):  # normal json not the tabular conversion case
+        elif is_list_or_tuple(thing):
+            # normal json not the tabular conversion case
+            # or arrays at the bottom
             out = [self._normv(v, key, i, path + (list,)) for i, v in enumerate(thing)]
+            errors = [(i, e) for i, e in enumerate(out)
+                      if isinstance(e, exc.TabularCellError)]
+
+            if errors:
+                cell_errors = [e for i, e in errors]
+                for i, e in errors:
+                    out[i] = e.value
+
+                e = exc.TabularCellError(str(cell_errors),
+                                         value=out,
+                                         location=[e.location for e in cell_errors])
+                raise e
+
             return out
 
         else:
@@ -344,6 +359,22 @@ class NormValues(HasErrors):
 
                 if isinstance(out, GeneratorType):
                     out = tuple(out)
+                    errors = [(i, e) for i, e in enumerate(out)
+                              if isinstance(e, exc.TabularCellError)]
+
+                    if errors:
+                        cell_errors = [e for i, e in errors]
+                        out = [_ for _ in out]
+                        for i, e in errors:
+                            out[i] = e.value
+
+                        out = tuple(out)
+                        e = exc.TabularCellError(str(cell_errors),
+                                                 value=out,
+                                                 location=[e.location for e in cell_errors])
+                        # FIXME this appears to cause double wrapping in tuples again >_<
+                        raise e
+
                     if len(out) == 1 and key in self._obj_inst._expect_single or path[-1] == list:
                         # lists of lists might encounter issues here, but we almost never
                         # encounter those cases with metadata, especially in the tabular conversion
