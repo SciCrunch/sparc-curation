@@ -373,13 +373,23 @@ class TriplesExportIdentifierMetadata(TriplesExport):
 
     def published_online(self, blob):
         try:
-            dp = blob['issued']['date-parts']
+            dpl = blob['issued']['date-parts']
         except KeyError as e:
             log.critical(e)
             return None
 
-        y, m, d = dp[0]
-        return f'{y}-{m:0>2}-{d:0>2}'
+        dp = dpl[0]
+        if len(dp) == 3:
+            y, m, d = dp
+            return f'{y}-{m:0>2}-{d:0>2}'
+        elif len(dp) == 2
+            y, m = dp
+            return f'{y}-{m:0>2}'
+        elif len(dp) == 1:
+            y = dp
+            return f'{y}'
+        else:
+            raise NotImplementedError(f'what the? {dp}')
 
     @property
     def triples(self):
