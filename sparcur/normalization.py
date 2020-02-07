@@ -8,6 +8,7 @@ from pysercomb.pyr import units as pyru
 from . import exceptions as exc
 from .core import log, logd, HasErrors
 from .core import OntId
+from .utils import is_list_or_tuple
 
 
 BLANK_VALUE = object()
@@ -537,14 +538,21 @@ class NormDatasetDescriptionFile(NormValues):
                                if o]))
             nonlocal cell_error
             if cell_error:
-                rv = exc.TabularCellError(cell_error, value=rv)
+                rv = (exc.TabularCellError(cell_error, value=rv),)
 
             return rv
 
-        if isinstance(value, list):
+        if is_list_or_tuple(value):
             yield from elist(value)
+
         else:
-            yield from elist(value.split(','))
+            seps = '|', ';', ','  # order in priority
+            for sep in seps:
+                if sep in value:
+                    break
+
+            lst = value.split(sep)
+            yield from elist(lst)
 
     def is_contact_person(self, value):
         # no truthy values only True itself

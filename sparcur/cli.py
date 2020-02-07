@@ -1741,6 +1741,7 @@ class Fix(Shell):
 
 
 def bind_file_handler(log_file):
+    # FIXME the this does not work with joblib at the moment
     from idlib.utils import log as idlog
     from protcur.core import log as prlog
     from orthauth.utils import log as oalog
