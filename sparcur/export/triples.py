@@ -295,7 +295,7 @@ class TriplesExportDataset(TriplesExport):
 
         yield from triples_gen(self.subject_id, self.subjects)
 
-    def sample_id(self, v, species=None):  # TODO species for human/animal
+    def primary_key(self, v, species=None):  # TODO species for human/animal
         #v = v.replace(' ', '%20')  # FIXME use quote urlencode
         v = quote(v, safe=tuple())
         s = rdflib.URIRef(self.dsid + '/samples/' + v)
@@ -316,8 +316,8 @@ class TriplesExportDataset(TriplesExport):
         def triples_gen(prefix_func, samples):
             for i, sample in enumerate(samples):
                 converter = conv.SampleConverter(sample)
-                if 'sample_id' in sample:
-                    s_local = sample['sample_id']
+                if 'primary_key' in sample:
+                    s_local = sample['primary_key']
                 else:
                     s_local = f'local-{i + 1}'  # sigh
 
@@ -342,7 +342,7 @@ class TriplesExportDataset(TriplesExport):
                     elif field not in converter.known_skipped:
                         loge.warning(f'Unhandled sample field: {field}')
 
-        yield from triples_gen(self.sample_id, self.samples)
+        yield from triples_gen(self.primary_key, self.samples)
 
 
 class TriplesExportIdentifierMetadata(TriplesExport):
