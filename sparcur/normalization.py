@@ -375,10 +375,13 @@ class NormValues(HasErrors):
                         # FIXME this appears to cause double wrapping in tuples again >_<
                         raise e
 
-                    if len(out) == 1 and key in self._obj_inst._expect_single or path[-1] == list:
+                    if (len(out) == 1 and (key in self._obj_inst._expect_single or
+                                           isinstance(out[0], pyru._Quant))
+                        or path[-1] == list):
                         # lists of lists might encounter issues here, but we almost never
                         # encounter those cases with metadata, especially in the tabular conversion
                         # but keep an eye out in which case we can check the schema type
+                        # FIXME bad test around Quantity
                         out = out[0]
                     elif not out:
                         if isinstance(thing, str):

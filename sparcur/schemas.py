@@ -490,7 +490,9 @@ class SubjectsSchema(JSONSchema):
                                             'strain': {'type': 'string'},  # TODO RRID
                                             'sex': {'type': 'string'},  # sex as a variable ?
                                             'mass': UnitSchema.schema,
+                                            'body_mass': UnitSchema.schema,
                                             'weight': UnitSchema.schema,
+                                            'body_weight': UnitSchema.schema,
                                             'age': UnitSchema.schema,
                                             'age_category': {'type': 'string'},  # TODO uberon
                                         },},},
