@@ -372,7 +372,12 @@ class TriplesExportIdentifierMetadata(TriplesExport):
             yield ontid, p, o
 
     def published_online(self, blob):
-        dp = blob['published-online']['date-parts']
+        try:
+            dp = blob['issued']['date-parts']
+        except KeyError as e:
+            log.critical(e)
+            return None
+
         y, m, d = dp[0]
         return f'{y}-{m:0>2}-{d:0>2}'
 
@@ -384,24 +389,33 @@ class TriplesExportIdentifierMetadata(TriplesExport):
                 id = idlib.Auto(id)
 
             s = id.asType(rdflib.URIRef)
-            source = blob['source']  # FIXME we need to wrap this in our normalized representation
-            if source == 'Crossref':  # FIXME CrossrefConvertor etc. OR put it in idlib as a an alternate ttl
-                pos = (
-                    (rdf.type, owl.NamedIndividual),
-                    (rdf.type, TEMP[blob['type']]),
-                    (dc.publisher, blob['publisher']),
-                    #(dc.type, blob['type']),  # FIXME semantify
-                    (dc.title, blob['title']),
-                    (dc.date, self.published_online(blob)),  # FIXME .... dangerzone
-                )
-                g = OntGraph()
-                doi = idlib.Doi(id) if not isinstance(id, idlib.Doi) else id  # FIXME idlib streams need to recognize their own type in __new__
-                g.parse(data=doi.ttl(), format='ttl')  # FIXME network bad
-                _their_record_s = [s for s, p, o in g if p == rdflib.term.URIRef('http://prismstandard.org/namespaces/basic/2.1/doi')][0]
-                yield s, owl.sameAs, _their_record_s
-                yield from g
+            if 'source' in blob:
+                source = blob['source']  # FIXME we need to wrap this in our normalized representation
+                if source == 'Crossref':  # FIXME CrossrefConvertor etc. OR put it in idlib as a an alternate ttl
+                    pos = (
+                        (rdf.type, owl.NamedIndividual),
+                        (rdf.type, TEMP[blob['type']]),
+                        (dc.publisher, blob['publisher']),
+                        #(dc.type, blob['type']),  # FIXME semantify
+                        (dc.title, blob['title']),
+                        (dc.date, self.published_online(blob)),  # FIXME .... dangerzone
+                    )
+                    g = OntGraph()
+                    doi = idlib.Doi(id) if not isinstance(id, idlib.Doi) else id  # FIXME idlib streams need to recognize their own type in __new__
+                    g.parse(data=doi.ttl(), format='ttl')  # FIXME network bad
+                    _their_record_s = [s for s, p, o in g if p == rdflib.term.URIRef('http://prismstandard.org/namespaces/basic/2.1/doi')][0]
+                    yield s, owl.sameAs, _their_record_s
+                    yield from g
+                else:
+                    msg = f'dont know what to do with {source}'
+                    log.error(msg)
+                    #raise NotImplementedError(msg)
+                    return
             else:
-                raise NotImplementedError('dont know what to do with {source}')
+                msg = f'dont know what to do with {blob} for {id.identifier}'
+                log.error(msg)
+                #raise NotImplementedError(msg)
+                return
 
             for p, oraw in pos:
                 if oraw is not None:

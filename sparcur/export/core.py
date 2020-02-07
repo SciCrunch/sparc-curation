@@ -13,7 +13,7 @@ from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
 from sparcur.core import JEncode, adops
 from sparcur.paths import Path
-from sparcur.utils import symlink_latest, loge
+from sparcur.utils import symlink_latest, loge, logd
 
 
 def export_schemas(export_path):
@@ -208,8 +208,10 @@ class Export:
                     metadata = id.metadata()
                     metadata['id'] = id.identifier  # FIXME normalization ...
                     return metadata
-                except requests.exceptions.HTTPError:
-                    return None
+                except requests.exceptions.HTTPError as e:
+                    logd.error(e)
+                except (requests.exceptions.ConnectionError, requests.exceptions.SSLError) as e:
+                    log.error(e)
 
             # retrieve doi metadata and materialize it in the dataset
             _dois = set([idlib.Auto(id) if not isinstance(id, idlib.Stream) else id
