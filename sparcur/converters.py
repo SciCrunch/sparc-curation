@@ -207,7 +207,7 @@ class MetaConverter(TripleConverter):
         index = int(value.rsplit('/', 1)[-1])
         id = self.integrator.data['contributors'][index]['id']
         o = self.l(id)
-        return TEMP.hasResponsiblePrincialInvestigator, o  # FIXME reload -> ir
+        return TEMP.hasResponsiblePrincipalInvestigator, o  # FIXME reload -> ir
 
     def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']
     class Extra:
