@@ -565,7 +565,6 @@ class Summary(Integrator, ExporterSummarizer):
 
     def _pipeline_end(self, timestamp=None):
         if not hasattr(self, '_data_cache'):
-            ca = self.path._cache_class._remote_class._cache_anchor
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
 
@@ -590,6 +589,8 @@ class Summary(Integrator, ExporterSummarizer):
             # HOWEVER: overwriting organs_sheet does
             #helpers['organs_sheet'] = self.organs_sheet
 
+            ca = self.path._cache_class._remote_class._cache_anchor
+
             if not self._debug:
                 # this flies with no_google, so something is up with
                 # the reserialization of the Sheets classes I think
@@ -600,7 +601,7 @@ class Summary(Integrator, ExporterSummarizer):
                 # the per-dataset ttl conversion as well, parsing the ttl is probably
                 # a bad call though
                 hrm = Parallel(n_jobs=12)(delayed(datame)(d, ca, timestamp, helpers)
-                                         for d in self.iter_datasets_safe)
+                                          for d in self.iter_datasets_safe)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
             else:

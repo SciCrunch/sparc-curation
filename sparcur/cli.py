@@ -793,6 +793,10 @@ class Main(Dispatcher):
 
     def export(self):
 
+        # FIXME export should be able to run without needing any external
+        # data the fetch step should happen before the export so that
+        # network connections don't creep into the process
+
         # TODO export source path without having to be in that folder
 
         if self.options.schemas:
