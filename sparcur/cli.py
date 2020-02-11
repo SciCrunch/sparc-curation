@@ -1171,16 +1171,16 @@ class Main(Dispatcher):
 
     def report(self):
         report = Report(self)
-        report()
+        report('report')
 
     def shell(self):
         """ drop into an shell with classes loaded """
         shell = Shell(self)
-        shell()
+        shell('shell')
 
     def fix(self):
         fix = Fix(self)
-        fix()
+        fix('fix')
 
 
 class Report(Dispatcher):
