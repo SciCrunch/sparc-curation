@@ -7,9 +7,10 @@ try:
 except ImportError:
     pass
 
+import augpathlib as aug
 from dateutil import parser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
-from augpathlib import XopenPath, RepoPath, LocalPath
+from augpathlib import RepoPath, LocalPath
 from augpathlib import RemotePath  # FIXME just for reimport
 from sparcur import backends
 from sparcur import exceptions as exc
@@ -179,12 +180,11 @@ class BlackfynnCache(PrimaryCache, EatCache):
 BlackfynnCache._bind_flavours()
 
 
-class Path(XopenPath, RepoPath, LocalPath):  # NOTE this is a hack to keep everything consistent
+class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack to keep everything consistent
     """ An augmented path for all the various local
         needs of the curation process. """
 
     _cache_class = BlackfynnCache
-
 
 Path._bind_flavours()
 

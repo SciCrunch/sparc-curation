@@ -49,8 +49,3 @@ class TestHierarchy(unittest.TestCase):
 
     def test_subjects(self):
         pass
-
-
-class TestLax(TestHierarchy):
-    def setUp(self):
-        self.ds =  [dat.DatasetStructureLax(p) for p in Path(project_path).children]

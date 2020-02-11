@@ -23,7 +23,7 @@ from blackfynn import base as bfb
 from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
-from werkzeug.contrib.iterio import IterIO
+from pyontutils.iterio import IterIO
 from sparcur import exceptions as exc
 from sparcur.core import log, lj
 from sparcur.metastore import MetaStore

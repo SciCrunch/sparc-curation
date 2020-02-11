@@ -15,7 +15,9 @@ if working_dir is None:
     working_dir = Path(__file__).parent.parent
 
 post_load = lambda : None
-post_main = lambda : None
+def post_main():
+    if hasattr(sparcur.paths.Path._cache_class, '_anchor'):
+        delattr(sparcur.paths.Path._cache_class, '_anchor')
 
 
 mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
@@ -53,7 +55,6 @@ mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
                  ['spc', 'annos'],
                  ['spc', 'annos', 'export'],
          ],
-         'curation': None,
 }
 
 mains['cli'] = [args + ['--project-path', project_path.as_posix(), '-N']
