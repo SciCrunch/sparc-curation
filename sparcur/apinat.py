@@ -334,9 +334,9 @@ class BaseElement(Base):
 
 class Node(BaseElement):
     key = 'nodes'
-    annotations = 'skipLabel', 'color'
-    objects = tuple()
-    objects_multi = 'sourceOf', 'targetOf'
+    annotations = 'skipLabel', 'color', 'generated'
+    objects = 'cloneOf', 'hostedBy'
+    objects_multi = 'sourceOf', 'targetOf', 'clones'
 
     def triples(self):
         yield from super().triples()
@@ -345,9 +345,9 @@ Graph.Node = Node
 class Lyph(BaseElement):
     key = 'lyphs'
     generics = 'topology',
-    annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate'
-    objects = 'layerIn', 'conveyedBy', 'border'
-    objects_multi = 'inCoalescences', 'subtypes', 'layers'
+    annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
+    objects = 'layerIn', 'conveyedBy', 'border', 'cloneOf'
+    objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones'
 
     def triples(self):
         yield from super().triples()
@@ -356,6 +356,7 @@ Graph.Lyph = Lyph
 
 class Link(BaseElement):
     key = 'links'
+    annotations = 'generated',
     generics = 'conveyingType',
     objects = 'source', 'target', 'conveyingLyph'
     objects_multi = 'conveyingMaterials',
@@ -374,6 +375,7 @@ Graph.Coalescence = Coalescence
 class Border(BaseElement):
     # FIXME class is Link ?
     key = 'borders'
+    objects = 'host',
 
 
 Graph.Border = Border
