@@ -185,7 +185,7 @@ from augpathlib import RemotePath, AugmentedPath  # for debug
 
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit, OntGraph
-from pyontutils.utils import NOWDANGER, TZLOCAL, UTCNOWISO, utcnowtz, isoformat, isoformat_safe
+from pyontutils.utils import UTCNOWISO
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
@@ -196,7 +196,7 @@ from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
 from sparcur.core import OntId, OntTerm, get_all_errors, adops
-from sparcur.utils import log, logd, SimpleFileHandler
+from sparcur.utils import log, logd, SimpleFileHandler, GetTimeNow
 from sparcur.utils import python_identifier, want_prefixes, symlink_latest
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
@@ -208,13 +208,6 @@ from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import FakeBFLocal
 from IPython import embed
 
-_start_time = utcnowtz()
-_start_local_tz = TZLOCAL()  # usually PST PDT
-_start_time_local = _start_time.astimezone(_start_local_tz)
-START_TIMESTAMP = isoformat(_start_time)
-START_TIMESTAMP_SAFE = isoformat_safe(_start_time)
-START_TIMESTAMP_LOCAL = isoformat(_start_time_local)
-START_TIMESTAMP_LOCAL_SAFE = isoformat_safe(_start_time_local)
 
 slow = False
 if slow:
@@ -337,12 +330,15 @@ class Main(Dispatcher):
     # any attr forced on children must be set before super().__init__ is called
     # set timestamp early so that the loggers can use it
     # I don't think this will cause too much trouble ...
-    _timestamp = START_TIMESTAMP
-    _folder_timestamp = START_TIMESTAMP_LOCAL
+    #_timestamp = None
+    #_folder_timestamp = None
 
     # things all children should have
     # kind of like a non optional provides you WILL have these in your namespace
-    def __init__(self, options):
+    def __init__(self, options, time_now=GetTimeNow()):
+        self._time_now = time_now
+        self._timestamp = self._time_now.START_TIMESTAMP
+        self._folder_timestamp = self._time_now.START_TIMESTAMP_LOCAL
         super().__init__(options)
         if not self.options.verbose:
             log.setLevel('INFO')
@@ -1775,6 +1771,7 @@ def bind_file_handler(log_file):
 
 
 def main():
+    time_now = GetTimeNow()
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
@@ -1784,11 +1781,11 @@ def main():
         log_path.mkdir(parents=True)
 
     try:
-        log_file = log_path / START_TIMESTAMP_SAFE  # FIXME configure and switch
+        log_file = log_path / time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
         bind_file_handler(log_file)
 
         options = Options(args, defaults)
-        main = Main(options)
+        main = Main(options, time_now)
         if main.options.debug:
             print(main.options)
 

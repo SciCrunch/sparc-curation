@@ -8,6 +8,7 @@ from functools import wraps
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
 from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
+from pyontutils.utils import TZLOCAL, utcnowtz, isoformat, isoformat_safe
 from sparcur.config import config
 
 
@@ -21,6 +22,32 @@ _alog.addHandler(log.handlers[0])
 # idlib logs TODO move to pyontutils probably?
 _ilog.removeHandler(_alog.handlers[0])
 _ilog.addHandler(log.handlers[0])
+
+
+class GetTimeNow:
+    def __init__(self):
+        self._start_time = utcnowtz()
+        self._start_local_tz = TZLOCAL()  # usually PST PDT
+
+    @property
+    def _start_time_local(self):
+        return self._start_time.astimezone(self._start_local_tz)
+
+    @property
+    def START_TIMESTAMP(self):
+        return isoformat(self._start_time)
+
+    @property
+    def START_TIMESTAMP_SAFE(self):
+        return isoformat_safe(self._start_time)
+
+    @property
+    def START_TIMESTAMP_LOCAL(self):
+        return isoformat(self._start_time_local)
+
+    @property
+    def START_TIMESTAMP_LOCAL_SAFE(self):
+        return isoformat_safe(self._start_time_local)
 
 
 class SimpleFileHandler:
