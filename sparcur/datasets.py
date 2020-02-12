@@ -586,6 +586,9 @@ class MetadataFile(HasErrors):
     _expect_single = tuple()
 
     def __new__(cls, path, schema_version=None):
+        if schema_version is not None:  # and schema_version < latest  # TODO
+            logd.info(schema_version)  # TODO warn
+
         if cls.record_type_key_header is None or cls.record_type_key_alt is None:
             raise TypeError(f'record_type_key_? should not be None on {cls.__name__}')
 

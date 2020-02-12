@@ -387,7 +387,7 @@ class DatasetDescriptionSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
-        'required': ['schema_version',
+        'required': ['schema_version',  # missing should fail for this one ...
                      'name',
                      'description',
                      'funding',

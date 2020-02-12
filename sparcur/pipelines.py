@@ -257,7 +257,10 @@ class DatasetDescriptionFilePipeline(PathPipeline):
 
     @hasSchema(sc.DatasetDescriptionSchema)
     def data(self):
-        return super().data
+        out = super().data
+        if 'schema_version' not in out:  # schema version MUST be present or downstream pipelines break
+            out['schema_version'] = None
+        return out
 
 
 hasSchema = sc.HasSchema()
@@ -591,30 +594,59 @@ class LoadIR(JSONPipeline):
             pass
 
 
-hasSchema = sc.HasSchema()
-@hasSchema.mark
-class SPARCBIDSPipeline(JSONPipeline):
+class PipelineStart(JSONPipeline):
 
     previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
     # metadata should come first since structure can fail, error handling sigh
 
     subpipelines = [
+        # FIXME in theory subpipelines can run sequentially
+        # except for the fact that _all_ pipeline input selections
+        # happen first at the same time enforcing a tiny bit of functional thinking
         [[[['dataset_description_file'], ['path']]],
          DatasetDescriptionFilePipeline,
          ['dataset_description_file']],
+    ]
+
+    @property
+    def pipeline_start(self):
+        data = super().pipeline_start
+        if 'errors' in data:
+            get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
+            sections = set((s,) for s in data)
+            # FIXME probably should just use adops.get to check for the path
+            both = get_paths & sections
+            if not both:
+                log.debug(f'{get_paths}\n{sections}\n{both}')
+                raise self.SkipPipelineError(data)
+
+        return data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class SPARCBIDSPipeline(JSONPipeline):
+
+    previous_pipeline_classes = PipelineStart,
+    #previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
+
+    subpipelines = [
+        #[[[['dataset_description_file'], ['path']]],
+         #DatasetDescriptionFilePipeline,
+         #['dataset_description_file']],
 
         [[[['submission_file'], ['path']],
-          [['dataset_description', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'schema_version'], ['schema_version']]],
          SubmissionFilePipeline,
          ['submission_file']],
 
         [[[['subjects_file'], ['path']],
-          [['dataset_description', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'schema_version'], ['schema_version']]],
          SubjectsFilePipeline,
          ['subjects_file']],
 
         [[[['samples_file'], ['path']],
-          [['dataset_description', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'schema_version'], ['schema_version']]],
          SamplesFilePipeline,
          ['samples_file']],
     ]
@@ -700,6 +732,20 @@ class SPARCBIDSPipeline(JSONPipeline):
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
     adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],]
 
+    @property
+    def pipeline_start(self):
+        data = super().pipeline_start
+        if 'errors' in data:
+            get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
+            sections = set((s,) for s in data)
+            # FIXME probably should just use adops.get to check for the path
+            both = get_paths & sections
+            if not both:
+                log.debug(f'{get_paths}\n{sections}\n{both}')
+                raise self.SkipPipelineError(data)
+
+        return data
+
     def subpipeline_errors(self, errors):
         paths = []
         saf = ['samples_file']
@@ -714,20 +760,6 @@ class SPARCBIDSPipeline(JSONPipeline):
             logd.error(f'samples_file nor subjects_file')
 
         super().subpipeline_errors(for_super)
-
-    @property
-    def pipeline_start(self):
-        data = super().pipeline_start
-        if 'errors' in data:
-            get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
-            sections = set((s,) for s in data)
-            # FIXME probably should just use adops.get to check for the path
-            both = get_paths & sections
-            if not both:
-                log.debug(f'{get_paths}\n{sections}\n{both}')
-                raise self.SkipPipelineError(data)
-
-        return data
 
     @property
     def cleaned(self):
@@ -910,7 +942,12 @@ class PipelineExtras(JSONPipeline):
 
 
         # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
-        local = self.previous_pipeline.pipelines[0].previous_pipeline.pipelines[0].path
+        # and indeed, when we added PipelineStart this shifted and broke everything
+        local = (self
+                 .previous_pipeline.pipelines[0]
+                 .previous_pipeline.pipelines[0]
+                 .previous_pipeline.pipelines[0]
+                 .path)
         remote = local.remote
         if 'doi' not in data['meta']:
             doi = remote.doi
