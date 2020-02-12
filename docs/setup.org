@@ -31,13 +31,13 @@ They only need to be run once.
 *** Gentoo
 #+CAPTION: /var/lib/portage/world
 #+BEGIN_SRC text
-      app-editors/emacs
-      app-editors/gvim
-      app-text/texlive
-      dev-vcs/git
-      dev-scheme/racket
-      dev-lisp/sbcl
-      www-client/google-chrome-stable
+app-editors/emacs
+app-editors/gvim
+app-text/texlive
+dev-vcs/git
+dev-scheme/racket
+dev-lisp/sbcl
+www-client/google-chrome-stable
 #+END_SRC
 *** Ubuntu
 18.10 cosmic cuttlefish (and presumably other debian derivatives)
@@ -47,7 +47,7 @@ The following need to be run in a shell where you have root (e.g. via =sudo su -
 # Remind me, why is an ssh server not provided by default!?
 #+CAPTION: Must be done locally as root prior to remote execution. \\
 #+BEGIN_SRC bash :exports code :eval never
-      apt install openssh-server net-tools
+apt install openssh-server net-tools
 #+END_SRC
 
 Add your ssh public key to [[file:${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
@@ -58,20 +58,20 @@ if you want to run this remotely.
 #+CAPTION: texlive-full is a big boy, minimal version is
 #+CAPTION: texlive texlive-luatex texlive-latex-extra  \\
 #+BEGIN_SRC bash :exports code :eval never
-      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-      echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' \
-      >> /etc/apt/sources.list.d/google-chrome.list
-      add-apt-repository ppa:plt/racket
-      add-apt-repository ppa:kelleyk/emacs
-      add-apt-repository ppa:pypy/ppa
-      apt update
-      apt install build-essential lib64readline-dev rxvt-unicode htop attr tree sqlite curl git
-      apt install emacs26 vim-gtk3 texlive-full pandoc hunspell
-      apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev maven
-      apt install inkscape gimp krita graphviz firefox google-chrome-stable xfce4
-      apt install nginx
-      update-alternatives --install /usr/bin/python python /usr/bin/python3 10
-      update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
+wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' \
+>> /etc/apt/sources.list.d/google-chrome.list
+add-apt-repository ppa:plt/racket
+add-apt-repository ppa:kelleyk/emacs
+add-apt-repository ppa:pypy/ppa
+apt update
+apt install build-essential lib64readline-dev rxvt-unicode htop attr tree sqlite curl git
+apt install emacs26 vim-gtk3 texlive-full pandoc hunspell
+apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev maven
+apt install inkscape gimp krita graphviz firefox google-chrome-stable xfce4
+apt install nginx
+update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
 #+END_SRC
 
 Ubuntu struggles to set user specific PATHs correctly via
@@ -82,18 +82,18 @@ Doesn't work on xfce either apparently. The absolute madness.
 #+CAPTION: Set user home PATHs for all users to simplify later steps
 #+CAPTION: FIXME for some reason if this block is treated a source block it kills html export !?
 #+BEGIN_EXAMPLE
-  { cat <<EOL
-  # set PATH so it includes user's private bin if it exists
-  if [ -d "$HOME/bin" ] ; then
-      PATH="$HOME/bin:$PATH"
-  fi
+{ cat <<EOL
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/bin" ] ; then
+    PATH="$HOME/bin:$PATH"
+fi
 
-  # set PATH so it includes user's private bin if it exists
-  if [ -d "$HOME/.local/bin" ] ; then
-      PATH="$HOME/.local/bin:$PATH"
-  fi
-  EOL
-  } > /etc/profile.d/user-home-paths.sh
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/.local/bin" ] ; then
+    PATH="$HOME/.local/bin:$PATH"
+fi
+EOL
+} > /etc/profile.d/user-home-paths.sh
 #+END_EXAMPLE
 
 Other software that you will probably need at some point but that is not packaged on ubuntu.
@@ -340,8 +340,8 @@ get a whole bunch of development related emails.
 Run the following in a terminal replacing the examples with the fields
 that apply to you.
 #+BEGIN_SRC bash :eval never
-      git config --global user.name "FIRST_NAME LAST_NAME"
-      git config --global user.email "MY_NAME@example.com"
+git config --global user.name "FIRST_NAME LAST_NAME"
+git config --global user.email "MY_NAME@example.com"
 #+END_SRC
 
 *** TODO Bootstrapping [[./setup.org][this =setup.org= file]]
@@ -359,22 +359,22 @@ if you do not copy the last newline of the blocks then you will have to hit ente
 #+NAME: setup-folders
 #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
 #+BEGIN_SRC bash :exports code :eval never
-      # TODO emacs auto setup to be able to run this file
-      mkdir -p ~/.local/bin
-      mkdir ~/bin
-      mkdir ~/opt
-      mkdir ~/git
-      mkdir ~/files
-      source .profile
-      #git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation  # FIXME LOL WINDOWS
-      # never clone to a target with ~ in it on windows
-      # copy and paste from this block into powershell will result
-      # in the hilarious problem where there is a literal ~ folder
-      # created, thus, use pushd and popd instead which work as expected
-      pushd ~/git
-      git clone https://github.com/SciCrunch/sparc-curation.git
-      popd
-      ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
+# TODO emacs auto setup to be able to run this file
+mkdir -p ~/.local/bin
+mkdir ~/bin
+mkdir ~/opt
+mkdir ~/git
+mkdir ~/files
+source .profile
+#git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation  # FIXME LOL WINDOWS
+# never clone to a target with ~ in it on windows
+# copy and paste from this block into powershell will result
+# in the hilarious problem where there is a literal ~ folder
+# created, thus, use pushd and popd instead which work as expected
+pushd ~/git
+git clone https://github.com/SciCrunch/sparc-curation.git
+popd
+ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
 #+END_SRC
 
 When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
@@ -384,23 +384,23 @@ It is normal to see errors during this step. When it finishes quit emacs by typi
 #+CAPTION: Install scimax to get the functionality to run this =setup.org= file.
 #+CAPTION: Copy and paste it into a terminal since you don't have emacs org-mode yet. \\
 #+BEGIN_SRC bash :exports code :eval never :noweb yes
-      tlmgr init-usertree  # init texlive for your user
-      # This is dangerous. I (Tom) have reviewed the install script at this commit.
-      # Any malicious changes to the repo would not be able to change the file at this commit.
-      # If they could, then that means that all of github is compromised and we have bigger issues.
-      pushd ~/opt
-      # TODO os detection
-      bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
-      # if you have not configured git prior to this step you will be prompted to set your name and email
-      popd
-      ln -sT ~/opt/scimax.sh ~/bin/scimax  # TODO windows emacs -l opt/scimax/init.el setup.org
+tlmgr init-usertree  # init texlive for your user
+# This is dangerous. I (Tom) have reviewed the install script at this commit.
+# Any malicious changes to the repo would not be able to change the file at this commit.
+# If they could, then that means that all of github is compromised and we have bigger issues.
+pushd ~/opt
+# TODO os detection
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
+# if you have not configured git prior to this step you will be prompted to set your name and email
+popd
+ln -sT ~/opt/scimax.sh ~/bin/scimax  # TODO windows emacs -l opt/scimax/init.el setup.org
 #+END_SRC
 
 #+begin_src powershell
-    pushd ~/opt
-    git clone https://github.com/jkitchin/scimax.git
-    popd
-    emacs -l ~/opt/scimax/init.el
+pushd ~/opt
+git clone https://github.com/jkitchin/scimax.git
+popd
+emacs -l ~/opt/scimax/init.el
 #+end_src
 
 Tangle the following block with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
@@ -408,64 +408,64 @@ Tangle the following block with =C-c C-v C-t= in vanilla emacs or paste it into 
 #+NAME: scimax-user-config
 #+CAPTION: Needed to get sane behavior for executing this file out of the box.
 #+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
-      ;; org goto heading
-      (defun org-goto-section (heading)
-        "\`heading' should be a string matching the desired heading"
-        (goto-char (org-find-exact-headline-in-buffer heading)))
+;; org goto heading
+(defun org-goto-section (heading)
+  "\`heading' should be a string matching the desired heading"
+  (goto-char (org-find-exact-headline-in-buffer heading)))
 
-      ;; recenter a line set using --eval to be at the top of the buffer
-      (add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))
+;; recenter a line set using --eval to be at the top of the buffer
+(add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))
 
-      ;; line numbers so it is harder to get lost in a big file
-      (when (>= emacs-major-version 26)
-        (setq display-line-numbers-grow-only 1)
-        (global-display-line-numbers-mode 1))
+;; line numbers so it is harder to get lost in a big file
+(when (>= emacs-major-version 26)
+  (setq display-line-numbers-grow-only 1)
+  (global-display-line-numbers-mode 1))
 
-      ;; open setup.org symlink without prompt
-      (setq vc-follow-symlinks 1)
+;; open setup.org symlink without prompt
+(setq vc-follow-symlinks 1)
 
-      ;; sane python indenting
-      (setq-default indent-tabs-mode nil)
-      (setq tab-width 4)
-      (setq org-src-preserve-indentation nil)
-      (setq org-src-tab-acts-natively nil)
+;; sane python indenting
+(setq-default indent-tabs-mode nil)
+(setq tab-width 4)
+(setq org-src-preserve-indentation nil)
+(setq org-src-tab-acts-natively nil)
 
-      ;; don't hang on tlmgr since it is broken on ubuntu
-      (setq scimax-installed-latex-packages t)
+;; don't hang on tlmgr since it is broken on ubuntu
+(setq scimax-installed-latex-packages t)
 
-      ;; save command history
-      (setq history-length t)
-      (savehist-mode 1)
-      (setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
+;; save command history
+(setq history-length t)
+(savehist-mode 1)
+(setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
 
-      ;; racket
-      (use-package racket-mode
-        :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
-        :bind (:map racket-mode-map
-                    ("<f5>" . recompile-quietly))
-        :init
-        (defun my/buffer-local-tab-complete ()
-          "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
-          (make-local-variable 'tab-always-indent)
-          (setq tab-always-indent 'complete))
-        (defun rcc ()
-          (set (make-local-variable 'compile-command)
-               (format "raco make %s" (file-name-nondirectory buffer-file-name))))
-        (add-hook 'racket-mode-hook 'rcc)
-        (add-hook 'racket-mode-hook 'hs-minor-mode)
-        (add-hook 'racket-mode-hook 'goto-address-mode)
-        (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
-        (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
+;; racket
+(use-package racket-mode
+  :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
+  :bind (:map racket-mode-map
+              ("<f5>" . recompile-quietly))
+  :init
+  (defun my/buffer-local-tab-complete ()
+    "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
+    (make-local-variable 'tab-always-indent)
+    (setq tab-always-indent 'complete))
+  (defun rcc ()
+    (set (make-local-variable 'compile-command)
+         (format "raco make %s" (file-name-nondirectory buffer-file-name))))
+  (add-hook 'racket-mode-hook 'rcc)
+  (add-hook 'racket-mode-hook 'hs-minor-mode)
+  (add-hook 'racket-mode-hook 'goto-address-mode)
+  (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
+  (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
 
-      ;; vim bindings if you need them
-      ;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
-      ;; to manually install, mega gnu elpa weirdness
-      ;; (setq evil-want-keybinding nil)
-      ;; (require 'scimax-evil)
+;; vim bindings if you need them
+;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
+;; to manually install, mega gnu elpa weirdness
+;; (setq evil-want-keybinding nil)
+;; (require 'scimax-evil)
 #+END_SRC
 
 #+BEGIN_SRC bash :exports code :eval never
-      scimax
+scimax
 #+END_SRC
 
 After running the next command you should have a version of this file open locally.
@@ -474,7 +474,7 @@ In that file go to the next header [[#per-user-setup][Per user setup]] and conti
 #+NAME: launch-setup-org-1
 #+CAPTION: Run the following to open this file in an executable form.
 #+BEGIN_SRC bash :exports code :eval never
-      scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
+scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
 #+END_SRC
 
 *** Per user setup
@@ -509,12 +509,12 @@ You can also run this block to update an existing installation.
 #+CAPTION: You can run them all at once from this block.
 #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
 #+BEGIN_SRC bash :results output :noweb yes :exports none :eval no-export
-      <<environment-sanity-checks>>
-      <<git-pull-all>>
-      <<clone-repos>>
-      <<python-setup>>
-      <<racket-ontology>>
-      <<racket-setup>>
+<<environment-sanity-checks>>
+<<git-pull-all>>
+<<clone-repos>>
+<<python-setup>>
+<<racket-ontology>>
+<<racket-setup>>
 #+END_SRC
 
 *If you run the block above you do not need to run the rest of this section*
@@ -522,23 +522,23 @@ You can also run this block to update an existing installation.
 
 #+NAME: environment-sanity-checks
 #+BEGIN_SRC bash :results output :eval no-export
-      # implicit check for bash by being able to run this block at all
+# implicit check for bash by being able to run this block at all
 
-      # git check on the off chance that we made it here without cloning this repo
-      git --version || exit 1
+# git check on the off chance that we made it here without cloning this repo
+git --version || exit 1
 
-      # python version check
-      python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
-      pip --version || exit 3
+# python version check
+python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
+pip --version || exit 3
 #+END_SRC
 
 #+NAME: clone-repos
 #+CAPTION: Clone all required git repositories.
 #+HEADER: :var REPOS=repos
 #+BEGIN_SRC bash :results output :eval no-export
-      pushd ~/git
-      for repo_url in ${REPOS}; do git clone ${repo_url}.git 2>&1; done
-      popd
+pushd ~/git
+for repo_url in ${REPOS}; do git clone ${repo_url}.git 2>&1; done
+popd
 #+END_SRC
 
 #+NAME: python-setup
@@ -546,31 +546,31 @@ You can also run this block to update an existing installation.
 #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
 #+HEADER: :var PYROOTS=py-roots
 #+BEGIN_SRC bash :results output :eval no-export
-      pushd ~/git
-      for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
-      popd
+pushd ~/git
+for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
+popd
 #+END_SRC
 
 #+NAME: racket-ontology
 #+CAPTION: Convert ontology and build as module for racket.
 #+CAPTION: This will take a bit of time to run. \\
 #+BEGIN_SRC bash :results output :eval no-export
-      ln -s ~/git/rkdf/bin/ttl-to-rkt ~/bin/ttl-to-rkt
-      ln -s ~/git/rkdf/bin/rkdf-convert-all ~/bin/rkdf-convert-all
-      pushd ~/git/NIF-Ontology
-      git checkout dev
-      rkdf-convert-all
-      git checkout master
-      popd
+ln -s ~/git/rkdf/bin/ttl-to-rkt ~/bin/ttl-to-rkt
+ln -s ~/git/rkdf/bin/rkdf-convert-all ~/bin/rkdf-convert-all
+pushd ~/git/NIF-Ontology
+git checkout dev
+rkdf-convert-all
+git checkout master
+popd
 #+END_SRC
 
 #+NAME: racket-setup
 #+CAPTION: Install racket packages and dependencies. \\
 #+HEADER: :var RKTROOTS=rkt-roots
 #+BEGIN_SRC bash :results output :eval no-export
-      pushd ~/git
-      raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
-      popd
+pushd ~/git
+raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
+popd
 #+END_SRC
 
 *** Configuration files
@@ -593,42 +593,42 @@ Each block in this section should have =#+RESULTS:= if it succeeds.
 #+CAPTION: Make =config.yaml= and =secrets.yaml= available in the home directory.
 #+CAPTION: *If you don't run this block you will get some really fun errors.*
 #+BEGIN_SRC bash :eval no-export
-      cd ~/
-      chmod 0700 ~/.config/pyontutils
-      ln -s ~/.config/pyontutils/config.yaml
-      touch ~/.config/pyontutils/secrets.yaml
-      chmod 0600 ~/.config/pyontutils/secrets.yaml
-      ln -s ~/.config/pyontutils/secrets.yaml
+cd ~/
+chmod 0700 ~/.config/pyontutils
+ln -s ~/.config/pyontutils/config.yaml
+touch ~/.config/pyontutils/secrets.yaml
+chmod 0600 ~/.config/pyontutils/secrets.yaml
+ln -s ~/.config/pyontutils/secrets.yaml
 #+END_SRC
 
 #+NAME: set-config-paths
 #+CAPTION: Set default paths in config.yaml \\
 #+BEGIN_SRC python :results value :cache yes :eval no-export
-      from pyontutils.config import auth
-      dc = auth.dynamic_config
-      blob = dc.load()
-      blob['auth-stores']['secrets']['path'] = 'secrets.yaml'
-      blob['auth-variables']['scigraph-api'] = 'http://scigraph.olympiangods.org/scigraph'
-      blob['auth-variables']['git-local-base'] = '~/git'
-      blob['auth-variables']['google-api-creds-file'] = {'path': 'google api creds-file'}
-      blob['auth-variables']['google-api-store-file'] = {'path': 'google api store-file'}
-      blob['auth-variables']['google-api-store-file-readonly'] = {'path': 'google api store-file-readonly'}
-      dc.dump(blob)
-      pblob = blob
+from pyontutils.config import auth
+dc = auth.dynamic_config
+blob = dc.load()
+blob['auth-stores']['secrets']['path'] = 'secrets.yaml'
+blob['auth-variables']['scigraph-api'] = 'http://scigraph.olympiangods.org/scigraph'
+blob['auth-variables']['git-local-base'] = '~/git'
+blob['auth-variables']['google-api-creds-file'] = {'path': 'google api creds-file'}
+blob['auth-variables']['google-api-store-file'] = {'path': 'google api store-file'}
+blob['auth-variables']['google-api-store-file-readonly'] = {'path': 'google api store-file-readonly'}
+dc.dump(blob)
+pblob = blob
 
-      from sparcur.config import auth
-      dc = auth.dynamic_config
-      blob = dc.load()
-      blob['auth-stores']['secrets']['path'] = 'secrets.yaml'
-      blob['auth-variables']['hypothesis-api-key'] = {'path': 'hypothesis api *replace-me-with-:your-user-name*'}
-      blob['auth-variables']['hypothesis-group'] = {'path': 'hypothesis group sparc-curation'}
-      blob['auth-variables']['protocols-io-api-creds-file'] = {'path': 'protocols-io api creds-file'}
-      blob['auth-variables']['protocols-io-api-store-file'] = {'path': 'protocols-io api store-file'}
-      dc.dump(blob)
+from sparcur.config import auth
+dc = auth.dynamic_config
+blob = dc.load()
+blob['auth-stores']['secrets']['path'] = 'secrets.yaml'
+blob['auth-variables']['hypothesis-api-key'] = {'path': 'hypothesis api *replace-me-with-:your-user-name*'}
+blob['auth-variables']['hypothesis-group'] = {'path': 'hypothesis group sparc-curation'}
+blob['auth-variables']['protocols-io-api-creds-file'] = {'path': 'protocols-io api creds-file'}
+blob['auth-variables']['protocols-io-api-store-file'] = {'path': 'protocols-io api store-file'}
+dc.dump(blob)
 
-      sblob = blob
+sblob = blob
 
-      return pblob, sblob
+return pblob, sblob
 #+END_SRC
 
 If everything works then you should be able to run =scig t brain= and get results.
@@ -636,34 +636,34 @@ If everything works then you should be able to run =scig t brain= and get result
 #+NAME: make-secrets-template
 #+CAPTION: Add template for secrets.yaml \\
 #+BEGIN_SRC python :results value :cache yes :eval no-export
-      from pathlib import Path
-      import yaml
-      spath = Path('~/.config/pyontutils/secrets.yaml').expanduser()
-      with open(spath, 'rt') as f:
-          sec = yaml.safe_load(f)
+from pathlib import Path
+import yaml
+spath = Path('~/.config/pyontutils/secrets.yaml').expanduser()
+with open(spath, 'rt') as f:
+    sec = yaml.safe_load(f)
 
-      if not sec:
-          secrets_template = {
-              'hypothesis': {'api':   {'*replace-me-with-:your-user-name*': 'fake-api-key'},
-                             'group': {'sparc-curation': 'FakeId12'}},
-              'blackfynn':  {'sparc': {'key':    'fake-api-key',
-                                       'secret': 'fake-api-secret'}},
-              'protocols-io': {'api': {'creds-file': '/path/to/creds-file.json',
-                                       'store-file': 'protocols-io-api-token-rw.json'}},
-              'google': {'api': {'creds-file':       '/path/to/creds-file.json',
-                                 'store-file':       'google-api-token-rw.pickle',  # store files created in the same folder as secrets.yaml by default
-                                 'store-file-readonly': 'google-api-token.pickle'},
-                         'sheets': {'sparc-master':        'document-hash-id',
-                                    'sparc-consistency':   'document-hash-id'},},}
+if not sec:
+    secrets_template = {
+        'hypothesis': {'api':   {'*replace-me-with-:your-user-name*': 'fake-api-key'},
+                       'group': {'sparc-curation': 'FakeId12'}},
+        'blackfynn':  {'sparc': {'key':    'fake-api-key',
+                                 'secret': 'fake-api-secret'}},
+        'protocols-io': {'api': {'creds-file': '/path/to/creds-file.json',
+                                 'store-file': 'protocols-io-api-token-rw.json'}},
+        'google': {'api': {'creds-file':       '/path/to/creds-file.json',
+                           'store-file':       'google-api-token-rw.pickle',  # store files created in the same folder as secrets.yaml by default
+                           'store-file-readonly': 'google-api-token.pickle'},
+                   'sheets': {'sparc-master':        'document-hash-id',
+                              'sparc-consistency':   'document-hash-id'},},}
 
-          with open(spath, 'wt') as f:
-              yaml.dump(secrets_template, f, default_flow_style=False)
+    with open(spath, 'wt') as f:
+        yaml.dump(secrets_template, f, default_flow_style=False)
 
-          with open(spath, 'rt') as f:
-              return f.read()  # return the template so that we can verify
+    with open(spath, 'rt') as f:
+        return f.read()  # return the template so that we can verify
 
-      else:
-          return f'{spath} already exists, not writing template!'
+else:
+    return f'{spath} already exists, not writing template!'
 
 #+END_SRC
 
@@ -682,7 +682,7 @@ Logout on the default ubuntu window manager is located in the upper right.
 #+NAME: launch-setup-org-2
 #+CAPTION: Run the following to open this file in an executable form.
 #+BEGIN_SRC bash :eval never
-      scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
+scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
 #+END_SRC
 
 When you exit emacs it may ask you if you want to save,
@@ -707,9 +707,9 @@ In a yaml file this looks like the block below.
 Replace the =fake-value= with the real value you obtain in the following sections.
 #+CAPTION: yaml view of =(-> key1 key2 key3)=
 #+BEGIN_SRC yaml :eval never
-      key1:
-        key2:
-          key3: fake-value
+key1:
+  key2:
+    key3: fake-value
 #+END_SRC
 You can open the [[file:${HOME}/secrets.yaml][secrets.yaml]]
 file in another buffer by clicking on the link to it here. When you edit the file and
@@ -763,16 +763,16 @@ Get the document ids for the following.
 ***** Hypothes.is
 #+CAPTION: as your user Install the hypothesis client in chrome.
 #+BEGIN_SRC bash :results none
-        google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
+google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
 #+END_SRC
 To get Hypothes.is API keys [[https://web.hypothes.is/start/][create an account]],
 login, and go to your [[https://hypothes.is/account/developer][developer page]].
 
 Temporary additions to .bashrc until this can be sourced from secrets directly
 #+BEGIN_SRC bash
-        HYP_USER=your-hypothesis-user-name
-        HYP_GROUP=$(cat ~/secrets.yaml | grep sparc-curation: | awk '{ print $2 }')
-        HYP_API_TOKEN=$(cat ~/secrets.yaml | grep "${HYP_USER}:" | awk '{ print $2 }')
+HYP_USER=your-hypothesis-user-name
+HYP_GROUP=$(cat ~/secrets.yaml | grep sparc-curation: | awk '{ print $2 }')
+HYP_API_TOKEN=$(cat ~/secrets.yaml | grep "${HYP_USER}:" | awk '{ print $2 }')
 #+END_SRC
 ***** protocols.io
 To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
@@ -785,17 +785,17 @@ Add the full path to that json file to =(-> protocols-io api creds-file)= in sec
 like you did for the google json file.
 #+CAPTION: protocols.io creds-file.json template
 #+BEGIN_SRC js
-        {
-            "installed": {
-                "client_id": "pr_live_id_fake-client-id<<<",
-                "client_secret": "pr_live_sc_fake-client-secret<<<",
-                "auth_uri": "https://www.protocols.io/api/v3/oauth/authorize",
-                "token_uri": "https://www.protocols.io/api/v3/oauth/token",
-                "redirect_uris": [
-                    "https://sparc.olympiangods.org/curation/"
-                ]
-            }
-        }
+{
+    "installed": {
+        "client_id": "pr_live_id_fake-client-id<<<",
+        "client_secret": "pr_live_sc_fake-client-secret<<<",
+        "auth_uri": "https://www.protocols.io/api/v3/oauth/authorize",
+        "token_uri": "https://www.protocols.io/api/v3/oauth/token",
+        "redirect_uris": [
+            "https://sparc.olympiangods.org/curation/"
+        ]
+    }
+}
 #+END_SRC
 
 You will be prompted for your protocols.io email and password the first
@@ -813,14 +813,14 @@ If you can use python3.7 (>=ubuntu-19.04) you can set the embedded debugger as f
 [[file:${HOME}/.vimrc][~/.vimrc]] settings to prevent klobbering of xattrs
 #+CAPTION: .vimrc
 #+begin_src vimrc
-     augroup HasXattrs
-      autocmd BufRead,BufNewFile * let x=system('getfattr ' . bufname('%')) | if len(x) | call HasXattrs() | endif
-     augroup END
+augroup HasXattrs
+ autocmd BufRead,BufNewFile * let x=system('getfattr ' . bufname('%')) | if len(x) | call HasXattrs() | endif
+augroup END
 
-     function HasXattrs()
-      " don't create new inodes
-      setlocal backupcopy=yes
-     endfunction
+function HasXattrs()
+ " don't create new inodes
+ setlocal backupcopy=yes
+endfunction
 #+end_src
 
 * Workflows
@@ -846,39 +846,39 @@ popd
 If you have never retrieved the data before run.
 #+CAPTION: first time per local network
 #+BEGIN_SRC bash :results none
-      pushd ~/files/blackfynn_local/
-      spc clone ${SPARC_ORG_ID} # initialize a new repo and pull existing structure
-      scp refresh -f
-      spc fetch  # actually download files
-      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'  # see what to fetch
-      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f  # fetch
-      spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f -r 10  # slow down you are seeing errors!
+pushd ~/files/blackfynn_local/
+spc clone ${SPARC_ORG_ID} # initialize a new repo and pull existing structure
+scp refresh -f
+spc fetch  # actually download files
+spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'  # see what to fetch
+spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f  # fetch
+spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f -r 10  # slow down you are seeing errors!
 #+END_SRC
 
 #+CAPTION: unfriendly refersh
 #+BEGIN_SRC bash :results none
-      ls -Q | xargs -P10 -r -n 1 sh -c 'spc refresh -r 4 "${1}"'
+ls -Q | xargs -P10 -r -n 1 sh -c 'spc refresh -r 4 "${1}"'
 #+END_SRC
 
 #+CAPTION: friendly refersh
 #+BEGIN_SRC bash :results none
-      find -maxdepth 1 -type d -name '[C-Z]*' -exec spc refresh -r 8 {} \;
+find -maxdepth 1 -type d -name '[C-Z]*' -exec spc refresh -r 8 {} \;
 #+END_SRC
 
 #+CAPTION: find any stragglers
 #+BEGIN_SRC bash :results none
-      find \( -name '*.xlsx' -o -name '*.csv' -o -name '*.tsv' \) -exec ls -hlS {} \+
+find \( -name '*.xlsx' -o -name '*.csv' -o -name '*.tsv' \) -exec ls -hlS {} \+
 #+END_SRC
 
 #+CAPTION: clean up empty directories
 #+CAPTION: temp fix for summary making folders when it should skip
 #+BEGIN_SRC bash :results none
-      find -maxdepth 1 -type d -exec rmdir {} \;
+find -maxdepth 1 -type d -exec rmdir {} \;
 #+END_SRC
 
 Pull local copy of data to a new computer. Note the double escape needed for the space.
 #+BEGIN_SRC bash :results none :eval never
-      rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local/SPARC\\\ Consortium ~/files/blackfynn_local/
+rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local/SPARC\\\ Consortium ~/files/blackfynn_local/
 #+END_SRC
 =-X= copy extended attributes
 =-u= update files
@@ -897,53 +897,53 @@ GIT TO THE RESCUE!
 Also, having this on an ssd makes it funfast.
 After finishing a =spc pull= and =spc -n "*" -l 2 -f=
 #+BEGIN_SRC bash
-      pushd ~/files/blackfynn_local/SPARC\ Consortium
-      git init
-      git add *
-      git commit -m "snapshot"
+pushd ~/files/blackfynn_local/SPARC\ Consortium
+git init
+git add *
+git commit -m "snapshot"
 #+END_SRC
 *** Export
 #+CAPTION: export everything
 #+BEGIN_SRC bash
-      pushd ${SPARCDATA}
-      spc export datasets
-      popd
+pushd ${SPARCDATA}
+spc export datasets
+popd
 #+END_SRC
 
 Setup as root
 #+begin_src bash :eval never
-    mkdir -p /var/www/sparc/sparc/archive/exports/
-    chown -R nginx:nginx /var/www/sparc
+mkdir -p /var/www/sparc/sparc/archive/exports/
+chown -R nginx:nginx /var/www/sparc
 #+end_src
 
 #+CAPTION: copy export to server location, run as root
 #+BEGIN_SRC bash :eval never
-      # export vs exports, no wonder this is so confusing >_<
-      function sparc-export-to-server () {
-          : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
-          EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/
-          FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
-          FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
-          pushd /var/www/sparc/sparc
-          cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
-          popd
-      }
+# export vs exports, no wonder this is so confusing >_<
+function sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/
+    FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
+    FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
+    pushd /var/www/sparc/sparc
+    cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
+    popd
+}
 #+END_SRC
 
 *** Reporting
 #+CAPTION: reports
 #+BEGIN_SRC bash
-      spc report completeness
+spc report completeness
 #+END_SRC
 
 #+CAPTION: reporting dashboard
 #+BEGIN_SRC bash
-      spc server --latest --count
+spc server --latest --count
 #+END_SRC
 
 #+begin_src python
-    keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
-                           for k in d['meta']['keywords']]))
+keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
+                       for k in d['meta']['keywords']]))
 #+end_src
 *** Archiving files with xattrs
 =tar= is the only one of the 'usual' suspects for file archiving that
@@ -1125,34 +1125,34 @@ to display hierarchies of classes.
 *** Viewing logs
 View the latest log file with colors using =less=.
 #+begin_src bash
-    less -R $(ls -d ~sparc/files/blackfynn_local/export/log/* | tail -n 1)
+less -R $(ls -d ~sparc/files/blackfynn_local/export/log/* | tail -n 1)
 #+end_src
 For a permanent fix for =less= add
 #+begin_src bash
-    alias less='less -R'
+alias less='less -R'
 #+end_src
 
 *** Debugging terminal pipeline errors
 You have an error!
 #+begin_src python
-      maybe_size = c.cache.meta.size  # << AttributeError here
+maybe_size = c.cache.meta.size  # << AttributeError here
 #+end_src
 
 Modify to wrap code
 #+begin_src python
-      try:
-          maybe_size = c.cache.meta.size
-      except AttributeError as e:
-          breakpoint()  # << investigate error
+try:
+    maybe_size = c.cache.meta.size
+except AttributeError as e:
+    breakpoint()  # << investigate error
 #+end_src
 
 Temporary squash by logging as an exception with optional explanation
 #+begin_src python
-      try:
-          maybe_size = c.cache.meta.size
-      except AttributeError as e:
-          log.exception(e)
-          log.error(f'explanation for error and local variables {c}')
+try:
+    maybe_size = c.cache.meta.size
+except AttributeError as e:
+    log.exception(e)
+    log.error(f'explanation for error and local variables {c}')
 #+end_src
 
 *** Dataset removed
@@ -1223,17 +1223,17 @@ Repository local roots. The ordering of the entries matters.
 #+NAME: repos-code
 #+HEADER: :var trl=tgbugs-repos srl=sci-repos orl=other-repos
 #+BEGIN_SRC python :results value :eval no-export
-     from itertools import chain
-     urs = chain((('tgbugs', r) for tr in trl for rs in tr for r in rs.split(' ')),
-                 (('SciCrunch', r) for sr in srl for rs in sr for r in rs.split(' ')),
-                 (ur.split('/') for o_r in orl for urs in o_r for ur in urs.split(' ')))
-     #print(trl, srl, orl)
-     #print(list(urs))  # will express the generator so there will be no result
+from itertools import chain
+urs = chain((('tgbugs', r) for tr in trl for rs in tr for r in rs.split(' ')),
+            (('SciCrunch', r) for sr in srl for rs in sr for r in rs.split(' ')),
+            (ur.split('/') for o_r in orl for urs in o_r for ur in urs.split(' ')))
+#print(trl, srl, orl)
+#print(list(urs))  # will express the generator so there will be no result
 
-     out = []
-     for user, repo in urs:
-         out.append(f'https://github.com/{user}/{repo}')
-     return [' '.join(out)]
+out = []
+for user, repo in urs:
+    out.append(f'https://github.com/{user}/{repo}')
+return [' '.join(out)]
 #+END_SRC
 
 #+NAME: repos
@@ -1244,79 +1244,79 @@ Repository local roots. The ordering of the entries matters.
 #+CAPTION: testing
 #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
 #+BEGIN_SRC bash
-     for repo in ${REPOS}; do echo ${repo}; done
-     echo '-------------'
-     for repo in ${PYROOTS}; do echo ${repo}; done
-     echo '-------------'
-     for repo in ${RKTROOTS}; do echo ${repo}; done
+for repo in ${REPOS}; do echo ${repo}; done
+echo '-------------'
+for repo in ${PYROOTS}; do echo ${repo}; done
+echo '-------------'
+for repo in ${RKTROOTS}; do echo ${repo}; done
 #+END_SRC
 ** Remote exports code
 #+NAME: remote-exports-code
 #+CAPTION: export commands to set if running remotely via copy and paste
 #+HEADER: :var REPOS=repos PYROOTS=py-roots RKTROOTS=rkt-roots
 #+BEGIN_SRC bash :results output code example :exports results :eval no-export
-     echo export REPOS="'"
-     printf "$(echo ${REPOS} | tr ' ' '\n')"
-     echo
-     echo "'"
-     echo export PYROOTS="'"
-     printf "$(echo ${PYROOTS} | tr ' ' '\n')"
-     echo
-     echo "'"
-     echo export RKTROOTS="'"
-     printf "$(echo ${RKTROOTS} | tr ' ' '\n')"
-     echo
-     echo "'"
+echo export REPOS="'"
+printf "$(echo ${REPOS} | tr ' ' '\n')"
+echo
+echo "'"
+echo export PYROOTS="'"
+printf "$(echo ${PYROOTS} | tr ' ' '\n')"
+echo
+echo "'"
+echo export RKTROOTS="'"
+printf "$(echo ${RKTROOTS} | tr ' ' '\n')"
+echo
+echo "'"
 #+END_SRC
 
 #+RESULTS: remote-exports-code
 #+begin_src bash
-   export REPOS='
-   https://github.com/tgbugs/augpathlib
-   https://github.com/tgbugs/idlib
-   https://github.com/tgbugs/hyputils
-   https://github.com/tgbugs/orthauth
-   https://github.com/tgbugs/ontquery
-   https://github.com/tgbugs/parsercomb
-   https://github.com/tgbugs/pyontutils
-   https://github.com/tgbugs/protc
-   https://github.com/tgbugs/rrid-metadata
-   https://github.com/tgbugs/rkdf
-   https://github.com/tgbugs/orgstrap
-   https://github.com/SciCrunch/NIF-Ontology
-   https://github.com/SciCrunch/scibot
-   https://github.com/SciCrunch/sparc-curation
-   https://github.com/Ophirr33/pda
-   https://github.com/zussitarze/qrcode
-   '
-   export PYROOTS='
-   augpathlib
-   idlib
-   pyontutils/htmlfn
-   pyontutils/ttlser
-   hyputils
-   orthauth
-   ontquery
-   parsercomb
-   pyontutils
-   pyontutils/nifstd
-   pyontutils/neurondm
-   protc/protcur
-   sparc-curation
-   scibot
-   '
-   export RKTROOTS='
-   qrcode/
-   pda/
-   protc/protc-lib
-   protc/protc-tools-lib
-   protc/protc
-   protc/protc-tools
-   rkdf/rkdf-lib
-   rkdf/rkdf
-   rrid-metadata/rrid
-   NIF-Ontology/
-   '
+export REPOS='
+https://github.com/tgbugs/augpathlib
+https://github.com/tgbugs/idlib
+https://github.com/tgbugs/hyputils
+https://github.com/tgbugs/orthauth
+https://github.com/tgbugs/ontquery
+https://github.com/tgbugs/parsercomb
+https://github.com/tgbugs/pyontutils
+https://github.com/tgbugs/protc
+https://github.com/tgbugs/rrid-metadata
+https://github.com/tgbugs/rkdf
+https://github.com/tgbugs/orgstrap
+https://github.com/SciCrunch/NIF-Ontology
+https://github.com/SciCrunch/scibot
+https://github.com/SciCrunch/sparc-curation
+https://github.com/Ophirr33/pda
+https://github.com/zussitarze/qrcode
+'
+export PYROOTS='
+augpathlib
+idlib
+pyontutils/htmlfn
+pyontutils/ttlser
+hyputils
+orthauth
+ontquery
+parsercomb
+pyontutils
+pyontutils/nifstd
+pyontutils/neurondm
+protc/protcur
+sparc-curation
+scibot
+'
+export RKTROOTS='
+qrcode/
+pda/
+protc/protc-lib
+protc/protc-tools-lib
+protc/protc
+protc/protc-tools
+rkdf/rkdf-lib
+rkdf/rkdf
+rrid-metadata/rrid
+NIF-Ontology/
+'
 #+end_src
 
 * Appendix
@@ -1332,50 +1332,50 @@ _*NOTE: DO NOT EDIT THE CODE BELOW IT WILL BE OVERWRITTEN.*_
 #+HEADER: :eval never
 #+RESULTS:
 #+begin_src bash
-    export REPOS='
-    https://github.com/tgbugs/augpathlib
-    https://github.com/tgbugs/idlib
-    https://github.com/tgbugs/hyputils
-    https://github.com/tgbugs/orthauth
-    https://github.com/tgbugs/ontquery
-    https://github.com/tgbugs/parsercomb
-    https://github.com/tgbugs/pyontutils
-    https://github.com/tgbugs/protc
-    https://github.com/tgbugs/rrid-metadata
-    https://github.com/tgbugs/rkdf
-    https://github.com/tgbugs/orgstrap
-    https://github.com/SciCrunch/NIF-Ontology
-    https://github.com/SciCrunch/scibot
-    https://github.com/SciCrunch/sparc-curation
-    https://github.com/Ophirr33/pda
-    https://github.com/zussitarze/qrcode
-    '
-    export PYROOTS='
-    augpathlib
-    idlib
-    pyontutils/htmlfn
-    pyontutils/ttlser
-    hyputils
-    orthauth
-    ontquery
-    parsercomb
-    pyontutils
-    pyontutils/nifstd
-    pyontutils/neurondm
-    protc/protcur
-    sparc-curation
-    scibot
-    '
-    export RKTROOTS='
-    qrcode/
-    pda/
-    protc/protc-lib
-    protc/protc-tools-lib
-    protc/protc
-    protc/protc-tools
-    rkdf/rkdf-lib
-    rkdf/rkdf
-    rrid-metadata/rrid
-    NIF-Ontology/
-    '
+export REPOS='
+https://github.com/tgbugs/augpathlib
+https://github.com/tgbugs/idlib
+https://github.com/tgbugs/hyputils
+https://github.com/tgbugs/orthauth
+https://github.com/tgbugs/ontquery
+https://github.com/tgbugs/parsercomb
+https://github.com/tgbugs/pyontutils
+https://github.com/tgbugs/protc
+https://github.com/tgbugs/rrid-metadata
+https://github.com/tgbugs/rkdf
+https://github.com/tgbugs/orgstrap
+https://github.com/SciCrunch/NIF-Ontology
+https://github.com/SciCrunch/scibot
+https://github.com/SciCrunch/sparc-curation
+https://github.com/Ophirr33/pda
+https://github.com/zussitarze/qrcode
+'
+export PYROOTS='
+augpathlib
+idlib
+pyontutils/htmlfn
+pyontutils/ttlser
+hyputils
+orthauth
+ontquery
+parsercomb
+pyontutils
+pyontutils/nifstd
+pyontutils/neurondm
+protc/protcur
+sparc-curation
+scibot
+'
+export RKTROOTS='
+qrcode/
+pda/
+protc/protc-lib
+protc/protc-tools-lib
+protc/protc
+protc/protc-tools
+rkdf/rkdf-lib
+rkdf/rkdf
+rrid-metadata/rrid
+NIF-Ontology/
+'
 #+end_src
