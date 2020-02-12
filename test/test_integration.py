@@ -3,18 +3,22 @@ from pathlib import Path
 from pyontutils.utils import get_working_dir
 from pyontutils.integration_test_helper import _TestScriptsBase as TestScripts
 from .common import project_path, project_path_real, test_organization, onerror
+from .common import fake_organization
 import sparcur
 import sparcur.cli
 import sparcur.paths
 from sparcur.blackfynn_api import FakeBFLocal
 
 
-# FIXME this is bad since it masks setup for tests against real remote
 def fake_setup(self, *args, **kwargs):
-    self.BlackfynnRemote._cache_anchor = self.anchor  # don't trigger remote lookup
-    self.bfl = self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
+    if self.anchor.id != fake_organization:
+        self._old_setup_bfl()
+    else:
+        self.BlackfynnRemote._cache_anchor = self.anchor  # don't trigger remote lookup
+        self.bfl = self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
 
 
+sparcur.cli.Main._old_setup_bfl = sparcur.cli.Main._setup_bfl
 sparcur.cli.Main._setup_bfl = fake_setup
 
 
@@ -70,7 +74,7 @@ mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
          ],
 }
 
-mains['cli'] = [args + ['--project-path', project_path.as_posix(), '-N', '--jobs', '1']
+mains['cli'] = [args + ['--project-path', project_path.as_posix(), '-N', '--local', '--jobs', '1']
                 for args in mains['cli']]
 _cli_real = mains.pop('cli-real')
 if 'CI' not in os.environ:

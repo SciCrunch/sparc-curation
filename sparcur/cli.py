@@ -1214,6 +1214,12 @@ class Report(Dispatcher):
     def access(self, ext=None):
         """ Report on datasets that are in the master sheet but which the
             automated pipelines do not have access to. """
+        if self.anchor.id == 'N:organization:fake-organization-id':
+            # FIXME need a way to generalize/fix this so that organization
+            # can vary ...
+            print('Not in correct organization for running access report.')
+            sys.exit(9999)
+
         from sparcur.sheets import Overview, Master
         if self.options.server:
             def fmt(d): return hfn.atag(d.uri_human, d.id, new_tab=True)
