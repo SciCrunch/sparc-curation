@@ -366,7 +366,14 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
       mkdir ~/git
       mkdir ~/files
       source .profile
-      git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation
+      #git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation  # FIXME LOL WINDOWS
+      # never clone to a target with ~ in it on windows
+      # copy and paste from this block into powershell will result
+      # in the hilarious problem where there is a literal ~ folder
+      # created, thus, use pushd and popd instead which work as expected
+      pushd ~/git
+      git clone https://github.com/SciCrunch/sparc-curation.git
+      popd
       ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
     #+END_SRC
 
@@ -388,6 +395,13 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
       popd
       ln -sT ~/opt/scimax.sh ~/bin/scimax  # TODO windows emacs -l opt/scimax/init.el setup.org
     #+END_SRC
+
+    #+begin_src powershell
+    pushd ~/opt
+    git clone https://github.com/jkitchin/scimax.git
+    popd
+    emacs -l ~/opt/scimax/init.el
+    #+end_src
 
     Tangle the following block with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
     [[file:${HOME}/opt/scimax/user/user.el][user.el]] directly.
@@ -737,9 +751,7 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
       =python ~/git/pyontutils/pyontutils/sheets.py auth sheets= and
       =python ~/git/pyontutils/pyontutils/sheets.py auth sheets --readonly=.
       Those commands will run the auth workflow and create the file specified at =(-> google api store-file)= for you.
-      If something goes wrong and you cannot open a browser the program should suggest
-      that you run it with =--noauth_local_webserver= but that message may be hidden if
-      other programs dump garbage in the terminal.
+      # TODO fix these instructions
 
       Get the document ids for the following.
       - =(-> google sheets sparc-master)=
