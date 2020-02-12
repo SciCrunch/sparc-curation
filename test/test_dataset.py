@@ -8,6 +8,7 @@ from sparcur.datasets import (Tabular,
                               SamplesFile,
                               remove_rule,)
 from sparcur import pipelines as pipes
+from sparcur import exceptions as exc
 from .common import examples_root, template_root, project_path, temp_path, ddih
 
 template_root = aug.RepoPath(template_root)
@@ -42,6 +43,7 @@ class Helper:
 
     def _versions(self):
         tf = temp_path / 'test-file.xlsx'
+        bads = []
         for ref in self.refs:
             if ref.startswith('d8a'):
                 file = template_root.working_dir / template_root.name / self.template
@@ -53,20 +55,31 @@ class Helper:
             with open(tf, 'wb') as f:
                 f.write(file.show(ref))
 
-            obj = self.urg(tf)
-            obj.data
+            obj = self.metadata_file_class(tf, schema_version=version)
+            try:
+                obj.data
+            except exc.MalformedHeaderError as e:
+                if version == '1.1':
+                    # known bad
+                    pass
+                else:
+                    bads.append((ref, e))
+            except BaseException as e:
+                bads.append((ref, e))
+
+        assert not bads, bads
 
 
 class TestSubmissionFile(Helper, unittest.TestCase):
     template = 'submission.xlsx'
-    urg = SubmissionFile
+    metadata_file_class = SubmissionFile
     pipe = pipes.SubmissionFilePipeline
     def test_sm_ot(self):
         tf = examples_root / 'sm-ot.csv'
-        obj = self.urg(tf)
+        obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
-        assert not [k for k in value if not isinstance(k, 'str')]
+        assert not [k for k in value if not isinstance(k, str)]
 
     def test_versions(self):
         self._versions()
@@ -74,7 +87,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
 
 class TestDatasetDescription(Helper, unittest.TestCase):
     template = 'dataset_description.xlsx'
-    urg = DatasetDescriptionFile
+    metadata_file_class = DatasetDescriptionFile
     pipe = pipes.DatasetDescriptionFilePipeline
     
     def test_dataset_description(self):
@@ -82,7 +95,7 @@ class TestDatasetDescription(Helper, unittest.TestCase):
 
     def test_dd_pie(self):
         tf = examples_root / 'dd-pie.csv'
-        obj = self.urg(tf)
+        obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
 
@@ -98,15 +111,15 @@ class TestDatasetDescription(Helper, unittest.TestCase):
 
 class TestSubjectsFile(Helper, unittest.TestCase):
     template = 'subjects.xlsx'
-    urg = SubjectsFile
+    metadata_file_class = SubjectsFile
     pipe = pipes.SubjectsFilePipeline
 
     def test_su_pie(self):
         tf = examples_root / 'su-pie.csv'
-        obj = self.urg(tf)
+        obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
-        assert [s for s in value if 'subject_id' in s]
+        assert [s for s in value['subjects'] if 'subject_id' in s]
 
     def test_versions(self):
         self._versions()
@@ -114,12 +127,12 @@ class TestSubjectsFile(Helper, unittest.TestCase):
 
 class TestSamplesFile(Helper, unittest.TestCase):
     template = 'samples.xlsx'
-    urg = SamplesFile
+    metadata_file_class = SamplesFile
     pipe = pipes.SamplesFilePipeline
 
     def test_sa_pie(self):
         tf = examples_root / 'sa-pie.csv'
-        obj = self.urg(tf)
+        obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
 
