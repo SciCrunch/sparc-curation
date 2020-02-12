@@ -4,6 +4,19 @@ from pyontutils.utils import get_working_dir
 from pyontutils.integration_test_helper import _TestScriptsBase as TestScripts
 from .common import project_path, project_path_real, test_organization, onerror
 import sparcur
+import sparcur.cli
+import sparcur.paths
+from sparcur.blackfynn_api import FakeBFLocal
+
+
+# FIXME this is bad since it masks setup for tests against real remote
+def fake_setup(self, *args, **kwargs):
+    self.BlackfynnRemote._cache_anchor = self.anchor  # don't trigger remote lookup
+    self.bfl = self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
+
+
+sparcur.cli.Main._setup_bfl = fake_setup
+
 
 only = tuple()
 skip = ('dashboard_server',)
@@ -57,11 +70,11 @@ mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
          ],
 }
 
-mains['cli'] = [args + ['--project-path', project_path.as_posix(), '-N']
+mains['cli'] = [args + ['--project-path', project_path.as_posix(), '-N', '--jobs', '1']
                 for args in mains['cli']]
 _cli_real = mains.pop('cli-real')
 if 'CI' not in os.environ:
-    mains['cli'].extend([args + ['--project-path', project_path_real.as_posix(), '-N']
+    mains['cli'].extend([args + ['--project-path', project_path_real.as_posix(), '-N', '--jobs', '1']
                          for args in _cli_real])
 
     # if the real project path exists then remove it so that we can test cloning

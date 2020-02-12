@@ -152,9 +152,11 @@ Options:
 
     --port=PORT             server port [default: 7250]
 
+    -j --jobs=N             number of jobs to run             [default: 12]
     -d --debug              drop into a shell after running a step
     -v --verbose            print extra information
     --profile               profile startup performance
+    --local                 ignore network issues
 
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
@@ -203,7 +205,7 @@ from sparcur.backends import BlackfynnRemote
 from sparcur.curation import Summary, Integrator
 from sparcur.curation import DatasetObject
 from sparcur.protocols import ProtocolData
-from sparcur.blackfynn_api import BFLocal
+from sparcur.blackfynn_api import FakeBFLocal
 from IPython import embed
 
 _start_time = utcnowtz()
@@ -223,6 +225,10 @@ stop = time()
 
 
 class Options(clif.Options):
+
+    @property
+    def jobs(self):
+        return int(self.args['--jobs'])
 
     @property
     def limit(self):
@@ -377,7 +383,14 @@ class Main(Dispatcher):
         if self.options.report and not self.options.raw and not self.options.access:
             Integrator.setup(local_only=True)  # FIXME sigh
         else:
-            self._setup_bfl()
+            try:
+                self._setup_bfl()
+            except BaseException as e:
+                if self.options.local:
+                    log.exception(e)
+                    self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
+                else:
+                    raise e
 
         if self.options.export or self.options.shell:
             self._setup_export()
@@ -415,6 +428,7 @@ class Main(Dispatcher):
         self.anchor.anchorClassHere()  # replace a bottom up anchoring rule with top down
         self.project_path = self.anchor.local
         self.summary = Summary(self.project_path)
+        Summary._n_jobs = self.options.jobs
         if self.options.debug:
             Summary._debug = True
 
@@ -1253,7 +1267,10 @@ class Report(Dispatcher):
                                #for c in d['contributors']
                                #if not log.info(lj(c)))),
                           #key=lambda c: c['last_name'] if 'last_name' in c else c['name'])
-        breakpoint()
+
+        if self.options.debug:
+            breakpoint()
+
         rows = [['id', 'last', 'first', 'PI', 'No Orcid']] + [[
             c['id'],
             c['last_name'] if 'last_name' in c else '',

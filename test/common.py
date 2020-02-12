@@ -43,33 +43,38 @@ ds_roots = (
 )
 ds_folders = set(Path(d).parts[0] for d in ds_roots)
 
+DIVISION_SLASH = '\u2215'  # what have we done
+
 
 def mk_fldr_meta(fldr_path, ftype='collection', id=None):
+    altid = f'N:{ftype}:' + fldr_path.as_posix()
+    _id = id if id is not None else altid
+    _id = _id.replace('/', DIVISION_SLASH)  # ARGH there must be a way to ensure file system safe ids :/
     _meta = fldr_path.meta
     kwargs = {**_meta}
-    kwargs['id'] = id if id is not None else f'N:{ftype}:' + fldr_path.as_posix()
+    kwargs['id'] = _id
     meta = PathMeta(**kwargs)
     # NOTE st_mtime -> modified time of the file contents (data)
     # NOTE st_ctime -> changed time of the file status (metadata)
     # linux does not have a unified way to bet st_btime aka st_crtime which is birth time or created time
     return meta.as_xattrs(prefix='bf')
-    return {'bf.id': id if id is not None else f'N:{ftype}:' + fldr_path.as_posix(),
-            'bf.created': meta.created.isoformat().replace('.', ',') if meta.created is not None else None,
-            'bf.updated': meta.updated.isoformat().replace('.', ',')}
+    #return {'bf.id': kwargs['id'],
+            #'bf.created': meta.created.isoformat().replace('.', ',') if meta.created is not None else None,
+            #'bf.updated': meta.updated.isoformat().replace('.', ',')}
 
 
 def mk_file_meta(fp):
     meta = fp.meta
     return meta.as_xattrs(prefix='bf')
-    return {'bf.id': 'N:package:' + fp.as_posix(),
-            'bf.file_id': 0,
-            'bf.size': meta.size,
+    #return {'bf.id': 'N:package:' + fp.as_posix(),
+            #'bf.file_id': 0,
+            #'bf.size': meta.size,
             # FIXME timezone
-            'bf.created': meta.created.isoformat().replace('.', ',') if meta.created is not None else None,
-            'bf.updated': meta.updated.isoformat().replace('.', ','),
-            'bf.checksum': fp.checksum(),
+            #'bf.created': meta.created.isoformat().replace('.', ',') if meta.created is not None else None,
+            #'bf.updated': meta.updated.isoformat().replace('.', ','),
+            #'bf.checksum': fp.checksum(),
             # 'bf.old_id': None  # TODO
-    }
+    #}
 
 
 def mk_required_files(path, suffix='.csv'):

@@ -473,6 +473,7 @@ class Summary(Integrator, ExporterSummarizer):
     schema_out_class = SummarySchema
     triples_class = TriplesExportSummary
     _debug = False
+    _n_jobs = 12
 
     def __new__(cls, path):
         #cls.schema = cls.schema_class()
@@ -591,7 +592,7 @@ class Summary(Integrator, ExporterSummarizer):
 
             ca = self.path._cache_class._remote_class._cache_anchor
 
-            if not self._debug:
+            if not self._debug and self._n_jobs > 1:  # yes debug masks jobs for now
                 # this flies with no_google, so something is up with
                 # the reserialization of the Sheets classes I think
                 # FIXME I suspect that the major bottleneck here is deserialization
@@ -600,8 +601,8 @@ class Summary(Integrator, ExporterSummarizer):
                 # dataset and then reload them all at once and possibly even do
                 # the per-dataset ttl conversion as well, parsing the ttl is probably
                 # a bad call though
-                hrm = Parallel(n_jobs=12)(delayed(datame)(d, ca, timestamp, helpers)
-                                          for d in self.iter_datasets_safe)
+                hrm = Parallel(n_jobs=self._n_jobs)(delayed(datame)(d, ca, timestamp, helpers)
+                                                    for d in self.iter_datasets_safe)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
             else:

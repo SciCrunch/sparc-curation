@@ -1038,12 +1038,19 @@ class OldStuff:
 class FakeBFLocal(BFLocal):
     class bf:
         """ tricksy hobbitses """
+        @classmethod
+        def get_dataset(cls, id):
+            class derp:
+                """ yep, this is getting called way down inside added
+                    in the extras pipeline :/ """
+                doi = None
+                status = 'FAKE STATUS ;_;'
+            return derp
 
     def __init__(self, project_id, anchor):
         self.organization = CacheAsBFObject(anchor)  # heh
         self.project_name = anchor.name
         self.project_path = anchor.local
-        self.metastore = MetaStore(self.project_path.parent / (self.project_name + ' xattrs.db'))
 
 
 class CacheAsBFObject(BaseNode):
@@ -1051,6 +1058,10 @@ class CacheAsBFObject(BaseNode):
         self.cache = cache
         self.id = cache.id
         self.cache.meta
+
+    @property
+    def name(self):
+        return self.cache.name
 
     @property
     def parent(self):
