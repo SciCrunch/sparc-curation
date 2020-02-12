@@ -156,18 +156,24 @@ class PathPipeline(PrePipeline):
         #log.debug(lj(previous_pipeline.data))
         if isinstance(previous_pipeline, Path):
             path = previous_pipeline
+            schema_version = None
         else:
             path = previous_pipeline.data['path']  # we already caught the duplicate error
+            try:
+                schema_version = previous_pipeline.data['schema_version']
+            except KeyError:
+                schema_version = None
 
         if isinstance(path, list):
             path, *_ = path
 
         self.path = path
+        self.schema_version = schema_version
 
     @property
     def _transformer(self):
         try:
-            return self.data_transformer_class(self.path)
+            return self.data_transformer_class(self.path, schema_version=self.schema_version)
         except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
             class NoData:  # FIXME
                 data = {}
@@ -593,19 +599,22 @@ class SPARCBIDSPipeline(JSONPipeline):
     # metadata should come first since structure can fail, error handling sigh
 
     subpipelines = [
-        [[[['submission_file'], ['path']]],
-         SubmissionFilePipeline,
-         ['submission_file']],
-
         [[[['dataset_description_file'], ['path']]],
          DatasetDescriptionFilePipeline,
          ['dataset_description_file']],
 
-        [[[['subjects_file'], ['path']]],
+        [[[['submission_file'], ['path']],
+          [['dataset_description', 'schema_version'], ['schema_version']]],
+         SubmissionFilePipeline,
+         ['submission_file']],
+
+        [[[['subjects_file'], ['path']],
+          [['dataset_description', 'schema_version'], ['schema_version']]],
          SubjectsFilePipeline,
          ['subjects_file']],
 
-        [[[['samples_file'], ['path']]],
+        [[[['samples_file'], ['path']],
+          [['dataset_description', 'schema_version'], ['schema_version']]],
          SamplesFilePipeline,
          ['samples_file']],
     ]

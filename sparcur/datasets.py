@@ -585,7 +585,7 @@ class MetadataFile(HasErrors):
     normalize_header = True
     _expect_single = tuple()
 
-    def __new__(cls, path):
+    def __new__(cls, path, schema_version=None):
         if cls.record_type_key_header is None or cls.record_type_key_alt is None:
             raise TypeError(f'record_type_key_? should not be None on {cls.__name__}')
 
@@ -594,9 +594,10 @@ class MetadataFile(HasErrors):
 
         return super().__new__(cls)
 
-    def __init__(self, path):
+    def __init__(self, path, schema_version=None):
         super().__init__()
         self.path = path
+        self.schema_version = schema_version
 
     def xopen(self):
         self.path.xopen()
@@ -903,6 +904,9 @@ class MetadataFile(HasErrors):
             gen = PrimaryKey(pk_name, combine_names, combine_function,
                              nalt_header, agen, gen).generator
 
+        # FIXME if the 'header' column is not at position zero
+        # this will fail see version 1.1 subjects template for this
+        # with a note that 1.1 had many issues
         self.header = next(gen)
         self._header = Header(self.header, normalize=self.normalize_header)
         self.norm_to_orig_header = self._header.lut(**self.renames_header)

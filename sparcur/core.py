@@ -626,7 +626,7 @@ class _DictTransformer:
             # can't lift a dict outside of itself
             # in this context
             adops.apply(adops.copy, data, source_path, target_path,
-                                        source_key_optional=source_key_optional)
+                        source_key_optional=source_key_optional)
 
     @staticmethod
     def move(data, moves, source_key_optional=False):
@@ -635,7 +635,7 @@ class _DictTransformer:
         """
         for source_path, target_path in moves:
             adops.apply(adops.move, data, source_path, target_path,
-                                        source_key_optional=source_key_optional)
+                        source_key_optional=source_key_optional)
 
     @classmethod
     def derive(cls, data, derives, source_key_optional=True, empty='CULL', cheaty_face=None):
