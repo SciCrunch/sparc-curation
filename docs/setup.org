@@ -197,14 +197,14 @@ SECreateSymbolicLinkPrivilege = $($currentSetting)
 You can skip this if you will only be using the windows computer locally.
 In a local administrator powershell install OpenSSH. The rest can then be done remotely.
 #+begin_src powershell
-       Get-WindowsCapability -Online | ? Name -like 'OpenSSH*'
-       Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
-       Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-       Set-Service sshd -StartupType Automatic
-       Start-Service sshd
-       # add your ssh key to %programdata%\ssh\administrators_authorized_keys
-       # disable password login in %programdata%\ssh\sshd_config
-       Restart-Service sshd
+Get-WindowsCapability -Online | ? Name -like 'OpenSSH*'
+Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+Set-Service sshd -StartupType Automatic
+Start-Service sshd
+# add your ssh key to %programdata%\ssh\administrators_authorized_keys
+# disable password login in %programdata%\ssh\sshd_config
+Restart-Service sshd
 #+end_src
 **** Package manager
 For managing a windows development/curation environment I highly recommend using
@@ -212,44 +212,51 @@ the [[https://chocolatey.org/][chocolatey]] package manager.
 [[https://chocolatey.org/install#install-with-powershellexe][Install chocolatey]].
 
 #+begin_src powershell :exports code :eval never
-       choco install `
-       autohotkey `
-       clisp `
-       emacs `
-       firefox `
-       GoogleChrome `
-       poshgit `
-       python `
-       racket `
-       vim
+choco install `
+autohotkey `
+clisp `
+emacs `
+firefox `
+GoogleChrome `
+poshgit `
+python `
+racket `
+vim
 #+end_src
 
 Update system Path to include packages that don't add themselves.
 This needs to be run as administrator.
 #+begin_src powershell :exports code :eval never
-     $path = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine)
-     $prefix_path = "C:\Program Files\Racket;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;"
-     [Environment]::SetEnvironmentVariable("Path",
-                                           $prefix_path + $path,
-                                           [EnvironmentVariableTarget]::Machine)
+$path = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine)
+$prefix_path = "C:\Program Files\Racket;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;"
+[Environment]::SetEnvironmentVariable("Path",
+                                      $prefix_path + $path,
+                                      [EnvironmentVariableTarget]::Machine)
 #+end_src
 
 If you are logged in remotely restarting sshd is the easiest way to refresh
 the environment so commands are in PATH. This is because new shells inherit the
 environment of sshd at the time that it was started.
 #+begin_src powershell :exports code :eval never
-       Restart-Service sshd
+Restart-Service sshd
 #+end_src
 You will need to reconnect to a new ssh session in order to have access to git and other
 newly installed commands.
 
 **** Manual install
-redland rdf tools
+***** texlive
+https://www.tug.org/texlive/windows.html
+https://www.tug.org/texlive/acquire-netinstall.html
+http://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe
+This takes quite a while, about 50 mins on a good connection with a fast computer.
+***** protege
+https://github.com/protegeproject/protege-distribution/releases/latest
+***** redland
+rdf tools
 http://librdf.org/raptor/INSTALL.html
 https://github.com/dajobe/raptor
 Unfortunately to get the latest version of these it seems you have to build them yourself.
-
-**** old :noexport:
+**** old                                                           :noexport:
 add to PATH so we can just link everything there
 =%HOMEPATH%\bin=
 =%APPDATA%\Python\Python37\Scripts=
@@ -320,15 +327,14 @@ mkdir ~/bin
 ln -s /usr/local/bin/python3 ~/bin/python
 ln -s /usr/local/bin/pip3 ~/bin/pip
 #+end_src
+
 ** User
 :PROPERTIES:
 :CUSTOM_ID: user
 :END:
-
 If you are already on a system that has the [[#one-shot][prerequisites]]
 installed start here. If you are not you will find out fairly
 quickly when the following commands fail.
-
 *** Git name and email
 These workflows make extensive use of git.
 Git needs to know who you are (and so do we) so that it can stash files
@@ -343,8 +349,7 @@ that apply to you.
 git config --global user.name "FIRST_NAME LAST_NAME"
 git config --global user.email "MY_NAME@example.com"
 #+END_SRC
-
-*** TODO Bootstrapping [[./setup.org][this =setup.org= file]]
+*** Bootstrapping [[./setup.org][this =setup.org= file]]
 You can run all the code in [[./setup.org][this =setup.org= file]] automatically
 using emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
 install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit for scientists and
@@ -366,117 +371,44 @@ mkdir ~/opt
 mkdir ~/git
 mkdir ~/files
 source .profile
-#git clone https://github.com/SciCrunch/sparc-curation.git ~/git/sparc-curation  # FIXME LOL WINDOWS
-# never clone to a target with ~ in it on windows
-# copy and paste from this block into powershell will result
-# in the hilarious problem where there is a literal ~ folder
-# created, thus, use pushd and popd instead which work as expected
-pushd ~/git
-git clone https://github.com/SciCrunch/sparc-curation.git
-popd
-ln -s ~/git/sparc-curation/docs/setup.org ~/setup.org
-#+END_SRC
-
-When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
-It is normal to see errors during this step. When it finishes quit emacs by typing =C-x C-c=
-(control x control c, or hold control and type x and then c), or by using the file menu or the =x= button.
-#+NAME: get-fancy-emacs
-#+CAPTION: Install scimax to get the functionality to run this =setup.org= file.
-#+CAPTION: Copy and paste it into a terminal since you don't have emacs org-mode yet. \\
-#+BEGIN_SRC bash :exports code :eval never :noweb yes
-tlmgr init-usertree  # init texlive for your user
-# This is dangerous. I (Tom) have reviewed the install script at this commit.
-# Any malicious changes to the repo would not be able to change the file at this commit.
-# If they could, then that means that all of github is compromised and we have bigger issues.
-pushd ~/opt
-# TODO os detection
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/jkitchin/scimax/455b34e655912c92b6caaadf87af1d9fabbb2ca6/install-scimax-linux.sh)"
-# if you have not configured git prior to this step you will be prompted to set your name and email
-popd
-ln -sT ~/opt/scimax.sh ~/bin/scimax  # TODO windows emacs -l opt/scimax/init.el setup.org
-#+END_SRC
-
-#+begin_src powershell
-pushd ~/opt
-git clone https://github.com/jkitchin/scimax.git
-popd
-emacs -l ~/opt/scimax/init.el
 #+end_src
 
-Tangle the following block with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
-[[file:${HOME}/opt/scimax/user/user.el][user.el]] directly.
-#+NAME: scimax-user-config
-#+CAPTION: Needed to get sane behavior for executing this file out of the box.
-#+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
-;; org goto heading
-(defun org-goto-section (heading)
-  "\`heading' should be a string matching the desired heading"
-  (goto-char (org-find-exact-headline-in-buffer heading)))
-
-;; recenter a line set using --eval to be at the top of the buffer
-(add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))
-
-;; line numbers so it is harder to get lost in a big file
-(when (>= emacs-major-version 26)
-  (setq display-line-numbers-grow-only 1)
-  (global-display-line-numbers-mode 1))
-
-;; open setup.org symlink without prompt
-(setq vc-follow-symlinks 1)
-
-;; sane python indenting
-(setq-default indent-tabs-mode nil)
-(setq tab-width 4)
-(setq org-src-preserve-indentation nil)
-(setq org-src-tab-acts-natively nil)
-
-;; don't hang on tlmgr since it is broken on ubuntu
-(setq scimax-installed-latex-packages t)
-
-;; save command history
-(setq history-length t)
-(savehist-mode 1)
-(setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
-
-;; racket
-(use-package racket-mode
-  :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
-  :bind (:map racket-mode-map
-              ("<f5>" . recompile-quietly))
-  :init
-  (defun my/buffer-local-tab-complete ()
-    "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
-    (make-local-variable 'tab-always-indent)
-    (setq tab-always-indent 'complete))
-  (defun rcc ()
-    (set (make-local-variable 'compile-command)
-         (format "raco make %s" (file-name-nondirectory buffer-file-name))))
-  (add-hook 'racket-mode-hook 'rcc)
-  (add-hook 'racket-mode-hook 'hs-minor-mode)
-  (add-hook 'racket-mode-hook 'goto-address-mode)
-  (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
-  (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
-
-;; vim bindings if you need them
-;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
-;; to manually install, mega gnu elpa weirdness
-;; (setq evil-want-keybinding nil)
-;; (require 'scimax-evil)
+Run the following block to clone this repository and the =scimax= repository.
+#+begin_src bash :exports code :eval never
+pushd ~/git
+git clone https://github.com/SciCrunch/sparc-curation.git
+git clone https://github.com/jkitchin/scimax.git
+popd
 #+END_SRC
 
-#+BEGIN_SRC bash :exports code :eval never
-scimax
-#+END_SRC
+Run the following command to initialize texlive for your user.
+It is needed for scimax to install correctly.
+#+name: setup-texlive
+#+begin_src bash :exports code :eval never
+tlmgr init-usertree
+#+end_src
 
-After running the next command you should have a version of this file open locally.
-In that file go to the next header [[#per-user-setup][Per user setup]] and continue this process.
+Run the following commands to create the =scimax= command ([[file:${HOME}/bin/scimax][~/bin/scimax]]
+on linux and macos, [[file:${HOME}/bin/scimax.ps1][~/bin/scimax.ps1]] on windows), and the config file
+[[file:${HOME}/opt/scimax/user/user.el][user.el]] that is needed for the rest of the process.
+# astoundingly powershell redirection and bash redirection have the same behavior for strings so it makes it
+# possible to work around the fact that the behavior is effectively mutually exclusive for strings passed as
+# arguments, all I can do is laugh at how dumb this is
+#+name: tangle-setup.org
+#+begin_src sh :eval never
+echo '(defvar *path-to-setup.org* "~/git/sparc-curation/docs/setup.org")' > vars.el
+emacs --batch --load vars.el --load org --load ob-shell --eval '(org-babel-tangle-file *path-to-setup.org*)'
+rm vars.el
+#+end_src
 
-#+NAME: launch-setup-org-1
-#+CAPTION: Run the following to open this file in an executable form.
-#+BEGIN_SRC bash :exports code :eval never
-scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
-#+END_SRC
-
+When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
+It is normal to see errors during this step. When everything finishes installing you should find
+yourself staring at next section of this file [[#per-user-setup][Per user setup]] and can continue
+from there in =scimax=.
+#+name: scimax-bootstrap
+#+begin_src bash :exports code :eval never
+scimax --find-file ~/git/sparc-curation/docs/setup.org --eval "(add-hook 'window-setup-hook (lambda () (org-goto-section *section-per-user-setup*)))"
+#+end_src
 *** Per user setup
 :PROPERTIES:
 :CUSTOM_ID: per-user-setup
@@ -504,6 +436,7 @@ it again.
 
 You can also run this block to update an existing installation.
 
+*After running this block you can move on to the [[#configuration-files][Configuration files]] section.*
 # FIXME why no output on first run? too many errors?
 # ANSWER i think it is because raco pkg install runs in alphabetical order
 #+CAPTION: You can run them all at once from this block.
@@ -517,67 +450,11 @@ You can also run this block to update an existing installation.
 <<racket-setup>>
 #+END_SRC
 
-*If you run the block above you do not need to run the rest of this section*
-*and you can move on to the [[#configuration-files][Configuration files]] section.*
-
-#+NAME: environment-sanity-checks
-#+BEGIN_SRC bash :results output :eval no-export
-# implicit check for bash by being able to run this block at all
-
-# git check on the off chance that we made it here without cloning this repo
-git --version || exit 1
-
-# python version check
-python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
-pip --version || exit 3
-#+END_SRC
-
-#+NAME: clone-repos
-#+CAPTION: Clone all required git repositories.
-#+HEADER: :var REPOS=repos
-#+BEGIN_SRC bash :results output :eval no-export
-pushd ~/git
-for repo_url in ${REPOS}; do git clone ${repo_url}.git 2>&1; done
-popd
-#+END_SRC
-
-#+NAME: python-setup
-#+CAPTION: Set up all python repositories so that they can be used from git.
-#+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
-#+HEADER: :var PYROOTS=py-roots
-#+BEGIN_SRC bash :results output :eval no-export
-pushd ~/git
-for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
-popd
-#+END_SRC
-
-#+NAME: racket-ontology
-#+CAPTION: Convert ontology and build as module for racket.
-#+CAPTION: This will take a bit of time to run. \\
-#+BEGIN_SRC bash :results output :eval no-export
-ln -s ~/git/rkdf/bin/ttl-to-rkt ~/bin/ttl-to-rkt
-ln -s ~/git/rkdf/bin/rkdf-convert-all ~/bin/rkdf-convert-all
-pushd ~/git/NIF-Ontology
-git checkout dev
-rkdf-convert-all
-git checkout master
-popd
-#+END_SRC
-
-#+NAME: racket-setup
-#+CAPTION: Install racket packages and dependencies. \\
-#+HEADER: :var RKTROOTS=rkt-roots
-#+BEGIN_SRC bash :results output :eval no-export
-pushd ~/git
-raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
-popd
-#+END_SRC
-
+See [[#developer-setup-code][Developer setup code]] in the appendix for the source for this block.
 *** Configuration files
 :PROPERTIES:
 :CUSTOM_ID: configuration-files
 :END:
-
 This section will create and populate
 [[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]],
 [[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]],
@@ -600,6 +477,10 @@ touch ~/.config/pyontutils/secrets.yaml
 chmod 0600 ~/.config/pyontutils/secrets.yaml
 ln -s ~/.config/pyontutils/secrets.yaml
 #+END_SRC
+
+#+call: set-config-paths()
+
+#+call: make-secrets-template()
 
 #+NAME: set-config-paths
 #+CAPTION: Set default paths in config.yaml \\
@@ -633,12 +514,13 @@ return pblob, sblob
 
 If everything works then you should be able to run =scig t brain= and get results.
 
+# TODO see if we can switch to tangling this ...
 #+NAME: make-secrets-template
 #+CAPTION: Add template for secrets.yaml \\
 #+BEGIN_SRC python :results value :cache yes :eval no-export
 from pathlib import Path
 import yaml
-spath = Path('~/.config/pyontutils/secrets.yaml').expanduser()
+spath = Path('~/.config/orthauth/secrets.yaml').expanduser()
 with open(spath, 'rt') as f:
     sec = yaml.safe_load(f)
 
@@ -667,7 +549,7 @@ else:
 
 #+END_SRC
 
-You can move your [[file:${HOME}/.config/pyontutils/secrets.yaml][~/.config/pyontutils/secrets.yaml]]
+You can move your [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
 to live where ever you want, but you will need to update the =auth-stores: secrets: path:= entry in
 [[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]] and
 [[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]].
@@ -681,8 +563,8 @@ Logout on the default ubuntu window manager is located in the upper right.
 *When you you log back in* run the following command to start at the next step.
 #+NAME: launch-setup-org-2
 #+CAPTION: Run the following to open this file in an executable form.
-#+BEGIN_SRC bash :eval never
-scimax  ~/setup.org --eval '(org-goto-section "Per user setup")'
+#+BEGIN_SRC bash :exports code :eval never
+scimax --find-file ~/git/sparc-curation/docs/setup.org --eval "(add-hook 'window-setup-hook (lambda () (org-goto-section *section-accounts-and-api-access*)))"
 #+END_SRC
 
 When you exit emacs it may ask you if you want to save,
@@ -693,7 +575,6 @@ try to pull updates for sparc-curation because git will complain.
 
 The [[#accounts-and-api-access][next section]] will walk you through the steps needed
 to get access to all the various systems holding different pieces of data that we need.
-
 *** Accounts and API access
 :PROPERTIES:
 :CUSTOM_ID: accounts-and-api-access
@@ -803,11 +684,11 @@ time you run.
 ** Developer extras
 If you can use python3.7 (>=ubuntu-19.04) you can set the embedded debugger as follows.
 #+begin_src bash
-     pip install --user pudb
+pip install --user pudb
 #+end_src
 #+CAPTION: .bashrc extras
 #+begin_src bash
-     export PYTHONBREAKPOINT=pudb.set_trace
+export PYTHONBREAKPOINT=pudb.set_trace
 #+end_src
 
 [[file:${HOME}/.vimrc][~/.vimrc]] settings to prevent klobbering of xattrs
@@ -1321,6 +1202,142 @@ NIF-Ontology/
 
 * Appendix
 ** Code
+*** Bootstrap code
+**** user.el
+Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
+#+NAME: scimax-user-config
+#+CAPTION: Needed to get sane behavior for executing this file out of the box.
+#+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
+;; org goto heading
+(defun org-goto-section (heading)
+  "\`heading' should be a string matching the desired heading"
+  (goto-char (org-find-exact-headline-in-buffer heading)))
+
+;; workaround for powershell cmd windows braindead handling of strings
+(defvar *section-per-user-setup* "Per user setup")
+(defvar *section-accounts-and-api-access* "Accounts and API access")
+
+;; recenter a line set using --eval to be at the top of the buffer
+(add-hook 'emacs-startup-hook (lambda () (recenter-top-bottom 0)))
+
+;; line numbers so it is harder to get lost in a big file
+(when (>= emacs-major-version 26)
+  (setq display-line-numbers-grow-only 1)
+  (global-display-line-numbers-mode 1))
+
+;; open setup.org symlink without prompt
+(setq vc-follow-symlinks 1)
+
+;; sane python indenting
+(setq-default indent-tabs-mode nil)
+(setq tab-width 4)
+(setq org-src-preserve-indentation nil)
+(setq org-src-tab-acts-natively nil)
+
+;; don't hang on tlmgr since it is broken on ubuntu
+(setq scimax-installed-latex-packages t)
+
+;; save command history
+(setq history-length t)
+(savehist-mode 1)
+(setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
+
+;; racket
+(use-package racket-mode
+  :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
+  :bind (:map racket-mode-map
+              ("<f5>" . recompile-quietly))
+  :init
+  (defun my/buffer-local-tab-complete ()
+    "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
+    (make-local-variable 'tab-always-indent)
+    (setq tab-always-indent 'complete))
+  (defun rcc ()
+    (set (make-local-variable 'compile-command)
+         (format "raco make %s" (file-name-nondirectory buffer-file-name))))
+  (add-hook 'racket-mode-hook 'rcc)
+  (add-hook 'racket-mode-hook 'hs-minor-mode)
+  (add-hook 'racket-mode-hook 'goto-address-mode)
+  (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
+  (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
+
+;; vim bindings if you need them
+;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
+;; to manually install, mega gnu elpa weirdness
+(setq evil-want-keybinding nil)
+(require 'scimax-evil)
+#+END_SRC
+**** scimax launch scripts
+#+name: scimax-cmd-windows
+#+begin_src powershell :eval never :tangle (when (eq system-type 'windows-nt) "~/bin/scimax.ps1")
+emacs -q -l ~/opt/scimax/init.el $args
+#+end_src
+#+name: scimax-cmd-posix
+#+header: :shebang "#!/usr/bin/env bash"
+#+begin_src bash :eval never :tangle (when (not (eq system-type 'windows-nt)) "~/bin/scimax") :tangle-mode (identity #o755)
+emacs -q -l ~/opt/scimax/init.el $@
+#+end_src
+
+*** Developer setup code
+:PROPERTIES:
+:CUSTOM_ID: developer-setup-code
+:END:
+#+NAME: environment-sanity-checks
+#+BEGIN_SRC bash :results output :eval no-export
+# implicit check for bash by being able to run this block at all
+
+# git check on the off chance that we made it here without cloning this repo
+git --version || exit 1
+
+# python version check
+python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
+pip --version || exit 3
+
+# git email check
+[[ -n "$(git config --list | grep user.email)" ]] || exit 4
+#+END_SRC
+
+#+NAME: clone-repos
+#+CAPTION: Clone all required git repositories.
+#+HEADER: :var REPOS=repos
+#+BEGIN_SRC bash :results output :eval no-export
+pushd ~/git
+for repo_url in ${REPOS}; do git clone ${repo_url}.git 2>&1; done
+popd
+#+END_SRC
+
+#+NAME: python-setup
+#+CAPTION: Set up all python repositories so that they can be used from git.
+#+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
+#+HEADER: :var PYROOTS=py-roots
+#+BEGIN_SRC bash :results output :eval no-export
+pushd ~/git
+for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
+popd
+#+END_SRC
+
+#+NAME: racket-ontology
+#+CAPTION: Convert ontology and build as module for racket.
+#+CAPTION: This will take a bit of time to run. \\
+#+BEGIN_SRC bash :results output :eval no-export
+ln -s ~/git/rkdf/bin/ttl-to-rkt ~/bin/ttl-to-rkt
+ln -s ~/git/rkdf/bin/rkdf-convert-all ~/bin/rkdf-convert-all
+pushd ~/git/NIF-Ontology
+git checkout dev
+rkdf-convert-all
+git checkout master
+popd
+#+END_SRC
+
+#+NAME: racket-setup
+#+CAPTION: Install racket packages and dependencies. \\
+#+HEADER: :var RKTROOTS=rkt-roots
+#+BEGIN_SRC bash :results output :eval no-export
+pushd ~/git
+raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
+popd
+#+END_SRC
+
 *** Remote exports
 Paste the results of this block into your shell if you are running
 the code from this file by pasting it into a terminal.
