@@ -24,6 +24,7 @@ OntGraph.metadata_type_markers.append(readable.Graph)
 
 OntCuries({'apinatomy': str(readable),
            'elements': str(elements),  # FIXME guranteed name collisions ...
+           'PMID': 'https://www.ncbi.nlm.nih.gov/pubmed/',
            # also just read this from the embedded local conventions
 })
 
@@ -323,20 +324,25 @@ class BaseElement(Base):
             if key in self.blob:
                 values = self.blob[key]
                 for value in values:
-                    value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
-                    yield self.s, readable[key], self.context[value]
+                    if key == 'external':
+                        o = OntId(value).URIRef
+                    else:
+                        value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
+                        o = self.context[value]
+
+                    yield self.s, readable[key], o
 
     def triples_external(self):
         if 'externals' in self.blob:
-            for external in self.blob['externals']:
+            for external in self.blob['external']:
                 yield self.s, rdf.type, OntId(external).URIRef
 
 
 class Node(BaseElement):
     key = 'nodes'
     annotations = 'skipLabel', 'color', 'generated'
-    objects = 'cloneOf', 'hostedBy'
-    objects_multi = 'sourceOf', 'targetOf', 'clones'
+    objects = 'cloneOf', 'hostedBy', 'internalIn'
+    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external'
 
     def triples(self):
         yield from super().triples()
@@ -347,7 +353,7 @@ class Lyph(BaseElement):
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
     objects = 'layerIn', 'conveyedBy', 'border', 'cloneOf'
-    objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones'
+    objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones', 'external'
 
     def triples(self):
         yield from super().triples()
@@ -358,8 +364,8 @@ class Link(BaseElement):
     key = 'links'
     annotations = 'generated',
     generics = 'conveyingType',
-    objects = 'source', 'target', 'conveyingLyph'
-    objects_multi = 'conveyingMaterials',
+    objects = 'source', 'target', 'conveyingLyph', 'fasciculatesIn'
+    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external'
 
 
 Graph.Link = Link
@@ -368,21 +374,21 @@ class Coalescence(BaseElement):
     generics = 'topology',
     annotations = 'generated',
     objects = 'generatedFrom',
-    objects_multi = 'lyphs',
+    objects_multi = 'lyphs', 'external'
 
 
 Graph.Coalescence = Coalescence
 class Border(BaseElement):
     # FIXME class is Link ?
     key = 'borders'
-    objects = 'host',
+    objects = 'host', 'external'
 
 
 Graph.Border = Border
 class Tree(BaseElement):
     key = 'trees'
     objects = 'root', 'lyphTemplate'
-    objects_multi = 'housingLyphs',
+    objects_multi = 'housingLyphs', 'external'
 
 
 Graph.Tree = Tree
@@ -405,7 +411,7 @@ Group.elements += (Group,)
 Graph.Group = Group
 class Material(BaseElement):
     key = 'materials'
-    objects_multi = 'materials', 'inMaterials'
+    objects_multi = 'materials', 'inMaterials', 'external'
 
 
 class fake:
@@ -417,7 +423,7 @@ Graph.Material = Material
 class External(BaseElement):
     externals = 'id',
     annotations = 'generated', 'uri', 'type',  # FIXME should be classes
-    objects_multi = 'externalTo',
+    objects_multi = 'annotates',
 
     @classmethod
     def fromRdf(cls, uri, graph, context=None):
@@ -466,6 +472,7 @@ class External(BaseElement):
         if self.id.startswith('PMID:'):
             log.warning('PMIDs should never be External IDs!')
             self._term = fake
+            self.s = OntId(self.id).URIRef
             return
 
         self._term = OntTerm(self.id)
