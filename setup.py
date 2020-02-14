@@ -40,7 +40,7 @@ setup(name='sparcur',
       install_requires=[
           'augpathlib>=0.0.9',
           'beautifulsoup4',
-          'blackfynn',
+          'blackfynn>=3.0.0',
           'dicttoxml',
           'idlib',
           'jsonschema>=3.0.1',  # need the draft 6 validator
