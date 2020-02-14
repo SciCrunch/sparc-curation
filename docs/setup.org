@@ -1249,23 +1249,24 @@ Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into
 (setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
 
 ;; racket
-(use-package racket-mode
-  :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
-  :bind (:map racket-mode-map
-              ("<f5>" . recompile-quietly))
-  :init
-  (defun my/buffer-local-tab-complete ()
-    "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
-    (make-local-variable 'tab-always-indent)
-    (setq tab-always-indent 'complete))
-  (defun rcc ()
-    (set (make-local-variable 'compile-command)
-         (format "raco make %s" (file-name-nondirectory buffer-file-name))))
-  (add-hook 'racket-mode-hook 'rcc)
-  (add-hook 'racket-mode-hook 'hs-minor-mode)
-  (add-hook 'racket-mode-hook 'goto-address-mode)
-  (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
-  (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete))
+(when fboundp 'use-package
+      (use-package racket-mode
+        :mode "\\.ptc\\'" "\\.rkt\\'" "\\.sxml\\'"
+        :bind (:map racket-mode-map
+                    ("<f5>" . recompile-quietly))
+        :init
+        (defun my/buffer-local-tab-complete ()
+          "Make \`tab-always-indent' a buffer-local variable and set it to 'complete."
+          (make-local-variable 'tab-always-indent)
+          (setq tab-always-indent 'complete))
+        (defun rcc ()
+          (set (make-local-variable 'compile-command)
+               (format "raco make %s" (file-name-nondirectory buffer-file-name))))
+        (add-hook 'racket-mode-hook 'rcc)
+        (add-hook 'racket-mode-hook 'hs-minor-mode)
+        (add-hook 'racket-mode-hook 'goto-address-mode)
+        (add-hook 'racket-mode-hook 'my/buffer-local-tab-complete)
+        (add-hook 'racket-repl-mode-hook 'my/buffer-local-tab-complete)))
 
 ;; config paths
 
