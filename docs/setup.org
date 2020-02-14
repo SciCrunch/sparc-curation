@@ -397,9 +397,11 @@ on linux and macos, [[file:${HOME}/bin/scimax.ps1][~/bin/scimax.ps1]] on windows
 #+name: tangle-setup-org
 #+begin_src sh :eval never
 echo '(defvar *path-to-setup.org* "~/git/sparc-curation/docs/setup.org")' > vars.el
-emacs --batch --load vars.el --load org --load ob-shell --eval '(org-babel-tangle-file *path-to-setup.org*)'
+emacs --batch --load vars.el --load org --load ob-shell --eval '(org-babel-tangle-file *path-to-setup.org*)' --load ~/opt/scimax/user/user.el --eval '(org-babel-tangle-file *path-to-setup.org*)'
 rm vars.el
 #+end_src
+# yes we tangle twice here intentionally because user-config-path needs to be defined
+# before the second round of tangles can succeed
 
 When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
 It is normal to see errors during this step. When everything finishes installing you should find
@@ -469,7 +471,7 @@ as hypothes.is group names, and google doc ids.
 The templates below should have already been tangled to the correct locations when
 [[tangle-setup-org][setup.org was tangled]].
 #+name: pyontutils-config-defaults
-#+begin_src yaml :tangle (when (not (file-exists-p (user-config-path "pyontutils/config.yaml"))) (user-config-path "pyontutils/config.yaml")) :mkdirp yes
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "pyontutils/config.yaml")))) (user-config-path "pyontutils/config.yaml")) :mkdirp yes
 auth-stores:
   secrets:
     path: '{:user-config-path}/orthauth/secrets.yaml'
@@ -501,7 +503,7 @@ auth-variables:
 #+end_src
 
 #+name: sparcur-config-defaults
-#+begin_src yaml :tangle (when (not (file-exists-p (user-config-path "sparcur/config.yaml"))) (user-config-path "sparcur/config.yaml")) :mkdirp yes
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "sparcur/config.yaml")))) (user-config-path "sparcur/config.yaml")) :mkdirp yes
 auth-stores:
   secrets:
     path: '{:user-config-path}/orthauth/secrets.yaml'
@@ -525,7 +527,7 @@ to live where ever you want, but you will need to update the =auth-stores: secre
 [[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]].
 #+name: secrets-template
 #+header: :tangle-mode (identity #o600)
-#+begin_src yaml :tangle (when (not (file-exists-p (user-config-path "orthauth/secrets.yaml"))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
 blackfynn:
   sparc:
     key: fake-api-key
