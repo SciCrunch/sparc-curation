@@ -1302,7 +1302,8 @@ Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into
 ;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
 ;; to manually install, mega gnu elpa weirdness
 (setq evil-want-keybinding nil)
-(require 'scimax-evil)
+(when (fboundp 'use-package)
+  (require 'scimax-evil))
 #+END_SRC
 **** scimax launch scripts
 #+name: scimax-cmd-windows
