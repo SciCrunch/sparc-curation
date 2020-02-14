@@ -1281,8 +1281,8 @@ Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into
               "~/Library/Application Support"
               "~/Library/Caches"
               "~/Library/Logs"))
-    (windows-nt ((let ((ucp "~/AppData/Local"))
-                   (list ucp ucp ucp (concat ucp "/Logs")))))
+    (windows-nt (let ((ucp "~/AppData/Local"))
+                  (list ucp ucp ucp (concat ucp "/Logs"))))
     (otherwise (error (format "Unknown OS %s" (or os system-type))))))
 
 (eval-when-compile (defvar *config-paths* (config-paths)))
