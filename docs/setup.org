@@ -768,20 +768,6 @@ rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local
 *** Fetch missing files
 fetching a whole dataset or a subset of a dataset
 =spc ** -f=
-*** Git gud?
-*NOTE: Still experimenting with git and git annex to see if they will work for this.*
-Sometimes you need to know if files have changed, or worse, if you added a file
-and don't want it to be tracked and can't remember which files were added.
-How do we deal with this!?
-GIT TO THE RESCUE!
-Also, having this on an ssd makes it funfast.
-After finishing a =spc pull= and =spc -n "*" -l 2 -f=
-#+BEGIN_SRC bash
-pushd ~/files/blackfynn_local/SPARC\ Consortium
-git init
-git add *
-git commit -m "snapshot"
-#+END_SRC
 *** Export
 #+CAPTION: export everything
 #+BEGIN_SRC bash
