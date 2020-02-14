@@ -1200,9 +1200,18 @@ NIF-Ontology/
 *** Bootstrap code
 **** user.el
 Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
+#+NAME: scimax-user-preload
+#+begin_src elisp :exports code :eval never :tangle ~/opt/scimax/user/preload.el
+;; silence ob-ipython complaining about missing command
+;; THIS CAN CAUSE RUNTIME ERRORS
+(setq ob-ipython-html-to-image-program "/dev/null")
+#+end_src
 #+NAME: scimax-user-config
 #+CAPTION: Needed to get sane behavior for executing this file out of the box.
 #+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
+;; requires
+(require 'cl)  ;; needed for case
+
 ;; org goto heading
 (defun org-goto-section (heading)
   "\`heading' should be a string matching the desired heading"
