@@ -10,12 +10,28 @@
   : /tmp/scigraph-build/sparc-data
 
   #+NAME: build-script
-  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location
+  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location()
     if [[ -d "${BUILD_LOCATION}" ]]; then
         rm "${BUILD_LOCATION}" -r
     fi
     mkdir -p "${BUILD_LOCATION}"
-    scigraph-load -c <(cat graphload.yaml.template | sed 's|BUILD_LOCATION|'"${BUILD_LOCATION}"'|g' )
+    #scigraph-load -c <(cat graphload.yaml.template | sed 's|BUILD_LOCATION|'"${BUILD_LOCATION}"'|g' )
+
+    LATEST="${BUILD_LOCATION}/../LATEST"
+    BASENAME=$(basename "${BUILD_LOCATION}")
+    STAMPED="${BASENAME}-graph-$(date +%Y%m%dT%H%M%S)"
+    ZIPNAME="${STAMPED}.zip"
+    ZIPPATH="$(dirname "${BUILD_LOCATION}")/${ZIPNAME}"
+
+    echo $BUILD_LOCATION $BASENAME $STAMPED $ZIPNAME $ZIPPATH
+    pushd "${BUILD_LOCATION}/.."
+    # mv prevents accidentally deploying the same graph twice
+    # but use cp -r for development to avoid continual rebuild
+    cp -r ${BASENAME} ${STAMPED}
+    zip -r ${ZIPNAME} ${STAMPED}
+    unlink "${LATEST}"
+    ln -sT "${ZIPNAME}" "${LATEST}"
+    popd
   #+end_src
 
   Tangle using =C-c C-v t= and run as =./build=
@@ -30,19 +46,14 @@
 * Deploy graph
   #+NAME: deploy-script
   #+HEADER: :var SERVER=localhost RUNTIME_LOCATION=/var/lib/scigraph SVC_USER=scigraph
-  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location 
+  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location()
     BASENAME=$(basename "${BUILD_LOCATION}")
-    STAMPED="${BASENAME}-graph-$(date +%Y%m%dT%H%M%S)"
-    ZIPNAME="${STAMPED}.zip" 
-    #ZIPNAME="${BASENAME}-graph-$(date +%Y%m%dT%H%M%S,%N | cut -b-22).zip"   # overkill
+    LATEST="${BUILD_LOCATION}/../LATEST"
+    ZIPNAME=$(readlink "${LATEST}")
+    STAMPED="${ZIPNAME//.zip/}"
     ZIPPATH="$(dirname "${BUILD_LOCATION}")/${ZIPNAME}"
     echo $BUILD_LOCATION $BASENAME $STAMPED $ZIPNAME $ZIPPATH
-    pushd "${BUILD_LOCATION}/.."
-    # mv prevents accidentally deploying the same graph twice
-    # but use cp -r for development to avoid continual rebuild
-    cp -r ${BASENAME} ${STAMPED}
-    zip -r ${ZIPNAME} ${STAMPED}
-    popd
+    exit 0
     if [ "${SERVER}" = "localhost" ]; then
         CMD="su - ${SVC_USER} -c \"cp ${ZIPPATH} ${RUNTIME_LOCATION};
                                    pushd ${RUNTIME_LOCATION};
@@ -109,4 +120,3 @@
                 paramType: query
                 required: false
   #+end_src
-
