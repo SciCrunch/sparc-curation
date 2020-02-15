@@ -14,26 +14,44 @@ Set =graph-folder-name= here
 #+name: graph-folder-name
 : sparc-data
 
+Set =path-graphload-template= here
+#+name: path-graphload-template
+: ~/git/pyontutils/nifstd/scigraph/graphload-base-template.yaml
+
+=path-sparc-data-ontologies=
+#+name: path-sparc-data-ontologies
+: ~/git/sparc-curation/resources/scigraph/ontologies-sparc-data.yaml
+
 Tangle using =C-c C-v t= and run as =./build=
 #+NAME: build
 #+HEADER: :eval never :noweb yes :tangle ./build :tangle-mode (identity #o755)
 #+HEADER: :shebang "#!/usr/bin/env bash"
+#+header: :var _PATH_GRAPHLOAD=path-graphload-template()
+#+header: :var _PATH_ONTOLOGIES_SECTION=path-sparc-data-ontologies()
 #+header: :var _BUILD_LOCATION=build-location() _GRAPH_FOLDER_NAME=graph-folder-name()
 #+begin_src bash :eval never :results output
+: ${PATH_GRAPHLOAD:="$(eval echo ${_PATH_GRAPHLOAD})"}
+: ${PATH_ONTOLOGIES_SECTION:="$(eval echo ${_PATH_ONTOLOGIES_SECTION})"}
 : ${BUILD_LOCATION:="${_BUILD_LOCATION}"}
 : ${GRAPH_FOLDER_NAME:="${_GRAPH_FOLDER_NAME}"}
 BUILD_GRAPH_PATH="${BUILD_LOCATION}/${GRAPH_FOLDER_NAME}"
+PATH_CONFIG_YAML="${BUILD_GRAPH_PATH}/graphload-$(date +%Y-%m-%d).yaml"
+PATH_CONFIG_YAML_RAW="${PATH_CONFIG_YAML}.raw"
 STAMPED="${GRAPH_FOLDER_NAME}-graph-$(date +%Y%m%dT%H%M%S)"
 ZIPNAME="${STAMPED}.zip"
 ZIPPATH="${BUILD_LOCATION}/${ZIPNAME}"
 LATEST="${BUILD_LOCATION}/LATEST"
+echo $PATH_GRAPHLOAD $PATH_ONTOLOGIES_SECTION
 echo $BUILD_GRAPH_PATH $GRAPH_FOLDER_NAME $STAMPED $ZIPNAME $ZIPPATH
 
 if [[ -d "${BUILD_GRAPH_PATH}" ]]; then
     rm "${BUILD_GRAPH_PATH}" -r
 fi
 mkdir -p "${BUILD_GRAPH_PATH}"
-#scigraph-load -c <(cat graphload.yaml.template | sed 's|BUILD_GRAPH_PATH|'"${BUILD_GRAPH_PATH}"'|g' )
+cat "${PATH_GRAPHLOAD}" "${PATH_ONTOLOGIES_SECTION}" > "${PATH_CONFIG_YAML_RAW}"
+yq -Y ".graphConfiguration.location = \"${BUILD_GRAPH_PATH}\"" \
+      "${PATH_CONFIG_YAML_RAW}"> "${PATH_CONFIG_YAML}"
+scigraph-load -c "${PATH_CONFIG_YAML}"
 
 pushd "${BUILD_LOCATION}"
 # mv prevents accidentally deploying the same graph twice
