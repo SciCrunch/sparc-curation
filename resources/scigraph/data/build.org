@@ -1,122 +1,127 @@
 * Instructions
-  See [[https://github.com/SciCrunch/sparc-curation/blob/master/docs/setup.org#bootstrapping-this-setuporg-file][setup.org bootstrapping]]
-  for instructions on how to get an emacs environment that can tangle the outputs of this file.
-  =TODO= tangle automatically from command line
-  See [[https://github.com/nakkaya/ferret/blob/7a374f52b90b1ec813eb027adf4beaaa16751c09/Makefile#L35][ferret's Makefile]]
-  for inspiration.
+See [[https://github.com/SciCrunch/sparc-curation/blob/master/docs/setup.org#bootstrapping-this-setuporg-file][setup.org bootstrapping]]
+for instructions on how to get an emacs environment that can tangle the outputs of this file.
+=TODO= tangle automatically from command line
+See [[https://github.com/nakkaya/ferret/blob/7a374f52b90b1ec813eb027adf4beaaa16751c09/Makefile#L35][ferret's Makefile]]
+for inspiration.
 
 * Load script
-  #+NAME: build-location
-  : /tmp/scigraph-build/sparc-data
+Set =build-location= here
+#+NAME: build-location
+: /tmp/scigraph-build
 
-  #+NAME: build-script
-  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location()
-    if [[ -d "${BUILD_LOCATION}" ]]; then
-        rm "${BUILD_LOCATION}" -r
-    fi
-    mkdir -p "${BUILD_LOCATION}"
-    #scigraph-load -c <(cat graphload.yaml.template | sed 's|BUILD_LOCATION|'"${BUILD_LOCATION}"'|g' )
+Set =graph-folder-name= here
+#+name: graph-folder-name
+: sparc-data
 
-    LATEST="${BUILD_LOCATION}/../LATEST"
-    BASENAME=$(basename "${BUILD_LOCATION}")
-    STAMPED="${BASENAME}-graph-$(date +%Y%m%dT%H%M%S)"
-    ZIPNAME="${STAMPED}.zip"
-    ZIPPATH="$(dirname "${BUILD_LOCATION}")/${ZIPNAME}"
+Tangle using =C-c C-v t= and run as =./build=
+#+NAME: build
+#+HEADER: :eval never :noweb yes :tangle ./build :tangle-mode (identity #o755)
+#+HEADER: :shebang "#!/usr/bin/env bash"
+#+header: :var _BUILD_LOCATION=build-location() _GRAPH_FOLDER_NAME=graph-folder-name()
+#+begin_src bash :eval never :results output
+: ${BUILD_LOCATION:="${_BUILD_LOCATION}"}
+: ${GRAPH_FOLDER_NAME:="${_GRAPH_FOLDER_NAME}"}
+BUILD_GRAPH_PATH="${BUILD_LOCATION}/${GRAPH_FOLDER_NAME}"
+STAMPED="${GRAPH_FOLDER_NAME}-graph-$(date +%Y%m%dT%H%M%S)"
+ZIPNAME="${STAMPED}.zip"
+ZIPPATH="${BUILD_LOCATION}/${ZIPNAME}"
+LATEST="${BUILD_LOCATION}/LATEST"
+echo $BUILD_GRAPH_PATH $GRAPH_FOLDER_NAME $STAMPED $ZIPNAME $ZIPPATH
 
-    echo $BUILD_LOCATION $BASENAME $STAMPED $ZIPNAME $ZIPPATH
-    pushd "${BUILD_LOCATION}/.."
-    # mv prevents accidentally deploying the same graph twice
-    # but use cp -r for development to avoid continual rebuild
-    cp -r ${BASENAME} ${STAMPED}
-    zip -r ${ZIPNAME} ${STAMPED}
-    unlink "${LATEST}"
-    ln -sT "${ZIPNAME}" "${LATEST}"
-    popd
-  #+end_src
+if [[ -d "${BUILD_GRAPH_PATH}" ]]; then
+    rm "${BUILD_GRAPH_PATH}" -r
+fi
+mkdir -p "${BUILD_GRAPH_PATH}"
+#scigraph-load -c <(cat graphload.yaml.template | sed 's|BUILD_GRAPH_PATH|'"${BUILD_GRAPH_PATH}"'|g' )
 
-  Tangle using =C-c C-v t= and run as =./build=
-  #+NAME: build
-  #+HEADER: :eval never :noweb yes :tangle ./build :tangle-mode (identity #o755)
-  #+HEADER: :shebang "#!/usr/bin/env bash"
-  #+HEADER: :var BUILD_LOCATION=build-location
-  #+begin_src bash
-    <<build-script>>
-  #+end_src
+pushd "${BUILD_LOCATION}"
+# mv prevents accidentally deploying the same graph twice
+# but use cp -r for development to avoid continual rebuild
+cp -r ${GRAPH_FOLDER_NAME} ${STAMPED}
+zip -r ${ZIPNAME} ${STAMPED}
+unlink "${LATEST}"
+ln -sT "${ZIPNAME}" "${LATEST}"
+popd
+#+end_src
 
 * Deploy graph
-  #+NAME: deploy-script
-  #+HEADER: :var SERVER=localhost RUNTIME_LOCATION=/var/lib/scigraph SVC_USER=scigraph
-  #+begin_src bash :eval never :results output :var BUILD_LOCATION=build-location()
-    BASENAME=$(basename "${BUILD_LOCATION}")
-    LATEST="${BUILD_LOCATION}/../LATEST"
-    ZIPNAME=$(readlink "${LATEST}")
-    STAMPED="${ZIPNAME//.zip/}"
-    ZIPPATH="$(dirname "${BUILD_LOCATION}")/${ZIPNAME}"
-    echo $BUILD_LOCATION $BASENAME $STAMPED $ZIPNAME $ZIPPATH
-    exit 0
-    if [ "${SERVER}" = "localhost" ]; then
-        CMD="su - ${SVC_USER} -c \"cp ${ZIPPATH} ${RUNTIME_LOCATION};
-                                   pushd ${RUNTIME_LOCATION};
-                                   unzip ${ZIPNAME};
-                                   unlink ${BASENAME};
-                                   ln -sT ${STAMPED} ${BASENAME};
-                                   popd\""
-        su - root -c "${CMD}"
-    else
-        scigraph_host="${SERVER}-deploy"  # by convention
-        scigraph_host_admin=${SERVER}
+#+name: localhost-deploy-command
+#+begin_src bash :eval never :exports code
+cp ${ZIPPATH} ${RUNTIME_LOCATION};
+pushd ${RUNTIME_LOCATION};
+unzip ${ZIPNAME};
+unlink ${GRAPH_FOLDER_NAME};
+ln -sT ${STAMPED} ${GRAPH_FOLDER_NAME};
+popd
+#+end_src
 
-        scp ${ZIPPATH} ${scigraph_host}:
-        ssh ${scigraph_host} "unzip ${ZIPNAME}"
+Tangle using =C-c C-v t= and run as =./deploy=
+#+NAME: deploy
+#+HEADER: :eval never :noweb yes :tangle ./deploy :tangle-mode (identity #o755)
+#+HEADER: :shebang "#!/usr/bin/env bash"
+#+HEADER: :var _SERVER="localhost" _RUNTIME_LOCATION="/var/lib/scigraph" _SVC_USER="scigraph"
+#+header: :var _BUILD_LOCATION=build-location() _GRAPH_FOLDER_NAME=graph-folder-name()
+#+begin_src bash :eval never :results output
+: ${SERVER:="${_SERVER}"}
+: ${RUNTIME_LOCATION:="${_RUNTIME_LOCATION}"}
+: ${SVC_USER:="${_SVC_USER}"}
 
-        ssh ${scigraph_host_admin} "sudo systemctl stop scigraph"
+: ${BUILD_LOCATION:="${_BUILD_LOCATION}"}
+: ${GRAPH_FOLDER_NAME:="${_GRAPH_FOLDER_NAME}"}
+LATEST="${BUILD_LOCATION}/LATEST"
+ZIPNAME=$(readlink "${LATEST}")
+STAMPED="${ZIPNAME//.zip/}"
+ZIPPATH="${BUILD_LOCATION}/${ZIPNAME}"
+echo $GRAPH_FOLDER_NAME $STAMPED $ZIPNAME $ZIPPATH
+if [ "${SERVER}" = "localhost" ]; then
+    CMD="su - ${SVC_USER} -c \"
+             <<localhost-deploy-command>>\""
+    su - root -c "${CMD}"
+else
+    scigraph_host="${SERVER}-deploy"  # by convention
+    scigraph_host_admin=${SERVER}
 
-        ssh ${scigraph_host} "unlink /var/lib/scigraph/graph
-                              ln -sT /var/lib/scigraph/${STAMPED} /var/lib/scigraph/graph"
+    scp ${ZIPPATH} ${scigraph_host}:
+    ssh ${scigraph_host} "unzip ${ZIPNAME}"
 
-        ssh ${scigraph_host_admin} "sudo systemctl start scigraph"
-    fi
-  #+end_src
+    ssh ${scigraph_host_admin} "sudo systemctl stop scigraph"
 
-  Tangle using =C-c C-v t= and run as =./deploy=
-  #+NAME: deploy
-  #+HEADER: :eval never :noweb yes :tangle deploy :tangle-mode (identity #o755)
-  #+HEADER: :shebang "#!/usr/bin/env bash"
-  #+HEADER: :var BUILD_LOCATION=build-location
-  #+HEADER: :var SVC_USER="scigraph"
-  #+HEADER: :var RUNTIME_LOCATION="/var/lib/scigraph"
-  #+begin_src bash
-    : ${SERVER:=localhost}
-    <<deploy-script>>
-  #+end_src
+    ssh ${scigraph_host} "unlink /var/lib/scigraph/graph
+                          ln -sT /var/lib/scigraph/${STAMPED} /var/lib/scigraph/graph"
+
+    ssh ${scigraph_host_admin} "sudo systemctl start scigraph"
+fi
+#+end_src
 
 * TODO Deploy services
-  Still not satisfied with any of the prior approaches to this ...
-  #+NAME: cypher-resources
-  #+begin_src yaml
-    cypherResources:
-      - path: /dynamic/shortestSimple
-        query: |
-                MATCH (start:Class{iri: '${start_id}'})
-                WITH start
-                MATCH (end:Class{iri: '${end_id}'})
-                WITH start, end
-                MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
-                RETURN path
-        operations:
-          - summary: Get the shortest path between two IDs
-            parameters:
-              - name: start_id
-                description: The starting node (ex UBERON:0005751)
-                paramType: query
-              - name: end_id
-                description: The ending node (ex UBERON:0001255)
-                paramType: query
-              - name: max_depth
-                description: the maximum depth to traverse
-                paramType: query
-              - name: relationship
-                description: The property to traverse (ex subClassOf or subClassOf|partOf|isA)
-                paramType: query
-                required: false
-  #+end_src
+Still not satisfied with any of the prior approaches to this ...
+[[file:/ssh:aws-scigraph-data-deploy:services.yaml]]
+#+NAME: cypher-resources
+#+begin_src yaml :dir /ssh:aws-scigraph-data-deploy:
+cypherResources:
+  - path: /dynamic/shortestSimple
+    query: |
+            MATCH (start:Class{iri: '${start_id}'})
+            WITH start
+            MATCH (end:Class{iri: '${end_id}'})
+            WITH start, end
+            MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
+            RETURN path
+    operations:
+      - summary: Get the shortest path between two IDs
+        parameters:
+          - name: start_id
+            description: The starting node (ex UBERON:0005751)
+            paramType: query
+          - name: end_id
+            description: The ending node (ex UBERON:0001255)
+            paramType: query
+          - name: max_depth
+            description: the maximum depth to traverse
+            paramType: query
+          - name: relationship
+            description: The property to traverse (ex subClassOf or subClassOf|partOf|isA)
+            paramType: query
+            required: false
+#+end_src

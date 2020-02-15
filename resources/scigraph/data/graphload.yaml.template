@@ -1,5 +1,5 @@
 graphConfiguration:
-    location: BUILD_LOCATION
+    location: BUILD_GRAPH_PATH
     neo4jConfig:
       dump_configuration : true
       dbms.pagecache.memory : 4G
