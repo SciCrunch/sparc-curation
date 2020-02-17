@@ -381,3 +381,19 @@ cypherResources:
             description: The predicate for the type of connectivity (eg ilxtr:hasPresynapticTerminalsIn)
             paramType: query
             required: false
+
+  - path: /dynamic/demos/apinat/housing-lyphs/{start-id}
+    operations:
+      - summary: List all the housing lyphs for a starting point.
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+            MATCH (soma:NamedIndividual{iri: '${start-id}'})
+            -[relation:apinatomy:conveyingLyph]-(link1)
+            -[:apinatomy:target]-(root)
+            -[:apinatomy:root]-(tree)
+            -[:apinatomy:housingLyphs]-(housing)
+            -[r:apinatomy:external*0..1]-(external)
+            RETURN housing, r, external
