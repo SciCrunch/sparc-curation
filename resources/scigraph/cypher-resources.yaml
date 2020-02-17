@@ -382,6 +382,19 @@ cypherResources:
             paramType: query
             required: false
 
+  - path: /dynamic/demos/apinat/housing-lyphs
+    operations:
+      - summary: List all the housing lyphs for all starting points.
+    query: |
+            MATCH (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
+            -[:apinatomy:external]-(soma:NamedIndividual)
+            -[relation:apinatomy:conveyingLyph]-(link1)
+            -[:apinatomy:target]-(root)
+            -[:apinatomy:root]-(tree)
+            -[:apinatomy:housingLyphs]-(housing)
+            -[r:apinatomy:external*0..1]-(external)
+            RETURN housing, r, external
+
   - path: /dynamic/demos/apinat/housing-lyphs/{start-id}
     operations:
       - summary: List all the housing lyphs for a starting point.
