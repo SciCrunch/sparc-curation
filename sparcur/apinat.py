@@ -106,12 +106,15 @@ def make_classes(schema):
     cs = []
     d = schema['definitions']
     for k, v in d.items():
+        if not v:
+            log.warning(f'empty definition for {k}')
+            continue
+
         c = top(k, v)
         ref = f'#/definitions/{k}'
         types[ref] = c
         cs.append(c)
 
-    #breakpoint()
     return cs
 
 
@@ -352,7 +355,7 @@ class Lyph(BaseElement):
     key = 'lyphs'
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
-    objects = 'layerIn', 'conveyedBy', 'border', 'cloneOf'
+    objects = 'layerIn', 'conveys', 'border', 'cloneOf'
     objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones', 'external'
 
     def triples(self):
