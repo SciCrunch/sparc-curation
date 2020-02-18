@@ -43,6 +43,7 @@ setup(name='sparcur',
           'blackfynn>=3.0.0',
           'dicttoxml',
           'idlib',
+          'ipython',
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'protcur>=0.0.3',
           'pyontutils>=0.1.15',
