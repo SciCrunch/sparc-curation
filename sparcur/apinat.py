@@ -321,6 +321,8 @@ class BaseElement(Base):
                 value = self.blob[key]
                 value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                 yield self.s, readable[key], self.context[value]
+                if key == 'root':  # FIXME temp hack to get directions to cooperate
+                    yield self.context[value], readable['rootOf'], self.s
 
     def triples_objects_multi(self):
         for key in self.objects_multi:
@@ -356,7 +358,7 @@ class Lyph(BaseElement):
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
     objects = 'layerIn', 'conveys', 'border', 'cloneOf'
-    objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones', 'external'
+    objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones', 'external', 'internalNodes', 'bundles', 'bundlesTrees'
 
     def triples(self):
         yield from super().triples()
@@ -384,19 +386,22 @@ Graph.Coalescence = Coalescence
 class Border(BaseElement):
     # FIXME class is Link ?
     key = 'borders'
-    objects = 'host', 'external'
+    objects = 'host',
+    objects_multi = 'borders', 'external'
 
 
 Graph.Border = Border
 class Tree(BaseElement):
     key = 'trees'
-    objects = 'root', 'lyphTemplate'
-    objects_multi = 'housingLyphs', 'external'
+    objects = 'root', 'lyphTemplate', 'group'
+    objects_multi = 'housingLyphs', 'external', 'levels'
 
 
 Graph.Tree = Tree
 class Group(BaseElement):
     key = 'groups'
+    objects = 'generatedFrom',
+    objects_multi = 'nodes', 'links', 'Lyphs', 'coalescences', 'groups'
     elements = Node, Link, Lyph, Coalescence  # Group  # ah class scope
 
     def triples(self):

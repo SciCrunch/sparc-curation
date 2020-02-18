@@ -2,17 +2,17 @@ ontologies:
   #- url: http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl
   #- url: http://ontology.neuinfo.org/NIF/extra.ttl
   #- url: http://ontology.neuinfo.org/NIF/ttl/nif.ttl
-  - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl
+  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
       removeUnsatisfiableClasses: true
-  - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/Bolser-Lewis-Model2.ttl
+  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/Bolser-Lewis-Model2.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
       removeUnsatisfiableClasses: true
-  - url: https://sparc.olympiangods.org/ApiNATOMY/ontologies/test-bolew.ttl
+  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/test-bolew.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true

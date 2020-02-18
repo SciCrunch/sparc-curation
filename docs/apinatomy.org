@@ -4,15 +4,25 @@
    Conversion from json to rdf should have few if any changes in semantics.
    Conversion from a direct rdf translation to OWL2 is where the semantic
    translation of ApiNATOMY structures into OWL2 constructs will happen.
+* Server setup
+On the ontology host (read, ttl host, not SciGraph host) you will need the following.
+#+begin_src bash :dir /ssh:host-apinat-ttl|sudo:host-apinat-ttl: :eval never
+mkdir /var/www/sparc/ApiANTOMY
+mkdir /var/www/sparc/ApiANTOMY/archive
+mkdir /var/www/sparc/ApiANTOMY/archive/manual
+mkdir /var/www/sparc/ApiANTOMY/ontologies
+chown -R nginx:nginx /var/www/sparc/ApiANTOMY
+#+end_src
 * Export
 Make sure SciGraph services and InterLex are accessible for OntTerm.
 
 Run this block in emacs with =C-c C-c= or tangle and run with the block below
-#+header: :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o0755)
-#+begin_src python :dir ../ :results output :tangle ../export-apinatomy-tests
 # note have to export to working dir not ../bin/ because
 # there is no test folder inside of bin and python can't
 # look backward up the folder hierarchy to find it
+#+name: bolew-export
+#+header: :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o0755)
+#+begin_src python :dir ../ :results output :tangle ../export-apinatomy-tests
 import sys
 import pathlib
 print(pathlib.Path.cwd())
@@ -31,5 +41,30 @@ emacs --batch \
       --load ob-shell \
       --load ob-python \
       --eval '(org-babel-tangle-file "./docs/apinatomy.org")'
+
 ./export-apinatomy-tests
 #+end_src
+* Deploy ttl
+First run the export via [[bolew-export][bolew-export]].
+Then
+#+begin_src bash :results none :noweb yes
+scp ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
+#+end_src
+
+#+begin_src bash :dir /ssh:cassava|sudo:cassava: :eval never
+DATE=$(date +%Y%m%dT%H%M%S)
+ARCHIVE_PATH="archive/manual/${DATE}"
+FOLDER="/var/www/sparc/ApiNATOMY/${ARCHIVE_PATH}"
+mkdir $FOLDER
+mv "/tmp/test-bolew.ttl" $FOLDER
+chown -R nginx:nginx $FOLDER
+pushd /var/www/sparc/ApiNATOMY/ontologies
+unlink test-bolew.ttl
+ln -s "../${ARCHIVE_PATH}/test-bolew.ttl"
+popd
+#+end_src
+
+* Load and deploy graph
+Then run
+[[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
+to load and deploy in one shot.
