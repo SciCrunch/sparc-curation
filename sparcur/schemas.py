@@ -9,7 +9,7 @@ import idlib
 import rdflib
 import requests
 from pyontutils.core import OntId, OntTerm
-from pysercomb.pyr.units import Expr
+from pysercomb.pyr.core import Expr
 from sparcur import exceptions as exc
 from sparcur.utils import logd
 from sparcur.core import JEncode
