@@ -1,6 +1,6 @@
 cypherResources:
   - path: /dynamic/prod/sparc/organParts/{id}
-    operations:
+    operations: &organParts-ops
       - summary: Get the parts list for an organ including nerves and blood vessles
         parameters:
          - name: id
@@ -22,12 +22,7 @@ cypherResources:
             RETURN path
 
   - path: /dynamic/test/sparc/organParts/{id}
-    operations:
-      - summary: Get the parts list for an organ including nerves and blood vessles
-        parameters:
-         - name: id
-           description: ontology id of the organ
-           paramType: path
+    operations: *organParts-ops
     query: *organParts
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
@@ -85,7 +80,7 @@ cypherResources:
             RETURN path
 
   - path: /dynamic/prod/sparc/rootLabels/{root-id}
-    operations:
+    operations: &rootLabes-ops
       - summary: Get the list of all parcellation labels for a single label root
         parameters:
          - name: root-id
@@ -101,12 +96,7 @@ cypherResources:
             RETURN path
 
   - path: /dynamic/test/sparc/rootLabels/{root-id}
-    operations:
-      - summary: Get the list of all parcellation labels for a single label root
-        parameters:
-         - name: root-id
-           description: ontology id of the parcellation label root
-           paramType: path
+    operations: *rootLabes-ops
     query: *rootLabels
 
   - path: /dynamic/prod/sparc/parcellationRoots
@@ -185,7 +175,7 @@ cypherResources:
             RETURN path
 
   - path: /dynamic/prod/sparc/parcellationRootsFMA/{species-id}/{fma-id}
-    operations:
+    operations: &parcellationRootsFMA-ops
       - summary: Get the graph of all parcellation label roots for a single species and anatomical region
         parameters:
          - name: species-id
@@ -236,15 +226,7 @@ cypherResources:
             RETURN path
 
   - path: /dynamic/test/sparc/parcellationRootsFMA/{species-id}/{fma-id}
-    operations:
-      - summary: Get the graph of all parcellation label roots for a single species and anatomical region
-        parameters:
-         - name: species-id
-           description: ontology id of the species
-           paramType: path
-         - name: fma-id
-           description: ontology id of the anatomical region
-           paramType: path
+    operations: *parcellationRootsFMA-ops
     query: *parcellationRootsFMA
 
   - path: /dynamic/prod/sparc/parcellationGraph
@@ -269,7 +251,7 @@ cypherResources:
             RETURN path
 
   - path: /dynamic/prod/sparc/organList
-    operations:
+    operations: &organList-ops
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
     query: &organList |
             MATCH (n)
@@ -296,12 +278,11 @@ cypherResources:
             RETURN n
 
   - path: /dynamic/test/sparc/organList
-    operations:
-      - summary: Get the list of all FMA organ identifiers relevant to SPARC
+    operations: *organList-ops
     query: *organList
 
   - path: /dynamic/prod/sparc/speciesList
-    operations:
+    operations: &speciesList-ops
       - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
     query: &speciesList |
             MATCH (n)
@@ -315,8 +296,7 @@ cypherResources:
             RETURN n
 
   - path: /dynamic/test/sparc/speciesList
-    operations:
-      - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
+    operations: *speciesList-ops
     query: *speciesList
 
   - path: /dynamic/shortestSimple
