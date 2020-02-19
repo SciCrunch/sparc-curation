@@ -46,7 +46,7 @@ setup(name='sparcur',
           'ipython',
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'protcur>=0.0.4',
-          'pyontutils>=0.1.16',
+          'pyontutils>=0.1.17',
           'pysercomb>=0.0.4',
           'robobrowser',
           'terminaltables',
