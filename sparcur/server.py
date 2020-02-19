@@ -69,6 +69,7 @@ def make_app(report, project_path, name='spc-server'):
             'subjects',
             'errors',
             'terms',
+            'contributors',
         )
         report_links = [atag(url_for(f'route_reports_{rn}', ext=None), rn) + '<br>\n'
                         for rn in report_names]
@@ -146,6 +147,11 @@ def make_app(report, project_path, name='spc-server'):
             tables.append(table + '<br>\n')
 
         return wrap_tables(*tables, title='Terms')
+
+    @app.route(f'{bp}/reports/contributors')
+    @app.route(f'{bp}/reports/contributors<ext>')
+    def route_reports_contributors(ext=None):
+        return report.contributors(ext=ext)
 
     @app.route(f'{bp}/apinat/demo')
     @app.route(f'{bp}/apinat/demo<ext>')

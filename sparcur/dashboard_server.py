@@ -24,6 +24,7 @@ args = {'server': True,
         '--export-path': auth.get_path('export-path'),
         '--partial': False,
         '--open': False,
+        '--debug': False,
 }
 
 options = Options(args, defaults)
