@@ -1618,7 +1618,9 @@ class Shell(Dispatcher):
         ds = datasets
         summary = self.summary
         org = Integrator(self.project_path)
+        embed()
 
+    def more(self):
         p, *rest = self._paths
         if p.cache.is_dataset():
             intr = Integrator(p)

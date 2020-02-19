@@ -705,7 +705,7 @@ class BlackfynnRemote(aug.RemotePath):
         return file_is_different
 
     @property
-    def data(self):
+    def _single_file(self):
         if isinstance(self.bfobject, DataPackage):
             files = list(self.bfobject.files)
             if len(files) > 1:
@@ -715,9 +715,23 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self.bfobject, File):
             file = self.bfobject
         else:
+            file = None
+
+        return file
+
+    @property
+    def _uri_file(self):
+        file = self._single_file
+        if file is not None:
+            return file.url
+
+    @property
+    def data(self):
+        uri_file = self._uri_file
+        if uri_file is None:
             return
 
-        gen = self.get_file_by_url(file.url)
+        gen = self.get_file_by_url(uri_file)
         try:
             self.data_headers = next(gen)
         except exc.NoRemoteFileWithThatIdError as e:
