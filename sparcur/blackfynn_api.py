@@ -16,6 +16,9 @@ from requests.exceptions import HTTPError, ConnectionError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from joblib import Parallel, delayed
+if 'BLACKFYNN_LOG_LEVEL' not in os.environ:
+    # silence agent import warning
+    os.environ['BLACKFYNN_LOG_LEVEL'] = 'CRITICAL'
 from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset, BaseNode
 from blackfynn.models import BaseCollection
