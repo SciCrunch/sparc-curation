@@ -75,6 +75,8 @@ Run the following block to clone this repository and the =scimax= repository.
 #+begin_src bash :exports code :eval never
 pushd ~/git
 git clone https://github.com/SciCrunch/sparc-curation.git
+popd
+pushd ~/opt
 git clone https://github.com/jkitchin/scimax.git
 popd
 #+END_SRC
