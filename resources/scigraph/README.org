@@ -1,33 +1,8 @@
 * Graph load and deployment
+SciGraph ontology deployment is documented in the
+[[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.org#sparc][sparc]]
+section of the main SciGraph deployment documentation.
 
-To load the graph run the following from the folder of this readme.
-
-#+BEGIN_SRC bash
-ontload graph \
---org SciCrunch  ${IFS# github organization} \
-NIF-Ontology     ${IFS# repo name} \
-NIF              ${IFS# remote base http:// pattern to swap with local file://,
-                   NIF automatically expands to http://ontology.neuinfo.org/NIF} \
---zip-location /tmp/test1  ${IFS# output folder where the loaded graph zip will be exported} \
---git-local /tmp/test1     ${IFS# location where git repo will be cloned} \
---branch dev               ${IFS# git ref (branch, commit, etc.) from which to build} \
---patch                    ${IFS# do apply patches} \
---graphload-config ./graphload.yaml  # path to the graphload config (only graphload.yaml.template needs to exist)
-#+END_SRC
-
-To create services.yaml run the following from the folder of this readme.
-
-#+BEGIN_SRC bash
-scigraph-deploy config \
-localhost                 ${IFS# build host} \
-scigraph.scicrunch.io     ${IFS# services host} \
---services-user ec2-user  ${IFS# user on the services host} \
---zip-location ./         ${IFS# local path to build files (not sure why
-                            we need this for deploying the config)} \
---local                   ${IFS# run all commands locally} \
---services-config ./services.yaml  # path to services config (only services.yaml.template needs to exist)
-#+END_SRC
-
-See the [[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.md#rpm-builds][RPM Builds]] section of the
-[[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.md][the pyontutils scigraph readme]] for the rest
-of the instructions for deployment.
+SciGraph data deployment is documented in the
+[[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.org#sparc-data][sparc-data]]
+section of the main SciGraph deployment documentation.
