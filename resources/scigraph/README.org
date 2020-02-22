@@ -1,4 +1,6 @@
-* Graph load and deployment
+#+TITLE: SPARC ontology load and deployment
+#+options: num:nil
+
 SciGraph ontology deployment is documented in the
 [[https://github.com/tgbugs/pyontutils/blob/master/nifstd/scigraph/README.org#sparc][sparc]]
 section of the main SciGraph deployment documentation.
