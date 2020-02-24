@@ -23,7 +23,20 @@ cypherResources:
 
   - path: /dynamic/test/sparc/organParts/{id}
     operations: *organParts-ops
-    query: *organParts
+    query: |
+      MATCH path = (start:Class{iri: "${id}"})
+      // FIXME need ILX:0738400 inverse
+      <-[:subClassOf|ILX:0738400|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..40]-(part)
+      <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
+      <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
+      RETURN path
+      UNION
+      MATCH path = (start:Class{iri: "${id}"})
+      // this one does not need to be inverted ? except for the INCOMING flag
+      <-[:fma:arterial_supply_of|fma:venous_drainage_of]-(vessel)
+      <-[:fma:branch|fma:tributary]-(more_vessel)
+      <-[:fma:branch|fma:tributary|fma:regional_part]-(even_more_vessel)
+      RETURN path
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
     operations:
