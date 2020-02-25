@@ -59,10 +59,10 @@ engineers that has everything we will need. The following steps will do this aut
 
 When pasting blocks into the terminal (middles mouse, or =C-V= =control-shift-v= in the ubuntu terminal)
 if you do not copy the last newline of the blocks then you will have to hit enter to run the last command.
+# TODO emacs auto setup to be able to run this file
 #+NAME: setup-folders
 #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
 #+BEGIN_SRC bash :exports code :eval never
-# TODO emacs auto setup to be able to run this file
 mkdir -p ~/.local/bin
 mkdir ~/bin
 mkdir ~/opt
@@ -88,12 +88,16 @@ It is needed for scimax to install correctly.
 tlmgr init-usertree
 #+end_src
 
-Run the following commands to create the =scimax= command ([[file:${HOME}/bin/scimax][~/bin/scimax]]
-on linux and macos, [[file:${HOME}/bin/scimax.ps1][~/bin/scimax.ps1]] on windows), and the config file
-[[file:${HOME}/opt/scimax/user/user.el][user.el]] that is needed for the rest of the process.
+Run the following commands to create the =scimax= command (
+[[file:${HOME}/bin/scimax][~/bin/scimax]] on linux and macos,
+[[file:${HOME}/bin/scimax.ps1][~/bin/scimax.ps1]] on windows),
+and the config file
+[[file:${HOME}/opt/scimax/user/user.el][user.el]]
+that is needed for the rest of the process.
 # astoundingly powershell redirection and bash redirection have the same behavior for strings so it makes it
 # possible to work around the fact that the behavior is effectively mutually exclusive for strings passed as
 # arguments, all I can do is laugh at how dumb this is
+# NOTE: can't use line continuation here because it is different between powershell and posix
 #+name: tangle-setup-org
 #+begin_src sh :eval never
 echo '(defvar *path-to-setup.org* "~/git/sparc-curation/docs/setup.org")' > vars.el
@@ -107,6 +111,7 @@ When running the next block =scimax= will launch emacs an install a number of pa
 It is normal to see errors during this step. When everything finishes installing you should find
 yourself staring at next section of this file [[#per-user-setup][Per user setup]] and can continue
 from there in =scimax=.
+# NOTE: cannot use line continuation because it breaks posix/powershell portability
 #+name: scimax-bootstrap
 #+begin_src bash :exports code :eval never
 scimax --find-file ~/git/sparc-curation/docs/setup.org --eval "(add-hook 'window-setup-hook (lambda () (org-goto-section *section-per-user-setup*)))"
@@ -157,107 +162,26 @@ See [[#developer-setup-code][Developer setup code]] in the appendix for the sour
 :PROPERTIES:
 :CUSTOM_ID: configuration-files
 :END:
-This section will create and populate
-[[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]],
-[[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]],
-and [[file:${HOME}/.config/orthauth/secrets.yaml][~/secrets.yaml]].
-They are used to configure the various programs that are used by the SPARC
-curation workflow, and store the API keys and semi private information such
-as hypothes.is group names, and google doc ids.
+The config files for this section should have already been tangled
+to the correct locations when [[tangle-setup-org][setup.org was tangled]].
+If you want to see their source it is contained in the [[#config-templates][Config Templates appendix]]
 
-*NOTE: If you are on macos   =~/.config= is =~/Library/Application Support=* \\
-*NOTE: If you are on windows =~/.config= is =~/AppData/Local=* \\
-
-The templates below should have already been tangled to the correct locations when
-[[tangle-setup-org][setup.org was tangled]].
-#+name: pyontutils-config-defaults
-#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "pyontutils/config.yaml")))) (user-config-path "pyontutils/config.yaml")) :mkdirp yes
-auth-stores:
-  secrets:
-    path: '{:user-config-path}/orthauth/secrets.yaml'
-auth-variables:
-  curies:
-  git-local-base: ~/git
-  git-remote-base:
-  google-api-creds-file:
-    path: google api creds-file
-  google-api-store-file:
-    path: google api store-file
-  google-api-store-file-readonly:
-    path: google api store-file-readonly
-  nifstd-checkout-ok:
-  ontology-local-repo:
-  ontology-org:
-  ontology-repo:
-  patch-config:
-  resources:
-  scigraph-api: https://scigraph.olympiangods.org/scigraph
-  scigraph-api-key:
-  scigraph-graphload:
-  scigraph-java:
-  scigraph-services:
-  scigraph-start:
-  scigraph-stop:
-  scigraph-systemd:
-  zip-location:
+If the basic configuration files have been tangled correctly
+you should be able to run this block with =C-c C-c= and get results.
+#+name: test-basic-config
+#+begin_src bash :results output drawer
+scig t brain
 #+end_src
 
-#+name: sparcur-config-defaults
-#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "sparcur/config.yaml")))) (user-config-path "sparcur/config.yaml")) :mkdirp yes
-auth-stores:
-  secrets:
-    path: '{:user-config-path}/orthauth/secrets.yaml'
-auth-variables:
-  blackfynn-organization:
-  cache-path:
-  export-path:
-  hypothesis-api-key: hypothesis api *replace-me-with-:your-user-name*
-  hypothesis-group: hypothesis group sparc-curation
-  hypothesis-user:
-  log-path:
-  protocols-io-api-creds-file: protocols-io api creds-file
-  protocols-io-api-store-file: protocols-io api store-file
-#+end_src
-
-If everything works then you should be able to run =scig t brain= and get results.
-
-You can move your [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
-to live where ever you want, but you will need to update the =auth-stores: secrets: path:= entry in
-[[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]] and
-[[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]].
-#+name: secrets-template
-#+header: :tangle-mode (identity #o600)
-#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
-blackfynn:
-  sparc:
-    key: fake-api-key
-    secret: fake-api-secret
-google:
-  api:
-    creds-file: /path/to/creds-file.json
-    store-file: google-api-token-rw.pickle
-    store-file-readonly: google-api-token.pickle
-  sheets:
-    sparc-consistency: document-hash-id
-    sparc-master: document-hash-id
-hypothesis:
-  api:
-    *replace-me-with-:your-user-name*: fake-api-key
-  group:
-    sparc-curation: FakeId12
-protocols-io:
-  api:
-    creds-file: /path/to/creds-file.json
-    store-file: protocols-io-api-token-rw.pickle
-#+end_src
-
-At this point installation is complete. Congratulations!
+At this point installation is complete. *Congratulations!*
 
 *You should log out and log back in to your window manager* so that any new terminal
 you open will have access to all the programs you just installed.
 Logout on the default ubuntu window manager is located in the upper right.
 
-*When you you log back in* run the following command to start at the next step.
+*When you log back in* run the following command to start at the next step.
+# Yes, this is a hilarious chicken and egg problem, I know.
+# NOTE: cannot use line continuation because it breaks posix/powershell portability
 #+NAME: launch-setup-org-2
 #+CAPTION: Run the following to open this file in an executable form.
 #+BEGIN_SRC bash :exports code :eval never
@@ -266,9 +190,6 @@ scimax --find-file ~/git/sparc-curation/docs/setup.org --eval "(add-hook 'window
 
 When you exit emacs it may ask you if you want to save,
 say yes so that the logs of the install are saved.
-# TODO FIXME
-NOTE this will cause problems down the line when you
-try to pull updates for sparc-curation because git will complain.
 
 The [[#accounts-and-api-access][next section]] will walk you through the steps needed
 to get access to all the various systems holding different pieces of data that we need.
@@ -276,11 +197,20 @@ to get access to all the various systems holding different pieces of data that w
 :PROPERTIES:
 :CUSTOM_ID: accounts-and-api-access
 :END:
-Create accounts, obtain various API keys.
-After you finish this section you can jump to [[#get-data][getting data]]!.
+At this point you should open your =secrets.yaml= file
+so that you can edit it as you work through the next section where you will
+get the various API keys that you will need to replace the fake values
+(seen in the template below). Direct links per platform are listed below.
+Clicking on the link will open it in another buffer. While editing the file
+you can save using the file menu, =C-x C-s= (emacs keys), or =:w= (vim keys).
 
-The notation =(-> key1 key2 key3)= indicates a path in
-your [[file:${HOME}/secrets.yaml][secrets.yaml]] file.
+| Linux   | [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]                                         |
+| Macos   | [[file:${HOME}/Library/Application Support/orthauth/secrets.yaml][~/Library/Application Support/orthauth/secrets.yaml]] |
+| Windows | [[file:${HOME}/AppData/Local/orthauth/secrets.yaml][~/AppData/Local/orthauth/secrets.yaml]]                             |
+
+_*When you are done* there should be *NO* entries with =*replace-me-with:= in the file._
+
+The notation =(-> key1 key2 key3)= indicates a path in the =secrets.yaml= file.
 In a yaml file this looks like the block below.
 Replace the =fake-value= with the real value you obtain in the following sections.
 #+CAPTION: yaml view of =(-> key1 key2 key3)=
@@ -289,70 +219,49 @@ key1:
   key2:
     key3: fake-value
 #+END_SRC
-You can open the [[file:${HOME}/secrets.yaml][secrets.yaml]]
-file in another buffer by clicking on the link to it here. When you edit the file and
-to add api keys you should save it after each one using the file menu or =C-x C-x=.
-**** Ontology
-***** SciGraph
-For some use cases you will need access to the SciCrunch production SciGraph endpoint.
-[[https://scicrunch.org/register][Register for an account]] and
-[[https://scicrunch.org/account/developer][get an api key]].
-Edit [[file:${HOME}/.config/pyontutils/config.yaml][config.yaml]]
-and update the =scigraph-api-key: path:= entry to point to =scicrunch api name-of-user-or-name-for-the-key=.
-Edit [[file:${HOME}/.config/pyontutils/secrets.yaml][secrets.yaml]]
-and add the api key to =(-> scicrunch api name-of-user-or-name-for-the-key)=.
-**** Data
-***** Blackfynn
+**** Blackfynn
 Once you have a Blackfynn account on the sparc org go to your
 [[https://app.blackfynn.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/profile/][profile]]
 and create an API key. Put they key in =(-> blackfynn sparc key)= and the secret in =(-> blackfynn sparc secret)=.
-+While you are there you should also connect your ORCiD.+ Broken at the moment.
-**** Human workflows
-***** Google
+While you are there you should also connect your ORCiD (button at the bottom of the page).
+**** Google API
 Enable the [[https://console.developers.google.com/apis/library/sheets.googleapis.com][google sheets API]]
 from the [[https://console.developers.google.com][google api dashboard]]. If you need other APIs
 you can enable them via the [[https://console.developers.google.com/apis/library][library page]].
 
 *If you do not do this then at the end of the client flow you will receive a =invalid_clientUnauthorized= error.*
 
-=(-> google api creds-file)=
-https://developers.google.com/identity/protocols/OAuth2
-https://developers.google.com/api-client-library/python/guide/aaa_oauth
+The instructions below are probably incomplete/missing steps. \\
 
-You will need to get API access for a OAuth client.
-https://console.developers.google.com/apis/credentials
-create credentials -> OAuth client ID
-Fill in the consent screen, you only need the Application name field.
-Download JSON
-Add the name of the downloaded JSON file to [[file:${HOME}/.config/pyontutils/secrets.yaml][secrets.yaml]]
-=(-> google api creds-file)=. Then run
-=python ~/git/pyontutils/pyontutils/sheets.py auth sheets= and
-=python ~/git/pyontutils/pyontutils/sheets.py auth sheets --readonly=.
-Those commands will run the auth workflow and create the file specified at =(-> google api store-file)= for you.
+Useful docs for =(-> google api creds-file)= \\
+https://developers.google.com/identity/protocols/OAuth2 \\
+https://developers.google.com/api-client-library/python/guide/aaa_oauth \\
+
+You will need to get API access for an OAuth client.
+1. https://console.developers.google.com/apis/credentials
+2. create credentials -> OAuth client ID
+3. Fill in the consent screen, you only need the Application name field.
+4. Download JSON
+5. Add the name of the downloaded JSON file to =(-> google api creds-file)=.
+6. Run the following \\
+   =googapis auth sheets= and \\
+   =googapis auth sheets --readonly=.
+
+Those commands will run the auth workflow and create the
+file specified at =(-> google api store-file)= for you.
+During the process you will be taken to (or need to paste
+a link to) a google login page to confirm that you want to
+give the google API project you created access to your account.
 # TODO fix these instructions
-
+**** Google sheets
 Get the document ids for the following.
 - =(-> google sheets sparc-master)=
 - =(-> google sheets sparc-consistency)=
 - =(-> google sheets sparc-affiliations)=
 - =(-> google sheets sparc-field-alignment)=
-  Document id matches this pattern https://docs.google.com/spreadsheets/d/{document_id}/edit.
-**** Protocol annotation set up
-***** Hypothes.is
-#+CAPTION: as your user Install the hypothesis client in chrome.
-#+BEGIN_SRC bash :results none
-google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
-#+END_SRC
-To get Hypothes.is API keys [[https://web.hypothes.is/start/][create an account]],
-login, and go to your [[https://hypothes.is/account/developer][developer page]].
 
-Temporary additions to .bashrc until this can be sourced from secrets directly
-#+BEGIN_SRC bash
-HYP_USER=your-hypothesis-user-name
-HYP_GROUP=$(cat ~/secrets.yaml | grep sparc-curation: | awk '{ print $2 }')
-HYP_API_TOKEN=$(cat ~/secrets.yaml | grep "${HYP_USER}:" | awk '{ print $2 }')
-#+END_SRC
-***** protocols.io
+Document id matches this pattern =https://docs.google.com/spreadsheets/d/{document_id}/edit=.
+**** protocols.io
 To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
 login, and go to your [[https://www.protocols.io/developers][developer page]].
 You will need to set the redirect uri on that page to match the redirect uri
@@ -375,10 +284,28 @@ like you did for the google json file.
     }
 }
 #+END_SRC
-
 You will be prompted for your protocols.io email and password the first
 time you run.
+**** Hypothes.is
+As your user Install the hypothesis client in chrome.
+#+CAPTION: open chrome to hypothesis extension install page
+#+BEGIN_SRC bash :results none
+google-chrome-stable https://chrome.google.com/webstore/detail/hypothesis-web-pdf-annota/bjfhmglciegochdpefhhlphglcehbmek
+#+END_SRC
+To get Hypothes.is API keys [[https://web.hypothes.is/start/][create an account]],
+login, and go to your [[https://hypothes.is/account/developer][developer page]].
+
+Add your the API key to =(-> hypothesis api user-default-hypothesis)=
+**** SciGraph
+For some use cases you will need access to the SciCrunch production SciGraph endpoint.
+[[https://scicrunch.org/register][Register for an account]] and
+[[https://scicrunch.org/account/developer][get an api key]].
+Edit [[file:${HOME}/.config/pyontutils/config.yaml][config.yaml]]
+and update the =scigraph-api-key: path:= entry to point to =scicrunch api name-of-user-or-name-for-the-key=.
+Edit [[file:${HOME}/.config/orthauth/secrets.yaml][secrets.yaml]]
+and add the api key to =(-> scicrunch api name-of-user-or-name-for-the-key)=.
 ** Developer extras
+*** Python debugger settings
 If you can use python3.7 (>=ubuntu-19.04) you can set the embedded debugger as follows.
 #+begin_src bash
 pip install --user pudb
@@ -387,7 +314,7 @@ pip install --user pudb
 #+begin_src bash
 export PYTHONBREAKPOINT=pudb.set_trace
 #+end_src
-
+*** Prevent vim from removing xattrs
 [[file:${HOME}/.vimrc][~/.vimrc]] settings to prevent klobbering of xattrs
 #+CAPTION: .vimrc
 #+begin_src vimrc
@@ -709,6 +636,9 @@ ln -s /usr/local/bin/pip3 ~/bin/pip
 * Workflows
 ** General
 *** Updating an installation
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 #+NAME: git-pull-all
 #+CAPTION: new features that you want to use? aka git pull all or =gpa= if implemented as a function
 #+BEGIN_SRC bash :results output :var REPOS=repos
@@ -725,6 +655,7 @@ popd
 *** Get data
 :PROPERTIES:
 :CUSTOM_ID: get-data
+:VISIBILITY: folded
 :END:
 If you have never retrieved the data before run.
 #+CAPTION: first time per local network
@@ -769,9 +700,15 @@ rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local
 =-r= recursive
 =-e= remote shell to use
 *** Fetch missing files
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 fetching a whole dataset or a subset of a dataset
 =spc ** -f=
 *** Export
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 #+CAPTION: export everything
 #+BEGIN_SRC bash
 pushd ${SPARCDATA}
@@ -798,8 +735,10 @@ function sparc-export-to-server () {
     popd
 }
 #+END_SRC
-
 *** Reporting
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 #+CAPTION: reports
 #+BEGIN_SRC bash
 spc report completeness
@@ -815,6 +754,9 @@ keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords'
                        for k in d['meta']['keywords']]))
 #+end_src
 *** Archiving files with xattrs
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 =tar= is the only one of the 'usual' suspects for file archiving that
 supports xattrs, =zip= cannot.
 
@@ -832,9 +774,11 @@ tar --force-local --xattrs -xvzf 2019-07-17T10\:44\:16\,457344.tar.gz
 #+begin_src bash
 find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
-
 *** Other random commands
 **** Duplicate top level and ./.operations/objects
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 # TODO upgrade this into backup and duplication
 #+begin_src bash
 function sparc-copy-pull () {
@@ -853,6 +797,9 @@ function sparc-copy-pull () {
 }
 #+end_src
 **** Simplified error report
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 #+CAPTION: simplified error report
 #+begin_src bash
   jq -r '[ .datasets[] |
@@ -861,8 +808,10 @@ function sparc-copy-pull () {
             se: [ .status.submission_errors[].message ] | unique,
             ce: [ .status.curation_errors[].message   ] | unique } ]' curation-export.json
 #+end_src
-
 **** File extensions
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 Get a list of all file extensions for symlinks (usually data)
 #+begin_src bash
 find -type l | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
@@ -872,8 +821,10 @@ Find datasets with unknown file types.
 #+begin_src bash
 find -name '*.roi' -exec spc meta --context --uri {} \+
 #+end_src
-
 **** Sort of manifest generation
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 This is slow, but prototypes functionality useful for the curators.
 #+begin_src bash
 find -type d -not -name 'ephys' -name 'ses-*' -exec bash -c \
@@ -882,6 +833,9 @@ find -type d -not -name 'ephys' -name 'ses-*' -exec bash -c \
 ** Developer
 See also the [[file:./developer-guide.org][sparcur developer guild]]
 *** Releases
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 **** DatasetTemplate
 Commit any changes and push to master.
 
@@ -918,6 +872,9 @@ with the new link.
 [[file:../../docs.sparc.science/pages/data_submission/submit_data.md][Link to the local copy.]]
 [[file:../../docs.sparc.science/pages/sparc_portal/sparc_data_format.md][Link to the local copy.]]
 *** Getting to know the codebase
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 Use =inspect.getclasstree= along with =pyontutils.utils.subclasses=
 to display hierarchies of classes.
 #+begin_src python :results output verbatim org
@@ -990,8 +947,10 @@ to display hierarchies of classes.
           (SshCache,
            (PrimaryCache, XattrCache))]]]]]]
 #+end_src
-
 *** Viewing logs
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 View the latest log file with colors using =less=.
 #+begin_src bash
 less -R $(ls -d ~sparc/files/blackfynn_local/export/log/* | tail -n 1)
@@ -1000,8 +959,10 @@ For a permanent fix for =less= add
 #+begin_src bash
 alias less='less -R'
 #+end_src
-
 *** Debugging terminal pipeline errors
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 You have an error!
 #+begin_src python
 maybe_size = c.cache.meta.size  # << AttributeError here
@@ -1023,8 +984,10 @@ except AttributeError as e:
     log.exception(e)
     log.error(f'explanation for error and local variables {c}')
 #+end_src
-
 *** Dataset removed
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
 If a dataset is removed, just move it manually to trash IF it is clear that it
 was supposed to be removed, otherwise to consult the curation team. You can confirm
 that it was actually removed by checking Blackfynn directly using DATASETID from
@@ -1066,8 +1029,6 @@ Hackathon Team Materials
 sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ mv Hackathon\ Team\ Materials ../.trash/
 sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
 #+end_src
-
-*** Keep letsencrypt up to date
 * Variables :noexport:
 :PROPERTIES:
 :VISIBILITY: folded
@@ -1187,10 +1148,101 @@ rrid-metadata/rrid
 NIF-Ontology/
 '
 #+end_src
-
 * Appendix
+:PROPERTIES:
+:CUSTOM_ID: appendix
+:END:
 ** Code
+*** Config Templates
+:PROPERTIES:
+:CUSTOM_ID: config-templates
+:VISIBILITY: folded
+:END:
+=~/.config/pyontutils/config.yaml=
+#+name: pyontutils-config-defaults
+#+caption: [[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]]
+#+header: :export neither
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "pyontutils/config.yaml")))) (user-config-path "pyontutils/config.yaml")) :mkdirp yes
+auth-stores:
+  secrets:
+    path: '{:user-config-path}/orthauth/secrets.yaml'
+auth-variables:
+  curies:
+  git-local-base: ~/git
+  git-remote-base:
+  google-api-creds-file:
+    path: google api creds-file
+  google-api-store-file:
+    path: google api store-file
+  google-api-store-file-readonly:
+    path: google api store-file-readonly
+  nifstd-checkout-ok:
+  ontology-local-repo:
+  ontology-org:
+  ontology-repo:
+  patch-config:
+  resources:
+  scigraph-api: https://scigraph.olympiangods.org/scigraph
+  scigraph-api-key:
+  scigraph-graphload:
+  scigraph-services:
+  zip-location:
+#+end_src
+
+=~/.config/sparcur/config.yaml=
+#+name: sparcur-config-defaults
+#+caption: [[file:${HOME}/.config/sparcur/config.yaml][~/.config/sparcur/config.yaml]]
+#+header: :export neither
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "sparcur/config.yaml")))) (user-config-path "sparcur/config.yaml")) :mkdirp yes
+auth-stores:
+  secrets:
+    path: '{:user-config-path}/orthauth/secrets.yaml'
+auth-variables:
+  blackfynn-organization:
+  cache-path:
+  export-path:
+  hypothesis-api-key: hypothesis api default-user
+  hypothesis-group: hypothesis group sparc-curation
+  hypothesis-user:
+  log-path:
+  protocols-io-api-creds-file: protocols-io api creds-file
+  protocols-io-api-store-file: protocols-io api store-file
+#+end_src
+
+=~/.config/orthauth/secrets.yaml=
+#+name: secrets-template
+#+caption: [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
+#+header: :tangle-mode (identity #o600)
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
+blackfynn:
+  sparc:
+    key: *replace-me-with:your-blackfynn-api-key*
+    secret: *replace-me-with:your-blackfynn-api-secret*
+google:
+  api:
+    creds-file: *replace-me-with:/path/to/creds-file.json*
+    store-file: google-api-token-rw.pickle
+    store-file-readonly: google-api-token.pickle
+  sheets:
+    sparc-consistency: *replace-me-with:document-hash-id*
+    sparc-master: *replace-me-with:document-hash-id*
+    sparc-affiliations: *replace-me-with:document-hash-id*
+    sparc-field-alignment: *replace-me-with:document-hash-id*
+hypothesis:
+  api:
+    user-default-hypothesis: *replace-me-with:your-hypothesis-api-key*
+  group:
+    sparc-curation: *replace-me-with:sparc-curation-group-id*
+protocols-io:
+  api:
+    creds-file: *replace-me-with:/path/to/creds-file.json*
+    store-file: protocols-io-api-token-rw.pickle
+#+end_src
 *** Bootstrap code
+:PROPERTIES:
+:CUSTOM_ID: bootstrap-code
+:VISIBILITY: folded
+:END:
 **** user.el
 Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
 #+NAME: scimax-user-preload
@@ -1306,10 +1358,10 @@ emacs -q -l ~/opt/scimax/init.el $args
 #+begin_src bash :eval never :tangle (when (not (eq system-type 'windows-nt)) "~/bin/scimax") :tangle-mode (identity #o755)
 emacs -q -l ~/opt/scimax/init.el $@
 #+end_src
-
 *** Developer setup code
 :PROPERTIES:
 :CUSTOM_ID: developer-setup-code
+:VISIBILITY: folded
 :END:
 #+NAME: environment-sanity-checks
 #+BEGIN_SRC bash :results output :eval no-export
@@ -1366,8 +1418,11 @@ pushd ~/git
 raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
 popd
 #+END_SRC
-
 *** Remote exports
+:PROPERTIES:
+:CUSTOM_ID: appendix-remote-exports
+:VISIBILITY: folded
+:END:
 Paste the results of this block into your shell if you are running
 the code from this file by pasting it into a terminal.
 
