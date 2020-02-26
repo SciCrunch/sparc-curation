@@ -100,7 +100,6 @@ class TestApiNATToRDF(unittest.TestCase):
             print(rtmap)
             assert False
 
-    #@pytest.mark.skip('not ready')
     def test_bolew(self):
         with open((Path(__file__).parent / 'apinatomy/data/bolser-lewis-map.json'), 'rt') as f:
             m = json.load(f)
@@ -113,6 +112,23 @@ class TestApiNATToRDF(unittest.TestCase):
         rtmap = apinat.Graph.fromRdf(rdfg).map
         if export:
             rdfg.write(Path('test-bolew.ttl'))
+        if debug:
+            print(rdfg.ttl)
+            print(rtmap)
+            assert False
+
+    def test_keast(self):
+        with open((Path(__file__).parent / 'apinatomy/data/keast-spinal-map.json'), 'rt') as f:
+            m = json.load(f)
+        #m = {'id':'null', 'resources':{}}
+        with open((Path(__file__).parent / 'apinatomy/data/keast-spinal-generated.json'), 'rt') as f:
+            g = json.load(f)
+
+        apin = apinat.Graph(m, g)
+        rdfg = apin.graph()
+        rtmap = apinat.Graph.fromRdf(rdfg).map
+        if export:
+            rdfg.write(Path('keast-spinal.ttl'))
         if debug:
             print(rdfg.ttl)
             print(rtmap)

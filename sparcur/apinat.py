@@ -347,7 +347,7 @@ class Node(BaseElement):
     key = 'nodes'
     annotations = 'skipLabel', 'color', 'generated'
     objects = 'cloneOf', 'hostedBy', 'internalIn'
-    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external'
+    objects_multi = 'sourceOf', 'targetOf', 'rootOf', 'leafOf', 'clones', 'external'
 
     def triples(self):
         yield from super().triples()
@@ -362,9 +362,9 @@ class Lyph(BaseElement):
 
     def triples(self):
         yield from super().triples()
+
+
 Graph.Lyph = Lyph
-
-
 class Link(BaseElement):
     key = 'links'
     annotations = 'generated',
@@ -398,6 +398,14 @@ class Tree(BaseElement):
 
 
 Graph.Tree = Tree
+class Chain(BaseElement):
+    key = 'chains'
+    #internal_references = 'housingLayers',   # FIXME TODO
+    objects = 'root', 'leaf', 'lyphTemplate', 'group'
+    objects_multi = 'housingLyphs', 'housingChain', 'external', 'levels'
+
+
+Graph.Chain = Chain
 class Group(BaseElement):
     key = 'groups'
     objects = 'generatedFrom',

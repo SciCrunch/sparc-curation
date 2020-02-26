@@ -29,7 +29,7 @@ print(pathlib.Path.cwd())
 import pytest
 import test.test_apinatomy as ta
 ta.export = True
-sys.argv = ['pytest', '-k', 'test_bolew']
+sys.argv = ['pytest', '-k', 'test_bolew', 'test_keast']
 pytest.main()
 #+end_src
 
