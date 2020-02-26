@@ -58,6 +58,7 @@ ARCHIVE_PATH="archive/manual/${DATE}"
 FOLDER="/var/www/sparc/ApiNATOMY/${ARCHIVE_PATH}"
 mkdir $FOLDER
 mv "/tmp/test-bolew.ttl" $FOLDER
+mv "/tmp/keast-spinal.ttl" $FOLDER
 chown -R nginx:nginx $FOLDER
 pushd /var/www/sparc/ApiNATOMY/ontologies
 unlink test-bolew.ttl
@@ -71,3 +72,9 @@ popd
 Then run
 [[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
 to load and deploy in one shot.
+
+An example run is
+#+begin_src bash
+~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-data
+~/git/pyontutils/nifstd/scigraph/bin/run-deploy-graph-sparc-data
+#+end_src
