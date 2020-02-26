@@ -894,7 +894,15 @@ class BFLocal:
     def get(self, id, attempt=1, retry_limit=3):
         log.debug('We have gone to the network!')
         if id.startswith('N:dataset:'):
-            thing = self.bf.get_dataset(id)  # heterogenity is fun!
+            try:
+                thing = self.bf.get_dataset(id)  # heterogenity is fun!
+            except Exception as e:
+                if str(e).startswith('No dataset matching name or ID'):
+                    # sigh no error types
+                    raise exc.NoRemoteFileWithThatIdError(id) from e
+                else:
+                    raise e
+
         elif id.startswith('N:organization:'):
             if id == self.organization.id:
                 return self.organization  # FIXME staleness?
