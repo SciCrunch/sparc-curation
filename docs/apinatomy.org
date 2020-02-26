@@ -20,7 +20,7 @@ Run this block in emacs with =C-c C-c= or tangle and run with the block below
 # note have to export to working dir not ../bin/ because
 # there is no test folder inside of bin and python can't
 # look backward up the folder hierarchy to find it
-#+name: bolew-export
+#+name: apinat-export
 #+header: :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o0755)
 #+begin_src python :dir ../ :results output :tangle ../export-apinatomy-tests
 import sys
@@ -29,7 +29,7 @@ print(pathlib.Path.cwd())
 import pytest
 import test.test_apinatomy as ta
 ta.export = True
-sys.argv = ['pytest', '-k', 'test_bolew', 'test_keast']
+sys.argv = ['pytest', '-k', 'test_bolew or test_keast']
 pytest.main()
 #+end_src
 
@@ -45,10 +45,11 @@ emacs --batch \
 ./export-apinatomy-tests
 #+end_src
 * Deploy ttl
-First run the export via [[bolew-export][bolew-export]].
+First run the export via [[apinat-export][apinat-export]].
 Then
 #+begin_src bash :results none :noweb yes
 scp ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
+scp ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
 #+end_src
 
 #+begin_src bash :dir /ssh:cassava|sudo:cassava: :eval never
@@ -61,6 +62,8 @@ chown -R nginx:nginx $FOLDER
 pushd /var/www/sparc/ApiNATOMY/ontologies
 unlink test-bolew.ttl
 ln -s "../${ARCHIVE_PATH}/test-bolew.ttl"
+unlink keast-spinal.ttl
+ln -s "../${ARCHIVE_PATH}/keast-spinal.ttl"
 popd
 #+end_src
 

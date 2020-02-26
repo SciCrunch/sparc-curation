@@ -148,7 +148,7 @@
       "name": "Keast Spinal Test",
       "class": "Graph",
       "external": [
-        "UBERON_0005844",
+        "UBERON:0005844",
         "CL:0000540",
         "UBERON:0001359",
         "UBERON:0004670",
@@ -1736,7 +1736,7 @@
       "name": "Segment of Spinal Cord",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_K_129",
@@ -1795,7 +1795,7 @@
       "name": "C1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_c1",
@@ -1839,7 +1839,7 @@
       "name": "T1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_t1",
@@ -1886,7 +1886,7 @@
       "name": "L1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_l1",
@@ -1933,7 +1933,7 @@
       "name": "S1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_s1",
@@ -1983,7 +1983,7 @@
       "name": "C2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_c2",
@@ -2027,7 +2027,7 @@
       "name": "T2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_t2",
@@ -2074,7 +2074,7 @@
       "name": "L2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_l2",
@@ -2120,7 +2120,7 @@
       "name": "S2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_s2",
@@ -2164,7 +2164,7 @@
       "name": "C3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_c3",
@@ -2215,7 +2215,7 @@
       "name": "T3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_t3",
@@ -2262,7 +2262,7 @@
       "name": "L3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_l3",
@@ -2308,7 +2308,7 @@
       "name": "S3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_s3",
@@ -2352,7 +2352,7 @@
       "name": "C4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_c4",
@@ -2399,7 +2399,7 @@
       "name": "T4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_t4",
@@ -2446,7 +2446,7 @@
       "name": "L4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_l4",
@@ -2490,7 +2490,7 @@
       "name": "S4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": "b_s4",
@@ -16764,8 +16764,8 @@
       ],
       "rootOf": "nn2"
     },
-    "UBERON_0005844": {
-      "id": "UBERON_0005844",
+    "UBERON:0005844": {
+      "id": "UBERON:0005844",
       "class": "External",
       "generated": true,
       "annotates": [
