@@ -497,6 +497,21 @@ def doi(self):
 Dataset.doi = doi
 
 
+def delete(self):
+    """ actually delete """
+    session = self._api.session
+    resp = session.delete(f'https://api.blackfynn.io/datasets/{self.id}')
+    if resp.ok:
+        return resp.json()
+    else:
+        if resp.status_code != 404:
+            log.warning(f'{self} issue deleting {resp.status_code}')
+
+
+# monkey patch Dataset to implement delete
+Dataset.delete = delete
+
+
 @property
 def teams(self):
     session = self._api.session

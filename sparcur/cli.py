@@ -589,6 +589,7 @@ class Main(Dispatcher):
             log.exception(e)
             sys.exit(11111)
 
+        # FIXME this needs to be implemented as part of local ???
         anchor.local_data_dir.mkdir()
         anchor.local_objects_dir.mkdir()
         anchor.trash.mkdir()

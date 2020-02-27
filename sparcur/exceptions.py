@@ -121,3 +121,7 @@ class SubPipelineError(SparCurError):
 
 class NoTripleError(SparCurError):
     """ an evil hack to prevent export of a triple THANKS STUPID DOI DECISIONS """
+
+
+class LostChildError(SparCurError):
+    """ someone attempting to upload a child to the wrong parent """

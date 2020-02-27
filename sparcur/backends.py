@@ -414,7 +414,7 @@ class BlackfynnRemote(aug.RemotePath):
                 bf = _cache.remote.bfo
 
             return bfo.exists
-        except exn.NoRemoteFileWithThatIdError as e:
+        except exc.NoRemoteFileWithThatIdError as e:
             return False
 
     def is_dir(self):
@@ -758,6 +758,7 @@ class BlackfynnRemote(aug.RemotePath):
             however might revisit this at some point if we want
             to explore translating remote semantics to file system
             on the RemotePath class ... """
+
         # probably better to work from the cache class
         # since it is the one that knows that the file doesn't
         # exist at the remote and can provide a way to move data
@@ -774,9 +775,14 @@ class BlackfynnRemote(aug.RemotePath):
             else:  # create an empty
                 child = object.__new__(self.__class__)
                 child._parent = self
-                class TempBFObject:
+                class TempBFObject:  # this will cause a type error if actually used
                     name = other
-                child._bfobject = TempBFObject()
+                    def exists(self):
+                        return False
+
+                tbfo = TempBFObject()
+                child._bfobject = tbfo
+                child._seed = tbfo
                 return child
 
     def _mkdir_child(self, child_name):
@@ -788,9 +794,11 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.NotADirectoryError(f'{self}')
 
-        return bfobject
+        return self.__class__(bfobject)
 
     def mkdir(self, parents=False):  # XXX
+        # note that under the current implementation it is impossible for self to exist
+        # and not have a _seed
         # same issue as with __rtruediv__
         if hasattr(self, '_seed'):
             raise exc.PathExistsError(f'remote already exists {self}')
@@ -798,6 +806,39 @@ class BlackfynnRemote(aug.RemotePath):
         bfobject = self._parent._mkdir_child(self.name)
         self._seed = bfobject
         self._bfobject = bfobject
+
+    def rmdir(self):
+        if self.is_organization():
+            raise exc.SparCurError("can't remove organizations right now")
+
+        elif self.is_dataset():
+            if list(self.children):  # FIXME super inefficient ...
+                raise exc.PathNotEmptyError(self)
+
+            self.bfobject.delete()
+        elif self.is_dir():
+            if list(self.children):  # FIXME super inefficient ...
+                raise exc.PathNotEmptyError(self)
+
+            self.bfobject.delete()
+        else:
+            raise exc.NotADirectoryError(f'{self}')
+
+    def _stream_child(self, local_child, replace=True):
+        # FIXME touch_child -> stream data ??? as a bridge to sanity?
+        if not self.is_dir():
+            raise exc.NotADirectoryError(f'{self} is not a directory!')
+
+        if child.parent != self.local:
+            raise exc.LostChildError('{child.parent} != {self.local}')
+
+        if replace and (self / local_child.name).exists():  # FIXME nasty performance cost here ...
+            # oh man the concurrency story for multiple people adding files with the same name
+            # wow ...
+            raise NotImplementedError('not quite ready')
+
+        bfobject = self.bfobject.upload(local_child)
+        return self.__class__(bfobject)
 
     @property
     def meta(self):
