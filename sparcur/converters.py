@@ -437,7 +437,7 @@ class ApiNATOMYConverter(TripleConverter):
         id = rm['id']
         mid = id.replace(' ', '-')
 
-        links = rm[id]['links']
+        links = rm['resources'][id]['links']
         #linknodes = [n for n in rm[id]['nodes'] if n['class'] == 'Link']  # visible confusion
 
         st = []
