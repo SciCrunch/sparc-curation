@@ -651,11 +651,13 @@ class BlackfynnRemote(aug.RemotePath):
         if self.is_file() and not force:  # this will tigger a fetch
             pass
         else:
-            #self._bfo0 = self._bfobject
-            self._bfobject = self._api.get(self.id)
-            #self._bfo1 = self._bfobject
+            try:
+                self._bfobject = self._api.get(self.id)
+            except exc.NoRemoteFileWithThatIdError as e:
+                log.exception(e)
+                return
+
             self.is_file()  # trigger fetching file in the no file_id case
-            #self._bfo2 = self._bfobject
 
         if update_cache or update_data:
             file_is_different = self.update_cache()
