@@ -712,7 +712,7 @@ fetching a whole dataset or a subset of a dataset
 #+CAPTION: export everything
 #+BEGIN_SRC bash
 pushd ${SPARCDATA}
-spc export datasets
+spc export
 popd
 #+END_SRC
 
@@ -733,6 +733,8 @@ function sparc-export-to-server () {
     pushd /var/www/sparc/sparc
     cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
     popd
+    echo Export complete. Check results at:
+    echo fill-in-the-url-here
 }
 #+END_SRC
 *** Reporting
