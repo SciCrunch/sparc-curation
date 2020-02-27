@@ -25,8 +25,7 @@ cypherResources:
     operations: *organParts-ops
     query: |
       MATCH path = (start:Class{iri: "${id}"})
-      // FIXME need ILX:0738400 inverse
-      <-[:subClassOf|ILX:0738400|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..40]-(part)
+      <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..40]-(part)
       <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
       <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
       RETURN path
