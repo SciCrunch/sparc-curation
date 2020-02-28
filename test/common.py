@@ -18,6 +18,7 @@ this_file = Path(__file__)
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
+path_project_container = this_file.parent / 'test_local'
 project_path = this_file.parent / 'test_local/test_project'
 fake_organization = 'N:organization:fake-organization-id'
 project_path_real = this_file.parent / 'test_local/UCSD'

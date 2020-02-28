@@ -9,12 +9,14 @@
 This is the simplest way to get a remote only connection to Blackfynn
 #+BEGIN_SRC python
 from sparcur.paths import BlackfynnCache, Path
+from sparcur.config import auth
 from sparcur.backends import BlackfynnRemote
-organization_id = 'N:organization:FILL-ME-IN'
+organization_id = auth.get('blackfynn-organization')
 BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
 BlackfynnRemote.init(organization_id)
 root = BlackfynnRemote(BlackfynnRemote.root)
 datasets = list(root.children)
+return datasets
 #+END_SRC
 ** Validate a dataset
 You can run this example block and it will validate the DatasetTemplate. \\

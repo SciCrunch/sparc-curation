@@ -288,8 +288,9 @@ file_related = [
     ['upload_filename', TEMP.hasDigitalArtifactThatIsAboutIt],
     ['dataset_id', TEMP.providerDatasetIdentifier],  # FIXME need a global convention for this
     ]
-execution_related = [
+performance_related = [
 
+    # TODO execution -> performance
     ['experiment_number', TEMP.localExecutionNumber],  # FIXME TODO
     ['session', TEMP.localExecutionNumber],
 ]
@@ -342,7 +343,7 @@ class SubjectConverter(TripleConverter):
         ['injection_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
         ['date_of_euthanasia', TEMP.protocolExecutionDate],
         ['date_of_injection', TEMP.protocolExecutionDate],
-    ] + file_related + execution_related + utility
+    ] + file_related + performance_related + utility
 SubjectConverter.setup()
 
 
@@ -366,7 +367,7 @@ class SampleConverter(TripleConverter):
         ['electrode_implant_location', TEMP.TODO],
         ['stimulation_electrode___chronic_or_acute', TEMP.TODO],
         ['includes_chronically_implanted_electrode_', TEMP.TODO],
-    ] + file_related + execution_related + utility
+    ] + file_related + performance_related + utility
     def subject_id(self, value):
         # FIXME _subject_id is monkey patched in
         return TEMP.wasDerivedFromSubject, self._subject_id(value)
