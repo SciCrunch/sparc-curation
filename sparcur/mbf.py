@@ -1,5 +1,6 @@
 import pathlib
 from lxml import etree
+from . import schemas as sc
 from .core import HasErrors
 from .utils import log, logd
 
@@ -19,21 +20,44 @@ class XmlSource:
 
         return xpath
 
-    def asDict(self):
+    def asDict(self):  # FIXME data vs asDict
         return self._condense()
 
     def _condense(self):
-        def condense(thing):
+        if hasattr(self.asDict, 'schema'):
+            _schema = self.asDict.schema.schema
+        else:
+            _schema = None
+
+        # FIXME how to deal with combination bits in schema, ignore for now
+
+        def condense(thing, schema=_schema):
+
+            print(thing, schema)
             if isinstance(thing, dict):
-                return {k:condense(v) for k, v in thing.items()}
+                nschema = schema['properties'] if 'properties' in schema else tuple()
+                return {k:nv
+                        for k, v in thing.items()
+                        for nv in (condense(v, nschema[k] if k in nschema else tuple()),)
+                        # stick with the pattern to filter null fields
+                        # we probably don't need to work in reverse
+                        # for this format
+                        if nv is not None}
+
             elif isinstance(thing, list):
+                nschema = schema['items'] if 'items' in schema else tuple()
                 if not thing:
-                    return None
+                    if sc.not_array(schema):
+                        return None
+                    else:
+                        return thing
                 else:
-                    condensed = [condense(v) for v in thing]
-                    if len(condensed) == 1:
+                    condensed = [condense(v, nschema) for v in thing]
+                    if len(condensed) == 1 and sc.not_array(schema):
                         return condensed[0]
                     else:
+                        # by default if we lack type information don't unpack
+                        # i.e., don't destroy anything unless we are told it is ok
                         return condensed
             else:
                 return thing
@@ -46,8 +70,11 @@ class XmlSource:
         raise NotImplementedError('implement in subclasses')
 
 
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class ExtractMBF(XmlSource, HasErrors):
 
+    @hasSchema.f(sc.MbfTracingSchema)
     def asDict(self):
         data_in = self._condense()
         id = self.path.cache.uri_api
@@ -82,9 +109,9 @@ class ExtractMBF(XmlSource, HasErrors):
 
         # these are probably study targets ? or rois ? or what ...
         contours = [
-            {'name': xpath('@name'),
-             'guid': xpath('_:property[@name="GUID"]/_:s/text()'),
-             'id':   xpath('_:property[@name="TraceAssociation"]/_:s/text()'),
+            {'name':        xpath('@name'),
+             'guid':        xpath('_:property[@name="GUID"]/_:s/text()'),
+             'id_ontology': xpath('_:property[@name="TraceAssociation"]/_:s/text()'),
              # closed=true ??
             }
             for contour in self.xpath('_:contour')

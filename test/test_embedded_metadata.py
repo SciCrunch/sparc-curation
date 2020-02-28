@@ -38,4 +38,6 @@ class TestExtractMetadata(unittest.TestCase):
         embfs = [mbf.ExtractMBF(x) for x in local_xmls]
         d = embfs[0].asDict()
         blob = [e.asDict() for e in embfs]
-        sc
+        errors = [b.pop('errors') for b in blob]
+        error_types = set(e['validator'] for es in errors for e in es)
+        assert error_types == {'not'} or not error_types, f'unexpected error type! {error_types}'

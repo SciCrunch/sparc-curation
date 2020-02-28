@@ -4,7 +4,7 @@ from sparcur import schemas as sc
 
 
 class OrcidSchema(sc.JSONSchema):
-    orcid_pattern = sc.ContributorSchema.schema['properties']['contributor_orcid_id']['pattern']
+    orcid_pattern = sc.orcid_pattern
     schema = {'type': 'object',
               'required': ['orcid'],
               'properties': {
@@ -33,3 +33,34 @@ class TestOrcidRegex(unittest.TestCase):
             j = {'orcid': o}
             ok, data_or_error, _  = os.validate(j)
             assert not ok and j != data_or_error
+
+
+class TestNoLTWhitespaceRegex(unittest.TestCase):
+    schema = sc.NoLTWhitespaceSchema
+
+    def test_positive(self):
+        strings = (
+            'asdf',
+            'asdf asdf',
+            'asdfaAdf asZf asd | " f asdf as df  131 23 45 ..as f91891l`1823409`-5',
+        )
+        schema = self.schema()
+        for s in strings:
+            ok, data_or_error, _  = schema.validate(s)
+            assert s == data_or_error
+
+    def test_negative(self):
+        strings = (
+            ' asdf',
+            'asdf ',
+            ' asdf ',
+            ' asdf asdf',
+            'asdf asdf ',
+            ' asdf asdf ',
+            ' asdfaAdf asZf asd | " f asdf as df  131 23 45 ..as f91891l`1823409`-5 ',
+        )
+
+        schema = self.schema()
+        for s in strings:
+            ok, data_or_error, _  = schema.validate(s)
+            assert not ok and s != data_or_error

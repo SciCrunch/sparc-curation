@@ -4,7 +4,7 @@ from functools import wraps
 import jsonschema
 
 # FIXME these imports should not be here types rules should be set in another way
-from pathlib import Path
+from pathlib import PurePath
 import idlib
 import rdflib
 import requests
@@ -13,6 +13,15 @@ from pysercomb.pyr.core import Expr
 from sparcur import exceptions as exc
 from sparcur.utils import logd
 from sparcur.core import JEncode
+
+
+def not_array(schema, in_all=False):
+    """ hacked way to determine that the blob in question cannot be an array """
+    return ('type' in schema and schema['type'] != 'array' or
+            # FIXME hack hard to maintain
+            'allOf' in schema and all(not_array(s, True) for s in schema['allOf']) or
+            'not' in schema and (not not_array(schema['not'], in_all) or in_all)
+    )
 
 
 class hproperty:
@@ -151,7 +160,7 @@ class JSONSchema(object):
 
     string_types = [  # add more types here
         str,
-        Path,
+        PurePath,
         idlib.Stream,
         rdflib.URIRef,
         rdflib.Literal,
@@ -241,6 +250,20 @@ iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
 doi_pattern = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
 
+orcid_pattern = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
+                 '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
+
+pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
+
+
+class NoLTWhitespaceSchema(JSONSchema):
+    schema = {'allOf': [{'type': 'string'},
+                        {'not': {'type': 'string',
+                                 'pattern': pattern_whitespace_lead_trail,
+                        }},]}
+
+string_noltws = NoLTWhitespaceSchema.schema
+
 class ErrorSchema(JSONSchema):
     schema = {'type':'array',
               'minItems': 1,
@@ -274,6 +297,42 @@ class ProvSchema(JSONSchema):
                                                      'path': {'type': 'array'},
                                                      'input': {'type': 'string'},
                                                  },},},},},},},}
+
+
+class MbfTracingSchema(JSONSchema):
+    schema = {'type': 'object',
+              'required': ['subject', 'atlas', 'images', 'contours'],
+              'properties': {'subject': {'type': 'object',
+                                         'required': ['id'],
+                                         'properties': {'id': {'type': 'string'},
+                                                        'species': {'type': 'string'},
+                                                        'sex': {'type': 'string'},
+                                                        'age': {'type': 'string'},
+                                         },},
+                             'atlas': {'type': 'object',
+                                       'properties': {'organ': {'type': 'string'},
+                                                      'atlas_label': {'type': 'string'},
+                                                      'atlas_rootid': {'type': 'string'},
+                                       },},
+                             'images': {'type': 'array',
+                                        'items': {'type': 'object',
+                                                  'properties':
+                                                  {'path_mbf': {'type': 'string'},
+                                                   'channels':
+                                                   {'type': 'array',
+                                                    'items': {
+                                                        'type': 'object',
+                                                        'properties': {'id': {'type': 'string'},
+                                                                       'source': {'type': 'string'},
+                                                        },},},},},},
+                             'contours': {'type': 'array',
+                                          'items': {'type': 'object',
+                                                    'properties': {
+                                                        'name': string_noltws,
+                                                        'guid': {'type': 'string'},
+                                                        'id_ontology': {'type': 'string'},},
+
+                                          },},},}
 
 
 class DatasetStructureSchema(JSONSchema):
@@ -310,8 +369,7 @@ class ContributorSchema(JSONSchema):
                   'first_name': {'type': 'string'},
                   'last_name': {'type': 'string'},
                   'contributor_orcid_id': {'type': 'string',
-                                           'pattern': ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
-                                                       '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')},
+                                           'pattern': orcid_pattern},
                   'contributor_affiliation': {'type': 'string'},
                   'contributor_role': {
                       'type':'array',

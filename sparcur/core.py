@@ -2,7 +2,7 @@ import copy
 import json
 import shutil
 import itertools
-from pathlib import Path
+from pathlib import PurePath
 from datetime import datetime
 from functools import wraps
 from collections import deque
@@ -166,7 +166,7 @@ class JEncode(json.JSONEncoder):
             return list(obj)
         elif isinstance(obj, ProtcurExpression):
             return obj.json()
-        elif isinstance(obj, Path):
+        elif isinstance(obj, PurePath):
             return obj.as_posix()
         elif isinstance(obj, Quantity):
             return obj.json()
