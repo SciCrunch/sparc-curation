@@ -19,7 +19,8 @@ install:
   - pip install --upgrade pytest pytest-cov
   - pip install coverage coveralls && export HAS_COVERALLS=1
   - pip install pipenv
-  - pipenv install --system --skip-lock --deploy
+  - pipenv install --system --skip-lock --deploy --verbose
+  - pipenv run pip show --files protcur
 
 script:
   - pipenv run pytest --cov=sparcur
