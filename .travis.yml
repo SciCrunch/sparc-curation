@@ -20,9 +20,9 @@ install:
   - pip install coverage coveralls && export HAS_COVERALLS=1
   - pip install pipenv
   - pipenv install --system --skip-lock --deploy --verbose
-  - pipenv run pip show --files protcur
 
 script:
+  - pipenv run pip show --files protcur || echo "PROBLEM :("
   - pipenv run pytest --cov=sparcur
 
 after_success:
