@@ -68,6 +68,8 @@ ln -s "../${ARCHIVE_PATH}/keast-spinal.ttl"
 popd
 #+end_src
 
+#+RESULTS:
+Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success.
 * Load and deploy graph
 Then run
 [[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
