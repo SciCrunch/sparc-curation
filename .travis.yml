@@ -3,8 +3,8 @@ sudo: false
 language: python
 env:
   global:
-    - PIPENV_VENV_IN_PROJECT=1
-    - PIPENV_IGNORE_VIRTUALENVS=1
+    - SCIGRAPH_API=https://scicrunch.org/api/1/sparc-scigraph
+    - secure: ByJNyHHRiFi23IYmw9mtXsMP6m3NNrl5an+LYXQlJzZFYn7TFBRGiPwWooukazITCa8OTYduR2K/sqsih5hHvDSxSP9vnLGOrNN1hGCUa1zb+j7fwVzNIX/Jx+BsGQ8Sf0Je01SDk+SRTPUsbaCXl4QcV5ray8iEHuj1XyNpfrEpN9LSGANgX5Uor/5V4N2uoRr/ub00tBqjO1rV1MeXaJAMlhd/ErXfMNperC9v9mOOKJc/sI6iOO1nZuf8+TQ87VFiNjr2u//HtxrZRMeq2mNUW+Ixx9GUMdHo5iC7bbLPbKdYmJ3MAfSiJJIa4mPSyIxZztpPnp1StcJNnxsozX3xTiHkUxQoMx8IiRGoxRFD3PVydPrbxM3dKkCjqS59DcUJ2ehdaMnQP1Odax4tG8RJB9D7D9EVWhQ81flwITC8JDCeturF6L/wHE87mKxdBD+63xo7SAMix2WTOkHvjhR3gHN3/w3f8J3CPFyNszH3M3AuOVwAlo/m05hQWDQVK9fE24ogCz+yZ039KLxo9dElj57WVI4juIyuGZ16z8BgqIjl1XlpKIrPM1VpCqwddkC96RlR3Fh3HOWAwt6y67ekiHMDCCld/9zlNN6WLkEyrV0d3sqJVx3eGDnDLzWok6Mwn9VomFvgm5OwdnUSk6jFNs7rSZwyIFWvAG5qA+I=
 branches:
   only:
     - master
