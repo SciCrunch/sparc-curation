@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import hashlib
+import logging
 from types import GeneratorType
 from socket import gethostname
 from datetime import datetime
@@ -626,6 +627,12 @@ class Summary(Integrator, ExporterSummarizer):
 
 def datame(d, ca, timestamp, helpers=None):
     """ sigh, pickles """
+    log_names = 'idlib', 'protcur', 'orthauth', 'ontquery', 'augpathlib', 'pyontutils'
+    for log_name in log_names:
+        log = logging.getLogger(log_name)
+        if not log.handlers:
+            log = makeSimpleLogger(log_name)
+
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):
         rc.anchorTo(ca)
