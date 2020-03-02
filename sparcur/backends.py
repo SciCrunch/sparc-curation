@@ -377,10 +377,15 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def doi(self):
-        blob = self.bfobject.doi
-        print(blob)
-        if blob:
-            return idlib.Doi(blob['doi'])
+        try:
+            blob = self.bfobject.doi
+            print(blob)
+            if blob:
+                return idlib.Doi(blob['doi'])
+        except exc.NoRemoteFileWithThatIdError as e:
+            log.exception(e)
+            if self.cache is not None and self.cache.exists():
+                self.cache.crumple()
 
     @property
     def size(self):

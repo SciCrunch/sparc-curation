@@ -912,7 +912,7 @@ class BFLocal:
             try:
                 thing = self.bf.get_dataset(id)  # heterogenity is fun!
             except Exception as e:
-                if str(e).startswith('No dataset matching name or ID'):
+                if 'No dataset matching name or ID' in str(e):
                     # sigh no error types
                     raise exc.NoRemoteFileWithThatIdError(id) from e
                 else:

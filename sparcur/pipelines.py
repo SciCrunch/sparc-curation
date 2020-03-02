@@ -966,7 +966,12 @@ class PipelineExtras(JSONPipeline):
             data['status'] = {}
 
         if 'status_on_platform' not in data['status']:
-            data['status']['status_on_platform'] = remote.bfobject.status
+            try:
+                data['status']['status_on_platform'] = remote.bfobject.status
+            except exc.NoRemoteFileWithThatIdError as e:
+                log.exception(e)
+                if remote.cache is not None and remote.cache.exists():
+                    remote.cache.crumple()
 
         return data
 
