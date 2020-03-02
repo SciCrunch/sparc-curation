@@ -5,7 +5,7 @@ import copy
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
-from xlsx2csv import Xlsx2csv, SheetNotFoundException
+from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
@@ -419,7 +419,11 @@ class Tabular(HasErrors):
             'hyperlinks': True,
         }
         sheetid = 1
-        xlsx2csv = Xlsx2csv(self.path.as_posix(), **kwargs)
+        try:
+            xlsx2csv = Xlsx2csv(self.path.as_posix(), **kwargs)
+        except InvalidXlsxFileException as e:
+            raise exc.NoDataError(f'{self.path}') from e
+
         ns = len(xlsx2csv.workbook.sheets)
         if ns > 1:
             message = f'too many sheets ({ns}) in {self.path.as_posix()!r}'
