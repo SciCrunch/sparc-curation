@@ -755,6 +755,25 @@ spc server --latest --count
 keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
                        for k in d['meta']['keywords']]))
 #+end_src
+*** Queries
+#+begin_src python :results output
+import rdflib
+from pyontutils.core import OntResIri
+from pyontutils.namespaces import sparc, TEMP
+
+ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+g = ori.graph
+
+human = set([urih for s, p, o in g
+             if isinstance(o, rdflib.Literal) and
+             ('human' in o.lower() or 'homo' in o.lower()) and
+             p == sparc.animalSubjectIsOfSpecies
+             for do in g[s:TEMP.hasDerivedInformationAsParticipant]
+             for urih in g[do:TEMP.hasUriHuman]])
+
+[print(h) for h in human]
+#+end_src
+
 *** Archiving files with xattrs
 :PROPERTIES:
 :VISIBILITY: folded
