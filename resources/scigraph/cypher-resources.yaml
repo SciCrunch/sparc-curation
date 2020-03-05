@@ -374,6 +374,19 @@ cypherResources:
             paramType: query
             required: false
 
+  - path: /dynamic/demos/apinat/bundles/{start-id}
+    operations:
+      - summary: Return the paths to somas from an anatomical region
+    query: |
+            MATCH path = (start:Class{iri: '${start-id}'})
+            -[:apinatomy:annotates]->(housing)
+            -[:apinatomy:bundlesChains]->(chain)
+            -[:apinatomy:root]->(root)
+            -[:apinatomy:internalIn]->(layer)
+            -[:apinatomy:layerIn]->(segment)
+            -[:apinatomy:external]->(soma_external)
+            RETURN path
+
   - path: /dynamic/demos/apinat/somas
     operations:
       - summary: List all the somas for a given graph (TODO on the given graph)
