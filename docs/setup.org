@@ -851,6 +851,15 @@ This is slow, but prototypes functionality useful for the curators.
 find -type d -not -name 'ephys' -name 'ses-*' -exec bash -c \
 'pushd $1 1>/dev/null; pwd >> ~/manifest-stuff.txt; spc report size --tab-table ./* >> ~/manifest-stuff.txt; popd 1>/dev/null' _ {} \;
 #+end_src
+**** Path ids
+This one is fairly slow, but is almost certainly i/o limited due to having to read the xattrs.
+Maintaining the backup database of the mappings would make this much faster.
+#+begin_src bash
+# folders and files
+find . -not -type l -not -path '*operations*' -exec getfattr -n user.bf.id --only-values {} \; -print
+# broken symlink format, needs work, hard to parse
+find . -type l -not -path '*operations*' -exec readlink -n {} \; -print
+#+end_src
 ** Developer
 See also the [[file:./developer-guide.org][sparcur developer guild]]
 *** Releases
