@@ -68,7 +68,6 @@ ln -s "../${ARCHIVE_PATH}/keast-spinal.ttl"
 popd
 #+end_src
 
-#+RESULTS:
 Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success.
 * Load and deploy graph
 Then run

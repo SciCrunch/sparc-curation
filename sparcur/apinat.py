@@ -251,8 +251,9 @@ class Graph(Base):
 
     @property
     def triples_generated(self):
+        """ not used """
         context = rdflib.Namespace(f'https://apinatomy.org/uris/models/{self.id}/ids/')
-        for cls in [Node, Link, Lyph, Tree, Group, Material]:
+        for cls in [Node, Link, Lyph, Tree, Group, Material, Border, Chain, Coalescence]:
             if cls.key in self.blob:
                 # FIXME trees not in all blobs
                 for blob in self.blob[cls.key]:
@@ -358,7 +359,8 @@ class Lyph(BaseElement):
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
     objects = 'layerIn', 'conveys', 'border', 'cloneOf'
-    objects_multi = 'inCoalescences', 'subtypes', 'layers', 'clones', 'external', 'internalNodes', 'bundles', 'bundlesTrees'
+    objects_multi = ('inCoalescences', 'subtypes', 'layers', 'clones', 'external',
+                     'internalNodes', 'bundles', 'bundlesTrees', 'bundlesChains')
 
     def triples(self):
         yield from super().triples()
@@ -402,7 +404,7 @@ class Chain(BaseElement):
     key = 'chains'
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group'
-    objects_multi = 'housingLyphs', 'housingChain', 'external', 'levels'
+    objects_multi = 'housingLyphs', 'housingChain', 'external', 'levels', 'lyphs'
 
 
 Graph.Chain = Chain
@@ -506,13 +508,4 @@ class Channel(BaseElement):
 
 
 Graph.Channel = Channel
-class Chain(BaseElement):
-    objects = 'start', 'end'
-    objects_multi = 'conveyingLyphs',
-    annotations = 'length',
-
-
-Graph.Chain = Chain
-
-
 hrm = make_classes(apinscm.schema)
