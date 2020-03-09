@@ -758,36 +758,38 @@ keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords'
 *** Queries
 **** Human datasets queries
 #+name: human-datasets-queries
-#+begin_src python :results output table :exports both
+#+begin_src python :results output drawer :exports both :eval no-export
 import rdflib
 from pyontutils.core import OntResIri
 from pyontutils.namespaces import sparc, TEMP, dc, rdfs
 
 ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
 g = ori.graph
+gns = g.namespace_manager
 
-human = set([urih for s, p, o in g
-             if isinstance(o, rdflib.Literal) and
-             ('human' in o.lower() or 'homo' in o.lower()) and
-             p == sparc.animalSubjectIsOfSpecies
-             for do in g[s:TEMP.hasDerivedInformationAsParticipant]
-             for urih in g[do:TEMP.hasUriHuman]])
+def fmt(s, u):
+    return f'[[{u}][{s.n3(gns)}]]'
 
-#[print(h) for h in human]
+species = set([fmt(do, urih) for s, p, o in g
+              if isinstance(o, rdflib.Literal) and
+              ('human' in o.lower() or 'homo' in o.lower()) and
+              p == sparc.animalSubjectIsOfSpecies
+              for do in g[s:TEMP.hasDerivedInformationAsParticipant]
+              for urih in g[do:TEMP.hasUriHuman]])
 
-hlabel = set([(urih, o) for s, p, o in g
+hlabel = set([fmt(s, urih) for s, p, o in g
              if isinstance(o, rdflib.Literal) and
              ('human' in o.lower() or 'homo' in o.lower()) and
              p == rdfs.label
              for urih in g[s:TEMP.hasUriHuman]])
 
-htitles = set([(urih, o) for s, p, o in g
-               if isinstance(o, rdflib.Literal) and
-               ('human' in o.lower() or 'homo' in o.lower()) and
-               p == dc.title
-               for urih in g[s:TEMP.hasUriHuman]])
+htitle = set([fmt(s, urih) for s, p, o in g
+              if isinstance(o, rdflib.Literal) and
+              ('human' in o.lower() or 'homo' in o.lower()) and
+              p == dc.title
+              for urih in g[s:TEMP.hasUriHuman]])
 
-htd = set([(urih, o) for s, p, o in g
+htd = set([fmt(s, urih) for s, p, o in g
            if isinstance(o, rdflib.Literal) and
            ('human' in o.lower() or 'homo' in o.lower()) and
            (p == dc.title or p == dc.description)
@@ -795,18 +797,18 @@ htd = set([(urih, o) for s, p, o in g
 
 counts = dict(species=len(human),
               label=len(hlabel),
-              title=len(htitles),
+              title=len(htitle),
               title_and_desc=len(htd))
 
-print(list(counts.items()))
+[print(_ + r' \\') for _ in ['species n= ' + str(counts['species'])] +
+sorted(species) +
+['label n= ' + str(counts['label'])] +
+sorted(hlabel) +
+['title n= ' + str(counts['title'])] +
+sorted(htitle) +
+['td n= ' + str(counts['title_and_desc'])] +
+sorted(htd)]
 #+end_src
-
-#+RESULTS:
-| species        |  9 |
-| label          | 12 |
-| title          |  7 |
-| title_and_desc | 20 |
-
 *** Archiving files with xattrs
 :PROPERTIES:
 :VISIBILITY: folded
