@@ -756,10 +756,12 @@ keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords'
                        for k in d['meta']['keywords']]))
 #+end_src
 *** Queries
-#+begin_src python :results output
+**** Human datasets queries
+#+name: human-datasets-queries
+#+begin_src python :results output table :exports both
 import rdflib
 from pyontutils.core import OntResIri
-from pyontutils.namespaces import sparc, TEMP
+from pyontutils.namespaces import sparc, TEMP, dc, rdfs
 
 ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
 g = ori.graph
@@ -771,8 +773,39 @@ human = set([urih for s, p, o in g
              for do in g[s:TEMP.hasDerivedInformationAsParticipant]
              for urih in g[do:TEMP.hasUriHuman]])
 
-[print(h) for h in human]
+#[print(h) for h in human]
+
+hlabel = set([(urih, o) for s, p, o in g
+             if isinstance(o, rdflib.Literal) and
+             ('human' in o.lower() or 'homo' in o.lower()) and
+             p == rdfs.label
+             for urih in g[s:TEMP.hasUriHuman]])
+
+htitles = set([(urih, o) for s, p, o in g
+               if isinstance(o, rdflib.Literal) and
+               ('human' in o.lower() or 'homo' in o.lower()) and
+               p == dc.title
+               for urih in g[s:TEMP.hasUriHuman]])
+
+htd = set([(urih, o) for s, p, o in g
+           if isinstance(o, rdflib.Literal) and
+           ('human' in o.lower() or 'homo' in o.lower()) and
+           (p == dc.title or p == dc.description)
+           for urih in g[s:TEMP.hasUriHuman]])
+
+counts = dict(species=len(human),
+              label=len(hlabel),
+              title=len(htitles),
+              title_and_desc=len(htd))
+
+print(list(counts.items()))
 #+end_src
+
+#+RESULTS:
+| species        |  9 |
+| label          | 12 |
+| title          |  7 |
+| title_and_desc | 20 |
 
 *** Archiving files with xattrs
 :PROPERTIES:
