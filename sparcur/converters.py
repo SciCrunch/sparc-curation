@@ -304,6 +304,7 @@ class SubjectConverter(TripleConverter):
         ['subject_id', TEMP.localId],
         ['ear_tag_number', TEMP.localIdAlt],
         ['age_category', TEMP.hasAgeCategory],
+        ['experimental_group', TEMP.hasAssignedGroup],
         ['group', TEMP.hasAssignedGroup],
         ['treatment', TEMP.TODO],
         #['rrid_for_strain', rdf.type],  # if only
@@ -354,6 +355,7 @@ class SampleConverter(TripleConverter):
         ['specimen_anatomical_location', TEMPRAW.wasExtractedFromAnatomicalRegion],
         ['sample_name', rdfs.label],
         ['sample_description', dc.description],
+        ['experimental_group', TEMP.hasAssignedGroup],
         ['group', TEMP.hasAssignedGroup],
 
         ['specimen', TEMP.TODO],  # sometimes used as anatomical location ...
