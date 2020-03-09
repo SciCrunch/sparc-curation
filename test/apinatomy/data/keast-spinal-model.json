@@ -1,6 +1,7 @@
 {
-  "id": "keastSpinalTest",
+  "id"  : "keastSpinalTest",
   "name": "Keast Spinal Test",
+  "description": "A demo model with chains of lyphs with generated structure",
   "nodes": [
     {
       "id": "n1",
@@ -28,7 +29,7 @@
       "id": "K_129",
       "name": "Segment of Spinal Cord",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "isTemplate": true,
       "layers": [
@@ -51,21 +52,33 @@
     {
       "id": "c1",
       "name": "C1",
+      "external": [
+        "UBERON:0006469"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "t1",
       "name": "T1",
+      "external": [
+        "UBERON:0006457"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "l1",
       "name": "L1",
+      "external": [
+        "UBERON:0006448"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "s1",
       "name": "S1",
+      "external": [
+        "UBERON:0006460"
+      ],
       "supertype": "K_129"
     },
     {
@@ -88,26 +101,41 @@
     {
       "id": "c2",
       "name": "C2",
+      "external": [
+        "UBERON:0006489"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "t2",
       "name": "T2",
+      "external": [
+        "UBERON:0006458"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "l2",
       "name": "L2",
+      "external": [
+        "UBERON:0006450"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "s2",
       "name": "S2",
+      "external": [
+        "UBERON:0006461"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "c3",
       "name": "C3",
+      "external": [
+        "UBERON:0006488"
+      ],
       "supertype": "K_129",
       "internalLyphs": [
         "soma"
@@ -119,36 +147,57 @@
     {
       "id": "t3",
       "name": "T3",
+      "external": [
+        "UBERON:0006459"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "l3",
       "name": "L3",
+      "external": [
+        "UBERON:0006449"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "s3",
       "name": "S3",
+      "external": [
+        "UBERON:0006462"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "c4",
       "name": "C4",
+      "external": [
+        "UBERON:0006490"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "t4",
       "name": "T4",
+      "external": [
+        "UBERON:0006452"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "l4",
       "name": "L4",
+      "external": [
+        "UBERON:0006451"
+      ],
       "supertype": "K_129"
     },
     {
       "id": "s4",
       "name": "S4",
+      "external": [
+        "UBERON:0006463"
+      ],
       "supertype": "K_129"
     },
     {
@@ -158,24 +207,7 @@
         "NLX:154731"
       ],
       "supertype": "229"
-    },
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {}
+    }
   ],
   "materials": [
     {

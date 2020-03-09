@@ -2,9 +2,10 @@
   "id": "keastSpinalTest",
   "name": "Keast Spinal Test",
   "class": "Graph",
+  "description": "A demo model with chains of lyphs with generated structure",
   "external": [
     {
-      "id": "UBERON_0005844",
+      "id": "UBERON:0005844",
       "class": "External",
       "generated": true,
       "annotates": [
@@ -2269,7 +2270,7 @@
       "name": "Segment of Spinal Cord",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2327,7 +2328,7 @@
       "name": "C1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2357,6 +2358,7 @@
         "ref_mat_K_77_K_129_c1_13",
         "ref_mat_KM_27_K_129_c1_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -2370,7 +2372,7 @@
       "name": "T1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2400,6 +2402,11 @@
         "ref_mat_K_77_K_129_t1_13",
         "ref_mat_KM_27_K_129_t1_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "t1_cls_nn1_lyph_3",
         "t1_cls_nn2_lyph_3"
@@ -2416,7 +2423,7 @@
       "name": "L1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2446,6 +2453,11 @@
         "ref_mat_K_77_K_129_l1_13",
         "ref_mat_KM_27_K_129_l1_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "l1_cls_nn1_lyph_7",
         "l1_cls_nn2_lyph_7"
@@ -2462,7 +2474,7 @@
       "name": "S1",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2492,6 +2504,7 @@
         "ref_mat_K_77_K_129_s1_13",
         "ref_mat_KM_27_K_129_s1_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -2556,7 +2569,7 @@
       "name": "C2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2586,6 +2599,7 @@
         "ref_mat_K_77_K_129_c2_13",
         "ref_mat_KM_27_K_129_c2_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -2599,7 +2613,7 @@
       "name": "T2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2629,6 +2643,11 @@
         "ref_mat_K_77_K_129_t2_13",
         "ref_mat_KM_27_K_129_t2_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "t2_cls_nn1_lyph_4",
         "t2_cls_nn2_lyph_4"
@@ -2645,7 +2664,7 @@
       "name": "L2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2675,6 +2694,10 @@
         "ref_mat_K_77_K_129_l2_13",
         "ref_mat_KM_27_K_129_l2_14"
       ],
+      "bundlesChains": [
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "l2_cls_nn2_lyph_8"
       ],
@@ -2690,7 +2713,7 @@
       "name": "S2",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2720,6 +2743,7 @@
         "ref_mat_K_77_K_129_s2_13",
         "ref_mat_KM_27_K_129_s2_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -2733,7 +2757,7 @@
       "name": "C3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2767,6 +2791,11 @@
         "ref_mat_K_77_K_129_c3_13",
         "ref_mat_KM_27_K_129_c3_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "c3_cls_nn1_lyph_1",
         "c3_cls_nn2_lyph_1"
@@ -2783,7 +2812,7 @@
       "name": "T3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2813,6 +2842,11 @@
         "ref_mat_K_77_K_129_t3_13",
         "ref_mat_KM_27_K_129_t3_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "t3_cls_nn1_lyph_5",
         "t3_cls_nn2_lyph_5"
@@ -2829,7 +2863,7 @@
       "name": "L3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2859,6 +2893,10 @@
         "ref_mat_K_77_K_129_l3_13",
         "ref_mat_KM_27_K_129_l3_14"
       ],
+      "bundlesChains": [
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "l3_cls_nn2_lyph_9"
       ],
@@ -2874,7 +2912,7 @@
       "name": "S3",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2904,6 +2942,7 @@
         "ref_mat_K_77_K_129_s3_13",
         "ref_mat_KM_27_K_129_s3_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -2917,7 +2956,7 @@
       "name": "C4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2947,6 +2986,11 @@
         "ref_mat_K_77_K_129_c4_13",
         "ref_mat_KM_27_K_129_c4_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "c4_cls_nn1_lyph_2",
         "c4_cls_nn2_lyph_2"
@@ -2963,7 +3007,7 @@
       "name": "T4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -2993,6 +3037,11 @@
         "ref_mat_K_77_K_129_t4_13",
         "ref_mat_KM_27_K_129_t4_14"
       ],
+      "bundlesChains": [
+        "nn1",
+        "nn2"
+      ],
+      "inChain": "ch1",
       "inCoalescences": [
         "t4_cls_nn1_lyph_6",
         "t4_cls_nn2_lyph_6"
@@ -3009,7 +3058,7 @@
       "name": "L4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -3039,6 +3088,7 @@
         "ref_mat_K_77_K_129_l4_13",
         "ref_mat_KM_27_K_129_l4_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -3052,7 +3102,7 @@
       "name": "S4",
       "class": "Lyph",
       "external": [
-        "UBERON_0005844"
+        "UBERON:0005844"
       ],
       "color": "#a6cee3",
       "border": {
@@ -3082,6 +3132,7 @@
         "ref_mat_K_77_K_129_s4_13",
         "ref_mat_KM_27_K_129_s4_14"
       ],
+      "inChain": "ch1",
       "inCoalescences": [],
       "width": 40,
       "height": 80,
@@ -3119,6 +3170,8 @@
       ],
       "internalIn": "ref_mat_KM_27_K_129_c3_4",
       "inCoalescences": [],
+      "width": 32,
+      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
@@ -4430,10 +4483,13 @@
         "ref_mat_56_229_nn1_lyph_1_2",
         "ref_mat_116_229_nn1_lyph_1_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "c3_cls_nn1_lyph_1"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4468,10 +4524,13 @@
         "ref_mat_56_229_nn1_lyph_2_2",
         "ref_mat_116_229_nn1_lyph_2_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "c4_cls_nn1_lyph_2"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4506,10 +4565,13 @@
         "ref_mat_56_229_nn1_lyph_3_2",
         "ref_mat_116_229_nn1_lyph_3_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "t1_cls_nn1_lyph_3"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4544,10 +4606,13 @@
         "ref_mat_56_229_nn1_lyph_4_2",
         "ref_mat_116_229_nn1_lyph_4_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "t2_cls_nn1_lyph_4"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4582,10 +4647,13 @@
         "ref_mat_56_229_nn1_lyph_5_2",
         "ref_mat_116_229_nn1_lyph_5_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "t3_cls_nn1_lyph_5"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4620,10 +4688,13 @@
         "ref_mat_56_229_nn1_lyph_6_2",
         "ref_mat_116_229_nn1_lyph_6_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "t4_cls_nn1_lyph_6"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4658,10 +4729,13 @@
         "ref_mat_56_229_nn1_lyph_7_2",
         "ref_mat_116_229_nn1_lyph_7_3"
       ],
+      "inChain": "nn1",
       "inCoalescences": [
         "l1_cls_nn1_lyph_7"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4696,10 +4770,13 @@
         "ref_mat_56_229_nn2_lyph_1_2",
         "ref_mat_116_229_nn2_lyph_1_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "c3_cls_nn2_lyph_1"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4734,10 +4811,13 @@
         "ref_mat_56_229_nn2_lyph_2_2",
         "ref_mat_116_229_nn2_lyph_2_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "c4_cls_nn2_lyph_2"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4772,10 +4852,13 @@
         "ref_mat_56_229_nn2_lyph_3_2",
         "ref_mat_116_229_nn2_lyph_3_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "t1_cls_nn2_lyph_3"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4810,10 +4893,13 @@
         "ref_mat_56_229_nn2_lyph_4_2",
         "ref_mat_116_229_nn2_lyph_4_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "t2_cls_nn2_lyph_4"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4848,10 +4934,13 @@
         "ref_mat_56_229_nn2_lyph_5_2",
         "ref_mat_116_229_nn2_lyph_5_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "t3_cls_nn2_lyph_5"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4886,10 +4975,13 @@
         "ref_mat_56_229_nn2_lyph_6_2",
         "ref_mat_116_229_nn2_lyph_6_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "t4_cls_nn2_lyph_6"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4924,10 +5016,13 @@
         "ref_mat_56_229_nn2_lyph_7_2",
         "ref_mat_116_229_nn2_lyph_7_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "l1_cls_nn2_lyph_7"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -4962,10 +5057,13 @@
         "ref_mat_56_229_nn2_lyph_8_2",
         "ref_mat_116_229_nn2_lyph_8_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "l2_cls_nn2_lyph_8"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -5000,10 +5098,13 @@
         "ref_mat_56_229_nn2_lyph_9_2",
         "ref_mat_116_229_nn2_lyph_9_3"
       ],
+      "inChain": "nn2",
       "inCoalescences": [
         "l3_cls_nn2_lyph_9"
       ],
       "angle": 180,
+      "width": 25.6,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
@@ -12770,10 +12871,13 @@
       "length": {},
       "layerIn": "soma",
       "inCoalescences": [],
+      "width": 10.666666666666668,
+      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_soma_2",
@@ -12799,10 +12903,13 @@
       "length": {},
       "layerIn": "soma",
       "inCoalescences": [],
+      "width": 10.666666666666668,
+      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_soma_3",
@@ -12828,10 +12935,13 @@
       "length": {},
       "layerIn": "soma",
       "inCoalescences": [],
+      "width": 10.666666666666668,
+      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_1_1",
@@ -12858,10 +12968,13 @@
       "length": {},
       "layerIn": "nn1_lyph_1",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_1_2",
@@ -12888,10 +13001,13 @@
       "length": {},
       "layerIn": "nn1_lyph_1",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_1_3",
@@ -12918,10 +13034,13 @@
       "length": {},
       "layerIn": "nn1_lyph_1",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_2_1",
@@ -12948,10 +13067,13 @@
       "length": {},
       "layerIn": "nn1_lyph_2",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_2_2",
@@ -12978,10 +13100,13 @@
       "length": {},
       "layerIn": "nn1_lyph_2",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_2_3",
@@ -13008,10 +13133,13 @@
       "length": {},
       "layerIn": "nn1_lyph_2",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_3_1",
@@ -13038,10 +13166,13 @@
       "length": {},
       "layerIn": "nn1_lyph_3",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_3_2",
@@ -13068,10 +13199,13 @@
       "length": {},
       "layerIn": "nn1_lyph_3",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_3_3",
@@ -13098,10 +13232,13 @@
       "length": {},
       "layerIn": "nn1_lyph_3",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_4_1",
@@ -13128,10 +13265,13 @@
       "length": {},
       "layerIn": "nn1_lyph_4",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_4_2",
@@ -13158,10 +13298,13 @@
       "length": {},
       "layerIn": "nn1_lyph_4",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_4_3",
@@ -13188,10 +13331,13 @@
       "length": {},
       "layerIn": "nn1_lyph_4",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_5_1",
@@ -13218,10 +13364,13 @@
       "length": {},
       "layerIn": "nn1_lyph_5",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_5_2",
@@ -13248,10 +13397,13 @@
       "length": {},
       "layerIn": "nn1_lyph_5",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_5_3",
@@ -13278,10 +13430,13 @@
       "length": {},
       "layerIn": "nn1_lyph_5",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_6_1",
@@ -13308,10 +13463,13 @@
       "length": {},
       "layerIn": "nn1_lyph_6",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_6_2",
@@ -13338,10 +13496,13 @@
       "length": {},
       "layerIn": "nn1_lyph_6",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_6_3",
@@ -13368,10 +13529,13 @@
       "length": {},
       "layerIn": "nn1_lyph_6",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn1_lyph_7_1",
@@ -13398,10 +13562,13 @@
       "length": {},
       "layerIn": "nn1_lyph_7",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn1_lyph_7_2",
@@ -13428,10 +13595,13 @@
       "length": {},
       "layerIn": "nn1_lyph_7",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn1_lyph_7_3",
@@ -13458,10 +13628,13 @@
       "length": {},
       "layerIn": "nn1_lyph_7",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_1_1",
@@ -13488,10 +13661,13 @@
       "length": {},
       "layerIn": "nn2_lyph_1",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_1_2",
@@ -13518,10 +13694,13 @@
       "length": {},
       "layerIn": "nn2_lyph_1",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_1_3",
@@ -13548,10 +13727,13 @@
       "length": {},
       "layerIn": "nn2_lyph_1",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_2_1",
@@ -13578,10 +13760,13 @@
       "length": {},
       "layerIn": "nn2_lyph_2",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_2_2",
@@ -13608,10 +13793,13 @@
       "length": {},
       "layerIn": "nn2_lyph_2",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_2_3",
@@ -13638,10 +13826,13 @@
       "length": {},
       "layerIn": "nn2_lyph_2",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_3_1",
@@ -13668,10 +13859,13 @@
       "length": {},
       "layerIn": "nn2_lyph_3",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_3_2",
@@ -13698,10 +13892,13 @@
       "length": {},
       "layerIn": "nn2_lyph_3",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_3_3",
@@ -13728,10 +13925,13 @@
       "length": {},
       "layerIn": "nn2_lyph_3",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_4_1",
@@ -13758,10 +13958,13 @@
       "length": {},
       "layerIn": "nn2_lyph_4",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_4_2",
@@ -13788,10 +13991,13 @@
       "length": {},
       "layerIn": "nn2_lyph_4",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_4_3",
@@ -13818,10 +14024,13 @@
       "length": {},
       "layerIn": "nn2_lyph_4",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_5_1",
@@ -13848,10 +14057,13 @@
       "length": {},
       "layerIn": "nn2_lyph_5",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_5_2",
@@ -13878,10 +14090,13 @@
       "length": {},
       "layerIn": "nn2_lyph_5",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_5_3",
@@ -13908,10 +14123,13 @@
       "length": {},
       "layerIn": "nn2_lyph_5",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_6_1",
@@ -13938,10 +14156,13 @@
       "length": {},
       "layerIn": "nn2_lyph_6",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_6_2",
@@ -13968,10 +14189,13 @@
       "length": {},
       "layerIn": "nn2_lyph_6",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_6_3",
@@ -13998,10 +14222,13 @@
       "length": {},
       "layerIn": "nn2_lyph_6",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_7_1",
@@ -14028,10 +14255,13 @@
       "length": {},
       "layerIn": "nn2_lyph_7",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_7_2",
@@ -14058,10 +14288,13 @@
       "length": {},
       "layerIn": "nn2_lyph_7",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_7_3",
@@ -14088,10 +14321,13 @@
       "length": {},
       "layerIn": "nn2_lyph_7",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_8_1",
@@ -14118,10 +14354,13 @@
       "length": {},
       "layerIn": "nn2_lyph_8",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_8_2",
@@ -14148,10 +14387,13 @@
       "length": {},
       "layerIn": "nn2_lyph_8",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_8_3",
@@ -14178,10 +14420,13 @@
       "length": {},
       "layerIn": "nn2_lyph_8",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_54_229_nn2_lyph_9_1",
@@ -14208,10 +14453,13 @@
       "length": {},
       "layerIn": "nn2_lyph_9",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_56_229_nn2_lyph_9_2",
@@ -14238,10 +14486,13 @@
       "length": {},
       "layerIn": "nn2_lyph_9",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     },
     {
       "id": "ref_mat_116_229_nn2_lyph_9_3",
@@ -14268,10 +14519,13 @@
       "length": {},
       "layerIn": "nn2_lyph_9",
       "inCoalescences": [],
+      "width": 8.533333333333335,
+      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "layerWidth": 33.333333333333336
     }
   ],
   "materials": [
@@ -15195,7 +15449,8 @@
         "ch1_lnk_14",
         "ch1_lnk_15",
         "ch1_lnk_16"
-      ]
+      ],
+      "housingLyphs": []
     },
     {
       "id": "nn1",
