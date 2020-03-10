@@ -1,13 +1,17 @@
 import os
+import json
 import unittest
 import pytest
 from pyontutils.utils import Async, deferred
+from sparcur.core import JEncode
 from sparcur.paths import BlackfynnCache, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.config import auth
 from sparcur import mbf
 from sparcur import schemas as sc
 from .common import path_project_container
+
+export = False
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
@@ -40,4 +44,10 @@ class TestExtractMetadata(unittest.TestCase):
         blob = [e.asDict() for e in embfs]
         errors = [b.pop('errors') for b in blob]
         error_types = set(e['validator'] for es in errors for e in es)
+        if export:
+            with open('mbf-test.json', 'wt') as f:
+                json.dump(blob, f, indent=2, cls=JEncode)
+            with open('mbf-errors.json', 'wt') as f:
+                json.dump(errors, f, indent=2, cls=JEncode)
+
         assert error_types == {'not'} or not error_types, f'unexpected error type! {error_types}'
