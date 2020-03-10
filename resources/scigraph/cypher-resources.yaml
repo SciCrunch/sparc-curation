@@ -377,15 +377,22 @@ cypherResources:
   - path: /dynamic/demos/apinat/bundles/{start-id}
     operations:
       - summary: Return the paths to somas from an anatomical region
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
     query: |
-            MATCH path = (start:Class{iri: '${start-id}'})
+            MATCH path1 = (start:Class{iri: '${start-id}'})
             -[:apinatomy:annotates]->(housing)
             -[:apinatomy:bundlesChains]->(chain)
             -[:apinatomy:root]->(root)
             -[:apinatomy:internalIn]->(layer)
+            WITH path1, layer
+            MATCH path2 = (layer_external)
+            -[:apinatomy:annotates]->(layer)
             -[:apinatomy:layerIn]->(segment)
             -[:apinatomy:external]->(soma_external)
-            RETURN path
+            RETURN path1, path2
 
   - path: /dynamic/demos/apinat/somas
     operations:
