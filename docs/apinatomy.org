@@ -21,7 +21,7 @@ Run this block in emacs with =C-c C-c= or tangle and run with the block below
 # there is no test folder inside of bin and python can't
 # look backward up the folder hierarchy to find it
 #+name: apinat-export
-#+header: :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o0755)
+#+header: :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o0755) :async
 #+begin_src python :dir ../ :results output :tangle ../export-apinatomy-tests
 import sys
 import pathlib

@@ -332,6 +332,8 @@ class BaseElement(Base):
                 for value in values:
                     if key == 'external':
                         o = OntId(value).URIRef
+                        yield o, readable['annotates'], self.s
+
                     else:
                         value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                         o = self.context[value]
