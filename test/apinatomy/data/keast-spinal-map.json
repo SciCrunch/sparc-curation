@@ -1,5 +1,5 @@
 {
-  "id": "keastSpinalTest",
+  "id": "keastFlatmap",
   "resources": {
     "54": {
       "id": "54",
@@ -143,14 +143,30 @@
       }
     },
     "waitingList": {},
-    "keastSpinalTest": {
-      "id": "keastSpinalTest",
-      "name": "Keast Spinal Test",
+    "keastFlatmap": {
+      "id": "keastFlatmap",
+      "name": "Keast Flatmap Test",
       "class": "Graph",
-      "description": "A demo model with chains of lyphs with generated structure",
       "external": [
         "UBERON:0005844",
+        "UBERON:0006469",
+        "UBERON:0006457",
+        "UBERON:0006448",
+        "UBERON:0006460",
         "CL:0000540",
+        "UBERON:0006489",
+        "UBERON:0006458",
+        "UBERON:0006450",
+        "UBERON:0006461",
+        "UBERON:0006488",
+        "UBERON:0006459",
+        "UBERON:0006449",
+        "UBERON:0006462",
+        "UBERON:0006490",
+        "UBERON:0006452",
+        "UBERON:0006451",
+        "UBERON:0006463",
+        "NLX:154731",
         "UBERON:0001359",
         "UBERON:0004670",
         "UBERON:0004677",
@@ -1115,7 +1131,8 @@
       "sourceOf": [
         "nn2_lnk_2",
         "lnk_nn2_node_1_nn2_node_1_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_2": {
       "id": "nn2_node_2",
@@ -1133,7 +1150,8 @@
       "sourceOf": [
         "nn2_lnk_3",
         "lnk_nn2_node_2_nn2_node_2_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_3": {
       "id": "nn2_node_3",
@@ -1151,7 +1169,8 @@
       "sourceOf": [
         "nn2_lnk_4",
         "lnk_nn2_node_3_nn2_node_3_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_4": {
       "id": "nn2_node_4",
@@ -1169,7 +1188,8 @@
       "sourceOf": [
         "nn2_lnk_5",
         "lnk_nn2_node_4_nn2_node_4_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_5": {
       "id": "nn2_node_5",
@@ -1187,7 +1207,8 @@
       "sourceOf": [
         "nn2_lnk_6",
         "lnk_nn2_node_5_nn2_node_5_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_6": {
       "id": "nn2_node_6",
@@ -1205,7 +1226,8 @@
       "sourceOf": [
         "nn2_lnk_7",
         "lnk_nn2_node_6_nn2_node_6_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_7": {
       "id": "nn2_node_7",
@@ -1223,7 +1245,8 @@
       "sourceOf": [
         "nn2_lnk_8",
         "lnk_nn2_node_7_nn2_node_7_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_8": {
       "id": "nn2_node_8",
@@ -1241,7 +1264,8 @@
       "sourceOf": [
         "nn2_lnk_9",
         "lnk_nn2_node_8_nn2_node_8_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_9": {
       "id": "nn2_node_9",
@@ -1255,7 +1279,8 @@
       "collide": 5,
       "targetOf": [
         "nn2_lnk_9"
-      ]
+      ],
+      "hidden": true
     },
     "lnk-soma": {
       "id": "lnk-soma",
@@ -1626,7 +1651,8 @@
       "fasciculatesIn": "ref_mat_K_84_K_129_c3_6",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_2": {
       "id": "nn2_lnk_2",
@@ -1639,7 +1665,8 @@
       "fasciculatesIn": "ref_mat_K_84_K_129_c4_6",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_3": {
       "id": "nn2_lnk_3",
@@ -1652,7 +1679,8 @@
       "fasciculatesIn": "ref_mat_K_84_K_129_t1_6",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_4": {
       "id": "nn2_lnk_4",
@@ -1665,7 +1693,8 @@
       "fasciculatesIn": "ref_mat_K_84_K_129_t2_6",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_5": {
       "id": "nn2_lnk_5",
@@ -1678,7 +1707,8 @@
       "fasciculatesIn": "ref_mat_K_83_K_129_t3_7",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_6": {
       "id": "nn2_lnk_6",
@@ -1691,7 +1721,8 @@
       "fasciculatesIn": "ref_mat_K_82_K_129_t4_8",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_7": {
       "id": "nn2_lnk_7",
@@ -1704,7 +1735,8 @@
       "fasciculatesIn": "ref_mat_K_81_K_129_l1_9",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_8": {
       "id": "nn2_lnk_8",
@@ -1717,7 +1749,8 @@
       "fasciculatesIn": "ref_mat_K_81_K_129_l2_9",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "nn2_lnk_9": {
       "id": "nn2_lnk_9",
@@ -1730,7 +1763,8 @@
       "fasciculatesIn": "ref_mat_K_81_K_129_l3_9",
       "length": 64,
       "geometry": "link",
-      "lineWidth": "0.003"
+      "lineWidth": "0.003",
+      "hidden": true
     },
     "K_129": {
       "id": "K_129",
@@ -1796,7 +1830,7 @@
       "name": "C1",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006469"
       ],
       "color": "#a6cee3",
       "border": "b_c1",
@@ -1841,7 +1875,7 @@
       "name": "T1",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006457"
       ],
       "color": "#a6cee3",
       "border": "b_t1",
@@ -1893,7 +1927,7 @@
       "name": "L1",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006448"
       ],
       "color": "#a6cee3",
       "border": "b_l1",
@@ -1945,7 +1979,7 @@
       "name": "S1",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006460"
       ],
       "color": "#a6cee3",
       "border": "b_s1",
@@ -1996,7 +2030,7 @@
       "name": "C2",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006489"
       ],
       "color": "#a6cee3",
       "border": "b_c2",
@@ -2041,7 +2075,7 @@
       "name": "T2",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006458"
       ],
       "color": "#a6cee3",
       "border": "b_t2",
@@ -2093,7 +2127,7 @@
       "name": "L2",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006450"
       ],
       "color": "#a6cee3",
       "border": "b_l2",
@@ -2143,7 +2177,7 @@
       "name": "S2",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006461"
       ],
       "color": "#a6cee3",
       "border": "b_s2",
@@ -2188,7 +2222,7 @@
       "name": "C3",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006488"
       ],
       "color": "#a6cee3",
       "border": "b_c3",
@@ -2244,7 +2278,7 @@
       "name": "T3",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006459"
       ],
       "color": "#a6cee3",
       "border": "b_t3",
@@ -2296,7 +2330,7 @@
       "name": "L3",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006449"
       ],
       "color": "#a6cee3",
       "border": "b_l3",
@@ -2346,7 +2380,7 @@
       "name": "S3",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006462"
       ],
       "color": "#a6cee3",
       "border": "b_s3",
@@ -2391,7 +2425,7 @@
       "name": "C4",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006490"
       ],
       "color": "#a6cee3",
       "border": "b_c4",
@@ -2443,7 +2477,7 @@
       "name": "T4",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006452"
       ],
       "color": "#a6cee3",
       "border": "b_t4",
@@ -2495,7 +2529,7 @@
       "name": "L4",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006451"
       ],
       "color": "#a6cee3",
       "border": "b_l4",
@@ -2540,7 +2574,7 @@
       "name": "S4",
       "class": "Lyph",
       "external": [
-        "UBERON:0005844"
+        "UBERON:0006463"
       ],
       "color": "#a6cee3",
       "border": "b_s4",
@@ -2585,7 +2619,7 @@
       "name": "Soma",
       "class": "Lyph",
       "external": [
-        "CL:0000540"
+        "NLX:154731"
       ],
       "color": "#e31a1c",
       "border": "b_soma",
@@ -2604,8 +2638,6 @@
       ],
       "internalIn": "ref_mat_KM_27_K_129_c3_4",
       "inCoalescences": [],
-      "width": 32,
-      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
@@ -4249,12 +4281,11 @@
         "c3_cls_nn2_lyph_1"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_1": {
       "id": "b_nn2_lyph_1",
@@ -4291,12 +4322,11 @@
         "c4_cls_nn2_lyph_2"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_2": {
       "id": "b_nn2_lyph_2",
@@ -4333,12 +4363,11 @@
         "t1_cls_nn2_lyph_3"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_3": {
       "id": "b_nn2_lyph_3",
@@ -4375,12 +4404,11 @@
         "t2_cls_nn2_lyph_4"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_4": {
       "id": "b_nn2_lyph_4",
@@ -4417,12 +4445,11 @@
         "t3_cls_nn2_lyph_5"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_5": {
       "id": "b_nn2_lyph_5",
@@ -4459,12 +4486,11 @@
         "t4_cls_nn2_lyph_6"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_6": {
       "id": "b_nn2_lyph_6",
@@ -4501,12 +4527,11 @@
         "l1_cls_nn2_lyph_7"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_7": {
       "id": "b_nn2_lyph_7",
@@ -4543,12 +4568,11 @@
         "l2_cls_nn2_lyph_8"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_8": {
       "id": "b_nn2_lyph_8",
@@ -4585,12 +4609,11 @@
         "l3_cls_nn2_lyph_9"
       ],
       "angle": 180,
-      "width": 25.6,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      }
+      },
+      "hidden": true
     },
     "b_nn2_lyph_9": {
       "id": "b_nn2_lyph_9",
@@ -13586,13 +13609,10 @@
       "length": {},
       "layerIn": "soma",
       "inCoalescences": [],
-      "width": 10.666666666666668,
-      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_soma_1": {
       "id": "b_ref_mat_54_229_soma_1",
@@ -13619,13 +13639,10 @@
       "length": {},
       "layerIn": "soma",
       "inCoalescences": [],
-      "width": 10.666666666666668,
-      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_soma_2": {
       "id": "b_ref_mat_56_229_soma_2",
@@ -13652,13 +13669,10 @@
       "length": {},
       "layerIn": "soma",
       "inCoalescences": [],
-      "width": 10.666666666666668,
-      "height": 64,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_soma_3": {
       "id": "b_ref_mat_116_229_soma_3",
@@ -14400,13 +14414,10 @@
       "length": {},
       "layerIn": "nn2_lyph_1",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_1_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_1_1",
@@ -14434,13 +14445,10 @@
       "length": {},
       "layerIn": "nn2_lyph_1",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_1_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_1_2",
@@ -14468,13 +14476,10 @@
       "length": {},
       "layerIn": "nn2_lyph_1",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_1_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_1_3",
@@ -14502,13 +14507,10 @@
       "length": {},
       "layerIn": "nn2_lyph_2",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_2_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_2_1",
@@ -14536,13 +14538,10 @@
       "length": {},
       "layerIn": "nn2_lyph_2",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_2_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_2_2",
@@ -14570,13 +14569,10 @@
       "length": {},
       "layerIn": "nn2_lyph_2",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_2_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_2_3",
@@ -14604,13 +14600,10 @@
       "length": {},
       "layerIn": "nn2_lyph_3",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_3_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_3_1",
@@ -14638,13 +14631,10 @@
       "length": {},
       "layerIn": "nn2_lyph_3",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_3_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_3_2",
@@ -14672,13 +14662,10 @@
       "length": {},
       "layerIn": "nn2_lyph_3",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_3_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_3_3",
@@ -14706,13 +14693,10 @@
       "length": {},
       "layerIn": "nn2_lyph_4",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_4_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_4_1",
@@ -14740,13 +14724,10 @@
       "length": {},
       "layerIn": "nn2_lyph_4",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_4_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_4_2",
@@ -14774,13 +14755,10 @@
       "length": {},
       "layerIn": "nn2_lyph_4",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_4_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_4_3",
@@ -14808,13 +14786,10 @@
       "length": {},
       "layerIn": "nn2_lyph_5",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_5_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_5_1",
@@ -14842,13 +14817,10 @@
       "length": {},
       "layerIn": "nn2_lyph_5",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_5_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_5_2",
@@ -14876,13 +14848,10 @@
       "length": {},
       "layerIn": "nn2_lyph_5",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_5_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_5_3",
@@ -14910,13 +14879,10 @@
       "length": {},
       "layerIn": "nn2_lyph_6",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_6_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_6_1",
@@ -14944,13 +14910,10 @@
       "length": {},
       "layerIn": "nn2_lyph_6",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_6_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_6_2",
@@ -14978,13 +14941,10 @@
       "length": {},
       "layerIn": "nn2_lyph_6",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_6_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_6_3",
@@ -15012,13 +14972,10 @@
       "length": {},
       "layerIn": "nn2_lyph_7",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_7_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_7_1",
@@ -15046,13 +15003,10 @@
       "length": {},
       "layerIn": "nn2_lyph_7",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_7_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_7_2",
@@ -15080,13 +15034,10 @@
       "length": {},
       "layerIn": "nn2_lyph_7",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_7_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_7_3",
@@ -15114,13 +15065,10 @@
       "length": {},
       "layerIn": "nn2_lyph_8",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_8_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_8_1",
@@ -15148,13 +15096,10 @@
       "length": {},
       "layerIn": "nn2_lyph_8",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_8_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_8_2",
@@ -15182,13 +15127,10 @@
       "length": {},
       "layerIn": "nn2_lyph_8",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_8_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_8_3",
@@ -15216,13 +15158,10 @@
       "length": {},
       "layerIn": "nn2_lyph_9",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_54_229_nn2_lyph_9_1": {
       "id": "b_ref_mat_54_229_nn2_lyph_9_1",
@@ -15250,13 +15189,10 @@
       "length": {},
       "layerIn": "nn2_lyph_9",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_56_229_nn2_lyph_9_2": {
       "id": "b_ref_mat_56_229_nn2_lyph_9_2",
@@ -15284,13 +15220,10 @@
       "length": {},
       "layerIn": "nn2_lyph_9",
       "inCoalescences": [],
-      "width": 8.533333333333335,
-      "height": 51.2,
       "scale": {
         "width": 40,
         "height": 80
-      },
-      "layerWidth": 33.333333333333336
+      }
     },
     "b_ref_mat_116_229_nn2_lyph_9_3": {
       "id": "b_ref_mat_116_229_nn2_lyph_9_3",
@@ -16576,7 +16509,8 @@
       "targetOf": [
         "nn2_lnk_1",
         "lnk_nn2_node_1_nn2_node_1_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_2_clone": {
       "id": "nn2_node_2_clone",
@@ -16592,7 +16526,8 @@
       "targetOf": [
         "nn2_lnk_2",
         "lnk_nn2_node_2_nn2_node_2_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_3_clone": {
       "id": "nn2_node_3_clone",
@@ -16608,7 +16543,8 @@
       "targetOf": [
         "nn2_lnk_3",
         "lnk_nn2_node_3_nn2_node_3_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_4_clone": {
       "id": "nn2_node_4_clone",
@@ -16624,7 +16560,8 @@
       "targetOf": [
         "nn2_lnk_4",
         "lnk_nn2_node_4_nn2_node_4_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_5_clone": {
       "id": "nn2_node_5_clone",
@@ -16640,7 +16577,8 @@
       "targetOf": [
         "nn2_lnk_5",
         "lnk_nn2_node_5_nn2_node_5_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_6_clone": {
       "id": "nn2_node_6_clone",
@@ -16656,7 +16594,8 @@
       "targetOf": [
         "nn2_lnk_6",
         "lnk_nn2_node_6_nn2_node_6_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_7_clone": {
       "id": "nn2_node_7_clone",
@@ -16672,7 +16611,8 @@
       "targetOf": [
         "nn2_lnk_7",
         "lnk_nn2_node_7_nn2_node_7_clone"
-      ]
+      ],
+      "hidden": true
     },
     "nn2_node_8_clone": {
       "id": "nn2_node_8_clone",
@@ -16688,7 +16628,8 @@
       "targetOf": [
         "nn2_lnk_8",
         "lnk_nn2_node_8_nn2_node_8_clone"
-      ]
+      ],
+      "hidden": true
     },
     "lnk_nn2_node_1_nn2_node_1_clone": {
       "id": "lnk_nn2_node_1_nn2_node_1_clone",
@@ -16702,7 +16643,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_2_nn2_node_2_clone": {
       "id": "lnk_nn2_node_2_nn2_node_2_clone",
@@ -16716,7 +16658,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_3_nn2_node_3_clone": {
       "id": "lnk_nn2_node_3_nn2_node_3_clone",
@@ -16730,7 +16673,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_4_nn2_node_4_clone": {
       "id": "lnk_nn2_node_4_nn2_node_4_clone",
@@ -16744,7 +16688,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_5_nn2_node_5_clone": {
       "id": "lnk_nn2_node_5_nn2_node_5_clone",
@@ -16758,7 +16703,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_6_nn2_node_6_clone": {
       "id": "lnk_nn2_node_6_nn2_node_6_clone",
@@ -16772,7 +16718,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_7_nn2_node_7_clone": {
       "id": "lnk_nn2_node_7_nn2_node_7_clone",
@@ -16786,7 +16733,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "lnk_nn2_node_8_nn2_node_8_clone": {
       "id": "lnk_nn2_node_8_nn2_node_8_clone",
@@ -16800,7 +16748,8 @@
       "geometry": "link",
       "stroke": "dashed",
       "lineWidth": "0.003",
-      "strength": 1
+      "strength": 1,
+      "hidden": true
     },
     "ns1": {
       "id": "ns1",
@@ -16830,31 +16779,48 @@
       "targetOf": [
         "lnk-soma"
       ],
-      "rootOf": "nn2"
+      "rootOf": "nn2",
+      "hidden": true
     },
     "UBERON:0005844": {
       "id": "UBERON:0005844",
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
-        "K_129",
-        "c1",
-        "t1",
-        "l1",
-        "s1",
-        "c2",
-        "t2",
-        "l2",
-        "s2",
-        "c3",
-        "t3",
-        "l3",
-        "s3",
-        "c4",
-        "t4",
-        "l4",
-        "s4"
+        "keastFlatmap",
+        "K_129"
+      ]
+    },
+    "UBERON:0006469": {
+      "id": "UBERON:0006469",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006457": {
+      "id": "UBERON:0006457",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006448": {
+      "id": "UBERON:0006448",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006460": {
+      "id": "UBERON:0006460",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
       ]
     },
     "CL:0000540": {
@@ -16863,8 +16829,7 @@
       "generated": true,
       "annotates": [
         "229",
-        "keastSpinalTest",
-        "soma",
+        "keastFlatmap",
         "nn1_lyph_1",
         "nn1_lyph_2",
         "nn1_lyph_3",
@@ -16883,12 +16848,116 @@
         "nn2_lyph_9"
       ]
     },
+    "UBERON:0006489": {
+      "id": "UBERON:0006489",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006458": {
+      "id": "UBERON:0006458",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006450": {
+      "id": "UBERON:0006450",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006461": {
+      "id": "UBERON:0006461",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006488": {
+      "id": "UBERON:0006488",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006459": {
+      "id": "UBERON:0006459",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006449": {
+      "id": "UBERON:0006449",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006462": {
+      "id": "UBERON:0006462",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006490": {
+      "id": "UBERON:0006490",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006452": {
+      "id": "UBERON:0006452",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006451": {
+      "id": "UBERON:0006451",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "UBERON:0006463": {
+      "id": "UBERON:0006463",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
+    "NLX:154731": {
+      "id": "NLX:154731",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "keastFlatmap"
+      ]
+    },
     "UBERON:0001359": {
       "id": "UBERON:0001359",
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_KM_9",
         "ref_mat_KM_9_K_129",
         "ref_mat_KM_9_K_129_c1_1",
@@ -16915,7 +16984,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_KM_23",
         "ref_mat_KM_23_K_129",
         "ref_mat_KM_23_K_129_c1_2",
@@ -16942,7 +17011,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_86",
         "ref_mat_K_86_K_129",
         "ref_mat_K_86_K_129_c1_3",
@@ -16969,7 +17038,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_85",
         "ref_mat_K_85_K_129",
         "ref_mat_K_85_K_129_c1_5",
@@ -16996,7 +17065,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_84",
         "ref_mat_K_84_K_129",
         "ref_mat_K_84_K_129_c1_6",
@@ -17023,7 +17092,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_83",
         "ref_mat_K_83_K_129",
         "ref_mat_K_83_K_129_c1_7",
@@ -17050,7 +17119,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_82",
         "ref_mat_K_82_K_129",
         "ref_mat_K_82_K_129_c1_8",
@@ -17077,7 +17146,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_81",
         "ref_mat_K_81_K_129",
         "ref_mat_K_81_K_129_c1_9",
@@ -17104,7 +17173,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_80",
         "ref_mat_K_80_K_129",
         "ref_mat_K_80_K_129_c1_10",
@@ -17131,7 +17200,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_79",
         "ref_mat_K_79_K_129",
         "ref_mat_K_79_K_129_c1_11",
@@ -17158,7 +17227,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_78",
         "ref_mat_K_78_K_129",
         "ref_mat_K_78_K_129_c1_12",
@@ -17185,7 +17254,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_K_77",
         "ref_mat_K_77_K_129",
         "ref_mat_K_77_K_129_c1_13",
@@ -17213,7 +17282,7 @@
       "generated": true,
       "annotates": [
         "54",
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_54",
         "ref_mat_54_229",
         "ref_mat_54_229_soma_1",
@@ -17241,7 +17310,7 @@
       "generated": true,
       "annotates": [
         "56",
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_56",
         "ref_mat_56_229",
         "ref_mat_56_229_soma_2",
@@ -17269,7 +17338,7 @@
       "generated": true,
       "annotates": [
         "116",
-        "keastSpinalTest",
+        "keastFlatmap",
         "mat_116",
         "ref_mat_116_229",
         "ref_mat_116_229_soma_3",
@@ -17296,7 +17365,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_1",
         "KM_7"
       ]
@@ -17314,7 +17383,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_6"
       ]
     },
@@ -17323,7 +17392,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_10"
       ]
     },
@@ -17332,7 +17401,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_11"
       ]
     },
@@ -17341,7 +17410,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_22"
       ]
     },
@@ -17350,7 +17419,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_24"
       ]
     },
@@ -17359,7 +17428,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_25"
       ]
     },
@@ -17368,7 +17437,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "KM_26"
       ]
     },
@@ -17378,7 +17447,7 @@
       "generated": true,
       "annotates": [
         "55",
-        "keastSpinalTest"
+        "keastFlatmap"
       ]
     },
     "SAO:1770195789": {
@@ -17386,7 +17455,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "nn1"
       ]
     },
@@ -17395,7 +17464,7 @@
       "class": "External",
       "generated": true,
       "annotates": [
-        "keastSpinalTest",
+        "keastFlatmap",
         "nn2"
       ]
     }
