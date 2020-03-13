@@ -355,14 +355,15 @@ class Node(BaseElement):
     def triples(self):
         yield from super().triples()
 
+
 Graph.Node = Node
 class Lyph(BaseElement):
     key = 'lyphs'
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
-    objects = 'layerIn', 'conveys', 'border', 'cloneOf'
+    objects = 'layerIn', 'conveys', 'border', 'cloneOf', 'supertype'
     objects_multi = ('inCoalescences', 'subtypes', 'layers', 'clones', 'external',
-                     'internalNodes', 'bundles', 'bundlesTrees', 'bundlesChains')
+                     'internalNodes', 'bundles', 'bundlesTrees', 'bundlesChains', 'subtypes')
 
     def triples(self):
         yield from super().triples()

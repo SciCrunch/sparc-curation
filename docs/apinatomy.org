@@ -1,8 +1,10 @@
+#+title: ApiNATOMY model RDF export and deployment
+#+options: num:nil
 * ApiNATOMY to RDF/OWL2 conversion
 ** Basic strategy
-   JSON -> RDF -> OWL2
-   Conversion from json to rdf should have few if any changes in semantics.
-   Conversion from a direct rdf translation to OWL2 is where the semantic
+   JSON -> RDF -> OWL2 \\
+   Conversion from json to rdf should have few if any changes in semantics. \\
+   Conversion from a direct rdf translation to OWL2 is where the semantic \\
    translation of ApiNATOMY structures into OWL2 constructs will happen.
 * Server setup
 On the ontology host (read, ttl host, not SciGraph host) you will need the following.

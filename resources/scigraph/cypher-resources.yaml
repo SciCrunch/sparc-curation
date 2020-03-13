@@ -398,7 +398,7 @@ cypherResources:
     operations:
       - summary: List all the somas for a given graph (TODO on the given graph)
     query: |
-            MATCH (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
+            MATCH (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
             -[:apinatomy:external]-(soma:NamedIndividual)
             -[:apinatomy:conveyingLyph]-(link1)
             -[:apinatomy:target]-(root)
@@ -411,7 +411,7 @@ cypherResources:
     operations:
       - summary: List all the housing lyphs for all starting points.
     query: |
-            MATCH path = (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
+            MATCH path = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
             -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
             -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
             -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
