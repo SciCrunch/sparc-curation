@@ -306,13 +306,27 @@ Edit [[file:${HOME}/.config/orthauth/secrets.yaml][secrets.yaml]]
 and add the api key to =(-> scicrunch api name-of-user-or-name-for-the-key)=.
 ** Developer extras
 *** Python debugger settings
+**** POSIX
 If you can use python3.7 (>=ubuntu-19.04) you can set the embedded debugger as follows.
 #+begin_src bash
 pip install --user pudb
 #+end_src
+
+Add the following to =~/.bashrc=.
 #+CAPTION: .bashrc extras
 #+begin_src bash
 export PYTHONBREAKPOINT=pudb.set_trace
+#+end_src
+**** Windows
+Sadly =pudb= doesn't support windows so we have to use =ipdb= instead.
+#+begin_src powershell
+pip install --user ipdb
+#+end_src
+
+Add the following to your powershell =$profile=.
+#+caption: powershell =$profile= extras
+#+begin_src powershell
+$Env:PYTHONBREAKPOINT = "ipdb.set_trace"
 #+end_src
 *** Prevent vim from removing xattrs
 [[file:${HOME}/.vimrc][~/.vimrc]] settings to prevent klobbering of xattrs
@@ -525,6 +539,7 @@ emacs `
 firefox `
 GoogleChrome `
 poshgit `
+procexp `
 python `
 racket `
 vim
