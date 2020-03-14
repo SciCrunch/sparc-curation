@@ -399,6 +399,38 @@ cypherResources:
       <-[:apinatomy:annotates]-(soma_NLX)
       RETURN path1, path2, path3
 
+  - path: /dynamic/demos/apinat/connected-somas
+    operations:
+      - summary: List all the somas
+    query: |
+      MATCH path = (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+      -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+      -[:apinatomy:rootOf]->(tree)                     // axon or dendrite tree
+      -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      RETURN path
+
+  - path: /dynamic/demos/apinat/connected-somas/{start-id}
+    operations:
+      - summary: List all the somas from a given starting point
+        parameters:
+          - name: start-id
+            description: ontology id of the starting point
+            paramType: path
+    query: |
+      MATCH path = (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+      -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+      -[:apinatomy:rootOf]->(tree)                     // axon or dendrite tree
+      -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      RETURN path
+
   - path: /dynamic/demos/apinat/somas
     operations:
       - summary: List all the somas for a given graph (TODO on the given graph)
