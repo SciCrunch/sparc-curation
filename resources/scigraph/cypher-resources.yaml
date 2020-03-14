@@ -429,10 +429,34 @@ cypherResources:
            description: ontology id of the starting point
            paramType: path
     query: |
-      MATCH (soma:NamedIndividual{iri: '${start-id}'})
-      -[relation:apinatomy:conveyingLyph]-(link1)
-      -[:apinatomy:target]-(root)
-      -[:apinatomy:root]-(tree)
-      -[:apinatomy:housingLyphs]-(housing)
-      -[r:apinatomy:external*0..1]-(external)
-      RETURN housing, r, external
+      // sadly it seems we have to union on this one in order to enforce matching start-id
+      MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+      -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+      <-[:apinatomy:internalNodes]-(layer_or_end)
+      <-[:apinatomy:annotates]-(layer_or_end_external:Class{iri: '${start-id}'})
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      WITH path1, root
+      MATCH path2 = (root)
+      -[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
+      -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      RETURN path1, path2
+      
+      UNION
+      
+      MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+      -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+      <-[:apinatomy:internalNodes]-(layer)
+      -[:apinatomy:layerIn]->(end_housing)
+      -[:apinatomy:external]->(end_housing_external:Class{iri: '${start-id}'})
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      WITH path1, root
+      MATCH path2 = (root)
+      -[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
+      -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      RETURN path1, path2
