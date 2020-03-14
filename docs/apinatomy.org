@@ -54,7 +54,7 @@ scp ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
 scp ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
 #+end_src
 
-#+begin_src bash :dir /ssh:cassava|sudo:cassava: :eval never
+#+begin_src bash :dir /ssh:cassava|sudo:cassava:
 DATE=$(date +%Y%m%dT%H%M%S)
 ARCHIVE_PATH="archive/manual/${DATE}"
 FOLDER="/var/www/sparc/ApiNATOMY/${ARCHIVE_PATH}"

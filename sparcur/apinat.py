@@ -322,13 +322,12 @@ class BaseElement(Base):
                 value = self.blob[key]
                 value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                 yield self.s, readable[key], self.context[value]
-                if key == 'root':  # FIXME temp hack to get directions to cooperate
-                    yield self.context[value], readable['rootOf'], self.s
 
     def triples_objects_multi(self):
         for key in self.objects_multi:
             if key in self.blob:
                 values = self.blob[key]
+                assert not isinstance(values, str), f'{values} in {key}'
                 for value in values:
                     if key == 'external':
                         o = OntId(value).URIRef
@@ -349,8 +348,8 @@ class BaseElement(Base):
 class Node(BaseElement):
     key = 'nodes'
     annotations = 'skipLabel', 'color', 'generated'
-    objects = 'cloneOf', 'hostedBy', 'internalIn'
-    objects_multi = 'sourceOf', 'targetOf', 'rootOf', 'leafOf', 'clones', 'external'
+    objects = 'cloneOf', 'hostedBy', 'internalIn', 'rootOf', 'leafOf'
+    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external'
 
     def triples(self):
         yield from super().triples()
@@ -406,8 +405,8 @@ Graph.Tree = Tree
 class Chain(BaseElement):
     key = 'chains'
     #internal_references = 'housingLayers',   # FIXME TODO
-    objects = 'root', 'leaf', 'lyphTemplate', 'group'
-    objects_multi = 'housingLyphs', 'housingChain', 'external', 'levels', 'lyphs'
+    objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
+    objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs'
 
 
 Graph.Chain = Chain
@@ -501,7 +500,8 @@ class External(BaseElement):
 
     def triples_class(self):
         yield self.s, rdf.type, owl.Class
-        yield self.s, rdfs.label, rdflib.Literal(self._term.label)
+        l = self._term.label if self._term.label is not None else self._term.curie
+        yield self.s, rdfs.label, rdflib.Literal(l)
         # TODO triples simple?
 
 
