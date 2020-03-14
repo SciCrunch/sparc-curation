@@ -382,17 +382,22 @@ cypherResources:
            description: ontology id of the starting point
            paramType: path
     query: |
-            MATCH path1 = (start:Class{iri: '${start-id}'})
-            -[:apinatomy:annotates]->(housing)
-            -[:apinatomy:bundlesChains]->(chain)
-            -[:apinatomy:root]->(root)
-            -[:apinatomy:internalIn]->(layer)
-            WITH path1, layer
-            MATCH path2 = (layer_external)
-            -[:apinatomy:annotates]->(layer)
-            -[:apinatomy:layerIn]->(segment)
-            -[:apinatomy:external]->(soma_external)
-            RETURN path1, path2
+      MATCH path1 = (start:Class{iri: '${start-id}'})
+      -[:apinatomy:annotates]->(start_housing)
+      -[:apinatomy:bundlesChains]->(chain)
+      -[:apinatomy:root]->(root)
+      -[:apinatomy:internalIn]->(layer_or_end)
+      -[:apinatomy:external]->(layer_or_end_external)
+      WITH path1, root, layer_or_end AS layer
+      OPTIONAL MATCH path2 = (layer)
+      -[:apinatomy:layerIn]->(end_housing)
+      -[:apinatomy:external]->(end_housing_external)
+      WITH path1, path2, root
+      MATCH path3 = (root) // in the layer case this hits an additional lyph
+      <-[:apinatomy:target|apinatomy:source]-(link)
+      <-[:apinatomy:conveys]-(soma)
+      <-[:apinatomy:annotates]-(soma_NLX)
+      RETURN path1, path2, path3
 
   - path: /dynamic/demos/apinat/somas
     operations:
