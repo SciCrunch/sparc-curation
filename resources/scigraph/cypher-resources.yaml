@@ -7,19 +7,19 @@ cypherResources:
            description: ontology id of the organ
            paramType: path
     query: &organParts |
-            // all parts of and directly connected to organ or parts of organ
-            MATCH path = (start:Class{iri: "${id}"})
-            -[:ILX:0738400|fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
-            -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage|fma:continuous_with*0..1]->(sup)
-            -[:fma:constitutional_part|fma:branch_of|fma:tributary_of|fma:branch*0..1]->(a_bit_more)
-            RETURN path
-            UNION
-            // return the major vessles for any arteries supplying the organ directly
-            MATCH path = (start:Class{iri: "${id}"})
-            -[:fma:arterial_supply|fma:venous_drainage]->(vessel)
-            -[:fma:branch_of|fma:tributary_of]->(more_vessel)
-            -[:fma:branch_of|fma:tributary_of|fma:regional_part_of]->(even_more_vessel)
-            RETURN path
+      // all parts of and directly connected to organ or parts of organ
+      MATCH path = (start:Class{iri: "${id}"})
+      -[:ILX:0738400|fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
+      -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage|fma:continuous_with*0..1]->(sup)
+      -[:fma:constitutional_part|fma:branch_of|fma:tributary_of|fma:branch*0..1]->(a_bit_more)
+      RETURN path
+      UNION
+      // return the major vessles for any arteries supplying the organ directly
+      MATCH path = (start:Class{iri: "${id}"})
+      -[:fma:arterial_supply|fma:venous_drainage]->(vessel)
+      -[:fma:branch_of|fma:tributary_of]->(more_vessel)
+      -[:fma:branch_of|fma:tributary_of|fma:regional_part_of]->(even_more_vessel)
+      RETURN path
 
   - path: /dynamic/test/sparc/organParts/{id}
     operations: *organParts-ops
@@ -41,11 +41,11 @@ cypherResources:
     operations:
       - summary: Get the graph of all parcellation artifacts for all species
     query: |
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            -[:ilxtr:isDefinedInTaxon]->(species)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      -[:ilxtr:isDefinedInTaxon]->(species)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
 
   - path: /dynamic/prod/sparc/parcellationArtifacts/{species-id}
     operations:
@@ -55,13 +55,13 @@ cypherResources:
            description: ontology id of the species
            paramType: path
     query: |
-            MATCH (parent)
-            -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
+      MATCH (parent)
+      -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
 
   - path: /dynamic/prod/sparc/artifactRoots/{artifact-id}
     operations:
@@ -71,10 +71,10 @@ cypherResources:
            description: ontology id of the parcellation artifact
            paramType: path
     query: |
-            MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
-            -(artifact:Class{iri: "${artifact-id}"})
-            RETURN path
+      MATCH path = (root)
+      -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
+      -(artifact:Class{iri: "${artifact-id}"})
+      RETURN path
 
   - path: /dynamic/prod/sparc/artifactLabels/{artifact-id}
     operations:
@@ -84,12 +84,12 @@ cypherResources:
            description: ontology id of the parcellation artifact
            paramType: path
     query: |
-            MATCH path = (label)
-            -[:subClassOf]->(root)
-            -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
-            -(artifact:Class{iri: "${artifact-id}"})
-            WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
+      MATCH path = (label)
+      -[:subClassOf]->(root)
+      -[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
+      -(artifact:Class{iri: "${artifact-id}"})
+      WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
 
   - path: /dynamic/prod/sparc/rootLabels/{root-id}
     operations: &rootLabes-ops
@@ -99,13 +99,13 @@ cypherResources:
            description: ontology id of the parcellation label root
            paramType: path
     query: &rootLabels |
-            MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
-            WITH label
-            MATCH path = (label)-[relation*0..1]-(maybe)
-            WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
-                  AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
-                  AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
+      MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
+      WITH label
+      MATCH path = (label)-[relation*0..1]-(maybe)
+      WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
+            AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
+            AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
 
   - path: /dynamic/test/sparc/rootLabels/{root-id}
     operations: *rootLabes-ops
@@ -115,17 +115,17 @@ cypherResources:
     operations:
       - summary: Get the graph of all parcellation label roots for all species
     query: |
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            -[:ilxtr:isDefinedInTaxon]->(species)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            return path
-            UNION
-            MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(artifact)
-            -[:subClassOf*0..2]->(parent)
-            -[:ilxtr:isDefinedInTaxon]->(species)
-            RETURN path
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      -[:ilxtr:isDefinedInTaxon]->(species)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      return path
+      UNION
+      MATCH path = (root)
+      -[:ilxtr:isDefinedBy]->(artifact)
+      -[:subClassOf*0..2]->(parent)
+      -[:ilxtr:isDefinedInTaxon]->(species)
+      RETURN path
 
   - path: /dynamic/prod/sparc/parcellationRoots/{species-id}
     operations:
@@ -135,21 +135,21 @@ cypherResources:
            description: ontology id of the species
            paramType: path
     query: |
-            MATCH (parent)
-            -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            return path
-            UNION
-            MATCH (parent)
-            -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(artifact)
-            -[:subClassOf*0..2]->(parent)
-            RETURN path
+      MATCH (parent)
+      -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      return path
+      UNION
+      MATCH (parent)
+      -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (root)
+      -[:ilxtr:isDefinedBy]->(artifact)
+      -[:subClassOf*0..2]->(parent)
+      RETURN path
 
   - path: /dynamic/prod/sparc/parcellationRoots/{species-id}/{region-id}
     operations:
@@ -162,29 +162,29 @@ cypherResources:
            description: ontology id of the anatomical region
            paramType: path
     query: |
-            MATCH
-            (region:Class{iri: "${region-id}"})
-            <-[:ilxtr:isDefinedInRegion]-
-            (parent)
-            -[:ilxtr:isDefinedInTaxon]->
-            (species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
-            UNION
-            MATCH
-            (region:Class{iri: "${region-id}"})
-            <-[:ilxtr:isDefinedInRegion]-
-            (parent)
-            -[:ilxtr:isDefinedInTaxon]->
-            (species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(artifact)
-            -[:subClassOf*0..2]->(parent)
-            RETURN path
+      MATCH
+      (region:Class{iri: "${region-id}"})
+      <-[:ilxtr:isDefinedInRegion]-
+      (parent)
+      -[:ilxtr:isDefinedInTaxon]->
+      (species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
+      UNION
+      MATCH
+      (region:Class{iri: "${region-id}"})
+      <-[:ilxtr:isDefinedInRegion]-
+      (parent)
+      -[:ilxtr:isDefinedInTaxon]->
+      (species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (root)
+      -[:ilxtr:isDefinedBy]->(artifact)
+      -[:subClassOf*0..2]->(parent)
+      RETURN path
 
   - path: /dynamic/prod/sparc/parcellationRootsFMA/{species-id}/{fma-id}
     operations: &parcellationRootsFMA-ops
@@ -197,45 +197,45 @@ cypherResources:
            description: ontology id of the anatomical region
            paramType: path
     query: &parcellationRootsFMA |
-            MATCH (fma:Class{iri: "${fma-id}"})
-            WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
-            MATCH (region)
-            -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
-            WHERE any(x IN
-                      region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
-                      WHERE x =~ curie)
-            WITH region
-            MATCH
-            (region)
-            <-[:ilxtr:isDefinedInRegion]-
-            (parent)
-            -[:ilxtr:isDefinedInTaxon]->
-            (species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
-            UNION
-            MATCH (fma:Class{iri: "${fma-id}"})
-            WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
-            MATCH (region)
-            -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
-            WHERE any(x IN
-                      region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
-                      WHERE x =~ curie)
-            WITH region
-            MATCH
-            (region)
-            <-[:ilxtr:isDefinedInRegion]-
-            (parent)
-            -[:ilxtr:isDefinedInTaxon]->
-            (species:Class{iri: "${species-id}"})
-            WITH parent
-            MATCH path = (root)
-            -[:ilxtr:isDefinedBy]->(artifact)
-            -[:subClassOf*0..2]->(parent)
-            RETURN path
+      MATCH (fma:Class{iri: "${fma-id}"})
+      WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
+      MATCH (region)
+      -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
+      WHERE any(x IN
+                region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
+                WHERE x =~ curie)
+      WITH region
+      MATCH
+      (region)
+      <-[:ilxtr:isDefinedInRegion]-
+      (parent)
+      -[:ilxtr:isDefinedInTaxon]->
+      (species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
+      UNION
+      MATCH (fma:Class{iri: "${fma-id}"})
+      WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
+      MATCH (region)
+      -[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
+      WHERE any(x IN
+                region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
+                WHERE x =~ curie)
+      WITH region
+      MATCH
+      (region)
+      <-[:ilxtr:isDefinedInRegion]-
+      (parent)
+      -[:ilxtr:isDefinedInTaxon]->
+      (species:Class{iri: "${species-id}"})
+      WITH parent
+      MATCH path = (root)
+      -[:ilxtr:isDefinedBy]->(artifact)
+      -[:subClassOf*0..2]->(parent)
+      RETURN path
 
   - path: /dynamic/test/sparc/parcellationRootsFMA/{species-id}/{fma-id}
     operations: *parcellationRootsFMA-ops
@@ -245,49 +245,49 @@ cypherResources:
     operations:
       - summary: Get the graph of all parcellation labels for all species
     query: |
-            MATCH path = (artifact)
-            -[:subClassOf*0..2]->(parent)
-            -[:ilxtr:isDefinedInTaxon]->(species)
-            WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            return path
-            UNION
-            MATCH path = (maybe)
-            -[relation*0..1]-(label)
-            -[:subClassOf]->(root)
-            -[:ilxtr:isDefinedBy]->(artifact)
-            -[:subClassOf*0..2]->(parent)
-            -[:ilxtr:isDefinedInTaxon]->(species)
-            WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
-                  AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
-                  AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-            RETURN path
+      MATCH path = (artifact)
+      -[:subClassOf*0..2]->(parent)
+      -[:ilxtr:isDefinedInTaxon]->(species)
+      WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      return path
+      UNION
+      MATCH path = (maybe)
+      -[relation*0..1]-(label)
+      -[:subClassOf]->(root)
+      -[:ilxtr:isDefinedBy]->(artifact)
+      -[:subClassOf*0..2]->(parent)
+      -[:ilxtr:isDefinedInTaxon]->(species)
+      WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
+            AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
+            AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+      RETURN path
 
   - path: /dynamic/prod/sparc/organList
     operations: &organList-ops
       - summary: Get the list of all FMA organ identifiers relevant to SPARC
     query: &organList |
-            MATCH (n)
-            WHERE n.iri IN [
-                    "http://purl.org/sig/ont/fma/fma7195",  // lung
-                    "http://purl.org/sig/ont/fma/fma7088",  // heart
-                    "http://purl.org/sig/ont/fma/fma7197",  // liver
-                    "http://purl.org/sig/ont/fma/fma7198",  // pancreas
-                    "http://purl.org/sig/ont/fma/fma7203",  // kidney
-                    "http://purl.org/sig/ont/fma/fma7148",  // stomach
-                    "http://purl.org/sig/ont/fma/fma7196",  // spleen
-                    "http://purl.org/sig/ont/fma/fma14543", // colon
-                    "http://purl.org/sig/ont/fma/fma7201",  // large intestine
-                    "http://purl.org/sig/ont/fma/fma7200",  // small intestine
-                    "http://purl.org/sig/ont/fma/fma7199",  // intestine
-                    "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
-                    "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
-                    "http://purl.org/sig/ont/fma/fma7157",  // nervous system
-                    "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
-                    "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
-                    "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
-                    "http://purl.org/sig/ont/fma/fma50801"  // brain
-                    ]
-            RETURN n
+      MATCH (n)
+      WHERE n.iri IN [
+              "http://purl.org/sig/ont/fma/fma7195",  // lung
+              "http://purl.org/sig/ont/fma/fma7088",  // heart
+              "http://purl.org/sig/ont/fma/fma7197",  // liver
+              "http://purl.org/sig/ont/fma/fma7198",  // pancreas
+              "http://purl.org/sig/ont/fma/fma7203",  // kidney
+              "http://purl.org/sig/ont/fma/fma7148",  // stomach
+              "http://purl.org/sig/ont/fma/fma7196",  // spleen
+              "http://purl.org/sig/ont/fma/fma14543", // colon
+              "http://purl.org/sig/ont/fma/fma7201",  // large intestine
+              "http://purl.org/sig/ont/fma/fma7200",  // small intestine
+              "http://purl.org/sig/ont/fma/fma7199",  // intestine
+              "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
+              "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
+              "http://purl.org/sig/ont/fma/fma7157",  // nervous system
+              "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
+              "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
+              "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
+              "http://purl.org/sig/ont/fma/fma50801"  // brain
+              ]
+      RETURN n
 
   - path: /dynamic/test/sparc/organList
     operations: *organList-ops
@@ -297,15 +297,15 @@ cypherResources:
     operations: &speciesList-ops
       - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
     query: &speciesList |
-            MATCH (n)
-            WHERE n.iri IN [
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9378",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9606",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9685",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_9823",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_10090",
-                    "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
-            RETURN n
+      MATCH (n)
+      WHERE n.iri IN [
+              "http://purl.obolibrary.org/obo/NCBITaxon_9378",
+              "http://purl.obolibrary.org/obo/NCBITaxon_9606",
+              "http://purl.obolibrary.org/obo/NCBITaxon_9685",
+              "http://purl.obolibrary.org/obo/NCBITaxon_9823",
+              "http://purl.obolibrary.org/obo/NCBITaxon_10090",
+              "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
+      RETURN n
 
   - path: /dynamic/test/sparc/speciesList
     operations: *speciesList-ops
@@ -313,12 +313,12 @@ cypherResources:
 
   - path: /dynamic/shortestSimple
     query: |
-            MATCH (start:Class{iri: '${start_id}'})
-            WITH start
-            MATCH (end:Class{iri: '${end_id}'})
-            WITH start, end
-            MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
-            RETURN path
+      MATCH (start:Class{iri: '${start_id}'})
+      WITH start
+      MATCH (end:Class{iri: '${end_id}'})
+      WITH start, end
+      MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
+      RETURN path
     operations:
       - summary: Get the shortest path between two IDs
         parameters:
@@ -403,41 +403,41 @@ cypherResources:
     operations:
       - summary: List all the somas for a given graph (TODO on the given graph)
     query: |
-            MATCH (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
-            -[:apinatomy:external]-(soma:NamedIndividual)
-            -[:apinatomy:conveyingLyph]-(link1)
-            -[:apinatomy:target]-(root)
-            -[:apinatomy:root]-(tree)
-            -[:apinatomy:housingLyphs]-(housing)
-            -[:apinatomy:external*0..1]-(external)
-            RETURN soma
+      MATCH (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:external]-(soma:NamedIndividual)
+      -[:apinatomy:conveyingLyph]-(link1)
+      -[:apinatomy:target]-(root)
+      -[:apinatomy:root]-(tree)
+      -[:apinatomy:housingLyphs]-(housing)
+      -[:apinatomy:external*0..1]-(external)
+      RETURN soma
 
   - path: /dynamic/demos/apinat/housing-lyphs
     operations:
       - summary: List all the housing lyphs for all starting points.
     query: |
-            MATCH path = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
-            -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
-            -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
-            -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
-            -[:apinatomy:rootOf]->(tree)                     // axon or dendrite tree
-            -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
-            -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
-            WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
-            RETURN path
+      MATCH path = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+      -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+      -[:apinatomy:rootOf]->(tree)                     // axon or dendrite tree
+      -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      RETURN path
 
   - path: /dynamic/demos/apinat/housing-lyphs-old
     operations:
       - summary: List all the housing lyphs for all starting points.
     query: |
-            MATCH (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
-            -[:apinatomy:external]-(soma:NamedIndividual)
-            -[:apinatomy:conveyingLyph]-(link1)
-            -[:apinatomy:target]-(root)
-            -[:apinatomy:root]-(tree)
-            -[:apinatomy:housingLyphs]-(housing)
-            -[r:apinatomy:external*0..1]-(external)
-            RETURN soma, housing, r, external
+      MATCH (c:Class{iri: "http://purl.obolibrary.org/obo/CL_0000540"})
+      -[:apinatomy:external]-(soma:NamedIndividual)
+      -[:apinatomy:conveyingLyph]-(link1)
+      -[:apinatomy:target]-(root)
+      -[:apinatomy:root]-(tree)
+      -[:apinatomy:housingLyphs]-(housing)
+      -[r:apinatomy:external*0..1]-(external)
+      RETURN soma, housing, r, external
 
   - path: /dynamic/demos/apinat/housing-lyphs/{start-id}
     operations:
@@ -447,10 +447,10 @@ cypherResources:
            description: ontology id of the starting point
            paramType: path
     query: |
-            MATCH (soma:NamedIndividual{iri: '${start-id}'})
-            -[relation:apinatomy:conveyingLyph]-(link1)
-            -[:apinatomy:target]-(root)
-            -[:apinatomy:root]-(tree)
-            -[:apinatomy:housingLyphs]-(housing)
-            -[r:apinatomy:external*0..1]-(external)
-            RETURN housing, r, external
+      MATCH (soma:NamedIndividual{iri: '${start-id}'})
+      -[relation:apinatomy:conveyingLyph]-(link1)
+      -[:apinatomy:target]-(root)
+      -[:apinatomy:root]-(tree)
+      -[:apinatomy:housingLyphs]-(housing)
+      -[r:apinatomy:external*0..1]-(external)
+      RETURN housing, r, external
