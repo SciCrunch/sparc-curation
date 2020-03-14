@@ -451,8 +451,8 @@ cypherResources:
       -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
       <-[:apinatomy:internalNodes]-(layer)
-      -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external:Class{iri: '${start-id}'})
+      <-[:apinatomy:layers]-(end_housing)
+      <-[:apinatomy:annotates]-(end_housing_external:Class{iri: '${start-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, root
       MATCH path2 = (root)
