@@ -300,12 +300,13 @@ cypherResources:
     query: &speciesList |
       MATCH (n)
       WHERE n.iri IN [
-              "http://purl.obolibrary.org/obo/NCBITaxon_9378",
-              "http://purl.obolibrary.org/obo/NCBITaxon_9606",
-              "http://purl.obolibrary.org/obo/NCBITaxon_9685",
-              "http://purl.obolibrary.org/obo/NCBITaxon_9823",
-              "http://purl.obolibrary.org/obo/NCBITaxon_10090",
-              "http://purl.obolibrary.org/obo/NCBITaxon_10116"]
+              "http://purl.obolibrary.org/obo/NCBITaxon_9378",   // Suncus murinus
+              "http://purl.obolibrary.org/obo/NCBITaxon_9606",   // Homo sapiens
+              "http://purl.obolibrary.org/obo/NCBITaxon_9685",   // Felis catus
+              "http://purl.obolibrary.org/obo/NCBITaxon_9823",   // Sus scrofa
+              "http://purl.obolibrary.org/obo/NCBITaxon_10090",  // Mus musculus
+              "http://purl.obolibrary.org/obo/NCBITaxon_10116"   // Rattus norvegicus
+              ]
       RETURN n
 
   - path: /dynamic/test/sparc/speciesList
