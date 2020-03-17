@@ -24,12 +24,13 @@ cypherResources:
   - path: /dynamic/test/sparc/organParts/{id}
     operations: *organParts-ops
     query: |
+      // depth of 6 captures everything, 5 is too shallow, 40 is WAY too deep
       MATCH path = (start:Class{iri: "${id}"})
-      <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..40]-(part)
+      <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
       <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
       <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
       RETURN path
-      UNION
+      UNION  // for this query UNION seems to be MUCH faster than using WITH
       MATCH path = (start:Class{iri: "${id}"})
       // this one does not need to be inverted ? except for the INCOMING flag
       <-[:fma:arterial_supply_of|fma:venous_drainage_of]-(vessel)
