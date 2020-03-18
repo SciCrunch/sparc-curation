@@ -7,23 +7,6 @@ cypherResources:
            description: ontology id of the organ
            paramType: path
     query: &organParts |
-      // all parts of and directly connected to organ or parts of organ
-      MATCH path = (start:Class{iri: "${id}"})
-      -[:ILX:0738400|fma:regional_part|fma:constitutional_part|fma:related_part*0..40]->(part)
-      -[:fma:arterial_supply|fma:nerve_supply|fma:venous_drainage|fma:continuous_with*0..1]->(sup)
-      -[:fma:constitutional_part|fma:branch_of|fma:tributary_of|fma:branch*0..1]->(a_bit_more)
-      RETURN path
-      UNION
-      // return the major vessles for any arteries supplying the organ directly
-      MATCH path = (start:Class{iri: "${id}"})
-      -[:fma:arterial_supply|fma:venous_drainage]->(vessel)
-      -[:fma:branch_of|fma:tributary_of]->(more_vessel)
-      -[:fma:branch_of|fma:tributary_of|fma:regional_part_of]->(even_more_vessel)
-      RETURN path
-
-  - path: /dynamic/test/sparc/organParts/{id}
-    operations: *organParts-ops
-    query: |
       // depth of 6 captures everything, 5 is too shallow, 40 is WAY too deep
       MATCH path = (start:Class{iri: "${id}"})
       <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
@@ -37,6 +20,10 @@ cypherResources:
       <-[:fma:branch|fma:tributary]-(more_vessel)
       <-[:fma:branch|fma:tributary|fma:regional_part]-(even_more_vessel)
       RETURN path
+
+  - path: /dynamic/test/sparc/organParts/{id}
+    operations: *organParts-ops
+    query: *organParts
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
     operations:
