@@ -965,7 +965,7 @@
             "internalLyphs": [
                 "258"
             ],
-            "bundlesTrees": [
+            "bundlesChains": [
                 "t3"
             ]
         },
@@ -977,7 +977,7 @@
                 "ILX:0731712"
             ],
             "supertype": "112",
-            "bundlesTrees": [
+            "bundlesChains": [
                 "t3"
             ]
         },
@@ -1753,9 +1753,9 @@
     ],
     "references": [
         {
-            "id": "NCBITaxon:99999",
+            "id": "NCBITaxon:10116",
             "type": "species",
-            "name": "cat"
+            "name": "Rattus norvegicus"
         }
     ],
     "coalescences": [],
@@ -1763,7 +1763,9 @@
     "chains": [
         {
             "id": "c1",
-            "conveyingLyphs": [
+            "root": "c1_s",
+            "leaf": "c1_t",
+            "lyphs": [
                 "200",
                 "203",
                 "204",
@@ -1780,18 +1782,15 @@
                 "215",
                 "216"
             ],
-            "source": "c1_s",
-            "target": "c1_t",
             "length": 100
-        }
-    ],
-    "trees": [
+        },
         {
             "id": "PVN-IML1-d",
             "name": "Dnd PVN-IML1",
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s202",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "202"
@@ -1803,6 +1802,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s228",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "228"
@@ -1814,6 +1814,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s107in214",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "107in214"
@@ -1825,6 +1826,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s265",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "265"
@@ -1836,6 +1838,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s266",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "266"
@@ -1847,6 +1850,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s262",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "262"
@@ -1858,6 +1862,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s264",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "264"
@@ -1869,6 +1874,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s249_1",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "249",
@@ -1884,6 +1890,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s248_1",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "248",
@@ -1899,6 +1906,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s248_2",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "248",
@@ -1914,6 +1922,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s249_2",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "249",
@@ -1929,6 +1938,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s249_3",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "249",
@@ -1944,6 +1954,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_1",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -1955,6 +1966,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_2",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -1966,6 +1978,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_3",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -1977,6 +1990,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_4",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -1988,6 +2002,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_5",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -1999,6 +2014,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_6",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2010,6 +2026,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_7",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2021,6 +2038,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_8",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2032,6 +2050,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_9",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2043,6 +2062,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_10",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2054,6 +2074,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_11",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2065,6 +2086,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_12",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2076,6 +2098,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_13",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2087,6 +2110,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_14",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2098,6 +2122,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_15",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2109,6 +2134,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_16",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2120,6 +2146,7 @@
             "external": [
                 "SAO:1211023249"
             ],
+            "root": "s220_17",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220"
@@ -2131,6 +2158,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t202",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "202",
@@ -2157,6 +2185,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t228",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "228",
@@ -2178,6 +2207,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t107in214",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "107in214",
@@ -2191,6 +2221,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t265",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "265",
@@ -2205,6 +2236,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t266",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "266",
@@ -2219,6 +2251,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t262",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "262",
@@ -2241,6 +2274,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t264",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "264",
@@ -2263,6 +2297,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t249_1",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "249",
@@ -2277,6 +2312,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t248_1",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "248",
@@ -2291,6 +2327,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t248_2",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "248",
@@ -2305,6 +2342,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t249_2",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "249",
@@ -2319,6 +2357,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t249_3",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "249",
@@ -2333,6 +2372,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_1",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2350,6 +2390,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_2",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2365,6 +2406,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_3",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2380,6 +2422,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_4",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2396,6 +2439,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_5",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2412,6 +2456,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_6",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2428,6 +2473,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_7",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2444,6 +2490,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_8",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2460,6 +2507,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_9",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2476,6 +2524,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_10",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2489,6 +2538,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_11",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2502,6 +2552,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_12",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2514,6 +2565,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_13",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2527,6 +2579,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_14",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2542,6 +2595,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_15",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2556,6 +2610,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_16",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2570,6 +2625,7 @@
             "external": [
                 "SAO:1770195789"
             ],
+            "root": "t220_17",
             "lyphTemplate": "229",
             "housingLyphs": [
                 "220",
@@ -2681,5 +2737,7 @@
                 "lnk16"
             ]
         }
-    ]
+    ],
+    "id": "bolserLewisNew",
+    "name": "Bolser-Lewis map"
 }

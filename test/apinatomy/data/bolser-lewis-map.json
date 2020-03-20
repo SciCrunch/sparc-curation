@@ -3775,9 +3775,11 @@
     "bolserLewisNew": {
       "id": "bolserLewisNew",
       "name": "Bolser-Lewis map",
+      "abbreviation": "bolew",
       "class": "Graph",
       "external": [
         "UBERON:0001894",
+        "NCBITaxon:99999",
         "ILX:0103217",
         "UBERON:0001898",
         "ILX:0105177",
@@ -6204,7 +6206,7 @@
         "117"
       ],
       "references": [
-        "NCBITaxon:99999"
+        "NCBITaxon:10116"
       ],
       "coalescences": [
         "202_cls_PVN-IML1-d_lyph_1",
@@ -14969,6 +14971,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_110",
+      "inheritedExternal": [
+        "UBERON:0000415"
+      ],
       "layerIn": "223",
       "bundles": [
         "AB-NTS-d_lnk_4",
@@ -15145,6 +15150,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_110",
+      "inheritedExternal": [
+        "UBERON:0000415"
+      ],
       "layerIn": "224",
       "bundles": [
         "CB-NTS-d_lnk_4",
@@ -15321,6 +15329,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_110",
+      "inheritedExternal": [
+        "UBERON:0000415"
+      ],
       "layerIn": "225",
       "bundles": [
         "CS-NTS-d_lnk_4",
@@ -15664,6 +15675,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "214",
       "bundles": [
         "T1-INTERCOSTAL-d_lnk_1",
@@ -15849,6 +15863,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "200",
       "bundles": [
         "PVN-IML1-a_lnk_3",
@@ -16097,6 +16114,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_114",
+      "inheritedExternal": [
+        "UBERON:0004982"
+      ],
       "layerIn": "226",
       "bundles": [
         "EM-NTS-d_lnk_4",
@@ -16287,6 +16307,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_112",
+      "inheritedExternal": [
+        "FMA:54807"
+      ],
       "layerIn": "227",
       "bundles": [
         "SCG-ECN-TONG-a_lnk_3",
@@ -18826,6 +18849,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "205",
       "bundles": [
         "PVN-IML1-a_lnk_6",
@@ -19045,6 +19071,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "209",
       "bundles": [
         "PVN-IML1-a_lnk_10",
@@ -19225,6 +19254,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "210",
       "bundles": [
         "PVN-IML1-a_lnk_11",
@@ -20110,6 +20142,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_108",
+      "inheritedExternal": [
+        "FMA:64182"
+      ],
       "layerIn": "221",
       "bundles": [
         "LM-NTS-d_lnk_4",
@@ -20290,6 +20325,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_109",
+      "inheritedExternal": [
+        "FMA:7470"
+      ],
       "layerIn": "222",
       "bundles": [
         "SCG-TRCHA-a_lnk_2",
@@ -20456,6 +20494,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-253",
       "layers": [
         "ref_mat_54_229_soma202_1",
@@ -20488,6 +20529,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-254",
       "layers": [
         "ref_mat_54_229_soma228_1",
@@ -20520,6 +20564,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-255",
       "layers": [
         "ref_mat_54_229_soma107in214_1",
@@ -20552,6 +20599,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-256",
       "layers": [
         "ref_mat_54_229_soma265_1",
@@ -20584,6 +20634,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-257",
       "layers": [
         "ref_mat_54_229_soma266_1",
@@ -20616,6 +20669,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-258",
       "layers": [
         "ref_mat_54_229_soma262_1",
@@ -20648,6 +20704,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-259",
       "layers": [
         "ref_mat_54_229_soma264_1",
@@ -20680,6 +20739,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-260",
       "layers": [
         "ref_mat_54_229_soma249_1_1",
@@ -20712,6 +20774,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-261",
       "layers": [
         "ref_mat_54_229_soma249_2_1",
@@ -20744,6 +20809,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "lnk_soma249_3",
       "layers": [
         "ref_mat_54_229_soma249_3_1",
@@ -20778,6 +20846,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-263",
       "layers": [
         "ref_mat_54_229_soma248_1_1",
@@ -20810,6 +20881,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-264",
       "layers": [
         "ref_mat_54_229_soma248_2_1",
@@ -20842,6 +20916,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-265",
       "layers": [
         "ref_mat_54_229_soma220_1_1",
@@ -20874,6 +20951,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-266",
       "layers": [
         "ref_mat_54_229_soma220_2_1",
@@ -20905,6 +20985,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-267",
       "layers": [
         "ref_mat_54_229_soma220_3_1",
@@ -20936,6 +21019,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-268",
       "layers": [
         "ref_mat_54_229_soma220_4_1",
@@ -20968,6 +21054,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-269",
       "layers": [
         "ref_mat_54_229_soma220_5_1",
@@ -21000,6 +21089,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-270",
       "layers": [
         "ref_mat_54_229_soma220_6_1",
@@ -21032,6 +21124,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-271",
       "layers": [
         "ref_mat_54_229_soma220_7_1",
@@ -21064,6 +21159,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-272",
       "layers": [
         "ref_mat_54_229_soma220_8_1",
@@ -21096,6 +21194,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-273",
       "layers": [
         "ref_mat_54_229_soma220_9_1",
@@ -21128,6 +21229,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-274",
       "layers": [
         "ref_mat_54_229_soma220_10_1",
@@ -21160,6 +21264,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-275",
       "layers": [
         "ref_mat_54_229_soma220_11_1",
@@ -21192,6 +21299,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-276",
       "layers": [
         "ref_mat_54_229_soma220_12_1",
@@ -21224,6 +21334,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-277",
       "layers": [
         "ref_mat_54_229_soma220_13_1",
@@ -21256,6 +21369,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-278",
       "layers": [
         "ref_mat_54_229_soma220_14_1",
@@ -21288,6 +21404,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-279",
       "layers": [
         "ref_mat_54_229_soma220_15_1",
@@ -21320,6 +21439,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-280",
       "layers": [
         "ref_mat_54_229_soma220_16_1",
@@ -21352,6 +21474,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "new-281",
       "layers": [
         "ref_mat_54_229_soma220_17_1",
@@ -21479,6 +21604,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "200",
       "inCoalescences": [],
       "scale": {
@@ -21506,6 +21634,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "200",
       "inCoalescences": [],
       "scale": {
@@ -21580,6 +21711,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "203",
       "inCoalescences": [],
       "scale": {
@@ -21607,6 +21741,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "203",
       "inCoalescences": [],
       "scale": {
@@ -21634,6 +21771,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "203",
       "bundles": [
         "PVN-IML1-a_lnk_4"
@@ -21795,6 +21935,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "204",
       "inCoalescences": [],
       "scale": {
@@ -21822,6 +21965,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "204",
       "inCoalescences": [],
       "scale": {
@@ -21849,6 +21995,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "204",
       "bundles": [
         "PVN-IML1-a_lnk_5"
@@ -22010,6 +22159,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "205",
       "inCoalescences": [],
       "scale": {
@@ -22037,6 +22189,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "205",
       "inCoalescences": [],
       "scale": {
@@ -22064,6 +22219,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "206",
       "inCoalescences": [],
       "scale": {
@@ -22091,6 +22249,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "206",
       "inCoalescences": [],
       "scale": {
@@ -22118,6 +22279,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "206",
       "bundles": [
         "PVN-IML1-a_lnk_7",
@@ -22285,6 +22449,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "207",
       "inCoalescences": [],
       "scale": {
@@ -22312,6 +22479,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "207",
       "inCoalescences": [],
       "scale": {
@@ -22339,6 +22509,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "207",
       "bundles": [
         "PVN-IML1-a_lnk_8",
@@ -22506,6 +22679,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "208",
       "inCoalescences": [],
       "scale": {
@@ -22533,6 +22709,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "208",
       "inCoalescences": [],
       "scale": {
@@ -22560,6 +22739,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "208",
       "bundles": [
         "PVN-IML1-a_lnk_9",
@@ -22727,6 +22909,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "209",
       "inCoalescences": [],
       "scale": {
@@ -22754,6 +22939,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "209",
       "inCoalescences": [],
       "scale": {
@@ -22781,6 +22969,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "210",
       "inCoalescences": [],
       "scale": {
@@ -22808,6 +22999,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "210",
       "inCoalescences": [],
       "scale": {
@@ -22835,6 +23029,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "211",
       "inCoalescences": [],
       "scale": {
@@ -22862,6 +23059,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "211",
       "inCoalescences": [],
       "scale": {
@@ -22889,6 +23089,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "211",
       "bundles": [
         "PVN-IML1-a_lnk_12",
@@ -23056,6 +23259,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "212",
       "inCoalescences": [],
       "scale": {
@@ -23083,6 +23289,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "212",
       "inCoalescences": [],
       "scale": {
@@ -23110,6 +23319,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "212",
       "bundles": [
         "PVN-IML1-a_lnk_13",
@@ -23277,6 +23489,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "213",
       "inCoalescences": [],
       "scale": {
@@ -23304,6 +23519,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "213",
       "inCoalescences": [],
       "scale": {
@@ -23331,6 +23549,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "213",
       "bundles": [
         "PVN-IML1-a_lnk_14",
@@ -23498,6 +23719,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "214",
       "inCoalescences": [],
       "scale": {
@@ -23525,6 +23749,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "214",
       "inCoalescences": [],
       "scale": {
@@ -23552,6 +23779,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "215",
       "inCoalescences": [],
       "scale": {
@@ -23579,6 +23809,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "215",
       "inCoalescences": [],
       "scale": {
@@ -23606,6 +23839,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "215",
       "inCoalescences": [],
       "scale": {
@@ -23633,6 +23869,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_104",
+      "inheritedExternal": [
+        "UBERON:0001359"
+      ],
       "layerIn": "216",
       "inCoalescences": [],
       "scale": {
@@ -23660,6 +23899,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_105",
+      "inheritedExternal": [
+        "UBERON:0004670"
+      ],
       "layerIn": "216",
       "inCoalescences": [],
       "scale": {
@@ -23687,6 +23929,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_107",
+      "inheritedExternal": [
+        "UBERON:0001017"
+      ],
       "layerIn": "216",
       "inCoalescences": [],
       "scale": {
@@ -23764,6 +24009,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "217",
       "bundles": [
         "IML1-SCG-a_lnk_5"
@@ -23925,6 +24173,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "218",
       "bundles": [
         "IML1-SCG-a_lnk_7",
@@ -24089,6 +24340,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "219",
       "bundles": [
         "IML1-SCG-a_lnk_9",
@@ -24307,6 +24561,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "220",
       "bundles": [
         "SCG-AB-d_lnk_1",
@@ -24640,6 +24897,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_41",
+      "inheritedExternal": [
+        "UBERON:0000178"
+      ],
       "layerIn": "223",
       "inCoalescences": [],
       "scale": {
@@ -24667,6 +24927,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_41",
+      "inheritedExternal": [
+        "UBERON:0000178"
+      ],
       "layerIn": "224",
       "inCoalescences": [],
       "scale": {
@@ -24694,6 +24957,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_41",
+      "inheritedExternal": [
+        "UBERON:0000178"
+      ],
       "layerIn": "225",
       "inCoalescences": [],
       "scale": {
@@ -24789,6 +25055,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_115",
+      "inheritedExternal": [
+        "FMA:55112"
+      ],
       "layerIn": "226",
       "inCoalescences": [],
       "scale": {
@@ -24876,6 +25145,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_113",
+      "inheritedExternal": [
+        "FMA:4668"
+      ],
       "layerIn": "227",
       "inCoalescences": [],
       "scale": {
@@ -25272,6 +25544,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_54",
+      "inheritedExternal": [
+        "GO:0005829"
+      ],
       "layerIn": "229",
       "inCoalescences": [],
       "scale": {
@@ -25542,6 +25817,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_56",
+      "inheritedExternal": [
+        "GO:0005886"
+      ],
       "layerIn": "229",
       "inCoalescences": [],
       "scale": {
@@ -25812,6 +26090,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_116",
+      "inheritedExternal": [
+        "ILX:0492026"
+      ],
       "layerIn": "229",
       "inCoalescences": [],
       "scale": {
@@ -25839,6 +26120,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "230",
       "bundles": [
         "IML1-SCG-a_lnk_3",
@@ -26003,6 +26287,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "231",
       "bundles": [
         "IML1-SCG-a_lnk_4"
@@ -26164,6 +26451,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "232",
       "bundles": [
         "IML1-SCG-a_lnk_6"
@@ -26325,6 +26615,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "233",
       "bundles": [
         "IML1-SCG-a_lnk_8",
@@ -26489,6 +26782,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "234",
       "bundles": [
         "IML1-SCG-a_lnk_10",
@@ -26653,6 +26949,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "235",
       "bundles": [
         "SCG-CB-a_lnk_2",
@@ -26838,6 +27137,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "236",
       "bundles": [
         "SCG-CB-a_lnk_3",
@@ -27002,6 +27304,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "237",
       "bundles": [
         "SCG-ICN-TONG-a_lnk_2",
@@ -27178,6 +27483,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "238",
       "bundles": [
         "P4-DIAPHRGM-a_lnk_3",
@@ -27342,6 +27650,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "239",
       "bundles": [
         "AB-NTS-d_lnk_2",
@@ -27536,6 +27847,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "240",
       "bundles": [
         "CB-NTS-d_lnk_2",
@@ -27706,6 +28020,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "241",
       "inCoalescences": [],
       "scale": {
@@ -27799,6 +28116,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "242",
       "bundles": [
         "LM-NTS-d_lnk_3",
@@ -27972,6 +28292,9 @@
       "thickness": {},
       "length": {},
       "supertype": "mat_117",
+      "inheritedExternal": [
+        "UBERON:0000010"
+      ],
       "layerIn": "243",
       "bundles": [
         "SCG-eSLN-LRYNX-a_lnk_5",
@@ -28200,6 +28523,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-d_lnk_1",
       "layers": [
         "ref_mat_54_229_PVN-IML1-d_lyph_1_1",
@@ -28235,6 +28561,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-d_lnk_1",
       "layers": [
         "ref_mat_54_229_IML1-SCG-d_lyph_1_1",
@@ -28270,6 +28599,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "T1-INTERCOSTAL-d_lnk_1",
       "layers": [
         "ref_mat_54_229_T1-INTERCOSTAL-d_lyph_1_1",
@@ -28305,6 +28637,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P4-DIAPHRGM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_P4-DIAPHRGM-d_lyph_1_1",
@@ -28340,6 +28675,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P5-DIAPHRGM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_P5-DIAPHRGM-d_lyph_1_1",
@@ -28375,6 +28713,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-d_lnk_1",
       "layers": [
         "ref_mat_54_229_NTS-IML1-d_lyph_1_1",
@@ -28410,6 +28751,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-d_lnk_1",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-d_lyph_1_1",
@@ -28445,6 +28789,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_AB-NTS-d_lyph_1_1",
@@ -28480,6 +28827,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-d_lnk_2",
       "layers": [
         "ref_mat_54_229_AB-NTS-d_lyph_2_1",
@@ -28515,6 +28865,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-d_lnk_3",
       "layers": [
         "ref_mat_54_229_AB-NTS-d_lyph_3_1",
@@ -28550,6 +28903,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-d_lnk_4",
       "layers": [
         "ref_mat_54_229_AB-NTS-d_lyph_4_1",
@@ -28585,6 +28941,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-d_lnk_5",
       "layers": [
         "ref_mat_54_229_AB-NTS-d_lyph_5_1",
@@ -28620,6 +28979,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_CB-NTS-d_lyph_1_1",
@@ -28655,6 +29017,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-d_lnk_2",
       "layers": [
         "ref_mat_54_229_CB-NTS-d_lyph_2_1",
@@ -28690,6 +29055,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-d_lnk_3",
       "layers": [
         "ref_mat_54_229_CB-NTS-d_lyph_3_1",
@@ -28725,6 +29093,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-d_lnk_4",
       "layers": [
         "ref_mat_54_229_CB-NTS-d_lyph_4_1",
@@ -28760,6 +29131,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-d_lnk_5",
       "layers": [
         "ref_mat_54_229_CB-NTS-d_lyph_5_1",
@@ -28795,6 +29169,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_CS-NTS-d_lyph_1_1",
@@ -28830,6 +29207,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-d_lnk_2",
       "layers": [
         "ref_mat_54_229_CS-NTS-d_lyph_2_1",
@@ -28865,6 +29245,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-d_lnk_3",
       "layers": [
         "ref_mat_54_229_CS-NTS-d_lyph_3_1",
@@ -28900,6 +29283,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-d_lnk_4",
       "layers": [
         "ref_mat_54_229_CS-NTS-d_lyph_4_1",
@@ -28935,6 +29321,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-d_lnk_5",
       "layers": [
         "ref_mat_54_229_CS-NTS-d_lyph_5_1",
@@ -28970,6 +29359,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_LM-NTS-d_lyph_1_1",
@@ -29005,6 +29397,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-d_lnk_2",
       "layers": [
         "ref_mat_54_229_LM-NTS-d_lyph_2_1",
@@ -29040,6 +29435,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-d_lnk_3",
       "layers": [
         "ref_mat_54_229_LM-NTS-d_lyph_3_1",
@@ -29075,6 +29473,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-d_lnk_4",
       "layers": [
         "ref_mat_54_229_LM-NTS-d_lyph_4_1",
@@ -29110,6 +29511,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-d_lnk_5",
       "layers": [
         "ref_mat_54_229_LM-NTS-d_lyph_5_1",
@@ -29145,6 +29549,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_EM-NTS-d_lyph_1_1",
@@ -29180,6 +29587,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-d_lnk_2",
       "layers": [
         "ref_mat_54_229_EM-NTS-d_lyph_2_1",
@@ -29215,6 +29625,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-d_lnk_3",
       "layers": [
         "ref_mat_54_229_EM-NTS-d_lyph_3_1",
@@ -29250,6 +29663,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-d_lnk_4",
       "layers": [
         "ref_mat_54_229_EM-NTS-d_lyph_4_1",
@@ -29285,6 +29701,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-d_lnk_5",
       "layers": [
         "ref_mat_54_229_EM-NTS-d_lyph_5_1",
@@ -29320,6 +29739,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-AB-d_lyph_1_1",
@@ -29355,6 +29777,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CB-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-CB-d_lyph_1_1",
@@ -29390,6 +29815,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-CS-d_lyph_1_1",
@@ -29425,6 +29853,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-d_lyph_1_1",
@@ -29460,6 +29891,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-d_lyph_1_1",
@@ -29495,6 +29929,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-d_lyph_1_1",
@@ -29530,6 +29967,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-d_lyph_1_1",
@@ -29565,6 +30005,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-d_lyph_1_1",
@@ -29600,6 +30043,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-d_lyph_1_1",
@@ -29635,6 +30081,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ECN-TONG-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-ECN-TONG-d_lyph_1_1",
@@ -29670,6 +30119,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TONG-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TONG-d_lyph_1_1",
@@ -29705,6 +30157,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-TRCHA-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-TRCHA-d_lyph_1_1",
@@ -29740,6 +30195,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TRCHA-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TRCHA-d_lyph_1_1",
@@ -29775,6 +30233,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-PVN-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-PVN-d_lyph_1_1",
@@ -29810,6 +30271,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RTRPZ-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-RTRPZ-d_lyph_1_1",
@@ -29845,6 +30309,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RVLM-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-RVLM-d_lyph_1_1",
@@ -29880,6 +30347,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-NTS-d_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-NTS-d_lyph_1_1",
@@ -29915,6 +30385,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_1",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_1_1",
@@ -29950,6 +30423,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_2",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_2_1",
@@ -29985,6 +30461,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_3",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_3_1",
@@ -30020,6 +30499,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_4",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_4_1",
@@ -30055,6 +30537,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_5",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_5_1",
@@ -30090,6 +30575,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_6",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_6_1",
@@ -30125,6 +30613,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_7",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_7_1",
@@ -30160,6 +30651,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_8",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_8_1",
@@ -30195,6 +30689,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_9",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_9_1",
@@ -30230,6 +30727,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_10",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_10_1",
@@ -30265,6 +30765,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_11",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_11_1",
@@ -30300,6 +30803,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_12",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_12_1",
@@ -30335,6 +30841,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_13",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_13_1",
@@ -30370,6 +30879,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_14",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_14_1",
@@ -30405,6 +30917,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_15",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_15_1",
@@ -30440,6 +30955,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "PVN-IML1-a_lnk_16",
       "layers": [
         "ref_mat_54_229_PVN-IML1-a_lyph_16_1",
@@ -30475,6 +30993,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_1",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_1_1",
@@ -30510,6 +31031,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_2",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_2_1",
@@ -30545,6 +31069,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_3",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_3_1",
@@ -30580,6 +31107,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_4",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_4_1",
@@ -30615,6 +31145,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_5",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_5_1",
@@ -30650,6 +31183,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_6",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_6_1",
@@ -30685,6 +31221,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_7",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_7_1",
@@ -30720,6 +31259,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_8",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_8_1",
@@ -30755,6 +31297,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_9",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_9_1",
@@ -30790,6 +31335,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_10",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_10_1",
@@ -30825,6 +31373,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "IML1-SCG-a_lnk_11",
       "layers": [
         "ref_mat_54_229_IML1-SCG-a_lyph_11_1",
@@ -30860,6 +31411,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "T1-INTERCOSTAL-a_lnk_1",
       "layers": [
         "ref_mat_54_229_T1-INTERCOSTAL-a_lyph_1_1",
@@ -30895,6 +31449,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "T1-INTERCOSTAL-a_lnk_2",
       "layers": [
         "ref_mat_54_229_T1-INTERCOSTAL-a_lyph_2_1",
@@ -30930,6 +31487,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "T1-INTERCOSTAL-a_lnk_3",
       "layers": [
         "ref_mat_54_229_T1-INTERCOSTAL-a_lyph_3_1",
@@ -30965,6 +31525,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P4-DIAPHRGM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_P4-DIAPHRGM-a_lyph_1_1",
@@ -31000,6 +31563,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P4-DIAPHRGM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_P4-DIAPHRGM-a_lyph_2_1",
@@ -31035,6 +31601,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P4-DIAPHRGM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_P4-DIAPHRGM-a_lyph_3_1",
@@ -31070,6 +31639,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P4-DIAPHRGM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_P4-DIAPHRGM-a_lyph_4_1",
@@ -31105,6 +31677,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P5-DIAPHRGM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_P5-DIAPHRGM-a_lyph_1_1",
@@ -31140,6 +31715,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P5-DIAPHRGM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_P5-DIAPHRGM-a_lyph_2_1",
@@ -31175,6 +31753,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P5-DIAPHRGM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_P5-DIAPHRGM-a_lyph_3_1",
@@ -31210,6 +31791,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "P5-DIAPHRGM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_P5-DIAPHRGM-a_lyph_4_1",
@@ -31245,6 +31829,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_1",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_1_1",
@@ -31280,6 +31867,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_2",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_2_1",
@@ -31315,6 +31905,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_3",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_3_1",
@@ -31350,6 +31943,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_4",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_4_1",
@@ -31385,6 +31981,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_5",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_5_1",
@@ -31420,6 +32019,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_6",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_6_1",
@@ -31455,6 +32057,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_7",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_7_1",
@@ -31490,6 +32095,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_8",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_8_1",
@@ -31525,6 +32133,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_9",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_9_1",
@@ -31560,6 +32171,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_10",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_10_1",
@@ -31595,6 +32209,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_11",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_11_1",
@@ -31630,6 +32247,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "NTS-IML1-a_lnk_12",
       "layers": [
         "ref_mat_54_229_NTS-IML1-a_lyph_12_1",
@@ -31665,6 +32285,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_1",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_1_1",
@@ -31700,6 +32323,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_2",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_2_1",
@@ -31735,6 +32361,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_3",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_3_1",
@@ -31770,6 +32399,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_4",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_4_1",
@@ -31805,6 +32437,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_5",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_5_1",
@@ -31840,6 +32475,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_6",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_6_1",
@@ -31875,6 +32513,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_7",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_7_1",
@@ -31910,6 +32551,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_8",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_8_1",
@@ -31945,6 +32589,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_9",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_9_1",
@@ -31980,6 +32627,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_10",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_10_1",
@@ -32015,6 +32665,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_11",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_11_1",
@@ -32050,6 +32703,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "RVLM-IML1-a_lnk_12",
       "layers": [
         "ref_mat_54_229_RVLM-IML1-a_lyph_12_1",
@@ -32085,6 +32741,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_AB-NTS-a_lyph_1_1",
@@ -32120,6 +32779,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_AB-NTS-a_lyph_2_1",
@@ -32155,6 +32817,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_AB-NTS-a_lyph_3_1",
@@ -32190,6 +32855,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "AB-NTS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_AB-NTS-a_lyph_4_1",
@@ -32225,6 +32893,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_CB-NTS-a_lyph_1_1",
@@ -32260,6 +32931,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_CB-NTS-a_lyph_2_1",
@@ -32295,6 +32969,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_CB-NTS-a_lyph_3_1",
@@ -32330,6 +33007,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CB-NTS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_CB-NTS-a_lyph_4_1",
@@ -32365,6 +33045,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_CS-NTS-a_lyph_1_1",
@@ -32400,6 +33083,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_CS-NTS-a_lyph_2_1",
@@ -32435,6 +33121,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_CS-NTS-a_lyph_3_1",
@@ -32470,6 +33159,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "CS-NTS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_CS-NTS-a_lyph_4_1",
@@ -32505,6 +33197,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_LM-NTS-a_lyph_1_1",
@@ -32540,6 +33235,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_LM-NTS-a_lyph_2_1",
@@ -32575,6 +33273,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_LM-NTS-a_lyph_3_1",
@@ -32610,6 +33311,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "LM-NTS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_LM-NTS-a_lyph_4_1",
@@ -32645,6 +33349,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_EM-NTS-a_lyph_1_1",
@@ -32680,6 +33387,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_EM-NTS-a_lyph_2_1",
@@ -32715,6 +33425,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_EM-NTS-a_lyph_3_1",
@@ -32750,6 +33463,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "EM-NTS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_EM-NTS-a_lyph_4_1",
@@ -32785,6 +33501,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_1_1",
@@ -32820,6 +33539,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_2_1",
@@ -32855,6 +33577,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_3_1",
@@ -32890,6 +33615,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_4_1",
@@ -32925,6 +33653,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_5_1",
@@ -32960,6 +33691,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_6_1",
@@ -32995,6 +33729,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-AB-a_lnk_7",
       "layers": [
         "ref_mat_54_229_SCG-AB-a_lyph_7_1",
@@ -33030,6 +33767,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CB-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-CB-a_lyph_1_1",
@@ -33065,6 +33805,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CB-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-CB-a_lyph_2_1",
@@ -33100,6 +33843,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CB-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-CB-a_lyph_3_1",
@@ -33135,6 +33881,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CB-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-CB-a_lyph_4_1",
@@ -33170,6 +33919,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CB-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-CB-a_lyph_5_1",
@@ -33205,6 +33957,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-CS-a_lyph_1_1",
@@ -33240,6 +33995,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-CS-a_lyph_2_1",
@@ -33275,6 +34033,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-CS-a_lyph_3_1",
@@ -33310,6 +34071,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-CS-a_lyph_4_1",
@@ -33345,6 +34109,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-CS-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-CS-a_lyph_5_1",
@@ -33380,6 +34147,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-a_lyph_1_1",
@@ -33415,6 +34185,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-a_lyph_2_1",
@@ -33450,6 +34223,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-a_lyph_3_1",
@@ -33485,6 +34261,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-a_lyph_4_1",
@@ -33520,6 +34299,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-a_lyph_5_1",
@@ -33555,6 +34337,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-LRYNX-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-LRYNX-a_lyph_6_1",
@@ -33590,6 +34375,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-a_lyph_1_1",
@@ -33625,6 +34413,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-a_lyph_2_1",
@@ -33660,6 +34451,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-a_lyph_3_1",
@@ -33695,6 +34489,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-a_lyph_4_1",
@@ -33730,6 +34527,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-a_lyph_5_1",
@@ -33765,6 +34565,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-LRYNX-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-LRYNX-a_lyph_6_1",
@@ -33800,6 +34603,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-a_lyph_1_1",
@@ -33835,6 +34641,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-a_lyph_2_1",
@@ -33870,6 +34679,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-a_lyph_3_1",
@@ -33905,6 +34717,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-a_lyph_4_1",
@@ -33940,6 +34755,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-a_lyph_5_1",
@@ -33975,6 +34793,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eSLN-EM-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-eSLN-EM-a_lyph_6_1",
@@ -34010,6 +34831,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-a_lyph_1_1",
@@ -34045,6 +34869,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-a_lyph_2_1",
@@ -34080,6 +34907,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-a_lyph_3_1",
@@ -34115,6 +34945,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-a_lyph_4_1",
@@ -34150,6 +34983,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-a_lyph_5_1",
@@ -34185,6 +35021,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iSLN-EM-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-iSLN-EM-a_lyph_6_1",
@@ -34220,6 +35059,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-a_lyph_1_1",
@@ -34255,6 +35097,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-a_lyph_2_1",
@@ -34290,6 +35135,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-a_lyph_3_1",
@@ -34325,6 +35173,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-a_lyph_4_1",
@@ -34360,6 +35211,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-a_lyph_5_1",
@@ -34395,6 +35249,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-eILN-EM-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-eILN-EM-a_lyph_6_1",
@@ -34430,6 +35287,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-a_lyph_1_1",
@@ -34465,6 +35325,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-a_lyph_2_1",
@@ -34500,6 +35363,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-a_lyph_3_1",
@@ -34535,6 +35401,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-a_lyph_4_1",
@@ -34570,6 +35439,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-a_lyph_5_1",
@@ -34605,6 +35477,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-iILN-EM-a_lnk_6",
       "layers": [
         "ref_mat_54_229_SCG-iILN-EM-a_lyph_6_1",
@@ -34640,6 +35515,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ECN-TONG-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-ECN-TONG-a_lyph_1_1",
@@ -34675,6 +35553,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ECN-TONG-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-ECN-TONG-a_lyph_2_1",
@@ -34710,6 +35591,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ECN-TONG-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-ECN-TONG-a_lyph_3_1",
@@ -34745,6 +35629,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TONG-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TONG-a_lyph_1_1",
@@ -34780,6 +35667,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TONG-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TONG-a_lyph_2_1",
@@ -34815,6 +35705,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TONG-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TONG-a_lyph_3_1",
@@ -34850,6 +35743,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-TRCHA-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-TRCHA-a_lyph_1_1",
@@ -34885,6 +35781,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-TRCHA-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-TRCHA-a_lyph_2_1",
@@ -34920,6 +35819,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TRCHA-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TRCHA-a_lyph_1_1",
@@ -34955,6 +35857,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TRCHA-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TRCHA-a_lyph_2_1",
@@ -34990,6 +35895,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-ICN-TRCHA-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-ICN-TRCHA-a_lyph_3_1",
@@ -35025,6 +35933,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-PVN-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-PVN-a_lyph_1_1",
@@ -35060,6 +35971,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-PVN-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-PVN-a_lyph_2_1",
@@ -35095,6 +36009,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-PVN-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-PVN-a_lyph_3_1",
@@ -35130,6 +36047,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-PVN-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-PVN-a_lyph_4_1",
@@ -35165,6 +36085,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-PVN-a_lnk_5",
       "layers": [
         "ref_mat_54_229_SCG-PVN-a_lyph_5_1",
@@ -35200,6 +36123,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RTRPZ-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-RTRPZ-a_lyph_1_1",
@@ -35235,6 +36161,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RTRPZ-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-RTRPZ-a_lyph_2_1",
@@ -35270,6 +36199,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RTRPZ-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-RTRPZ-a_lyph_3_1",
@@ -35305,6 +36237,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RTRPZ-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-RTRPZ-a_lyph_4_1",
@@ -35340,6 +36275,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RVLM-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-RVLM-a_lyph_1_1",
@@ -35375,6 +36313,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RVLM-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-RVLM-a_lyph_2_1",
@@ -35410,6 +36351,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RVLM-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-RVLM-a_lyph_3_1",
@@ -35445,6 +36389,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-RVLM-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-RVLM-a_lyph_4_1",
@@ -35480,6 +36427,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-NTS-a_lnk_1",
       "layers": [
         "ref_mat_54_229_SCG-NTS-a_lyph_1_1",
@@ -35515,6 +36465,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-NTS-a_lnk_2",
       "layers": [
         "ref_mat_54_229_SCG-NTS-a_lyph_2_1",
@@ -35550,6 +36503,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-NTS-a_lnk_3",
       "layers": [
         "ref_mat_54_229_SCG-NTS-a_lyph_3_1",
@@ -35585,6 +36541,9 @@
       "thickness": {},
       "length": {},
       "supertype": "229",
+      "inheritedExternal": [
+        "CL:0000540"
+      ],
       "conveys": "SCG-NTS-a_lnk_4",
       "layers": [
         "ref_mat_54_229_SCG-NTS-a_lyph_4_1",
@@ -55774,14 +56733,11 @@
       "borders": [],
       "host": "ref_mat_116_229_SCG-NTS-a_lyph_4_3"
     },
-    "NCBITaxon:99999": {
-      "id": "NCBITaxon:99999",
-      "name": "cat",
+    "NCBITaxon:10116": {
+      "id": "NCBITaxon:10116",
+      "name": "Rattus norvegicus",
       "class": "External",
-      "type": "species",
-      "annotates": [
-        "200"
-      ]
+      "type": "species"
     },
     "202_cls_PVN-IML1-d_lyph_1": {
       "id": "202_cls_PVN-IML1-d_lyph_1",
@@ -68047,6 +69003,15 @@
     },
     "UBERON:0001894": {
       "id": "UBERON:0001894",
+      "class": "External",
+      "generated": true,
+      "annotates": [
+        "200",
+        "bolserLewisNew"
+      ]
+    },
+    "NCBITaxon:99999": {
+      "id": "NCBITaxon:99999",
       "class": "External",
       "generated": true,
       "annotates": [
