@@ -132,10 +132,7 @@ class Base:
                 else:
                     continue  # TODO s rdf:type apinatomy:External ??
             else:
-                if p == rdfs.label:
-                    key = 'name'
-                else:
-                    _, key = p.rsplit('/', 1)
+                _, key = p.rsplit('/', 1)
 
                 if isinstance(o, rdflib.Literal):
                     value = o.toPython()
@@ -159,12 +156,13 @@ class Base:
 
             else:
                 blob[key] = value
-            
+
         return cls(blob, context)
 
-    def __init__(self, blob, context=None):
+    def __init__(self, blob, context=None, label_suffix=''):
         self.blob = blob
         self.context = context
+        self.label_suffix = label_suffix
         try:
             self.id = blob['id'].replace(' ', '-')  #FIXME
         except KeyError as e:
@@ -203,7 +201,20 @@ class Graph(Base):
         #OntCuries.reset()
         OntCuries({'local': str(context)})
         _, id = iri.rsplit('/', 1)
-        resources = {}
+
+        blob = {'id': id}
+        resources = {id: blob}
+        map = {'id': id,
+               'resources': resources}
+
+        for p, o in graph[iri:]:
+            if p == rdf.type:
+                blob['class'] = o.toPython()
+
+            else:
+                _, key = p.rsplit('/', 1)
+                blob[key] = o.toPython()
+
         for s in graph[:rdf.type:owl.NamedIndividual]:
             for element in graph[s:rdf.type]:
                 if element != owl.NamedIndividual:
@@ -218,17 +229,19 @@ class Graph(Base):
             resource = External.fromRdf(s, graph, context)
             resources[resource.id] = resource.blob
 
-        map = {'id': id,
-               'resources': resources}
-        
-        return cls(map, {})
+        return cls(map)
 
-    def __init__(self, map, blob):
+    def __init__(self, map):
         self.map = map
-        self.resources = map['resources']
+        self.resources = map['resources']  # FIXME resources.pop('waitingList') ??
         self.prefixes = {}  # TODO curie mapping
         self.id = self.map['id'].replace(' ', '-')  # FIXME
-        self.blob = blob
+
+        self.blob = self.resources[self.map['id']]
+        # FIXME should we require name and abbrev and make missing a fatal error?
+        self.name = self.blob['name'] if 'name' in self.blob else None
+        self.abbreviation = self.blob['abbreviation'] if 'abbreviation' in self.blob else None
+        self.label_suffix = f' ({self.abbreviation})' if self.abbreviation else ''
         #apinscm.validate(self.blob)  # TODO
 
     @property
@@ -239,28 +252,16 @@ class Graph(Base):
     def triples(self):
         self.iri = rdflib.URIRef(f'https://apinatomy.org/uris/models/{self.id}')
         yield self.iri, rdf.type, readable.Graph
+        yield self.iri, readable.name, rdflib.Literal(self.name)
+        yield self.iri, readable.abbreviation, rdflib.Literal(self.abbreviation)
         for id, blob in self.resources.items():
             if 'class' not in blob:
-                logd.warning(f'no class in\n{blob!r}')
+                logd.warning(f'no class in\n{blob!r} for {id}')
                 continue
             elif blob['class'] == 'Graph':
-                log.warning('Graph is in resources itself')
                 continue
 
-            yield from getattr(self, blob['class'])(blob, self.context).triples()
-
-    @property
-    def triples_generated(self):
-        """ not used """
-        context = rdflib.Namespace(f'https://apinatomy.org/uris/models/{self.id}/ids/')
-        for cls in [Node, Link, Lyph, Tree, Group, Material, Border, Chain, Coalescence]:
-            if cls.key in self.blob:
-                # FIXME trees not in all blobs
-                for blob in self.blob[cls.key]:
-                    try:
-                        yield from cls(blob, context).triples()
-                    except NoIdError as e:
-                        logd.exception(e)
+            yield from getattr(self, blob['class'])(blob, self.context, self.label_suffix).triples()
 
     def populate(self, graph):
         #[graph.add(t) for t in self.triples]
@@ -289,17 +290,18 @@ class BaseElement(Base):
     objects_multi = tuple()
 
     def triples(self):
-        yield from self.triples_class()
+        yield from self.triples_resource()
         yield from self.triples_external()
         yield from self.triples_annotations()
         yield from self.triples_generics()
         yield from self.triples_objects()
         yield from self.triples_objects_multi()
 
-    def triples_class(self):
+    def triples_resource(self):
         yield self.s, rdf.type, owl.NamedIndividual
         yield self.s, rdf.type, elements[f'{self.cname}']
-        yield self.s, rdfs.label, rdflib.Literal(self.name)
+        yield self.s, readable['name'], rdflib.Literal(self.name)
+        yield self.s, rdfs.label, rdflib.Literal(self.name + self.label_suffix)
 
     def triples_annotations(self):
         for key in self.annotations:
@@ -314,7 +316,11 @@ class BaseElement(Base):
                 value = self.blob[key]
                 yield self.s, readable[key], readable[value]
             else:
-                log.warning(f'{key} not in {self.blob}')
+                # TODO the logic for warnings is a bit more complex
+                # e.g. when should a lyph have a topology? not entirely clear
+                # is there a default topology?
+                if key not in ('topology', 'conveyingType'):
+                    log.warning(f'{key} not in {self.blob}')
 
     def triples_objects(self):
         for key in self.objects:
@@ -331,8 +337,9 @@ class BaseElement(Base):
                 for value in values:
                     if key == 'external':
                         o = OntId(value).URIRef
-                        yield o, readable['annotates'], self.s
-
+                        #yield o, readable['annotates'], self.s
+                    elif key == 'interitedExternal':
+                        o = OntId(value).URIRef
                     else:
                         value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                         o = self.context[value]
@@ -361,7 +368,7 @@ class Lyph(BaseElement):
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
     objects = 'layerIn', 'conveys', 'border', 'cloneOf', 'supertype'
-    objects_multi = ('inCoalescences', 'subtypes', 'layers', 'clones', 'external',
+    objects_multi = ('inCoalescences', 'subtypes', 'layers', 'clones', 'external', 'inheritedExternal'
                      'internalNodes', 'bundles', 'bundlesTrees', 'bundlesChains', 'subtypes')
 
     def triples(self):
@@ -374,7 +381,7 @@ class Link(BaseElement):
     annotations = 'generated',
     generics = 'conveyingType',
     objects = 'source', 'target', 'conveyingLyph', 'fasciculatesIn'
-    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external'
+    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external', 'inheritedExternal'
 
 
 Graph.Link = Link
@@ -383,7 +390,7 @@ class Coalescence(BaseElement):
     generics = 'topology',
     annotations = 'generated',
     objects = 'generatedFrom',
-    objects_multi = 'lyphs', 'external'
+    objects_multi = 'lyphs', 'external', 'inheritedExternal'
 
 
 Graph.Coalescence = Coalescence
@@ -391,14 +398,14 @@ class Border(BaseElement):
     # FIXME class is Link ?
     key = 'borders'
     objects = 'host',
-    objects_multi = 'borders', 'external'
+    objects_multi = 'borders', 'external', 'inheritedExternal'
 
 
 Graph.Border = Border
 class Tree(BaseElement):
     key = 'trees'
     objects = 'root', 'lyphTemplate', 'group'
-    objects_multi = 'housingLyphs', 'external', 'levels'
+    objects_multi = 'housingLyphs', 'external', 'levels', 'inheritedExternal'
 
 
 Graph.Tree = Tree
@@ -406,7 +413,7 @@ class Chain(BaseElement):
     key = 'chains'
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
-    objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs'
+    objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs', 'inheritedExternal'
 
 
 Graph.Chain = Chain
@@ -431,7 +438,7 @@ Group.elements += (Group,)
 Graph.Group = Group
 class Material(BaseElement):
     key = 'materials'
-    objects_multi = 'materials', 'inMaterials', 'external'
+    objects_multi = 'materials', 'inMaterials', 'external', 'inheritedExternal'
 
 
 class fake:
@@ -498,7 +505,7 @@ class External(BaseElement):
         self._term = OntTerm(self.id)
         self.s = self._term.URIRef
 
-    def triples_class(self):
+    def triples_resource(self):
         yield self.s, rdf.type, owl.Class
         l = self._term.label if self._term.label is not None else self._term.curie
         yield self.s, rdfs.label, rdflib.Literal(l)
