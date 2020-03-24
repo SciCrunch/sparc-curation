@@ -376,6 +376,8 @@ cypherResources:
       -[:apinatomy:bundlesChains]->(chain)
       -[:apinatomy:root]->(root)
       -[:apinatomy:internalIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:external]->(layer_or_end_external)
       WITH path1, root, layer_or_end AS layer
       OPTIONAL MATCH path2 = (layer)
