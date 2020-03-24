@@ -1,7 +1,9 @@
 import rdflib
 from ontquery.utils import mimicArgs
 from pyontutils.core import OntGraph, OntId, OntTerm
+from pyontutils.utils import Async, deferred
 from pyontutils.namespaces import rdf, rdfs, owl, OntCuries
+from pyontutils import combinators as cmb
 import sparcur.schemas as sc
 from sparcur.core import adops
 from sparcur.utils import log, logd
@@ -10,6 +12,7 @@ from ttlser import CustomTurtleSerializer
 
 elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 readable = rdflib.Namespace('https://apinatomy.org/uris/readable/')
+ordered = rdflib.Namespace('https://apinatomy.org/uris/readable/ordered/')
 
 # add apinatomy:Graph to ttlser topClasses
 tc = CustomTurtleSerializer.topClasses
@@ -24,6 +27,7 @@ OntGraph.metadata_type_markers.append(readable.Graph)
 
 OntCuries({'apinatomy': str(readable),
            'elements': str(elements),  # FIXME guranteed name collisions ...
+           'ordered': str(ordered),
            'PMID': 'https://www.ncbi.nlm.nih.gov/pubmed/',
            # also just read this from the embedded local conventions
 })
@@ -145,10 +149,19 @@ class Base:
                     else:
                         value = oid.curie  # FIXME external is tricky
                         log.warning(f'{oid!r}')
+                elif isinstance(o, rdflib.BNode):
+                    raise NotImplementedError(f'a bit more complex ...')
                 else:
                     raise NotImplementedError(f'{o}')
                 
-            if key in cls.objects_multi:
+            if key in cls.objects_ordered:  # ordered representation takes priority
+                raise NotImplementedError('TODO this is quite a bit more complex')
+                if key in blob:
+                    blob[key].append(value)
+                else:
+                    blob[key] = [value]
+
+            elif key in cls.objects_multi:
                 if key in blob:
                     blob[key].append(value)
                 else:
@@ -254,6 +267,7 @@ class Graph(Base):
         yield self.iri, rdf.type, readable.Graph
         yield self.iri, readable.name, rdflib.Literal(self.name)
         yield self.iri, readable.abbreviation, rdflib.Literal(self.abbreviation)
+        externals = []
         for id, blob in self.resources.items():
             if 'class' not in blob:
                 logd.warning(f'no class in\n{blob!r} for {id}')
@@ -261,7 +275,18 @@ class Graph(Base):
             elif blob['class'] == 'Graph':
                 continue
 
-            yield from getattr(self, blob['class'])(blob, self.context, self.label_suffix).triples()
+            obj = getattr(self, blob['class'])(blob, self.context, self.label_suffix)
+
+            if blob['class'] == 'External':
+                # defer lookup
+                externals.append(obj)
+                continue
+
+            yield from obj.triples()
+
+        Async()(deferred(lambda x: x._term)(e) for e in externals)
+        for e in externals:
+            yield from e.triples()
 
     def populate(self, graph):
         #[graph.add(t) for t in self.triples]
@@ -288,6 +313,7 @@ class BaseElement(Base):
     generics = tuple()
     objects = tuple()
     objects_multi = tuple()
+    objects_ordered = tuple()
 
     def triples(self):
         yield from self.triples_resource()
@@ -296,6 +322,7 @@ class BaseElement(Base):
         yield from self.triples_generics()
         yield from self.triples_objects()
         yield from self.triples_objects_multi()
+        yield from self.triples_objects_ordered()
 
     def triples_resource(self):
         yield self.s, rdf.type, owl.NamedIndividual
@@ -327,7 +354,14 @@ class BaseElement(Base):
             if key in self.blob:
                 value = self.blob[key]
                 value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
-                yield self.s, readable[key], self.context[value]
+                o = self.context[value]
+
+                #if key == 'source':
+                    #yield o, readable.sourceOf, self.s
+                #elif key == 'target':
+                    #yield o, readable.targetOf, self.s
+
+                yield self.s, readable[key], o
 
     def triples_objects_multi(self):
         for key in self.objects_multi:
@@ -337,14 +371,23 @@ class BaseElement(Base):
                 for value in values:
                     if key == 'external':
                         o = OntId(value).URIRef
-                        #yield o, readable['annotates'], self.s
-                    elif key == 'interitedExternal':
+                        yield o, readable.annotates, self.s
+                    elif key == 'inheritedExternal':
                         o = OntId(value).URIRef
                     else:
                         value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                         o = self.context[value]
 
                     yield self.s, readable[key], o
+
+    def triples_objects_ordered(self):
+        for key in self.objects_ordered:
+            if key in self.blob:
+                values = self.blob[key]
+                if values:
+                    assert not isinstance(values, str), f'{values} in {key}'
+                    objects = [OntId(self.context[v.replace(' ', '-')]).URIRef for v in values]
+                    yield from cmb.olist(*objects)(self.s, ordered[key])
 
     def triples_external(self):
         if 'externals' in self.blob:
@@ -355,7 +398,7 @@ class BaseElement(Base):
 class Node(BaseElement):
     key = 'nodes'
     annotations = 'skipLabel', 'color', 'generated'
-    objects = 'cloneOf', 'hostedBy', 'internalIn', 'rootOf', 'leafOf'
+    objects = 'cloneOf', 'hostedBy', 'internalIn', 'rootOf', 'leafOf',
     objects_multi = 'sourceOf', 'targetOf', 'clones', 'external'
 
     def triples(self):
@@ -406,6 +449,7 @@ class Tree(BaseElement):
     key = 'trees'
     objects = 'root', 'lyphTemplate', 'group'
     objects_multi = 'housingLyphs', 'external', 'levels', 'inheritedExternal'
+    objects_ordered = 'housingLyphs',
 
 
 Graph.Tree = Tree
@@ -414,6 +458,7 @@ class Chain(BaseElement):
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
     objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs', 'inheritedExternal'
+    objects_ordered = 'housingLyphs',
 
 
 Graph.Chain = Chain
@@ -490,7 +535,6 @@ class External(BaseElement):
             
         return cls(blob, context)
 
-
     @mimicArgs(BaseElement.__init__)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -498,12 +542,18 @@ class External(BaseElement):
         # FIXME idlib PMID(thing) urg the regex state machine is so simple ;_;
         if self.id.startswith('PMID:'):
             log.warning('PMIDs should never be External IDs!')
-            self._term = fake
+            self._c_term = fake
             self.s = OntId(self.id).URIRef
             return
 
-        self._term = OntTerm(self.id)
-        self.s = self._term.URIRef
+        self.s = OntId(self.id).URIRef
+
+    @property
+    def _term(self):
+        if not hasattr(self, '_c_term'):
+            self._c_term = OntTerm(self.id)
+
+        return self._c_term
 
     def triples_resource(self):
         yield self.s, rdf.type, owl.Class

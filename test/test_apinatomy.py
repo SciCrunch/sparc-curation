@@ -95,9 +95,9 @@ class TestApiNATToRDF(unittest.TestCase):
 
         apin = apinat.Graph(m)
         rdfg = apin.graph()
-        rtmap = apinat.Graph.fromRdf(rdfg).map
         if export:
             rdfg.write(Path('test-bolew.ttl'))
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         if debug:
             print(rdfg.ttl)
             print(rtmap)
@@ -109,9 +109,9 @@ class TestApiNATToRDF(unittest.TestCase):
 
         apin = apinat.Graph(m)
         rdfg = apin.graph()
-        rtmap = apinat.Graph.fromRdf(rdfg).map
         if export:
             rdfg.write(Path('keast-spinal.ttl'))
+        rtmap = apinat.Graph.fromRdf(rdfg).map
         if debug:
             print(rdfg.ttl)
             print(rtmap)
