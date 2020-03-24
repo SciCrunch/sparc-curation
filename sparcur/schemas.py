@@ -245,6 +245,7 @@ metadata_filename_pattern = r'^.+\/[a-z_\/]+\.(xlsx|csv|tsv|json)$'
 
 simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
+# NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
 
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
@@ -252,6 +253,8 @@ doi_pattern = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
 
 orcid_pattern = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
                  '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
+
+ror_pattern = ('^https://ror.org/0[0-9a-z]{6}[0-9]{2}$')
 
 pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
@@ -262,12 +265,46 @@ class NoLTWhitespaceSchema(JSONSchema):
                                  'pattern': pattern_whitespace_lead_trail,
                         }},]}
 
+
 string_noltws = NoLTWhitespaceSchema.schema
+
 
 class ErrorSchema(JSONSchema):
     schema = {'type':'array',
               'minItems': 1,
               'items': {'type': 'object'},}
+
+
+class EmbeddedIdentifierSchema(JSONSchema):
+    schema = {'allOf':
+              [{'type': 'object',
+                'required': ['type', 'id', 'label'],
+                'properties': {
+                       'lable': {'type': 'string'},
+                       'synonyms': {'type': 'array',
+                                    'minItems': 1},},},
+               {'oneOf': [
+                   {'properties': {'type': {'type': 'string',
+                                            'enum': ['OntTerm']},
+                                   'id': {'type': 'string',
+                                          'format': 'iri'}}},
+                   {'properties': {'type': {'type': 'string',
+                                            'enum': ['Ror']},
+                                   'id': {'type': 'string',
+                                          'pattern': ror_pattern}}},
+                   {'properties': {'type': {'type': 'string',
+                                            'enum': ['Orcid']},
+                                   'id': {'type': 'string',
+                                          'pattern': orcid_pattern}}},
+                   {'properties': {'type': {'type': 'string',
+                                            'enum': ['Doi']},  # TODO
+                                   'id': {'type': 'string',
+                                          'pattern': doi_pattern}}},
+
+               ]}]}
+
+
+EISs = EmbeddedIdentifierSchema.schema
 
 
 class ProvSchema(JSONSchema):
@@ -649,7 +686,6 @@ class MetaOutSchema(JSONSchema):
                       'number_of_samples',
                       'timestamp_created',
                       'timestamp_updated',
-                      'doi',  # may be none FIXME inconsistent
                       #'subject_count',
                       #'sample_count',
     ]
@@ -661,9 +697,8 @@ class MetaOutSchema(JSONSchema):
     __schema['properties'].update({
         'errors': ErrorSchema.schema,
         'dirs': {'type': 'integer'},
-        'doi': {'oneOf': [{'type': 'string',
-                           'pattern': doi_pattern,},
-                          {'type': 'null'},]},
+        'doi': {'type': 'string',
+                'pattern': doi_pattern,},
         'files': {'type': 'integer'},
         'size': {'type': 'integer'},
         'folder_name': {'type': 'string'},

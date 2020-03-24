@@ -73,6 +73,14 @@ class OntTerm(OTB, OntId):
     #def atag(self, curie=False, **kwargs):
         #return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
+    def asDict(self):
+        return {
+            'type': 'OntTerm',  # TODO -> idlib
+            'id': self.iri,
+            'label': self.label,
+            'synonyms': self.synonyms,
+        }
+
     def tabular(self, sep='|'):
         if self.label is None:
             if self.prefix not in self._known_no_label:

@@ -957,10 +957,7 @@ class PipelineExtras(JSONPipeline):
                     if metadata is not None:
                         data['meta']['doi'] = doi.identifier
                 except requests.exceptions.HTTPError:
-                    data['meta']['doi'] = None
                     pass
-            else:
-                data['meta']['doi'] = None
 
         if 'status' not in data:
             data['status'] = {}
