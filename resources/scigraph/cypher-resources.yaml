@@ -425,6 +425,8 @@ cypherResources:
       -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
       -[:apinatomy:internalIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:external]->(layer_or_end_external:Class{iri: '${start-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, root
@@ -441,6 +443,8 @@ cypherResources:
       -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
       -[:apinatomy:internalIn]->(layer)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:layerIn]->(end_housing)
       -[:apinatomy:external]->(end_housing_external:Class{iri: '${start-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
@@ -450,3 +454,26 @@ cypherResources:
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
       -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
       RETURN path1, path2
+
+  - path: /dynamic/demos/apinat/soma-processes
+    operations:
+      - summary: List all the neuronal processes for all somas.
+    query: |
+      MATCH (chain) // FIXME this bit could become slow
+      -[:apinatomy:housingLyphs]->(housingLyph)
+      -[:apinatomy:inCoalescences]->(coal)
+      -[:apinatomy:topology]->(c{iri: "https://apinatomy.org/uris/readable/EMBEDDING"})
+      WITH housingLyph, coal
+      MATCH path = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+      -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+      // -[:apinatomy:rootOf]->(chain)  // nodeRoot can also go to the chain but we don't need it here
+      -[:apinatomy:sourceOf]->(linkStart)
+      -[:apinatomy:conveyingLyph]->(lyphStart)
+      -[:apinatomy:nextLyph*]->(lyph)
+      -[:apinatomy:inCoalescences]->(coal)
+      -[:apinatomy:lyphs]->(housingLyph)
+      -[:apinatomy:external]->(external)
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      RETURN path
