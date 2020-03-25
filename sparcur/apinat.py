@@ -1,3 +1,4 @@
+from types import MappingProxyType
 import rdflib
 from ontquery.utils import mimicArgs
 from pyontutils.core import OntGraph, OntId, OntTerm
@@ -314,6 +315,7 @@ class BaseElement(Base):
     objects = tuple()
     objects_multi = tuple()
     objects_ordered = tuple()
+    objects_ordered_succession = MappingProxyType({})
 
     def triples(self):
         yield from self.triples_resource()
@@ -381,13 +383,22 @@ class BaseElement(Base):
                     yield self.s, readable[key], o
 
     def triples_objects_ordered(self):
+        for key, predicate in self.objects_ordered_succession.items():
+            if key in self.blob:
+                values = self.blob[key]
+                if values:
+                    assert not isinstance(values, str), f'{values} in {key}'
+                    objects = [OntId(self.context[v.replace(' ', '-')]).URIRef for v in values]
+                    for s, o in zip(objects[:-1],objects[1:]):
+                        yield s, predicate, o
+
         for key in self.objects_ordered:
             if key in self.blob:
                 values = self.blob[key]
                 if values:
                     assert not isinstance(values, str), f'{values} in {key}'
                     objects = [OntId(self.context[v.replace(' ', '-')]).URIRef for v in values]
-                    yield from cmb.olist(*objects)(self.s, ordered[key])
+                    yield from cmb.olist(*objects)(self.s, ordered[key])  # NOTE scigraph does not translate rdf lists
 
     def triples_external(self):
         if 'externals' in self.blob:
@@ -449,7 +460,6 @@ class Tree(BaseElement):
     key = 'trees'
     objects = 'root', 'lyphTemplate', 'group'
     objects_multi = 'housingLyphs', 'external', 'levels', 'inheritedExternal'
-    objects_ordered = 'housingLyphs',
 
 
 Graph.Tree = Tree
@@ -458,7 +468,7 @@ class Chain(BaseElement):
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
     objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs', 'inheritedExternal'
-    objects_ordered = 'housingLyphs',
+    objects_ordered_succession = {'lyphs': readable.nextLyph}
 
 
 Graph.Chain = Chain
