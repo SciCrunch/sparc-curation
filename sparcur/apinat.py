@@ -468,7 +468,8 @@ class Chain(BaseElement):
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
     objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs', 'inheritedExternal'
-    objects_ordered_succession = {'lyphs': readable.nextLyph}
+    objects_ordered_succession = {'lyphs': readable.nextLyph,
+                                  'levels': readable['next']}
 
 
 Graph.Chain = Chain
