@@ -464,14 +464,27 @@ cypherResources:
       -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
       -[:apinatomy:sourceOf]->(linkStart)
-      -[:apinatomy:next*]->(link)
+      -[:apinatomy:next*0..]->(link)
       -[:apinatomy:fasciculatesIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:external]->(external)
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
-      WITH path1, layer_or_end AS layer
+      WITH path1, nodeRoot, linkStart, layer_or_end AS layer
       OPTIONAL MATCH path2 = (layer)
       -[:apinatomy:layerIn]->(end_housing)
       -[:apinatomy:external]->(end_housing_external)
-      RETURN path1, path2
+      WITH path1, path2, nodeRoot, linkStart
+      MATCH path3 = (nodeRoot)
+      -[:apinatomy:rootOf]->(chain)
+      WITH path1, path2, path3, linkStart
+      MATCH path4 = (linkStart)
+      -[:apinatomy:fasciculatesIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
+      -[:apinatomy:external]->(external)
+      WITH path1, path2, path3, path4,layer_or_end AS layer
+      OPTIONAL MATCH path5 = (layer)
+      -[:apinatomy:layerIn]->(end_housing)
+      -[:apinatomy:external]->(end_housing_external)
+      RETURN path1, path2, path3, path4, path5
