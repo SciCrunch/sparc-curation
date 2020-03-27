@@ -477,3 +477,83 @@ cypherResources:
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
       RETURN path1, path2, path3
+
+  - path: /dynamic/demos/apinat/soma-processes/{start-id}
+    operations:
+      - summary: List all the neuronal processes for somas located in start-id.
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+      -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+      -[:apinatomy:internalIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
+      -[:apinatomy:layerIn*0..1]->(layerSoma)  // don't need to see both layer and housing for soma
+      -[:apinatomy:external]->(externalEndSoma:Class{iri: '${start-id}'})
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      WITH path1, nodeRoot
+      MATCH path3 = (chain)
+      <-[:apinatomy:rootOf]-(nodeRoot)
+      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)
+      -[:apinatomy:fasciculatesIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
+      -[:apinatomy:external]->(external)
+      WITH path1, path3, nodeRoot, layer_or_end AS layer
+      OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+      -[:apinatomy:layerIn]->(end_housing)
+      -[:apinatomy:external]->(end_housing_external)
+      RETURN path1, path2, path3
+
+  - path: /dynamic/demos/apinat/weird-soma-processes/{process-id}
+    operations:
+      - summary: List all the neuronal processes for somas where some processes is in process-id.
+        parameters:
+         - name: process-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+      -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+      -[:apinatomy:fasciculatesIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
+      -[:apinatomy:external]->(external:Class{iri: '${process-id}'})
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      WITH path1, nodeRoot, layer_or_end AS layer
+      OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+      -[:apinatomy:layerIn]->(end_housing)
+      -[:apinatomy:external]->(end_housing_external)
+      WITH path1, path2, nodeRoot
+      MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
+      -[:apinatomy:rootOf]->(chain)
+      RETURN path1, path2, path3
+      
+      UNION
+      
+      MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+      -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+      -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+      -[:apinatomy:fasciculatesIn]->(layer_or_end)
+      -[:apinatomy:cloneOf*0..1]->()
+      -[:apinatomy:supertype*0..1]->()
+      -[:apinatomy:external]->(external)
+      WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+      WITH path1, nodeRoot, layer_or_end AS layer
+      MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+      -[:apinatomy:layerIn]->(end_housing)
+      -[:apinatomy:external]->(end_housing_external:Class{iri: '${process-id}'})
+      WITH path1, path2, nodeRoot
+      MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
+      -[:apinatomy:rootOf]->(chain)
+      RETURN path1, path2, path3

@@ -86,7 +86,7 @@ NOTE: this section contains temporary instructions.
 This should really be done on a development instance of data services.
 Sometimes it is faster to edit [[tramp:/ssh:aws-scigraph-data-scigraph:services.yaml]] directly.
 Use the following command to restart services to load the updated dynamic queries.
-#+begin_src bash
+#+begin_src bash :results none
 ssh aws-scigraph-data sudo systemctl restart scigraph
 #+end_src
 When you have a query working as desired add it or update it in
