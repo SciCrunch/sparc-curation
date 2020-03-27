@@ -81,3 +81,15 @@ An example run is
 ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-data
 ~/git/pyontutils/nifstd/scigraph/bin/run-deploy-graph-sparc-data
 #+end_src
+* Dynamic cypher queries
+NOTE: this section contains temporary instructions.
+This should really be done on a development instance of data services.
+Sometimes it is faster to edit [[tramp:/ssh:aws-scigraph-data-scigraph:services.yaml]] directly.
+Use the following command to restart services to load the updated dynamic queries.
+#+begin_src bash
+ssh aws-scigraph-data sudo systemctl restart scigraph
+#+end_src
+When you have a query working as desired add it or update it in
+[[file:../resources/scigraph/cypher-resources.yaml][cypher resources]].
+# TODO need that local/remote git link ...
+See also [[file:../../pyontutils/nifstd/scigraph/README.org::#sparc-data-services-build-deploy][data services build and deploy]].
