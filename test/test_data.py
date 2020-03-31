@@ -1,11 +1,12 @@
-from typing import Union, Dict, List, Tuple
 import unittest
+from pprint import pprint
+from typing import Union, Dict, List, Tuple
 
 import rdflib
-from rdflib.plugins import sparql
 import pytest
-
-from pyontutils.core import OntResIri
+from rdflib.plugins import sparql
+from pyontutils.core import OntResIri, OntGraph
+from pyontutils.namespaces import UBERON
 
 Semantic = Union[rdflib.URIRef, rdflib.Literal, rdflib.BNode]
 
@@ -15,32 +16,58 @@ class TestCurationExportTtl(unittest.TestCase):
     def setUpClass(cls):
         cls.ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
         cls.graph = cls.ori.graph
-        cls.spaql_templates = SparqlQueryTemplates(cls.graph)
+        cls.nsm = cls.graph.namespace_manager
+        cls.spaql_templates = SparqlQueryTemplates(cls.nsm)
 
-    def test_dataset_subjs(self):
-        """ sparql queries here """
+    @classmethod
+    def pp(cls, res):
+        pprint(sorted([tuple(cls.nsm._qhrm(e)
+                             if isinstance(e, rdflib.URIRef) else e.toPython()
+                             for e in r)
+                       for r in res]))
+
+    def test_dataset_about_heart(self):
+        subj = UBERON['0000948']
+        query = self.spaql_templates.dataset_about()
+        res = list(self.graph.query(query, initBindings={'about': subj}))
+        self.pp(res)
+        assert len(res) > 0
+
+    def test_dataset_subjects(self):
         subj = rdflib.URIRef('https://api.blackfynn.io/datasets/N:dataset:c2a014b8-2c15-4269-b10a-3345420e3d56/subjects/53')
-        query = self.spaql_templates.dataset_subjs()
-        assert len(list(self.graph.query(query, initBindings={'startsubj': subj}))) > 0
+        query = self.spaql_templates.dataset_subjects()
+        res = list(self.graph.query(query, initBindings={'startsubj': subj}))
+        self.pp(res)
+        assert len(res) > 0
 
     def test_dataset_groups(self):
-        """ sparql queries here """
-        subj = rdflib.URIRef('https://api.blackfynn.io/datasets/N:dataset:c2a014b8-2c15-4269-b10a-3345420e3d56/subjects/53')
+        #subj = rdflib.URIRef('https://api.blackfynn.io/datasets/N:dataset:c2a014b8-2c15-4269-b10a-3345420e3d56/subjects/53')
+        subj = rdflib.URIRef('https://api.blackfynn.io/datasets/N:dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c/samples/104_sample4')
         query = self.spaql_templates.dataset_groups()
-        assert len(list(self.graph.query(query, initBindings={'startsubj': subj}))) > 0
+        res = list(self.graph.query(query, initBindings={'startsubj': subj}))
+        self.pp(res)
+        assert len(res) > 0
 
-    def test_related_datasets(self):
-        subj = rdflib.util.from_n3('dataset:bec4d335-9377-4863-9017-ecd01170f354', nsm=self.graph)
-        query = self.spaql_templates.related_datasets()
-        assert len(list(self.graph.query(query, initBindings={'startdataset': subj}))) > 0
+    def test_dataset_bundle(self):
+        subj = rdflib.util.from_n3('dataset:bec4d335-9377-4863-9017-ecd01170f354', nsm=self.nsm)
+        query = self.spaql_templates.dataset_bundle()
+        res = list(self.graph.query(query, initBindings={'startdataset': subj}))
+        self.pp(res)
+        assert len(res) > 0
+
+    def test_dataset_subject_species(self):
+        query = self.spaql_templates.dataset_subject_species()
+        res = list(self.graph.query(query))
+        self.pp(res)
+        assert len(res) > 0
 
 
 class SparqlQueryTemplates:
     """ Creates SPARQL query templates. """
 
     def __init__(self, nsm=None):
-        self.nsm = nsm if nsm else rdflib.Graph().namespace_manager
-        self.prefixes = {p:ns for p, ns in self.nsm.namespaces() if p}
+        self.nsm = nsm if nsm else OntGraph().namespace_manager
+        self.prefixes = dict(self.nsm)
 
     def sparql_iri(self, iri: Union[rdflib.URIRef, str]) -> str:
         """ Converts IRIs and curies to a usable format for SPARQL queries. """
@@ -48,13 +75,24 @@ class SparqlQueryTemplates:
             return '<'+str(iri)+'>'
         return iri
 
-    def dataset_subjs(self) -> str:
+    def dataset_about(self):
+        # FIXME this will return any resource matching isAbout:
+        query = """
+            SELECT ?dataset
+            WHERE {
+                ?dataset rdf:type sparc:Resource .
+                ?dataset isAbout: ?about .
+            }
+        """
+        return sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_subjects(self) -> str:
         """ Get all subject groups and dataset associated with subject input.
 
         :returns: list of tuples containing: subject, subjects group, and subjects dataset.
         """
         query = """
-            SELECT ?subj ?dataset
+            SELECT ?dataset ?subj
             WHERE {
                 ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
                 ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
@@ -68,7 +106,7 @@ class SparqlQueryTemplates:
         :returns: list of tuples containing: subject, subjects group, and subjects dataset.
         """
         query = """
-            SELECT ?subj ?group ?dataset
+            SELECT ?dataset ?group ?subj
             WHERE {
                 ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
                 ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
@@ -77,16 +115,28 @@ class SparqlQueryTemplates:
         """
         return sparql.prepareQuery(query, initNs=self.prefixes)
 
-    def related_datasets(self) -> str:
+    def dataset_bundle(self) -> str:
         """ Get all related datasets of subject.
 
         :returns: list of tuples containing: subject & subjects shared dataset.
         """
         query = """
-            SELECT ?subj ?dataset
+            SELECT ?dataset
             WHERE {
                 ?startdataset TEMP:collectionTitle ?string .
-                ?subj  TEMP:collectionTitle ?string .
+                ?dataset  TEMP:collectionTitle ?string .
+            }
+        """
+        return sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_subject_species(self):
+        # FIXME how to correctly init bindings to multiple values ...
+        query = """
+            SELECT DISTINCT ?dataset
+            WHERE {
+                VALUES ?species { "human" "homo sapiens" } .
+                ?dataset TEMP:isAboutParticipant ?subject .
+                ?subject sparc:animalSubjectIsOfSpecies ?species .
             }
         """
         return sparql.prepareQuery(query, initNs=self.prefixes)
