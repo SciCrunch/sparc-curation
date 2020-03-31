@@ -93,30 +93,34 @@ def mk_required_files(path, suffix='.csv'):
             file_path.setxattrs(attrs)
 
 
-if not project_path.exists() or not list(project_path.iterdir()):
-    project_path.mkdir(parents=True, exist_ok=True)
-    attrs = mk_fldr_meta(project_path, 'organization', id=fake_organization)
-    project_path.setxattrs(attrs)
-    for ds in ds_folders:
-        dsp = project_path / ds
-        dsp.mkdir()
-        dsp.setxattrs(mk_fldr_meta(dsp, 'dataset'))
+if project_path.exists():
+    # too much time wasted over stale test data
+    # like ACSF just make it fresh every time
+    project_path.rmtree(onerror=onerror)
 
-    for root in ds_roots:
-        rp = project_path / root
-        if not rp.exists():
-            current_parent = rp
-            to_reverse = []
-            while not current_parent.exists():
-                to_reverse.append(current_parent)
-                current_parent = current_parent.parent
+project_path.mkdir(parents=True, exist_ok=True)
+attrs = mk_fldr_meta(project_path, 'organization', id=fake_organization)
+project_path.setxattrs(attrs)
+for ds in ds_folders:
+    dsp = project_path / ds
+    dsp.mkdir()
+    dsp.setxattrs(mk_fldr_meta(dsp, 'dataset'))
 
-            for folder in reversed(to_reverse):
-                folder.mkdir()
-                folder.setxattrs(mk_fldr_meta(folder))
+for root in ds_roots:
+    rp = project_path / root
+    if not rp.exists():
+        current_parent = rp
+        to_reverse = []
+        while not current_parent.exists():
+            to_reverse.append(current_parent)
+            current_parent = current_parent.parent
 
-        print(rp)
-        mk_required_files(rp)  # TODO all variants of missing files
+        for folder in reversed(to_reverse):
+            folder.mkdir()
+            folder.setxattrs(mk_fldr_meta(folder))
+
+    print(rp)
+    mk_required_files(rp)  # TODO all variants of missing files
 
 
 fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
