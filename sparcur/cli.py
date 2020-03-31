@@ -3,31 +3,31 @@ from sparcur.config import auth
 __doc__ = f"""
 SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
-    spc clone <project-id>
-    spc pull [options] [<directory>...]
-    spc refresh [options] [<path>...]
-    spc fetch [options] [<path>...]
-    spc find [options] --name=<PAT>...
-    spc status [options]
-    spc meta [options] [--uri] [--browser] [--human] [--diff] [<path>...]
-    spc export [schemas] [options] [<path>...]
-    spc report size [options] [<path>...]
-    spc report tofetch [options] [<directory>...]
-    spc report terms [anatomy cells subcelluar] [options]
-    spc report [access filetypes pathids test] [options]
-    spc report [completeness keywords subjects samples errors] [options]
-    spc report [contributors] [options]
-    spc shell [affil integration protocols exit] [options]
-    spc server [options]
-    spc tables [<directory>...]
-    spc annos [export shell]
+    spc clone    [options] <project-id>
+    spc pull     [options] [<directory>...]
+    spc refresh  [options] [<path>...]
+    spc fetch    [options] [<path>...]
+    spc find     [options] --name=<PAT>...
+    spc status   [options]
+    spc meta     [options] [--uri] [--browser] [--human] [--diff] [<path>...]
+    spc export   [schemas] [options] [<path>...]
+    spc report   size    [options] [<path>...]
+    spc report   tofetch [options] [<directory>...]
+    spc report   terms   [anatomy cells subcelluar] [options]
+    spc report   [access filetypes pathids test]    [options]
+    spc report   [completeness keywords subjects]   [options]
+    spc report   [contributors samples errors]      [options]
+    spc shell    [affil integration protocols exit] [options]
+    spc server   [options]
+    spc tables   [options] [<directory>...]
+    spc annos    [options] [export shell]
     spc feedback <feedback-file> <feedback>...
-    spc missing [options]
-    spc xattrs [options]
-    spc demos [options]
-    spc goto <remote-id>
-    spc fix [options] [duplicates mismatch] [<path>...]
-    spc stash [options --restore] <path>...
+    spc missing  [options]
+    spc xattrs   [options]
+    spc demos    [options]
+    spc goto     <remote-id>
+    spc fix      [options] [duplicates mismatch] [<path>...]
+    spc stash    [options --restore] <path>...
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -385,6 +385,7 @@ class Main(Dispatcher):
                 if self.options.local:
                     log.exception(e)
                     self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
+                    self.BlackfynnRemote.anchorTo(self.anchor)
                 else:
                     raise e
 
@@ -394,8 +395,8 @@ class Main(Dispatcher):
 
     def _setup_local(self):
         # pass debug along (sigh)
-        AugmentedPath._debug = True
-        RemotePath._debug = True
+        AugmentedPath._debug = self.options.debug
+        RemotePath._debug = self.options.debug
         self.BlackfynnRemote = BlackfynnCache._remote_class
         self.BlackfynnRemote._async_rate = self.options.rate
 
@@ -407,6 +408,7 @@ class Main(Dispatcher):
             _cpath = local.cache  # FIXME project vs subfolder
             if _cpath is None:
                 raise exc.NoCachedMetadataError  # FIXME somehow we decided not to raise this!??!
+
             self.anchor = _cpath.anchor
         except exc.NoCachedMetadataError as e:
             root = local.find_cache_root()
@@ -421,7 +423,9 @@ class Main(Dispatcher):
                 print(f'{local} is not in a project!')
                 sys.exit(111)
 
-        self.anchor.anchorClassHere()  # replace a bottom up anchoring rule with top down
+        # replace a bottom up anchoring rule with top down
+        self.anchor.anchorClassHere(remote_init=False)
+
         self.project_path = self.anchor.local
         self.summary = Summary(self.project_path)
         Summary._n_jobs = self.options.jobs
@@ -429,7 +433,7 @@ class Main(Dispatcher):
             Summary._debug = True
 
     def _setup_bfl(self):
-        self.BlackfynnRemote.anchorTo(self.anchor)
+        self.BlackfynnRemote.init(self.anchor.id)
 
         self.bfl = self.BlackfynnRemote._api
         State.bind_blackfynn(self.bfl)
@@ -574,12 +578,15 @@ class Main(Dispatcher):
         # make sure that we aren't in a project already
         existing_root = self.cwd.find_cache_root()
         if existing_root is not None:
-            message = f'fatal: already in project located at {root.resolve()!r}'
+            message = f'fatal: already in project located at {existing_root.resolve()!r}'
             print(message)
             sys.exit(3)
 
         try:
-            anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
+            if self.options.project_path:
+                anchor = self.BlackfynnRemote.anchorTo(self.cwd, create=True)
+            else:
+                anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
         except exc.DirectoryNotEmptyError:
             message = (f'fatal: destination path {anchor} already '
                        'exists and is not an empty directory.')
@@ -818,16 +825,31 @@ class Main(Dispatcher):
             embed()
 
     def annos(self):
+        data = (self.summary.data()
+                if self.options.raw else
+                self._export().latest_export)
+        dataset_blobs = data['datasets']
+
         from protcur.analysis import protc, Hybrid
-        from sparcur.protocols import ProtcurSource
-        ProtcurSource.populate_annos()
+        from sparcur.protocols import ProtcurData
+        ProtcurData.populate_annos()
+
+        class ProtocolActual(ProtocolData):  # FIXME so ... bad ...
+            @property
+            def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
+                for d in dataset_blobs:
+                    try:
+                        yield from adops.get(d, ['meta', 'protocol_url_or_doi'])
+                    except exc.NoSourcePathError:
+                        pass
+
         if self.options.export:
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
-        all_blackfynn_uris = set(u for d in self.summary
-                                 for u in d.protocol_uris_resolved)
-        all_hypotehsis_uris = set(a.uri for a in protc)
+        pa = ProtocolActual()
+        all_blackfynn_uris = set(pa.protocol_uris_resolved)
+        all_hypothesis_uris = set(a.uri for a in protc)
         if self.options.shell or self.options.debug:
             p, *rest = self._paths
             f = Integrator(p)
@@ -925,7 +947,7 @@ class Main(Dispatcher):
 
     def find(self):
         paths = []
-        if self.options.name:
+        if self.options.name:  # has to always be true now
             patterns = self.options.name
             path = self.cwd
             for pattern in patterns:

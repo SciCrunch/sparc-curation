@@ -7,10 +7,16 @@ from .common import fake_organization
 import sparcur
 import sparcur.cli
 import sparcur.paths
+import sparcur.backends
 from sparcur.blackfynn_api import FakeBFLocal
 
 
 def fake_setup(self, *args, **kwargs):
+    """ replace _setup_bfl with a version that handles repated invocation of
+        cli.Main.__init__ as occurs during testing """
+    # FIXME obviously the whole init process should be reworked to avoid the
+    # utter insanity that cli.Main.__init__ is at the moment ...
+
     if self.anchor.id != fake_organization:
         self._old_setup_bfl()
     else:
@@ -33,17 +39,21 @@ if working_dir is None:
 
 post_load = lambda : None
 def post_main():
-    if hasattr(sparcur.paths.Path._cache_class, '_anchor'):
-        delattr(sparcur.paths.Path._cache_class, '_anchor')
+    # just wipe out the state of these after every test
+    # there are countless strange and hard to debug errors
+    # that can occur because of mutation of class aka global state
+    # they really don't teach the fact that class level variables
+    # are actually global variables and should be treated with fear
+    sparcur.backends.BlackfynnRemote._new(sparcur.paths.Path,
+                                          sparcur.paths.BlackfynnCache)
 
 
-mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
-                       '&&', 'spc', 'clone', test_organization],
+mains = {'cli-real': [['spc', 'clone', test_organization],
                       ['spc', 'pull'],
                       ['spc', 'refresh'],
                       ['spc', 'fetch']],
          'cli': [['spc', 'find', '--name', '*.xlsx'],
-                 ['spc', 'find', '--limit', '3'],
+                 ['spc', 'find', '--name', '*', '--limit', '3'],
 
                  ['spc', 'status'],
                  ['spc', 'meta'],
@@ -62,13 +72,11 @@ mains = {'cli-real': [['pushd', project_path_real.parent.as_posix(),
                  ['spc', 'report', 'pathids'],
                  ['spc', 'report', 'errors'],
                  ['spc', 'report', 'access'],
-                 ['spc', 'report', 'stats'],
                  ['spc', 'report', 'size'],
                  ['spc', 'report', 'test'],
 
                  ['spc', 'tables'],
                  ['spc', 'missing'],
-                 #['spc', 'xattrs'],  # deprecated
                  ['spc', 'annos'],
                  ['spc', 'annos', 'export'],
          ],

@@ -98,9 +98,15 @@ if project_path.exists():
     # like ACSF just make it fresh every time
     project_path.rmtree(onerror=onerror)
 
-project_path.mkdir(parents=True, exist_ok=True)
+project_path.mkdir(parents=True)
 attrs = mk_fldr_meta(project_path, 'organization', id=fake_organization)
 project_path.setxattrs(attrs)
+# FIXME I know why lddi is on cache but I still don't like it
+# because it should be possible to call lddi without forcing the cache to exist
+# file under CachPath and RemotePath implementations are broken because instances
+# can only exist if the underlying thing exists, which defeats the point of paths
+project_path.cache.local_data_dir_init()
+
 for ds in ds_folders:
     dsp = project_path / ds
     dsp.mkdir()

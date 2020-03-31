@@ -219,7 +219,7 @@ class Export:
                          chain(adops.get(blob, ['meta', 'protocol_url_or_doi'], on_failure=[]),
                                adops.get(blob, ['meta', 'originating_article_doi'], on_failure=[]),
                                # TODO data["links"]?
-                               [blob['meta']['doi']])
+                               [blob['meta']['doi']] if 'doi' in blob['meta'] else [])
                          if id is not None])
 
             dois = [d for d in _dois if isinstance(d, idlib.Doi)]

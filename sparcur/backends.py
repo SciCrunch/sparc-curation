@@ -9,7 +9,6 @@ from sparcur.utils import log
 from sparcur.core import BlackfynnId
 import augpathlib as aug
 from augpathlib import PathMeta
-from augpathlib.remotes import RemoteFactory
 from sparcur.blackfynn_api import BFLocal, FakeBFLocal, id_to_type  # FIXME there should be a better way ...
 from blackfynn import Collection, DataPackage, Organization, File
 from blackfynn import Dataset

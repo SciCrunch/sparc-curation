@@ -144,6 +144,12 @@ class ProtocolData(dat.HasErrors):
     def cache_path(cls):
         return config.protocol_cache_path
 
+
+    @property
+    def protocol_uris(self):
+        raise NotImplementedError('implement in subclass')
+        yield
+
     @property
     def protocol_uris_resolved(self):
         if not hasattr(self, '_c_protocol_uris_resolved'):
