@@ -81,10 +81,11 @@ class ExamplesDT:
                                    De.contributor_name,
                                    [['first_name'], ['last_name']]]])
 
-    @property
-    def derive_error(self):
+        # this is no longer an error because we allow TypeError and
+        # catch the issue using the schema
         yield ({'a': 1}, {'a': 1}, [[[['a']],
-                                     lambda _: None,  # TODO is there any way to catch this information early ?
+                                     # TODO is there any way to catch this information early ?
+                                     lambda _: None,  # previously None would include a TypeError
                                      [['b']]]])
 
     @property

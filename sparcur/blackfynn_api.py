@@ -906,6 +906,17 @@ class BFLocal:
     def root(self):
         return self.organization.id
 
+    def create_package(self, local_path):
+        pkg = DataPackage(local_path.name, package_type='Generic')  # TODO mimetype -> package_type ...
+        pcache = local_path.parent.cache
+        pkg.dataset = pcache.dataset.id
+        if pcache.id != pkg.dataset:
+            pkg.parent = pcache.id
+
+        # FIXME this seems to create an empty package with no files?
+        # have to do aws upload first or something?
+        return self.bf._api.packages.create(pkg)
+
     def get(self, id, attempt=1, retry_limit=3):
         log.debug('We have gone to the network!')
         if id.startswith('N:dataset:'):

@@ -3,7 +3,7 @@ import unittest
 import augpathlib as aug
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow
-from sparcur.paths import BlackfynnCache as BFC, LocalPath
+from sparcur.paths import BlackfynnCache as BFC, LocalPath, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.blackfynn_api import BFLocal
 from .common import test_organization, test_dataset
@@ -79,7 +79,9 @@ class TestUpdate(_TestOperation, unittest.TestCase):
     def test(self):
         test_file = self.test_base / 'dataset_description.csv'
         test_file.data = iter(('lol'.encode(),))
-        test_file.remote.data = test_file.data
+        # FIXME temp sandboxing for upload until naming gets sorted
+        test_file.__class__.upload = Path.upload
+        test_file.upload()
         pass
 
 

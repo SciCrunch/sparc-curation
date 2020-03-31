@@ -781,10 +781,9 @@ class BlackfynnRemote(aug.RemotePath):
             else:  # create an empty
                 child = object.__new__(self.__class__)
                 child._parent = self
-                class TempBFObject:  # this will cause a type error if actually used
+                class TempBFObject(BaseNode):  # this will cause a type error if actually used
                     name = other
-                    def exists(self):
-                        return False
+                    exists = False
 
                 tbfo = TempBFObject()
                 child._bfobject = tbfo
@@ -830,21 +829,48 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.NotADirectoryError(f'{self}')
 
-    def _stream_child(self, local_child, replace=True):
+    @classmethod
+    def _prepare_package_for(cls, local_file, mkdir=False):
+        # TODO maybe ???
+        raise NotImplementedError('I think doing it this way requires uploading to s3 first ...')
+        if not isinstance(local_file, cls._local_class):
+            raise TypeError(f'{local_file} {type(local_file)} is not a {cls._local_class}')
+
+        local_file.name
+        local_file.parent.remote  # FIXME recursively mkdir ???
+        bfobject = cls._api.create_package(local_file)
+        remote = cls(bfobject)
+        return remote.cache
+
+    @classmethod
+    def _stream_from_local(cls, local_path, replace=True, local_backup=False):
         # FIXME touch_child -> stream data ??? as a bridge to sanity?
-        if not self.is_dir():
-            raise exc.NotADirectoryError(f'{self} is not a directory!')
+        # /packages/ endpoint should allow us to create a new empty package
+        self = local_path.parent.remote
 
-        if child.parent != self.local:
-            raise exc.LostChildError('{child.parent} != {self.local}')
+        if type(self) != cls:
+            raise TypeError(f'{type(self)} != {cls}')
 
-        if replace and (self / local_child.name).exists():  # FIXME nasty performance cost here ...
-            # oh man the concurrency story for multiple people adding files with the same name
-            # wow ...
-            raise NotImplementedError('not quite ready')
+        old_remote = self / local_path.name
+        manifests = self.bfobject.upload(local_path, use_agent=False)
+        blob = manifests[0][0]  # there is other stuff in here but ignore for now
+        id = blob['package']['content']['nodeId']
+        remote = cls(id)
+        try:
+            # do a little dance to update the name back to what it is supposed to be
+            if replace and old_remote.exists():  # FIXME nasty performance cost here ...
+                # oh man the concurrency story for multiple people adding files with the same name
+                # wow ...
+                old_remote.bfobject.package.delete()  # FIXME this is terrifying ...
+                # though not as terrifying as running it before the upload
+                # of course now there is the renaming issue I'm sure ...
+                #raise NotImplementedError('not quite ready')
+                remote.bfobject.package.name = remote.bfobject.name
+                remote.bfobject.package.update()
+        except BaseException as e:
+            log.critical(e)
 
-        bfobject = self.bfobject.upload(local_child)
-        return self.__class__(bfobject)
+        return remote
 
     @property
     def meta(self):

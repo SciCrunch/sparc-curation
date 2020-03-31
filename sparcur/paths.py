@@ -186,6 +186,26 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     _cache_class = BlackfynnCache
 
+    def upload(self, replace=True, local_backup=False):
+        # FIXME we really need a staging area ...
+        remote = (self
+                  ._cache_class
+                  ._remote_class
+                  ._stream_from_local(self,
+                                      replace=True,
+                                      local_backup=False))
+        if self.cache is None:
+            # FIXME didn't we already figure out the right way to do this?
+            cache = self.cache_init(remote.meta)
+            self._cache = cache
+            cache._remote = remote
+            remote._cache = cache
+        else:
+            self.cache._meta_updater(remote.meta)  # FIXME what the heck is the right way to fix this
+
+        #breakpoint()
+
+
 Path._bind_flavours()
 
 
