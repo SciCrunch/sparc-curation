@@ -692,10 +692,10 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def parent_id(self):
         # work around inhomogenous
-        if self.id == self._bfobject.dataset:
-            return self.organization.id
-        elif self == self.organization:
+        if self == self.organization:
             return self.id  # this behavior is consistent with how Path.parent works
+        elif self.id == self._bfobject.dataset:
+            return self.organization.id
         else:
             pid = getattr(self._bfobject, 'parent')
             if pid is None:
@@ -890,10 +890,12 @@ class BlackfynnRemote(aug.RemotePath):
         child = object.__new__(self.__class__)
         child._parent = self
         class TempBFObject(BaseNode):  # this will cause a type error if actually used
-            parent = self._bfobject.parent
             dataset = self._bfobject.dataset
             name = other
             exists = False
+
+        if self != self.organization and not self.is_dataset():
+            TempBFObject.parent = self.id
 
         tbfo = TempBFObject()
         child._bfobject = tbfo

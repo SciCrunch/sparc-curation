@@ -19,13 +19,14 @@ this_file = Path(__file__)
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
-path_project_container = this_file.parent / 'test_local'
-project_path = this_file.parent / 'test_local/test_project'
+_pid = os.getpid()
+path_project_container = this_file.parent / f'test_local-{_pid}'
+project_path = path_project_container / 'test_project'
 fake_organization = 'N:organization:fake-organization-id'
-project_path_real = this_file.parent / 'test_local/UCSD'
+project_path_real = path_project_container / 'UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
-temp_path = Path(gettempdir(), f'.sparcur-testing-base-{os.getpid()}')
+temp_path = Path(gettempdir(), f'.sparcur-testing-base-{_pid}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
 
