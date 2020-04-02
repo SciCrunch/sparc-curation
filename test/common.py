@@ -3,6 +3,7 @@ import shutil
 from tempfile import gettempdir
 from pathlib import PurePosixPath
 from datetime import datetime
+import pytest
 from augpathlib import PathMeta
 from augpathlib.utils import onerror_windows_readwrite_remove
 from sparcur import config
@@ -27,6 +28,10 @@ test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
 temp_path = Path(gettempdir(), f'.sparcur-testing-base-{os.getpid()}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
+
+SKIP_NETWORK = ('SKIP_NETWORK' in os.environ or
+                'FEATURES' in os.environ and 'network-sandbox' in os.environ['FEATURES'])
+skipif_no_net = pytest.mark.skipif(SKIP_NETWORK, reason='Skipping due to network requirement')
 
 ddih = DatasetDescriptionFile.ignore_header  # save original skips
 DatasetDescriptionFile.ignore_header = tuple(_ for _ in ddih if _ != 'example')  # use the example values for tests

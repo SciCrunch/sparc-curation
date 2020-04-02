@@ -159,7 +159,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
             self.data_headers = next(gen)
         except exc.NoRemoteFileWithThatIdError as e:
             log.error(f'{self} {e}')
-            raise FileNotFoundError(f'{self}') from e  # have to raise so that we don't overwrite the file
+            raise exc.CacheNotFoundError(f'{self}') from e  # have to raise so that we don't overwrite the file
 
         log.debug(self.data_headers)
         if self.local_object_cache_path.exists():
@@ -201,9 +201,16 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             cache._remote = remote
             remote._cache = cache
         else:
-            self.cache._meta_updater(remote.meta)  # FIXME what the heck is the right way to fix this
-
-        #breakpoint()
+            # remote has no cache and self already has a cache in this case
+            # so we can't just assign directly so we have to say which
+            # cache we want to update, and make sure that names match
+            # the cache should already have been updated EXCEPT for the
+            # fact that the remote fileid is not known, but we are inside
+            # the code that actually makes that update ...
+            # and the absense of a staging area / history makes the cache.meta
+            # the only place we can do this besides the object store, especially
+            # if we lack the ability to retrieve checksums for single files (sigh)
+            remote.update_cache(cache=self.cache)
 
 
 Path._bind_flavours()

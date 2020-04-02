@@ -17,7 +17,8 @@ class TestHierarchy(unittest.TestCase):
     def test_create(self):
         ppattrs = project_path.cache.xattrs()
         for pthing in project_path.rglob('*'):
-            ptattrs = pthing.cache.xattrs()
+            if not pthing.skip_cache:
+                ptattrs = pthing.cache.xattrs()
 
     def test_paths(self):
         for d in self.ds:

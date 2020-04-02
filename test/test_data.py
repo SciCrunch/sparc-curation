@@ -7,10 +7,12 @@ import pytest
 from rdflib.plugins import sparql
 from pyontutils.core import OntResIri, OntGraph
 from pyontutils.namespaces import UBERON
+from .common import skipif_no_net
 
 Semantic = Union[rdflib.URIRef, rdflib.Literal, rdflib.BNode]
 
 
+@skipif_no_net
 class TestCurationExportTtl(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -20,17 +22,26 @@ class TestCurationExportTtl(unittest.TestCase):
         cls.spaql_templates = SparqlQueryTemplates(cls.nsm)
 
     @classmethod
-    def pp(cls, res):
-        pprint(sorted([tuple(cls.nsm._qhrm(e)
-                             if isinstance(e, rdflib.URIRef) else e.toPython()
-                             for e in r)
-                       for r in res]))
+    def pp(cls, res, unpack=False):
+        print()
+        print(len(res))
+        if unpack:
+            pprint(sorted([cls.nsm._qhrm(e)
+                           if isinstance(e, rdflib.URIRef) else
+                           e.toPython()
+                           for r in res
+                           for e in r]))
+        else:
+            pprint(sorted([tuple(cls.nsm._qhrm(e)
+                                 if isinstance(e, rdflib.URIRef) else e.toPython()
+                                 for e in r)
+                           for r in res]))
 
     def test_dataset_about_heart(self):
         subj = UBERON['0000948']
         query = self.spaql_templates.dataset_about()
         res = list(self.graph.query(query, initBindings={'about': subj}))
-        self.pp(res)
+        self.pp(res, unpack=True)
         assert len(res) > 0
 
     def test_dataset_subjects(self):
@@ -52,13 +63,13 @@ class TestCurationExportTtl(unittest.TestCase):
         subj = rdflib.util.from_n3('dataset:bec4d335-9377-4863-9017-ecd01170f354', nsm=self.nsm)
         query = self.spaql_templates.dataset_bundle()
         res = list(self.graph.query(query, initBindings={'startdataset': subj}))
-        self.pp(res)
+        self.pp(res, unpack=True)
         assert len(res) > 0
 
     def test_dataset_subject_species(self):
         query = self.spaql_templates.dataset_subject_species()
         res = list(self.graph.query(query))
-        self.pp(res)
+        self.pp(res, unpack=True)
         assert len(res) > 0
 
 

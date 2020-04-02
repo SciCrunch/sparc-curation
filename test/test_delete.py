@@ -30,11 +30,6 @@ class _TestOperation:
         self.BlackfynnRemote.init(test_organization)
         self.anchor = self.BlackfynnRemote.dropAnchor(base)
 
-        # FIXME this needs to be implemented as part of local
-        self.anchor.local_data_dir.mkdir()
-        self.anchor.local_objects_dir.mkdir()
-        self.anchor.trash.mkdir()
-
         self.root = self.anchor.remote
         self.project_path = self.anchor.local
         list(self.root.children)  # populate datasets
@@ -73,16 +68,31 @@ class TestDelete(_TestOperation):
         # remote | o
         pass
 
+
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestUpdate(_TestOperation, unittest.TestCase):
 
-    def test(self):
+    def test_upload_noreplace(self):
+        test_file = self.test_base / 'dataset_description.csv'
+        test_file.data = iter(('lol'.encode(),))
+        # FIXME temp sandboxing for upload until naming gets sorted
+        test_file.__class__.upload = Path.upload
+        # create some noise
+        remotes = [
+            test_file.upload(replace=False),
+            test_file.upload(replace=False),
+            test_file.upload(replace=False),
+        ]
+
+        [print(r.bfobject.package.name) for r in remotes]
+
+
+    def test_upload(self):
         test_file = self.test_base / 'dataset_description.csv'
         test_file.data = iter(('lol'.encode(),))
         # FIXME temp sandboxing for upload until naming gets sorted
         test_file.__class__.upload = Path.upload
         test_file.upload()
-        pass
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
@@ -201,7 +211,12 @@ class TestRemote(_TestOperation, unittest.TestCase):
     def test_remote_path_does_not_exist(self):
         new_thing = self.root / 'does not exist'
 
+    @pytest.mark.skip('Not ready.')
     def test_cache_path_does_not_exist(self):
+        """ This should not produce an error.
+            Path objects should be able to be instantiated without
+            po.exists() -> True at a point in time prior to instantiation.
+        """
         new_thing = self.anchor / 'does not exist'
 
     def __test_cache_path_fake_id(self):
