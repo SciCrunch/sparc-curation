@@ -694,28 +694,12 @@ class BlackfynnRemote(aug.RemotePath):
         # work around inhomogenous
         if self == self.organization:
             return self.id  # this behavior is consistent with how Path.parent works
-        elif self.id == self._bfobject.dataset:
+        elif not hasattr(self._bfobject, 'dataset'):
             return self.organization.id
         else:
             pid = getattr(self._bfobject, 'parent')
             if pid is None:
                 return self._bfobject.dataset
-
-    #def _parent_changed(self, cache):
-        # implementation to avoid hitting the network during a call to self.parent
-        # one alternative would be to have a self.parent_id which avoids the network
-        # lookup entailed by self.parent
-
-        # if self._bfobject is missing the 'parent' attribute
-        # then that is probably an error yes?
-        #return not (self.parent_id is None and
-                    #cache.parent.is_dataset() or
-                    #self.parent_id == self.cache.parent.id)
-
-        #return (hasattr(self._bfobject, 'parent') and
-                #(not ((self._bfobject.parent is None and
-                       #cache.parent.is_dataset()) or
-                      #self._bfobject.parent == cache.parent.id)))
 
     def _on_cache_move_error(self, error, cache):
         if self.bfobject.package.name != self.bfobject.name:
@@ -882,20 +866,23 @@ class BlackfynnRemote(aug.RemotePath):
                 return child
 
             else:  # create an empty
-                return self._temp_child()
+                return self._temp_child(other)
 
-    def _temp_child(self):
+    def _temp_child(self, child_name):
         """ construct child with a fake placeholder bfobject """
         # FIXME hack around instantiation-existence issue
         child = object.__new__(self.__class__)
         child._parent = self
         class TempBFObject(BaseNode):  # this will cause a type error if actually used
-            dataset = self._bfobject.dataset
-            name = other
+            name = child_name
             exists = False
 
-        if self != self.organization and not self.is_dataset():
-            TempBFObject.parent = self.id
+        if self != self.organization:
+            if self.id.startswith('N:dataset:'):  # FIXME sigh
+                TempBFObject.dataset = self.id
+            else:
+                TempBFObject.dataset = self._bfobject.dataset
+                TempBFObject.parent = self.id
 
         tbfo = TempBFObject()
         child._bfobject = tbfo
