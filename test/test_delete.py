@@ -1,4 +1,5 @@
 import os
+import secrets
 import unittest
 import augpathlib as aug
 from sparcur import exceptions as exc
@@ -34,6 +35,7 @@ class _TestOperation:
         self.project_path = self.anchor.local
         list(self.root.children)  # populate datasets
         self.test_base = [p for p in self.project_path.children if p.cache.id == test_dataset][0]
+
         asdf = self.root / 'lol' / 'lol' / 'lol (1)'
 
         class Fun(os.PathLike):
@@ -73,23 +75,30 @@ class TestDelete(_TestOperation):
 class TestUpdate(_TestOperation, unittest.TestCase):
 
     def test_upload_noreplace(self):
+        for i in range(2):
+            test_file = self.test_base / 'dataset_description.csv'
+            test_file.data = iter((secrets.token_bytes(100),))
+            # FIXME temp sandboxing for upload until naming gets sorted
+            test_file.__class__.upload = Path.upload
+            # create some noise
+            remote = test_file.upload(replace=False)
+            print(remote.bfobject.package.name)
+
+    def test_upload_noreplace_fail(self):
         test_file = self.test_base / 'dataset_description.csv'
-        test_file.data = iter(('lol'.encode(),))
+        test_file.data = iter((secrets.token_bytes(100),))
         # FIXME temp sandboxing for upload until naming gets sorted
         test_file.__class__.upload = Path.upload
-        # create some noise
-        remotes = [
-            test_file.upload(replace=False),
-            test_file.upload(replace=False),
-            test_file.upload(replace=False),
-        ]
+        test_file.upload(replace=False)
+        try:
+            test_file.upload(replace=False)
+            assert False, 'should have failed'
+        except exc.FileHasNotChangedError:
+            pass
 
-        [print(r.bfobject.package.name) for r in remotes]
-
-
-    def test_upload(self):
+    def test_upload_replace(self):
         test_file = self.test_base / 'dataset_description.csv'
-        test_file.data = iter(('lol'.encode(),))
+        test_file.data = iter((secrets.token_bytes(100),))
         # FIXME temp sandboxing for upload until naming gets sorted
         test_file.__class__.upload = Path.upload
         test_file.upload()

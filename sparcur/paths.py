@@ -188,12 +188,21 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     def upload(self, replace=True, local_backup=False):
         # FIXME we really need a staging area ...
-        remote = (self
-                  ._cache_class
-                  ._remote_class
-                  ._stream_from_local(self,
-                                      replace=True,
-                                      local_backup=False))
+        remote, old_remote = (
+            self
+            ._cache_class
+            ._remote_class
+            ._stream_from_local(self,
+                                replace=True,
+                                local_backup=False))
+
+        if True:  # local_backup = True:  # force True until we can get remote checksums
+            # FIXME there must be a better way to do this ...
+            object_path = self._cache_class._anchor.local_objects_dir / remote.cache_key
+            # TODO possibly use _data_setter to calculate the hash at the same time?
+            object_path.copy_from(self)
+            object_path.cache_init(remote.meta)
+
         if self.cache is None:
             # FIXME didn't we already figure out the right way to do this?
             cache = self.cache_init(remote.meta)
@@ -210,7 +219,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             # and the absense of a staging area / history makes the cache.meta
             # the only place we can do this besides the object store, especially
             # if we lack the ability to retrieve checksums for single files (sigh)
-            remote.update_cache(cache=self.cache)
+
+            # we already have the latest data (ignoring concurency)
+            remote.update_cache(cache=self.cache, fetch=False) # FIXME fetch=False => different diff rule
+
+        return remote
 
 
 Path._bind_flavours()
@@ -238,3 +251,4 @@ class StashPath(Path):
 
 BlackfynnCache._local_class = Path
 backends.BlackfynnRemote._new(Path, BlackfynnCache)
+backends.BlackfynnRemote.cache_key = BlackfynnCache.cache_key

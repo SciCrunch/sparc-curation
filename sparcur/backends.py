@@ -422,8 +422,12 @@ class BlackfynnRemote(aug.RemotePath):
             return False
 
     def is_dir(self):
-        bfo = self.bfobject
-        return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
+        try:
+            bfo = self.bfobject
+            return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
+        except BaseException as e:
+            breakpoint()
+            raise e
 
     def is_file(self):
         bfo = self.bfobject
@@ -774,6 +778,36 @@ class BlackfynnRemote(aug.RemotePath):
             # for many useful references
             raise NotImplementedError('TODO')
 
+    def _lchildmeta(self, child):
+        # FIXME all of this should be accessible from local and/or cache directly ...
+        lchild = self.cache.local / child.name  # TODO LocalPath.__truediv__ ?
+        excache = None
+        lchecksum = None
+        echecksum = None
+        modified = False
+        if lchild.exists() and False:  # TODO XXX
+            lmeta = lchild.meta
+            lchecksum = lmeta.checksum
+            excache = lchild.cache
+            if excache is None:
+                lmeta = lchild.meta
+                lmeta.id = None
+                echecksum = lmeta.checksum
+            else:
+                echecksum = excache.checksum
+
+            if lchecksum != echecksum:
+                log.debug(f'file has been modified {lchild}')
+                modified = True
+        return lchild, excache, lmeta, lchecksum, echecksum, modified
+
+    def _lchild(self, child):
+        l = self.cache.local
+        if l is None:
+            l = self.cache.parent.local / self.name
+        
+        return l / child.name
+
     def __truediv__(self, other):  # XXX
         """ this is probably the we want to use for this at all
             it is kept around as a reminder NOT to do this
@@ -802,6 +836,13 @@ class BlackfynnRemote(aug.RemotePath):
                 childs = names[other]
                 if len(childs) > 1:
                     op = PurePath(other)
+                    # TODO I think it might make sense for this to come first?
+                    # of course the remote checksums aren't actually implemented
+                    # unless it is at the dataset package level (sigh)
+
+                    #if lchecksum is not None and False:  # TODO XXX
+                        #matches = [c for c in childs if c.checksum == lchecksum]
+
                     package_names = {c._bfobject.package.name
                                      if c.is_file() else
                                      c.name
@@ -825,7 +866,19 @@ class BlackfynnRemote(aug.RemotePath):
                 else:
                     child = childs[0]
 
-                self.cache / child
+                """  # ARGH I don't think we actually need this :/
+                lchild = self._lchild(child)  # TODO LocalPath.__truediv__ ?
+                if not lchild.exists():
+                    # if the local child already exists then do not create
+                    # a cache for it since the cache will overwrite and in
+                    # that case the call to update meta should be explicit
+                    # NOTE as defined here symlinked meta will still update
+                    self.cache.__truediv__(child)
+                else:
+                    self.cache.__truediv__(child, update_meta=False)
+                """
+
+                self.cache / child  # THIS SIDE EFFECTS TO UPDATE THE CHILD CACHE
                 return child
 
             else:  # create an empty
@@ -914,6 +967,18 @@ class BlackfynnRemote(aug.RemotePath):
         checksum = local_path.checksum()
 
         old_remote = self / local_path.name
+        rchecksum = old_remote.checksum
+        if rchecksum is None:
+            # has side effect of caching the object on the off chance that
+            # a local copy has not already been stashed (e.g. if we didn't
+            # upload it using this function)
+            rchecksum = old_remote.cache.checksum()
+
+        if checksum == rchecksum:
+            # TODO check to make sure nothing else has changed ???
+            # also how does this interact with replace = true?
+            raise exc.FileHasNotChangedError('no changes have been made, not uploading')
+
         manifests = self.bfobject.upload(local_path, use_agent=False)
         blob = manifests[0][0]  # there is other stuff in here but ignore for now
         id = blob['package']['content']['nodeId']
@@ -975,40 +1040,10 @@ class BlackfynnRemote(aug.RemotePath):
             elif not stem_diff and old_remote.exists():
                 log.critical(f'YOU MAY HAVE FUNKY DATA IN {local_path.cache.parent.uri_human}')
 
-        except requests.exceptions.HTTPError as e:
-            log.exception(e)
-            # FIXME we should not be hitting this now ?
-            #if e.response.text == 'package name is already taken':  # ugh
-                #sleep(.01)  # LOL ARE YOU KIDDING ME
-                #remote.bfobject.package.update()  # yay for non-blocking HTTP delete! BFBUG
-
-            if False:  # this is now handled correctly in __truediv__
-                # our local pointer to old_remote is not pointing
-                # the the right package, this can easily happen if
-                # someone else is also running _stream_from_local
-                # from another process/local repo, concurrent sigh
-
-                # terrifyingly the right thing to do here seems to be
-                # to lookup all the existing children of the current remote
-                # and find the one that actually has the same package name
-                name_matching_remotes = [
-                    p for p in old_remote.cache.parent.remote._children(create_cache=False)
-                    if p.is_file() and
-                    p.bfobject.package.name == remote.bfobject.package.name]
-
-                if name_matching_remotes:
-                    name_matching_remote = name_name_matching_remote[0]
-                    name_matching_remote.update_cache(cache=local_path.cache)
-                    # our current local is wrong so we have to update it first
-                    name_matching_remote.delete()
-                    # now we should be able to call update properly
-                    remote.bfobject.package.update()
-                    log.critical('YOU MAY HAVE FUNKY DATA IN {local_path.cache.parent.uri_human}')
-
         except BaseException as e:
             log.exception(e)
 
-        return remote
+        return remote, old_remote
 
     @property
     def meta(self):
