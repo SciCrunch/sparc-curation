@@ -67,7 +67,7 @@ class hproperty:
 class HasSchema:
     """ decorator for classes with methods whose output can be validated by jsonschema """
     def __init__(self, input_schema_class=None, fail=True, normalize=False):
-        self.input_schema = input_schema_class() if input_schema_class is not None else None
+        self.input_schema_class = input_schema_class
         self.fail = fail
         self.normalize = normalize
         self.schema = None  # deprecated output schema ...
@@ -75,12 +75,17 @@ class HasSchema:
     def mark(self, cls):
         """ note that this runs AFTER all the methods """
 
-        if self.input_schema is not None:
+        if self.input_schema_class is not None:
             # FIXME probably better to do this as types
             # and check that schemas match at class time
             cls._pipeline_start = cls.pipeline_start
+
             @hproperty
-            def pipeline_start(self, schema=self.input_schema, fail=self.fail):
+            def pipeline_start(self, isc=self.input_schema_class, fail=self.fail):
+                if pipeline_start.schema == isc:
+                    pipeline_start.schema = isc()
+
+                schema = pipeline_start.schema
                 data = self._pipeline_start
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok and fail:
@@ -88,7 +93,7 @@ class HasSchema:
 
                 return data
 
-            pipeline_start.schema = self.input_schema
+            pipeline_start.schema = self.input_schema_class
             cls.pipeline_start = pipeline_start
 
         return cls
@@ -109,11 +114,14 @@ class HasSchema:
 
     def __call__(self, schema_class, fail=False, _property=True):
         # TODO switch for normalized output if value passes?
-        schema = schema_class()
         def decorator(function):
             pipeline_stage_name = function.__qualname__
             @wraps(function)
             def schema_wrapped_property(_self, *args, **kwargs):
+                if schema_wrapped_property.schema == schema_class:
+                    schema_wrapped_property.schema = schema_class()
+
+                schema = schema_wrapped_property.schema
                 data = function(_self, *args, **kwargs)
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
@@ -139,7 +147,7 @@ class HasSchema:
             if _property:
                 schema_wrapped_property = hproperty(schema_wrapped_property)
 
-            schema_wrapped_property.schema = schema
+            schema_wrapped_property.schema = schema_class
             return schema_wrapped_property
         return decorator
 
@@ -229,11 +237,12 @@ class JSONSchema(object):
 
 class RemoteSchema(JSONSchema):
     schema = ''
+    # FIXME TODO these need to be cached locally
     def __new__(cls):
         if isinstance(cls.schema, str):
             cls.schema = requests.get(cls.schema).json()
 
-        return super().__new__(cls)
+        super().__new__(cls)
 
 
 class ApiNATOMYSchema(RemoteSchema):

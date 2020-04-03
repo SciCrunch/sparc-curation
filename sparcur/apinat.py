@@ -38,9 +38,6 @@ class NoIdError(Exception):
     """ blob has no id """
 
 
-apinscm = sc.ApiNATOMYSchema()
-
-
 def make_classes(schema):
     types = {}
 
@@ -579,4 +576,12 @@ class Channel(BaseElement):
 
 
 Graph.Channel = Channel
-hrm = make_classes(apinscm.schema)
+
+
+if __name__ == '__main__':
+    # FIXME this eternal annoyance of dealing with the network at top level
+    # of course if you want to generate some code based on something from the
+    # network then of course you have to do this at some point otherwise
+    # you have to figure out how to defer loading until the last possible moment
+    apinscm = sc.ApiNATOMYSchema()
+    hrm = make_classes(apinscm.schema)

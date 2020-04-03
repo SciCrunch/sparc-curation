@@ -1,4 +1,5 @@
 import os
+import atexit
 import shutil
 from tempfile import gettempdir
 from pathlib import PurePosixPath
@@ -98,13 +99,13 @@ def mk_required_files(path, suffix='.csv'):
             attrs = mk_file_meta(file_path)
             file_path.setxattrs(attrs)
 
-
 if project_path.exists():
     # too much time wasted over stale test data
     # like ACSF just make it fresh every time
     project_path.rmtree(onerror=onerror)
 
 project_path.mkdir(parents=True)
+atexit.register(lambda : path_project_container.rmtree(onerror=onerror))
 attrs = mk_fldr_meta(project_path, 'organization', id=fake_organization)
 project_path.setxattrs(attrs)
 # FIXME I know why lddi is on cache but I still don't like it

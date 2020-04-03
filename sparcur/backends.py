@@ -255,7 +255,11 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def dataset(self):
-        dataset = self.bfobject.dataset
+        remote = self.__class__(self.dataset_id)
+        remote.cache_init()
+        return remote
+
+        dataset = self._bfobject.dataset
         if isinstance(dataset, str):
             dataset = self.organization.get_child_by_id(dataset)
             self.bfobject.dataset = dataset.bfobject
@@ -549,7 +553,7 @@ class BlackfynnRemote(aug.RemotePath):
     def rchildren(self):
         yield from self._rchildren()
 
-    def _rchildren(self, create_cache=True):
+    def _rchildren(self, create_cache=True, exclude_uploaded=True):
         if isinstance(self.bfobject, File):
             return
         elif isinstance(self.bfobject, DataPackage):
@@ -569,7 +573,7 @@ class BlackfynnRemote(aug.RemotePath):
                         if state == 'DELETING' or state == 'PARENT-DELETING':
                             deleted.append(child)
                             continue
-                        if state == 'UPLOADED':
+                        if exclude_uploaded and state == 'UPLOADED':
                             continue
 
                     if child.is_file():
@@ -850,18 +854,6 @@ class BlackfynnRemote(aug.RemotePath):
                 else:
                     child = childs[0]
 
-                """  # ARGH I don't think we actually need this :/
-                lchild = self._lchild(child)  # TODO LocalPath.__truediv__ ?
-                if not lchild.exists():
-                    # if the local child already exists then do not create
-                    # a cache for it since the cache will overwrite and in
-                    # that case the call to update meta should be explicit
-                    # NOTE as defined here symlinked meta will still update
-                    self.cache.__truediv__(child)
-                else:
-                    self.cache.__truediv__(child, update_meta=False)
-                """
-
                 self.cache / child  # THIS SIDE EFFECTS TO UPDATE THE CHILD CACHE
                 return child
 
@@ -889,13 +881,20 @@ class BlackfynnRemote(aug.RemotePath):
         child._seed = tbfo
         return child
 
-
-
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """
         if self.is_organization():
             bfobject = self._api.bf.create_dataset(child_name)
         elif self.is_dir():  # all other possible dirs are already handled
+            # sigh it would be nice if creation would just fail
+            # if a folder with that name already existed :/
+            maybe_child = self / child_name
+            if maybe_child.exists():
+                log.warning(f'folder with name {child_name} already exists '
+                            'one level of its children have been included')
+                list(maybe_child.children)  # force a single level of instantiation
+                return maybe_child
+
             bfobject = self.bfobject.create_collection(child_name)
         else:
             raise exc.NotADirectoryError(f'{self}')
@@ -956,12 +955,14 @@ class BlackfynnRemote(aug.RemotePath):
         checksum = local_path.checksum()
 
         old_remote = self / local_path.name
-        rchecksum = old_remote.checksum
-        if rchecksum is None:
-            # has side effect of caching the object on the off chance that
-            # a local copy has not already been stashed (e.g. if we didn't
-            # upload it using this function)
-            rchecksum = old_remote.cache.checksum()
+        rchecksum = None
+        if old_remote is not None:
+            rchecksum = old_remote.checksum
+            if rchecksum is None and old_remote.cache is not None:
+                # has side effect of caching the object on the off chance that
+                # a local copy has not already been stashed (e.g. if we didn't
+                # upload it using this function)
+                rchecksum = old_remote.cache.checksum()
 
         if checksum == rchecksum:
             # TODO check to make sure nothing else has changed ???
@@ -972,6 +973,44 @@ class BlackfynnRemote(aug.RemotePath):
         blob = manifests[0][0]  # there is other stuff in here but ignore for now
         id = blob['package']['content']['nodeId']
         remote = cls(id)
+        if False:  # the web api endpoints are old and busted and don't ensure checksum generation
+            for i in range(100):
+                # sometimes you just need a blocking call ...
+                # FIXME looks like there is a websocket connection that
+                # will notify when a package _actually_ finished uploading ...
+                if remote.state == 'READY':
+                    break
+                elif remote.state == 'UPLOADED':
+                    try:
+                        remote.bfobject.package.process()  # processing required to get a checksum
+                    except BaseException as e:
+                        log.exception(e)
+                        break
+                else:
+                    # even if the remote state says uploaded we get 400 error bad url ...
+                    log.debug(remote.state)
+                    remote = cls(id)
+            else:
+                raise BaseException('too many retires when uploading {remote}')
+
+            for i in range(100):
+                if remote.state == 'READY':
+                    log.debug(f'finally ready after {i + 1}')
+                    with_checksum_maybe = [  # FIXME sigh ...
+                        p for p in remote.dataset.bfobject._packages(filename=remote.stem)
+                        if p.id == remote.id or hasattr(p, 'pkg_id') and p.pkg_id == remote.id]
+
+                    with_checksum_maybe = with_checksum_maybe[-1] if with_checksum_maybe else None
+                    if with_checksum_maybe.checksum:
+                        remote.bfobject.checksum = with_checksum_maybe.checksum
+                        breakpoint()
+
+                    break
+                else:
+                    log.debug(remote.state)
+                    #sleep(1)
+                    remote = cls(id)
+
         if remote.meta.checksum is None:
             if hasattr(remote.bfobject, 'checksum'):
                 raise BaseException('what is going on here!?')

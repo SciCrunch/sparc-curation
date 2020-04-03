@@ -114,11 +114,15 @@ def check_files(files):
 transfers.check_files = check_files
 
 
+#_orgid = auth.get('blackfynn-organization')  # HACK
+# this works, but then we have to do the multipart upload dance
+# which the bf client does not implement at the moment
 def get_preview(self, files, append):
     paths = files
 
     params = dict(
         append = append,
+        # dataset_id=?,
     )
 
     payload = { "files": [
@@ -126,12 +130,18 @@ def get_preview(self, files, append):
             "fileName": p.name,
             "size": p.size,
             "uploadId": i,
+            "processing": True,
         } for i, p in enumerate(paths)
     ]}
 
+    # current web dance
+    # /upload/preview/organizations/{_orgid}?append= append ?dataset_id= integer???
+    # /upload/fineuploaderchunk/organizations/{_orgid}/id/{importId}?multipartId= from-prev-resp
+    # /upload/complete/organizations/{_orgid}/id/{importId}?datasetId=
     response = self._post(
-        endpoint = self._uri('/files/upload/preview'),
-        params = params,
+        endpoint=self._uri('/files/upload/preview'),
+        #endpoint=self._uri(f'/upload/preview/organizations/{_orgid}'),
+        params=params,
         json=payload,
         )
 
@@ -318,8 +328,13 @@ def get(self, pkg, include='files,source'):
 
 PackagesAPI.get = get
 
+
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
+    yield from self._packages(pageSize=pageSize, includeSourceFiles=True)
+
+
+def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_only=False, filename=None):
     """ python implementation to make use of /dataset/{id}/packages """
     remapids = {}
     def restructure(j):
@@ -348,17 +363,27 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
     #pageSize
     #includeSourceFiles
     #types
+    #filename
+    filename_args = f'&filename={filename}' if filename is not None else ''
     cursor_args = ''
     out_of_order = []
     while True:
         resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
                            f'pageSize={pageSize}&'
                            f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                           f'{filename_args}'
                            f'{cursor_args}')
         #print(resp.url)
         if resp.ok:
             j = resp.json()
             packages = j['packages']
+            if raw:
+                yield from packages
+                if latest_only:
+                    break
+                else:
+                    continue
+
             if out_of_order:
                 packages += out_of_order
                 # if a parent is on the other side of a
@@ -370,7 +395,9 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 if out_of_order[0] is None:
                     out_of_order.remove(None)
                 elif packages == out_of_order:
-                    if 'cursor' not in j:
+                    if filename is not None:
+                        out_of_order = None
+                    elif 'cursor' not in j:
                         raise RuntimeError('We are going nowhere!')
                     else:
                         # the missing parent is in another castle!
@@ -383,13 +410,21 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         id = package['content']['nodeId']
                         name = package['content']['name']
                         bftype = id_to_type(id)
+                        dcp = deepcopy(package)
                         try:
                             #if id.startswith('N:package:'):
                                 #log.debug(lj(package))
-                            rdp = restructure(deepcopy(package))
+                            rdp = restructure(dcp)
                         except KeyError as e:
-                            out_of_order.append(package)
-                            continue
+                            if out_of_order is None:  # filename case
+                                # parents will simply not be listed
+                                # if you are using filename then beware
+                                if 'parentId' in dcp['content']:
+                                    dcp['content'].pop('parentId')
+                                rdp = restructure(dcp)
+                            else:
+                                out_of_order.append(package)
+                                continue
 
                         bfobject = bftype.from_dict(rdp, api=self._api)
                         if name != bfobject.name:
@@ -417,6 +452,8 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                                 bfobject.state = 'PARENT-DELETING'
 
                         yield bfobject  # only yield if we can get a parent
+                    elif out_of_order is None:  # filename case
+                        yield bfobject
                     elif bfobject.parent is None:
                         # both collections and packages can be at the top level
                         # dataset was set to its bfobject repr above so safe to yield
@@ -457,6 +494,7 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
 
 
 # monkey patch Dataset to implement packages endpoint
+Dataset._packages = _packages
 Dataset.packages = packages
 
 
