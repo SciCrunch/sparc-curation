@@ -242,7 +242,7 @@ class RemoteSchema(JSONSchema):
         if isinstance(cls.schema, str):
             cls.schema = requests.get(cls.schema).json()
 
-        super().__new__(cls)
+        return super().__new__(cls)
 
 
 class ApiNATOMYSchema(RemoteSchema):

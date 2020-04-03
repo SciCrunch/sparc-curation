@@ -42,7 +42,7 @@ class TestExtractMetadata(unittest.TestCase):
         embfs = [mbf.ExtractMBF(x) for x in local_xmls]
         d = embfs[0].asDict()
         blob = [e.asDict() for e in embfs]
-        errors = [b.pop('errors') for b in blob]
+        errors = [b.pop('errors') for b in blob if 'errors' in b]
         error_types = set(e['validator'] for es in errors for e in es)
         if export:
             with open('mbf-test.json', 'wt') as f:
