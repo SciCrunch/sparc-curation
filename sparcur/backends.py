@@ -501,7 +501,7 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def parent(self):
         if isinstance(self.bfobject, Organization):
-            return None
+            return self  # match behavior of Path
 
         elif isinstance(self.bfobject, Dataset):
             return self.organization

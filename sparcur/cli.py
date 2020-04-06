@@ -591,7 +591,7 @@ class Main(Dispatcher):
             else:
                 anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
         except exc.DirectoryNotEmptyError:
-            message = (f'fatal: destination path {anchor} already '
+            message = (f'fatal: destination path already '
                        'exists and is not an empty directory.')
             print(message)
             sys.exit(2)
