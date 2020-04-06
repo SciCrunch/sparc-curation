@@ -19,6 +19,7 @@ Usage:
     spc report   [contributors samples errors]      [options]
     spc shell    [affil integration protocols exit] [options]
     spc server   [options]
+    spc apinat   [options] <path-in> <path-out>
     spc tables   [options] [<directory>...]
     spc annos    [options] [export shell]
     spc feedback <feedback-file> <feedback>...
@@ -354,10 +355,15 @@ class Main(Dispatcher):
 
         self.cwdintr = Integrator(self.cwd)
 
+        # pass debug along (sigh)
+        AugmentedPath._debug = self.options.debug
+        RemotePath._debug = self.options.debug
+
         # FIXME populate this via decorator
         if (self.options.clone or
             self.options.meta or
             self.options.goto or
+            self.options.apinat or
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
@@ -394,9 +400,6 @@ class Main(Dispatcher):
             self._setup_ontquery()
 
     def _setup_local(self):
-        # pass debug along (sigh)
-        AugmentedPath._debug = self.options.debug
-        RemotePath._debug = self.options.debug
         self.BlackfynnRemote = BlackfynnCache._remote_class
         self.BlackfynnRemote._async_rate = self.options.rate
 
@@ -1215,6 +1218,17 @@ class Main(Dispatcher):
     def fix(self):
         fix = Fix(self)
         fix('fix')
+
+    def apinat(self):
+        from sparcur import apinat
+        path_in = Path(self.options.path_in)
+        path_out = Path(self.options.path_out)
+        with open(inp) as f:
+            resource_map = json.load(f)
+
+        agraph = apinat.Graph(resource_map)
+        graph = agraph.graph()
+        graph.write(path=out)
 
 
 class Report(Dispatcher):

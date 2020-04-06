@@ -418,7 +418,7 @@ class Lyph(BaseElement):
     key = 'lyphs'
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
-    objects = 'layerIn', 'conveys', 'border', 'cloneOf', 'supertype'
+    objects = 'layerIn', 'conveys', 'border', 'cloneOf', 'supertype', 'internalIn'
     objects_multi = ('inCoalescences', 'subtypes', 'layers', 'clones', 'external', 'inheritedExternal'
                      'internalNodes', 'bundles', 'bundlesTrees', 'bundlesChains', 'subtypes')
 
