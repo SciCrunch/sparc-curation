@@ -1223,12 +1223,12 @@ class Main(Dispatcher):
         from sparcur import apinat
         path_in = Path(self.options.path_in)
         path_out = Path(self.options.path_out)
-        with open(inp) as f:
+        with open(path_in) as f:
             resource_map = json.load(f)
 
         agraph = apinat.Graph(resource_map)
         graph = agraph.graph()
-        graph.write(path=out)
+        graph.write(path=path_out)
 
 
 class Report(Dispatcher):
