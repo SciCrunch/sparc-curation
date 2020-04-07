@@ -23,16 +23,10 @@ Run this block in emacs with =C-c C-c= or tangle and run with the block below
 # there is no test folder inside of bin and python can't
 # look backward up the folder hierarchy to find it
 #+name: apinat-export
-#+header: :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o0755) :async
-#+begin_src python :dir ../ :results output :tangle ../export-apinatomy-tests
-import sys
-import pathlib
-print(pathlib.Path.cwd())
-import pytest
-import test.test_apinatomy as ta
-ta.export = True
-sys.argv = ['pytest', '-k', 'test_bolew or test_keast']
-pytest.main()
+#+header: :shebang "#!/usr/bin/env bash" :tangle-mode (identity #o0755)
+#+begin_src bash :dir ../ :tangle ../export-apinatomy-tests
+spc apinat ./test/apinatomy/data/keast-spinal-map.json keast-spinal.ttl
+spc apinat ./test/apinatomy/data/bolser-lewis-map.json test-bolew.ttl
 #+end_src
 
 You can also tangle this file to produce [[file:../export-apinatomy-tests]]
@@ -93,3 +87,14 @@ When you have a query working as desired add it or update it in
 [[file:../resources/scigraph/cypher-resources.yaml][cypher resources]].
 # TODO need that local/remote git link ...
 See also [[file:../../pyontutils/nifstd/scigraph/README.org::#sparc-data-services-build-deploy][data services build and deploy]].
+* Add new ApiNATOMY model to SciGraph load
+Edit [[file:../resources/scigraph/ontologies-sparc-data.yaml][ontologies-sparc-data.yaml]].
+To add a new entry that looks like the following. Change the name =my-model.ttl=
+to match the name of the file that you scp to cassava.
+#+begin_src yaml
+  - url: https://localhost/ApiNATOMY/ontologies/my-model.ttl
+    reasonerConfiguration:
+      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
+      addDirectInferredEdges: true
+      removeUnsatisfiableClasses: true
+#+end_src

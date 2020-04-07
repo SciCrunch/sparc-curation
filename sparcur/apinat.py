@@ -406,8 +406,8 @@ class BaseElement(Base):
 class Node(BaseElement):
     key = 'nodes'
     annotations = 'skipLabel', 'color', 'generated'
-    objects = 'cloneOf', 'hostedBy', 'internalIn', 'rootOf', 'leafOf',
-    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external'
+    objects = 'cloneOf', 'hostedBy', 'internalIn',
+    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external', 'rootOf', 'leafOf',
 
     def triples(self):
         yield from super().triples()
@@ -432,7 +432,7 @@ class Link(BaseElement):
     annotations = 'generated',
     generics = 'conveyingType',
     objects = 'source', 'target', 'conveyingLyph', 'fasciculatesIn'
-    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external', 'inheritedExternal'
+    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external', 'inheritedExternal',  'next', 'prev'
 
 
 Graph.Link = Link
@@ -465,8 +465,8 @@ class Chain(BaseElement):
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
     objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs', 'inheritedExternal'
-    objects_ordered_succession = {'lyphs': readable.nextLyph,
-                                  'levels': readable['next']}
+    #objects_ordered_succession = {'lyphs': readable.nextLyph,
+                                  #'levels': readable['next']}
 
 
 Graph.Chain = Chain
