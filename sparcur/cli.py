@@ -585,7 +585,7 @@ class Main(Dispatcher):
 
         # make sure that we aren't in a project already
         existing_root = self.cwd.find_cache_root()
-        if existing_root is not None:
+        if existing_root is not None and existing_root != self.cwd:
             message = f'fatal: already in project located at {existing_root.resolve()!r}'
             print(message)
             sys.exit(3)
