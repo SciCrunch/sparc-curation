@@ -10,6 +10,7 @@ from pyontutils.utils import byCol
 from sparcur import normalization as nml
 from sparcur.core import log, logd
 from sparcur.paths import Path
+#from sparcur.utils import cache
 from sparcur.config import config, auth
 from bs4 import BeautifulSoup
 
@@ -250,3 +251,55 @@ class MembersData:
             m = lookup(lnd, ln, fn)
 
         return m
+
+
+class BlackfynnDatasetData:
+
+    cache_path = auth.get_path('cache-path')
+    cache_base = cache_path / 'blackfynn-meta'
+
+    def __init__(self, remote):
+        self.remote = remote
+        self.bfobject = remote.bfobject
+        self.ntfs_safe_id = remote.id.split(':')[-1]  # sigh
+        self.cache = self.cache_base / self.ntfs_safe_id
+        if not self.cache_base.exists():
+            self.cache_base.mkdir()
+
+    def fromCache(self):
+        """ retrieve cached results without hitting the network """
+        # TODO FIXME error on no cache?
+        with open(self.cache, 'rt') as f:
+            return json.load(f)
+
+    def __call__(self):
+        # FIXME TODO switch to use dict transformers
+        # self.bfobject.relationships()
+        meta = self.bfobject.meta  # why this is not default in the python api the world may never know
+        cont = meta['content']
+        blob = {'id': self.remote.id,
+                'name': cont['name'],  # title
+                'description': cont['description'],  # subtitle
+                'readme': self.bfobject.readme,
+                # 'banner': self.bfobject.banner,  # FIXME not persistent ...
+                'status-log': self.bfobject.status_log,  # FIXME most recent only?
+                'tags': cont['tags'],
+
+                # FIXME strip emails before export
+                # leave teams and users out of this for now, too much noise
+                #'teams': self.bfobject.teams,
+                #'users': self.bfobject.users,
+                'contributors': self.bfobject.contributors,
+        }
+
+        if 'license' in cont:
+            blob['license'] = cont['license']
+
+        doi = self.remote.doi
+        if doi is not None:
+            blob['doi'] = self.remote.doi
+
+        with open(self.cache, 'wt') as f:
+            json.dump(blob, f, indent=2, sort_keys=True)
+
+        return blob

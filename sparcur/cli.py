@@ -10,6 +10,7 @@ Usage:
     spc find     [options] --name=<PAT>...
     spc status   [options]
     spc meta     [options] [--uri] [--browser] [--human] [--diff] [<path>...]
+    spc rmeta    [options]
     spc export   [schemas] [options] [<path>...]
     spc report   size    [options] [<path>...]
     spc report   tofetch [options] [<directory>...]
@@ -64,6 +65,8 @@ Commands:
                        : --human
                        : --context  include context, e.g. dataset
 
+    rmeta       retrieve metadata about files/folders from the remote
+
     export      export extracted data to json (and everything else)
 
                 datasets        ttl for individual datasets in addition to full export
@@ -102,6 +105,8 @@ Commands:
     server      reporting server
 
                 options: --raw  run server on live data without export
+
+    apinat      convert ApiNATOMY json to rdf and serialize to ttl
 
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
@@ -1230,6 +1235,17 @@ class Main(Dispatcher):
         graph = agraph.graph()
         graph.write(path=path_out)
 
+    def rmeta(self):
+        from pyontutils.utils import Async, deferred
+        from sparcur.datasources import BlackfynnDatasetData
+        dsr = self.datasets_remote
+        prepared = [BlackfynnDatasetData(r) for r in dsr]
+        hz = self.options.rate
+        if not self.options.debug:
+            blobs = Async(rate=hz)(deferred(d)() for d in prepared)
+        else:
+            blobs = [d() for d in  prepared]
+
 
 class Report(Dispatcher):
 
@@ -1629,6 +1645,11 @@ class Report(Dispatcher):
 
             yield self._print_table(rows, title=title, ext=ext)
 
+    def changes(self):
+        ori1 = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+        ori2 = OntResIri('https://cassava.ucsd.edu/sparc/archive/exports/2020-03-23T12:16:56,102146-07:00/curation-export.ttl')
+        g1 = ori1.graph
+        g2 = ori2.graph
 
 class Shell(Dispatcher):
     # property ports

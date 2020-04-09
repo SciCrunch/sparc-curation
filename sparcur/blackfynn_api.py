@@ -551,6 +551,61 @@ Dataset.delete = delete
 
 
 @property
+def contributors(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/contributors')
+    return resp.json()
+
+
+# monkey patch Dataset to implement contributors endpoint
+Dataset.contributors = contributors
+
+
+@property
+def banner(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/banner')
+    return resp.json()
+
+
+# monkey patch Dataset to implement banner endpoint
+Dataset.banner = banner
+
+
+@property
+def readme(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/readme')
+    return resp.json()
+
+
+# monkey patch Dataset to implement readme endpoint
+Dataset.readme = readme
+
+
+@property
+def status_log(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/status-log')
+    return resp.json()
+
+
+# monkey patch Dataset to implement status_log endpoint
+Dataset.status_log = status_log
+
+
+@property
+def meta(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}')
+    return resp.json()
+
+
+# monkey patch Dataset to implement just the dataset metadata endpoint
+Dataset.meta = meta
+
+
+@property
 def teams(self):
     session = self._api.session
     resp = session.get(f'https://api.blackfynn.io/organizations/{self.id}/teams')

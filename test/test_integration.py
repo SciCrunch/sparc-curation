@@ -51,7 +51,8 @@ def post_main():
 mains = {'cli-real': [['spc', 'clone', test_organization],
                       ['spc', 'pull'],
                       ['spc', 'refresh'],
-                      ['spc', 'fetch']],
+                      ['spc', 'fetch'],
+                      ['spc', 'rmeta'],],
          'cli': [['spc', 'find', '--name', '*.xlsx'],
                  ['spc', 'find', '--name', '*', '--limit', '3'],
 

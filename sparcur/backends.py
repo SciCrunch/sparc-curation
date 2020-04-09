@@ -382,7 +382,7 @@ class BlackfynnRemote(aug.RemotePath):
     def doi(self):
         try:
             blob = self.bfobject.doi
-            print(blob)
+            #print(blob)
             if blob:
                 return idlib.Doi(blob['doi'])
         except exc.NoRemoteFileWithThatIdError as e:
