@@ -639,7 +639,7 @@ Add the following to your ~/.bash_profile
 Add the following to your ~/.bashrc
 #+CAPTION: .bashrc
 #+begin_src bash :exports code :eval never
-export PATH=${HOME}/bin:${HAOME}/Library/Python/3.7/bin:${PATH}
+export PATH=${HOME}/bin:${HOME}/Library/Python/3.7/bin:${PATH}
 #+end_src
 
 Run the following to symlink python3 to python
