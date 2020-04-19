@@ -92,6 +92,7 @@ Commands:
 
                 subjects        all headings from subjects files
                 errors          list of all errors per dataset
+                test            do as little as possible (use with --profile)
 
                 options: --raw  run reports on live data without export
                        : --tab-table
@@ -181,7 +182,6 @@ import pprint
 from itertools import chain
 from collections import Counter, defaultdict
 import idlib
-import requests
 import htmlfn as hfn
 import ontquery as oq
 start_middle = time()
@@ -196,8 +196,7 @@ from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
 from sparcur import config
-from sparcur import export as ex
-from sparcur import schemas as sc
+#from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
@@ -212,7 +211,11 @@ from sparcur.curation import Summary, Integrator
 from sparcur.curation import DatasetObject
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import FakeBFLocal
-from IPython import embed
+
+try:
+    breakpoint
+except NameError:
+    from IPython import embed as breakpoint
 
 
 slow = False
@@ -248,7 +251,8 @@ class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
                  '.~lock',)
 
-    def _export(self, export_source_path=None):
+    def _export(self, ex, export_source_path=None):
+
         if export_source_path is None:
             export_source_path = self.cwd
 
@@ -816,6 +820,8 @@ class Main(Dispatcher):
 
     def export(self):
 
+        from sparcur import export as ex  # FIXME very slow to import
+
         # FIXME export should be able to run without needing any external
         # data the fetch step should happen before the export so that
         # network connections don't creep into the process
@@ -825,12 +831,11 @@ class Main(Dispatcher):
         if self.options.schemas:
             ex.export_schemas(self.options.export_path)
 
-        else:
-            export = self._export()
-            int_or_sum = export.export()
+        export = self._export(ex)
+        int_or_sum = export.export(dataset_paths=tuple(self.paths))
 
         if self.options.debug:
-            embed()
+            breakpoint()
 
     def annos(self):
         data = (self.summary.data()
@@ -863,7 +868,7 @@ class Main(Dispatcher):
             f = Integrator(p)
             all_annos = [list(protc.byIri(uri))
                          for uri in f.protocol_uris_resolved]
-            embed()
+            breakpoint()
 
     def demos(self):
         # get the first dataset
@@ -1651,6 +1656,7 @@ class Report(Dispatcher):
         g1 = ori1.graph
         g2 = ori2.graph
 
+
 class Shell(Dispatcher):
     # property ports
     paths = Main.paths
@@ -1673,7 +1679,7 @@ class Shell(Dispatcher):
         ds = datasets
         summary = self.summary
         org = Integrator(self.project_path)
-        embed()
+        breakpoint()
 
     def more(self):
         p, *rest = self._paths
@@ -1717,7 +1723,7 @@ class Shell(Dispatcher):
         except AttributeError as e:
             logd.error(f'{d} is missing some file')
 
-        embed()
+        breakpoint()
 
     def affil(self):
         from pyontutils.utils import Async, deferred
@@ -1727,7 +1733,7 @@ class Shell(Dispatcher):
         rors = sorted(set(_ for _ in m.values() if _))
         #dat = Async(rate=5)(deferred(lambda r:r.data)(i) for i in rors)
         dat = [r.data for r in rors]  # once the cache has been populated
-        embed()
+        breakpoint()
 
     def protocols(self):
         """ test protocol identifier functionality """
@@ -1743,7 +1749,7 @@ class Shell(Dispatcher):
         #dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
         #dois = [d['protocol']['doi'] for d in dat if d]
         dois = [p.doi for p in pis]
-        embed()
+        breakpoint()
 
     def integration(self):
         from protcur.analysis import protc, Hybrid
@@ -1756,7 +1762,7 @@ class Shell(Dispatcher):
         pj = list(intr.protocol_jsons)
         pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
-        embed()
+        breakpoint()
 
 
 class Fix(Shell):
@@ -1781,7 +1787,7 @@ class Fix(Shell):
 
         nall = self.stash(paths, stashmetafunc=sf)
         [print(n.cache.meta.as_pretty(n)) for n in nall]
-        embed()
+        breakpoint()
         # once everything is in order and backed up 
         # [p.cache.fetch() for p in paths]
 
@@ -1870,6 +1876,7 @@ def main():
         e = (exit - start)
         s = f'{a} + {b} = {c}\n{c} + {d} = {e}'
         print(s)
+
 
 if __name__ == '__main__':
     main()

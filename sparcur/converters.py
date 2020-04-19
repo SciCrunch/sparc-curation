@@ -1,7 +1,7 @@
 from types import GeneratorType
 import idlib
 import rdflib
-from pysercomb.pyr.units import Expr, _Quant as Quantity, Range
+from pysercomb.pyr.types import ProtcurExpression, Quantity, Range
 from pyontutils import combinators as cmb
 from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc
 from pyontutils.namespaces import rdf, rdfs, owl, dc
@@ -18,7 +18,7 @@ class TripleConverter(dat.HasErrors):
     known_skipped = tuple()
     mapping = tuple()
 
-    _already_warned = set()
+    _already_logged = set()
 
     class Extra:
         def __init__(self, converter):
@@ -43,7 +43,7 @@ class TripleConverter(dat.HasErrors):
             return value.asType(rdflib.URIRef)
         if isinstance(value, OntId):
             return value.u
-        if isinstance(value, Expr):
+        if isinstance(value, ProtcurExpression):
             return value
         if isinstance(value, Quantity):
             return value
@@ -53,9 +53,9 @@ class TripleConverter(dat.HasErrors):
             # NOPE! This idiot put a type field in his json dicts!
             if 'type' in value:
                 if value['type'] == 'quantity':
-                    return Quantity.fromJson(value)
+                    return self.pyru._Quant.fromJson(value)
                 elif value['type'] == 'range':
-                    return Range.fromJson(value)
+                    return self.pyru.Range.fromJson(value)
 
             raise ValueError(value)
         else:
@@ -92,7 +92,7 @@ class TripleConverter(dat.HasErrors):
                         continue
 
                     log.debug(o)
-                    if isinstance(o, Expr) or isinstance(o, Quantity):
+                    if isinstance(o, ProtcurExpression) or isinstance(o, Quantity):
                         s = rdflib.BNode()
                         yield subject, p, s
                         qt = sparc.Measurement
@@ -114,8 +114,8 @@ class TripleConverter(dat.HasErrors):
 
             else:
                 msg = f'Unhandled {self.__class__.__name__} field: {field}'
-                if msg not in self._already_warned:
-                    self._already_warned.add(msg)
+                if msg not in self._already_logged:
+                    self._already_logged.add(msg)
                     log.warning(msg)
                     self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error')
 

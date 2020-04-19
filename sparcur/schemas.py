@@ -9,7 +9,7 @@ import idlib
 import rdflib
 import requests
 from pyontutils.core import OntId, OntTerm
-from pysercomb.pyr.core import Expr
+from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
 from sparcur.utils import logd
 from sparcur.core import JEncode
@@ -174,7 +174,7 @@ class JSONSchema(object):
         rdflib.Literal,
         OntId,
         OntTerm,
-        Expr,
+        ProtcurExpression,
     ]
 
     def __init__(self):

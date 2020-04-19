@@ -4,7 +4,7 @@ import numbers
 from types import GeneratorType
 from html.parser import HTMLParser
 import idlib
-from pysercomb.pyr import units as pyru
+from pysercomb.pyr.types import Quantity
 from . import exceptions as exc
 from .core import log, logd, HasErrors
 from .core import OntId
@@ -223,6 +223,15 @@ class NormValues(HasErrors):
     """ Base class with an open dir to avoid name collisions """
 
     embed_bad_key_message = False  # TODO probably don't want this, better to zap bad values in pipeline
+    _logged = set()
+
+    @classmethod
+    def _already_logged(cls, thing):
+        case = thing in cls._logged
+        if not case:
+            cls._logged.add(thing)
+
+        return case
 
     def __init__(self, obj_inst):
         super().__init__()
@@ -376,7 +385,7 @@ class NormValues(HasErrors):
                         raise e
 
                     if (len(out) == 1 and (key in self._obj_inst._expect_single or
-                                           isinstance(out[0], pyru._Quant))
+                                           isinstance(out[0], Quantity))
                         or path[-1] == list):
                         # lists of lists might encounter issues here, but we almost never
                         # encounter those cases with metadata, especially in the tabular conversion
@@ -668,6 +677,12 @@ class NormDatasetDescriptionFile(NormValues):
 
 class NormSubjectsFile(NormValues):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not hasattr(self.__class__, 'pyru'):
+            from pysercomb.pyr import units as pyru
+            self.__class__.pyru = pyru
+
     def subject_id(self, value):
         if not isinstance(value, str):
             msg = f'Bad type for subject_id: {type(value)}'
@@ -723,15 +738,16 @@ class NormSubjectsFile(NormValues):
         self._error_on_na(value)
 
         if isinstance(value, numbers.Number):
-            yield pyru.ur.Quantity(value)
+            yield self.pyru.ur.Quantity(value)
             return
 
         try:
-            pv = pyru.UnitsParser(value).asPython()
-        except pyru.UnitsParser.ParseFailure as e:
+            pv = self.pyru.UnitsParser(value).asPython()
+        except self.pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
             msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
-            log.error(msg)
+            if not self._already_logged(msg):
+                log.error(msg)
             self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline')
             yield value
             return
@@ -822,7 +838,7 @@ class NormSubjectsFile(NormValues):
                 except ValueError as e:
                     raise exc.UnhandledTypeError(f'{h_value} {dhv!r} was not parsed!') from e
 
-            compose = dhv * pyru.ur.parse_units(dict_[h_unit])
+            compose = dhv * self.pyru.ur.parse_units(dict_[h_unit])
             #_, v, rest = parameter_expression(compose)
             #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
             #breakpoint()

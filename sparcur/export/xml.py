@@ -1,6 +1,6 @@
 import rdflib
 import dicttoxml
-from pysercomb.pyr.units import Expr, _Quant as Quantity
+from pysercomb.pyr.types import ProtcurExpression, Quantity
 from sparcur.core import OntTerm, get_all_errors
 
 
@@ -23,7 +23,7 @@ def xml(dataset_blobs):
         if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
             return ot.tabular()
-        if isinstance(v, Expr):
+        if isinstance(v, ProtcurExpression):
             return str(v)  # FIXME for xml?
         if isinstance(v, Quantity):
             return str(v)

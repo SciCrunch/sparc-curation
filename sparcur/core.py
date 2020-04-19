@@ -12,24 +12,19 @@ import htmlfn as hfn
 import requests
 import ontquery as oq
 import augpathlib as aug
-#from joblib import Memory
 from idlib.utils import resolution_chain
 from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
+from pysercomb.pyr.types import ProtcurExpression, Quantity  # FIXME import slowdown
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.utils import isoformat, TZLOCAL
 from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, cache, python_identifier  # FIXME fix other imports
+from sparcur.utils import log, logd, python_identifier  # FIXME fix other imports
 from sparcur.utils import is_list_or_tuple
 from sparcur.config import config, auth
-
-
-# disk cache decorator
-#memory = Memory(config.cache_dir, verbose=0)
 
 
 xsd = rdflib.XSD
@@ -73,6 +68,16 @@ class OntTerm(OTB, OntId):
     #def atag(self, curie=False, **kwargs):
         #return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
+    _logged = set()
+
+    @classmethod
+    def _already_logged(cls, thing):
+        case = thing in cls._logged
+        if not case:
+            cls._logged.add(thing)
+
+        return case
+
     def asDict(self):
         return {
             'type': 'OntTerm',  # TODO -> idlib
@@ -83,10 +88,12 @@ class OntTerm(OTB, OntId):
 
     def tabular(self, sep='|'):
         if self.label is None:
+            _id = self.curie if self.curie else self.iri
             if self.prefix not in self._known_no_label:
-                log.error(f'No label {self.curie if self.curie else self.iri}')
+                if not self._already_logged(_id):
+                    log.error(f'No label {_id}')
 
-            return self.curie if self.curie else self.iri
+            return _id
 
         return self.label + sep + self.curie
 

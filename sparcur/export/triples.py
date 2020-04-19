@@ -393,6 +393,7 @@ class TriplesExportIdentifierMetadata(TriplesExport):
 
     @property
     def triples(self):
+        crossref_doi_pred = rdflib.term.URIRef('http://prismstandard.org/namespaces/basic/2.1/doi')
         for blob in self.data['identifier_metadata']:
             id = blob['id']
             if not isinstance(id, idlib.Stream):
@@ -413,9 +414,14 @@ class TriplesExportIdentifierMetadata(TriplesExport):
                     g = OntGraph()
                     doi = idlib.Doi(id) if not isinstance(id, idlib.Doi) else id  # FIXME idlib streams need to recognize their own type in __new__
                     g.parse(data=doi.ttl(), format='ttl')  # FIXME network bad
-                    _their_record_s = [s for s, p, o in g if p == rdflib.term.URIRef('http://prismstandard.org/namespaces/basic/2.1/doi')][0]
-                    yield s, owl.sameAs, _their_record_s
-                    yield from g
+                    _tr = [s for s, p, o in g if p == crossref_doi_pred]
+                    if _tr:
+                        _their_record_s = _tr[0]
+                        yield s, owl.sameAs, _their_record_s
+                        yield from g
+                    else:
+                        g.debug()
+                        log.critical('No crossref doi section in graph!')
                 else:
                     msg = f'dont know what to do with {source}'
                     log.error(msg)

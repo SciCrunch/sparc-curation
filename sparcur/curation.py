@@ -32,7 +32,6 @@ from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
 from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
-from pysercomb.pyr import units as pyru
 
 
 class PathData:
@@ -476,21 +475,27 @@ class Summary(Integrator, ExporterSummarizer):
     _debug = False
     _n_jobs = 12
 
-    def __new__(cls, path):
+    def __new__(cls, path, dataset_paths=tuple()):
         #cls.schema = cls.schema_class()
         cls.schema_out = cls.schema_out_class()
         return super().__new__(cls, path)
 
-    def __init__(self, path):
+    def __init__(self, path, dataset_paths=tuple()):
         super().__init__(path)
         # not sure if this is kosher ... but it works
 
         # avoid infinite recursion of calling self.anchor.path
         super().__init__(self.path.cache.anchor.local) # FIXME ugh
+        self._use_these_datasets = dataset_paths
  
     @property
     def iter_datasets_safe(self):
-        for i, path in enumerate(self.anchor.path.iterdir()):
+        if self._use_these_datasets:
+            gen = enumerate(self._use_these_datasets)
+        else:
+            gen = enumerate(self.anchor.path.iterdir())
+
+        for i, path in gen:
             # FIXME non homogenous, need to find a better way ...
             if path.cache is None and path.skip_cache:
                 continue
@@ -503,10 +508,15 @@ class Summary(Integrator, ExporterSummarizer):
             of the current Integrator regardless of whether that
             Integrator is itself an organization node """
 
+        if self._use_these_datasets:
+            gen = enumerate(self._use_these_datasets)
+        else:
+            gen = enumerate(self.anchor.path.iterdir())
+
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth
         # do not cache in here
-        for i, path in enumerate(self.anchor.path.iterdir()):
+        for i, path in gen:
             # FIXME non homogenous, need to find a better way ...
             if path.cache is None and path.skip_cache:
                 # FIXME just as anticipated nullability of cache is BAD

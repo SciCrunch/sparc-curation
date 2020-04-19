@@ -264,19 +264,19 @@ class Export:
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
 
-    def export(self):
+    def export(self, dataset_paths=tuple()):
         """ export output of curation workflows to file """
         if self.export_source_path != self.export_source_path.cache.anchor:
             if not self.export_source_path.cache.is_dataset():  # FIXME just go find the dataset in that case?
                 print(f'{export_source_path.cache} is not at dataset level!')
                 sys.exit(123)
 
-            return self.export_single_dataset()
+            return self.export_single_dataset()  # FIXME unused
 
         else:
-            return self.export_datasets()
+            return self.export_datasets(dataset_paths=dataset_paths)
 
-    def export_datasets(self):
+    def export_datasets(self, dataset_paths=tuple()):
         # start time not end time ...
         # obviously not transactional ...
         filename = 'curation-export'
@@ -289,7 +289,7 @@ class Export:
         filepath = dump_path / filename
 
         # data
-        summary = cur.Summary(self.export_source_path)  # FIXME implicit state set by cli
+        summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths)  # FIXME implicit state set by cli
         blob_data = (self.latest_export if
                      self.latest else
                      summary.data_for_export(self.timestamp))

@@ -1,16 +1,16 @@
 import idlib
 import rdflib
 import requests
+from idlib.cache import cache
 from idlib.utils import resolution_chain
 from orthauth.utils import QuietDict
-from pysercomb.pyr import units as pyru
 from pyontutils import combinators as cmb
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
 from sparcur import datasets as dat
 from sparcur.core import log, logd, OntTerm, OntId, sparc
 from sparcur.paths import Path
-from sparcur.utils import log, logd, cache
+from sparcur.utils import log, logd
 from sparcur.config import config, auth
 from sparcur.protocols_io_api import get_protocols_io_auth
 
