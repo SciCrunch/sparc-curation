@@ -363,7 +363,9 @@ class MbfTracingSchema(JSONSchema):
                              'images': {'type': 'array',
                                         'items': {'type': 'object',
                                                   'properties':
-                                                  {'path_mbf': {'type': 'string'},
+                                                  {'path_mbf': {'type': 'array',
+                                                                'minItems': 1,
+                                                                'items': {'type': 'string'}},
                                                    'channels':
                                                    {'type': 'array',
                                                     'items': {

@@ -47,6 +47,7 @@ Commands:
     fetch       fetch remote data based on local metadata (NOTE does NOT refresh first)
 
                 options: --level
+                       : --mbf      fetch mbf xml metadata and only for specific datasets
 
     find        list unfetched files with option to fetch
 
@@ -69,13 +70,12 @@ Commands:
 
     export      export extracted data to json (and everything else)
 
-                datasets        ttl for individual datasets in addition to full export
-                json            json for a single dataset
-                ttl             turtle for a single dataset
+                schemas         export schemas from python to json
 
                 options: --latest   run derived pipelines from latest json
                        : --partial  run derived pipelines from the latest partial json export
                        : --open     open the output file using xopen
+                       : --mbf      extract and export mbf embedded metadata
 
     report      print a report on all datasets
 
@@ -164,6 +164,7 @@ Options:
     -v --verbose            print extra information
     --profile               profile startup performance
     --local                 ignore network issues
+    --mbf                   fetch/export mbf related metadata
 
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
@@ -806,7 +807,37 @@ class Main(Dispatcher):
             for path in self._not_dirs:
                 path.cache.refresh(update_data=fetch, size_limit_mb=limit)
 
+    @property
+    def _datasets_mbf(self):
+        """ FIXME HACK """
+        has_mbf_xml = [
+            'N:dataset:bec4d335-9377-4863-9017-ecd01170f354',
+            'N:dataset:0170271a-8fac-4769-a8f5-2b9520291d03',
+            'N:dataset:f58c75a2-7d86-439a-8883-e9a4ee33d7fa',
+            'N:dataset:ded103ed-e02d-41fd-8c3e-3ef54989da81',
+            'N:dataset:e4bfb720-a367-42ab-92dd-31fd7eefb82e',
+            'N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e',
+            'N:dataset:b225fa8a-9eb5-4716-8399-0f7fac9c2b64',
+            'N:dataset:e19b9b69-6776-427a-92f4-6b03f395d01f',
+        ]
+        datasets = [d for d in self.datasets if d.id in has_mbf_xml]
+        return datasets
+
+    def _fetch_mbf(self):
+        from pyontutils.utils import Async, deferred
+        def fetch_mbf_metadata(dataset):
+            xmls = dataset.rglob('*.xml')
+            Async(rate=5)(deferred(x.fetch)(size_limit_mb=None)
+                          for x in xmls if not x.exists())
+
+        for dataset in self._datasets_mbf:
+            fetch_mbf_metadata(dataset)
+
     def fetch(self):
+        if self.options.mbf:  # FIXME hack
+            self._fetch_mbf()
+            return
+
         paths = [p for p in self._paths if not p.is_dir()]
         self._print_paths(paths)
         if self.options.pretend:
@@ -830,6 +861,67 @@ class Main(Dispatcher):
 
         if self.options.schemas:
             ex.export_schemas(self.options.export_path)
+            return
+
+        elif self.options.mbf:
+            from sparcur import mbf
+            from sparcur.core import JEncode
+            def do_mbf_metadata(local):  # FIXME HACK needs its own pipeline
+                local_xmls = list(local.rglob('*.xml'))
+                if any(p for p in local_xmls if not p.exists()):
+                    raise BaseException('unfetched children')
+
+                #embfs = {x:mbf.ExtractMBF(x) for x in local_xmls}
+                #blob = {x:e.asDict() for x, e in embfs.items()}
+                # FIXME WARNING the memory usage on a etree.parse inside of
+                # ExtractMBF is HUGE ~100mb per file (WAT) which seems utterly insane
+                # for now we work around this by calling asDict() immedately
+                # it might be something else causing the issue but seriously wtf
+                blob = {x:mbf.ExtractMBF(x).asDict() for x in local_xmls}
+                return blob
+
+            if self.options.jobs == 1 or self.options.debug:
+                dataset_dict = {}
+                for dataset in self._datasets_mbf:
+                    blob = do_mbf_metadata(dataset.local)
+                    dataset_dict[dataset.id] = blob
+            else:
+                # 3.7 0m25.395s, pypy3 fails iwth unpickling error
+                from joblib import Parallel, delayed
+                from joblib.externals.loky import get_reusable_executor
+                hrm = Parallel(n_jobs=9)(delayed(do_mbf_metadata)
+                                         (dataset.local)
+                                         for dataset in self._datasets_mbf)
+                get_reusable_executor().shutdown()  # close the loky executor to clear memory
+                dataset_dict = {d:b for d, b in zip(self._datasets_mbf, hrm)}
+
+            with open(Path(self.options.export_path) / 'mbf-export-test.json', 'wt') as f:
+                json.dump(dataset_dict, f, indent=2, sort_keys=True)
+
+            # and yet somehow the thing is STILL using 4 gigs of memory for a 1mb output
+            sigh = FileSize(len(json.dumps({str(k):v
+                                            if not isinstance(v, dict) else
+                                            {str(k):v for k, v in v.items()}
+                                            for k, v in dataset_dict.items()},
+                                           cls=JEncode)))
+
+            key = lambda p: (not p[0], p[1])
+            all_conts = sorted(set(((OntId(c['id_ontology'])
+                                     if 'id_ontology' in c else
+                                     ''),
+                                    c['name'])
+                                   for file_dict in dataset_dict.values()
+                                   for metadata_blob in file_dict.values()
+                                   if 'contours' in metadata_blob
+                                   for c in metadata_blob['contours']),
+                               key=key)
+
+            #if self.options.server:
+            self._print_table([['id', 'name']] + all_conts, title='all MBF contours')
+            #breakpoint()
+            #_ = [print(f'{a.curie if a else a:<15}{b}') for a, b in all_conts]
+            #ex.export_mbf(self.options.export_path)
+            return
 
         export = self._export(ex)
         int_or_sum = export.export(dataset_paths=tuple(self.paths))
@@ -1102,7 +1194,12 @@ class Main(Dispatcher):
 
     def goto(self):
         # TODO this needs an inverted index
-        for rc in self.cwd.rchildren:
+        if self.options.remote_id.startswith('N:dataset:'):
+            gen = self.cwd.children
+        else:
+            gen = self.cwd.rchildren
+
+        for rc in gen:
             try:
                 if rc.cache.id == self.options.remote_id:
                     if rc.is_broken_symlink() or rc.is_file():

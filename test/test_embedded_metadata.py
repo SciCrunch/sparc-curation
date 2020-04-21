@@ -8,14 +8,13 @@ from sparcur.paths import BlackfynnCache, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.config import auth
 from sparcur import mbf
-from sparcur import schemas as sc
 from .common import path_project_container
 
 export = False
 
-
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestExtractMetadata(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         cls.organization_id = auth.get('blackfynn-organization')

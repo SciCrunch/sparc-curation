@@ -1,22 +1,68 @@
 import pathlib
-from lxml import etree
+#from xml.etree import ElementTree as etree  # pypy3 2m18.445s  # 3.7 1m56.417s  # WAT
+from lxml import etree  # python3.7 0m38.388s
 from . import schemas as sc
 from .core import HasErrors
 from .utils import log, logd
+
+if etree.__name__ == 'lxml.etree':
+    parser = etree.XMLParser(
+        collect_ids=False,
+        #remove_blank_text=True,
+    )
 
 
 class XmlSource:
 
     def __init__(self, path):
         self.path = path
-        #parser = etree.XMLParser(remove_blank_text=True)
-        self.e = etree.parse(self.path.as_posix())
-        self.namespaces = {k if k else '_':v for k, v in next(self.e.iter()).nsmap.items()}
+        if etree.__name__ == 'lxml.etree':
+            # FIXME this version is much faster but on a completely run of the
+            # mill workload uses 4 gigs of memory vs 360mb for pure python
+            # possibly relevant
+            # https://benbernardblog.com/tracking-down-a-freaky-python-memory-leak-part-2/
+            self.e = etree.parse(self.path.as_posix(), parser=parser)
+            self.namespaces = {k if k else '_':v
+                               for k, v in next(self.e.iter()).nsmap.items()}
+        else:
+            self.e = etree.parse(self.path)
+            self.namespaces = dict([node for (_, node) in
+                                    etree.iterparse(self.path,
+                                                    events=['start-ns'])])
+            if '' in self.namespaces:
+                self.namespaces['_'] = self.namespaces.pop('')
+
         self.xpath = self.mkx(self.e)
 
+    if etree.__name__ == 'lxml.etree':
+        def __del__(self):
+            # slows things down a bit but saves a ton of
+            # memory when parsing multiple files
+            self.e.getroot().clear()
+            del self.e
+
     def mkx(self, element):
-        def xpath(path, e=element):
-            return e.xpath(path, namespaces=self.namespaces)
+        if hasattr(element, 'xpath'):
+            def xpath(path, e=element):
+                return e.xpath(path, namespaces=self.namespaces)
+        else:
+            def xpath(path, e=element):
+                if path.startswith('@'):
+                    attribute = path.strip('@')
+                    return e.get(attribute)
+
+                elif '/@' in path:
+                    path, attribute = path.split('/@')
+                    return [m.get(attribute)
+                            for m in e.findall(path, namespaces=self.namespaces)]
+
+                elif path.endswith('/text()'):
+                    path, _ = path.rsplit('/', 1)
+                    return [m.text
+                            for m in e.findall(path, namespaces=self.namespaces)]
+
+                else:
+                    return e.findall(path, namespaces=self.namespaces)
 
         return xpath
 
@@ -31,21 +77,22 @@ class XmlSource:
 
         # FIXME how to deal with combination bits in schema, ignore for now
 
+        et = tuple()
         def condense(thing, schema=_schema):
 
-            print(thing, schema)
+            #print(thing, schema)
             if isinstance(thing, dict):
-                nschema = schema['properties'] if 'properties' in schema else tuple()
+                nschema = schema['properties'] if 'properties' in schema else et
                 return {k:nv
                         for k, v in thing.items()
-                        for nv in (condense(v, nschema[k] if k in nschema else tuple()),)
+                        for nv in (condense(v, nschema[k] if k in nschema else et),)
                         # stick with the pattern to filter null fields
                         # we probably don't need to work in reverse
                         # for this format
                         if nv is not None}
 
             elif isinstance(thing, list):
-                nschema = schema['items'] if 'items' in schema else tuple()
+                nschema = schema['items'] if 'items' in schema else et
                 if not thing:
                     if sc.not_array(schema):
                         return None
@@ -64,6 +111,10 @@ class XmlSource:
 
         data_in = self._extract()
         data_out = condense(data_in)
+        for k, v in tuple(data_out.items()):
+            if not v:
+                data_out.pop(k)
+
         return data_out
 
     def _extract(self):
