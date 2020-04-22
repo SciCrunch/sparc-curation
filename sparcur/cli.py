@@ -843,7 +843,7 @@ done"""
             fetch_mbf_metadata(dataset)
 
     def fetch(self):
-        if self.options.mbf:  # FIXME hack
+        if self.options.mbf:  # FIXME hack -> fetch '*.xml' or something
             self._fetch_mbf()
             return
 
@@ -876,7 +876,7 @@ done"""
             ex.export_schemas(self.options.export_path)
 
         elif self.options.mbf:
-            export = self._export(ex.ExportMBF)
+            export = self._export(ex.ExportXml)
             dataset_paths = self._datasets_with_extension('xml')
             blob_ir, *rest = export.export(dataset_paths=dataset_paths,
                                            jobs=self.options.jobs,
@@ -1661,19 +1661,19 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Path identifiers', ext=ext)
 
     def mbf(self, ext=None):
-        from sparcur import mbf
+        from sparcur.extract import xml as exml
 
         def settype(mimetype):
-            return {mbf.ExtractMBF.mimetype: 'MBF Metadata',
-                    mbf.ExtractNeurolucida.mimetype: 'Neurolucida',}[mimetype]
+            return {exml.ExtractMBF.mimetype: 'MBF Metadata',
+                    exml.ExtractNeurolucida.mimetype: 'Neurolucida',}[mimetype]
 
         if self.options.raw:
-            blob_ir, = self.parent.export()
+            blob_ir = self.parent.export()
         else:
             from sparcur import export as ex
-            blob_ir = self._export(ex.ExportMBF).latest_export  # FIXME need to load?
+            blob_ir = self._export(ex.ExportXml).latest_export  # FIXME need to load?
 
-        mbf_types = tuple(c.mimetype for c in (mbf.ExtractMBF, mbf.ExtractNeurolucida))
+        mbf_types = tuple(c.mimetype for c in (exml.ExtractMBF, exml.ExtractNeurolucida))
         key = lambda p: (p[2], not p[0], p[1])
         all_conts = sorted(set(((OntId(c['id_ontology'])
                                  if 'id_ontology' in c else

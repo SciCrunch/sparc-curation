@@ -119,13 +119,11 @@ class ExportBase:
         raise NotImplementedError('implement in subclass')
 
 
-class ExportMBF(ExportBase):
+class ExportXml(ExportBase):
+    """ convert and export metadata embedded in xml files """
 
-    export_type = 'mbf'
-    filename_ir = 'mbf-export.json'
-
-    latest_mbf_path = ExportBase.latest_export_path
-    latest_mbf = ExportBase.latest_export
+    export_type = 'filetype'
+    filename_ir = 'xml-export.json'
 
     def export(self, dataset_paths=tuple(), **kwargs):
         return super().export(dataset_paths=dataset_paths, **kwargs)
@@ -134,39 +132,33 @@ class ExportMBF(ExportBase):
         pass
 
     def make_ir(self, dataset_paths=tuple(), jobs=None, debug=False):
-        from sparcur import mbf
-        def do_mbf_metadata(local, id):  # FIXME HACK needs its own pipeline
+        from sparcur.extract import xml as exml
+        def do_xml_metadata(local, id):  # FIXME HACK needs its own pipeline
             local_xmls = list(local.rglob('*.xml'))
             if any(p for p in local_xmls if not p.exists()):
                 raise BaseException('unfetched children')
 
-            #embfs = {x:mbf.ExtractMBF(x) for x in local_xmls}
-            #blob = {x:e.asDict() for x, e in embfs.items()}
-            # FIXME WARNING the memory usage on a etree.parse inside of
-            # ExtractMBF is HUGE ~100mb per file (WAT) which seems utterly insane
-            # for now we work around this by calling asDict() immedately
-            # it might be something else causing the issue but seriously wtf
             blob = {'type': 'all-xml-files',
                     'dataset_id': id,
                     'xml': tuple()}
             blob['xml'] = [{'path': x.relative_to(local).as_posix(),
-                            'type': e.xmlType,  # FIXME should this in the extracted ??
-                            'extracted': e.asDict() if e.xmlType else None}
+                            'type': e.mimetype,  # FIXME should this in the extracted ??
+                            'extracted': e.asDict() if e.mimetype else None}
                            for x in local_xmls
-                           for e in (mbf.ExtractXml(x),)]
+                           for e in (exml.ExtractXml(x),)]
 
             return blob
 
         if jobs == 1 or debug:
             dataset_dict = {}
             for dataset in dataset_paths:
-                blob = do_mbf_metadata(dataset.local, dataset.id)
+                blob = do_xml_metadata(dataset.local, dataset.id)
                 dataset_dict[dataset.id] = blob
         else:
             # 3.7 0m25.395s, pypy3 fails iwth unpickling error
             from joblib import Parallel, delayed
             from joblib.externals.loky import get_reusable_executor
-            hrm = Parallel(n_jobs=9)(delayed(do_mbf_metadata)
+            hrm = Parallel(n_jobs=9)(delayed(do_xml_metadata)
                                      (dataset.local, dataset.id)
                                      for dataset in dataset_paths)
             get_reusable_executor().shutdown()  # close the loky executor to clear memory

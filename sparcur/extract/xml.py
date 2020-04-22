@@ -2,9 +2,9 @@ import pathlib
 #from xml.etree import ElementTree as etree  # pypy3 2m18.445s  # 3.7 1m56.417s  # WAT
 from lxml import etree  # python3.7 0m38.388s
 from pyontutils.utils import subclasses
-from . import schemas as sc
-from .core import HasErrors
-from .utils import log, logd
+from .. import schemas as sc
+from ..core import HasErrors
+from ..utils import log, logd
 
 if etree.__name__ == 'lxml.etree':
     parser = etree.XMLParser(
