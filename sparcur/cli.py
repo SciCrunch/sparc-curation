@@ -1695,11 +1695,11 @@ class Report(Dispatcher):
         # cells
         # subcelluar
         import rdflib
-        from sparcur import export as ex
         # FIXME cache these results and only recompute if latest changes?
         if self.options.raw:
             graph = self.summary.triples_exporter.graph
         else:
+            from sparcur import export as ex  # FIXME very slow to import
             graph = OntGraph()
             self._export(ex.Export).latest_export_ttl_populate(graph)
 
@@ -1707,7 +1707,9 @@ class Report(Dispatcher):
         skipped_prefixes = set()
         for t in graph:
             for e in t:
-                if isinstance(e, rdflib.URIRef):
+                if (isinstance(e, rdflib.URIRef) and
+                    not e.startswith('info:') and
+                    not e.startswith('doi:')):
                     oid = OntId(e)
                     if oid.prefix in want_prefixes:
                         objects.add(oid)
