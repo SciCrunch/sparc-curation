@@ -3,4 +3,4 @@ from .disco import disco
 from .triples import (TriplesExportDataset,
                       TriplesExportIdentifierMetadata,
                       TriplesExportSummary)
-from .core import Export
+from .core import Export, ExportMBF

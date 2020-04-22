@@ -17,7 +17,7 @@ Usage:
     spc report   terms   [anatomy cells subcelluar] [options]
     spc report   [access filetypes pathids test]    [options]
     spc report   [completeness keywords subjects]   [options]
-    spc report   [contributors samples errors]      [options]
+    spc report   [contributors samples errors mbf]  [options]
     spc shell    [affil integration protocols exit] [options]
     spc server   [options]
     spc apinat   [options] <path-in> <path-out>
@@ -174,6 +174,7 @@ Options:
 from time import time
 start = time()
 
+import os
 import re
 import sys
 import json
@@ -247,24 +248,29 @@ class Options(clif.Options):
     def rate(self):
         return int(self.args['--rate']) if self.args['--rate'] else None
 
+    @property
+    def mbf(self):
+        # deal with the fact that both mbf and --mbf are present
+        return self.args['--mbf'] or self._default_mbf
+
 
 class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
                  '.~lock',)
 
-    def _export(self, ex, export_source_path=None):
+    def _export(self, export_class, export_source_path=None):
 
         if export_source_path is None:
             export_source_path = self.cwd
 
         export_source_path = self.cwd
-        export = ex.Export(self.options.export_path,
-                           export_source_path,
-                           self._folder_timestamp,
-                           self._timestamp,
-                           self.options.latest,
-                           self.options.partial,
-                           self.options.open,)
+        export = export_class(self.options.export_path,
+                              export_source_path,
+                              self._folder_timestamp,
+                              self._timestamp,
+                              self.options.latest,
+                              self.options.partial,
+                              self.options.open,)
         return export
 
     def _print_table(self, rows, title=None, align=None, ext=None):
@@ -312,6 +318,10 @@ class Dispatcher(clif.Dispatcher):
         else:
             key = lambda ps: ps
 
+        def derp(p):
+            if p.cache is None:
+                raise exc.NoCachedMetadataError(p)
+
         rows = [['Path', 'size', '?'],
                 *((p, s.hr
                    if isinstance(s, FileSize) else
@@ -322,7 +332,7 @@ class Dispatcher(clif.Dispatcher):
                                 if p.cache.meta.size else
                                 '??')
                                if p.cache.meta else '_')]
-                          for p in paths), key=key))]
+                          for p in paths if not derp(p)), key=key))]
         self._print_table(rows, title)
 
 
@@ -335,6 +345,7 @@ class Main(Dispatcher):
                         'summary',
                         'cwd',
                         'cwdintr',
+                        '_datasets_with_extension',
                         '_timestamp',
                         '_folder_timestamp',)
 
@@ -807,20 +818,18 @@ class Main(Dispatcher):
             for path in self._not_dirs:
                 path.cache.refresh(update_data=fetch, size_limit_mb=limit)
 
-    @property
-    def _datasets_mbf(self):
-        """ FIXME HACK """
-        has_mbf_xml = [
-            'N:dataset:bec4d335-9377-4863-9017-ecd01170f354',
-            'N:dataset:0170271a-8fac-4769-a8f5-2b9520291d03',
-            'N:dataset:f58c75a2-7d86-439a-8883-e9a4ee33d7fa',
-            'N:dataset:ded103ed-e02d-41fd-8c3e-3ef54989da81',
-            'N:dataset:e4bfb720-a367-42ab-92dd-31fd7eefb82e',
-            'N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e',
-            'N:dataset:b225fa8a-9eb5-4716-8399-0f7fac9c2b64',
-            'N:dataset:e19b9b69-6776-427a-92f4-6b03f395d01f',
-        ]
-        datasets = [d for d in self.datasets if d.id in has_mbf_xml]
+    def _datasets_with_extension(self, extension):
+        """ Hack around the absurd slowness of python's rglob """
+
+        command = fr"""for d in */; do
+    find "$d" \( -type l -o -type f \) -name '*.{extension}' \
+    -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
+done"""
+        with os.popen(command) as p:
+            string = p.read()
+
+        has_extension = string.split('\n')
+        datasets = [d for d in self.datasets if d.id in has_extension]
         return datasets
 
     def _fetch_mbf(self):
@@ -830,7 +839,7 @@ class Main(Dispatcher):
             Async(rate=5)(deferred(x.fetch)(size_limit_mb=None)
                           for x in xmls if not x.exists())
 
-        for dataset in self._datasets_mbf:
+        for dataset in self._datasets_with_extension('xml'):
             fetch_mbf_metadata(dataset)
 
     def fetch(self):
@@ -847,10 +856,14 @@ class Main(Dispatcher):
         hz = self.options.rate
         Async(rate=hz)(deferred(path.cache.fetch)(
             size_limit_mb=self.options.limit)
-                       for path in paths)
+                       for path in paths
+                       if not path.exists()
+                       # FIXME need a staging area ...
+                       # FIXME also, the fact that we sometimes need content_different
+                       # means that there may be silent fetch failures
+                       or path.content_different())
 
     def export(self):
-
         from sparcur import export as ex  # FIXME very slow to import
 
         # FIXME export should be able to run without needing any external
@@ -861,78 +874,30 @@ class Main(Dispatcher):
 
         if self.options.schemas:
             ex.export_schemas(self.options.export_path)
-            return
 
         elif self.options.mbf:
-            from sparcur import mbf
-            from sparcur.core import JEncode
-            def do_mbf_metadata(local):  # FIXME HACK needs its own pipeline
-                local_xmls = list(local.rglob('*.xml'))
-                if any(p for p in local_xmls if not p.exists()):
-                    raise BaseException('unfetched children')
+            export = self._export(ex.ExportMBF)
+            dataset_paths = self._datasets_with_extension('xml')
+            blob_ir, *rest = export.export(dataset_paths=dataset_paths,
+                                           jobs=self.options.jobs,
+                                           debug=self.options.debug)
 
-                #embfs = {x:mbf.ExtractMBF(x) for x in local_xmls}
-                #blob = {x:e.asDict() for x, e in embfs.items()}
-                # FIXME WARNING the memory usage on a etree.parse inside of
-                # ExtractMBF is HUGE ~100mb per file (WAT) which seems utterly insane
-                # for now we work around this by calling asDict() immedately
-                # it might be something else causing the issue but seriously wtf
-                blob = {x:mbf.ExtractMBF(x).asDict() for x in local_xmls}
-                return blob
+            return blob_ir
 
-            if self.options.jobs == 1 or self.options.debug:
-                dataset_dict = {}
-                for dataset in self._datasets_mbf:
-                    blob = do_mbf_metadata(dataset.local)
-                    dataset_dict[dataset.id] = blob
-            else:
-                # 3.7 0m25.395s, pypy3 fails iwth unpickling error
-                from joblib import Parallel, delayed
-                from joblib.externals.loky import get_reusable_executor
-                hrm = Parallel(n_jobs=9)(delayed(do_mbf_metadata)
-                                         (dataset.local)
-                                         for dataset in self._datasets_mbf)
-                get_reusable_executor().shutdown()  # close the loky executor to clear memory
-                dataset_dict = {d:b for d, b in zip(self._datasets_mbf, hrm)}
-
-            with open(Path(self.options.export_path) / 'mbf-export-test.json', 'wt') as f:
-                json.dump(dataset_dict, f, indent=2, sort_keys=True)
-
-            # and yet somehow the thing is STILL using 4 gigs of memory for a 1mb output
-            sigh = FileSize(len(json.dumps({str(k):v
-                                            if not isinstance(v, dict) else
-                                            {str(k):v for k, v in v.items()}
-                                            for k, v in dataset_dict.items()},
-                                           cls=JEncode)))
-
-            key = lambda p: (not p[0], p[1])
-            all_conts = sorted(set(((OntId(c['id_ontology'])
-                                     if 'id_ontology' in c else
-                                     ''),
-                                    c['name'])
-                                   for file_dict in dataset_dict.values()
-                                   for metadata_blob in file_dict.values()
-                                   if 'contours' in metadata_blob
-                                   for c in metadata_blob['contours']),
-                               key=key)
-
-            #if self.options.server:
-            self._print_table([['id', 'name']] + all_conts, title='all MBF contours')
-            #breakpoint()
-            #_ = [print(f'{a.curie if a else a:<15}{b}') for a, b in all_conts]
-            #ex.export_mbf(self.options.export_path)
-            return
-
-        export = self._export(ex)
-        int_or_sum = export.export(dataset_paths=tuple(self.paths))
+        else:
+            export = self._export(ex.Export)
+            blob_ir, *rest = export.export(dataset_paths=tuple(self.paths))
 
         if self.options.debug:
             breakpoint()
 
     def annos(self):
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export().latest_export)
+        if self.options.raw:
+            data = self.summary.data()
+        else:
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_export
+
         dataset_blobs = data['datasets']
 
         from protcur.analysis import protc, Hybrid
@@ -1245,7 +1210,8 @@ class Main(Dispatcher):
             self.dataset_index = {d.meta.id:Integrator(d)
                                   for d in self.datasets}
         else:
-            data = self._export().latest_export
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_export
             self.dataset_index = {d['id']:d for d in data['datasets']}
 
         report = Report(self)
@@ -1403,9 +1369,12 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Access Report', ext=ext)
 
     def contributors(self, ext=None):
-        data = (self.summary.data_for_export(UTCNOWISO())
-                if self.options.raw else
-                self._export().latest_export)
+        if self.options.raw:
+            data = self.summary.data_for_export(UTCNOWISO())
+        else:
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_export
+
         datasets = data['datasets']
         unique = {c['id']:c for d in datasets
                   if 'contributors' in d
@@ -1528,9 +1497,12 @@ class Report(Dispatcher):
                                  ext=ext)
 
     def samples(self, ext=None):
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export().latest_export)
+        if self.options.raw:
+            data = self.summary.data()
+        else:
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_export
+
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -1546,9 +1518,12 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Samples Report', ext=ext)
 
     def subjects(self, ext=None):
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export().latest_export)
+        if self.options.raw:
+            data = self.summary.data()
+        else:
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_export
+
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -1567,7 +1542,8 @@ class Report(Dispatcher):
         if self.options.raw:
             raw = self.summary.completeness
         else:
-            datasets = self._export().latest_export['datasets']
+            from sparcur import export as ex
+            datasets = self._export(ex.Export).latest_export['datasets']
             raw = [self.summary._completeness(data) for data in datasets]
 
         def rformat(i, si, ci, ei, name, id, award, organ):
@@ -1606,9 +1582,10 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Completeness Report', ext=ext)
 
     def keywords(self, ext=None):
+        from sparcur import export as ex
         data = (self.summary.data()
                 if self.options.raw else
-                self._export().latest_export)
+                self._export(ex.Export).latest_export)
         datasets = data['datasets']
         _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
                         key=lambda v: -len(v))
@@ -1643,7 +1620,8 @@ class Report(Dispatcher):
         if self.options.raw:
             self.summary.data()['datasets']
         else:
-            datasets = self._export().latest_export['datasets']
+            from sparcur import export as ex
+            datasets = self._export(ex.Export).latest_export['datasets']
 
         if self.cwd != self.anchor:
             id = self.cwd.cache.dataset.id
@@ -1682,17 +1660,48 @@ class Report(Dispatcher):
         )
         return self._print_table(rows, title='Path identifiers', ext=ext)
 
+    def mbf(self, ext=None):
+        from sparcur import mbf
+
+        def settype(mimetype):
+            return {mbf.ExtractMBF.mimetype: 'MBF Metadata',
+                    mbf.ExtractNeurolucida.mimetype: 'Neurolucida',}[mimetype]
+
+        if self.options.raw:
+            blob_ir, = self.parent.export()
+        else:
+            from sparcur import export as ex
+            blob_ir = self._export(ex.ExportMBF).latest_export  # FIXME need to load?
+
+        mbf_types = tuple(c.mimetype for c in (mbf.ExtractMBF, mbf.ExtractNeurolucida))
+        key = lambda p: (p[2], not p[0], p[1])
+        all_conts = sorted(set(((OntId(c['id_ontology'])
+                                 if 'id_ontology' in c else
+                                 ''),
+                                c['name'],
+                                settype(metadata_blob['type']))
+                               for dataset_xml in blob_ir.values()
+                               if dataset_xml['type'] == 'all-xml-files'  # FIXME
+                               for metadata_blob in dataset_xml['xml']
+                               if metadata_blob['type'] in mbf_types and
+                               'contours' in metadata_blob['extracted']
+                               for c in metadata_blob['extracted']['contours']),
+                           key=key)
+        return self._print_table([['id', 'name', 'metadata source']] + all_conts,
+                                 title='Unique MBF contours')
+
     def terms(self, ext=None):
         # anatomy
         # cells
         # subcelluar
         import rdflib
+        from sparcur import export as ex
         # FIXME cache these results and only recompute if latest changes?
         if self.options.raw:
             graph = self.summary.triples_exporter.graph
         else:
             graph = OntGraph()
-            self._export().latest_export_ttl_populate(graph)
+            self._export(ex.Export).latest_export_ttl_populate(graph)
 
         objects = set()
         skipped_prefixes = set()
@@ -1787,7 +1796,7 @@ class Shell(Dispatcher):
             #triples = list(f.triples)
 
         try:
-            latest_datasets = self._export().latest_export['datasets']
+            latest_datasets = self._export(None).latest_export['datasets']
         except:
             pass
 

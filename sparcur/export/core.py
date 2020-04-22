@@ -11,7 +11,7 @@ from pyontutils.utils import Async, deferred
 from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
-from sparcur.core import JEncode, adops
+from sparcur.core import JEncode, JFixKeys, adops
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge, logd
 
@@ -27,7 +27,10 @@ def export_schemas(export_path):
         s.export(sb)
 
 
-class Export:
+class ExportBase:
+
+    export_type = None
+    filename_ir = None
 
     def __init__(self,
                  export_path,
@@ -38,12 +41,23 @@ class Export:
                  partial=False,
                  open_when_done=False,):
         self.export_source_path = export_source_path
-        self.export_base = Path(export_path, export_source_path.cache.anchor.id)
+        self.export_base = Path(export_path, export_source_path.cache.anchor.id, self.export_type)
         self.latest = latest
         self.partial = partial
         self.folder_timestamp = folder_timestamp
         self.timestamp = timestamp
         self.open_when_done = open_when_done
+
+    @staticmethod
+    def make_dump_path(dump_path):
+        if not dump_path.exists():
+            dump_path.mkdir(parents=True)
+
+    @staticmethod
+    def write_json(filepath, blob):
+        # FIXME we still create a new export folder every time even if the json didn't change ...
+        with open(filepath.with_suffix('.json'), 'wt') as f:
+            json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
     @property
     def LATEST_PARTIAL(self):
@@ -59,20 +73,121 @@ class Export:
         return self.export_base / 'LATEST_RUN'
 
     @property
+    def base_path(self):
+        return self.LATEST_PARTIAL if self.partial else self.LATEST
+
+    @property
+    def latest_export_path(self):
+        return self.base_path / self.filename_ir
+
+    @property
     def latest_export(self):
-        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
-        with open(base_path / 'curation-export.json', 'rt') as f:
+        with open(self.latest_export_path, 'rt') as f:
             return json.load(f)
 
     @property
+    def dump_path(self):
+        return self.export_base / self.folder_timestamp
+
+    @property
+    def filepath_ir(self):
+        return self.dump_path / self.filename_ir
+
+    def export(self, *args, **kwargs):
+        dump_path = self.dump_path
+        # make the dump directory
+        self.make_dump_path(dump_path)
+        symlink_latest(dump_path, self.LATEST_RUN)
+
+        filepath_ir = self.filepath_ir
+        # build or load the export of the internal representation
+        blob_ir, *rest_ir = self.make_ir(**kwargs)
+        self.write_json(filepath_ir, blob_ir)
+        symlink_latest(dump_path, self.LATEST_PARTIAL)
+
+        # build or load derived exports
+        self.export_other_formats(dump_path, filepath_ir, blob_ir, *rest_ir)
+        symlink_latest(dump_path, self.LATEST)
+
+        return (blob_ir, *rest_ir)  # FIXME :/
+
+    def make_ir(self, *args, **kwargs):
+        raise NotImplementedError('implement in subclass')
+
+    def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
+        """ explicitly make this a noop if there aren't other formats you care about """
+        raise NotImplementedError('implement in subclass')
+
+
+class ExportMBF(ExportBase):
+
+    export_type = 'mbf'
+    filename_ir = 'mbf-export.json'
+
+    latest_mbf_path = ExportBase.latest_export_path
+    latest_mbf = ExportBase.latest_export
+
+    def export(self, dataset_paths=tuple(), **kwargs):
+        return super().export(dataset_paths=dataset_paths, **kwargs)
+
+    def export_other_formats(self, *args, **kwargs):
+        pass
+
+    def make_ir(self, dataset_paths=tuple(), jobs=None, debug=False):
+        from sparcur import mbf
+        def do_mbf_metadata(local, id):  # FIXME HACK needs its own pipeline
+            local_xmls = list(local.rglob('*.xml'))
+            if any(p for p in local_xmls if not p.exists()):
+                raise BaseException('unfetched children')
+
+            #embfs = {x:mbf.ExtractMBF(x) for x in local_xmls}
+            #blob = {x:e.asDict() for x, e in embfs.items()}
+            # FIXME WARNING the memory usage on a etree.parse inside of
+            # ExtractMBF is HUGE ~100mb per file (WAT) which seems utterly insane
+            # for now we work around this by calling asDict() immedately
+            # it might be something else causing the issue but seriously wtf
+            blob = {'type': 'all-xml-files',
+                    'dataset_id': id,
+                    'xml': tuple()}
+            blob['xml'] = [{'path': x.relative_to(local).as_posix(),
+                            'type': e.xmlType,  # FIXME should this in the extracted ??
+                            'extracted': e.asDict() if e.xmlType else None}
+                           for x in local_xmls
+                           for e in (mbf.ExtractXml(x),)]
+
+            return blob
+
+        if jobs == 1 or debug:
+            dataset_dict = {}
+            for dataset in dataset_paths:
+                blob = do_mbf_metadata(dataset.local, dataset.id)
+                dataset_dict[dataset.id] = blob
+        else:
+            # 3.7 0m25.395s, pypy3 fails iwth unpickling error
+            from joblib import Parallel, delayed
+            from joblib.externals.loky import get_reusable_executor
+            hrm = Parallel(n_jobs=9)(delayed(do_mbf_metadata)
+                                     (dataset.local, dataset.id)
+                                     for dataset in dataset_paths)
+            get_reusable_executor().shutdown()  # close the loky executor to clear memory
+            dataset_dict = {d.id:b for d, b in zip(dataset_paths, hrm)}
+
+        blob_ir = dataset_dict
+        return blob_ir,
+
+
+class Export(ExportBase):
+
+    export_type = 'integrated'
+    filename_ir = 'curation-export.json'
+
+    @property
     def latest_ttl_path(self):
-        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
-        return base_path / 'curation-export.ttl'
+        return self.latest_export_path.with_suffix('.ttl')
 
     @property
     def latest_protocols_path(self):
-        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
-        return base_path / 'protocols.json'
+        return self.base_path / 'protocols.json'
 
     @property
     def latest_protocols(self):
@@ -81,8 +196,7 @@ class Export:
 
     @property
     def latest_id_met_path(self):
-        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
-        return base_path / 'identifier-metadata.json'
+        return self.base_path / 'identifier-metadata.json'
 
     @property
     def latest_id_met(self):
@@ -91,13 +205,11 @@ class Export:
 
     @property
     def latest_datasets_path(self):
-        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
-        return base_path / 'datasets'
+        return self.base_path / 'datasets'
 
     def latest_export_ttl_populate(self, graph):
-        base_path = self.LATEST_PARTIAL if self.partial else self.LATEST
         # intentionally fail if the ttl export failed
-        lce = (base_path / 'curation-export.ttl').as_posix()
+        lce = self.latest_ttl_path.as_posix()
         return graph.parse(lce, format='ttl')
 
     def export_single_dataset(self):
@@ -274,34 +386,34 @@ class Export:
             return self.export_single_dataset()  # FIXME unused
 
         else:
-            return self.export_datasets(dataset_paths=dataset_paths)
+            return super().export(dataset_paths=dataset_paths)
 
-    def export_datasets(self, dataset_paths=tuple()):
-        # start time not end time ...
-        # obviously not transactional ...
-        filename = 'curation-export'
-        dump_path = self.export_base / self.folder_timestamp
-        if not dump_path.exists():
-            dump_path.mkdir(parents=True)
+    def make_ir(self, dataset_paths=tuple()):
+        """ build the internal representation """
+        # FIXME inversion of control would be nice here :/
+        # FIXME this should really be coming from a fully
+        # factored pipeline end without all the insane hidden state
 
-        symlink_latest(dump_path, self.LATEST_RUN)
-
-        filepath = dump_path / filename
+        # previous latest must be stored to a variable before
+        # symlink_latest of LATEST_PARTIAL otherwise export_other_formats
+        # that need access to partial export of other things beyond
+        # just the internal representation will fail i.e. there are
+        # multiple possible partial stages but we only explicitly track
+        # the one that corresponds to export_ir
+        previous_latest = self.latest_datasets_path.resolve()
 
         # data
-        summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths)  # FIXME implicit state set by cli
+        # FIXME Summary has implicit state set by cli
+        summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths)
         blob_data = (self.latest_export if
                      self.latest else
                      summary.data_for_export(self.timestamp))
 
-        # FIXME we still create a new export folder every time even if the json didn't change ...
-        with open(filepath.with_suffix('.json'), 'wt') as f:
-            json.dump(blob_data, f, sort_keys=True, indent=2, cls=JEncode)
+        return blob_data, summary, previous_latest
 
-        previous_latest = self.latest_datasets_path.resolve()
-        symlink_latest(dump_path, self.LATEST_PARTIAL)
-
-        dataset_blobs = blob_data['datasets']
+    def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
+        summary, previous_latest = rest
+        dataset_blobs = blob_ir['datasets']
 
         # identifier metadata
         blob_id_met = self.export_identifier_metadata(dump_path, dataset_blobs)
@@ -312,16 +424,13 @@ class Export:
 
         # rdf
         teds = self.export_rdf(dump_path, previous_latest, dataset_blobs)
-        tes = ex.TriplesExportSummary(blob_data, teds=teds + [teim])
+        tes = ex.TriplesExportSummary(blob_ir, teds=teds + [teim])
 
-        with open(filepath.with_suffix('.ttl'), 'wb') as f:
+        with open(filepath_ir.with_suffix('.ttl'), 'wb') as f:
             f.write(tes.ttl)
 
         # xml
-        self.export_xml(filepath, dataset_blobs)
+        self.export_xml(filepath_ir, dataset_blobs)
 
         # disco
-        self.export_disco(filepath, dataset_blobs, teds)
-
-        symlink_latest(dump_path, self.LATEST)
-        return summary
+        self.export_disco(filepath_ir, dataset_blobs, teds)

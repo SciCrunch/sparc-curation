@@ -383,6 +383,11 @@ class MbfTracingSchema(JSONSchema):
                                           },},},}
 
 
+class NeurolucidaSchema(JSONSchema):
+    schema = copy.deepcopy(MbfTracingSchema.schema)
+    schema['required'] = ['images', 'contours']
+
+
 class DatasetStructureSchema(JSONSchema):
     __schema = {'type': 'object',
                 'required': ['submission_file', 'dataset_description_file'],

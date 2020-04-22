@@ -175,25 +175,45 @@ def lj(j):
     return '\n' + json.dumps(j, indent=2, cls=JEncode)
 
 
+def json_export_type_converter(obj):
+    if isinstance(obj, deque):
+        return list(obj)
+    elif isinstance(obj, ProtcurExpression):
+        return obj.json()
+    elif isinstance(obj, PurePath):
+        return obj.as_posix()
+    elif isinstance(obj, Quantity):
+        return obj.json()
+    elif isinstance(obj, idlib.Stream):
+        return obj.identifier
+    elif isinstance(obj, datetime):
+        return isoformat(obj)
+
+
 class JEncode(json.JSONEncoder):
+
     def default(self, obj):
-        if isinstance(obj, deque):
-            return list(obj)
-        elif isinstance(obj, ProtcurExpression):
-            return obj.json()
-        elif isinstance(obj, PurePath):
-            return obj.as_posix()
-        elif isinstance(obj, Quantity):
-            return obj.json()
-        elif isinstance(obj, idlib.Stream):
-            return obj.identifier
-        elif isinstance(obj, datetime):
-            return isoformat(obj)
+        new_obj = json_export_type_converter(obj)
+        if new_obj is not None:
+            return new_obj
         #else:
             #log.critical(f'{type(obj)} -> {obj}')
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
+
+
+def JFixKeys(obj):
+    def jetc(o):
+        out = json_export_type_converter(o)
+        return out if out else o
+
+    if isinstance(obj, dict):
+        return {jetc(k): JFixKeys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [JFixKeys(v) for v in obj]
+    else:
+        return obj
 
 
 def zipeq(*iterables):

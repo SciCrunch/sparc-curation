@@ -52,6 +52,8 @@ mains = {'cli-real': [['spc', 'clone', test_organization],
                       ['spc', 'pull'],
                       ['spc', 'refresh'],
                       ['spc', 'fetch'],
+                      ['spc', 'fetch', '--mbf'],  # FIXME abstract --mbf
+                      ['spc', 'fetch', '--mbf', '-j', '1'],
                       #['spc', 'report', 'access'],  # TODO no easy way to test this ...
                       ['spc', 'rmeta'],],
          'cli': [['spc', 'find', '--name', '*.xlsx'],
