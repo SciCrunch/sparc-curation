@@ -319,47 +319,55 @@ class ExtractLAS(XmlSource):
 
 
 class ExtractPVScan(XmlSource):
-    """ Not sure exactly what this is or where it comes from.
-        Internal format for these or something?
-        https://github.com/swharden/Scan-A-Gator
-        https://github.com/swharden/ROI-Analysis-Pipeline
-    """
+    """ Format for proprietary Prairie View Software made by Bruker Corporation
+        Version matters for parsing.
+        See https://www.openmicroscopy.org/community/viewtopic.php?f=13&t=7534
+        Google search results are garbage when searching from the tags and
+        for Prairie View without additional qualifiers specifically software or
+        microscopy."""
 
     top_tag = 'PVScan'  # probably not sufficient ...
-    mimetype = 'application/vnd.unknown.pvscan+xml'  # TODO
+    mimetype = 'application/vnd.bruker.pvscan+xml'  # TODO
 
     def _extract(self):
         # TODO nothing of obvious relevance for metadata
         return {}
 
-class ExtractVrecSE(XmlSource):
+class ExtractPVVrecSE(XmlSource):
+    """ An auxillary Prairie View file that is referenced from the main PVSync
+        record in the VoltageRecording section """
 
     top_tag = 'VRecSessionEntry'
-    mimetype = 'application/vnd.unknown.vrecsessionentry+xml'  # TODO
+    mimetype = 'application/vnd.bruker.vrecsessionentry+xml'  # TODO
 
     def _extract(self):
         # TODO nothing of obvious relevance for metadata
         return {}
 
 
-class ExtractExperimentThing(XmlSource):
+class ExtractPVExperiment(XmlSource):
+    """ An auxillary Prairie View file that is referenced from the main PVSync
+        record in the VoltageOutput section """
 
     # TODO FIXME gonna need some additional context from somewhere
     # xml files like these (missing xmlns) should flag a warning for
     # bad (solipsistic) data management practices
 
     top_tag = 'Experiment'  # very helpful xml schema creator guy >_<
-    mimetype = 'application/vnd.unknown.experimentthing+xml'  # TODO
+    mimetype = 'application/vnd.bruker.experiment+xml'  # TODO
 
     def _extract(self):
         # TODO nothing of obvious relevance for metadata
         return {}
 
 
-class ExtractMETADATALOL(XmlSource):
+class ExtractZISRAWSUBBLOCK_METADATA(XmlSource):
+    """ This is xml extracted from xml embedded in a
+        ZISRAWSUBBLOCK section of a Zeiss czi file """
 
     top_tag = 'METADATA'  # LOL OH WOW >_< this just keeps getting better
-    mimetype = 'application/vnd.unknown.METADATALOL+xml'  # TODO
+    
+    mimetype = 'application/vnd.zeiss.czi.ZISRAWSUBBLOCK.METADATA+xml'  # TODO
 
     def _extract(self):
         # TODO has time information and stage and focus

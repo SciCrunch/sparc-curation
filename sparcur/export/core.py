@@ -135,8 +135,10 @@ class ExportXml(ExportBase):
         from sparcur.extract import xml as exml
         def do_xml_metadata(local, id):  # FIXME HACK needs its own pipeline
             local_xmls = list(local.rglob('*.xml'))
-            if any(p for p in local_xmls if not p.exists()):
-                raise BaseException('unfetched children')
+            missing = [p.as_posix() for p in local_xmls if not p.exists()]
+            if missing:
+                oops = "\n".join(missing)
+                raise BaseException(f'unfetched children\n{oops}')
 
             blob = {'type': 'all-xml-files',
                     'dataset_id': id,
