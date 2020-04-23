@@ -2,7 +2,6 @@ import tempfile
 from pathlib import Path
 import orthauth as oa
 
-#auth = oa.configure(oa.crpath(__file__, 'auth-config.py'))
 auth = oa.configure_here('auth-config.py', __name__)
 
 
