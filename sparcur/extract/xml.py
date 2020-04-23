@@ -151,12 +151,12 @@ class XmlSource(HasErrors):
 
         return xpath
 
-    def asDict(self):  # FIXME data vs asDict
-        data_in = self._condense()
+    def asDict(self, *args, **kwargs):  # FIXME data vs asDict
+        data_in = self._condense(*args, **kwargs)
         self.embedErrors(data_in)
         return data_in
 
-    def _condense(self):
+    def _condense(self, *args, **kwargs):
         et = tuple()
         if hasattr(self.asDict, 'schema'):
             _schema = self.asDict.schema.schema
@@ -195,7 +195,7 @@ class XmlSource(HasErrors):
             else:
                 return thing
 
-        data_in = self._extract()
+        data_in = self._extract(*args, **kwargs)
         data_out = condense(data_in)
         for k, v in tuple(data_out.items()):
             if not v:
@@ -203,7 +203,7 @@ class XmlSource(HasErrors):
 
         return data_out
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         raise NotImplementedError('implement in subclasses')
 
 
@@ -215,17 +215,29 @@ class ExtractMBF(XmlSource):
     mimetype = 'application/vnd.mbfbioscience.metadata+xml'
 
     @hasSchema.f(sc.MbfTracingSchema)
-    def asDict(self):
-        return super().asDict()
+    def asDict(self, unique=True, guid=False):
+        return self._condense(unique=unique, guid=guid)
 
-        data_in = self._condense()
-        #id = self.path.cache.uri_api
-        #data_in['id'] = id  # FIXME how to approach file level metadata and manifest information
-        # TODO
-        self.embedErrors(data_in)
+    def _condense(self, unique=True, guid=False):
+        data_in = super()._condense(unique=unique, guid=guid)
+        if 'contours' in data_in:
+            if not guid:
+                # remove guid fields if present
+                # option to retain if a use case for this appears
+                for c in data_in['contours']:
+                    c.pop('guid', None)
+
+            if unique:
+                # by default only store uniquely identified contours,
+                # they may be identified by their list index but we
+                # don't need that for this part of the metadata
+                data_in['contours'] = [dict(s) for s in
+                                       set(frozenset(d.items())
+                                           for d in data_in['contours'])]
+
         return data_in
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         subject = {
             'id':      self.xpath('_:sparcdata/_:subject/@subjectid'),
             'species': self.xpath('_:sparcdata/_:subject/@species'),
@@ -276,10 +288,10 @@ class ExtractNeurolucida(ExtractMBF):
     mimetype = 'application/vnd.mbfbioscience.neurolucida+xml'
 
     @hasSchema.f(sc.NeurolucidaSchema)
-    def asDict(self):
+    def asDict(self, unique=True, guid=False):
         # pretty sure we can't use super().asDict() here because
         # the schemas will fight with eachother
-        data_in = self._condense()
+        data_in = self._condense(unique=unique, guid=guid)
         self.embedErrors(data_in)
         return data_in
 
