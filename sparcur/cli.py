@@ -1321,7 +1321,7 @@ done"""
             blobs = [d() for d in  prepared]
 
     def make_url(self):
-        lu = {d.id:d for d in self.datasets_local}
+        lu = {d.cache.id:d.cache for d in self.datasets_local}
         for iop in self.options.id_or_path:
             if iop.startswith('N:dataset:'):
                 cache = lu[iop]
