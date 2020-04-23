@@ -883,27 +883,25 @@ jq -r '[ .datasets[] |
 :PROPERTIES:
 :VISIBILITY: folded
 :END:
-Get a list of all file extensions for symlinks (usually data)
+***** List all file extensions
+Get a list of all file extensions.
 #+begin_src bash
-find -type l | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
+find -type l -o -type f | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
 #+end_src
-
-Find datasets with unknown file types.
-#+begin_src bash
-find -name '*.roi' -exec spc meta --context --uri {} \+
-#+end_src
-
+***** Get ids with files matching a specific extension
 Arbitrary information about a dataset with files matching a pattern.
 The example here gives ids for all datasets that contain xml files.
 Nesting =find -exec= does not work so the first pattern here uses shell
 globing to get the datasets.
 #+begin_src bash
-for d in */; do
-    find "$d" \( -type l -o -type f \) -name '*.xml' \
-    -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
-done
+function datasets-matching () {
+    for d in */; do
+        find "$d" \( -type l -o -type f \) -name "*.$1" \
+        -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
+    done
+}
 #+end_src
-
+***** Fetch files matching a specific pattern
 Fetch files that have zero size (indication that fetch is broken).
 #+begin_src bash
 find -type f -name '*.xml' -empty -exec spc fetch {} \+
