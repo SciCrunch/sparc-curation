@@ -30,6 +30,7 @@ Usage:
     spc goto     <remote-id>
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
+    spc make-url [options] [<id-or-path>...]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -120,6 +121,7 @@ Commands:
                 mismatch
                 duplicates
     stash       stash a copy of the specific files and their parents
+    make-url    return urls for blackfynn dataset ids, or paths
 
 Options:
     -f --fetch              fetch matching files
@@ -398,12 +400,16 @@ class Main(Dispatcher):
               self.options.mismatch or
               self.options.stash or
               self.options.contributors or
+              self.options.make_url or
               self.options.missing):
             Integrator.no_google = True
 
         self._setup_local()  # if this isn't run up here the internal state of the program get's wonky
 
-        if self.options.report and not self.options.raw and not self.options.access:
+        if (self.options.make_url or
+            (self.options.report and
+             not self.options.raw and
+             not self.options.access)):
             Integrator.setup(local_only=True)  # FIXME sigh
         else:
             try:
@@ -1313,6 +1319,16 @@ done"""
             blobs = Async(rate=hz)(deferred(d)() for d in prepared)
         else:
             blobs = [d() for d in  prepared]
+
+    def make_url(self):
+        lu = {d.id:d for d in self.datasets_local}
+        for iop in self.options.id_or_path:
+            if iop.startswith('N:dataset:'):
+                cache = lu[iop]
+            else:
+                cache = Path(iop).cache
+
+            print(hfn.atag(cache.uri_human, cache.id))
 
 
 class Report(Dispatcher):
