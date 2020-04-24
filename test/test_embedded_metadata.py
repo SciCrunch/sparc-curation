@@ -7,7 +7,7 @@ from sparcur.core import JEncode
 from sparcur.paths import BlackfynnCache, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.config import auth
-from sparcur import mbf
+from sparcur.extract import xml as exml
 from .common import path_project_container
 
 export = False
@@ -38,7 +38,7 @@ class TestExtractMetadata(unittest.TestCase):
             if any(p for p in local_xmls if not p.exists()):
                 raise BaseException('unfetched children')
 
-        embfs = [mbf.ExtractMBF(x) for x in local_xmls]
+        embfs = [exml.ExtractXml(x) for x in local_xmls]
         d = embfs[0].asDict()
         blob = [e.asDict() for e in embfs]
         errors = [b.pop('errors') for b in blob if 'errors' in b]

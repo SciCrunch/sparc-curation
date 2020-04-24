@@ -2,6 +2,7 @@ import unittest
 from pprint import pprint
 from typing import Union, Dict, List, Tuple
 
+import idlib
 import rdflib
 import pytest
 from rdflib.plugins import sparql
@@ -70,6 +71,33 @@ class TestCurationExportTtl(unittest.TestCase):
         query = self.spaql_templates.dataset_subject_species()
         res = list(self.graph.query(query))
         self.pp(res, unpack=True)
+        assert len(res) > 0
+
+    def test_award_affil(self):
+        query = self.spaql_templates.award_affiliations()
+        res = list(self.graph.query(query))
+        breakpoint()
+        out = {}
+        for award, affil in res:
+            award = self.nsm._qhrm(award)
+            if isinstance(affil, rdflib.URIRef):
+                ror = idlib.Ror(affil)
+                affil = f'{ror.identifier.curie} ({ror.label})'
+            else:
+                continue  # skip these for now
+                affil = affil.toPython()
+
+            if award not in out:
+                out[award] = []
+
+            out[award].append(affil)
+
+        for k, vs in sorted(out.items()):
+            vs.sort()
+            print(k)
+            [print('\t', v) for v in vs]
+
+        self.pp(res, unpack=False)
         assert len(res) > 0
 
 
@@ -148,6 +176,17 @@ class SparqlQueryTemplates:
                 VALUES ?species { "human" "homo sapiens" } .
                 ?dataset TEMP:isAboutParticipant ?subject .
                 ?subject sparc:animalSubjectIsOfSpecies ?species .
+            }
+        """
+        return sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def award_affiliations(self):
+        query = """
+            SELECT DISTINCT ?award ?affiliation
+            WHERE {
+                ?dataset TEMP:hasAwardNumber ?award .
+                ?contributor TEMP:contributorTo ?dataset .
+                ?contributor TEMP:hasAffiliation ?affiliation .
             }
         """
         return sparql.prepareQuery(query, initNs=self.prefixes)

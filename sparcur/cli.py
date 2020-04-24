@@ -94,10 +94,12 @@ Commands:
                 subjects        all headings from subjects files
                 errors          list of all errors per dataset
                 test            do as little as possible (use with --profile)
+                mbf             mbf term report (can use with --unique)
 
                 options: --raw  run reports on live data without export
                        : --tab-table
                        : --sort-count-desc
+                       : --unique
                        : --debug
 
     shell       drop into an ipython shell
@@ -167,6 +169,7 @@ Options:
     --profile               profile startup performance
     --local                 ignore network issues
     --mbf                   fetch/export mbf related metadata
+    --unique                return a unique set of values without additional info
 
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
@@ -1677,6 +1680,7 @@ class Report(Dispatcher):
         return self._print_table(rows, title='Path identifiers', ext=ext)
 
     def mbf(self, ext=None):
+        et = tuple()
         from sparcur.extract import xml as exml
 
         def settype(mimetype):
@@ -1690,12 +1694,17 @@ class Report(Dispatcher):
             blob_ir = self._export(ex.ExportXml).latest_export  # FIXME need to load?
 
         mbf_types = tuple(c.mimetype for c in (exml.ExtractMBF, exml.ExtractNeurolucida))
-        key = lambda p: (p[2], not p[0], p[1])
+        if self.options.unique:
+            key = lambda p: (p[2], not p[0], p[1].lower(), p[1])
+        else:
+            key = lambda p: (p[2], p[3], not p[0], p[1].lower(), p[1])
+
         all_conts = sorted(set(((OntId(c['id_ontology'])
                                  if 'id_ontology' in c else
                                  ''),
                                 c['name'],
-                                settype(metadata_blob['type']))
+                                settype(metadata_blob['type']),
+                                *((dataset_xml['dataset_id'],) if not self.options.unique else et))
                                for dataset_xml in blob_ir.values()
                                if dataset_xml['type'] == 'all-xml-files'  # FIXME
                                for metadata_blob in dataset_xml['xml']
@@ -1703,7 +1712,11 @@ class Report(Dispatcher):
                                'contours' in metadata_blob['extracted']
                                for c in metadata_blob['extracted']['contours']),
                            key=key)
-        return self._print_table([['id', 'name', 'metadata source']] + all_conts,
+        header = [['id', 'name', 'metadata source', 'dataset']]
+        if self.options.unique:
+            header[0] = header[0][:-1]
+
+        return self._print_table(header + all_conts,
                                  title='Unique MBF contours')
 
     def terms(self, ext=None):
