@@ -76,7 +76,6 @@ class TestCurationExportTtl(unittest.TestCase):
     def test_award_affil(self):
         query = self.spaql_templates.award_affiliations()
         res = list(self.graph.query(query))
-        breakpoint()
         out = {}
         for award, affil in res:
             award = self.nsm._qhrm(award)
