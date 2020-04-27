@@ -409,10 +409,9 @@ class Main(Dispatcher):
 
         self._setup_local()  # if this isn't run up here the internal state of the program get's wonky
 
-        if (self.options.make_url or
-            (self.options.report and
-             not self.options.raw and
-             not self.options.access)):
+        if (self.options.report and
+            not self.options.raw and
+            not self.options.access):
             Integrator.setup(local_only=True)  # FIXME sigh
         else:
             try:
