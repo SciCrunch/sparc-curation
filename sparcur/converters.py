@@ -100,6 +100,9 @@ class TripleConverter(dat.HasErrors):
                             yield from o.asRdf(s, quantity_rdftype=qt)
                         elif isinstance(o, Quantity):
                             yield from o.asRdf(s, rdftype=qt)
+                            n = rdflib.BNode()
+                            yield s, TEMP.asBaseUnits, n
+                            yield from o.to_base_units().asRdf(n)
                         else:
                             log.warning(f'unhanded Expr type {o}')
                             yield from o.asRdf(s)
