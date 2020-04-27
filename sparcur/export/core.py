@@ -217,16 +217,16 @@ class Export(ExportBase):
         functions = []
         suffixes = []
         modes = []
-        data = intr.data_for_export(self.timestamp)  # build and cache the data
+        blob_data = intr.data_for_export(self.timestamp)  # build and cache the data
 
         # always dump the json
-        j = lambda f: json.dump(data, f, sort_keys=True, indent=2, cls=JEncode)
+        j = lambda f: json.dump(blob_data, f, sort_keys=True, indent=2, cls=JEncode)
         functions.append(j)
         suffixes.append('.json')
         modes.append('wt')
 
         # always dump the ttl (for single datasets this is probably ok)
-        t = lambda f: f.write(ex.TriplesExportDataset(data).ttl)
+        t = lambda f: f.write(ex.TriplesExportDataset(blob_data).ttl)
         functions.append(t)
         suffixes.append('.ttl')
         modes.append('wb')
@@ -249,7 +249,7 @@ class Export(ExportBase):
                 out.xopen()
 
         symlink_latest(dump_path, latest_path)
-        return intr
+        return blob_data, intr
 
     def export_rdf(self, dump_path, latest_path, dataset_blobs):
         dataset_dump_path = dump_path / 'datasets'
@@ -377,7 +377,7 @@ class Export(ExportBase):
                 print(f'{export_source_path.cache} is not at dataset level!')
                 sys.exit(123)
 
-            return self.export_single_dataset()  # FIXME unused
+            return self.export_single_dataset()  # FIXME unused except for `spc export .` from inside a dataset folder
 
         else:
             return super().export(dataset_paths=dataset_paths)
