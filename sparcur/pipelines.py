@@ -394,7 +394,7 @@ class JSONPipeline(Pipeline):
         data = self.moved
         removed = list(DictTransformer.pop(data, self.cleans, source_key_optional=True))
         #log.debug(f'cleaned the following values from {self}' + lj(removed))
-        print(log.handlers)
+        #log.debug(log.handlers)
         log.debug(f'cleaned {len(removed)} values from {self}')
         return data
 
