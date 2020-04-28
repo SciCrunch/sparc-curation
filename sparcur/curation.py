@@ -1,34 +1,20 @@
-#!/usr/bin/env python3
-import copy
 import json
-import math
-import hashlib
 import logging
-from types import GeneratorType
 from socket import gethostname
-from datetime import datetime
 from functools import wraps
-from itertools import chain
-from collections import defaultdict, deque
+import idlib
 from joblib import Parallel, delayed
-from pyontutils.utils import byCol as _byCol, Async, deferred
-from protcur.analysis import parameter_expression
-from protcur.core import annoSync
-from protcur.analysis import protc, Hybrid
-from terminaltables import AsciiTable
-from hyputils.hypothesis import group_to_memfile, HypothesisHelper
-from sparcur import config
+from pyontutils.utils import byCol as _byCol, Async, deferred, makeSimpleLogger
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
-from sparcur.core import JT, log, logd, lj
+from sparcur.core import JT, log
 from sparcur.core import adops, OntTerm
 from sparcur.paths import Path
 from sparcur.state import State
 from sparcur import schemas as sc
 from sparcur.export.triples import TriplesExportDataset, TriplesExportSummary
-from sparcur.datasources import OrganData, OntologyData, MembersData
-from sparcur.protocols import ProtocolData, ProtcurData
-from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
+from sparcur.datasources import OrganData, OntologyData
+from sparcur.protocols import ProtocolData
 from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
@@ -186,7 +172,6 @@ class Integrator(PathData, OntologyData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasetdata = dat.DatasetStructure(self.path)
-        #self.protcur = ProtcurData(self)
 
     @property
     def triples(self):
@@ -468,9 +453,8 @@ hasSchema = sc.HasSchema()
 @hasSchema.mark
 class Summary(Integrator, ExporterSummarizer):
     """ A class that summarizes members of its __base__ class """
-    #schema_class = MetaOutSchema  # FIXME clearly incorrect
-    schema_class = SummarySchema
-    schema_out_class = SummarySchema
+    schema_class = sc.SummarySchema
+    schema_out_class = sc.SummarySchema
     triples_class = TriplesExportSummary
     _debug = False
     _n_jobs = 12
@@ -642,10 +626,16 @@ def datame(d, ca, timestamp, helpers=None):
         log = logging.getLogger(log_name)
         if not log.handlers:
             log = makeSimpleLogger(log_name)
+            log.info('{log_name} had no handler')
+        else:
+            log.debug(log.handlers)
 
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):
         rc.anchorTo(ca)
+
+    if not hasattr(idlib.Pio, '_protocol_data'):  # ARRRRRGGGHGHHHGHHG SIGH
+        ProtocolData.setup()
 
     if helpers is not None:
         d.add_helpers(helpers)

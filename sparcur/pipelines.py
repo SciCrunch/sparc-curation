@@ -93,8 +93,10 @@ class ContributorsPipeline(DatasourcePipeline):
                 fn, mn = fn.split(' ', 1)
                 mn, _mn = mn.rstrip('.'), mn
                 if mn != _mn:
-                    he.addError(f'Middle initials don\'t need periods :) {name!r}',
-                                logfunc=logd.error)
+                    msg = f'Middle initials don\'t need periods :) {name!r}'
+                    #if he.addError(msg):
+                    logd.debug(msg)
+
                 contributor['middle_name'] = mn
                 contributor['first_name'] = fn
 
@@ -1033,6 +1035,7 @@ class PipelineEnd(JSONPipeline):
 
         'NormSubjectsFile',
         'NormSubjectsFile.age',
+        'NormSubjectsFile.protocol_url_or_doi',
 
         'SubjectsFilePipeline._transformer',
         'SubjectsFilePipeline.transformer',

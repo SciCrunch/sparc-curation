@@ -304,10 +304,10 @@ class DatasetStructure(Path):
 
                 if path.name[0].isupper():
                     msg = f'path has bad casing {path.as_posix()!r}'
-                    self.addError(msg,
-                                  blame='submission',
-                                  path=path)
-                    logd.error(msg)
+                    if self.addError(msg,
+                                     blame='submission',
+                                     path=path):
+                        logd.error(msg)
 
                 yield path
 
@@ -386,17 +386,17 @@ class Tabular(HasErrors):
                     # LOL THE FILE WITH > 1 million empty rows, 8mb of commas
                     # totally the maximum errors champion
                     message = f'There are {diff} empty rows in {self.path.as_posix()!r}'
-                    self.addError(message,
-                                  logfunc=logd.error,
-                                  blame='submission',
-                                  path=self.path)
+                    if self.addError(message,
+                                     blame='submission',
+                                     path=self.path):
+                        logd.error(message)
 
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
-                    self.addError(exc.EncodingError(message),
-                                  blame='submission',
-                                  path=self.path)
-                    logd.error(message)
+                    if self.addError(exc.EncodingError(message),
+                                     blame='submission',
+                                     path=self.path):
+                        logd.error(message)
 
                 yield from rows
                 return
@@ -405,10 +405,10 @@ class Tabular(HasErrors):
             except csv.Error as e:
                 logd.exception(e)
                 message = f'WHAT HAVE YOU DONE {e!r} {self.path.as_posix()!r}'
-                self.addError(message,
-                              blame='EVERYONE',
-                              path=self.path)
-                logd.error(message)
+                if self.addError(message,
+                                 blame='EVERYONE',
+                                 path=self.path):
+                    logd.error(message)
 
     def xlsx(self):
         kwargs = {
@@ -426,10 +426,10 @@ class Tabular(HasErrors):
         ns = len(xlsx2csv.workbook.sheets)
         if ns > 1:
             message = f'too many sheets ({ns}) in {self.path.as_posix()!r}'
-            self.addError(exc.EncodingError(message),
-                          blame='submission',
-                          path=self.path)
-            logd.error(message)
+            if self.addError(exc.EncodingError(message),
+                             blame='submission',
+                             path=self.path):
+                logd.error(message)
 
         f = io.StringIO()
         try:
@@ -458,7 +458,7 @@ class Tabular(HasErrors):
         cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
         for row in cleaned_rows:
             n_row = [c.strip().replace('\ufeff', '') for c in row
-                     if (not self.addError(error, logfunc=logd.error)  # FIXME will probably append multiple ...
+                     if ((not logd.error(error) if self.addError(error) else True)  # FIXME will probably append multiple ...
                          if '\ufeff' in c else True)]
             if not all(not(c) for c in n_row):  # skip totally empty rows
                 yield n_row
@@ -973,7 +973,7 @@ SubmissionFilePath._bind_flavours()
 _props = sc.DatasetDescriptionSchema.schema['properties']
 _props2 = sc.ContributorSchema.schema['properties']  # FIXME recurse ...
 _nddfes = [k for k, v in chain(_props.items(), _props2.items())
-           if isinstance(v, dict) and 'type' in v and v['type'] not in ('array',)]
+           if isinstance(v, dict) and sc.not_array(v)]
 
 
 class DatasetDescriptionFile(MetadataFile):
@@ -1015,9 +1015,7 @@ DatasetDescriptionFilePath._bind_flavours()
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
 _props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
 _nsffes = [k for k, v in chain(_props.items(), _props2.items())
-           if isinstance(v, dict) and ('type' in v and v['type'] not in ('array',)
-                                       # FIXME hack to get UnitsSchema in
-                                       or 'oneOf' in v)]
+           if isinstance(v, dict) and sc.not_array(v)]
 
 class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE

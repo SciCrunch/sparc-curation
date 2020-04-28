@@ -27,6 +27,42 @@ from sparcur.utils import is_list_or_tuple
 from sparcur.config import config, auth
 
 
+__type_registry = {}
+def register_type(cls, type_name):
+    if type_name in __type_registry:
+        raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
+                         f'{type_name} -> {__type_registry["type_name"]}')
+
+    __type_registry[type_name] = cls
+
+
+def fromJson(blob):
+    if isinstance(blob, dict):
+        if 'type' in blob:
+            t = blob['type']
+
+            if t == 'identifier':
+                type_name = blob['system']
+            elif t in ('quantity', 'range'):
+                type_name = t
+            else:
+                breakpoint()
+                raise NotImplementedError(f'TODO fromJson for type {t} '
+                                          f'currently not implemented\n{blob}')
+
+            return __type_registry[type_name].fromJson(blob)
+        else:
+            return {k:v
+                    if k == 'errors' or k.endswith('_errors') else
+                    fromJson(v)
+                    for k, v in blob.items()}
+
+    elif isinstance(blob, list):
+        return [fromJson(_) for _ in blob]
+    else:
+        return blob
+
+
 xsd = rdflib.XSD
 po = CustomTurtleSerializer.predicateOrder
 po.extend((sparc.firstName,
@@ -71,6 +107,11 @@ class OntTerm(OTB, OntId):
     _logged = set()
 
     @classmethod
+    def fromJson(cls, blob):
+        assert blob['identifier_type'] == cls.__name__
+        return cls(blob['id'], label=blob['label'])
+
+    @classmethod
     def _already_logged(cls, thing):
         case = thing in cls._logged
         if not case:
@@ -79,14 +120,18 @@ class OntTerm(OTB, OntId):
         return case
 
     def asDict(self):
-        return {
-            'type': 'OntTerm',  # TODO -> idlib
+        out = {
+            'type': 'identifier',
+            'system': self.__class__.__name__,
             'id': self.iri,
             'label': self.label,
-            'synonyms': self.synonyms,
         }
+        if hasattr(self, 'synonyms') and self.synonyms:
+            out['synonyms'] = self.synonyms
 
-    def tabular(self, sep='|'):
+        return out
+
+    def asCell(self, sep='|'):
         if self.label is None:
             _id = self.curie if self.curie else self.iri
             if self.prefix not in self._known_no_label:
@@ -100,6 +145,7 @@ class OntTerm(OTB, OntId):
 
 class HasErrors:
     message_passing_key = 'keys_with_errors'
+    _already_logged = set()
 
     def __init__(self, *args, pipeline_stage=None, **kwargs):
         try:
@@ -119,6 +165,10 @@ class HasErrors:
             data[mpk] = [key]
 
     def addError(self, error, pipeline_stage=None, logfunc=None, blame=None, path=None):
+        do_log = error not in self._already_logged
+        if do_log:
+            self._already_logged.add(error)
+
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
@@ -127,8 +177,7 @@ class HasErrors:
         self._last_error = et
         self._errors_set.add(et)
         a = len(self._errors_set)
-        if logfunc is not None and a != b:  # only log on new errors
-            logfunc(error)
+        return a != b and do_log
 
     def _render(self, e, stage, blame, path):
         o = {'pipeline_stage': stage,
@@ -184,8 +233,13 @@ def json_export_type_converter(obj):
         return obj.as_posix()
     elif isinstance(obj, Quantity):
         return obj.json()
-    elif isinstance(obj, idlib.Stream):
-        return obj.identifier
+    elif isinstance(obj, oq.OntTerm):
+        return obj.asDict()  # FIXME need a no network/scigraph version
+    elif isinstance(obj, idlib.Stream) and hasattr(obj, '_id_class'):
+        if obj._id_class is str:
+            return obj.identifier
+        else:
+            return obj.asDict()  # FIXME need a no network/scigraph version
     elif isinstance(obj, datetime):
         return isoformat(obj)
 
@@ -917,3 +971,8 @@ def get_all_errors(_with_errors):
 
 class JPointer(str):
     """ a class to mark json pointers for resolution """
+
+
+# register idlib classes for fromJson
+[register_type(i, i.__name__) for i in
+ (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, OntTerm)]

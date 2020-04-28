@@ -4,6 +4,7 @@ import csv
 import json
 from socket import gethostname
 from itertools import chain
+from collections import Counter
 import idlib
 import requests
 from pyontutils.core import OntGraph
@@ -11,20 +12,22 @@ from pyontutils.utils import Async, deferred
 from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
-from sparcur.core import JEncode, JFixKeys, adops
+from sparcur.core import JEncode, JFixKeys, adops, register_type, fromJson
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge, logd
 
 
-def export_schemas(export_path):
+def export_schemas(export_schemas_path):
     schemas = (sc.DatasetDescriptionSchema,
                sc.SubjectsSchema,
                sc.SamplesFileSchema,
                sc.SubmissionSchema,)
 
-    sb = export_path / 'schemas'
+    if not export_schemas_path.exists():
+        export_schemas_path.mkdir()
+
     for s in schemas:
-        s.export(sb)
+        s.export(export_schemas_path)
 
 
 class ExportBase:
@@ -91,6 +94,12 @@ class ExportBase:
     def latest_export(self):
         with open(self.latest_export_path, 'rt') as f:
             return json.load(f)
+
+    @property
+    def latest_ir(self):
+        # TODO not entirely sure about the best way to do this
+        # possibly use a json -> ir pipeline a la raw_json?
+        return fromJson(self.latest_export)
 
     @property
     def dump_path(self):
@@ -181,6 +190,7 @@ class Export(ExportBase):
 
     export_type = 'integrated'
     filename_ir = 'curation-export.json'
+    id_metadata = 'identifier-metadata.json'
 
     @property
     def latest_ttl_path(self):
@@ -197,7 +207,7 @@ class Export(ExportBase):
 
     @property
     def latest_id_met_path(self):
-        return self.base_path / 'identifier-metadata.json'
+        return self.base_path / self.id_metadata
 
     @property
     def latest_id_met(self):
@@ -264,9 +274,23 @@ class Export(ExportBase):
         suffix = '.ttl'
         mode = 'wb'
 
+        wat = [b['id'] for b in dataset_blobs]
+        counts = Counter([d for d in wat])
+        bads = set(id for id, c in counts.most_common() if c > 1)
+        key = lambda d: d['id']
+        dupes = sorted([b for b in dataset_blobs if b['id'] in bads], key=key)
+        if bads:
+            loge.critical(bads)
+            # TODO
+            #breakpoint()
+            #raise BaseException('NOPE')
+
         teds = []
         for dataset_blob in dataset_blobs:
             filename = dataset_blob['id']
+            if filename in bads:
+                loge.critical(filename)
+                continue
             filepath = dataset_dump_path / filename
             filepsuf = filepath.with_suffix(suffix)
             lfilepath = self.latest_datasets_path / filename
@@ -309,11 +333,12 @@ class Export(ExportBase):
 
         return blob_protocols
 
-    def export_identifier_metadata(self, dump_path, dataset_blobs):
+    def export_identifier_metadata(self, dump_path, latest_path, dataset_blobs):
 
-        if (self.latest and
-            self.latest_id_met_path.exists()):
-            blob_id_met = self.latest_id_met
+        latest_id_met_path = latest_path / self.id_metadata
+        if (self.latest and latest_id_met_path.exists()):
+            with open(latest_id_met_path, 'rt') as f:
+                blob_id_met = json.load(f)
 
         else:
             def fetch(id):  # FIXME error proof version ...
@@ -327,7 +352,9 @@ class Export(ExportBase):
                     log.error(e)
 
             # retrieve doi metadata and materialize it in the dataset
-            _dois = set([idlib.Auto(id) if not isinstance(id, idlib.Stream) else id
+            _dois = set([id
+                         if isinstance(id, idlib.Stream) else
+                         (fromJson(id) if isinstance(id, dict) else idlib.Auto(id))
                          for blob in dataset_blobs for id in
                          chain(adops.get(blob, ['meta', 'protocol_url_or_doi'], on_failure=[]),
                                adops.get(blob, ['meta', 'originating_article_doi'], on_failure=[]),
@@ -351,7 +378,7 @@ class Export(ExportBase):
                                     'export_project_path': self.export_source_path.cache.anchor,},
             }
 
-        with open(dump_path / 'identifier-metadata.json', 'wt') as f:
+        with open(dump_path / self.id_metadata, 'wt') as f:
             json.dump(blob_id_met, f, sort_keys=True, indent=2, cls=JEncode)
 
         return blob_id_met
@@ -401,30 +428,33 @@ class Export(ExportBase):
         # just the internal representation will fail i.e. there are
         # multiple possible partial stages but we only explicitly track
         # the one that corresponds to export_ir
-        previous_latest = self.latest_datasets_path.resolve()
-
+        previous_latest = self.base_path.resolve()
+        previous_latest_datasets = self.latest_datasets_path.resolve()
         # data
         # FIXME Summary has implicit state set by cli
         summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths)
-        blob_data = (self.latest_export if
-                     self.latest else
-                     summary.data_for_export(self.timestamp))
+        if self.latest:
+            from pysercomb.pyr import units as pyru
+            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            blob_data = self.latest_ir
+        else:
+            blob_data = summary.data_for_export(self.timestamp)
 
-        return blob_data, summary, previous_latest
+        return blob_data, summary, previous_latest, previous_latest_datasets
 
     def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
-        summary, previous_latest = rest
+        summary, previous_latest, previous_latest_datasets = rest
         dataset_blobs = blob_ir['datasets']
 
         # identifier metadata
-        blob_id_met = self.export_identifier_metadata(dump_path, dataset_blobs)
+        blob_id_met = self.export_identifier_metadata(dump_path, previous_latest, dataset_blobs)
         teim = self.export_identifier_rdf(dump_path, blob_id_met)
 
         # protocol
-        blob_protocol = self.export_protocols(dump_path, dataset_blobs, summary)
+        #blob_protocol = self.export_protocols(dump_path, dataset_blobs, summary)
 
         # rdf
-        teds = self.export_rdf(dump_path, previous_latest, dataset_blobs)
+        teds = self.export_rdf(dump_path, previous_latest_datasets, dataset_blobs)
         tes = ex.TriplesExportSummary(blob_ir, teds=teds + [teim])
 
         with open(filepath_ir.with_suffix('.ttl'), 'wb') as f:

@@ -70,22 +70,22 @@ def disco(dataset_blobs, graphs):
             # probably better to centralized the reload ...
             oid = OntId(v)
             if oid.prefix in want_prefixes:
-                return OntTerm(v).tabular()
+                return OntTerm(v).asCell()
             else:
                 return oid.iri
 
         if isinstance(v, idlib.Stream):
-            if hasattr(v, 'asTabular'):
-                return v.asTabular()
+            if hasattr(v, 'asCell'):
+                return v.asCell()
             else:
-                loge.debug(f'{type(v)} does not implement a tabular representation')
+                loge.debug(f'{type(v)} does not implement an asCell representation')
                 return v.asType(str)
 
         if isinstance(v, OntId):
             if not isinstance(v, OntTerm):
                 v = OntTerm(v)
 
-            v = v.tabular()
+            v = v.asCell()
         if isinstance(v, list) or isinstance(v, tuple):
             v = ','.join(json.dumps(_, cls=JEncode)
                          if isinstance(_, dict) else
@@ -107,8 +107,8 @@ def disco(dataset_blobs, graphs):
         is_about = [OntTerm(o) for s, o in graph[:isAbout:] if isinstance(o, rdflib.URIRef)]
         involves = [OntTerm(o) for s, o in graph[:TEMP.involvesAnatomicalRegion:]]
 
-        inv = ','.join(i.tabular() for i in involves)
-        ia = ','.join(a.tabular() for a in is_about)
+        inv = ','.join(i.asCell() for i in involves)
+        ia = ','.join(a.asCell() for a in is_about)
         #row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
         row = [id, dowe['status']['submission_index'], dowe['status']['curation_index']]  # FIXME this doubles up on the row
         if 'meta' in dowe:

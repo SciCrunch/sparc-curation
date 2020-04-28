@@ -413,7 +413,15 @@ class TriplesExportIdentifierMetadata(TriplesExport):
                     )
                     g = OntGraph()
                     doi = idlib.Doi(id) if not isinstance(id, idlib.Doi) else id  # FIXME idlib streams need to recognize their own type in __new__
-                    g.parse(data=doi.ttl(), format='ttl')  # FIXME network bad
+                    data = doi.ttl()
+                    if data is None:  # blackfynn has some bad settings on their doi records ...
+                        return
+
+                    try:
+                        g.parse(data=data, format='ttl')  # FIXME network bad
+                    except BaseException as e:
+                        loge.exception(e)
+
                     _tr = [s for s, p, o in g if p == crossref_doi_pred]
                     if _tr:
                         _their_record_s = _tr[0]

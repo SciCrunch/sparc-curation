@@ -3,11 +3,11 @@ import idlib
 import rdflib
 from pysercomb.pyr.types import ProtcurExpression, Quantity, Range
 from pyontutils import combinators as cmb
-from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc
+from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc, NIFRID
 from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import OntId, OntTerm, lj
+from sparcur.core import OntId, OntTerm, lj, fromJson
 from sparcur.utils import log, logd
 from sparcur.protocols import ProtocolData
 
@@ -39,7 +39,7 @@ class TripleConverter(dat.HasErrors):
         self.extra = self.Extra(self)
 
     def l(self, value):
-        if isinstance(value, idlib.Stream):
+        if isinstance(value, idlib.Stream) and hasattr(value, '_id_class'):
             return value.asType(rdflib.URIRef)
         if isinstance(value, OntId):
             return value.u
@@ -56,6 +56,8 @@ class TripleConverter(dat.HasErrors):
                     return self.pyru._Quant.fromJson(value)
                 elif value['type'] == 'range':
                     return self.pyru.Range.fromJson(value)
+                elif value['type'] == 'identifier':
+                    return fromJson(value).asType(rdflib.URIRef)
 
             raise ValueError(value)
         else:
@@ -85,14 +87,28 @@ class TripleConverter(dat.HasErrors):
                     values = value,
 
                 for v in values:
-                    log.debug(f'{field} {v} {convert}')
+                    #log.debug(f'{field} {v} {convert}')
                     try:
                         p, o = convert(v)
                     except exc.NoTripleError as e:
                         continue
 
-                    log.debug(o)
-                    if isinstance(o, ProtcurExpression) or isinstance(o, Quantity):
+                    #log.debug((o, v))
+                    a = isinstance(o, idlib.Stream) and hasattr(o, '_id_class') or isinstance(o, OntTerm)
+                    b = isinstance(v, idlib.Stream) and hasattr(v, '_id_class') or isinstance(v, OntTerm)
+                    if (a or b):
+                        # FIXME this thing is a mess ...
+                        _v = o if a else v
+                        s = _v.asType(rdflib.URIRef)
+                        yield subject, p, s
+                        d = _v.asDict()
+                        yield s, rdf.type, (owl.Class if isinstance(o, OntTerm) else owl.NamedIndividual)
+                        yield s, rdfs.label, rdflib.Literal(d['label'])
+                        if 'synonyms' in d:  # FIXME yield from o.synonyms(s)
+                            for syn in d['synonyms']:
+                                yield s, NIFRID.synonym, rdflib.Literal(syn)
+
+                    elif isinstance(o, ProtcurExpression) or isinstance(o, Quantity):
                         s = rdflib.BNode()
                         yield subject, p, s
                         qt = sparc.Measurement
@@ -117,10 +133,8 @@ class TripleConverter(dat.HasErrors):
 
             else:
                 msg = f'Unhandled {self.__class__.__name__} field: {field}'
-                if msg not in self._already_logged:
-                    self._already_logged.add(msg)
+                if self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error'):
                     log.warning(msg)
-                    self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error')
 
 
 class ContributorConverter(TripleConverter):
@@ -237,18 +251,18 @@ class MetaConverter(TripleConverter):
             _, s = self.c.protocol_url_or_doi(value)
             yield s, rdf.type, owl.NamedIndividual
             yield s, rdf.type, sparc.Protocol
-            pd = ProtocolData(self.integrator.id)
+            log.debug(value)
+            pioid = value if isinstance(value, idlib.Pio) else idlib.Pio(value)  # FIXME :/ should be handled in Pio directly probably?
             # FIXME needs to be a pipeline so that we can export errors
             try:
-                pj = pd(value)  # FIXME a bit opaque, needs to move to a pipeline, clean up init etc.
+                data = pioid.data()
             except OntId.BadCurieError as e:
                 logd.error(e)  # FIXME export errors ...
-                pj = None
+                data = None
 
-            if pj:
-                label = pj['protocol']['title']
-                yield s, rdfs.label, rdflib.Literal(label)
-                nsteps = len(pj['protocol']['steps'])
+            if data:
+                yield s, rdfs.label, rdflib.Literal(pioid.label)
+                nsteps = len(data['steps'])
                 yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
 
             try:

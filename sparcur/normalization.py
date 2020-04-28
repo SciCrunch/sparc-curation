@@ -308,10 +308,10 @@ class NormValues(HasErrors):
                         else:
                             kmsg = f'.{key}'
 
-                        self.addError(e,
-                                      pipeline_stage=f'{self.__class__.__name__}{kmsg}',
-                                      logfunc=log.critical,
-                                      blame='submission')
+                        if self.addError(e,
+                                         pipeline_stage=f'{self.__class__.__name__}{kmsg}',
+                                         blame='submission'):
+                            log.critical(e)
                         #if isinstance(out[k], dict):
                             #self.embedLastError(out[k])
 
@@ -398,10 +398,10 @@ class NormValues(HasErrors):
 
                         if thing is not None and thing != '':
                             msg = f'Normalization {key} returned None for input "{thing}"'
-                            self.addError(msg,
-                                          pipeline_stage=f'{self.__class__.__name__}.{key}',
-                                          logfunc=log.critical,
-                                          blame='pipeline',)
+                            if self.addError(msg,
+                                             pipeline_stage=f'{self.__class__.__name__}.{key}',
+                                             blame='pipeline',):
+                                log.critical(msg)
 
                         out = None
 
@@ -458,10 +458,11 @@ class NormDatasetDescriptionFile(NormValues):
         try:
             return int(value)
         except ValueError as e:
-            self.addError(e,
-                          pipeline_stage=f'{self.__class__.__name__}',
-                          logfunc=logd.exception,
-                          blame='submission',)
+            if self.addError(e,
+                             pipeline_stage=f'{self.__class__.__name__}',
+                             blame='submission',):
+                logd.exception(e)
+
             return value  # and let the schema sort them out
 
     number_of_samples = number_of_subjects
@@ -530,8 +531,8 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(numeric) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.Orcid._id_class.OrcidLengthError(msg))
-                logd.error(msg)
+                if self.addError(idlib.Orcid._id_class.OrcidLengthError(msg)):
+                    logd.error(msg)
                 return
 
         try:
@@ -540,16 +541,16 @@ class NormDatasetDescriptionFile(NormValues):
             if not orcid.identifier.checksumValid:  # FIXME should not handle this with ifs ...
                 # FIXME json schema can't do this ...
                 msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.Orcid._id_class.OrcidChecksumError(msg))
-                logd.error(msg)
+                if self.addError(idlib.Orcid._id_class.OrcidChecksumError(msg)):
+                    logd.error(msg)
                 return
 
             yield orcid
 
         except (OntId.BadCurieError, idlib.Orcid._id_class.OrcidMalformedError) as e:
             msg = f'orcid malformed {value!r} {self._path.as_posix()!r}'
-            self.addError(idlib.Orcid._id_class.OrcidMalformedError(msg))
-            logd.error(msg)
+            if self.addError(idlib.Orcid._id_class.OrcidMalformedError(msg)):
+                logd.error(msg)
             yield value
 
     def contributor_role(self, value):
@@ -635,13 +636,15 @@ class NormDatasetDescriptionFile(NormValues):
                 except BaseException as e:
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...
-                    self.addError(e,
-                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.error)
-                    self.addError(self._path.as_posix(),
-                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.critical,
-                                  blame='debug')
+                    _ps = f'{self.__class__.__name__}.protocol_url_or_doi'
+                    if self.addError(e, pipeline_stage=_ps):
+                        logd.error(e)
+
+                    _pp = self._path.as_posix()
+                    if self.addError(_pp,
+                                     pipeline_stage=_ps,
+                                     blame='debug'):
+                        logd.critical(_pp)
                     # TODO raise exc.BadDataError from e
 
     def originating_article_doi(self, value):
@@ -677,6 +680,9 @@ class NormDatasetDescriptionFile(NormValues):
 
 class NormSubjectsFile(NormValues):
 
+    _protocol_url_or_doi = NormDatasetDescriptionFile._protocol_url_or_doi
+    protocol_url_or_doi = NormDatasetDescriptionFile.protocol_url_or_doi
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not hasattr(self.__class__, 'pyru'):
@@ -686,10 +692,11 @@ class NormSubjectsFile(NormValues):
     def subject_id(self, value):
         if not isinstance(value, str):
             msg = f'Bad type for subject_id: {type(value)}'
-            self.addError(msg,
-                          pipeline_stage=self.__class__.__name__,
-                          blame='submission',
-                          logfunc=logd.error,)
+            if self.addError(msg,
+                             pipeline_stage=self.__class__.__name__,
+                             blame='submission',):
+                logd.error(msg)
+
             return str(value)
         else:
             return value

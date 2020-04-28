@@ -28,10 +28,10 @@ class ExtractXml:
                 inst = c(path)
                 if not inst._isXml:
                     inst = NotXml(path)
-                    inst.addError(f'path is not a valid xml file! {path}',
-                                  logfunc=logd.error,
-                                  blame='submission',
-                                  path=path)
+                    msg = f'path is not a valid xml file! {path}'
+                    if inst.addError(msg, blame='submission', path=path):
+                        logd.error(msg)
+
                     return inst
 
             if inst.typeMatches():

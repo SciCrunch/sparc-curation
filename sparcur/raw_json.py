@@ -35,6 +35,17 @@ class RawJsonSubmission(RawJson):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
+class RawJsonDatasetDescription(RawJson):
+
+    @hasSchema(sc.DatasetDescriptionSchema)
+    def data(self):
+        blob = super().data
+        # TODO lift everything we can back to the ir
+        return blob
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class RawJsonSubjects(RawJson):
 
     @hasSchema(sc.SubjectsSchema)

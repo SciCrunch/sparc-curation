@@ -18,6 +18,7 @@ from sparcur.core import JEncode
 def not_array(schema, in_all=False):
     """ hacked way to determine that the blob in question cannot be an array """
     return ('type' in schema and schema['type'] != 'array' or
+            'properties' in schema and 'items' not in schema or
             # FIXME hack hard to maintain
             'allOf' in schema and all(not_array(s, True) for s in schema['allOf']) or
             'not' in schema and (not not_array(schema['not'], in_all) or in_all)
@@ -258,12 +259,11 @@ simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
 
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
-doi_pattern = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
+doi_pattern = idlib.Doi._id_class.canonical_regex
 
-orcid_pattern = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
-                 '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
+orcid_pattern = idlib.Orcid._id_class.canonical_regex
 
-ror_pattern = ('^https://ror.org/0[0-9a-z]{6}[0-9]{2}$')
+ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
@@ -284,35 +284,59 @@ class ErrorSchema(JSONSchema):
               'items': {'type': 'object'},}
 
 
+
+def make_id_schema(cls, pattern=None, format=None):
+    id_schema = {'type': 'string'}
+    if format is not None:
+        id_schema['format'] = format
+
+    if pattern is not None:
+        id_schema['pattern'] = pattern
+    elif hasattr(cls, '_id_class') and hasattr(cls._id_class, 'canonical_regex'):
+        id_schema['pattern'] = cls._id_class.canonical_regex
+
+    class _IdSchema(JSONSchema):
+        __name__ = cls.__name__ + 'Schema'
+        schema = {'properties': {'system': {'type': 'string',
+                                            'enum': [cls.__name__],},
+                                 'id': id_schema},}
+
+    return _IdSchema
+
+
+OntTermSchema = make_id_schema(OntTerm, format='iri')
+DoiSchema = make_id_schema(idlib.Doi)
+RorSchema = make_id_schema(idlib.Ror)
+OrcidSchema = make_id_schema(idlib.Orcid)
+PioSchema = make_id_schema(idlib.Pio)
+
+
 class EmbeddedIdentifierSchema(JSONSchema):
-    schema = {'allOf':
-              [{'type': 'object',
-                'required': ['type', 'id', 'label'],
-                'properties': {
-                       'lable': {'type': 'string'},
-                       'synonyms': {'type': 'array',
-                                    'minItems': 1},},},
-               {'oneOf': [
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['OntTerm']},
-                                   'id': {'type': 'string',
-                                          'format': 'iri'}}},
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['Ror']},
-                                   'id': {'type': 'string',
-                                          'pattern': ror_pattern}}},
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['Orcid']},
-                                   'id': {'type': 'string',
-                                          'pattern': orcid_pattern}}},
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['Doi']},  # TODO
-                                   'id': {'type': 'string',
-                                          'pattern': doi_pattern}}},
+    schema = {'type': 'object',
+              'required': ['type', 'id', 'label'],
+              'properties': {
+                  'id': {'type': 'string'},
+                  'type': {'type': 'string',
+                           'enum': ['identifier']},
+                  'system': {'type': 'string'},
+                  'label': {'type': 'string'},
+                  'synonyms': {'type': 'array',
+                               'minItems': 1},},}
 
-               ]}]}
+    @classmethod
+    def _allOf(cls, schema):
+        return {'allOf': [cls.schema,
+                          schema.schema,]}
+
+    @classmethod
+    def allOf(cls, schema_):
+        class _SCM(JSONSchema):
+            schema = cls._allOf(schema_)  # LOL PYTHON
+
+        return _SCM
 
 
+EIS = EmbeddedIdentifierSchema
 EISs = EmbeddedIdentifierSchema.schema
 
 
@@ -421,9 +445,9 @@ class ContributorSchema(JSONSchema):
                   'contributor_name': {'type': 'string'},
                   'first_name': {'type': 'string'},
                   'last_name': {'type': 'string'},
-                  'contributor_orcid_id': {'type': 'string',
-                                           'pattern': orcid_pattern},
-                  'contributor_affiliation': {'type': 'string'},
+                  'contributor_orcid_id': EIS._allOf(OrcidSchema),
+                  'contributor_affiliation': {'oneOf': [EIS._allOf(RorSchema),
+                                                        {'type': 'string'}]},
                   'contributor_role': {
                       'type':'array',
                       'minItems': 1,
@@ -521,15 +545,18 @@ class DatasetDescriptionSchema(JSONSchema):
             'completeness_of_data_set': {'type': 'string'},
             'prior_batch_number': {'type': 'string'},
             'title_for_complete_data_set': {'type': 'string'},
-            'originating_article_doi': {'type': 'array', 'items': {'type': 'string'}},  # TODO doi matching? maybe types?
+            'originating_article_doi': {'type': 'array',
+                                        'items': EIS._allOf(DoiSchema)},
             'number_of_subjects': {'type': 'integer'},
             'number_of_samples': {'type': 'integer'},
             'parent_dataset_id': {'type': 'string'},  # blackfynn id
             'protocol_url_or_doi': {
                 'type': 'array',
                 'minItems': 1,
-                'items': {'type': 'string',
-                          'pattern': simple_url_pattern}},
+                'items': {'oneOf':[EIS._allOf(DoiSchema),
+                                   EIS._allOf(PioSchema),
+                                   {'type': 'string',
+                                    'pattern': simple_url_pattern,}]}},
             'links': {
                 'type': 'array',
                 'minItems': 1,
@@ -660,8 +687,11 @@ class SamplesFileSchema(JSONSchema):
                                             'disease': {'type': 'string'},
                                             'reference_atlas': {'type': 'string'},
                                             'protocol_title': {'type': 'string'},
-                                            'protocol_url_or_doi': {'type': 'string'},  # protocols_io_location ??
-
+                                            'protocol_url_or_doi':
+                                            {'oneOf':[EIS._allOf(DoiSchema),
+                                                      EIS._allOf(PioSchema),
+                                                      {'type': 'string',
+                                                       'pattern': simple_url_pattern,}]},
                                             'experimental_log_file_name': {'type': 'string'},
                                         },},},
 
@@ -713,8 +743,7 @@ class MetaOutSchema(JSONSchema):
     __schema['properties'].update({
         'errors': ErrorSchema.schema,
         'dirs': {'type': 'integer'},
-        'doi': {'type': 'string',
-                'pattern': doi_pattern,},
+        'doi': EIS._allOf(DoiSchema),
         'files': {'type': 'integer'},
         'size': {'type': 'integer'},
         'folder_name': {'type': 'string'},
@@ -734,8 +763,10 @@ class MetaOutSchema(JSONSchema):
         'principal_investigator': {'type': 'string'},
         'protocol_url_or_doi': {'type': 'array',
                                 'minItems': 1,
-                                'items': {'type': 'string',
-                                          'pattern': simple_url_pattern,}},
+                                'items': {'oneOf':[EIS._allOf(DoiSchema),
+                                                   EIS._allOf(PioSchema),
+                                                   {'type': 'string',
+                                                    'pattern': simple_url_pattern,}]}},
         'additional_links': {'type': 'array',
                              'minItems': 1,
                              'items': {'type': 'string'}},

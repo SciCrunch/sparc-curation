@@ -1,7 +1,9 @@
+import idlib
 import rdflib
 import dicttoxml
 from pysercomb.pyr.types import ProtcurExpression, Quantity
 from sparcur.core import OntTerm, get_all_errors
+from sparcur.utils import loge
 
 
 def xml(dataset_blobs):
@@ -13,24 +15,29 @@ def xml(dataset_blobs):
     resources = []
 
     def normv(v):
+        if isinstance(v, list):
+            return [normv(_) for _ in v]
         if isinstance(v, str) and v.startswith('http'):
             # needed for loading from json that has been serialized
             # rather than from our internal representation
             # probably better to centralized the reload ...
             v = OntTerm(v)
-            return v.tabular()
-
+            return v.asCell()
         if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
-            return ot.tabular()
+            return ot.asCell()
         if isinstance(v, ProtcurExpression):
             return str(v)  # FIXME for xml?
         if isinstance(v, Quantity):
             return str(v)
         elif isinstance(v, pathlib.Path):
             return str(v)
+        elif isinstance(v, idlib.Stream):
+            return v.asCell()
+        #elif isinstance(v, list) or isinstance(v, str):
+            #return v
         else:
-            #log.debug(repr(v))
+            #loge.debug(repr(v))
             return v
 
     for dataset_blob in dataset_blobs:

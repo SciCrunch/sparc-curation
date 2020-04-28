@@ -31,7 +31,7 @@ Usage:
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
-    spc show     [(export [json ttl])] [options] [<project-id>]
+    spc show     [schemas (export [json ttl])] [options] [<project-id>]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -237,6 +237,10 @@ stop = time()
 class Options(clif.Options):
 
     @property
+    def export_schemas_path(self):
+        return Path(self.export_path) / 'schemas'  # FIXME not sure if correct
+
+    @property
     def jobs(self):
         return int(self._args['--jobs'])
 
@@ -397,6 +401,7 @@ class Main(Dispatcher):
             self.options.filetypes or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
+            (self.options.export and self.options.schemas) or
             (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
@@ -874,6 +879,16 @@ done"""
                        # means that there may be silent fetch failures
                        or path.content_different())
 
+    def _check_duplicates(self, datasets):
+        if not datasets:
+            datasets = list(self.datasets_local)
+
+        counts = Counter([d.id for d in datasets])
+        bads = [(id, c) for id, c in counts.most_common() if c > 1]
+        if bads:
+            # FIXME sys.exit ?
+            raise BaseException(f'duplicate datasets {bads}')
+
     def export(self):
         from sparcur import export as ex  # FIXME very slow to import
 
@@ -884,11 +899,12 @@ done"""
         # TODO export source path without having to be in that folder
 
         if self.options.schemas:
-            ex.export_schemas(self.options.export_path)
+            ex.core.export_schemas(self.options.export_schemas_path)
 
         elif self.options.mbf:
             export = self._export(ex.ExportXml)
             dataset_paths = self._datasets_with_extension('xml')
+            self._check_duplicates(dataset_paths)
             blob_ir, *rest = export.export(dataset_paths=dataset_paths,
                                            jobs=self.options.jobs,
                                            debug=self.options.debug)
@@ -897,7 +913,9 @@ done"""
 
         else:
             export = self._export(ex.Export)
-            blob_ir, *rest = export.export(dataset_paths=tuple(self.paths))
+            dataset_paths = tuple(self.paths)
+            self._check_duplicates(dataset_paths)
+            blob_ir, *rest = export.export(dataset_paths=dataset_paths)
 
         if self.options.debug:
             breakpoint()
@@ -1329,6 +1347,11 @@ done"""
                 export.latest_export_path.xopen()
             elif self.options.ttl:
                 export.latest_ttl_path.xopen()
+
+        elif self.options.schemas:
+            print(self.options.export_schemas_path)
+            self.options.export_schemas_path.xopen()  # NOTE it is a folder
+
 
     ### sub dispatchers
 

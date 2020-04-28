@@ -1,7 +1,7 @@
 import idlib
 import rdflib
 import requests
-from idlib.cache import cache
+from idlib.cache import cache, COOLDOWN
 from idlib.utils import resolution_chain
 from orthauth.utils import QuietDict
 from pyontutils import combinators as cmb
@@ -34,7 +34,7 @@ class ProtcurData:
             yield p
             yield from gen
         except StopIteration:
-            log.error(f'could not find annotations for {protocol_uri}')
+            log.error(f'could not find annotations for {protocol_uri.identifier}')
             return
 
         if p.document.otherVersionUri:  # FIXME also maybe check /abstract?
@@ -171,19 +171,17 @@ class ProtocolData(dat.HasErrors):
                 sc = end_uri.progenitor.status_code
                 if sc > 400:
                     msg = f'error accessing {end_uri} {sc}'
-                    self.addError(msg,
-                                  blame='submission',
-                                  logfunc=logd.error)
+                    if self.addError(msg, blame='submission'):
+                        logd.error(msg)
+
             except idlib.exceptions.ResolutionError as e:
                 pass  # FIXME I think we already log this error?
             except requests.exceptions.MissingSchema as e:
-                self.addError(e,
-                              blame='submission',
-                              logfunc=logd.error)
+                if self.addError(e, blame='submission'):
+                    logd.error(e)
             except OntId.BadCurieError as e:
-                self.addError(e,
-                              blame='submission',
-                              logfunc=logd.error)
+                if self.addError(e, blame='submission'):
+                    logd.error(e)
             except BaseException as e:
                 #breakpoint()
                 log.exception(e)
@@ -203,7 +201,6 @@ class ProtocolData(dat.HasErrors):
 
     @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
     def get(self, uri):
-         #juri = uri + '.json'
         logd.info(uri)
         log.debug('going to network for protocols')
         resp = requests.get(uri, headers=self._pio_header)
@@ -222,8 +219,10 @@ class ProtocolData(dat.HasErrors):
                 sc = j['status_code']
                 em = j['error_message']
                 msg = f'protocol issue {uri} {resp.status_code} {sc} {em} {self.id!r}'
-                logd.error(msg)
-                self.addError(msg)
+                if self.addError(msg):
+                    logd.error(msg)
+
+                return {COOLDOWN: msg,}
                 # can't return here because of the cache
             except BaseException as e:
                 log.exception(e)
@@ -240,8 +239,9 @@ class ProtocolData(dat.HasErrors):
             log.info(pioid)
         else:
             msg = f'protocol uri is not from protocols.io {pi} {self.id}'
-            logd.error(msg)
-            self.addError(msg)
+            if self.addError(msg):
+                logd.error(msg)
+
             return
 
         #uri_path = uri.rsplit('/', 1)[-1]
@@ -266,8 +266,10 @@ class ProtocolData(dat.HasErrors):
                 sc = j['status_code']
                 em = j['error_message']
                 msg = f'protocol issue {uri} {resp.status_code} {sc} {em} {self.id!r}'
-                logd.error(msg)
-                self.addError(msg)
+                if self.addError(msg):
+                    logd.error(msg)
+
+                return {COOLDOWN: msg,}
                 # can't return here because of the cache
             except BaseException as e:
                 log.exception(e)
