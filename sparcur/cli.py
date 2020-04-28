@@ -31,6 +31,7 @@ Usage:
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
+    spc show     [(export [json ttl])] [options] [<project-id>]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -237,33 +238,33 @@ class Options(clif.Options):
 
     @property
     def jobs(self):
-        return int(self.args['--jobs'])
+        return int(self._args['--jobs'])
 
     @property
     def limit(self):
-        l = int(self.args['--limit'])
+        l = int(self._args['--limit'])
         if l >= 0:
             return l
 
     @property
     def level(self):
-        return int(self.args['--level']) if self.args['--level'] else None
+        return int(self._args['--level']) if self._args['--level'] else None
 
     @property
     def rate(self):
-        return int(self.args['--rate']) if self.args['--rate'] else None
+        return int(self._args['--rate']) if self._args['--rate'] else None
 
     @property
     def mbf(self):
         # deal with the fact that both mbf and --mbf are present
-        return self.args['--mbf'] or self._default_mbf
+        return self._args['--mbf'] or self._default_mbf
 
 
 class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
                  '.~lock',)
 
-    def _export(self, export_class, export_source_path=None):
+    def _export(self, export_class, export_source_path=None, org_id=None):
 
         if export_source_path is None:
             export_source_path = self.cwd
@@ -275,7 +276,8 @@ class Dispatcher(clif.Dispatcher):
                               self._timestamp,
                               self.options.latest,
                               self.options.partial,
-                              self.options.open,)
+                              self.options.open,
+                              org_id)
         return export
 
     def _print_table(self, rows, title=None, align=None, ext=None):
@@ -388,6 +390,7 @@ class Main(Dispatcher):
         # FIXME populate this via decorator
         if (self.options.clone or
             self.options.meta or
+            self.options.show or
             self.options.goto or
             self.options.apinat or
             self.options.tofetch or  # size does need a remote but could do it lazily
@@ -1285,21 +1288,6 @@ done"""
             nall = list(new_anchor.rchildren)
             return nall
 
-    ### sub dispatchers
-
-    def report(self):
-        report = Report(self)
-        report('report')
-
-    def shell(self):
-        """ drop into an shell with classes loaded """
-        shell = Shell(self)
-        shell('shell')
-
-    def fix(self):
-        fix = Fix(self)
-        fix('fix')
-
     def apinat(self):
         from sparcur import apinat
         path_in = Path(self.options.path_in)
@@ -1331,6 +1319,31 @@ done"""
                 cache = Path(iop).cache
 
             print(hfn.atag(cache.uri_human, cache.id))
+
+    def show(self):
+        if self.options.export:
+            from sparcur import export as ex
+            org_id = self.options.project_id if self.options.project_id else auth.get('blackfynn-organization')
+            export = self._export(ex.Export, org_id=org_id)
+            if self.options.json:
+                export.latest_export_path.xopen()
+            elif self.options.ttl:
+                export.latest_ttl_path.xopen()
+
+    ### sub dispatchers
+
+    def report(self):
+        report = Report(self)
+        return report('report')
+
+    def shell(self):
+        """ drop into an shell with classes loaded """
+        shell = Shell(self)
+        return shell('shell')
+
+    def fix(self):
+        fix = Fix(self)
+        return fix('fix')
 
 
 class Report(Dispatcher):

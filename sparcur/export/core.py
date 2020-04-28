@@ -39,9 +39,16 @@ class ExportBase:
                  timestamp,
                  latest=False,
                  partial=False,
-                 open_when_done=False,):
-        self.export_source_path = export_source_path
-        self.export_base = Path(export_path, export_source_path.cache.anchor.id, self.export_type)
+                 open_when_done=False,
+                 org_id=None):
+        if org_id is None:
+            self.export_source_path = export_source_path
+            id = export_source_path.cache.anchor.id
+        else:
+            # do not set export_source_path, to prevent accidental export
+            id = org_id
+
+        self.export_base = Path(export_path, id, self.export_type)
         self.latest = latest
         self.partial = partial
         self.folder_timestamp = folder_timestamp
