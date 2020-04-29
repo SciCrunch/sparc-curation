@@ -1,4 +1,65 @@
 cypherResources:
+  - path: /dynamic/prod/sparc/allOrganParts
+    operations: &allOrganParts-ops
+      - summary: Get the list of all FMA organ parts for all FMA organs relevant to SPARC
+    query: &allOrganParts |
+      MATCH (n)
+      WHERE n.iri IN [
+          "http://purl.org/sig/ont/fma/fma7195",  // lung
+          "http://purl.org/sig/ont/fma/fma7088",  // heart
+          "http://purl.org/sig/ont/fma/fma7197",  // liver
+          "http://purl.org/sig/ont/fma/fma7198",  // pancreas
+          "http://purl.org/sig/ont/fma/fma7203",  // kidney
+          "http://purl.org/sig/ont/fma/fma7148",  // stomach
+          "http://purl.org/sig/ont/fma/fma7196",  // spleen
+          "http://purl.org/sig/ont/fma/fma14543", // colon
+          "http://purl.org/sig/ont/fma/fma7201",  // large intestine
+          "http://purl.org/sig/ont/fma/fma7200",  // small intestine
+          "http://purl.org/sig/ont/fma/fma7199",  // intestine
+          "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
+          "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
+          "http://purl.org/sig/ont/fma/fma7157",  // nervous system
+          "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
+          "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
+          "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
+          "http://purl.org/sig/ont/fma/fma50801"  // brain
+        ]
+      WITH n
+      MATCH path = (start:Class{iri: n.iri})
+      <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
+      <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
+      <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
+      RETURN path
+      UNION  // for this query UNION seems to be MUCH faster than using WITH
+      MATCH (n)
+      WHERE n.iri IN [
+          "http://purl.org/sig/ont/fma/fma7195",  // lung
+          "http://purl.org/sig/ont/fma/fma7088",  // heart
+          "http://purl.org/sig/ont/fma/fma7197",  // liver
+          "http://purl.org/sig/ont/fma/fma7198",  // pancreas
+          "http://purl.org/sig/ont/fma/fma7203",  // kidney
+          "http://purl.org/sig/ont/fma/fma7148",  // stomach
+          "http://purl.org/sig/ont/fma/fma7196",  // spleen
+          "http://purl.org/sig/ont/fma/fma14543", // colon
+          "http://purl.org/sig/ont/fma/fma7201",  // large intestine
+          "http://purl.org/sig/ont/fma/fma7200",  // small intestine
+          "http://purl.org/sig/ont/fma/fma7199",  // intestine
+          "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
+          "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
+          "http://purl.org/sig/ont/fma/fma7157",  // nervous system
+          "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
+          "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
+          "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
+          "http://purl.org/sig/ont/fma/fma50801"  // brain
+        ]
+      WITH n
+      MATCH path = (start:Class{iri: n.iri})
+      // this one does not need to be inverted ? except for the INCOMING flag
+      <-[:fma:arterial_supply_of|fma:venous_drainage_of]-(vessel)
+      <-[:fma:branch|fma:tributary]-(more_vessel)
+      <-[:fma:branch|fma:tributary|fma:regional_part]-(even_more_vessel)
+      RETURN path
+
   - path: /dynamic/prod/sparc/organParts/{id}
     operations: &organParts-ops
       - summary: Get the parts list for an organ including nerves and blood vessles
@@ -435,9 +496,9 @@ cypherResources:
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
       -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
       RETURN path1, path2
-      
+
       UNION
-      
+
       MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
       -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
       -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
@@ -536,9 +597,9 @@ cypherResources:
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
       RETURN path1, path2, path3
-      
+
       UNION
-      
+
       MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
       -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
       -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
