@@ -1,8 +1,8 @@
 cypherResources:
-  - path: /dynamic/prod/sparc/allOrganParts
-    operations: &allOrganParts-ops
+  - path: /dynamic/prod/sparc/organParts
+    operations: &organParts-ops
       - summary: Get the list of all FMA organ parts for all FMA organs relevant to SPARC
-    query: &allOrganParts |
+    query: &organParts |
       MATCH (n)
       WHERE n.iri IN [
           "http://purl.org/sig/ont/fma/fma7195",  // lung
@@ -61,13 +61,13 @@ cypherResources:
       RETURN path
 
   - path: /dynamic/prod/sparc/organParts/{id}
-    operations: &organParts-ops
+    operations: &organParts-ids-ops
       - summary: Get the parts list for an organ including nerves and blood vessles
         parameters:
          - name: id
            description: ontology id of the organ
            paramType: path
-    query: &organParts |
+    query: &organParts-ids |
       // depth of 6 captures everything, 5 is too shallow, 40 is WAY too deep
       MATCH path = (start:Class{iri: "${id}"})
       <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
@@ -83,8 +83,8 @@ cypherResources:
       RETURN path
 
   - path: /dynamic/test/sparc/organParts/{id}
-    operations: *organParts-ops
-    query: *organParts
+    operations: *organParts-ids-ops
+    query: *organParts-ids
 
   - path: /dynamic/prod/sparc/parcellationArtifacts
     operations:
