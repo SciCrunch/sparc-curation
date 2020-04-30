@@ -102,6 +102,11 @@ class ProtcurData:
         annos.clear()
         annos.extend(get_annos())
 
+        # reset classes in case some other class has populated them
+        # (e.g. during testing) FIXME this is a bad hack
+        protc.reset()
+        Hybrid.reset()
+
         # FIXME this is expensive and slow to continually recompute
         [protc(a, annos) for a in annos]
         [Hybrid(a, annos) for a in annos]
