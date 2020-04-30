@@ -925,7 +925,7 @@ done"""
             data = self.summary.data()
         else:
             from sparcur import export as ex
-            data = self._export(ex.Export).latest_export
+            data = self._export(ex.Export).latest_ir
 
         dataset_blobs = data['datasets']
 
@@ -1240,7 +1240,7 @@ done"""
                                   for d in self.datasets}
         else:
             from sparcur import export as ex
-            data = self._export(ex.Export).latest_export
+            data = self._export(ex.Export).latest_ir
             self.dataset_index = {d['id']:d for d in data['datasets']}
 
         report = Report(self)
@@ -1427,7 +1427,7 @@ class Report(Dispatcher):
             data = self.summary.data_for_export(UTCNOWISO())
         else:
             from sparcur import export as ex
-            data = self._export(ex.Export).latest_export
+            data = self._export(ex.Export).latest_ir
 
         datasets = data['datasets']
         unique = {c['id']:c for d in datasets
@@ -1555,7 +1555,7 @@ class Report(Dispatcher):
             data = self.summary.data()
         else:
             from sparcur import export as ex
-            data = self._export(ex.Export).latest_export
+            data = self._export(ex.Export).latest_ir
 
         datasets = data['datasets']
         key = self._sort_key
@@ -1576,7 +1576,7 @@ class Report(Dispatcher):
             data = self.summary.data()
         else:
             from sparcur import export as ex
-            data = self._export(ex.Export).latest_export
+            data = self._export(ex.Export).latest_ir
 
         datasets = data['datasets']
         key = self._sort_key
@@ -1597,7 +1597,7 @@ class Report(Dispatcher):
             raw = self.summary.completeness
         else:
             from sparcur import export as ex
-            datasets = self._export(ex.Export).latest_export['datasets']
+            datasets = self._export(ex.Export).latest_ir['datasets']
             raw = [self.summary._completeness(data) for data in datasets]
 
         def rformat(i, si, ci, ei, name, id, award, organ):
@@ -1639,7 +1639,7 @@ class Report(Dispatcher):
         from sparcur import export as ex
         data = (self.summary.data()
                 if self.options.raw else
-                self._export(ex.Export).latest_export)
+                self._export(ex.Export).latest_ir)
         datasets = data['datasets']
         _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
                         key=lambda v: -len(v))
@@ -1675,7 +1675,7 @@ class Report(Dispatcher):
             self.summary.data()['datasets']
         else:
             from sparcur import export as ex
-            datasets = self._export(ex.Export).latest_export['datasets']
+            datasets = self._export(ex.Export).latest_ir['datasets']
 
         if self.cwd != self.anchor:
             id = self.cwd.cache.dataset.id
@@ -1726,7 +1726,7 @@ class Report(Dispatcher):
             blob_ir = self.parent.export()
         else:
             from sparcur import export as ex
-            blob_ir = self._export(ex.ExportXml).latest_export  # FIXME need to load?
+            blob_ir = self._export(ex.ExportXml).latest_ir  # FIXME need to load?
 
         mbf_types = tuple(c.mimetype for c in (exml.ExtractMBF, exml.ExtractNeurolucida))
         if self.options.unique:

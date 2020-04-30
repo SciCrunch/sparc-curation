@@ -192,6 +192,17 @@ class Export(ExportBase):
     filename_ir = 'curation-export.json'
     id_metadata = 'identifier-metadata.json'
 
+    _pyru_loaded = False
+
+    @property
+    def latest_ir(self):
+        if not self.__class__._pyru_loaded:
+            self.__class__._pyru_loaded = True
+            from pysercomb.pyr import units as pyru
+            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+
+        return super().latest_ir
+
     @property
     def latest_ttl_path(self):
         return self.latest_export_path.with_suffix('.ttl')
@@ -434,8 +445,6 @@ class Export(ExportBase):
         # FIXME Summary has implicit state set by cli
         summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths)
         if self.latest:
-            from pysercomb.pyr import units as pyru
-            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
             blob_data = self.latest_ir
         else:
             blob_data = summary.data_for_export(self.timestamp)
