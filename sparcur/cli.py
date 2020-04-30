@@ -282,7 +282,6 @@ class Dispatcher(clif.Dispatcher):
                               self.options.latest,
                               self.options.partial,
                               self.options.open,
-                              self._logfile,
                               org_id)
         return export
 
@@ -370,17 +369,10 @@ class Main(Dispatcher):
 
     # things all children should have
     # kind of like a non optional provides you WILL have these in your namespace
-    def __init__(self, options, time_now=GetTimeNow(), logpath=None):
+    def __init__(self, options, time_now=GetTimeNow()):
         self._time_now = time_now
         self._timestamp = self._time_now.START_TIMESTAMP
         self._folder_timestamp = self._time_now.START_TIMESTAMP_LOCAL
-
-        if logpath:
-            self._logfile = logpath / self._time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
-            bind_file_handler(self._logfile)
-        else:
-            self._logfile = None
-
         super().__init__(options)
         if not self.options.verbose:
             log.setLevel('INFO')
@@ -2018,8 +2010,11 @@ def main():
         logpath.mkdir(parents=True)
 
     try:
+        logfile = logpath / time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
+        bind_file_handler(logfile)
+
         options = Options(args, defaults)
-        main = Main(options, time_now, logpath)
+        main = Main(options, time_now)
         if main.options.debug:
             print(main.options)
 
@@ -2029,8 +2024,8 @@ def main():
         print()
         raise e
     finally:
-        if main._logfile.size == 0:
-            main._logfile.unlink()
+        if logfile.size == 0:
+            logfile.unlink()
 
     if options.profile:
         exit = time()
