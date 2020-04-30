@@ -7,10 +7,11 @@ from joblib import Parallel, delayed
 from pyontutils.utils import byCol as _byCol, Async, deferred, makeSimpleLogger
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
-from sparcur.core import JT, log
+from sparcur.core import JT
 from sparcur.core import adops, OntTerm
 from sparcur.paths import Path
 from sparcur.state import State
+from sparcur.utils import log, SimpleFileHandler
 from sparcur import schemas as sc
 from sparcur.export.triples import TriplesExportDataset, TriplesExportSummary
 from sparcur.datasources import OrganData, OntologyData
@@ -187,7 +188,7 @@ class Integrator(PathData, OntologyData):
     def name(self):
         return self.path.name
 
-    def pipeline(self, timestamp):
+    def pipeline(self, timestamp, logfile=None):
         if hasattr(self, '_pipeline'):
             return self._pipeline
 
@@ -271,15 +272,15 @@ class Integrator(PathData, OntologyData):
         self._pipeline = pipes.PipelineEnd(self.path, lifters, RuntimeContext())
         return self._pipeline
 
-    def data(self, timestamp=None):
+    def data(self, timestamp=None, logfile=None):
         if hasattr(self, '_data'):
             return self._data
 
         self._data = self.pipeline(timestamp).data
         return self._data
 
-    def data_for_export(self, timestamp):
-        data = self.data(timestamp)
+    def data_for_export(self, timestamp, logfile=None):
+        data = self.data(timestamp, logfile)
         # NOTE this timestamps the cached data AS INTENDED
         data['prov'] = {
             'export_system_identifier': Path.sysid,
@@ -559,7 +560,7 @@ class Summary(Integrator, ExporterSummarizer):
     def pipeline_end(self):
         return self._pipeline_end()
 
-    def _pipeline_end(self, timestamp=None):
+    def _pipeline_end(self, timestamp=None, logfile=None):
         if not hasattr(self, '_data_cache'):
             # FIXME validating in vs out ...
             # return self.make_json(d.validate_out() for d in self)
@@ -596,37 +597,40 @@ class Summary(Integrator, ExporterSummarizer):
                 # dataset and then reload them all at once and possibly even do
                 # the per-dataset ttl conversion as well, parsing the ttl is probably
                 # a bad call though
-                hrm = Parallel(n_jobs=self._n_jobs)(delayed(datame)(d, ca, timestamp, helpers)
+                hrm = Parallel(n_jobs=self._n_jobs)(delayed(datame)(d, ca, timestamp, logfile, helpers)
                                                     for d in self.iter_datasets_safe)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
             else:
-                self._data_cache = self.make_json(datame(d, ca, timestamp, helpers)
+                self._data_cache = self.make_json(datame(d, ca, timestamp, logfile, helpers)
                                                   for d in self.iter_datasets_safe)
 
         return self._data_cache
 
     @hasSchema.f(sc.SummarySchema, fail=True)
-    def data(self, timestamp=None):
-        data = self._pipeline_end(timestamp)
+    def data(self, timestamp=None, logfile=None):
+        data = self._pipeline_end(timestamp, logfile)
         return data  # FIXME we want objects that wrap the output rather than generate it ...
 
     @hasSchema.f(sc.SummarySchema, fail=True)
-    def data_for_export(self, timestamp):
-        data = self._pipeline_end(timestamp)
+    def data_for_export(self, timestamp, logfile=None):
+        data = self._pipeline_end(timestamp, logfile)
         # NOTE this timestamps the cached data AS INTENDED
         data['prov']['timestamp_export_start'] = timestamp
         return data
 
 
-def datame(d, ca, timestamp, helpers=None):
+def datame(d, ca, timestamp, logfile=None, helpers=None):
     """ sigh, pickles """
     log_names = 'idlib', 'protcur', 'orthauth', 'ontquery', 'augpathlib', 'pyontutils'
     for log_name in log_names:
         log = logging.getLogger(log_name)
         if not log.handlers:
             log = makeSimpleLogger(log_name)
-            log.info('{log_name} had no handler')
+            if logfile is not None:
+                SimpleFileHandler(logfile, log)
+
+            log.info(f'{log_name} had no handler')
         else:
             log.debug(log.handlers)
 

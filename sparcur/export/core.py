@@ -43,6 +43,7 @@ class ExportBase:
                  latest=False,
                  partial=False,
                  open_when_done=False,
+                 logfile=None,
                  org_id=None):
         if org_id is None:
             self.export_source_path = export_source_path
@@ -57,6 +58,7 @@ class ExportBase:
         self.folder_timestamp = folder_timestamp
         self.timestamp = timestamp
         self.open_when_done = open_when_done
+        self.logfile = logfile
 
     @staticmethod
     def make_dump_path(dump_path):
@@ -245,7 +247,7 @@ class Export(ExportBase):
         functions = []
         suffixes = []
         modes = []
-        blob_data = intr.data_for_export(self.timestamp)  # build and cache the data
+        blob_data = intr.data_for_export(self.timestamp, self.logfile)  # build and cache the data
 
         # always dump the json
         j = lambda f: json.dump(blob_data, f, sort_keys=True, indent=2, cls=JEncode)
@@ -447,7 +449,7 @@ class Export(ExportBase):
         if self.latest:
             blob_data = self.latest_ir
         else:
-            blob_data = summary.data_for_export(self.timestamp)
+            blob_data = summary.data_for_export(self.timestamp, self.logfile)
 
         return blob_data, summary, previous_latest, previous_latest_datasets
 

@@ -223,15 +223,6 @@ class NormValues(HasErrors):
     """ Base class with an open dir to avoid name collisions """
 
     embed_bad_key_message = False  # TODO probably don't want this, better to zap bad values in pipeline
-    _logged = set()
-
-    @classmethod
-    def _already_logged(cls, thing):
-        case = thing in cls._logged
-        if not case:
-            cls._logged.add(thing)
-
-        return case
 
     def __init__(self, obj_inst):
         super().__init__()
@@ -753,9 +744,8 @@ class NormSubjectsFile(NormValues):
         except self.pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
             msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
-            if not self._already_logged(msg):
+            if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline'):
                 log.error(msg)
-            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline')
             yield value
             return
 

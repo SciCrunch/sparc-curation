@@ -209,7 +209,8 @@ from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
 from sparcur.core import OntId, OntTerm, get_all_errors, adops
-from sparcur.utils import log, logd, SimpleFileHandler, GetTimeNow
+from sparcur.utils import GetTimeNow
+from sparcur.utils import log, logd, SimpleFileHandler, bind_file_handler
 from sparcur.utils import python_identifier, want_prefixes, symlink_latest
 from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
 from sparcur.state import State
@@ -281,6 +282,7 @@ class Dispatcher(clif.Dispatcher):
                               self.options.latest,
                               self.options.partial,
                               self.options.open,
+                              self._logfile,
                               org_id)
         return export
 
@@ -368,10 +370,17 @@ class Main(Dispatcher):
 
     # things all children should have
     # kind of like a non optional provides you WILL have these in your namespace
-    def __init__(self, options, time_now=GetTimeNow()):
+    def __init__(self, options, time_now=GetTimeNow(), logpath=None):
         self._time_now = time_now
         self._timestamp = self._time_now.START_TIMESTAMP
         self._folder_timestamp = self._time_now.START_TIMESTAMP_LOCAL
+
+        if logpath:
+            self._logfile = logpath / self._time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
+            bind_file_handler(self._logfile)
+        else:
+            self._logfile = None
+
         super().__init__(options)
         if not self.options.verbose:
             log.setLevel('INFO')
@@ -1998,35 +2007,19 @@ class Fix(Shell):
         breakpoint()
 
 
-def bind_file_handler(log_file):
-    # FIXME the this does not work with joblib at the moment
-    from idlib.utils import log as idlog
-    from protcur.core import log as prlog
-    from orthauth.utils import log as oalog
-    from ontquery.utils import log as oqlog
-    from augpathlib.utils import log as alog
-    from pyontutils.utils import log as pylog
-
-    sfh = SimpleFileHandler(log_file, log, logd)
-    sfh(alog, idlog, oalog, oqlog, prlog, pylog)
-
-
 def main():
     time_now = GetTimeNow()
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
 
-    log_path = Path(args['--log-path'])
-    if not log_path.exists():
-        log_path.mkdir(parents=True)
+    logpath = Path(args['--log-path'])
+    if not logpath.exists():
+        logpath.mkdir(parents=True)
 
     try:
-        log_file = log_path / time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
-        bind_file_handler(log_file)
-
         options = Options(args, defaults)
-        main = Main(options, time_now)
+        main = Main(options, time_now, logpath)
         if main.options.debug:
             print(main.options)
 
@@ -2036,8 +2029,8 @@ def main():
         print()
         raise e
     finally:
-        if log_file.size == 0:
-            log_file.unlink()
+        if main._logfile.size == 0:
+            main._logfile.unlink()
 
     if options.profile:
         exit = time()

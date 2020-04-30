@@ -65,6 +65,19 @@ class SimpleFileHandler:
         self.log_file_handler.setFormatter(log.handlers[0].formatter)
 
 
+def bind_file_handler(log_file):
+    # FIXME the this does not work with joblib at the moment
+    from idlib.utils import log as idlog
+    from protcur.core import log as prlog
+    from orthauth.utils import log as oalog
+    from ontquery.utils import log as oqlog
+    from augpathlib.utils import log as alog
+    from pyontutils.utils import log as pylog
+
+    sfh = SimpleFileHandler(log_file, log)
+    sfh(alog, idlog, oalog, oqlog, prlog, pylog)
+
+
 class _log:
     """ logging prevents nice ipython recurions error printing
         so rename this class to log when you need fake logging """
