@@ -1,6 +1,6 @@
 import idlib
 from pyontutils.sheets import Sheet
-from sparcur.core import OntId, OntTerm
+from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
 from urllib.parse import quote
 
@@ -118,18 +118,51 @@ class Organs(FieldAlignment):
     fetch_grid = True
     #fetch_grid = False
 
-    def _lookup(self, dataset_id):
+    def _lookup(self, dataset_id, fail=False, raw=True):
         try:
-            return self.byCol.searchIndex('id', dataset_id)
+            row = self.byCol.searchIndex('id', dataset_id, raw=raw)
+            return row
         except KeyError as e:
             # TODO update the sheet automatically
             log.critical(f'New dataset! {dataset_id}')
+            if fail:
+                raise e
 
     def _dataset_row_index(self, dataset_id):
         # FIXME dict or cache this for performance
-        for i, id in enumerate(self.byCol.id):
-            if id == dataset_id:
-                return i + 1
+        row = self._lookup(dataset_id, fail=True)
+        return self.values.index(row)
+
+    def _update_dataset_metadata(self, id, name, award):
+        try:
+            row_index = self._dataset_row_index(id)
+            row = self.row_object(row_index)
+
+            cell_dsn = row.dataset_name()
+            if cell_dsn.value != name:
+                cell_dsn.value = name
+
+            cell_award = row.award()
+            if cell_award.value != award:
+                cell_award.value = award
+
+        except KeyError as e:
+            row = ['', '', name, id, award]
+            self._appendRow(row)
+
+    def update_from_ir(self, ir):
+        dataset_blobs = ir['datasets']
+        self._wat = self.values[8]
+        for blob in dataset_blobs:
+            meta = blob['meta']
+            self._update_dataset_metadata(
+                id=blob['id'],
+                name=adops.get(blob, ['meta', 'folder_name'], on_failure=''),
+                award=adops.get(blob, ['meta', 'award_number'], on_failure=''),
+            )
+
+        #log.debug(self.uncommitted())
+        self.commit()
 
     def modality(self, dataset_id):
         """ tuple of modalities """

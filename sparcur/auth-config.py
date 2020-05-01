@@ -12,4 +12,7 @@
   'hypothesis-user': {'environment-variables': 'HYP_USER'},
   'protocols-io-api-creds-file': None,
   'protocols-io-api-store-file': None,
+  'datasets-noexport': None,
+  'datasets-sparse': None,
+  'datasets-no': None,
  }}

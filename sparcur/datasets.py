@@ -186,6 +186,7 @@ class DatasetStructure(Path):
                         size += maybe_size
 
             if need_meta and self._refresh_on_missing:
+                log.critical(f'OH NO THIS IS GOING TO CAUSE DUPLICATES (probably)\n{self}')
                 nl = '\n'
                 log.info(f'refreshing {len(need_meta)} files with missing metadata in {self}'
                          f'\n{nl.join(_.as_posix() for _ in need_meta)}')

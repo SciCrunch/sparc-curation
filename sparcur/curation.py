@@ -460,18 +460,19 @@ class Summary(Integrator, ExporterSummarizer):
     _debug = False
     _n_jobs = 12
 
-    def __new__(cls, path, dataset_paths=tuple()):
+    def __new__(cls, path, dataset_paths=tuple(), exclude=tuple()):
         #cls.schema = cls.schema_class()
         cls.schema_out = cls.schema_out_class()
         return super().__new__(cls, path)
 
-    def __init__(self, path, dataset_paths=tuple()):
+    def __init__(self, path, dataset_paths=tuple(), exclude=tuple()):
         super().__init__(path)
         # not sure if this is kosher ... but it works
 
         # avoid infinite recursion of calling self.anchor.path
         super().__init__(self.path.cache.anchor.local) # FIXME ugh
         self._use_these_datasets = dataset_paths
+        self._exclude = exclude
  
     @property
     def iter_datasets_safe(self):
@@ -485,6 +486,10 @@ class Summary(Integrator, ExporterSummarizer):
             if path.cache is None and path.skip_cache:
                 continue
 
+            if path.cache.id in self._exclude:
+                log.info(f'skipping export of {path} because {path.cache.id} is in noexport')
+                continue
+
             yield IntegratorSafe(path)
 
     @property
@@ -496,7 +501,7 @@ class Summary(Integrator, ExporterSummarizer):
         if self._use_these_datasets:
             gen = enumerate(self._use_these_datasets)
         else:
-            gen = enumerate(self.anchor.path.iterdir())
+            gen = enumerate(self.anchor.path.children)
 
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth
@@ -504,13 +509,12 @@ class Summary(Integrator, ExporterSummarizer):
         for i, path in gen:
             # FIXME non homogenous, need to find a better way ...
             if path.cache is None and path.skip_cache:
-                # FIXME just as anticipated nullability of cache is BAD
-                # probably better to switch out cache is None for cache is NullCache
-                # to make treatment of cache homogenous for all local files so that
-                # handling the None case doesn't spread througout the codebase :/
                 continue
 
-            #if path.cache.id == 'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded':
+            if path.cache.id in self._exclude:
+                log.info(f'skipping export of {path} because {path.cache.id} is in noexport')
+                continue
+
             yield self.__class__.__base__(path)
 
     def __iter__(self):
@@ -597,8 +601,9 @@ class Summary(Integrator, ExporterSummarizer):
                 # dataset and then reload them all at once and possibly even do
                 # the per-dataset ttl conversion as well, parsing the ttl is probably
                 # a bad call though
-                hrm = Parallel(n_jobs=self._n_jobs)(delayed(datame)(d, ca, timestamp, helpers)
-                                                    for d in self.iter_datasets_safe)
+                hrm = Parallel(n_jobs=self._n_jobs)(
+                    delayed(datame)(d, ca, timestamp, helpers)
+                    for d in self.iter_datasets_safe)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
             else:
@@ -629,7 +634,8 @@ def datame(d, ca, timestamp, helpers=None):
             log = makeSimpleLogger(log_name)
             log.info(f'{log_name} had no handler')
         else:
-            log.debug(log.handlers)
+            #log.debug(log.handlers)
+            pass
 
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):

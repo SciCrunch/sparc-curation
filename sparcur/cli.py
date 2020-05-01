@@ -31,7 +31,8 @@ Usage:
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
-    spc show     [schemas (export [json ttl])] [options] [<project-id>]
+    spc show     [schemas rmeta (export [json ttl])] [options] [<project-id>]
+    spc sheets   [update] [options] <sheet-name>
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -199,7 +200,7 @@ from augpathlib import RemotePath, AugmentedPath  # for debug
 
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit, OntGraph
-from pyontutils.utils import UTCNOWISO
+from pyontutils.utils import UTCNOWISO, subclasses
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
@@ -396,6 +397,7 @@ class Main(Dispatcher):
         if (self.options.clone or
             self.options.meta or
             self.options.show or
+            self.options.sheets or
             self.options.goto or
             self.options.apinat or
             self.options.tofetch or  # size does need a remote but could do it lazily
@@ -651,21 +653,58 @@ class Main(Dispatcher):
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         dirs = self.directories
         cwd = self.cwd
+        skip = auth.get_list('datasets-no')
         if self.project_path.parent.name == 'big':
-            skip = self.skip
-            only = self.skip_big
+            only = auth.get_list('datasets-sparse')
         else:
-            skip = self.skip_big + self.skip
+            sparse = auth.get_list('datasets-sparse')
 
         if not dirs:
             dirs = cwd,
 
         dirs = sorted(dirs, key=lambda d: d.name)
+        if self.project_path in dirs:
+            check_dirs = [c for d in dirs for c in
+                          (d.children if d == self.project_path else (d,))
+                          if c.is_dir() and True or  # XXX not skipping sparse
+                          (c.cache.id not in sparse
+                           or only and c.cache.id in only)]
+        else:
+            check_dirs = dirs
 
-        existing_locals = set(rc for d in dirs for rc in d.rchildren)
-        # FIXME don't parse the fucking dates unless someone needs them you idiot
-        existing_d = {c.cache.id:c for c in existing_locals
-                      if c.cache is not None}  # yay null cache
+        existing_locals = set(rc for d in check_dirs for rc in d.rchildren)  # this is fairly quick
+
+        if self.options.profile:
+            from desc.prof import profile_me
+        else:
+            profile_me = lambda f: f
+
+        @profile_me
+        def fast():
+            # 2 seconds on sparse, 8.3 seconds for 223k ids
+            # faster than find getfattr by a long shot
+            existing_d = {e.cache_id:e for e in existing_locals}
+            return existing_d
+
+        @profile_me
+        def slow():
+            # some numbers when excluding the sparse datasets
+            # 33 seconds !!! WAT WAT WAT WAT
+            # now down to 22 by not parsing dates unless we need them
+            # but still a 10x overhead compared to the fast version above
+            # down to ~9 seconds just checking c.cach is not None
+            # so roughly 4x overhead just to instantiate the caches ... ugh
+
+            # FIXME TODO wow calling cache.meta is expensive
+            # is is the overhead for parsing the paths again
+            # probably worth creating a hack to init from local parts directly
+            existing_d = {c:c for c in existing_locals
+                          if c.cache is not None}  # yay null cache
+            return existing_d
+
+        existing_d1 = fast()
+        #existing_d2 = slow()
+        existing_d = existing_d1
         existing_ids = set(existing_d)
 
         log.debug(dirs)
@@ -692,7 +731,7 @@ class Main(Dispatcher):
             if d.cache.is_organization():  # FIXME FIXME FIXME hack to mask broken bootstrap handling of existing dirs :/
                 for cd in d.children:
                     if cd.is_dir():
-                        oc = cd.cache
+                        oc = cd.cache  # FIXME getting the cache slow
                         if oc is None and cd.skip_cache:
                             continue
 
@@ -706,7 +745,10 @@ class Main(Dispatcher):
 
             # FIXME something after this point is retaining stale filepaths on dataset rename ...
             #d = r.local  # in case a folder moved
-            caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
+            caches = newc.remote.bootstrap(recursive=recursive,
+                                           only=only,
+                                           skip=skip,
+                                           sparse=sparse,)
 
         new_locals = set(c.local for c in caches if c is not None)  # FIXME 
         new_ids = {c.id:c for c in caches if c is not None}
@@ -740,22 +782,6 @@ class Main(Dispatcher):
                                           for l in maybe_removed
                                           # FIXME deal with untracked files
                                           if l.cache)
-
-    ###
-    skip = (
-            'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
-            'N:dataset:a896935a-4718-4906-8a7b-b6d76fb260b6',  # test computational resource
-            'N:dataset:8bcf659c-f4b3-425f-ac33-8c560e02d4aa',  # test dataset
-        )
-
-    skip_big = (
-            'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
-            'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded',  # big max 2
-            'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
-            'N:dataset:ca9afa19-b616-41a9-a532-3ae5aaf4088f',  # big tif
-            #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
-        )
-    ###
 
     def refresh(self):
         paths = self.paths
@@ -881,10 +907,17 @@ done"""
                        or path.content_different())
 
     def _check_duplicates(self, datasets):
+        # NOTE this is an ok sanity check
+        # but cannot catch the duplicate dataset issue
+        # which actually comes from calling refresh
+        # while iterating through the list of dataset paths
+        # which can and does cause datasets move due to
+        # changes in their folder name
         if not datasets:
             datasets = list(self.datasets_local)
 
-        counts = Counter([d.id for d in datasets])
+        counts = Counter([d['id'] if isinstance(d, dict) else d.id
+                          for d in datasets])
         bads = [(id, c) for id, c in counts.most_common() if c > 1]
         if bads:
             # FIXME sys.exit ?
@@ -915,8 +948,11 @@ done"""
         else:
             export = self._export(ex.Export)
             dataset_paths = tuple(self.paths)
-            self._check_duplicates(dataset_paths)
-            blob_ir, *rest = export.export(dataset_paths=dataset_paths)
+            self._check_duplicates(dataset_paths)  # NOTE can be empty
+            noexport = (auth.get_list('datasets-noexport') +
+                        auth.get_list('datasets-no'))
+            blob_ir, *rest = export.export(dataset_paths=dataset_paths,
+                                           exclude=noexport)
 
         if self.options.debug:
             breakpoint()
@@ -970,8 +1006,7 @@ done"""
                                 if 'dataset_description' in d.data]  # FIXME
 
         # get package testing
-        bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
-                   'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
+        bigskip = auth.get_list('datasets-sparse') + auth.get_list('datasets-no')
         bfds = self.bfl.bf.datasets()
         packages = [list(d.packages) for d in bfds[:3]
                     if d.id not in bigskip]
@@ -1353,6 +1388,41 @@ done"""
             print(self.options.export_schemas_path)
             self.options.export_schemas_path.xopen()  # NOTE it is a folder
 
+        elif self.options.rmeta:
+            from sparcur import datasources as ds
+            Path(ds.BlackfynnDatasetData.cache_base).xopen()
+
+    def sheets(self):
+        from pyontutils import sheets as ps
+        from sparcur import sheets
+
+        # get ir
+        if self.options.raw:
+            data = self.summary.data()
+        else:
+            from sparcur import export as ex
+            org_id = auth.get('blackfynn-organization')
+            export = self._export(ex.Export, org_id=org_id)
+            data = export.latest_ir
+
+        # check that the ir is sane
+        self._check_duplicates(data['datasets'])
+
+        # get sheets
+        sheets = {(s.name, s.sheet_name):s for s in subclasses(ps.Sheet)
+                  if not s.__name__.startswith('_')}
+        by_sn = {sn:s for (n, sn), s in sheets.items()}
+        sn = self.options.sheet_name
+        Sheet = by_sn[sn]
+        Sheet.fetch_grid = False
+
+        if self.options.update:
+            sheet = Sheet(readonly=False)
+            sheet.update_from_ir(data)
+        else:
+            sheet = Sheet()
+
+        breakpoint()
 
     ### sub dispatchers
 

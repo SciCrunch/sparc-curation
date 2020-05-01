@@ -415,7 +415,7 @@ class Export(ExportBase):
                 writer = csv.writer(f, delimiter='\t', lineterminator='\n')
                 writer.writerows(tabular)
 
-    def export(self, dataset_paths=tuple()):
+    def export(self, dataset_paths=tuple(), exclude=tuple()):
         """ export output of curation workflows to file """
         if self.export_source_path != self.export_source_path.cache.anchor:
             if not self.export_source_path.cache.is_dataset():  # FIXME just go find the dataset in that case?
@@ -425,9 +425,9 @@ class Export(ExportBase):
             return self.export_single_dataset()  # FIXME unused except for `spc export .` from inside a dataset folder
 
         else:
-            return super().export(dataset_paths=dataset_paths)
+            return super().export(dataset_paths=dataset_paths, exclude=exclude)
 
-    def make_ir(self, dataset_paths=tuple()):
+    def make_ir(self, dataset_paths=tuple(), exclude=tuple()):
         """ build the internal representation """
         # FIXME inversion of control would be nice here :/
         # FIXME this should really be coming from a fully
@@ -443,7 +443,7 @@ class Export(ExportBase):
         previous_latest_datasets = self.latest_datasets_path.resolve()
         # data
         # FIXME Summary has implicit state set by cli
-        summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths)
+        summary = cur.Summary(self.export_source_path, dataset_paths=dataset_paths, exclude=exclude)
         if self.latest:
             blob_data = self.latest_ir
         else:

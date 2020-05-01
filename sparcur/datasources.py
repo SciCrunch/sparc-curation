@@ -8,7 +8,7 @@ from pyontutils.config import auth as pauth
 from pyontutils.core import OntId
 from pyontutils.utils import byCol
 from sparcur import normalization as nml
-from sparcur.core import log, logd
+from sparcur.core import log, logd, JEncode
 from sparcur.paths import Path
 #from sparcur.utils import cache
 from sparcur.config import config, auth
@@ -300,6 +300,6 @@ class BlackfynnDatasetData:
             blob['doi'] = self.remote.doi
 
         with open(self.cache, 'wt') as f:
-            json.dump(blob, f, indent=2, sort_keys=True)
+            json.dump(blob, f, indent=2, sort_keys=True, cls=JEncode)
 
         return blob

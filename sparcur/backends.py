@@ -605,7 +605,7 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.UnhandledTypeError  # TODO
 
-    def children_pull(self, existing_caches=tuple(), only=tuple(), skip=tuple()):
+    def children_pull(self, existing_caches=tuple(), only=tuple(), skip=tuple(), sparse=tuple()):
         # FIXME this is really a recursive pull for organization level only ...
         sname = lambda gen: sorted(gen, key=lambda c: c.name)
         def refresh(c):
@@ -636,7 +636,7 @@ class BlackfynnRemote(aug.RemotePath):
 
         if not self._debug:
             yield from (rc for d in Async(rate=self._async_rate)(
-                deferred(child.bootstrap)(recursive=True, only=only, skip=skip)
+                deferred(child.bootstrap)(recursive=True, only=only, skip=skip, sparse=sparse)
                 for child in sname(self.children)
                 #if child.id in skipexisting
                 # TODO when dataset's have a 'anything in me updated'
@@ -645,7 +645,7 @@ class BlackfynnRemote(aug.RemotePath):
                 ) for rc in d)
         else:  # debug
              yield from (rc for d in (
-                child.bootstrap(recursive=True, only=only, skip=skip)
+                child.bootstrap(recursive=True, only=only, skip=skip, sparse=sparse)
                 for child in sname(self.children))
                 #if child.id in skipexisting
                 # TODO when dataset's have a 'anything in me updated'

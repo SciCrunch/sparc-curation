@@ -53,7 +53,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
             # if you get unicode decode error here it is because
             # struct packing of timestamp vs isoformat are fighting
             # in xattrs pathmeta helper
-            return parser.parse(value.decode())  # FIXME with timezone vs without ...
+            return value.decode()  # path meta handles decoding for us
 
     @property
     def anchor(self):
@@ -168,13 +168,24 @@ class BlackfynnCache(PrimaryCache, EatCache):
             yield from self.local_object_cache_path._data_setter(gen)
             self.local_object_cache_path.cache_init(self.meta)  # FIXME self.meta be stale here?!
 
-    def _bootstrap_recursive(self, only=tuple(), skip=tuple()):
+    def _bootstrap_recursive(self, only=tuple(), skip=tuple(), sparse=False):
         # bootstrap the rest if we told it to
         if self.id.startswith('N:organization:'):  # FIXME :/
-            yield from self.remote.children_pull(self.children, only=only, skip=skip)
+            yield from self.remote.children_pull(self.children,
+                                                 only=only,
+                                                 skip=skip,
+                                                 sparse=sparse,)
 
         else:
-            yield from super()._bootstrap_recursive()
+            yield from super()._bootstrap_recursive(sparse=sparse)
+
+    _sparse_stems = (
+        'manifest', 'dataset_description', 'submission', 'subjects', 'samples'
+    )
+
+    def _sparse_include(self):
+        sl = self.stem.lower()
+        return bool([an for an in self._sparse_stems if an in sl])
 
 
 BlackfynnCache._bind_flavours()
@@ -185,6 +196,18 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         needs of the curation process. """
 
     _cache_class = BlackfynnCache
+
+    @property
+    def cache_id(self):
+        """ fast way to get cache.id terrifyingly this has roughly
+        an order of magnitude less overhead than self.cache.id """
+
+        try:
+            return (self.getxattr('bf.id').decode()
+                    if self.is_dir() or self.is_file() else
+                    self.readlink().parts[1])
+        except OSError as e:
+            raise exc.NoCachedMetadataError(self) from e
 
     def upload(self, replace=True, local_backup=False):
         # FIXME we really need a staging area ...
@@ -252,3 +275,5 @@ class StashPath(Path):
 BlackfynnCache._local_class = Path
 backends.BlackfynnRemote._new(Path, BlackfynnCache)
 backends.BlackfynnRemote.cache_key = BlackfynnCache.cache_key
+backends.BlackfynnRemote._sparse_stems = BlackfynnCache._sparse_stems
+backends.BlackfynnRemote._sparse_include = BlackfynnCache._sparse_include
