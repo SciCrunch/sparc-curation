@@ -699,10 +699,16 @@ find -maxdepth 1 -type d -name '[C-Z]*' -exec spc refresh -r 8 {} \;
 find \( -name '*.xlsx' -o -name '*.csv' -o -name '*.tsv' \) -exec ls -hlS {} \+
 #+END_SRC
 
+Open the dataset page for all empty directories in the browser.
+#+begin_src bash
+find -maxdepth 1 -type d -empty -exec spc pull {} \+
+find -maxdepth 1 -type d -empty -exec spc meta -u --browser {} \+
+#+end_src
+
+# temp fix for summary making folders when it should skip
 #+CAPTION: clean up empty directories
-#+CAPTION: temp fix for summary making folders when it should skip
 #+BEGIN_SRC bash :results none
-find -maxdepth 1 -type d -exec rmdir {} \;
+find -maxdepth 1 -type d -empty -exec rmdir {} \;
 #+END_SRC
 
 Pull local copy of data to a new computer. Note the double escape needed for the space.
@@ -923,6 +929,10 @@ Maintaining the backup database of the mappings would make this much faster.
 find . -not -type l -not -path '*operations*' -exec getfattr -n user.bf.id --only-values {} \; -print
 # broken symlink format, needs work, hard to parse
 find . -type l -not -path '*operations*' -exec readlink -n {} \; -print
+#+end_src
+**** Path counts per dataset
+#+begin_src bash
+for d in */; do printf "$(find "${d}" -print | wc -l) "; printf "$(getfattr --only-values -n user.bf.id "${d}") ${d}\n" ; done | sort -n
 #+end_src
 ** Developer
 See also the [[file:./developer-guide.org][sparcur developer guild]]
