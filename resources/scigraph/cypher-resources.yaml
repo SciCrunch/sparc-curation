@@ -25,40 +25,21 @@ cypherResources:
           "http://purl.org/sig/ont/fma/fma50801"  // brain
         ]
       WITH n
-      MATCH path = (start:Class{iri: n.iri})
+      MATCH path1 = (start:Class{iri: n.iri})
       <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
       <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
       <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
-      RETURN path
-      UNION  // for this query UNION seems to be MUCH faster than using WITH
-      MATCH (n)
-      WHERE n.iri IN [
-          "http://purl.org/sig/ont/fma/fma7195",  // lung
-          "http://purl.org/sig/ont/fma/fma7088",  // heart
-          "http://purl.org/sig/ont/fma/fma7197",  // liver
-          "http://purl.org/sig/ont/fma/fma7198",  // pancreas
-          "http://purl.org/sig/ont/fma/fma7203",  // kidney
-          "http://purl.org/sig/ont/fma/fma7148",  // stomach
-          "http://purl.org/sig/ont/fma/fma7196",  // spleen
-          "http://purl.org/sig/ont/fma/fma14543", // colon
-          "http://purl.org/sig/ont/fma/fma7201",  // large intestine
-          "http://purl.org/sig/ont/fma/fma7200",  // small intestine
-          "http://purl.org/sig/ont/fma/fma7199",  // intestine
-          "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
-          "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
-          "http://purl.org/sig/ont/fma/fma7157",  // nervous system
-          "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
-          "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
-          "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
-          "http://purl.org/sig/ont/fma/fma50801"  // brain
-        ]
-      WITH n
-      MATCH path = (start:Class{iri: n.iri})
+      WITH path1, n
+      MATCH path2 = (start:Class{iri: n.iri})
       // this one does not need to be inverted ? except for the INCOMING flag
       <-[:fma:arterial_supply_of|fma:venous_drainage_of]-(vessel)
       <-[:fma:branch|fma:tributary]-(more_vessel)
       <-[:fma:branch|fma:tributary|fma:regional_part]-(even_more_vessel)
-      RETURN path
+      RETURN path1, path2
+
+  - path: /dynamic/test/sparc/organParts
+    operations: *organParts-ops
+    query: *organParts
 
   - path: /dynamic/prod/sparc/organParts/{id}
     operations: &organParts-ids-ops
