@@ -42,7 +42,7 @@ class TriplesExport(ProtcurData):
 
     @property
     def ontid(self):
-        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/{self.id}')
+        return rdflib.URIRef(f'https://cassava.ucsd.edu/sparc/ontologies/{self.id}')
 
     @property
     def header_graph_description(self):
