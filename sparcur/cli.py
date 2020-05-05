@@ -9,7 +9,7 @@ Usage:
     spc fetch    [options] [<path>...]
     spc find     [options] --name=<PAT>...
     spc status   [options]
-    spc meta     [options] [--uri] [--browser] [--human] [--diff] [<path>...]
+    spc meta     [options] [<path>...]
     spc rmeta    [options]
     spc export   [schemas] [options] [<path>...]
     spc report   size    [options] [<path>...]
@@ -66,6 +66,7 @@ Commands:
     meta        display the metadata the current folder or specified paths
 
                 options: --diff     diff the local and cached metadata
+                       : --uri      render the uri for the remote
                        : --browser  navigate to the human uri for this file
                        : --human
                        : --context  include context, e.g. dataset
@@ -98,11 +99,15 @@ Commands:
                 errors          list of all errors per dataset
                 test            do as little as possible (use with --profile)
                 mbf             mbf term report (can use with --unique)
+                anno-tags       list anno exact for a curation tag
+                mis             list summary predicates used per dataset
 
                 options: --raw  run reports on live data without export
                        : --tab-table
                        : --sort-count-desc
                        : --unique
+                       : --uri
+                       : --uri-api
                        : --debug
 
     shell       drop into an ipython shell
@@ -1921,7 +1926,8 @@ class Report(Dispatcher):
             e = e.strip().rstrip()
             return e
 
-        matches = [(normalize_exact(a.exact), a) for a in hyp.HypothesisHelper.byTags(*tags)]
+        # note that HypothesisHelper.byTags is an AND search not and OR search
+        matches = [(normalize_exact(a.exact), a) for tag in tags for a in hyp.HypothesisHelper.byTags(tag)]
         if 'protc:input' in tags:
             pm = [protc.byId(a.id) for _, a in matches]
 
@@ -1938,8 +1944,12 @@ class Report(Dispatcher):
         for e, a in matches:
             md[e].append(a)
 
-        rows = sorted([['TODO', e, c, (' '.join([a.shareLink for a in md[e]] if links else ''))] for e, c in
-                       Counter([normalize_exact(e) for e, a in matches]).most_common()],
+        def gtag(e):  # FIXME memoize/cache?
+            return ' '.join(sorted(set(t for a in md[e] for t in a.tags if t in tags)))
+
+        rows = sorted([[gtag(e), e, c, (' '.join([a.htmlLink if self.options.uri_api else a.shareLink
+                                                 for a in md[e]] if links else ''))]
+                       for e, c in Counter([normalize_exact(e) for e, a in matches]).most_common()],
                       key=lambda ab: (ab[0], -ab[2], ab[1].lower()))
 
         header = [['tag', 'exact', 'count', 'links']]
@@ -1949,6 +1959,8 @@ class Report(Dispatcher):
     def anno_tags(self, *tags, links=False):
         if not tags:
             tags = self.options.tag
+
+        links = links or self.options.uri or self.options.uri_api
 
         return self._by_tags(*tags, links=links)
 
