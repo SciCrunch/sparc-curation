@@ -18,6 +18,7 @@ Usage:
     spc report   [access filetypes pathids test]    [options]
     spc report   [completeness keywords subjects]   [options]
     spc report   [contributors samples errors mbf]  [options]
+    spc report   [(anno-tags <tag>...) changes mis] [options]
     spc shell    [affil integration protocols exit] [options]
     spc server   [options]
     spc apinat   [options] <path-in> <path-out>
@@ -195,9 +196,9 @@ import htmlfn as hfn
 import ontquery as oq
 start_middle = time()
 import augpathlib as aug
+from hyputils import hypothesis as hyp
 from augpathlib import FileSize
 from augpathlib import RemotePath, AugmentedPath  # for debug
-
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit, OntGraph
 from pyontutils.utils import UTCNOWISO, subclasses
@@ -402,6 +403,7 @@ class Main(Dispatcher):
             self.options.apinat or
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
+            self.options.anno_tags or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
             (self.options.export and self.options.schemas) or
@@ -1893,11 +1895,72 @@ class Report(Dispatcher):
 
             yield self._print_table(rows, title=title, ext=ext)
 
+    def _annos(self):
+        if hasattr(self, '_c_annos'):
+            return self._c_annos
+
+        group_id = auth.get('hypothesis-group')
+        cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+        get_annos = hyp.Memoizer(memoization_file=cache_file, group=group_id)
+        get_annos.api_token = auth.get('hypothesis-api-key')
+        self._c_annos = get_annos()
+        return self._c_annos
+
+    def _by_tags(self, *tags, links=True):
+        annos = self._annos()
+        [hyp.HypothesisHelper(a, annos) for a in annos]
+        if 'protc:input' in tags:
+            from pysercomb.parsers import racket
+            from pysercomb.pyr import units as pyru
+            from protcur.analysis import protc
+            [protc(a, annos) for a in annos]
+
+        def normalize_exact(e):
+            e = e.replace('\t', ' ')
+            e = e.replace('\xA0', ' ')  # nbsp
+            e = e.strip().rstrip()
+            return e
+
+        matches = [(normalize_exact(a.exact), a) for a in hyp.HypothesisHelper.byTags(*tags)]
+        if 'protc:input' in tags:
+            pm = [protc.byId(a.id) for _, a in matches]
+
+            # testing
+            input = pm[13]
+            invar = next(next(input.children).children)
+            paramparser = pyru.ParamParser()
+            tv = racket.sexp(invar.parameter())[1]
+            tp = invar._parameter[1]
+            assert tv == tp
+            hrm = paramparser(tv)
+
+        md = defaultdict(list)
+        for e, a in matches:
+            md[e].append(a)
+
+        rows = sorted([['TODO', e, c, (' '.join([a.shareLink for a in md[e]] if links else ''))] for e, c in
+                       Counter([normalize_exact(e) for e, a in matches]).most_common()],
+                      key=lambda ab: (ab[0], -ab[2], ab[1].lower()))
+
+        header = [['tag', 'exact', 'count', 'links']]
+        return self._print_table(header + rows,
+                                 title=f'Annos for {" ".join(tags)}')
+
+    def anno_tags(self, *tags, links=False):
+        if not tags:
+            tags = self.options.tag
+
+        return self._by_tags(*tags, links=links)
+
     def changes(self):
         ori1 = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
         ori2 = OntResIri('https://cassava.ucsd.edu/sparc/archive/exports/2020-03-23T12:16:56,102146-07:00/curation-export.ttl')
         g1 = ori1.graph
         g2 = ori2.graph
+
+    def mis(self):
+        ori1 = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+        ori2 = OntResIri('https://cassava.ucsd.edu/sparc/archive/exports/2020-03-23T12:16:56,102146-07:00/curation-export.ttl')
 
 
 class Shell(Dispatcher):
