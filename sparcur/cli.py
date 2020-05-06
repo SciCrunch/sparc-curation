@@ -1429,7 +1429,19 @@ done"""
         else:
             sheet = Sheet()
 
-        breakpoint()
+        if sheet.sheet_name == 'Organs':
+            h = sheet.row_object(0)
+            tech_cells = [
+                cell
+                for hcell in h.cells if 'technique' in hcell.value
+                for cell in hcell.column.cells[1:] if cell.value]
+            sheet.fetch_grid = True
+            sheet.fetch()
+
+        if self.options.debug:
+            breakpoint()
+
+        return sheet
 
     ### sub dispatchers
 
