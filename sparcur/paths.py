@@ -177,6 +177,9 @@ class BlackfynnCache(PrimaryCache, EatCache):
                                                  sparse=sparse,)
 
         else:
+            if isinstance(sparse, list) and self.id.startswith('N:dataset:'):
+                sparse = self.id in sparse
+
             yield from super()._bootstrap_recursive(sparse=sparse)
 
     _sparse_stems = (
