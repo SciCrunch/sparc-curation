@@ -1017,6 +1017,7 @@ class PipelineEnd(JSONPipeline):
 
 
         'DatasetDescriptionFile',
+        'RawJsonDatasetDescription.data',
 
         'NormDatasetDescriptionFile',
         #'NormDatasetDescriptionFile.contributor_orcid_id',

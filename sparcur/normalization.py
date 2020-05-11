@@ -330,9 +330,19 @@ class NormValues(HasErrors):
         elif is_list_or_tuple(thing):
             # normal json not the tabular conversion case
             # or arrays at the bottom
-            out = [self._normv(v, key, i, path + (list,)) for i, v in enumerate(thing)]
+            out = []
+            _errors = []
+            for i, v in enumerate(thing):
+                try:
+                    o = self._normv(v, key, i, path + (list,))
+                    out.append(o)
+                except exc.TabularCellError as e:
+                    out.append(None)  # will be replaced in the if errors block
+                    _errors.append((i, e))
+
             errors = [(i, e) for i, e in enumerate(out)
                       if isinstance(e, exc.TabularCellError)]
+            errors = errors + _errors
 
             if errors:
                 cell_errors = [e for i, e in errors]

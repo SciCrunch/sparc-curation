@@ -996,6 +996,7 @@ class DatasetDescriptionFile(MetadataFile):
                                'example_image_description'),}
 
     ignore_header = 'metadata_element', 'example', 'description_header'
+    raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
     _expect_single = _nddfes
 

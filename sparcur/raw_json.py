@@ -41,6 +41,21 @@ class RawJsonDatasetDescription(RawJson):
     def data(self):
         blob = super().data
         # TODO lift everything we can back to the ir
+        class RawDatasetDescriptionSchema(sc.JSONSchema):
+            schema = sc.DatasetDescriptionSchema.schema
+
+        rds = RawDatasetDescriptionSchema()
+        blob = super().data
+        try:
+            rds.validate_strict(blob)
+        except:
+            pass
+
+        if not isinstance(blob['contributors'], list):
+            # TODO this needs to be an error with an easy fix
+            blob['contributors'] = [blob['contributors']]
+            breakpoint()
+
         return blob
 
 
