@@ -12,6 +12,7 @@ from pyontutils.utils import Async, deferred
 from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
+from sparcur import pipelines as pipes
 from sparcur.core import JEncode, JFixKeys, adops, register_type, fromJson
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge, logd
@@ -118,7 +119,8 @@ class ExportBase:
         filepath_ir = self.filepath_ir
         # build or load the export of the internal representation
         blob_ir, *rest_ir = self.make_ir(**kwargs)
-        self.write_json(filepath_ir, blob_ir)
+        export_ir = self.export_ir(blob_ir)
+        self.write_json(filepath_ir, export_ir)
         symlink_latest(dump_path, self.LATEST_PARTIAL)
 
         # build or load derived exports
@@ -128,6 +130,14 @@ class ExportBase:
         return (blob_ir, *rest_ir)  # FIXME :/
 
     def make_ir(self, *args, **kwargs):
+        raise NotImplementedError('implement in subclass')
+
+    def export_ir(self, *args, **kwargs):
+        """
+        if your ir is identical to your export
+        just implement this as
+        def export_ir(self, blob_ir): return blob_ir
+        """
         raise NotImplementedError('implement in subclass')
 
     def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
@@ -246,9 +256,11 @@ class Export(ExportBase):
         suffixes = []
         modes = []
         blob_data = intr.data_for_export(self.timestamp)  # build and cache the data
+        epipe = pipes.IrToExportJsonPipeline(blob_data)
+        blob_export = epipe.data
 
         # always dump the json
-        j = lambda f: json.dump(blob_data, f, sort_keys=True, indent=2, cls=JEncode)
+        j = lambda f: json.dump(blob_export, f, sort_keys=True, indent=2, cls=JEncode)
         functions.append(j)
         suffixes.append('.json')
         modes.append('wt')
@@ -357,7 +369,7 @@ class Export(ExportBase):
                     metadata = id.metadata()
                     metadata['id'] = id.identifier  # FIXME normalization ...
                     return metadata
-                except requests.exceptions.HTTPError as e:
+                except (requests.exceptions.HTTPError, idlib.exceptions.ResolutionError) as e:
                     logd.error(e)
                 except (requests.exceptions.ConnectionError, requests.exceptions.SSLError) as e:
                     log.error(e)
@@ -450,6 +462,20 @@ class Export(ExportBase):
             blob_data = summary.data_for_export(self.timestamp)
 
         return blob_data, summary, previous_latest, previous_latest_datasets
+
+    def export_ir(self, blob_ir):
+        # if the ir contains python objects then we probably want an explicit transform step
+
+        # FIXME hack
+        datasets = blob_ir['datasets']
+        export_ir = {k:v for k, v in blob_ir.items() if k != 'datasets'}
+        export_ir['datasets'] = []
+        for blob_dataset in datasets:
+            pipe = pipes.IrToExportJsonPipeline(blob_dataset)
+            data = pipe.data
+            export_ir['datasets'].append(pipe.data)
+
+        return export_ir
 
     def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
         summary, previous_latest, previous_latest_datasets = rest

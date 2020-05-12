@@ -125,3 +125,7 @@ class NoTripleError(SparCurError):
 
 class LostChildError(SparCurError):
     """ someone attempting to upload a child to the wrong parent """
+
+
+class NetworkFailedForPathError(SparCurError):
+    """ the network failed while trying to retrieve a specfic path """

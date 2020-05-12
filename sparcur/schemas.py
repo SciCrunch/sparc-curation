@@ -8,11 +8,11 @@ from pathlib import PurePath
 import idlib
 import rdflib
 import requests
-from pyontutils.core import OntId, OntTerm
+import ontquery as oq
 from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
 from sparcur.utils import logd
-from sparcur.core import JEncode
+from sparcur.core import JEncode, JApplyRecursive
 
 
 def not_array(schema, in_all=False):
@@ -170,11 +170,11 @@ class JSONSchema(object):
     string_types = [  # add more types here
         str,
         PurePath,
-        idlib.Stream,
+        idlib.Stream,  # FIXME str/dict
         rdflib.URIRef,
         rdflib.Literal,
-        OntId,
-        OntTerm,
+        oq.OntId,
+        oq.OntTerm,  # FIXME str/dict
         ProtcurExpression,
     ]
 
@@ -304,11 +304,12 @@ def make_id_schema(cls, pattern=None, format=None):
     return _IdSchema
 
 
-OntTermSchema = make_id_schema(OntTerm, format='iri')
+OntTermSchema = make_id_schema(oq.OntTerm, format='iri')
 DoiSchema = make_id_schema(idlib.Doi)
 RorSchema = make_id_schema(idlib.Ror)
 OrcidSchema = make_id_schema(idlib.Orcid)
 PioSchema = make_id_schema(idlib.Pio)
+RridSchema = make_id_schema(idlib.Rrid)
 
 
 class EmbeddedIdentifierSchema(JSONSchema):
@@ -321,7 +322,22 @@ class EmbeddedIdentifierSchema(JSONSchema):
                   'system': {'type': 'string'},
                   'label': {'type': 'string'},
                   'synonyms': {'type': 'array',
-                               'minItems': 1},},}
+                               'minItems': 1},
+                  # NOTE: description is the normalized form name ofr
+                  # ontology term definitions
+                  'description': {'type': 'string'},},}
+
+    @classmethod
+    def _to_pattern(cls, obj, *args, path=None, **kwargs):
+        if (isinstance(obj, dict) and
+            'allOf' in obj and
+            len(obj) == 1 and
+            len(obj['allOf']) == 2 and
+            obj['allOf'][0] == cls.schema):
+            return obj['allOf'][1]['properties']['id']
+
+        else:
+            return obj
 
     @classmethod
     def _allOf(cls, schema):
@@ -439,14 +455,14 @@ class DatasetStructureSchema(JSONSchema):
                             {'required': ['samples_file']}]}]}
 
 
-class ContributorSchema(JSONSchema):
+class ContributorExportSchema(JSONSchema):
     schema = {'type': 'object',
               'properties': {
                   'contributor_name': {'type': 'string'},
                   'first_name': {'type': 'string'},
                   'last_name': {'type': 'string'},
                   'contributor_orcid_id': EIS._allOf(OrcidSchema),
-                  'contributor_affiliation': {'oneOf': [EIS._allOf(RorSchema),
+                  'contributor_affiliation': {'anyOf': [EIS._allOf(RorSchema),
                                                         {'type': 'string'}]},
                   'contributor_role': {
                       'type':'array',
@@ -483,7 +499,12 @@ class ContributorSchema(JSONSchema):
               }}
 
 
-class ContributorsSchema(JSONSchema):
+class ContributorSchema(JSONSchema):
+    __schema = copy.deepcopy(ContributorExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class ContributorsExportSchema(JSONSchema):
     schema = {'type': 'array',
               'contains': {
                   'type': 'object',
@@ -492,33 +513,48 @@ class ContributorsSchema(JSONSchema):
                       'is_contact_person': {'type': 'boolean', 'enum': [True]},
                   },
               },
-              'items': ContributorSchema.schema,
+              'items': ContributorExportSchema.schema,
             }
 
+class ContributorsSchema(JSONSchema):
+    __schema = copy.deepcopy(ContributorsExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
-class ContributorOutSchema(JSONSchema):
-    schema = copy.deepcopy(ContributorSchema.schema)
+
+class ContributorOutExportSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorExportSchema.schema)
     schema['properties']['contributor_role']['items']['enum'].remove('Creator')
 
 
-class ContributorsOutSchema(JSONSchema):
-    schema = copy.deepcopy(ContributorsSchema.schema)
-    schema['items'] = ContributorOutSchema.schema
+class ContributorsOutExportSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorsExportSchema.schema)
+    schema['items'] = ContributorOutExportSchema.schema
 
 
-class CreatorSchema(JSONSchema):
-    schema = copy.deepcopy(ContributorSchema.schema)
+class CreatorExportSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorExportSchema.schema)
     schema['properties'].pop('contributor_role')
     schema['properties'].pop('is_contact_person')
 
 
-class CreatorsSchema(JSONSchema):
+class CreatorSchema(JSONSchema):
+    __schema = copy.deepcopy(CreatorExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+
+class CreatorsExportSchema(JSONSchema):
     schema = {'type': 'array',
               'minItems': 1,
-              'items': CreatorSchema.schema}
+              'items': CreatorExportSchema.schema}
 
 
-class DatasetDescriptionSchema(JSONSchema):
+class CreatorsSchema(JSONSchema):
+    __schema = copy.deepcopy(CreatorsExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class DatasetDescriptionExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
@@ -553,7 +589,7 @@ class DatasetDescriptionSchema(JSONSchema):
             'protocol_url_or_doi': {
                 'type': 'array',
                 'minItems': 1,
-                'items': {'oneOf':[EIS._allOf(DoiSchema),
+                'items': {'anyOf':[EIS._allOf(DoiSchema),
                                    EIS._allOf(PioSchema),
                                    {'type': 'string',
                                     'pattern': simple_url_pattern,}]}},
@@ -580,9 +616,14 @@ class DatasetDescriptionSchema(JSONSchema):
                     }
                 }
             },
-            'contributors': ContributorsSchema.schema,
+            'contributors': ContributorsExportSchema.schema,
         }
     }
+
+
+class DatasetDescriptionSchema(JSONSchema):
+    __schema = copy.deepcopy(DatasetDescriptionExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
 class SubmissionSchema(JSONSchema):
@@ -611,7 +652,7 @@ class UnitSchema(JSONSchema):
                                         'unit': {'type': 'string'}}}]}
 
 
-class SubjectsSchema(JSONSchema):
+class SubjectsExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'required': ['subjects'],
@@ -644,14 +685,19 @@ class SubjectsSchema(JSONSchema):
                                             'software_version': {'type': 'string'},
                                             'software_vendor': {'type': 'string'},
                                             'software_url': {'type': 'string'},
-                                            'software_rrid': {'type': 'string'},
+                                            'software_rrid': EIS._allOf(RridSchema),
                                         },},}}}
 
     # FIXME not implemented
     extras = [['unique', ['subjects', '*', 'subject_id']]]
 
 
-class SamplesFileSchema(JSONSchema):
+class SubjectsSchema(JSONSchema):
+    __schema = copy.deepcopy(SubjectsExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class SamplesFileExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'required': ['samples'],
@@ -711,8 +757,13 @@ class SamplesFileSchema(JSONSchema):
     extras = [['unique', ['samples', '*', 'sample_id']]]
 
 
-class MetaOutSchema(JSONSchema):
-    __schema = copy.deepcopy(DatasetDescriptionSchema.schema)
+class SamplesFileSchema(JSONSchema):
+    __schema = copy.deepcopy(SamplesFileExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class MetaOutExportSchema(JSONSchema):
+    __schema = copy.deepcopy(DatasetDescriptionExportSchema.schema)
     extra_required = ['award_number',
                       'principal_investigator',
                       'species',
@@ -763,7 +814,7 @@ class MetaOutSchema(JSONSchema):
         'principal_investigator': {'type': 'string'},
         'protocol_url_or_doi': {'type': 'array',
                                 'minItems': 1,
-                                'items': {'oneOf':[EIS._allOf(DoiSchema),
+                                'items': {'anyOf':[EIS._allOf(DoiSchema),
                                                    EIS._allOf(PioSchema),
                                                    {'type': 'string',
                                                     'pattern': simple_url_pattern,}]}},
@@ -802,7 +853,12 @@ class MetaOutSchema(JSONSchema):
                         ]}]}
 
 
-class DatasetOutSchema(JSONSchema):
+class MetaOutSchema(JSONSchema):
+    __schema = copy.deepcopy(MetaOutExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class DatasetOutExportSchema(JSONSchema):
     """ Schema that adds the id field since investigators shouldn't need to know
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
@@ -814,14 +870,14 @@ class DatasetOutSchema(JSONSchema):
                             'prov']
     __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
                                      'pattern': '^N:dataset:'},
-                              'meta': MetaOutSchema.schema,
+                              'meta': MetaOutExportSchema.schema,
                               'prov': ProvSchema.schema,
                               'errors': ErrorSchema.schema,
-                              'contributors': ContributorsOutSchema.schema,
-                              'creators': CreatorsSchema.schema,
+                              'contributors': ContributorsOutExportSchema.schema,
+                              'creators': CreatorsExportSchema.schema,
                               # FIXME subjects_file might make the name overlap clearer
-                              'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
-                              'samples': SamplesFileSchema.schema['properties']['samples'],
+                              'subjects': SubjectsExportSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
+                              'samples': SamplesFileExportSchema.schema['properties']['samples'],
                               # 'identifier_metadata': {'type': 'array'},  # FIXME temporary
                               'resources': {'type':'array',
                                             'items': {'type': 'object'},},
@@ -829,7 +885,7 @@ class DatasetOutSchema(JSONSchema):
                                          # TODO do we need errors at this level?
                                          'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
                                                         'submission_file': SubmissionSchema.schema,
-                                                        'subjects_file': SubjectsSchema.schema,},},}
+                                                        'subjects_file': SubjectsExportSchema.schema,},},}
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
     schema = {'allOf': [__schema,
@@ -837,6 +893,11 @@ class DatasetOutSchema(JSONSchema):
                             {'required': ['subjects']},  # FIXME extract subjects from samples ?
                             {'required': ['samples']}
                         ]}]}
+
+
+class DatasetOutSchema(JSONSchema):
+    __schema = copy.deepcopy(DatasetOutExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
 class StatusSchema(JSONSchema):

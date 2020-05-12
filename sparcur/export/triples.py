@@ -95,7 +95,8 @@ class TriplesExport(ProtcurData):
                     (hasattr(element, '_value') and (isinstance(element._value, dict) or
                                                      isinstance(element._value, list) or
                                                      isinstance(element._value, tuple))) or
-                    (isinstance(element, rdflib.URIRef) and element.startswith('<'))):
+                    (isinstance(element, rdflib.URIRef) and (element.startswith('<') or
+                                                             not rdflib.term._is_valid_uri(element)))):
                     #if (isinstance(element, rdflib.URIRef) and element.startswith('<')):
                         #breakpoint()
                     loge.critical(element)
@@ -175,8 +176,14 @@ class TriplesExportDataset(TriplesExport):
             return
 
         cid = contributor['id']
+
         if isinstance(cid, idlib.Stream):  # FIXME nasty branch
             s = cid.asType(rdflib.URIRef)
+        elif isinstance(cid, dict):
+            if isinstance(cid['id'], idlib.Stream):  # FIXME nasty branch
+                s = cid['id'].asType(rdflib.URIRef)
+            else:
+                raise NotImplementedError(f'{type(cid["id"])}: {cid["id"]}')
         else:
             s = rdflib.URIRef(cid)  # FIXME json reload needs to deal with this
 

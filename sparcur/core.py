@@ -109,7 +109,11 @@ class OntTerm(OTB, OntId):
     @classmethod
     def fromJson(cls, blob):
         assert blob['identifier_type'] == cls.__name__
-        return cls(blob['id'], label=blob['label'])
+        identifier = blob['id']
+        if isinstance(identifier, cls):
+            return identifier
+        else:
+            return cls(identifier, label=blob['label'])
 
     @classmethod
     def _already_logged(cls, thing):
@@ -119,11 +123,15 @@ class OntTerm(OTB, OntId):
 
         return case
 
+    def asType(self, _class):
+        return _class(self.iri)
+
     def asDict(self):
         out = {
             'type': 'identifier',
             'system': self.__class__.__name__,
-            'id': self.iri,
+            #'id': self.iri,
+            'id': self,  # XXX
             'label': self.label,
         }
         if hasattr(self, 'synonyms') and self.synonyms:
@@ -224,6 +232,56 @@ def lj(j):
     return '\n' + json.dumps(j, indent=2, cls=JEncode)
 
 
+def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **kwargs):
+    try:
+        dict_literal = _json_identifier_expansion(obj)
+    except idlib.exceptions.ResolutionError as e:
+        if hasattr(obj, '_cooldown'):
+            return obj._cooldown()  # trigger cooldown to simplify issues down the line
+
+        oops = json_export_type_converter(obj)
+        msg = (f'{stage.lifters.id} could not resolve '  # FIXME lifters sigh
+               f'{type(obj)}: {oops} {obj.asUri()}')
+        error = dict(error=msg,
+                     pipeline_stage=stage.__class__.__name__,
+                     blame='submission',
+                     path=tuple(path))
+
+        if addError:
+            if addError(**error):
+                logd.error(msg)
+        else:
+            return {'errors': [error]}
+
+
+def _json_identifier_expansion(obj, *args, **kwargs):
+    if isinstance(obj, oq.OntTerm):
+        obj.__class__ = OntTerm  # that this works is amazing/terrifying
+        return obj.asDict()
+
+    elif isinstance(obj, idlib.Stream):
+        if obj._id_class is str:
+            return obj.identifier
+        else:
+            return obj.asDict()
+    else:
+        return obj
+
+
+def json_identifier_expansion(obj, *args, path=None, **kwargs):
+    """ expand identifiers to json literal form """
+    try:
+        return _json_identifier_expansion(obj, *args, **kwargs)
+    except idlib.exceptions.ResolutionError as e:
+        oops = json_export_type_converter(obj)
+        msg = f'could not resolve {type(obj)}: {oops}'
+        out = {'id': obj,
+               'type': 'identifier',
+               'system': obj.__class__.__name__,
+               'errors': [{'message': msg, 'path': path}]}
+        return out
+
+
 def json_export_type_converter(obj):
     if isinstance(obj, deque):
         return list(obj)
@@ -234,12 +292,14 @@ def json_export_type_converter(obj):
     elif isinstance(obj, Quantity):
         return obj.json()
     elif isinstance(obj, oq.OntTerm):
-        return obj.asDict()  # FIXME need a no network/scigraph version
+        return obj.iri
+        #return obj.asDict()  # FIXME need a no network/scigraph version
     elif isinstance(obj, idlib.Stream) and hasattr(obj, '_id_class'):
         if obj._id_class is str:
             return obj.identifier
         else:
-            return obj.asDict()  # FIXME need a no network/scigraph version
+            return json_export_type_converter(obj.identifier)
+            #return obj.asDict()  # FIXME need a no network/scigraph version
     elif isinstance(obj, datetime):
         return isoformat(obj)
 
@@ -268,6 +328,43 @@ def JFixKeys(obj):
         return [JFixKeys(v) for v in obj]
     else:
         return obj
+
+
+def JApplyRecursive(function, obj, *args, condense=False, skip_keys=('errors',), path=None, **kwargs):
+    """ *args, **kwargs, and path= are passed to the function """
+    def testx(v):
+        return v is not None and not (not v and (is_list_or_tuple(v) or isinstance(v, dict)))
+
+    if path is None:
+        path = []
+
+    if isinstance(obj, dict):
+        out = {k: JApplyRecursive(function, v, *args,
+                                  condense=condense,
+                                  skip_keys=skip_keys,
+                                  path=path + [k],
+                                  **kwargs)
+               for k, v in obj.items() if k not in skip_keys}
+
+        if condense:
+            out = {k:v for k, v in out.items() if testx(v)}
+
+        return function(out, *args, path=path, **kwargs)
+
+    elif is_list_or_tuple(obj):
+        out = [JApplyRecursive(function, v, *args,
+                               condense=condense,
+                               skip_keys=skip_keys,
+                               path=path + [i],
+                               **kwargs)
+               for i, v in enumerate(obj)]
+        if condense:
+            out = [v for v in out if testx(v)]
+
+        return function(out, *args, path=path, **kwargs)
+
+    else:
+        return function(obj, *args, path=path, **kwargs)
 
 
 def zipeq(*iterables):
@@ -975,4 +1072,4 @@ class JPointer(str):
 
 # register idlib classes for fromJson
 [register_type(i, i.__name__) for i in
- (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, OntTerm)]
+ (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm)]

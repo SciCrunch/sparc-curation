@@ -1,13 +1,13 @@
+import pathlib
 import idlib
 import rdflib
 import dicttoxml
 from pysercomb.pyr.types import ProtcurExpression, Quantity
 from sparcur.core import OntTerm, get_all_errors
-from sparcur.utils import loge
+from sparcur.utils import loge, is_list_or_tuple
 
 
 def xml(dataset_blobs):
-    import pathlib
     #datasets = []
     #contributors = []
     subjects = []
@@ -15,8 +15,10 @@ def xml(dataset_blobs):
     resources = []
 
     def normv(v):
-        if isinstance(v, list):
+        if is_list_or_tuple(v):
             return [normv(_) for _ in v]
+        if isinstance(v, dict):
+            return {k:normv(v) for k, v in v.items()}
         if isinstance(v, str) and v.startswith('http'):
             # needed for loading from json that has been serialized
             # rather than from our internal representation

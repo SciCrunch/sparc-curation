@@ -101,12 +101,16 @@ class TripleConverter(dat.HasErrors):
                         _v = o if a else v
                         s = _v.asType(rdflib.URIRef)
                         yield subject, p, s
-                        d = _v.asDict()
-                        yield s, rdf.type, (owl.Class if isinstance(o, OntTerm) else owl.NamedIndividual)
-                        yield s, rdfs.label, rdflib.Literal(d['label'])
-                        if 'synonyms' in d:  # FIXME yield from o.synonyms(s)
-                            for syn in d['synonyms']:
-                                yield s, NIFRID.synonym, rdflib.Literal(syn)
+                        try:
+                            d = _v.asDict()  # FIXME this is a silly way to do this, use Stream.triples_gen
+                            yield s, rdf.type, (owl.Class if isinstance(o, OntTerm) else owl.NamedIndividual)
+                            if 'label' in d:
+                                yield s, rdfs.label, rdflib.Literal(d['label'])
+                            if 'synonyms' in d:  # FIXME yield from o.synonyms(s)
+                                for syn in d['synonyms']:
+                                    yield s, NIFRID.synonym, rdflib.Literal(syn)
+                        except idlib.exceptions.ResolutionError:
+                            pass
 
                     elif isinstance(o, ProtcurExpression) or isinstance(o, Quantity):
                         s = rdflib.BNode()
@@ -247,12 +251,35 @@ class MetaConverter(TripleConverter):
 
                     yield s, isAbout, o.u
 
+        def doi(self, value):
+            yield from value.triples_gen
+
         def protocol_url_or_doi(self, value):
-            _, s = self.c.protocol_url_or_doi(value)
-            yield s, rdf.type, owl.NamedIndividual
-            yield s, rdf.type, sparc.Protocol
+            #_, s = self.c.protocol_url_or_doi(value)
+            #yield s, rdf.type, owl.NamedIndividual
+            #yield s, rdf.type, sparc.Protocol
             log.debug(value)
-            pioid = value if isinstance(value, idlib.Pio) else idlib.Pio(value)  # FIXME :/ should be handled in Pio directly probably?
+            if not isinstance(value, idlib.Pio):
+                if isinstance(value, idlib.Doi):
+                    for t in value.triples_gen:
+                        yield t
+
+                    ds, _, _ = t
+                    try:
+                        pioid = value.dereference(asType=idlib.Pio)
+                        s = self.c.l(pioid)
+                        yield ds, TEMP.dereferencesTo, s
+                        yield s, TEMP.hasDoi, ds
+                    except idlib.exceptions.MalformedIdentifierError as e:
+                        log.warning(e)
+                        return
+                else:
+                    pioid = idlib.Pio(value)  # FIXME :/ should be handled in Pio directly probably?
+            else:
+                pioid = value
+
+            s = self.c.l(pioid)
+
             # FIXME needs to be a pipeline so that we can export errors
             try:
                 data = pioid.data()

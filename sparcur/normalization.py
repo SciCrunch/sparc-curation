@@ -299,7 +299,7 @@ class NormValues(HasErrors):
                         else:
                             kmsg = f'.{key}'
 
-                        if self.addError(e,
+                        if self.addError(str(e),
                                          pipeline_stage=f'{self.__class__.__name__}{kmsg}',
                                          blame='submission'):
                             log.critical(e)
@@ -459,7 +459,7 @@ class NormDatasetDescriptionFile(NormValues):
         try:
             return int(value)
         except ValueError as e:
-            if self.addError(e,
+            if self.addError(str(e),
                              pipeline_stage=f'{self.__class__.__name__}',
                              blame='submission',):
                 logd.exception(e)
@@ -516,8 +516,9 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(v) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.Orcid._id_class.OrcidLengthError(msg))
-                logd.error(msg)
+                if self.addError(idlib.Orcid._id_class.OrcidLengthError(msg)):
+                    logd.error(msg)
+
                 return
 
             v = 'ORCID:' + v
@@ -638,7 +639,7 @@ class NormDatasetDescriptionFile(NormValues):
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...
                     _ps = f'{self.__class__.__name__}.protocol_url_or_doi'
-                    if self.addError(e, pipeline_stage=_ps):
+                    if self.addError(str(e), pipeline_stage=_ps):
                         logd.error(e)
 
                     _pp = self._path.as_posix()
@@ -802,9 +803,9 @@ class NormSubjectsFile(NormValues):
             msg = (f'Bad value for age_range_max: {value}\n'
                    'did you want to put that in age_cagegory instead?\n'
                    f'"{self._path}"')
-            logd.error(msg)
-            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
-                          path=self._path)
+            if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
+                             path=self._path):
+                logd.error(msg)
             return value
 
         yield from self._param(value)
@@ -826,7 +827,24 @@ class NormSubjectsFile(NormValues):
         yield from self._param_unit(value, 'in')
 
     def rrid_for_strain(self, value):
-        yield value
+        yield from self._rrid(value)
+
+    def _rrid(self, value):
+        # OF COURSE RRIDS ARE SPECIAL
+        if value.strip().lower() in ('unknown', 'uknown'):
+            yield UNKNOWN
+        else:
+            try:
+                rrid = idlib.Rrid(value)
+                yield rrid
+            except idlib.exceptions.MalformedIdentifierError as e:
+                msg = f'malformed RRID: {value}'
+                if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
+                                 path=self._path):
+                    log.error(msg)
+
+                if not value.startswith('RRID:'):
+                    yield from self.rrid_for_strain('RRID:' + value)
 
     #def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
         #yield value

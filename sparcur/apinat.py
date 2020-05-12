@@ -1,12 +1,12 @@
 from types import MappingProxyType
 import rdflib
 from ontquery.utils import mimicArgs
-from pyontutils.core import OntGraph, OntId, OntTerm
+from pyontutils.core import OntGraph
 from pyontutils.utils import Async, deferred
 from pyontutils.namespaces import rdf, rdfs, owl, OntCuries
 from pyontutils import combinators as cmb
 import sparcur.schemas as sc
-from sparcur.core import adops
+from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
 from ttlser import CustomTurtleSerializer
 

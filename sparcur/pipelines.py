@@ -3,7 +3,6 @@ from pathlib import Path
 from collections import deque
 import idlib
 import rdflib
-import requests
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
@@ -14,6 +13,7 @@ from sparcur import converters as conv
 from sparcur import exceptions as exc
 from sparcur.core import DictTransformer, copy_all, get_all_errors
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
+from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
 from sparcur.state import State
 from sparcur.derives import Derives
 
@@ -182,8 +182,9 @@ class PathPipeline(PrePipeline):
                 t = f'No data for {self.path}'
 
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
-            logd.exception(e)  # FIXME isn't this were we should accumulate errors?
-            he.addError(e, path=self.path)
+            if he.addError(e, path=self.path):
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+
             he.embedErrors(NoData.data)
             return NoData
 
@@ -196,12 +197,11 @@ class PathPipeline(PrePipeline):
             # since they are properly pipelined
             data = {}
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.transformer')
-            logd.exception(e)  # FIXME isn't this were we should accumulate errors?
-            he.addError(e, path=self.path)
+            if he.addError(e, path=self.path):
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+
             he.embedErrors(data)
             return data
-
-
 
     # @hasSchema(sc.TransformerSchema)
     @property  # transformer out schema goes here
@@ -814,6 +814,15 @@ class SPARCBIDSPipeline(JSONPipeline):
     @hasSchema(sc.DatasetOutSchema)
     def data(self):
         data = super().data
+
+        # dereference should happen here not at the end of PiplineStart
+        # though harder to work backwards to the offending file right now
+
+        # FIXME pure side effecting going on here, also definitely wrong place
+        he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.data')
+        JApplyRecursive(dereference_all_identifiers, data, self, addError=he.addError)
+        he.embedErrors(data)
+
         return data
 
 
@@ -946,6 +955,7 @@ class PipelineExtras(JSONPipeline):
 
         # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
         # and indeed, when we added PipelineStart this shifted and broke everything
+        # FIXME use the rmeta
         local = (self
                  .previous_pipeline.pipelines[0]
                  .previous_pipeline.pipelines[0]
@@ -958,8 +968,8 @@ class PipelineExtras(JSONPipeline):
                 try:
                     metadata = doi.metadata()
                     if metadata is not None:
-                        data['meta']['doi'] = doi.identifier
-                except requests.exceptions.HTTPError:
+                        data['meta']['doi'] = doi
+                except idlib.exceptions.ResolutionError:
                     pass
 
         if 'status' not in data:
@@ -1161,6 +1171,24 @@ class PipelineEnd(JSONPipeline):
         return data
 
     @hasSchema(sc.PostSchema, fail=True)
+    def data(self):
+        return super().data
+
+
+class IrToExportJsonPipeline(JSONPipeline):
+    """ transform json ir -> json export """
+
+    def __init__(self, blob_ir):
+        self.blob_ir = blob_ir
+
+    @property
+    def augmented(self):
+        data_in = self.blob_ir
+        # XXX NOTE JApplyRecursive is actually functional
+        data = JApplyRecursive(json_identifier_expansion, data_in)
+        return data
+
+    @hasSchema(sc.DatasetOutExportSchema)
     def data(self):
         return super().data
 

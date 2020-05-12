@@ -211,7 +211,6 @@ from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
 from sparcur import config
-#from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
@@ -932,6 +931,7 @@ done"""
 
     def export(self):
         from sparcur import export as ex  # FIXME very slow to import
+        from sparcur import schemas as sc
 
         # FIXME export should be able to run without needing any external
         # data the fetch step should happen before the export so that
@@ -960,6 +960,8 @@ done"""
                         auth.get_list('datasets-no'))
             blob_ir, *rest = export.export(dataset_paths=dataset_paths,
                                            exclude=noexport)
+
+            sc.SummarySchema().validate_strict(export.latest_export)
 
         if self.options.debug:
             breakpoint()

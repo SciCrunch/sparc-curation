@@ -4,6 +4,7 @@ import copy
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
+import requests
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
@@ -294,7 +295,10 @@ class DatasetStructure(Path):
                 if path.is_broken_symlink():
                     log.info(f'fetching unretrieved metadata path {path.as_posix()!r}'
                              '\nFIXME batch these using async in cli export ...')
-                    path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
+                    try:
+                        path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
+                    except requests.exceptions.ConnectionError as e:
+                        raise exc.NetworkFailedForPathError(path) from e
 
                 if path.suffix in path.stem:
                     msg = f'path has duplicate suffix {path.as_posix()!r}'
