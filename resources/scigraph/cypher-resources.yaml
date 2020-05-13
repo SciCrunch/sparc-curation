@@ -25,7 +25,7 @@ cypherResources:
           "http://purl.org/sig/ont/fma/fma50801"  // brain
         ]
       WITH n as start
-      MATCH path1 = (start:Class{iri: n.iri})
+      MATCH path1 = (start)
       <-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
       <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
       <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
