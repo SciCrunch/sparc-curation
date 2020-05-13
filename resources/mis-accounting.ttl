@@ -1,0 +1,426 @@
+@prefix : <file:///ERROR/EMPTY/PREFIX/BANNED/> .
+
+# other ns
+@prefix adjacentTo: <http://purl.obolibrary.org/obo/RO_0002220> .
+@prefix agentIn: <http://purl.obolibrary.org/obo/RO_0002217> .
+@prefix altTerm: <http://purl.obolibrary.org/obo/IAO_0000118> .
+@prefix apinatomy: <https://apinatomy.org/uris/readable/> .
+@prefix apinatomy.elements: <https://apinatomy.org/uris/elements/> .
+@prefix apinm.bolew: <https://apinatomy.org/uris/models/bolserLewisNew/ids/> .
+@prefix apinm.keast: <https://apinatomy.org/uris/models/keastSpinalTest/ids/> .
+@prefix bearerOf: <http://purl.obolibrary.org/obo/RO_0000053> .
+@prefix BFO: <http://purl.obolibrary.org/obo/BFO_> .
+@prefix BFO1: <http://www.ifomis.org/bfo/1.1#> .
+@prefix BFO1SNAP: <http://www.ifomis.org/bfo/1.1/snap#> .
+@prefix BFO1SPAN: <http://www.ifomis.org/bfo/1.1/span#> .
+@prefix BIRNANN: <http://ontology.neuinfo.org/NIF/Backend/BIRNLex_annotation_properties.owl#> .
+@prefix BIRNLEX: <http://uri.neuinfo.org/nif/nifstd/birnlex_> .
+@prefix BIRNOBI: <http://ontology.neuinfo.org/NIF/Backend/BIRNLex-OBI-proxy.owl#> .
+@prefix BIRNOBO: <http://ontology.neuinfo.org/NIF/Backend/BIRNLex-OBO-UBO.owl#> .
+@prefix CAO: <http://www.cognitiveatlas.org/ontology/cogat.owl#CAO_> .
+@prefix CHEBI: <http://purl.obolibrary.org/obo/CHEBI_> .
+@prefix chebi: <http://purl.obolibrary.org/obo/chebi/> .
+@prefix chebi1: <http://purl.obolibrary.org/obo/chebi#2> .
+@prefix chebi2: <http://purl.obolibrary.org/obo/chebi#> .
+@prefix chebi3: <http://purl.obolibrary.org/obo/chebi#3> .
+@prefix CL: <http://purl.obolibrary.org/obo/CL_> .
+@prefix CLO: <http://purl.obolibrary.org/obo/CLO_> .
+@prefix COGAT: <http://www.cognitiveatlas.org/ontology/cogat.owl#> .
+@prefix COGPO: <http://www.cogpo.org/ontologies/COGPO_> .
+@prefix COGPO1: <http://www.cogpo.org/ontologies/CogPOver1.owl#COGPO_> .
+@prefix COGPO10: <http://www.cogpo.org/ontologies/CogPOver2010.owl#COGPO_> .
+@prefix containedIn: <http://purl.obolibrary.org/obo/RO_0001018> .
+@prefix contains: <http://purl.obolibrary.org/obo/RO_0001019> .
+@prefix curatorNote: <http://purl.obolibrary.org/obo/IAO_0000232> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix dctypes: <http://purl.org/dc/dcmitype/> .
+@prefix definition: <http://purl.obolibrary.org/obo/IAO_0000115> .
+@prefix defSource: <http://purl.obolibrary.org/obo/IAO_0000119> .
+@prefix derivesFrom: <http://purl.obolibrary.org/obo/RO_0001000> .
+@prefix derivesInto: <http://purl.obolibrary.org/obo/RO_0001001> .
+@prefix DICOM: <http://uri.interlex.org/dicom/uris/terms/> .
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+@prefix DOID: <http://purl.obolibrary.org/obo/DOID_> .
+@prefix editorNote: <http://purl.obolibrary.org/obo/IAO_0000116> .
+@prefix EFO: <http://www.ebi.ac.uk/efo/EFO_> .
+@prefix EMAPA: <http://purl.obolibrary.org/obo/EMAPA_> .
+@prefix ERO: <http://purl.obolibrary.org/obo/ERO_> .
+@prefix FIXME: <http://FIXME.org/> .
+@prefix fma: <http://purl.org/sig/ont/fma/> .
+@prefix FMA: <http://purl.org/sig/ont/fma/fma> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix fobo: <http://uri.interlex.org/fakeobo/uris/obo/> .
+@prefix GBIF: <http://www.gbif.org/species/> .
+@prefix GO: <http://purl.obolibrary.org/obo/GO_> .
+@prefix hasAgent: <http://purl.obolibrary.org/obo/RO_0002218> .
+@prefix hasCurStatus: <http://purl.obolibrary.org/obo/IAO_0000114> .
+@prefix hasInput: <http://purl.obolibrary.org/obo/RO_0002233> .
+@prefix hasOutput: <http://purl.obolibrary.org/obo/RO_0002234> .
+@prefix hasPart: <http://purl.obolibrary.org/obo/BFO_0000051> .
+@prefix hasParticipant: <http://purl.obolibrary.org/obo/RO_0000057> .
+@prefix hasRole: <http://purl.obolibrary.org/obo/RO_0000087> .
+@prefix HBA: <http://api.brain-map.org:80/api/v2/data/Structure/> .
+@prefix HP: <http://purl.obolibrary.org/obo/HP_> .
+@prefix hyp: <https://hyp.is/> .
+@prefix IAO: <http://purl.obolibrary.org/obo/IAO_> .
+@prefix ilx: <http://uri.interlex.org/> .
+@prefix ILX: <http://uri.interlex.org/base/ilx_> .
+@prefix ilx.anno.allowedTypes: <http://uri.interlex.org/base/ilx_0381358> .
+@prefix ilx.anno.allowedValues: <http://uri.interlex.org/base/ilx_0381359> .
+@prefix ilx.anno.condition: <http://uri.interlex.org/base/ilx_0381354> .
+@prefix ilx.anno.filterElement: <http://uri.interlex.org/base/ilx_0381352> .
+@prefix ilx.anno.hasBroadSynonym: <http://uri.interlex.org/base/ilx_0737164> .
+@prefix ilx.anno.hasConstraint: <http://uri.interlex.org/base/ilx_0115071> .
+@prefix ilx.anno.hasExactSynonym: <http://uri.interlex.org/base/ilx_0737161> .
+@prefix ilx.anno.hasNarrowSynonym: <http://uri.interlex.org/base/ilx_0737163> .
+@prefix ilx.anno.hasRelatedSynonym: <http://uri.interlex.org/base/ilx_0737162> .
+@prefix ilx.anno.maxValue: <http://uri.interlex.org/base/ilx_0381357> .
+@prefix ilx.anno.minValue: <http://uri.interlex.org/base/ilx_0381356> .
+@prefix ilx.anno.required: <http://uri.interlex.org/base/ilx_0381353> .
+@prefix ilx.anno.size: <http://uri.interlex.org/base/ilx_0381355> .
+@prefix ilx.federatesElement: <http://uri.interlex.org/base/ilx_0381445> .
+@prefix ilx.hasDbXref: <http://uri.interlex.org/base/ilx_0381360> .
+@prefix ilx.hasLaterality: <http://uri.interlex.org/base/ilx_0381387> .
+@prefix ilx.hasMeasurementType: <http://uri.interlex.org/base/ilx_0381388> .
+@prefix ilx.hasRole: <http://uri.interlex.org/base/ilx_0112784> .
+@prefix ilx.hasUnit: <http://uri.interlex.org/base/ilx_0381384> .
+@prefix ilx.includeForSPARC: <http://uri.interlex.org/base/ilx_0738400> .
+@prefix ilx.isAbout: <http://uri.interlex.org/base/ilx_0381385> .
+@prefix ilx.isMeasureOf: <http://uri.interlex.org/base/ilx_0381389> .
+@prefix ilx.partOf: <http://uri.interlex.org/base/ilx_0112785> .
+@prefix ilx.relatedTo: <http://uri.interlex.org/base/ilx_0112796> .
+@prefix ilx.type: <http://uri.interlex.org/base/readable/type/> .
+@prefix ilxr: <http://uri.interlex.org/base/readable/> .
+@prefix ILXREPLACE: <http://ILXREPLACE.org/> .
+@prefix ilxti: <http://uri.interlex.org/tgbugs/uris/indexes/> .
+@prefix ilxtib: <http://uri.interlex.org/tgbugs/uris/indexes/blank/> .
+@prefix ilxtio: <http://uri.interlex.org/tgbugs/uris/indexes/ontologies/> .
+@prefix ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/> .
+@prefix importedFrom: <http://purl.obolibrary.org/obo/IAO_0000412> .
+@prefix inheresIn: <http://purl.obolibrary.org/obo/RO_0000052> .
+@prefix isAbout: <http://purl.obolibrary.org/obo/IAO_0000136> .
+@prefix ITISTSN: <http://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=> .
+@prefix JAX: <http://jaxmice.jax.org/strain/> .
+@prefix lex: <http://uri.interlex.org/base/lexical/> .
+@prefix locatedIn: <http://purl.obolibrary.org/obo/RO_0001025> .
+@prefix locationOf: <http://purl.obolibrary.org/obo/RO_0001015> .
+@prefix MA: <http://purl.obolibrary.org/obo/MA_> .
+@prefix MBA: <http://api.brain-map.org/api/v2/data/Structure/> .
+@prefix MESH: <https://meshb.nlm.nih.gov/record/ui?ui=> .
+@prefix MONDO: <http://purl.obolibrary.org/obo/MONDO_> .
+@prefix MP: <http://purl.obolibrary.org/obo/MP_> .
+@prefix NCBIGene: <http://www.ncbi.nlm.nih.gov/gene/> .
+@prefix NCBITaxon: <http://purl.obolibrary.org/obo/NCBITaxon_> .
+@prefix NDA.CDE: <http://uri.interlex.org/NDA/uris/datadictionary/elements/> .
+@prefix NIFANN: <http://ontology.neuinfo.org/NIF/NIF-Annotation-Standard.owl#> .
+@prefix NIFCELL: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Cell.owl#> .
+@prefix NIFCHEM: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Chemical.owl#> .
+@prefix NIFDYS: <http://ontology.neuinfo.org/NIF/Dysfunction/NIF-Dysfunction.owl#> .
+@prefix NIFEXT: <http://uri.neuinfo.org/nif/nifstd/nifext_> .
+@prefix NIFFUN: <http://ontology.neuinfo.org/NIF/Function/NIF-Function.owl#> .
+@prefix NIFGA: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-GrossAnatomy.owl#> .
+@prefix NIFGG: <http://ontology.neuinfo.org/NIF/DigitalEntities/NIF-Government-Granting-Agency.owl#> .
+@prefix NIFINV: <http://ontology.neuinfo.org/NIF/DigitalEntities/NIF-Investigation.owl#> .
+@prefix NIFMOL: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Molecule.owl#> .
+@prefix NIFMOLINF: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Molecule-Role-Inferred.owl#> .
+@prefix NIFMOLROLE: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Molecule-Role-Bridge#> .
+@prefix NIFNCBI: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-NCBITax-Bridge.owl#> .
+@prefix NIFNCBISLIM: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-NCBITaxonomy-Slim.owl#> .
+@prefix NIFNEURBR: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Neuron-BrainRegion-Bridge.owl#> .
+@prefix NIFNEURBR2: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Neuron-Brain-Bridge.owl#> .
+@prefix NIFNEURCIR: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Neuron-Circuit-Role-Bridge.owl#> .
+@prefix NIFNEURMC: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF_Neuron_MolecularConstituent_Bridge.owl#> .
+@prefix NIFNEURMOR: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Neuron-Morphology-Bridge.owl#> .
+@prefix NIFNEURNT: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Neuron-NT-Bridge.owl#> .
+@prefix NIFORG: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Organism.owl#> .
+@prefix NIFQUAL: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Quality.owl#> .
+@prefix NIFRAW: <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/> .
+@prefix NIFRES: <http://ontology.neuinfo.org/NIF/DigitalEntities/NIF-Resource.owl#> .
+@prefix NIFRET: <http://ontology.neuinfo.org/NIF/Retired/NIF-Retired.owl#> .
+@prefix NIFRID: <http://uri.neuinfo.org/nif/nifstd/readable/> .
+@prefix NIFSCID: <http://ontology.neuinfo.org/NIF/DigitalEntities/NIF-Scientific-Discipline.owl#> .
+@prefix NIFSTD: <http://uri.neuinfo.org/nif/nifstd/> .
+@prefix NIFSUB: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Subcellular.owl#> .
+@prefix NIFTTL: <http://ontology.neuinfo.org/NIF/ttl/> .
+@prefix NIFUNCL: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/NIF-Unclassified.owl#> .
+@prefix NINDS.CDE: <http://uri.interlex.org/NINDSCDE/uris/readable/> .
+@prefix NLX: <http://uri.neuinfo.org/nif/nifstd/nlx_> .
+@prefix NLXANAT: <http://uri.neuinfo.org/nif/nifstd/nlx_anat_> .
+@prefix NLXBR: <http://uri.neuinfo.org/nif/nifstd/nlx_br_> .
+@prefix NLXCELL: <http://uri.neuinfo.org/nif/nifstd/nlx_cell_> .
+@prefix NLXCHEM: <http://uri.neuinfo.org/nif/nifstd/nlx_chem_> .
+@prefix NLXDYS: <http://uri.neuinfo.org/nif/nifstd/nlx_dys_> .
+@prefix NLXFUNC: <http://uri.neuinfo.org/nif/nifstd/nlx_func_> .
+@prefix NLXINV: <http://uri.neuinfo.org/nif/nifstd/nlx_inv_> .
+@prefix NLXMOL: <http://uri.neuinfo.org/nif/nifstd/nlx_mol_> .
+@prefix NLXNEURNT: <http://uri.neuinfo.org/nif/nifstd/nlx_neuron_nt_> .
+@prefix NLXOEN: <http://uri.neuinfo.org/nif/nifstd/oen_> .
+@prefix NLXORG: <http://uri.neuinfo.org/nif/nifstd/nlx_organ_> .
+@prefix NLXQUAL: <http://uri.neuinfo.org/nif/nifstd/nlx_qual_> .
+@prefix NLXRES: <http://uri.neuinfo.org/nif/nifstd/nlx_res_> .
+@prefix NLXSUB: <http://uri.neuinfo.org/nif/nifstd/nlx_subcell_> .
+@prefix NLXUBO: <http://uri.neuinfo.org/nif/nifstd/nlx_ubo_> .
+@prefix NLXUNCL: <http://uri.neuinfo.org/nif/nifstd/nlx_uncl_> .
+@prefix NLXWIKI: <http://neurolex.org/wiki/> .
+@prefix npokb: <http://uri.interlex.org/npo/uris/neurons/> .
+@prefix nsu: <http://www.FIXME.org/nsupper#> .
+@prefix OBI: <http://purl.obolibrary.org/obo/OBI_> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+@prefix OBOANN: <http://ontology.neuinfo.org/NIF/Backend/OBO_annotation_properties.owl#> .
+@prefix oboInOwl: <http://www.geneontology.org/formats/oboInOwl#> .
+@prefix obsReason: <http://purl.obolibrary.org/obo/IAO_0000231> .
+@prefix overlaps: <http://purl.obolibrary.org/obo/RO_0002131> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix PAR: <http://uri.interlex.org/fakeobo/uris/obo/PAR_> .
+@prefix participatesIn: <http://purl.obolibrary.org/obo/RO_0000056> .
+@prefix partOf: <http://purl.obolibrary.org/obo/BFO_0000050> .
+@prefix PATO: <http://purl.obolibrary.org/obo/PATO_> .
+@prefix PAXMUS: <http://uri.interlex.org/paxinos/uris/mouse/labels/> .
+@prefix PAXRAT: <http://uri.interlex.org/paxinos/uris/rat/labels/> .
+@prefix PR: <http://purl.obolibrary.org/obo/PR_> .
+@prefix PROTEGE: <http://protege.stanford.edu/plugins/owl/protege#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix PTHR: <http://www.pantherdb.org/panther/family.do?clsAccession=PTHR> .
+@prefix PW: <http://purl.obolibrary.org/obo/PW_> .
+@prefix RadLex: <http://www.radlex.org/RID/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix realizedIn: <http://purl.obolibrary.org/obo/BFO_0000054> .
+@prefix realizes: <http://purl.obolibrary.org/obo/BFO_0000055> .
+@prefix replacedBy: <http://purl.obolibrary.org/obo/IAO_0100001> .
+@prefix RO: <http://purl.obolibrary.org/obo/RO_> .
+@prefix ro: <http://www.obofoundry.org/ro/ro.owl#> .
+@prefix SAO: <http://uri.neuinfo.org/nif/nifstd/sao> .
+@prefix SAOCORE: <http://ontology.neuinfo.org/NIF/BiomaterialEntities/SAO-CORE_properties.owl#> .
+@prefix SBO: <http://www.ebi.ac.uk/sbo/main/SBO:> .
+@prefix SCR: <http://scicrunch.org/resolver/SCR_> .
+@prefix SIO: <http://semanticscience.org/resource/SIO_> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix SO: <http://purl.obolibrary.org/obo/SO_> .
+@prefix SWO: <http://www.ebi.ac.uk/efo/swo/SWO_> .
+@prefix SWOL: <http://www.ebi.ac.uk/swo/license/SWO_> .
+@prefix SYMP: <http://purl.obolibrary.org/obo/SYMP_> .
+@prefix termEditor: <http://purl.obolibrary.org/obo/IAO_0000117> .
+@prefix termsMerged: <http://purl.obolibrary.org/obo/IAO_0000227> .
+@prefix toward: <http://purl.obolibrary.org/obo/RO_0002503> .
+@prefix TEMPIND: <http://uri.interlex.org/temp/uris/phenotype-indicators/> .
+@prefix TRANS: <http://purl.obolibrary.org/obo/TRANS_> .
+@prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
+@prefix UO: <http://purl.obolibrary.org/obo/UO_> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# current mis namespaces 
+@prefix awards: <http://uri.interlex.org/temp/uris/awards/> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix BIRNLEX: <http://uri.neuinfo.org/nif/nifstd/birnlex_> .
+@prefix dataset: <https://api.blackfynn.io/datasets/N:dataset:> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix hyp: <https://hyp.is/> .
+@prefix ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/> .
+@prefix isAbout: <http://purl.obolibrary.org/obo/IAO_0000136> .
+@prefix NIFRID: <http://uri.neuinfo.org/nif/nifstd/readable/> .
+@prefix NLXINV: <http://uri.neuinfo.org/nif/nifstd/nlx_inv_> .
+@prefix ORCID: <https://orcid.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prism.basic: <http://prismstandard.org/namespaces/basic/2.1/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ror: <https://ror.org/> .
+@prefix sparc: <http://uri.interlex.org/tgbugs/uris/readable/sparc/> .
+@prefix tech: <http://uri.interlex.org/tgbugs/uris/readable/technique/> .
+@prefix TEMP: <http://uri.interlex.org/temp/uris/> .
+@prefix TEMPRAW: <http://uri.interlex.org/temp/uris/raw/> .
+@prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
+@prefix unit: <http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# things we will need to map
+@prefix TEMPRAW: <http://uri.interlex.org/temp/uris/raw/> .
+@prefix TEMP: <http://uri.interlex.org/temp/uris/> .
+@prefix sparc: <http://uri.interlex.org/tgbugs/uris/readable/sparc/> .
+@prefix tech: <http://uri.interlex.org/tgbugs/uris/readable/technique/> .
+
+# conceptual namespaces
+@prefix blackfynn: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/blackfynn/> .
+@prefix c2m2: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/c2m2/> .
+@prefix biccn: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/biccn/> .
+@prefix dandi: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/dandi/> .
+@prefix datacite: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/datacite/> .
+@prefix orcid: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/orcid/> .
+@prefix aws: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/aws/> .
+@prefix s3: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/aws/s3/> .
+@prefix ec2: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/aws/ec2/> .
+@prefix hbp: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/hbp/> .
+@prefix unix: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/unix/> .
+
+@prefix fs: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/file-system/> .
+@prefix jir: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/json-ir/> .
+@prefix jexp: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/json-export-schema/> .
+@prefix format: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/format/> .
+@prefix MISSING: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/currently-missing-concepts/> .
+
+<https://raw.githubusercontent.com/SciCrunch/sparc-curation/master/resources/mis-accounting.ttl> a owl:Ontology ;
+    dc:title "SPARC MIS alignment" ;
+    dc:description "MAP ALL THE THINGS" ;
+    rdfs:comment "Do you really want to argue with someone that has been driven crazy enough to create this ontology and is using a text editor to do it?" ;
+    ilxtr:indexNamespace TEMP: .
+
+orcid: a ilxtr:Namespace .
+blackfynn: a ilxtr:Namespace .
+c2m2: a ilxtr:Namespace .
+jir: a ilxtr:Namespace .
+fs: a ilxtr:Namespace .
+
+ilxtr:block-storage a owl:Class .
+ilxtr:object-storage a owl:Class .
+
+unix:byte-stream a owl:Class .
+unix:user a owl:Class .
+unix:group a owl:Class .
+
+fs:inode a owl:Class .
+fs:block a owl:Class .
+fs:stream a owl:Class ;
+rdfs:comment "this is the abstraction of the file content over blocks" .
+fs:path-name a owl:Class ;
+    owl:deprecated true ;
+    replacedBy: fs:path ;
+    rdfs:comment "need to distinguish between the name for a thing and the object it dereferences
+not entirely sure I got this right, file/path/folder should possibly refer to the name and
+then we use file-descriptor to refer to the actual file stream? hard to know",
+"ajudication: NO we do not need this, in the file system we will have the stream
+essentially be composed of blocks, and the fs:stream will be what we actually work from
+that way paths live in the same realm as names and uris" .
+fs:path a owl:Class .
+fs:metadata a owl:Class .
+fs:permissions a owl:Class ; rdfs:subClassOf fs:metadata .
+fs:stat-output a owl:Class ; rdfs:subClassOf fs:metadata .
+fs:user a owl:Class ; rdfs:subClassOf fs:permission .
+fs:group a owl:Class ; rdfs:subClassOf fs:permission .
+fs:mode a owl:Class ; rdfs:subClassOf fs:permission .
+fs:file a owl:Class ; rdfs:subClassOf fs:path .
+fs:folder a owl:Class ; rdfs:subClassOf fs:path .
+fs:directory a owl:Class ; owl:equivalentClass fs:folder .
+fs:xattrs a owl:Class ; rdfs:subClassOf fs:metadata .
+fs:symlink a owl:Class ; rdfs:subClassOf fs:path, fs:metadata .
+
+aws:bucket a owl:Class .
+
+# TODO generate a list of all paths in the mis
+jexp:definitions/summary .
+jexp:definitions/dataset .
+jexp:dataset/metadata  .
+
+format:tabular a owl:Class .
+format:relational a owl:Class ; rdfs:comment "TODO how does this relate to tabular" .
+format:json-like a owl:Class ; rdfs:comment "associative array + list + some set of literals" .  
+format:graph-like a owl:Class .
+format:graph-triple a owl:Class ; rdfs:subClassOf format:graph-like ; rdfs:comment "includes quads etc" .
+format:graph-property a owl:Class ; rdfs:subClassOf format:graph-like ; rdfs:comment "has more to do with the internal representation of the graph and the fact that all edges are individuals rather than the way that predicates are used in rdf" .
+format:tree-like a owl:Class .
+format:xml a owl:Class ; rdfs:subClassOf format:tree-like .
+format:sexp a owl:Class ; rdfs:subClassOf format:tree-like .
+
+format:ser a owl:Class .
+format:ser-ttl a owl:Class ; rdfs:subClassOf format:ser .
+format:ser-json a owl:Class ; rdfs:subClassOf format:ser .
+
+s3:object-owner a owl:Class .
+s3:object a owl:Class ;
+hasPart: s3:key, s3:version-id, s3:value, s3:metadata, s3:subresources, s3:access-control-information .
+s3:key a owl:Class ;
+    ilxtr:similarTo fs:file ;
+    rdfs:comment "THIS IS NOT A PATH KIDS. IT IS EVIL and allows people to put things like / in their keys." .
+
+s3:version-id a owl:Class ;
+ilxtr:similarTo fs:inode ;
+    rdfs:comment "multiple files with the same name? on some filesystems you could have a version number to distinguish them, in the fs, there would still be an inode sitting behind that probably" .
+
+s3:metadata a owl:Class ;
+    ilxtr:similarTo fs:metadata ;
+    rdfs:comment "NOTE: metadata is immutable, the s3:object must be copied" .
+
+s3:value a owl:Class ;
+ilxtr:similarTo fs:stream .
+
+blackfynn:file a owl:Class ;
+    rdfs:subClassOf ilxtr:path-like, 
+        [ a owl:Restriction ;
+        owl:onProperty ilxtr:dereferencesTo ;
+        owl:someValuesFrom s3:object
+        ]
+    .
+blackfynn:package a owl:Class ; rdfs:subClassOf ilxtr:path-like .
+blackfynn:collection a owl:Class ; rdfs:subClassOf ilxtr:path-like .
+blackfynn:dataset .
+blackfynn:organization a owl:Class ;
+    rdfs:subClassOf [a owl:Restriction; owl:onProperty hasPart: ; owl:someValuesFrom blackfynn:people] .
+
+# 
+blackfynn:model a owl:Class .
+blackfynn:relationship a owl:Class .
+blackfynn:record a owl:Class .
+
+# pages
+blackfynn:dataset-settings a owl:Class ;
+ilxtr:alsoAccessibleFrom blackfynn:button-edit-dataset .
+
+blackfynn:dataset-permissions a owl:Class .
+blackfynn:organization-people  a owl:Class ;
+ilxtr:hasInterfaceLabel "People" .
+blackfynn:organization-teams a owl:Class ;
+ilxtr:hasInterfaceLabel "Teams" .
+blackfynn:organization-datasets a owl:Class ;
+ilxtr:hasInterfaceLabel "Datasets" .
+blackfynn:dataset-overview a owl:Class ;
+blackfynn:dataset-records a owl:Class; rdfs:comment "not named as such, has a tiny little records and then the dataset name" .
+blackfynn:dataset-models a owl:Class;
+    ilxtr:aka "Data Management", "graph-management", "models", "Models" ;
+    ilxtr:uriPathTemplate "https://app.blackfynn.io/{org}/datasets/{dat}/graph-management/models" .
+blackfynn:dataset-files a owl:Class; rdfs:comment "" .
+
+# page elements
+blackfynn:dataset-description a owl:Class ;
+ilxtr:hasEditButton blackfynn:button-dataset-description-edit ;
+ilxtr:currentlyAppearsOnPage blackfynn:dataset-overview .
+blackfynn:dataset-name a owl:Class.
+blackfynn:dataset-subtitle a owl:Class.
+blackfynn:dataset-license-type a owl:Class.
+blackfynn:dataset-tags a owl:Class.
+blackfynn:dataset-contributors a owl:Class.
+blackfynn:dataset-banner-image a owl:Class.
+# data elements
+blackfynn:dataset-update a owl:Class .
+blackfynn:dataset-created a owl:Class .
+
+# buttons/links
+blackfynn:button-edit-dataset a owl:Class .
+blackfynn:button-create-contributor a owl:Class .
+blackfynn:button-update-on-blackfynn-discover a owl:Class .
+blackfynn:button-publish-to-blackfynn-discover a owl:Class .
+blackfynn:button-package-link-to-record a owl:Class .
+
+blackfynn:user a owl:Class ; rdfs:comment "get a list of these from People" .
+
+blackfynn:team a owl:Class ;
+    rdfs:subClassOf [ owl:Restriction;
+    owl:onProperty blackfynn:hasMember ;
+    owl:someValuesFrom blackfynn:user
+        ] .
+
+# bf persmission roles
+blackfynn:owner a owl:Class .
+blackfynn:manager a owl:Class .
+blackfynn:editor a owl:Class .
+# bf contributor roles
+blackfynn:dataset-owner a owl:Class ; rdfs:comment "conflation between contributor and permissions".
+blackfynn:
+    
+
+MISSING:bundle
+MISSING:checksum
+### Serialized using the ttlser deterministic serializer v1.2.0
