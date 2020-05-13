@@ -30,7 +30,7 @@ cypherResources:
       <-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
       <-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
       WITH path1, n
-      MATCH path2 = (start:Class{iri: n.iri})
+      MATCH path2 = (start)
       // this one does not need to be inverted ? except for the INCOMING flag
       <-[:fma:arterial_supply_of|fma:venous_drainage_of]-(vessel)
       <-[:fma:branch|fma:tributary]-(more_vessel)
