@@ -102,16 +102,16 @@ to match the name of the file that you scp to cassava.
 While an ApiNATOMY server has been on the roadmap for some time, there have not been
 clear requirements and use cases to drive the development in a way that is productive.
 As the conversion of ApiNATOMY models to RDF has progressed, some of the requirements
-and use cases have presented themselves and helped to solidify a set of initial use case.
+and use cases have presented themselves and helped to solidify a set of initial use cases.
 The need to integrate knowledge represented in ApiNATOMY into the larger linked data space
-provides the first requirement that the server be able to provide persistent and resolvable
-identifiers for ApiNATOMY models, and to be able to provide high granularity access to the
-version history of these models. In addition we ultimately are aiming for the server to be
-able to automatically convert input models or spreadsheets into generated models and
-resource maps. We have mapped out three phases for arriving at this end goal. The first
-is to be able to resolve input models, and to upload and link the generated model and
-resource map and track which input model they came from. This will address our primary
-short-term needs.
+provides some initial requirements which are the that the server be able to provide persistent
+and resolvable identifiers for ApiNATOMY models, and that it be able to provide high granularity
+access to the version history of these models. In addition, we are ultimately aiming for
+the server to be able to automatically convert input models or spreadsheets into generated
+models and resource maps. We have mapped out three phases for arriving at this end goal.
+The first phase is to be able to resolve input models, the second is to be able to upload
+and link the generated model and resource map and track which input model they came from.
+These two will address our primary short-term needs.
 
 To accomplish this, the plan is to use git (via GitHub) as the primary datastore for the models.
 This will allow us to leverage the significant existing infrastructure around GitHub for version
@@ -120,8 +120,9 @@ server that provides resolvable persistent identifiers for ApiNATOMY models so t
 appearing in the linked data graphs will be resolvable and interoperable with the rest of the
 NIF-Ontology search and discovery tooling.
 
-In the future we can work towards automating the conversion of input models, and it might also be
-possible to have the server automatically convert and serve the RDF version of the models as well.
+In the future as part of the third phase we can work towards automating the conversion of input models,
+and it might also be possible to have the server automatically convert and serve the RDF version of the
+models as well.
 
 A brief outline of the initial requirements needed to meet the needs of the RDF conversion pipeline
 are documented below.
