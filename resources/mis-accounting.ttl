@@ -256,6 +256,7 @@
 @prefix ec2: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/aws/ec2/> .
 @prefix hbp: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/hbp/> .
 @prefix unix: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/unix/> .
+@prefix soda: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/soda/> .
 
 @prefix fs: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/file-system/> .
 @prefix jir: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/json-ir/> .
@@ -269,19 +270,24 @@
     rdfs:comment "Do you really want to argue with someone that has been driven crazy enough to create this ontology and is using a text editor to do it?" ;
     ilxtr:indexNamespace TEMP: .
 
+
+### namespaces
 orcid: a ilxtr:Namespace .
 blackfynn: a ilxtr:Namespace .
 c2m2: a ilxtr:Namespace .
 jir: a ilxtr:Namespace .
 fs: a ilxtr:Namespace .
 
+### storage types
 ilxtr:block-storage a owl:Class .
 ilxtr:object-storage a owl:Class .
 
+### operating system primitives
 unix:byte-stream a owl:Class .
 unix:user a owl:Class .
 unix:group a owl:Class .
 
+### file systems
 fs:inode a owl:Class .
 fs:block a owl:Class .
 fs:stream a owl:Class ;
@@ -308,13 +314,13 @@ fs:directory a owl:Class ; owl:equivalentClass fs:folder .
 fs:xattrs a owl:Class ; rdfs:subClassOf fs:metadata .
 fs:symlink a owl:Class ; rdfs:subClassOf fs:path, fs:metadata .
 
-aws:bucket a owl:Class .
-
+### sparc json export
 # TODO generate a list of all paths in the mis
 jexp:definitions/summary .
 jexp:definitions/dataset .
 jexp:dataset/metadata  .
 
+### formats
 format:tabular a owl:Class .
 format:relational a owl:Class ; rdfs:comment "TODO how does this relate to tabular" .
 format:json-like a owl:Class ; rdfs:comment "associative array + list + some set of literals" .  
@@ -328,6 +334,9 @@ format:sexp a owl:Class ; rdfs:subClassOf format:tree-like .
 format:ser a owl:Class .
 format:ser-ttl a owl:Class ; rdfs:subClassOf format:ser .
 format:ser-json a owl:Class ; rdfs:subClassOf format:ser .
+
+### aws
+s3:bucket a owl:Class .
 
 s3:object-owner a owl:Class .
 s3:object a owl:Class ;
@@ -354,6 +363,8 @@ blackfynn:file a owl:Class ;
         owl:someValuesFrom s3:object
         ]
     .
+
+### blackfynn
 blackfynn:package a owl:Class ; rdfs:subClassOf ilxtr:path-like .
 blackfynn:collection a owl:Class ; rdfs:subClassOf ilxtr:path-like .
 blackfynn:dataset .
@@ -418,9 +429,65 @@ blackfynn:manager a owl:Class .
 blackfynn:editor a owl:Class .
 # bf contributor roles
 blackfynn:dataset-owner a owl:Class ; rdfs:comment "conflation between contributor and permissions".
-blackfynn:
-    
 
-MISSING:bundle
-MISSING:checksum
+### c2m2
+
+# implicit classes
+c2m2:project a owl:Class, ilxtr:apparently-implicit-class .
+c2m2:subject a owl:Class, ilxtr:apparently-implicit-class .
+c2m2:sample a owl:Class, ilxtr:apparently-implicit-class .
+c2m2:protocol a owl:Class, ilxtr:apparently-implicit-class .
+c2m2:hash-algorithm a owl:Class, ilxtr:apparently-implicit-class .
+
+# explicit classes
+c2m2:namespace a owl:Class .
+c2m2:file a owl:Class .
+
+# level 0 below the usual level
+# https://nih-cfde.org/product/level-0-asset-manifest-specification/
+c2m2:namespace-id a owl:ObjectProperty .
+c2m2:namespace-name a owl:AnnotationProperty .
+c2m2:namespace-description a owl:AnnotationProperty .
+
+c2m2:file-id-namespace a owl:objectProperty .
+c2m2:file-id a owl:AnnotationProperty .  # uri a owl:Class .
+c2m2:file-size-in-bytes a owl:AnnotationProperty .
+#c2m2:file-sha256 a owl:AnnotationProperty .
+#c2m2:file-md5 a owl:AnnotationProperty .
+c2m2:file-persistent-id a owl:ObjectProperty .
+c2m2:file-filename a owl:AnnotationProperty .
+c2m2:associated-project a owl:ObjectProperty .  # seems to have been dropped
+# would prefer, but might require blank node
+c2m2:file-hash-algorithm a owl:ObjectProperty .
+c2m2:file-checksum a owl:AnnotationProperty .
+
+# level 1
+c2m2:assay-type a owl:ObjectProperty .
+c2m2:file-format a owl:ObjectProperty .
+c2m2:file-data-type a owl:ObjectProperty .
+c2m2:host-species a owl:ObjectProperty .
+c2m2:subject-id a owl:AnnotationProperty .
+c2m2:sample-id a owl:AnnotationProperty .
+c2m2:anatomy a owl:ObjectProperty .
+
+# level 2
+c2m2:subject-sex a owl:ObjectProperty .
+c2m2:subject-age-at-collection a owl:AnnotationProperty .  # FIXME our blank node structure for this in rdf not owl FIXME also generic age doesn't work
+c2m2:subject-disease a owl:ObjectProperty .
+c2m2:subject-health-conditions a owl:ObjectProperty .
+c2m2:subject-medication a owl:ObjectProperty .  # this will be tricky ... due to dose ?
+c2m2:subject-vital-stats a owl:ObjectProperty .  # probably needs to be split up
+c2m2:subject-visit-info a owl:ObjectProperty .   # or point to an data record object
+
+# level 3
+c2m2:sequencing-technique a owl:ObjectProperty .
+c2m2:geographic-location a owl:DatatypeProperty .
+c2m2:subject-strain a owl:ObjectProperty .  # race/ethnicity RRID
+c2m2:sample-collection-date a owl:DatatypeProperty .
+c2m2:employed-protocol a owl:ObjectProperty .
+
+### things that need to be added
+MISSING:bundle a owl:Class .
+MISSING:hash-algorithm a owl:ObjectProperty .
+MISSING:checksum a owl:AnnotationProperty .
 ### Serialized using the ttlser deterministic serializer v1.2.0
