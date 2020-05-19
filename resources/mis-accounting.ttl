@@ -365,6 +365,9 @@ blackfynn:file a owl:Class ;
     .
 
 ### blackfynn
+blackfynn:internal a owl:Class ; rdfs:comment "sometimes referred to as the blackfynn platform" .
+blackfynn:discover a owl:Class .
+
 blackfynn:package a owl:Class ; rdfs:subClassOf ilxtr:path-like .
 blackfynn:collection a owl:Class ; rdfs:subClassOf ilxtr:path-like .
 blackfynn:dataset .
@@ -485,6 +488,9 @@ c2m2:geographic-location a owl:DatatypeProperty .
 c2m2:subject-strain a owl:ObjectProperty .  # race/ethnicity RRID
 c2m2:sample-collection-date a owl:DatatypeProperty .
 c2m2:employed-protocol a owl:ObjectProperty .
+
+# dandi
+dandi:set a owl:Class .  # heh
 
 ### things that need to be added
 MISSING:bundle a owl:Class .
