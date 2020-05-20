@@ -40,7 +40,10 @@ class TripleConverter(dat.HasErrors):
 
     def l(self, value):
         if isinstance(value, idlib.Stream) and hasattr(value, '_id_class'):
-            return value.asType(rdflib.URIRef)
+            if hasattr(value, 'asUri'):  # FIXME
+                return value.asUri(rdflib.URIRef)
+            else:
+                return value.asType(rdflib.URIRef)
         if isinstance(value, OntId):
             return value.u
         if isinstance(value, ProtcurExpression):
@@ -94,16 +97,21 @@ class TripleConverter(dat.HasErrors):
                         continue
 
                     #log.debug((o, v))
-                    a = isinstance(o, idlib.Stream) and hasattr(o, '_id_class') or isinstance(o, OntTerm)
-                    b = isinstance(v, idlib.Stream) and hasattr(v, '_id_class') or isinstance(v, OntTerm)
+                    a = (isinstance(o, idlib.Stream) and hasattr(o, '_id_class')
+                         or isinstance(o, OntTerm))
+                    b = (isinstance(v, idlib.Stream) and hasattr(v, '_id_class')
+                         or isinstance(v, OntTerm))
                     if (a or b):
                         # FIXME this thing is a mess ...
                         _v = o if a else v
-                        s = _v.asType(rdflib.URIRef)
+                        s = _v.asUri(rdflib.URIRef)
                         yield subject, p, s
                         try:
                             d = _v.asDict()  # FIXME this is a silly way to do this, use Stream.triples_gen
-                            yield s, rdf.type, (owl.Class if isinstance(o, OntTerm) else owl.NamedIndividual)
+                            _o = (owl.Class
+                                  if isinstance(v, OntTerm) else  # FIXME not really accurate
+                                  owl.NamedIndividual)
+                            yield s, rdf.type, _o
                             if 'label' in d:
                                 yield s, rdfs.label, rdflib.Literal(d['label'])
                             if 'synonyms' in d:  # FIXME yield from o.synonyms(s)

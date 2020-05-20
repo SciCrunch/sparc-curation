@@ -19,7 +19,7 @@ from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pysercomb.pyr.types import ProtcurExpression, Quantity  # FIXME import slowdown
 from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
 from pyontutils.utils import isoformat, TZLOCAL
-from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
+from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
 from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, python_identifier  # FIXME fix other imports
@@ -126,6 +126,11 @@ class OntTerm(OTB, OntId):
     def asType(self, _class):
         return _class(self.iri)
 
+    def asUri(self, asType=None):
+        return (self.iri
+                if asType is None else
+                asType(self.iri))
+
     def asDict(self):
         out = {
             'type': 'identifier',
@@ -149,6 +154,23 @@ class OntTerm(OTB, OntId):
             return _id
 
         return self.label + sep + self.curie
+
+    @property
+    def triples_simple(self):
+        # method name matches convention from neurondm
+        # but I still don't really like this pattern
+        # especially since this wouldn't be derived directly
+        # from the json from but would/could hit the network again
+        s = self.asUri(rdflib.URIRef)
+        yield s, rdf.type, owl.Class
+        if self.label:
+            yield s, rdfs.label, rdflib.Literal(self.label)
+        if self.definition:
+            yield s, definition, rdflib.Literal(self.definition)
+        if self.deprecated:
+            yield s, owl.deprecated, rdflib.Literal(True)
+        for syn in self.synonyms:
+            s, NIFRID.synonyms, rdflib.Literal(syn)
 
 
 class HasErrors:

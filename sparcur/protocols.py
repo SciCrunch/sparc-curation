@@ -65,6 +65,7 @@ class ProtcurData:
                 continue
 
             done.add(term)
+            yield from OntTerm(term).triples_simple
             o = term.u
             t = dataset_subject, TEMP.involvesAnatomicalRegion, o
             sl = rdflib.URIRef(anno.shareLink)

@@ -823,7 +823,7 @@ class MetaOutExportSchema(JSONSchema):
                              'items': {'type': 'string'}},
         'species': {'type': 'string'},
         'schema_version': {'type': 'string'},
-        'organ': {'type': 'string'},
+        'organ': EIS._allOf(OntTermSchema),
         'modality': {'type': 'array',
                      'minItems': 1,
                      'items': {
