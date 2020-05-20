@@ -429,7 +429,7 @@ class BlackfynnRemote(aug.RemotePath):
         try:
             bfo = self.bfobject
             return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
-        except BaseException as e:
+        except Exception as e:
             breakpoint()
             raise e
 
@@ -500,6 +500,12 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def parent(self):
+        if hasattr(self, '_c_parent'):
+            # WARNING staleness could occure because of this
+            # wow does it save on the network roundtrips
+            # for rchildren though
+            return self._c_parent
+
         if isinstance(self.bfobject, Organization):
             return self  # match behavior of Path
 
@@ -520,7 +526,8 @@ class BlackfynnRemote(aug.RemotePath):
 
         if parent:
             parent_cache = self.cache.parent if self.cache is not None else None
-            return self.__class__(parent, cache=parent_cache)
+            self._c_parent = self.__class__(parent, cache=parent_cache)
+            return self._c_parent
 
     @property
     def children(self):
@@ -553,7 +560,34 @@ class BlackfynnRemote(aug.RemotePath):
     def rchildren(self):
         yield from self._rchildren()
 
-    def _rchildren(self, create_cache=True, exclude_uploaded=True):
+    def _dir_or_file(self, child, deleted, exclude_uploaded):
+        state = child.bfobject.state
+        if state != 'READY':
+            log.debug (f'{state} {child.name} {child.id}')
+            if state == 'DELETING' or state == 'PARENT-DELETING':
+                deleted.append(child)
+                return
+            if exclude_uploaded and state == 'UPLOADED':
+                return
+
+        if child.is_file():
+            cid = child.id
+            existing = [c for c in self.cache.local.children
+                        if (c.is_file() and c.cache or c.is_broken_symlink())
+                        and c.cache.id == cid]
+            if existing:
+                unmatched = [e for e in existing if child.name != e.name]
+                if unmatched:
+                    log.debug(f'skipping {child.name} becuase a file with that '
+                                f'id already exists {unmatched}')
+                    return
+
+        return True
+
+    def _rchildren(self,
+                   create_cache=True,
+                   exclude_uploaded=True,
+                   sparse=False,):
         if isinstance(self.bfobject, File):
             return
         elif isinstance(self.bfobject, DataPackage):
@@ -564,29 +598,70 @@ class BlackfynnRemote(aug.RemotePath):
                 yield from child._rchildren(create_cache=create_cache)
         elif isinstance(self.bfobject, Dataset):
             deleted = []
+            if sparse:
+                filenames = self._sparse_stems
+                sbfo = self.bfobject
+                _parents_yielded = set()
+                _int_id_map = {}
+                for bfobject in self.bfobject.packagesByName(filenames=filenames):
+                    child = self.__class__(bfobject)
+                    if child.is_dir() or child.is_file():
+                        if not self._dir_or_file(child, deleted, exclude_uploaded):
+                            continue
+                    else:
+                        # probably a package that has files
+                        #log.debug(f'skipping {child} becuase it is neither a directory nor a file')
+                        continue
+
+                    parent = child
+                    parents = []
+                    while True:
+                        log.debug(parent)
+                        parent_int_id = None
+                        if (parent.from_packages and
+                            'parentId' in parent.bfobject.package._json['content']):
+                            # FIXME HACK
+                            # FIXME incredibly slow, but still faster than non-sparse
+                            parent_int_id = parent.bfobject.package._json['content']['parentId']
+                            if parent_int_id not in _int_id_map:
+                                parent = self.__class__(parent.id)
+                                parent.bfobject
+                                _int_id_map[parent_int_id] = parent.parent
+
+                        if not parents:  # add the child as the last parent
+                            parents.append(parent)
+
+                        if parent.parent_id in (sbfo, self.id):
+                            break  # child yielded below
+                        else:
+                            if parent_int_id is not None:
+                                parent = _int_id_map[parent_int_id]
+                            else:
+                                parent = parent.parent
+                            # TODO create cache
+                            if parent.id not in _parents_yielded:
+                                _parents_yielded.add(parent.id)
+                                # actually yield below in the reverse order
+                                parents.append(parent)
+                                #yield parent
+                            else:
+                                break
+
+                    if create_cache:
+                        pcache = self.cache
+                        for parent in reversed(parents):
+                            yield parent
+                            pcache = pcache / parent
+                    else:
+                        yield from reversed(parents)
+
+                return
+
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
                 if child.is_dir() or child.is_file():
-                    state = child.bfobject.state
-                    if state != 'READY':
-                        log.debug (f'{state} {child.name} {child.id}')
-                        if state == 'DELETING' or state == 'PARENT-DELETING':
-                            deleted.append(child)
-                            continue
-                        if exclude_uploaded and state == 'UPLOADED':
-                            continue
-
-                    if child.is_file():
-                        cid = child.id
-                        existing = [c for c in self.cache.local.children
-                                    if (c.is_file() and c.cache or c.is_broken_symlink())
-                                    and c.cache.id == cid]
-                        if existing:
-                            unmatched = [e for e in existing if child.name != e.name]
-                            if unmatched:
-                                log.debug(f'skipping {child.name} becuase a file with that '
-                                          f'id already exists {unmatched}')
-                                continue
+                    if not self._dir_or_file(child, deleted, exclude_uploaded):
+                        continue
 
                     if create_cache:
                         # FIXME I don't think existing detection is working
@@ -606,6 +681,7 @@ class BlackfynnRemote(aug.RemotePath):
             raise exc.UnhandledTypeError  # TODO
 
     def children_pull(self, existing_caches=tuple(), only=tuple(), skip=tuple(), sparse=tuple()):
+        """ ONLY USE FOR organization level """
         # FIXME this is really a recursive pull for organization level only ...
         sname = lambda gen: sorted(gen, key=lambda c: c.name)
         def refresh(c):

@@ -205,8 +205,8 @@ from hyputils import hypothesis as hyp
 from augpathlib import FileSize
 from augpathlib import RemotePath, AugmentedPath  # for debug
 from pyontutils import clifun as clif
-from pyontutils.core import OntResGit, OntGraph
-from pyontutils.utils import UTCNOWISO, subclasses
+from pyontutils.core import OntResGit, OntGraph, OntResIri
+from pyontutils.utils import UTCNOWISO, subclasses, anyMembers
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
@@ -655,6 +655,7 @@ class Main(Dispatcher):
 
     def pull(self):
         # TODO folder meta -> org
+        from pyontutils.utils import Async, deferred
         only = tuple()
         recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
         dirs = self.directories
@@ -734,20 +735,26 @@ class Main(Dispatcher):
             if newc is None:
                 continue  # directory was deleted
 
-            if d.cache.is_organization():  # FIXME FIXME FIXME hack to mask broken bootstrap handling of existing dirs :/
-                for cd in d.children:
-                    if cd.is_dir():
-                        oc = cd.cache  # FIXME getting the cache slow
-                        if oc is None and cd.skip_cache:
-                            continue
+            def hrm(child):
+                cd = child
+                if cd.is_dir():
+                    oc = cd.cache  # FIXME getting the cache slow
+                    if oc is None and cd.skip_cache:
+                        return
 
-                        nc = oc.refresh()  # FIXME can't we just build an index off datasets here??
-                        if nc != oc:
-                            log.info(f'Dataset moved!\n{oc} -> {nc}')
-                            # FIXME FIXME FIXME
-                            rnl = self.anchor.local_data_dir / 'renames.log'
-                            with open(rnl, 'at') as f:
-                                f.write(f'{oc} -> {nc} -> {nc.id}\n')
+                    nc = oc.refresh()  # FIXME can't we just build an index off datasets here??
+                    if nc != oc:
+                        log.info(f'Dataset moved!\n{oc} -> {nc}')
+                        # FIXME FIXME FIXME
+                        rnl = self.anchor.local_data_dir / 'renames.log'
+                        with open(rnl, 'at') as f:
+                            f.write(f'{oc} -> {nc} -> {nc.id}\n')
+
+            if d.cache.is_organization():  # FIXME FIXME FIXME hack to mask broken bootstrap handling of existing dirs :/
+                if self.options.debug or self.options.jobs == 1:
+                    _blank = [hrm(cd) for cd in d.children]
+                else:
+                    _blank = Async()(deferred(hrm)(cd) for cd in d.children)
 
             # FIXME something after this point is retaining stale filepaths on dataset rename ...
             #d = r.local  # in case a folder moved
@@ -1928,31 +1935,60 @@ class Report(Dispatcher):
     def _by_tags(self, *tags, links=True):
         annos = self._annos()
         [hyp.HypothesisHelper(a, annos) for a in annos]
-        if 'protc:input' in tags:
+        process_protc = anyMembers(tags,
+                                   'protc:input',
+                                   'protc:aspect',
+                                   'protc:input-instance',
+                                   'protc:implied-aspect',
+                                   'protc:implied-input')
+        if process_protc:
             from pysercomb.parsers import racket
             from pysercomb.pyr import units as pyru
             from protcur.analysis import protc
             [protc(a, annos) for a in annos]
 
         def normalize_exact(e):
-            e = e.replace('\t', ' ')
-            e = e.replace('\xA0', ' ')  # nbsp
-            e = e.strip().rstrip()
-            return e
+            if e is not None:
+                e = e.replace('\n', ' ')  # sigh
+                e = e.replace('\t', ' ')
+                e = e.replace('\xA0', ' ')  # nbsp
+                e = e.strip().rstrip()
+                return e
+        def normtext(t):
+            if 'https://' in t:
+                return ''
+            else:
+                return t
 
         # note that HypothesisHelper.byTags is an AND search not and OR search
         matches = [(normalize_exact(a.exact), a) for tag in tags for a in hyp.HypothesisHelper.byTags(tag)]
-        if 'protc:input' in tags:
+        if process_protc:
             pm = [protc.byId(a.id) for _, a in matches]
 
             # testing
-            input = pm[13]
-            invar = next(next(input.children).children)
-            paramparser = pyru.ParamParser()
-            tv = racket.sexp(invar.parameter())[1]
-            tp = invar._parameter[1]
-            assert tv == tp
-            hrm = paramparser(tv)
+            if 'protc:input' in tags:
+                input = pm[13]
+                invar = next(next(input.children).children)
+                paramparser = pyru.ParamParser()
+                tv = racket.sexp(invar.parameter())[1]
+                tp = invar._parameter[1]
+                assert tv == tp
+                hrm = paramparser(tv)
+
+            hrm = defaultdict(list)
+            def denone(t): return tuple('' if e is None else e for e in t)
+            for p in pm:
+                pt = [t for t in p.tags if t in tags]
+                if pt:
+                    hrm[denone((pt[0], p.value, normtext(p.text), normalize_exact(p.exact)))].append(p)
+                else:
+                    log.warning(f'WAT {p.tags}')
+
+            header = [['tag', 'value', 'text', 'exact', 'count']]
+            #rows = [[(*k, ' '.join([a.shareLink for a in v]))] for k, v in sorted(hrm.items())]
+            rows = [[*k, len(v)] for k, v in sorted(hrm.items())]
+            return self._print_table(header + rows,
+                                     title=f'Annos for {" ".join(tags)}')
 
         md = defaultdict(list)
         for e, a in matches:

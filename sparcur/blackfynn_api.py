@@ -331,7 +331,15 @@ PackagesAPI.get = get
 
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
-    yield from self._packages(pageSize=pageSize, includeSourceFiles=True)
+    yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles)
+
+
+def packagesByName(self, pageSize=1000, includeSourceFiles=True, filenames=tuple()):
+    if filenames:
+        for filename in filenames:
+            yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles, filename=filename)
+    else:
+        yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles)
 
 
 def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_only=False, filename=None):
@@ -496,6 +504,7 @@ def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_on
 # monkey patch Dataset to implement packages endpoint
 Dataset._packages = _packages
 Dataset.packages = packages
+Dataset.packagesByName = packagesByName
 
 
 @property

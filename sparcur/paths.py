@@ -169,6 +169,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
             self.local_object_cache_path.cache_init(self.meta)  # FIXME self.meta be stale here?!
 
     def _bootstrap_recursive(self, only=tuple(), skip=tuple(), sparse=False):
+        """ only on the first call to this function should sparse be a tuple """
         # bootstrap the rest if we told it to
         if self.id.startswith('N:organization:'):  # FIXME :/
             yield from self.remote.children_pull(self.children,
