@@ -367,7 +367,7 @@ class Export(ExportBase):
             def fetch(id):  # FIXME error proof version ...
                 try:
                     metadata = id.metadata()
-                    metadata['id'] = id.identifier  # FIXME normalization ...
+                    metadata['id'] = id
                     return metadata
                 except (requests.exceptions.HTTPError, idlib.exceptions.ResolutionError) as e:
                     logd.error(e)
