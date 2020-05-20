@@ -35,6 +35,7 @@ command_args="
 --user ${SVCUSER}
 --log-level ${LOG_LEVEL}
 --log-file ${LOG}
+--capture-output
 sparcur.dashboard_server:app"
 retry='TERM/30/KILL/5'
 
