@@ -935,6 +935,11 @@ done"""
             # FIXME sys.exit ?
             raise BaseException(f'duplicate datasets {bads}')
 
+    def _check_exists(self, dataset_paths):
+        bads = [p for p in dataset_paths if not p.exists()]
+        if bads:
+            raise FileNotFoundError(f'The following do not exist!\n{bads}')
+
     def export(self):
         from sparcur import export as ex  # FIXME very slow to import
         from sparcur import schemas as sc
@@ -952,6 +957,7 @@ done"""
             export = self._export(ex.ExportXml)
             dataset_paths = self._datasets_with_extension('xml')
             self._check_duplicates(dataset_paths)
+            self._check_exists(dataset_paths)
             blob_ir, *rest = export.export(dataset_paths=dataset_paths,
                                            jobs=self.options.jobs,
                                            debug=self.options.debug)
@@ -962,6 +968,7 @@ done"""
             export = self._export(ex.Export)
             dataset_paths = tuple(self.paths)
             self._check_duplicates(dataset_paths)  # NOTE can be empty
+            self._check_exists(dataset_paths)
             noexport = (auth.get_list('datasets-noexport') +
                         auth.get_list('datasets-no'))
             blob_ir, *rest = export.export(dataset_paths=dataset_paths,

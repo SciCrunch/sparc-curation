@@ -62,9 +62,6 @@ mains = {'cli-real': [['spc', 'clone', test_organization],
                  ['spc', 'meta'],
 
                  ['spc', 'export'],
-                 ['spc', 'export', 'datasets'],
-                 ['spc', 'export', 'ttl'],
-                 ['spc', 'export', 'json'],
 
                  ['spc', 'report', 'completeness'],
                  ['spc', 'report', 'contributors'],

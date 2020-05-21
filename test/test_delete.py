@@ -132,6 +132,7 @@ class TestUpdate(_TestOperation, unittest.TestCase):
             print(remote.bfobject.package.name)
 
     def test_upload_noreplace_fail(self):
+        # some persistent state from other tests is causing this to fail
         test_file = self.test_base / 'dataset_description.csv'
         test_file.data = iter((make_rand(100),))
         # FIXME temp sandboxing for upload until naming gets sorted

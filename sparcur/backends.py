@@ -1030,7 +1030,13 @@ class BlackfynnRemote(aug.RemotePath):
         # FIXME BAD forces us to read file twice
         checksum = local_path.checksum()
 
-        old_remote = self / local_path.name
+        try:
+            old_remote = self / local_path.name
+        except NotImplementedError as e:
+            # well now this isn't failing ...
+            #breakpoint()
+            raise e
+
         rchecksum = None
         if old_remote is not None:
             rchecksum = old_remote.checksum

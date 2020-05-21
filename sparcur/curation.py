@@ -487,7 +487,8 @@ class Summary(Integrator, ExporterSummarizer):
                 continue
 
             if path.cache.id in self._exclude:
-                log.info(f'skipping export of {path} because {path.cache.id} is in noexport')
+                log.info(f'skipping export of {path} because '
+                         f'{path.cache.id} is in noexport')
                 continue
 
             yield IntegratorSafe(path)
