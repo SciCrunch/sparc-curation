@@ -1021,9 +1021,11 @@ DatasetDescriptionFilePath._bind_flavours()
 
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
 _props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
-_nsffes = [k for k, v in chain(_props.items(), _props2.items())
+_props3 = sc._software_schema['items']['properties']
+_nsffes = [k for k, v in chain(_props.items(), _props2.items(), _props3.items())
            if isinstance(v, dict) and sc.not_array(v)]
 _nsffes = sorted(set(_nsffes))
+
 
 class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE
@@ -1093,6 +1095,7 @@ class SamplesFile(SubjectsFile):
                       'handedness': 'right',}]]
     normalization_class = nml.NormSamplesFile
     normalize_header = False
+    _expect_single = _nsffes
 
 
 class SamplesFilePath(ObjectPath):

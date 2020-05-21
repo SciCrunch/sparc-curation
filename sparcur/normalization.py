@@ -707,6 +707,9 @@ class NormSubjectsFile(NormValues):
         value, _j = self._deatag(value)
         return value
 
+    def software_rrid(self, value):
+        yield from self._rrid(value)
+
     def species(self, value):
         nv = NormSpecies(value)
         #yield self._query(nv, 'NCBITaxon')
@@ -757,7 +760,12 @@ class NormSubjectsFile(NormValues):
             msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
             if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline'):
                 log.error(msg)
-            yield value
+
+            if value.strip().lower() in ('unknown', 'uknown'):
+                yield UNKNOWN
+            else:
+                yield value
+
             return
 
         #if not pv[0] == 'param:parse-failure':
@@ -839,7 +847,9 @@ class NormSubjectsFile(NormValues):
                 yield rrid
             except idlib.exceptions.MalformedIdentifierError as e:
                 msg = f'malformed RRID: {value}'
-                if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
+                if self.addError(msg,
+                                 pipeline_stage=self.__class__.__name__,
+                                 blame='submission',
                                  path=self._path):
                     log.error(msg)
 

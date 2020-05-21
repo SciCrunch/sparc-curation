@@ -21,6 +21,8 @@ def not_array(schema, in_all=False):
             'properties' in schema and 'items' not in schema or
             # FIXME hack hard to maintain
             'allOf' in schema and all(not_array(s, True) for s in schema['allOf']) or
+            'oneOf' in schema and all(not_array(s, True) for s in schema['oneOf']) or
+            'anyOf' in schema and all(not_array(s, True) for s in schema['anyOf']) or
             'not' in schema and (not not_array(schema['not'], in_all) or in_all)
     )
 
@@ -554,6 +556,12 @@ class CreatorsSchema(JSONSchema):
     schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
+_protocol_url_or_doi_schema = {'anyOf':[EIS._allOf(DoiSchema),
+                                        EIS._allOf(PioSchema),
+                                        {'type': 'string',
+                                         'pattern': simple_url_pattern,}]}
+
+
 class DatasetDescriptionExportSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -586,13 +594,9 @@ class DatasetDescriptionExportSchema(JSONSchema):
             'number_of_subjects': {'type': 'integer'},
             'number_of_samples': {'type': 'integer'},
             'parent_dataset_id': {'type': 'string'},  # blackfynn id
-            'protocol_url_or_doi': {
-                'type': 'array',
-                'minItems': 1,
-                'items': {'anyOf':[EIS._allOf(DoiSchema),
-                                   EIS._allOf(PioSchema),
-                                   {'type': 'string',
-                                    'pattern': simple_url_pattern,}]}},
+            'protocol_url_or_doi': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': _protocol_url_or_doi_schema},
             'links': {
                 'type': 'array',
                 'minItems': 1,
@@ -652,6 +656,18 @@ class UnitSchema(JSONSchema):
                                         'unit': {'type': 'string'}}}]}
 
 
+_software_schema = {'type': 'array',
+                    'minItems': 1,
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'software_version': {'type': 'string'},
+                            'software_vendor': {'type': 'string'},
+                            'software_url': {'type': 'string'},
+                            'software_rrid': EIS._allOf(RridSchema),
+                        },},}
+
+
 class SubjectsExportSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -677,16 +693,7 @@ class SubjectsExportSchema(JSONSchema):
                                         },},},
 
                        'errors': ErrorSchema.schema,
-                       'software': {'type': 'array',
-                                    'minItems': 1,
-                                    'items': {
-                                        'type': 'object',
-                                        'properties': {
-                                            'software_version': {'type': 'string'},
-                                            'software_vendor': {'type': 'string'},
-                                            'software_url': {'type': 'string'},
-                                            'software_rrid': EIS._allOf(RridSchema),
-                                        },},}}}
+                       'software': _software_schema}}
 
     # FIXME not implemented
     extras = [['unique', ['subjects', '*', 'subject_id']]]
@@ -716,7 +723,7 @@ class SamplesFileExportSchema(JSONSchema):
 
                                             'species': {'type': 'string'},
                                             'strain': {'type': 'string'},  # TODO RRID
-                                            'RRID_for_strain': {'type': 'string'},  # FIXME why is this in samples and not subjects?
+                                            'rrid_for_strain': EIS._allOf(RridSchema),
                                             'genotype': {'type': 'string'},
 
                                             'sex': {'type': 'string'},  # sex as a variable ?
@@ -733,25 +740,13 @@ class SamplesFileExportSchema(JSONSchema):
                                             'disease': {'type': 'string'},
                                             'reference_atlas': {'type': 'string'},
                                             'protocol_title': {'type': 'string'},
-                                            'protocol_url_or_doi':
-                                            {'oneOf':[EIS._allOf(DoiSchema),
-                                                      EIS._allOf(PioSchema),
-                                                      {'type': 'string',
-                                                       'pattern': simple_url_pattern,}]},
+                                            'protocol_url_or_doi': _protocol_url_or_doi_schema 
+                                            ,
                                             'experimental_log_file_name': {'type': 'string'},
                                         },},},
 
                        'errors': ErrorSchema.schema,
-                       'software': {'type': 'array',
-                                    'minItems': 1,
-                                    'items': {
-                                        'type': 'object',
-                                        'properties': {
-                                            'software_version': {'type': 'string'},
-                                            'software_vendor': {'type': 'string'},
-                                            'software_url': {'type': 'string'},
-                                            'software_rrid': {'type': 'string'},
-                                        },},}}}
+                       'software': _software_schema}}
 
     # FIXME not implemented
     extras = [['unique', ['samples', '*', 'sample_id']]]
@@ -814,10 +809,7 @@ class MetaOutExportSchema(JSONSchema):
         'principal_investigator': {'type': 'string'},
         'protocol_url_or_doi': {'type': 'array',
                                 'minItems': 1,
-                                'items': {'anyOf':[EIS._allOf(DoiSchema),
-                                                   EIS._allOf(PioSchema),
-                                                   {'type': 'string',
-                                                    'pattern': simple_url_pattern,}]}},
+                                'items': _protocol_url_or_doi_schema},
         'additional_links': {'type': 'array',
                              'minItems': 1,
                              'items': {'type': 'string'}},
