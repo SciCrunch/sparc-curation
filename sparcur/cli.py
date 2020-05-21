@@ -489,7 +489,6 @@ class Main(Dispatcher):
 
     def _setup_export(self):
         Integrator.setup()
-        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
 
     def _setup_ontquery(self):
         # FIXME this should be in its own setup method

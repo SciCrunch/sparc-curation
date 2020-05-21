@@ -641,9 +641,6 @@ def datame(d, ca, timestamp, helpers=None):
     if not hasattr(rc, '_cache_anchor'):
         rc.anchorTo(ca)
 
-    if not hasattr(idlib.Pio, '_protocol_data'):  # ARRRRRGGGHGHHHGHHG SIGH
-        ProtocolData.setup()
-
     if helpers is not None:
         d.add_helpers(helpers)
 

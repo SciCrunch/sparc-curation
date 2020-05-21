@@ -12,7 +12,6 @@ from sparcur.core import log, logd, OntTerm, OntId, sparc
 from sparcur.paths import Path
 from sparcur.utils import log, logd
 from sparcur.config import config, auth
-from sparcur.protocols_io_api import get_protocols_io_auth
 
 
 class ProtcurData:
@@ -132,25 +131,6 @@ class ProtocolData(dat.HasErrors):
 
     __call__ = protocol
 
-    @classmethod
-    def setup(cls, creds_file=None):
-        if creds_file is None:
-            try:
-                creds_file = auth.get_path('protocols-io-api-creds-file')
-            except KeyError as e:
-                raise TypeError('creds_file is a required argument'
-                                ' unless you have it in secrets') from e
-        _pio_creds = get_protocols_io_auth(creds_file)
-        cls._pio_header = QuietDict({'Authorization': 'Bearer ' + _pio_creds.token})
-        _inst = cls()
-        for wants in cls._instance_wanted_by:
-            wants._protocol_data = _inst
-
-    @classmethod
-    def cache_path(cls):
-        return config.protocol_cache_path
-
-
     @property
     def protocol_uris(self):
         raise NotImplementedError('implement in subclass')
@@ -205,79 +185,20 @@ class ProtocolData(dat.HasErrors):
             if j:
                 yield j
 
-    @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
-    def get(self, uri):
-        logd.info(uri)
-        log.debug('going to network for protocols')
-        resp = requests.get(uri, headers=self._pio_header)
-        #log.info(str(resp.request.headers))
-        if resp.ok:
-            try:
-                j = resp.json()  # the api is reasonably consistent
-            except BaseException as e:
-                log.exception(e)
-                breakpoint()
-                raise e
-            return j
-        else:
-            try:
-                j = resp.json()
-                sc = j['status_code']
-                em = j['error_message']
-                msg = f'protocol issue {uri} {resp.status_code} {sc} {em} {self.id!r}'
-                if self.addError(msg):
-                    logd.error(msg)
-
-                return {COOLDOWN: msg,}
-                # can't return here because of the cache
-            except BaseException as e:
-                log.exception(e)
-
-            logd.error(f'protocol no access {uri} {self.id!r}')
-
-    @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
     def _get_protocol_json(self, uri):
         #juri = uri + '.json'
         logd.info(uri.identifier if isinstance(uri, idlib.Stream) else uri)  # FIXME
         pi = idlib.get_right_id(uri)
         if 'protocols.io' in pi:
-            pioid = pi.slug  # FIXME normalize before we ever get here ...
-            log.info(pioid)
+            out = pi.data()
+            if out is None and hasattr(pi, '_failure_message'):
+                msg = pi._failure_message  # FIXME HACK use progenitor
+                msg += ' {self.id!r}'
+                if self.addError(msg):
+                    logd.error(msg)
+
+            return out
         else:
             msg = f'protocol uri is not from protocols.io {pi} {self.id}'
             if self.addError(msg):
                 logd.error(msg)
-
-            return
-
-        #uri_path = uri.rsplit('/', 1)[-1]
-        apiuri = 'https://www.protocols.io/api/v3/protocols/' + pioid
-        #'https://www.protocols.io/api/v3/groups/sparc/protocols'
-        #apiuri = 'https://www.protocols.io/api/v3/filemanager/folders?top'
-        #print(apiuri, header)
-        log.debug('going to network for protocols')
-        resp = requests.get(apiuri, headers=self._pio_header)
-        #log.info(str(resp.request.headers))
-        if resp.ok:
-            try:
-                j = resp.json()  # the api is reasonably consistent
-            except BaseException as e:
-                log.exception(e)
-                breakpoint()
-                raise e
-            return j
-        else:
-            try:
-                j = resp.json()
-                sc = j['status_code']
-                em = j['error_message']
-                msg = f'protocol issue {uri} {resp.status_code} {sc} {em} {self.id!r}'
-                if self.addError(msg):
-                    logd.error(msg)
-
-                return {COOLDOWN: msg,}
-                # can't return here because of the cache
-            except BaseException as e:
-                log.exception(e)
-
-            logd.error(f'protocol no access {uri} {self.id!r}')

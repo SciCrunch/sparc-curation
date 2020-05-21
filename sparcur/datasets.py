@@ -979,6 +979,7 @@ _props = sc.DatasetDescriptionSchema.schema['properties']
 _props2 = sc.ContributorSchema.schema['properties']  # FIXME recurse ...
 _nddfes = [k for k, v in chain(_props.items(), _props2.items())
            if isinstance(v, dict) and sc.not_array(v)]
+_nddfes = sorted(set(_nddfes))
 
 
 class DatasetDescriptionFile(MetadataFile):
@@ -1022,6 +1023,7 @@ _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties
 _props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
 _nsffes = [k for k, v in chain(_props.items(), _props2.items())
            if isinstance(v, dict) and sc.not_array(v)]
+_nsffes = sorted(set(_nsffes))
 
 class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE
