@@ -1,5 +1,6 @@
 import pprint
 import unittest
+import pytest
 import augpathlib as aug
 from sparcur.datasets import (Tabular,
                               DatasetDescriptionFile,
@@ -46,7 +47,11 @@ class Helper:
         bads = []
         for ref in self.refs:
             if ref.startswith('d8a'):
-                file = template_root.working_dir / template_root.name / self.template
+                wd = template_root.working_dir
+                if wd is None:
+                    pytest.skip('not in repo')
+
+                file = wd / template_root.name / self.template
                 version = None
             else:
                 file = self.file
