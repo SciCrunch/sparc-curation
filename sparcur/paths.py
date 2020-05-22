@@ -11,11 +11,9 @@ import augpathlib as aug
 from dateutil import parser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
-from augpathlib import RemotePath  # FIXME just for reimport
 from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log
-from augpathlib import PathMeta
 
 
 def cleanup(func):
@@ -42,6 +40,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
     xattr_prefix = 'bf'
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
+
     cypher = hashlib.sha256  # set the remote hash cypher on the cache class
 
     uri_human = backends.BlackfynnRemote.uri_human
@@ -128,6 +127,58 @@ class BlackfynnCache(PrimaryCache, EatCache):
     def cache_key(self):
         return f'{self.id}-{self.file_id}'
 
+    def _dataset_metadata(self, force_cache=False):
+        """ get metadata about a dataset from the remote metadata store """
+        # TODO figure out the right default for force_cache
+        dataset = self.dataset
+        if dataset == self:
+            if not hasattr(self, '_c__dataset_metadata'):
+                bdd = BlackfynnDatasetData(self)
+                try:
+                    blob = bdd.fromCache()
+                except FileNotFoundError as e:
+                    # FIXME TODO also check cached rmeta dates during pull
+                    if force_cache:
+                        raise e
+                    else:
+                        log.warning(e)
+                        blob = bdd()
+
+                self._c__dataset_metadata = blob
+
+            return self._c__dataset_metadata
+
+        else:
+            return dataset._dataset_metadata()
+
+    def _package_count(self):
+        if self.is_dataset():
+            return sum(self._dataset_metadata()['package_counts'].values())
+        else:
+            raise NotImplementedError('unused at the moment')
+
+    def _sparse_materialize(self, *args, sparse_limit=None):
+        """ use data from the remote mark or clear datasets as sparse """
+        if sparse_limit is None:
+            sparse_limit = auth.get('sparse-limit')  # yay for yaml having int type
+            #sparse_limit = _sl if _sl is None else int_(sl)
+
+        if self.is_dataset():
+            package_count = self._package_count()
+            sparse_remote = (False
+                             if sparse_limit is None else
+                             package_count >= sparse_limit)
+            sparse_cache = self.is_sparse()
+            if sparse_remote:
+                if not sparse_cache:
+                    self._mark_sparse()
+            elif sparse_cache:  # strange case where number of packages decreases
+                self._clear_sparse()
+
+        else:
+            msg = 'at the moment only datasets can be marked as sparse'
+            raise NotImplementedError(msg)
+
     @property
     def data(self):
         """ get the 'cached' data which isn't really cached at the moment
@@ -167,6 +218,9 @@ class BlackfynnCache(PrimaryCache, EatCache):
         else:
             yield from self.local_object_cache_path._data_setter(gen)
             self.local_object_cache_path.cache_init(self.meta)  # FIXME self.meta be stale here?!
+
+    def _meta_is_root(self, meta):
+        return meta.id.startswith('N:organization:')
 
     def _bootstrap_recursive(self, only=tuple(), skip=tuple(), sparse=False):
         """ only on the first call to this function should sparse be a tuple """
@@ -281,3 +335,6 @@ backends.BlackfynnRemote._new(Path, BlackfynnCache)
 backends.BlackfynnRemote.cache_key = BlackfynnCache.cache_key
 backends.BlackfynnRemote._sparse_stems = BlackfynnCache._sparse_stems
 backends.BlackfynnRemote._sparse_include = BlackfynnCache._sparse_include
+
+# end imports (woo circular deps)
+from sparcur.datasources import BlackfynnDatasetData

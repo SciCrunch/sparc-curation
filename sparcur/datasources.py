@@ -263,7 +263,7 @@ class BlackfynnDatasetData:
         if isinstance(remote_cache_or_id, aug.RemotePath):
             self._remote = remote_cache_or_id
             self._bfobject = self._remote.bfobject
-            self.id = remote.id
+            self.id = self._remote.id
         elif isinstance(remote_cache_or_id, aug.CachePath):
             self._c_cache_path = remote_cache_or_id
             self.id = self._c_cache_path.id

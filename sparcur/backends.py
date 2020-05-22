@@ -597,6 +597,7 @@ class BlackfynnRemote(aug.RemotePath):
                 yield child
                 yield from child._rchildren(create_cache=create_cache)
         elif isinstance(self.bfobject, Dataset):
+            sparse = sparse or self.cache.is_sparse()
             deleted = []
             if sparse:
                 filenames = self._sparse_stems
@@ -680,7 +681,11 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.UnhandledTypeError  # TODO
 
-    def children_pull(self, existing_caches=tuple(), only=tuple(), skip=tuple(), sparse=tuple()):
+    def children_pull(self,
+                      existing_caches=tuple(),
+                      only=tuple(),
+                      skip=tuple(),
+                      sparse=tuple()):
         """ ONLY USE FOR organization level """
         # FIXME this is really a recursive pull for organization level only ...
         sname = lambda gen: sorted(gen, key=lambda c: c.name)
@@ -712,7 +717,10 @@ class BlackfynnRemote(aug.RemotePath):
 
         if not self._debug:
             yield from (rc for d in Async(rate=self._async_rate)(
-                deferred(child.bootstrap)(recursive=True, only=only, skip=skip, sparse=sparse)
+                deferred(child.bootstrap)(recursive=True,
+                                          only=only,
+                                          skip=skip,
+                                          sparse=sparse)
                 for child in sname(self.children)
                 #if child.id in skipexisting
                 # TODO when dataset's have a 'anything in me updated'

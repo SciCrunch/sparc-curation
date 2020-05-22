@@ -10,7 +10,7 @@ from augpathlib.utils import onerror_windows_readwrite_remove
 from sparcur import config
 from sparcur import exceptions as exc
 from sparcur.paths import Path
-from sparcur.paths import LocalPath, PrimaryCache, RemotePath
+from sparcur.paths import LocalPath, PrimaryCache
 from sparcur.paths import SymlinkCache
 from sparcur.state import State
 from sparcur.datasets import DatasetDescriptionFile

@@ -221,7 +221,7 @@ from sparcur.core import OntId, OntTerm, get_all_errors, adops
 from sparcur.utils import GetTimeNow
 from sparcur.utils import log, logd, SimpleFileHandler, bind_file_handler
 from sparcur.utils import python_identifier, want_prefixes, symlink_latest
-from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
+from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
 from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemote
@@ -521,7 +521,17 @@ class Main(Dispatcher):
 
     @property
     def datasets(self):
-        yield from self.anchor.children  # ok to yield from cache now that it is the bridge
+        # XXX DO NOT YIELD DIRECTLY FROM self.anchor.children
+        # unless you are cloning or something like that
+        # because cache.children completely ignores existing
+        # files and folders and there really isn't a safe way
+        # to use it once files already exist because then
+        # viewing the cached children would move all the folders
+        # around, file under sigh, yes fix CachePath construction
+        for local in self.datasets_local:
+            yield local.cache
+
+        #yield from self.anchor.children  # NOT OK TO YIELD FROM THIS URG
 
     @property
     def datasets_remote(self):
@@ -658,8 +668,49 @@ class Main(Dispatcher):
         self.anchor = anchor
         self.project_path = self.anchor.local
         with anchor:
-            self.cwd = Path.cwd()  # have to update self.cwd so pull sees the right thing
-            self.pull()
+            # update self.cwd so pull sees the right thing
+            self.cwd = Path.cwd()
+            self._clone_pull()
+
+    def _clone_pull(self):
+        """ wow this really shows that the pull -> bootstrap workflow
+            is completely broken and stupidly slow """
+
+        # populate just the dataset folders
+        datasets = list(self.anchor.children)
+        # populate the dataset metadata
+        self.rmeta(use_cache_path=True, exist_ok=True)
+
+        # mark sparse datasets so that we don't have to
+        # fiddle with detecting sparseness during bootstrap
+        sparse_limit = self.options.sparse_limit
+        [d._sparse_materialize(sparse_limit=sparse_limit) for d in datasets]
+        sparse = [d for d in datasets if d.is_sparse()]  # sanity check
+
+
+        skip = auth.get_list('datasets-no')  # FIXME this should be materialized as well
+
+        # pull all the files
+        from joblib import Parallel, delayed
+        import logging
+
+        def asdf(ca, d,
+                 level='DEBUG' if self.options.verbose else 'INFO',
+                 log_name=log.name):
+            log = logging.getLogger(log_name)
+            log.setLevel(level)
+
+            rc = d._remote_class
+            if not hasattr(rc, '_cache_anchor'):
+                rc.anchorTo(ca)
+
+            list(d.rchildren)
+
+
+        Parallel(n_jobs=12)(delayed(asdf)(self.anchor, d)
+                            for d in datasets
+                            # FIXME skip should be materialized in xattrs as well
+                            if d.id not in skip)
 
     def _total_package_counts(self):
         from sparcur.datasources import BlackfynnDatasetData
@@ -702,7 +753,6 @@ class Main(Dispatcher):
         cwd = self.cwd
         skip = auth.get_list('datasets-no')
         sparse = self._sparse_from_metadata()
-        breakpoint()
         if self.project_path.parent.name == 'big':
             only = auth.get_list('datasets-sparse')
         else:
@@ -1421,11 +1471,12 @@ done"""
         graph = agraph.graph()
         graph.write(path=path_out)
 
-    def rmeta(self):
+    def rmeta(self, use_cache_path=False, exist_ok=False):
         from pyontutils.utils import Async, deferred
         from sparcur.datasources import BlackfynnDatasetData
-        dsr = self.datasets_remote
-        prepared = [BlackfynnDatasetData(r) for r in dsr]
+        dsr = self.datasets if use_cache_path else self.datasets_remote
+        all_ = [BlackfynnDatasetData(r) for r in dsr]
+        prepared = [bdd for bdd in all_ if not (exist_ok and bdd.cache_path.exists())]
         hz = self.options.rate
         if not self.options.debug:
             blobs = Async(rate=hz)(deferred(d)() for d in prepared)
@@ -1809,13 +1860,16 @@ class Report(Dispatcher):
         if not intrs:
             intrs = self.cwdintr,
 
-        rows = [['path', 'id', 'dirs', 'files', 'size', 'hr'],
-                *sorted([[d.name, d.id, c['dirs'], c['files'], c['size'], c['size'].hr]
+        rows = [['path', 'id', 'sparse', 'dirs', 'files', 'size', 'hr'],
+                *sorted([[d.name,
+                          d.id,
+                          'x' if d.path.cache.is_sparse() else '',
+                          c['dirs'], c['files'], c['size'], c['size'].hr]
                          for d in intrs
                          for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
 
         return self._print_table(rows, title='Size Report',
-                                 align=['l', 'l', 'r', 'r', 'r', 'r'], ext=ext)
+                                 align=['l', 'l', 'c', 'r', 'r', 'r', 'r'], ext=ext)
 
     def test(self, ext=None):
         rows = [['hello', 'world'], [1, 2]]
@@ -2201,7 +2255,7 @@ class Fix(Shell):
         paths = [p for p, *_ in oops]
 
         def sf(cmeta):
-            nmeta = PathMeta(id=cmeta.old_id)
+            nmeta = aug.PathMeta(id=cmeta.old_id)
             assert nmeta.id, f'No old_id for {pathmeta}'
             return nmeta
 
