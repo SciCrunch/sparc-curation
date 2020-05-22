@@ -4,6 +4,7 @@ from collections import defaultdict
 from urllib.parse import urlparse, parse_qs
 import rdflib
 import requests
+import augpathlib as aug
 from pyontutils.config import auth as pauth
 from pyontutils.core import OntId
 from pyontutils.utils import byCol
@@ -258,17 +259,51 @@ class BlackfynnDatasetData:
     cache_path = auth.get_path('cache-path')
     cache_base = cache_path / 'blackfynn-meta'
 
-    def __init__(self, remote):
-        self.remote = remote
-        self.bfobject = remote.bfobject
-        self.ntfs_safe_id = remote.id.split(':')[-1]  # sigh
+    def __init__(self, remote_cache_or_id):
+        if isinstance(remote_cache_or_id, aug.RemotePath):
+            self._remote = remote_cache_or_id
+            self._bfobject = self._remote.bfobject
+            self.id = remote.id
+        elif isinstance(remote_cache_or_id, aug.CachePath):
+            self._c_cache_path = remote_cache_or_id
+            self.id = self._c_cache_path.id
+        else:
+            self.id = remote_cache_or_id
+
+        self.ntfs_safe_id = self.id.split(':')[-1]  # sigh
         self.cache = self.cache_base / self.ntfs_safe_id
         if not self.cache_base.exists():
             self.cache_base.mkdir()
 
+    @property
+    def _cache_path(self):
+        if not hasattr(self, '_c_cache_path'):
+            raise NotImplementedError('if you need access to the cache '
+                                      'pass one in at construction time')
+
+        return self._c_cache_path
+
+    @property
+    def remote(self):
+        if not hasattr(self, '_remote'):
+            self._remote = self._cache_path.remote
+
+        return self._remote
+
+    @property
+    def bfobject(self):
+        if not hasattr(self, '_bfobject'):
+            self._bfobject = self.remote.bfobject
+
+        return self._bfobject
+
     def fromCache(self):
         """ retrieve cached results without hitting the network """
         # TODO FIXME error on no cache?
+        if not self.cache.exists():
+            msg = 'No cached metadata for {self.id}. Run `spc rmeta` to populate.'
+            raise FileNotFoundError(msg)
+
         with open(self.cache, 'rt') as f:
             return json.load(f)
 
@@ -276,6 +311,7 @@ class BlackfynnDatasetData:
         # FIXME TODO switch to use dict transformers
         # self.bfobject.relationships()
         meta = self.bfobject.meta  # why this is not default in the python api the world may never know
+        package_counts = self.bfobject.packageTypeCounts
         cont = meta['content']
         blob = {'id': self.remote.id,
                 'name': cont['name'],  # title
@@ -290,6 +326,7 @@ class BlackfynnDatasetData:
                 #'teams': self.bfobject.teams,
                 #'users': self.bfobject.users,
                 'contributors': self.bfobject.contributors,
+                'package_counts': package_counts,
         }
 
         if 'license' in cont:

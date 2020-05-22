@@ -41,6 +41,7 @@ Commands:
     pull        retrieve remote file structure
 
                 options: --empty
+                       : --sparse-limit
 
     refresh     retrieve remote file sizes and fild ids (can also fetch using the new data)
 
@@ -138,7 +139,7 @@ Options:
     -R --refresh            refresh matching files
     -r --rate=HZ            sometimes we can go too fast when fetching [default: 5]
     -l --limit=SIZE_MB      the maximum size to download in megabytes [default: 2]
-                            use negative numbers to indicate no limit
+                            use zero or negative numbers to indicate no limit
     -L --level=LEVEL        how deep to go in a refresh
                             used by any command that acceps <path>...
     -p --pretend            if the defult is to act, dont, opposite of fetch
@@ -155,6 +156,8 @@ Options:
     -z --only-no-file-id    only pull files missing file_id
     -o --overwrite          fetch even if the file exists
     --project-path=<PTH>    set the project path manually
+    --sparse-limit=COUNT    package count that forces a sparse pull [default: {auth.get('sparse-limit')}]
+                            use zero or negative numbers to indicate no limit
 
     -t --tab-table          print simple table using tabs for copying
     -A --latest             run derived pipelines from latest json
@@ -254,6 +257,12 @@ class Options(clif.Options):
     @property
     def limit(self):
         l = int(self._args['--limit'])
+        if l >= 0:
+            return l
+
+    @property
+    def sparse_limit(self):
+        l = int(self._args['--sparse-limit'])
         if l >= 0:
             return l
 
@@ -652,6 +661,38 @@ class Main(Dispatcher):
             self.cwd = Path.cwd()  # have to update self.cwd so pull sees the right thing
             self.pull()
 
+    def _total_package_counts(self):
+        from sparcur.datasources import BlackfynnDatasetData
+
+        def total_packages(cache):
+            bdd = BlackfynnDatasetData(cache)
+            try:
+                blob = bdd.fromCache()
+            except FileNotFoundError as e:
+                # FIXME TODO also check cached rmeta dates during pull
+                log.warning(e)
+                blob = bdd()
+
+            return sum(blob['package_counts'].values())
+
+        totals = []
+        for cache in self.datasets:
+            totals.append((cache, total_packages(cache)))
+
+        return totals
+
+    def _sparse_from_metadata(self, sparse_limit:int=None):
+        if sparse_limit is None:
+            sparse_limit = self.options.sparse_limit
+
+        if sparse_limit is None:
+            return []
+
+        totals = self._total_package_counts()
+        #tps = sorted([ for d in self.datasets], key= lambda ab: ab[1])
+        sparse = [r.id for r, pc in totals if pc >= sparse_limit]
+        return sparse
+
     def pull(self):
         # TODO folder meta -> org
         from pyontutils.utils import Async, deferred
@@ -660,10 +701,15 @@ class Main(Dispatcher):
         dirs = self.directories
         cwd = self.cwd
         skip = auth.get_list('datasets-no')
+        sparse = self._sparse_from_metadata()
+        breakpoint()
         if self.project_path.parent.name == 'big':
             only = auth.get_list('datasets-sparse')
         else:
-            sparse = auth.get_list('datasets-sparse')
+            more_sparse = auth.get_list('datasets-sparse')
+            if more_sparse:
+                sparse.extend(more_sparse)
+                sparse = sorted(set(sparse))
 
         if not dirs:
             dirs = cwd,
@@ -753,7 +799,8 @@ class Main(Dispatcher):
                 if self.options.debug or self.options.jobs == 1:
                     _blank = [hrm(cd) for cd in d.children]
                 else:
-                    _blank = Async()(deferred(hrm)(cd) for cd in d.children)
+                    _blank = Async(rate=self.options.rate)(
+                        deferred(hrm)(cd) for cd in d.children)
 
             # FIXME something after this point is retaining stale filepaths on dataset rename ...
             #d = r.local  # in case a folder moved
@@ -768,7 +815,6 @@ class Main(Dispatcher):
         maybe_new_ids = set(new_ids) - set(existing_ids)
         if maybe_removed_ids:
             # FIXME pull sometimes has fake file extensions
-            from pyontutils.utils import Async, deferred
             from pathlib import PurePath
             maybe_removed = [existing_d[id] for id in maybe_removed_ids]
             maybe_removed_stems = {PurePath(p.parent) / p.stem:p

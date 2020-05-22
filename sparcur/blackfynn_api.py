@@ -501,10 +501,22 @@ def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_on
             break
 
 
+@property
+def packageTypeCounts(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packageTypeCounts')
+    if resp.ok:
+        j = resp.json()
+        return j
+    else:
+        resp.raise_for_status()
+
+
 # monkey patch Dataset to implement packages endpoint
 Dataset._packages = _packages
 Dataset.packages = packages
 Dataset.packagesByName = packagesByName
+Dataset.packageTypeCounts = packageTypeCounts
 
 
 @property
