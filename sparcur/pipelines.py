@@ -1034,7 +1034,7 @@ class PipelineEnd(JSONPipeline):
         #'NormDatasetDescriptionFile.contributor_role',
         #'NormDatasetDescriptionFile.funding',
         #'NormDatasetDescriptionFile.originating_article_doi',
-        #'NormDatasetDescriptionFile.protocol_url_or_doi',
+        'NormDatasetDescriptionFile.protocol_url_or_doi',
 
         'DatasetDescriptionFilePipeline._transformer',
         'DatasetDescriptionFilePipeline.transformer',
