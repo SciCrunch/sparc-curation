@@ -7,6 +7,7 @@ from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
 from pyontutils.closed_namespaces import rdf, rdfs, owl
+from sparcur import apinat
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import converters as conv
@@ -542,7 +543,7 @@ class ApiNATOMY(JSONPipeline):
 # is one way to solve this problem
 class ApiNATOMY_rdf(RdfPipeline):
 
-    converter_class = conv.ApiNATOMYConverter
+    converter_class = lambda self, a, b: apinat.Graph(a)
 
     @property
     def id(self):
@@ -553,33 +554,8 @@ class ApiNATOMY_rdf(RdfPipeline):
         return self._pipeline_start.object.id
 
     @property
-    def ontid(self):
-        # FIXME TODO
-        return rdflib.URIRef(f'https://sparc.olympiangods.org/ApiNATOMY/ontologies/{self.id}')
-
-    @property
     def triples_header(self):
-        # TODO TODO
-        ontid = self.ontid
-        nowish = utcnowtz()  # FIXME pass in so we can align all times per export??
-        epoch = nowish.timestamp()
-        iso = isoformat(nowish)
-        ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
-        #sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
-                                      #'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
-
-        pos = (
-            (a, owl.Ontology),
-            (owl.versionIRI, ver_ontid),
-            (owl.versionInfo, rdflib.Literal(iso)),
-            #(isAbout, rdflib.URIRef(self.uri_api)),
-            #(TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
-            (rdfs.label, rdflib.Literal(f'TODO export graph')),
-            #(rdfs.comment, self.header_graph_description),
-            #(owl.imports, sparc_methods),
-        )
-        for p, o in pos:
-            yield ontid, p, o
+        yield from tuple()
 
 
 class LoadIR(JSONPipeline):

@@ -286,6 +286,8 @@ class Graph(Base):
         for e in externals:
             yield from e.triples()
 
+    triples_gen = triples  # match the converters interface
+
     def populate(self, graph):
         #[graph.add(t) for t in self.triples]
         for t in self.triples:
