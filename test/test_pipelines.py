@@ -7,7 +7,7 @@ from .common import examples_root
 
 class TestApiNAT(unittest.TestCase):
 
-    source = Path(__file__).parent / 'apinatomy/data'
+    source = Path(__file__).parent / 'apinatomy'
 
     def test_load(self):
         m = pipes.ApiNATOMY(Path(self.source, 'keast-spinal-model.json'))
