@@ -157,6 +157,13 @@ class DatasetStructure(Path):
 
             setattr(cls, section, sec)
 
+    def files_last_updated(self):
+        # FIXME TODO can we get this more efficiently during pull?
+        all_updated = [c.cache.meta.updated for c in
+                       chain((self,), self.rchildren) if c.is_file()]
+        if all_updated:
+            return max(all_updated)
+
     @property
     def counts(self):
         if not hasattr(self, '_counts'):

@@ -19,7 +19,9 @@ Usage:
     spc report   [completeness keywords subjects]   [options]
     spc report   [contributors samples errors mbf]  [options]
     spc report   [(anno-tags <tag>...) changes mis] [options]
+    spc report   [overview]                         [options]
     spc shell    [affil integration protocols exit] [options]
+    spc shell    [dates]                            [options]
     spc server   [options]
     spc apinat   [options] <path-in> <path-out>
     spc tables   [options] [<directory>...]
@@ -1869,7 +1871,34 @@ class Report(Dispatcher):
                          for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
 
         return self._print_table(rows, title='Size Report',
-                                 align=['l', 'l', 'c', 'r', 'r', 'r', 'r'], ext=ext)
+                                 align=['l', 'l', 'r', 'r', 'r', 'r', 'r'], ext=ext)
+
+    def overview(self, ext=None):
+        from sparcur import export as ex
+        data = (self.summary.data()
+                if self.options.raw else
+                self._export(ex.Export).latest_ir)
+        datasets = data['datasets']
+        hrm = {'award': ['meta', 'award_number'],
+               'id': ['id'],
+               'name': ['meta', 'folder_name'],
+               'errors': ['status', 'error_index'],
+               'updated': ['status', 'updated'],
+               'published': ['meta', 'doi'],
+               # TODO
+               # subject_count
+               # sample_count
+               # contributor_count
+               }
+        header = tuple(hrm)  # TODO counts ?
+        paths = tuple(hrm.values())
+        def getl(d):
+            return [_.identifier if isinstance(_, idlib.Stream)
+                    else _ for _ in [adops.get(d, path, on_failure='') for path in paths]]
+        _rows = sorted([getl(d) for d in datasets], key=lambda r: (r[-1], r[0], r[-2], r[-3]))
+        rows = [header] + _rows
+        return self._print_table(rows, title='Dataset Report',
+                                 align=['l', 'l', 'l', 'r', 'r', 'r'], ext=ext)
 
     def test(self, ext=None):
         rows = [['hello', 'world'], [1, 2]]
@@ -2153,6 +2182,11 @@ class Shell(Dispatcher):
         ds = datasets
         summary = self.summary
         org = Integrator(self.project_path)
+        breakpoint()
+
+    def dates(self):
+        hrm  = [[f.cache.meta.updated for f in d.rchildren] for d in self.datasets_local]
+        asdf = [max(u) if u else None for u in hrm]
         breakpoint()
 
     def more(self):
