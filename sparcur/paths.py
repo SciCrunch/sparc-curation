@@ -267,6 +267,21 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         except OSError as e:
             raise exc.NoCachedMetadataError(self) from e
 
+    def updated_cache_transitive(self):
+        """ fast get the date for the most recently updated cached path """
+        if self.cache.is_organization():
+            gen = (rc for c in self.children for rc in c.rchildren)
+        elif self.cache.is_dataset():
+            gen = self.rchildren
+        else:
+            gen = chain((self,), self.rchildren)
+
+        simple_meta = [aug.PathMeta(updated=c.getxattr('bf.updated').decode())
+                       if not c.is_broken_symlink() else aug.PathMeta.from_symlink(c)
+                       for c in gen]
+        if simple_meta:
+            return max(m.updated for m in simple_meta)
+
     def upload(self, replace=True, local_backup=False):
         # FIXME we really need a staging area ...
         remote, old_remote = (

@@ -101,12 +101,15 @@ class DatasetMetadata(Path, HasErrors):
     def data(self):
         if self.cache is not None:
             cmeta = self.cache.meta
-            return dict(id=self.cache.id,
-                        meta=dict(folder_name=self.name,
-                                  uri_human=self.cache.uri_human,
-                                  uri_api=self.cache.uri_api,
-                                  timestamp_created=cmeta.created,
-                                  timestamp_updated=cmeta.updated,
+            return dict(
+                id=self.cache.id,
+                meta=dict(
+                    folder_name=self.name,
+                    uri_human=self.cache.uri_human,
+                    uri_api=self.cache.uri_api,
+                    timestamp_created=cmeta.created,
+                    timestamp_updated=cmeta.updated,
+                    timestamp_updated_contents=self.updated_cache_transitive(),
                         ))
         else:
             return dict(id=self.id,

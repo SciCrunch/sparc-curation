@@ -766,8 +766,8 @@ class MetaOutExportSchema(JSONSchema):
                       'modality',
                       'techniques',
                       'contributor_count',
-                      'uri_human',  # from DatasetMetadat
-                      'uri_api',  # from DatasetMetadat
+                      'uri_human',  # from DatasetMetadata
+                      'uri_api',  # from DatasetMetadata
                       'files',
                       'dirs',
                       'size',
@@ -778,6 +778,7 @@ class MetaOutExportSchema(JSONSchema):
                       'number_of_samples',
                       'timestamp_created',
                       'timestamp_updated',
+                      'timestamp_updated_contents',
                       #'subject_count',
                       #'sample_count',
     ]
@@ -798,6 +799,8 @@ class MetaOutExportSchema(JSONSchema):
                               'pattern': iso8601pattern,},
         'timestamp_updated': {'type': 'string',
                               'pattern': iso8601pattern,},
+        'timestamp_updated_contents': {'type': 'string',
+                                       'pattern': iso8601pattern,},
         'uri_human': {'type': 'string',
                       'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
         },

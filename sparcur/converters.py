@@ -217,6 +217,7 @@ class MetaConverter(TripleConverter):
         ['originating_article_doi', TEMP.isDescribedBy],  # see relationType  IsDescribedBy -> isDescribedBy
         ['timestamp_created', TEMP.wasCreatedAtTime],
         ['timestamp_updated', TEMP.wasUpdatedAtTime],
+        ['timestamp_updated_contents', TEMP.contentsWereUpdatedAtTime],
 
         # TODO
         #['additional_links', ],

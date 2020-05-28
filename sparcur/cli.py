@@ -19,9 +19,9 @@ Usage:
     spc report   [completeness keywords subjects]   [options]
     spc report   [contributors samples errors mbf]  [options]
     spc report   [(anno-tags <tag>...) changes mis] [options]
-    spc report   [overview]                         [options]
+    spc report   [(overview [<path>...])]           [options]
     spc shell    [affil integration protocols exit] [options]
-    spc shell    [dates]                            [options]
+    spc shell    [(dates [<path>...])]              [options]
     spc server   [options]
     spc apinat   [options] <path-in> <path-out>
     spc tables   [options] [<directory>...]
@@ -2185,8 +2185,12 @@ class Shell(Dispatcher):
         breakpoint()
 
     def dates(self):
-        hrm  = [[f.cache.meta.updated for f in d.rchildren] for d in self.datasets_local]
-        asdf = [max(u) if u else None for u in hrm]
+        paths = self.paths
+        paths = paths if paths else list(self.datasets_local)
+        asdf = {p:p.updated_cache_transitive() for p in paths}
+        s = sorted(asdf.items(),
+                   key=lambda kv: (1, kv[0]) if kv[-1] is None else (0, kv[-1]),
+                   reverse=True)
         breakpoint()
 
     def more(self):
