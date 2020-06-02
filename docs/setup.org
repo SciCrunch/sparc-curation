@@ -1332,6 +1332,8 @@ google:
     sparc-master: *replace-me-with:document-hash-id*
     sparc-affiliations: *replace-me-with:document-hash-id*
     sparc-field-alignment: *replace-me-with:document-hash-id*
+    spc-reports: *replace-me-with:document-hash-id*
+    anno-tags: *replace-me-with:document-hash-id*
 hypothesis:
   api:
     user-default-hypothesis: *replace-me-with:your-hypothesis-api-key*
