@@ -113,7 +113,9 @@ class Reports(Sheet):
                     for columns in rows]
 
         def decorator(method):
-            class ReportSheet(Reports):
+            tags = method.__name__ == 'anno_tags'
+
+            class ReportSheet(cls):
                 __name__ = f'Report{method.__name__.capitalize()}'
                 sheet_name = method.__name__
                 index_columns = index_cols
@@ -131,6 +133,12 @@ class Reports(Sheet):
                 out = method(self, *args, **kwargs)
 
                 if self.options.to_sheets:
+                    if tags:
+                        if args:
+                            method._report_class.sheet_name = args[0]
+                        else:
+                            method._report_class.sheet_name = self.options.tag[0]
+
                     rows, title = out
                     # fetch=False since the remote sheet may not exist
                     # TODO improve the ergonimcs here
@@ -143,7 +151,7 @@ class Reports(Sheet):
                     else:
                         report.fetch()
                         if report.index_columns:
-                            report.upsert(*rows_stringified)
+                            report.upsert(*rows_stringified[1:])
                         else:
                             report.update(rows)
 
@@ -154,6 +162,10 @@ class Reports(Sheet):
             return inner
 
         return decorator
+
+
+class AnnoTags(Reports):
+    name = 'anno-tags'
 
 
 # field alignment
