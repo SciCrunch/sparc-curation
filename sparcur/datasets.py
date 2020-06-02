@@ -5,12 +5,12 @@ from types import GeneratorType
 from itertools import chain
 from collections import Counter
 import requests
+import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
-from augpathlib import FileSize
 from . import schemas as sc
 from . import raw_json as rj
 from . import exceptions as exc
@@ -183,10 +183,21 @@ class DatasetStructure(Path):
             for c in gen:
                 if c.is_dir():
                     dirs += 1
+                    maybe_size = 0  # the remote size of a folder is zero for bf
                 else:
                     files += 1  # testing for broken symlinks is hard
                     try:
-                        maybe_size = c.cache.meta.size
+                        if c.is_broken_symlink():
+                            maybe_size = (aug.PathMeta
+                                          .from_symlink(c)
+                                          .size)
+                        else:
+                            maybe_size = (aug.PathMeta
+                                          .from_xattrs(c.xattrs(),
+                                                        prefix='bf')
+                                          .size)
+
+                        #maybe_size = c.cache.meta.size
                     except AttributeError as e:
                         log.error(f'no cache or no meta for {c}\n{e}')
                         continue
@@ -201,6 +212,8 @@ class DatasetStructure(Path):
                 nl = '\n'
                 log.info(f'refreshing {len(need_meta)} files with missing metadata in {self}'
                          f'\n{nl.join(_.as_posix() for _ in need_meta)}')
+                breakpoint()
+                raise TypeError('fuck')
                 new_caches = Async(rate=self.rate)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
                     if c is None:
@@ -212,7 +225,7 @@ class DatasetStructure(Path):
 
                     size += c.meta.size
 
-            self._counts = dict(size=FileSize(size), dirs=dirs, files=files)
+            self._counts = dict(size=aug.FileSize(size), dirs=dirs, files=files)
 
         return self._counts
 

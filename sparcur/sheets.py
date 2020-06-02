@@ -1,3 +1,4 @@
+from functools import wraps
 import idlib
 from pyontutils.sheets import Sheet
 from sparcur.core import adops, OntId, OntTerm
@@ -80,6 +81,79 @@ class Affiliations(Sheet):
         return {a:idlib.Ror(r) if r else None
                 for a, r in zip(self.byCol.affiliation_string,
                                 self.byCol.ror_id)}
+
+
+# class sparc reports
+
+class Reports(Sheet):
+    """ spreadsheet that contains all spc reports as tabs """
+    name = 'spc-reports'
+
+    @classmethod
+    def makeReportSheet(cls, *index_cols):
+        """ Decorator to build a Sheet class for a cli.Report method
+
+            NOTE reports that do not have index columns will update
+            the entire sheet every time, so probabaly don't edit those
+        """
+        def _rowcellify(cell_value):
+            if isinstance(cell_value, idlib.Stream):
+                try:
+                    return cell_value.asUri()
+                except AttributeError as e:
+                    breakpoint()
+            elif isinstance(cell_value, str):
+                if cell_value.lower() == 'x':
+                    return True
+
+            return cell_value
+
+        def rowcellify(rows):
+            return [[_rowcellify(cell_value) for cell_value in columns]
+                    for columns in rows]
+
+        def decorator(method):
+            class ReportSheet(Reports):
+                __name__ = f'Report{method.__name__.capitalize()}'
+                sheet_name = method.__name__
+                index_columns = index_cols
+
+            method._report_class = ReportSheet
+
+            @wraps(method)
+            def inner(self, *args, **kwargs):
+                if 'ext' not in kwargs or kwargs['ext'] is None:
+                    kwargs['ext'] = True
+                else:
+                    msg = 'Should not have extension and export to sheets.'
+                    raise TypeError(msg)
+
+                out = method(self, *args, **kwargs)
+
+                if self.options.to_sheets:
+                    rows, title = out
+                    # fetch=False since the remote sheet may not exist
+                    # TODO improve the ergonimcs here
+                    report = method._report_class(fetch=False, readonly=False)
+                    report.metadata()  # idlib.Stream vs ? behavior not decided
+                    rows_stringified = rowcellify(rows)
+                    if report.sheetId() is None:
+                        report.createRemoteSheet()
+                        report.update(rows_stringified)
+                    else:
+                        report.fetch()
+                        if report.index_columns:
+                            report.upsert(*rows_stringified)
+                        else:
+                            report.update(rows)
+
+                    report.commit()
+
+                return out
+
+            return inner
+
+        return decorator
 
 
 # field alignment

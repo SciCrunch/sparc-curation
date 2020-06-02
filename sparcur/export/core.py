@@ -16,6 +16,7 @@ from sparcur import pipelines as pipes
 from sparcur.core import JEncode, JFixKeys, adops, register_type, fromJson
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge, logd
+from sparcur.config import auth
 
 
 def export_schemas(export_schemas_path):
@@ -29,6 +30,20 @@ def export_schemas(export_schemas_path):
 
     for s in schemas:
         s.export(export_schemas_path)
+
+
+def latest_ir(org_id=None):
+    if org_id is None:
+        org_id = auth.get('blackfynn-organization')
+
+    export = Export(auth.get_path('export-path'),
+                    None,
+                    None,
+                    None,
+                    latest=True,
+                    org_id=auth.get('blackfynn-organization'))
+
+    return export.latest_ir
 
 
 class ExportBase:
@@ -157,6 +172,8 @@ class ExportXml(ExportBase):
     def export_other_formats(self, *args, **kwargs):
         pass
 
+    register_type(None, 'all-xml-files')  # FIXME VERY BAD TO NEED TO CALL THIS HERE
+
     def make_ir(self, dataset_paths=tuple(), jobs=None, debug=False):
         from sparcur.extract import xml as exml
         def do_xml_metadata(local, id):  # FIXME HACK needs its own pipeline
@@ -166,7 +183,7 @@ class ExportXml(ExportBase):
                 oops = "\n".join(missing)
                 raise BaseException(f'unfetched children\n{oops}')
 
-            blob = {'type': 'all-xml-files',
+            blob = {'type': 'all-xml-files',  # FIXME not quite correct use of type here
                     'dataset_id': id,
                     'xml': tuple()}
             blob['xml'] = [{'path': x.relative_to(local).as_posix(),

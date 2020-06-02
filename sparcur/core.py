@@ -27,7 +27,7 @@ from sparcur.utils import is_list_or_tuple
 from sparcur.config import config, auth
 
 
-__type_registry = {}
+__type_registry = {None: None}
 def register_type(cls, type_name):
     if type_name in __type_registry:
         raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
@@ -45,17 +45,21 @@ def fromJson(blob):
                 type_name = blob['system']
             elif t in ('quantity', 'range'):
                 type_name = t
-            else:
+            elif t not in __type_registry:
                 breakpoint()
                 raise NotImplementedError(f'TODO fromJson for type {t} '
                                           f'currently not implemented\n{blob}')
+            else:
+                type_name = t
 
-            return __type_registry[type_name].fromJson(blob)
-        else:
-            return {k:v
-                    if k == 'errors' or k.endswith('_errors') else
-                    fromJson(v)
-                    for k, v in blob.items()}
+            cls = __type_registry[type_name]
+            if cls is not None:
+                return cls.fromJson(blob)
+
+        return {k:v
+                if k == 'errors' or k.endswith('_errors') else
+                fromJson(v)
+                for k, v in blob.items()}
 
     elif isinstance(blob, list):
         return [fromJson(_) for _ in blob]

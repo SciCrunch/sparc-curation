@@ -3,7 +3,7 @@ import pathlib
 from lxml import etree  # python3.7 0m38.388s
 from pyontutils.utils import subclasses
 from .. import schemas as sc
-from ..core import HasErrors
+from ..core import HasErrors, register_type
 from ..utils import log, logd
 
 if etree.__name__ == 'lxml.etree':
@@ -389,3 +389,8 @@ class ExtractZISRAWSUBBLOCK_METADATA(XmlSource):
 
 
 ExtractXml.classes = (*[c for c in subclasses(XmlSource)], XmlSource)
+
+# FIXME not entirely clear that I am using type correctly here
+[register_type(None, cls.mimetype) for cls in ExtractXml.classes
+ # NotXml has no mimetype
+ if cls.mimetype is not None]

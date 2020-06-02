@@ -19,7 +19,7 @@ Usage:
     spc report   [completeness keywords subjects]   [options]
     spc report   [contributors samples errors mbf]  [options]
     spc report   [(anno-tags <tag>...) changes mis] [options]
-    spc report   [(overview [<path>...])]           [options]
+    spc report   [(overview [<path>...]) all]       [options]
     spc shell    [affil integration protocols exit] [options]
     spc shell    [(dates [<path>...])]              [options]
     spc server   [options]
@@ -85,8 +85,9 @@ Commands:
                        : --open     open the output file using xopen
                        : --mbf      extract and export mbf embedded metadata
 
-    report      print a report on all datasets
+    report      generate reports
 
+                all             generate all reports (use with --to-sheets)
                 size            dataset sizes and file counts
                 completeness    submission and curation completeness
                 filetypes       filetypes used across datasets
@@ -99,14 +100,20 @@ Commands:
                                 subcelluar
 
                 subjects        all headings from subjects files
+                samples         all headings from samples files
+                contributors    report on all contributors
                 errors          list of all errors per dataset
                 test            do as little as possible (use with --profile)
                 mbf             mbf term report (can use with --unique)
                 anno-tags       list anno exact for a curation tag
+                changes         diff two curation exports
                 mis             list summary predicates used per dataset
+                access          report on dataset access master vs pipelines
+                overview        general dataset information
 
                 options: --raw  run reports on live data without export
                        : --tab-table
+                       : --to-sheets
                        : --sort-count-desc
                        : --unique
                        : --uri
@@ -165,6 +172,7 @@ Options:
     -A --latest             run derived pipelines from latest json
     -P --partial            run derived pipelines from the latest partial json export
     -W --raw                run reporting on live data without export
+    --to-sheets             push report to google sheets
 
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
@@ -216,6 +224,8 @@ from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
 from sparcur import config
+from sparcur import sheets
+from sparcur import reports
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT, JPointer, lj, DictTransformer as DT
@@ -304,8 +314,17 @@ class Dispatcher(clif.Dispatcher):
 
     def _print_table(self, rows, title=None, align=None, ext=None):
         """ ext is only used when self.options.server -> True """
+        def asStr(c):
+            if hasattr(c, 'asStr'):
+                return c.asStr()
+            else:
+                return str(c)
+
+        def asAsciiRows(rows):
+            return [[asStr(cell) for cell in row] for row in rows]
+
         def simple_tsv(rows):
-            return '\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n'
+            return '\n'.join('\t'.join(asAsciiRows(rows))) + '\n'
 
         if self.options.tab_table:
             if title:
@@ -328,9 +347,8 @@ class Dispatcher(clif.Dispatcher):
                     return 'Not found', 404
 
             return hfn.render_table(rows[1:], *rows[0]), title
-
         else:
-            table = AsciiTable(rows, title=title)
+            table = AsciiTable(asAsciiRows(rows), title=title)
             if align:
                 assert len(align) == len(rows[0])
                 table.justify_columns = {i:('left' if v == 'l'
@@ -340,6 +358,8 @@ class Dispatcher(clif.Dispatcher):
                                                         'left')))
                                          for i, v in enumerate(align)}
             print(table.table)
+            if ext:
+                return rows, title
 
     def _print_paths(self, paths, title=None):
         if self.options.sort_size_desc:
@@ -1573,7 +1593,7 @@ done"""
         return fix('fix')
 
 
-class Report(Dispatcher):
+class Report(reports.Report, Dispatcher):
 
     paths = Main.paths
     _paths = Main._paths
@@ -1587,6 +1607,24 @@ class Report(Dispatcher):
         else:
             return lambda kv: kv
 
+    def all(self):
+        #self.access()  # must be on live data
+        self.contributors()
+        self.filetypes()
+        self.samples()
+        self.subjects()
+        self.completeness()
+        self.keywords()
+        #self.size(dirs=list(self.datasets_local))  # TODO needs to be reworked to use latest_ir
+        self.overview()
+        #self.test()  # just a test
+        self.errors()
+        #self.pathids()  # too big/slow
+        self.mbf()
+        self.terms()
+        self.anno_tags()
+        self.mis()
+
     def access(self, ext=None):
         """ Report on datasets that are in the master sheet but which the
             automated pipelines do not have access to. """
@@ -1596,19 +1634,18 @@ class Report(Dispatcher):
             print('Not in correct organization for running access report.')
             sys.exit(9999)
 
-        from sparcur.sheets import Overview, Master
         if self.options.server:
             def fmt(d): return hfn.atag(d.uri_human, d.id, new_tab=True)
         else:
             def fmt(d): return d.uri_human
 
         if self.options.server:
-            uri_human = Master._uri_human()
+            uri_human = sheets.Master._uri_human()
             def fmtmc(s): return hfn.atag(uri_human, s, new_tab=True)
         else:
             def fmtmc(s): return s
 
-        o = Overview()
+        o = sheets.Overview()
         remote = self.anchor.remote
         remote_datasets = remote.children
 
@@ -1626,6 +1663,7 @@ class Report(Dispatcher):
         ]
         return self._print_table(rows, title='Access Report', ext=ext)
 
+    @sheets.Reports.makeReportSheet('id')
     def contributors(self, ext=None):
         if self.options.raw:
             data = self.summary.data_for_export(UTCNOWISO())
@@ -1638,7 +1676,11 @@ class Report(Dispatcher):
                   if 'contributors' in d
                   for c in d['contributors']}
         contribs = sorted(unique.values(),
-                          key=lambda c: c['last_name'] if 'last_name' in c else (c['contributor_name'] if 'contributor_name' in c else 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz'))
+                          key=lambda c: (c['last_name']  # pYthON dOEsNt hAEV mUlTiLiNE lAmBDaS
+                                         if 'last_name' in c else
+                                         (c['contributor_name'] if
+                                          'contributor_name' in c else
+                                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzz')))
         #contribs = sorted((dict(c) for c in
                            #set(frozenset({k:tuple(v) if isinstance(v, list) else
                                           #(frozenset(v.items()) if isinstance(v, dict) else v)
@@ -1660,7 +1702,9 @@ class Report(Dispatcher):
             'x' if 'orcid' not in c['id'] else '']
             for c in contribs]
 
-        return self._print_table(rows, title='Contributors Report', ext=ext)
+        return self._print_table(rows,
+                                 title='Contributors Report',
+                                 ext=ext)
 
     def tofetch(self, dirs=None):
         if dirs is None:
@@ -1725,6 +1769,8 @@ class Report(Dispatcher):
 
         return self._print_table(rows, title='File size counts', ext=ext)
 
+    # TODO generator issue
+    #@sheets.Reports.makeReportSheet('suffix', 'mimetype', 'magic_mimetype')
     def filetypes(self, ext=None):
         key = self._sort_key
         paths = self.paths if self.paths else (self.cwd,)
@@ -1754,6 +1800,7 @@ class Report(Dispatcher):
                                  title='All types aligned (has duplicates)',
                                  ext=ext)
 
+    @sheets.Reports.makeReportSheet('column_name')
     def samples(self, ext=None):
         if self.options.raw:
             data = self.summary.data()
@@ -1772,9 +1819,15 @@ class Report(Dispatcher):
         counts = tuple(kv for kv in sorted(Counter(samples_headers).items(),
                                             key=key))
 
-        rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-        return self._print_table(rows, title='Samples Report', ext=ext)
+        index_col_name = 'Column Name'
+        if ext is None:
+            index_col_name += f' unique = {len(counts)}'
+        rows = ((index_col_name, '#'), *counts)
+        return self._print_table(rows,
+                                 title='Samples Report',
+                                 ext=ext)
 
+    @sheets.Reports.makeReportSheet('column_name')
     def subjects(self, ext=None):
         if self.options.raw:
             data = self.summary.data()
@@ -1793,9 +1846,15 @@ class Report(Dispatcher):
         counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
                                             key=key))
 
-        rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-        return self._print_table(rows, title='Subjects Report', ext=ext)
+        index_col_name = 'Column Name'
+        if ext is None:
+            index_col_name += f' unique = {len(counts)}'
+        rows = ((index_col_name, '#'), *counts)
+        return self._print_table(rows,
+                                 title='Subjects Report',
+                                 ext=ext)
 
+    @sheets.Reports.makeReportSheet('id')  # FIXME vs path
     def completeness(self, ext=None):
         if self.options.raw:
             raw = self.summary.completeness
@@ -1829,7 +1888,6 @@ class Report(Dispatcher):
                          if organ else '')
                 if isinstance(organ, list):
                     organ = ' '.join([repr(o) for o in organ])
-                    
 
             return (i + 1, si, ci, ei, name, id, award, organ)
 
@@ -1837,8 +1895,11 @@ class Report(Dispatcher):
         rows += [rformat(i, *cols) for i, cols in enumerate(sorted(
             raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
 
-        return self._print_table(rows, title='Completeness Report', ext=ext)
+        return self._print_table(rows,
+                                 title='Completeness Report',
+                                 ext=ext)
 
+    @sheets.Reports.makeReportSheet()
     def keywords(self, ext=None):
         from sparcur import export as ex
         data = (self.summary.data()
@@ -1853,8 +1914,12 @@ class Report(Dispatcher):
             key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
         header = [[f'{i + 1}' for i, _ in enumerate(rows[-1])]]
         rows = header + rows
-        return self._print_table(rows, title='Keywords Report')
+        return self._print_table(rows,
+                                 title='Keywords Report',
+                                 ext=ext)
 
+
+    @sheets.Reports.makeReportSheet('id')
     def size(self, dirs=None, ext=None):
         if dirs is None:
             dirs = self.paths
@@ -1871,8 +1936,10 @@ class Report(Dispatcher):
                          for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
 
         return self._print_table(rows, title='Size Report',
-                                 align=['l', 'l', 'r', 'r', 'r', 'r', 'r'], ext=ext)
+                                 align=['l', 'l', 'r', 'r', 'r', 'r', 'r'],
+                                 ext=ext)
 
+    @sheets.Reports.makeReportSheet('id')
     def overview(self, ext=None):
         from sparcur import export as ex
         data = (self.summary.data()
@@ -1893,17 +1960,19 @@ class Report(Dispatcher):
         header = tuple(hrm)  # TODO counts ?
         paths = tuple(hrm.values())
         def getl(d):
-            return [_.identifier if isinstance(_, idlib.Stream)
-                    else _ for _ in [adops.get(d, path, on_failure='') for path in paths]]
+            return [adops.get(d, path, on_failure='') for path in paths]
         _rows = sorted([getl(d) for d in datasets], key=lambda r: (r[-1], r[0], r[-2], r[-3]))
         rows = [header] + _rows
         return self._print_table(rows, title='Dataset Report',
-                                 align=['l', 'l', 'l', 'r', 'r', 'r'], ext=ext)
+                                 align=['l', 'l', 'l', 'r', 'r', 'r'],
+                                 ext=ext)
 
     def test(self, ext=None):
         rows = [['hello', 'world'], [1, 2]]
         return self._print_table(rows, title='Report Test', ext=ext)
 
+
+    #@sheets.Reports.makeReportSheet('id')  # TODO bad return format right now
     def errors(self, *, id=None, ext=None):
         if self.options.raw:
             self.summary.data()['datasets']
@@ -1913,7 +1982,7 @@ class Report(Dispatcher):
 
         if self.cwd != self.anchor:
             id = self.cwd.cache.dataset.id
-            
+
         if id is not None:
             if not id.startswith('N:dataset:'):
                 return []
@@ -1948,6 +2017,8 @@ class Report(Dispatcher):
         )
         return self._print_table(rows, title='Path identifiers', ext=ext)
 
+
+    #@sheets.Reports.makeReportSheet('id')  # TODO bad return format right now
     def mbf(self, ext=None):
         et = tuple()
         from sparcur.extract import xml as exml
@@ -1986,7 +2057,8 @@ class Report(Dispatcher):
             header[0] = header[0][:-1]
 
         return self._print_table(header + all_conts,
-                                 title='Unique MBF contours')
+                                 title='Unique MBF contours',
+                                 ext=ext)
 
     def terms(self, ext=None):
         # anatomy
@@ -2239,8 +2311,7 @@ class Shell(Dispatcher):
 
     def affil(self):
         from pyontutils.utils import Async, deferred
-        from sparcur.sheets import Affiliations
-        a = Affiliations()
+        a = sheets.Affiliations()
         m = a.mapping
         rors = sorted(set(_ for _ in m.values() if _))
         #dat = Async(rate=5)(deferred(lambda r:r.data)(i) for i in rors)
@@ -2265,7 +2336,6 @@ class Shell(Dispatcher):
 
     def integration(self):
         from protcur.analysis import protc, Hybrid
-        from sparcur import sheets
         #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
         from sparcur.protocols import ProtcurData
         p, *rest = self._paths

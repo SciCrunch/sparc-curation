@@ -44,21 +44,20 @@ def disco(dataset_blobs, graphs):
            'involves_anatomical_region',
            'title',
            'folder_name',
-
            'timestamp_created',
            'timestamp_updated',
            'timestamp_updated_contents',
     ]
     chs = ['contributor_affiliation',
-            'contributor_orcid_id',
-            'contributor_role',
-            'is_contact_person',
-            'name',
-            'first_name',
-            'last_name',
-            'middle_name',
-            'id',
-            'blackfynn_user_id',]
+           'contributor_orcid_id',
+           'contributor_role',
+           'is_contact_person',
+           'name',
+           'first_name',
+           'last_name',
+           'middle_name',
+           'id',
+           'blackfynn_user_id',]
 
     datasets = [['id', 'submission_index', 'curation_index'] + dsh]
     contributors = [['id'] + chs]
