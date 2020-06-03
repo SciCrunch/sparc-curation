@@ -656,7 +656,6 @@ resource map<y:LabelModel>
       </data>
     </node>
     <node id="n39">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="58.38100051879883" width="58.50005340576172" x="-45.048983351440256" y="60.26827090454185"/>
@@ -678,7 +677,6 @@ resource map<y:LabelModel>
       </data>
     </node>
     <node id="n40">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="58.38100051879883" width="58.50005340576172" x="-9.000053405761719" y="333.8094997406006"/>
@@ -699,7 +697,6 @@ resource map<y:LabelModel>
       </data>
     </node>
     <node id="n41">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="64.63923645019531" width="56.554100036621094" x="-43.10347820922857" y="-102.63923645019531"/>
@@ -721,7 +718,6 @@ resource map<y:LabelModel>
       </data>
     </node>
     <node id="n42">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="64.63923645019531" width="56.554100036621094" x="-43.10347820922857" y="-182.17023645019503"/>
@@ -743,7 +739,6 @@ resource map<y:LabelModel>
       </data>
     </node>
     <node id="n43">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="66.76200103759766" width="56.554100036621094" x="-121.09702331542962" y="-103.70061874389648"/>
@@ -765,7 +760,6 @@ resource map<y:LabelModel>
       </data>
     </node>
     <node id="n44">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="64.63923645019531" width="56.554100036621094" x="-121.09702331542962" y="-182.17023645019503"/>
@@ -833,7 +827,6 @@ dashboard<y:LabelModel>
       </data>
     </node>
     <node id="n48">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="62.31911087036133" width="56.55500030517578" x="-121.09747344970697" y="-23.685229095458567"/>
@@ -855,7 +848,6 @@ dashboard<y:LabelModel>
       </data>
     </node>
     <node id="n49">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="64.53585815429688" width="56.554996490478516" x="-43.10392643615728" y="-23.10823645019559"/>
@@ -877,7 +869,6 @@ dashboard<y:LabelModel>
       </data>
     </node>
     <node id="n50">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="66.76200103759766" width="56.554100036621094" x="-121.09702331542962" y="51.88727038574302"/>
@@ -899,7 +890,6 @@ dashboard<y:LabelModel>
       </data>
     </node>
     <node id="n51">
-      <data key="d5"/>
       <data key="d6">
         <y:SVGNode>
           <y:Geometry height="58.38100051879883" width="58.50005340576172" x="-9.000053405761719" y="153.8094997406006"/>
@@ -943,7 +933,8 @@ cypher queries<y:LabelModel>
           <y:Geometry height="30.0" width="120.0" x="103.5" y="288.0"/>
           <y:Fill hasColor="false" transparent="false"/>
           <y:BorderStyle color="#000000" type="dotted" width="2.0"/>
-          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="17.96875" horizontalTextPosition="center" iconTextGap="4" modelName="custom" textColor="#000000" verticalTextPosition="bottom" visible="true" width="23.107421875" x="48.4462890625" y="6.015625">???<y:LabelModel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="31.9375" horizontalTextPosition="center" iconTextGap="4" modelName="custom" textColor="#000000" verticalTextPosition="bottom" visible="true" width="93.9765625" x="13.01171875" y="-0.96875">UCSD SPARC
+Curation Portal<y:LabelModel>
               <y:SmartNodeLabelModel distance="4.0"/>
             </y:LabelModel>
             <y:ModelParameter>
