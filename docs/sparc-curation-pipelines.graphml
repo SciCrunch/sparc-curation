@@ -381,7 +381,7 @@ portal (internal)<y:LabelModel>
         <y:ShapeNode>
           <y:Geometry height="30.0" width="120.0" x="277.5" y="348.0"/>
           <y:Fill hasColor="false" transparent="false"/>
-          <y:BorderStyle color="#000000" type="line" width="1.0"/>
+          <y:BorderStyle color="#000000" type="dotted" width="2.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="17.96875" horizontalTextPosition="center" iconTextGap="4" modelName="custom" textColor="#000000" verticalTextPosition="bottom" visible="true" width="44.51171875" x="37.744140625" y="6.015625">Algolio<y:LabelModel>
               <y:SmartNodeLabelModel distance="4.0"/>
             </y:LabelModel>
@@ -1153,7 +1153,7 @@ data sync<y:LabelModel>
             <y:Point x="421.4892" y="269.0210286458335"/>
             <y:Point x="421.4892" y="363.0"/>
           </y:Path>
-          <y:LineStyle color="#000000" type="dashed" width="1.0"/>
+          <y:LineStyle color="#000000" type="dotted" width="2.0"/>
           <y:Arrows source="none" target="standard"/>
           <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
