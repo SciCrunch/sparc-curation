@@ -96,6 +96,8 @@ class TestCurationExportTtl(unittest.TestCase):
             print(k)
             [print('\t', v) for v in vs]
 
+        print('unique awards:', len(out))
+        print('unique affils:', len(set([v for vs in out.values() for v in vs])))
         self.pp(res, unpack=False)
         assert len(res) > 0
 
