@@ -8,7 +8,7 @@ from sparcur.paths import BlackfynnCache, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.config import auth
 from sparcur.extract import xml as exml
-from .common import path_project_container
+from .common import path_project_container, examples_root
 
 export = False
 
@@ -23,6 +23,14 @@ class TestExtractMetadata(unittest.TestCase):
         cls.anchor = cls.BlackfynnRemote.smartAnchor(path_project_container)
         cls.anchor.local_data_dir_init()
         cls.datasets = list(cls.anchor.children)
+
+    def test_new_mbf_format(self):
+        x = examples_root / 'mbf-example.xml'
+        embf = exml.ExtractXml(x)
+        d = embf.asDict()
+        errors = d.pop('errors') if 'errors' in d else tuple()
+        error_types = set(e['validator'] for es in errors for e in es)
+        assert error_types == {'not'} or not error_types, f'unexpected error type! {error_types}'
 
     def test_mbf_header(self):
         test_id = 'N:dataset:bec4d335-9377-4863-9017-ecd01170f354'
