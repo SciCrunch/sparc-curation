@@ -466,8 +466,17 @@ class Tabular(HasErrors):
             gen = csv.reader(f, delimiter='\t')
             yield from gen
         except SheetNotFoundException as e:
-            log.warning(f'Sheet weirdness in{self.path}')
+            log.warning(f'Sheet weirdness in {self.path}')
             log.warning(str(e))
+        except AttributeError as e:
+            message = ('Major sheet weirdness (maybe try resaving, '
+                       'probably a bug in the xlsx2csv converter)? '
+                       f'in {self.path}')
+            if self.addError(exc.EncodingError(message),
+                             blame='submission',
+                             path=self.path):
+                log.exception(e)
+                logd.critical(message)
 
     def _bad_filetype(self, type_):
         message = f'bad filetype {type_}\n{self.path.as_posix()!r}'
