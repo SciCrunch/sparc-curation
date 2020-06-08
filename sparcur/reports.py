@@ -1,5 +1,6 @@
 import re
 import sys
+import json
 import types
 import pprint
 from itertools import chain
@@ -11,13 +12,176 @@ from hyputils import hypothesis as hyp
 from pyontutils.core import OntGraph, OntResIri
 from pyontutils.utils import UTCNOWISO, anyMembers
 from sparcur import sheets
-from sparcur.core import OntId, OntTerm, get_all_errors, adops
+from sparcur.core import OntId, OntTerm, get_all_errors, adops, register_type, fromJson
 from sparcur.utils import want_prefixes, log as _log
 from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.curation import Integrator, DatasetObject  # FIXME
 
 log = _log.getChild('reports')
+
+
+class SparqlQueries:
+    """ Creates SPARQL query templates. """
+
+    def __init__(self, nsm=None):
+        from rdflib.plugins import sparql
+        self.sparql = sparql
+
+        self.nsm = nsm if nsm else OntGraph().namespace_manager
+        self.prefixes = dict(self.nsm)
+
+    def dataset_about(self):
+        # FIXME this will return any resource matching isAbout:
+        query = """
+            SELECT ?dataset
+            WHERE {
+                ?dataset rdf:type sparc:Resource .
+                ?dataset isAbout: ?about .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_subjects(self) -> str:
+        """ Get all subject groups and dataset associated with subject input.
+
+        :returns: list of tuples containing: subject, subjects group, and subjects dataset.
+        """
+        query = """
+            SELECT ?dataset ?subj
+            WHERE {
+                ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
+                ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_groups(self) -> str:
+        """ Get all subject groups and dataset associated with subject input.
+
+        :returns: list of tuples containing: subject, subjects group, and subjects dataset.
+        """
+        query = """
+            SELECT ?dataset ?group ?subj
+            WHERE {
+                ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
+                ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
+                ?subj  TEMP:hasAssignedGroup ?group .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_bundle(self) -> str:
+        """ Get all related datasets of subject.
+
+        :returns: list of tuples containing: subject & subjects shared dataset.
+        """
+        query = """
+            SELECT ?dataset
+            WHERE {
+                ?startdataset TEMP:collectionTitle ?string .
+                ?dataset  TEMP:collectionTitle ?string .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_subject_species(self):
+        # FIXME how to correctly init bindings to multiple values ...
+        query = """
+            SELECT DISTINCT ?dataset
+            WHERE {
+                VALUES ?species { "human" "homo sapiens" } .
+                ?dataset TEMP:isAboutParticipant ?subject .
+                ?subject sparc:animalSubjectIsOfSpecies ?species .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def award_affiliations(self):
+        query = """
+            SELECT DISTINCT ?award ?affiliation
+            WHERE {
+                ?dataset TEMP:hasAwardNumber ?award .
+                ?contributor TEMP:contributorTo ?dataset .
+                ?contributor TEMP:hasAffiliation ?affiliation .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def dataset_milestone_completion_date(self):
+        query = """
+            SELECT DISTINCT ?dataset ?date
+            WHERE {
+                ?dataset TEMP:milestoneCompletionDate ?date .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+
+class TtlFile:
+
+    def __init__(self, uri=None, uri_compare_to=None):
+        import rdflib
+        from pyontutils import namespaces as ns
+        self.rdflib = rdflib
+        self.ns = ns
+
+        if uri is None:
+            uri = 'https://cassava.ucsd.edu/sparc/exports/curation-export.ttl'
+            self.ori = OntResIri(uri)
+
+        if uri_compare_to is None:
+            uri_compare_to = uri
+            self.ori_compare_to = OntResIri(uri_compare_to)
+        else:
+            self.ori_compare_to = OntResIri(uri_compare_to)
+
+        self.graph = ori.graph
+        self.graph_compare_to = self.ori_compare_to.graph
+
+        self.queries = SparqlQueries(nsm=self.graph.namespace_manager)
+
+    def _to_human(self, row):
+        return [self.graph.namespace_manager.qname(cell)
+                if isinstance(cell, rdflib.URIRef) else
+                cell.toPython() for cell in row]
+
+    def changes(self):
+        added, removed, changed = self.graph.subjectsChanges(self.graph_compare_to)
+
+    def milestones(self):
+        query = self.queries.dataset_milestone_completion_date()
+        res = list(self.graph.query(query))
+        rows = sorted(self._to_human(row) for row in res)
+        header = [['dataset', 'milestone comp date']]
+        return self._print_table(header + rows,
+                                 title=f'Dataset milestone completion dates')
+
+    def mis(self, ext=None):
+        rdflib = self.rdflib
+        ns = self.ns
+        ori = self.ori
+
+        counts = Counter(ori.graph.predicates())
+        g = OntGraph(namespace_manager=ori.graph.namespace_manager)
+
+        [(g.add((s, ns.ilxtr.numberOfOccurrences, rdflib.Literal(count))),
+          g.add((s, ns.rdf.type, ns.TEMP.Something)))
+         for s, count in counts.items()
+         if g.namespace_manager.qname(s).split(':')[0]
+         not in ('rdf', 'rdfs', 'owl')]
+        g.debug()
+
+        rows = [[g.namespace_manager.qname(s), count]
+                for s, count in counts.most_common()]
+        #rows = [[c, count] for c, count in _rows
+                #if not (c.startswith('rdf:') or
+                        #c.startswith('rdfs:') or
+                        #c.startswith('owl:'))]
+        header = [['curie', 'count']]
+        return self._print_table(header + rows,
+                                 title=f'MIS predicates',
+                                 ext=ext)
 
 
 class Report:
@@ -94,13 +258,22 @@ class Report:
         ]
         return self._print_table(rows, title='Access Report', ext=ext)
 
-    @sheets.Reports.makeReportSheet('id')
-    def contributors(self, ext=None):
+    def _data_ir(self):
         if self.options.raw:
             data = self.summary.data_for_export(UTCNOWISO())
+        elif self.options.export_file:
+            from pysercomb.pyr import units as pyru
+            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            with open(self.options.export_file, 'rt') as f:
+                data = fromJson(json.load(f))
         else:
             from sparcur import export as ex
             data = self._export(ex.Export).latest_ir
+        return data
+
+    @sheets.Reports.makeReportSheet('id')
+    def contributors(self, ext=None):
+        data = self._data_ir()
 
         datasets = data['datasets']
         unique = {c['id']:c for d in datasets
@@ -233,12 +406,7 @@ class Report:
 
     @sheets.Reports.makeReportSheet('column_name')
     def samples(self, ext=None):
-        if self.options.raw:
-            data = self.summary.data()
-        else:
-            from sparcur import export as ex
-            data = self._export(ex.Export).latest_ir
-
+        data = self._data_ir()
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -260,12 +428,7 @@ class Report:
 
     @sheets.Reports.makeReportSheet('column_name')
     def subjects(self, ext=None):
-        if self.options.raw:
-            data = self.summary.data()
-        else:
-            from sparcur import export as ex
-            data = self._export(ex.Export).latest_ir
-
+        data = self._data_ir()
         datasets = data['datasets']
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
@@ -332,10 +495,7 @@ class Report:
 
     @sheets.Reports.makeReportSheet()
     def keywords(self, ext=None):
-        from sparcur import export as ex
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export(ex.Export).latest_ir)
+        data = self._data_ir()
         datasets = data['datasets']
         _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
                         key=lambda v: -len(v))
@@ -372,10 +532,7 @@ class Report:
 
     @sheets.Reports.makeReportSheet('id')
     def overview(self, ext=None):
-        from sparcur import export as ex
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export(ex.Export).latest_ir)
+        data = self._data_ir()
         datasets = data['datasets']
         hrm = {'award': ['meta', 'award_number'],
                'id': ['id'],
@@ -383,6 +540,8 @@ class Report:
                'errors': ['status', 'error_index'],
                'updated': ['status', 'updated'],
                'published': ['meta', 'doi'],
+               'milestone_completion_date': ['submission',
+                                             'milestone_completion_date'],
                # TODO
                # subject_count
                # sample_count
@@ -393,16 +552,17 @@ class Report:
         def getl(d):
             return [adops.get(d, path, on_failure='') for path in paths]
         _rows = sorted([getl(d) for d in datasets],
-                       key=lambda r: (r[-1].asStr()
-                                      if isinstance(r[-1], idlib.Stream) else
-                                      r[-1],
-                                      r[0],
+                       key=lambda r: (r[-2].asStr()
+                                      if isinstance(r[-2], idlib.Stream) else
                                       r[-2],
+                                      print(r),
+                                      r[0],
                                       r[-3],
+                                      r[-4],
                                       ))
         rows = [header] + _rows
         return self._print_table(rows, title='Dataset Report',
-                                 align=['l', 'l', 'l', 'r', 'r', 'r'],
+                                 align=['l', 'l', 'l', 'r', 'r', 'r', 'r'],
                                  ext=ext)
 
     def test(self, ext=None):
@@ -412,11 +572,8 @@ class Report:
 
     #@sheets.Reports.makeReportSheet('id')  # TODO bad return format right now
     def errors(self, *, id=None, ext=None):
-        if self.options.raw:
-            self.summary.data()['datasets']
-        else:
-            from sparcur import export as ex
-            datasets = self._export(ex.Export).latest_ir['datasets']
+        data = self._data_ir()
+        datasets = data['datasets']
 
         if self.cwd != self.anchor:
             id = self.cwd.cache.dataset.id
@@ -638,6 +795,7 @@ class Report:
             from pysercomb.pyr import units as pyru
             from pysercomb.parsers import racket
 
+            # FIXME cannot breakpoint with this protc instances around ...
             pm = [protc.byId(a.id) for _, a in matches]
 
             # testing
@@ -688,11 +846,31 @@ class Report:
 
                         hrmd[nk].extend(hrmd.pop(k))
 
-            header = [['tag', 'value', 'text', 'exact', 'count']]
+                # this has to come after due to remapping that happens above first
+                wev = sheets.WorkingExecVerb()
+                value_to_key, create = wev.condense()
+                for _key in create:
+                    if _key not in hrmd:
+                        hrmd[_key] = []
+
+                for k, p in list(hrmd.items()):
+                    _, v, _, _ = k
+                    if v in value_to_key:
+                        nk = value_to_key[v]
+                        hrmd[nk].extend(hrmd.pop(k))
+
+            def more(k, v):
+                count = len(v)
+                link = v[0].shareLink if count == 1 else ''
+                facet = 'TODO'
+                return count, link, facet
+
+            header = [['tag', 'value', 'text', 'exact', 'count', 'link', 'facet']]
             #rows = [[(*k, ' '.join([a.shareLink for a in v]))] for k, v in sorted(hrm.items())]
-            rows = [[*k, len(v)] for k, v in sorted(hrmd.items())]
+            rows = [[*k, *more(k, v)]
+                    for k, v in sorted(hrmd.items())]
             if self.options.sort_count_desc:
-                rows = sorted(rows, key=lambda r: -r[-1])
+                rows = sorted(rows, key=lambda r: -r[-3])
 
             return self._print_table(header + rows,
                                      title=f'Annos for {" ".join(tags)}',
@@ -703,11 +881,13 @@ class Report:
             md[e].append(a)
 
         def gtag(e):  # FIXME memoize/cache?
-            return ' '.join(sorted(set(t for a in md[e] for t in a.tags if t in tags)))
+            return ' '.join(sorted(set(t for a in md[e] for t in a.tags
+                                       if t in tags)))
 
-        rows = sorted([[gtag(e), e, c, (' '.join([a.htmlLink if self.options.uri_api else a.shareLink
-                                                 for a in md[e]] if links else ''))]
-                       for e, c in Counter([normalize_exact(e) for e, a in matches]).most_common()],
+        rows = sorted([[gtag(e), e, c, (' '.join(
+            [a.htmlLink if self.options.uri_api else a.shareLink for a in md[e]]
+            if links else ''))] for e, c in
+                       Counter([normalize_exact(e) for e, a in matches]).most_common()],
                       key=lambda ab: (ab[0], -ab[2], ab[1].lower()))
 
         header = [['tag', 'exact', 'count', 'links']]
@@ -724,33 +904,19 @@ class Report:
 
         return self._by_tags(*tags, links=links, ext=ext)
 
-    def changes(self):
-        ori1 = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
-        ori2 = OntResIri('https://cassava.ucsd.edu/sparc/archive/exports/2020-03-23T12:16:56,102146-07:00/curation-export.ttl')
-        g1 = ori1.graph
-        g2 = ori2.graph
-        added, removed, changed = g1.subjectsChanges(g2)
+    @property
+    @idlib.utils.cache_result
+    def _ttlfile(self):
+        # TODO uri/path reconciliation 
+        uri = None
+        uri_compare_to = None
+        return TtlFile(uri, uri_compare_to)
 
+    def changes(self):
+        tout = self._ttlfile.changes()
 
     @sheets.Reports.makeReportSheet('curies')
     def mis(self, ext=None):
-        import rdflib
-        from pyontutils import namespaces as ns
-        ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
-        counts = Counter(ori.graph.predicates())
-        g = OntGraph(namespace_manager=ori.graph.namespace_manager)
-
-        [(g.add((s, ns.ilxtr.numberOfOccurrences, rdflib.Literal(count))),
-          g.add((s, ns.rdf.type, ns.TEMP.Something)))
-         for s, count in counts.items()]
-        g.debug()
-        _rows = [[g.namespace_manager.qname(s), count]
-                 for s, count in counts.most_common()]
-        rows = [[c, count] for c, count in _rows
-                if not (c.startswith('rdf:') or
-                        c.startswith('rdfs:') or
-                        c.startswith('owl:'))]
-        header = [['curie', 'count']]
-        return self._print_table(header + rows,
-                                 title=f'MIS predicates',
-                                 ext=ext)
+        self._ttlfile()
+        tout = self._ttlfile.mis(ext=ext)
+        return tout

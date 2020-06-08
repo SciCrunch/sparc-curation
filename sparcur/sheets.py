@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import wraps
 import idlib
 from pyontutils.sheets import Sheet
@@ -166,6 +167,40 @@ class Reports(Sheet):
 
 class AnnoTags(Reports):
     name = 'anno-tags'
+
+
+class WorkingExecVerb(AnnoTags):
+    sheet_name = 'working-protc:executor-verb'
+    index_columns = 'value',
+
+    def condense(self):
+        marked_as_done = '-'
+        mapping = defaultdict(list)
+
+        def make_key(row):
+            return tuple(c.value for c in [row.tag(), row.value(), row.text(), row.exact()])
+
+        create = []
+        for mt_cell in self.row_object(0).map_to().column.cells[1:]:
+            if (mt_cell.value and mt_cell.value != marked_as_done and
+                mt_cell.value != mt_cell.row.value().value):
+                try:
+                    row, iv = self._row_from_index(value=mt_cell.value)
+                    key = make_key(row)
+                except AttributeError as e:  # value not in index
+                    key = ('protc:executor-verb', mt_cell.value, '', '')
+                    if key not in create:
+                        create.append(key)
+                        log.exception(e)
+
+                mapping[key].append(mt_cell.row.value().value)  # cells don't move so we're ok
+
+        mapping = dict(mapping)
+        value_to_map_to = {value:k for k, values in mapping.items()
+                           for value in values}
+
+        #breakpoint()
+        return value_to_map_to, create  # old -> new, original -> correct
 
 
 # field alignment

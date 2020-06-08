@@ -21,7 +21,7 @@ Usage:
     spc report   [(anno-tags <tag>...) changes mis] [options]
     spc report   [(overview [<path>...]) all]       [options]
     spc shell    [affil integration protocols exit] [options]
-    spc shell    [(dates [<path>...])]              [options]
+    spc shell    [(dates [<path>...]) sheets]       [options]
     spc server   [options]
     spc apinat   [options] <path-in> <path-out>
     spc tables   [options] [<directory>...]
@@ -119,6 +119,7 @@ Commands:
                        : --uri
                        : --uri-api
                        : --debug
+                       : --export-file
 
     shell       drop into an ipython shell
 
@@ -168,6 +169,7 @@ Options:
     --sparse-limit=COUNT    package count that forces a sparse pull [default: {auth.get('sparse-limit')}]
                             use zero or negative numbers to indicate no limit
 
+    -F --export-file=PATH   run reports on a specific export file
     -t --tab-table          print simple table using tabs for copying
     -A --latest             run derived pipelines from latest json
     -P --partial            run derived pipelines from the latest partial json export
@@ -426,6 +428,7 @@ class Main(Dispatcher):
             self.options.anno_tags or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
+            (self.options.report and self.options.export_file) or
             (self.options.export and self.options.schemas) or
             (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
@@ -1599,6 +1602,11 @@ class Shell(Dispatcher):
         """ useful for profiling startup time issues """
         print('Peace.')
         return
+
+    def sheets(self):
+        from sparcur import sheets
+        wev = sheets.WorkingExecVerb()
+        wev.condense()
 
     def default(self):
         datasets = list(self.datasets)

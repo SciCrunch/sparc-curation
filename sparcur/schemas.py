@@ -259,6 +259,7 @@ simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
 # NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
+iso8601datepattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]'
 
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
 doi_pattern = idlib.Doi._id_class.canonical_regex
@@ -644,7 +645,8 @@ class SubmissionSchema(JSONSchema):
                 # TODO allOf?
                 'properties': {'sparc_award_number': {'type': 'string'},
                                'milestone_achieved': {'type': 'string'},
-                               'milestone_completion_date': {'type': 'string'},}}}}
+                               'milestone_completion_date': {'type': 'string',
+                                                             'pattern': iso8601datepattern,},}}}}
 
 
 class UnitSchema(JSONSchema):
@@ -874,8 +876,9 @@ class DatasetOutExportSchema(JSONSchema):
                               'subjects': SubjectsExportSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
                               'samples': SamplesFileExportSchema.schema['properties']['samples'],
                               # 'identifier_metadata': {'type': 'array'},  # FIXME temporary
-                              'resources': {'type':'array',
+                              'resources': {'type': 'array',
                                             'items': {'type': 'object'},},
+                              'submission': {'type': 'object',},
                               'inputs': {'type': 'object',
                                          # TODO do we need errors at this level?
                                          'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
