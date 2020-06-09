@@ -249,6 +249,7 @@
 @prefix c2m2: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/c2m2/> .
 @prefix biccn: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/biccn/> .
 @prefix dandi: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/dandi/> .
+@prefix crossref: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/crossref/> .
 @prefix datacite: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/datacite/> .
 @prefix orcid: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/orcid/> .
 @prefix aws: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/aws/> .
@@ -272,11 +273,39 @@
 
 
 ### namespaces
+crossref: a ilxtr:Namespace .
+datacite: a ilxtr:Namespace .
 orcid: a ilxtr:Namespace .
 blackfynn: a ilxtr:Namespace .
 c2m2: a ilxtr:Namespace .
 jir: a ilxtr:Namespace .
 fs: a ilxtr:Namespace .
+
+### generic primitives
+ilxtr:stream a owl:Class ;
+    definition: """An information stream, from [01]+, to strings,
+to a stream of pointers to complex objects in memory,
+to a stream of spoken words, to a stream of letters,
+to a stream of written words, to a stream of dance moves.
+The stream implies minimally that there is some ordering,
+perhaps in time, perhaps in physical arrangement, if not in
+specification for correct interpretation. The stream itself
+is not and cannot have any aboutness, that is dependent on
+the interpreter, who may be able to infer or define aboutness
+on the basis of their interpretation. When we specify the type
+of a stream in the ontology here it is the type that the consumers
+that use this ontology to communicate should assume/enforce/expect.
+
+To the NIC card and ring buffer it is just bytes. To the TCP/IP stack
+it is an bunch of IP packets. To the browser it is a PNG file. To the
+graphics card it is just bytes again. To the human, it is a kitten.
+""" ;
+    rdfs:comment "this seems very close to ilxtr:informationArtifact" ;
+    rdfs:subClassOf [ a owl:Restriction ;
+        owl:onProperty ilxtr:isComposedOf ;
+        owl:someValuesFrom [ a owl:Class ;
+            owl:unionOf ( ilxtr:stream ilxtr:stream-atom ) ;
+            ] ; ] .
 
 ### storage types
 ilxtr:block-storage a owl:Class .
@@ -295,12 +324,12 @@ rdfs:comment "this is the abstraction of the file content over blocks" .
 fs:path-name a owl:Class ;
     owl:deprecated true ;
     replacedBy: fs:path ;
-    rdfs:comment "need to distinguish between the name for a thing and the object it dereferences
+    rdfs:comment """need to distinguish between the name for a thing and the object it dereferences
 not entirely sure I got this right, file/path/folder should possibly refer to the name and
-then we use file-descriptor to refer to the actual file stream? hard to know",
-"ajudication: NO we do not need this, in the file system we will have the stream
+then we use file-descriptor to refer to the actual file stream? hard to know""",
+"""ajudication: NO we do not need this, in the file system we will have the stream
 essentially be composed of blocks, and the fs:stream will be what we actually work from
-that way paths live in the same realm as names and uris" .
+that way paths live in the same realm as names and uris""" .
 fs:path a owl:Class .
 fs:metadata a owl:Class .
 fs:permissions a owl:Class ; rdfs:subClassOf fs:metadata .
@@ -316,24 +345,42 @@ fs:symlink a owl:Class ; rdfs:subClassOf fs:path, fs:metadata .
 
 ### sparc json export
 # TODO generate a list of all paths in the mis
-jexp:definitions/summary .
-jexp:definitions/dataset .
-jexp:dataset/metadata  .
+jexp:definitions\/summary a ilxtr:json-path .
+jexp:definitions\/dataset a ilxtr:json-path .
+jexp:dataset\/metadata  a ilxtr:json-path .
 
 ### formats
-format:tabular a owl:Class .
-format:relational a owl:Class ; rdfs:comment "TODO how does this relate to tabular" .
-format:json-like a owl:Class ; rdfs:comment "associative array + list + some set of literals" .  
-format:graph-like a owl:Class .
-format:graph-triple a owl:Class ; rdfs:subClassOf format:graph-like ; rdfs:comment "includes quads etc" .
-format:graph-property a owl:Class ; rdfs:subClassOf format:graph-like ; rdfs:comment "has more to do with the internal representation of the graph and the fact that all edges are individuals rather than the way that predicates are used in rdf" .
-format:tree-like a owl:Class .
-format:xml a owl:Class ; rdfs:subClassOf format:tree-like .
-format:sexp a owl:Class ; rdfs:subClassOf format:tree-like .
+format:information-representation-format a owl:Class ;
+    rdfs:comment "Information whose immediate physical representation WITHOUT FURTHER TRANSFORMATION can be operated on using processes that apply to that general category of information." .
+format:format a owl:Class;
+    owl:equivalentClass format:information-representation-format .
+format:tabular a owl:Class ;
+    rdfs:subClassOf format:format .
+format:relational a owl:Class ;
+    rdfs:subClassOf format:format;
+    rdfs:comment "TODO how does this relate to tabular" .
+format:json-like a owl:Class ;
+    rdfs:subClassOf format:format;
+    rdfs:comment "associative array + list + some set of literals" .  
+format:graph-like a owl:Class;
+    rdfs:subClassOf format:format .
+format:graph-triple a owl:Class ;
+    rdfs:subClassOf format:graph-like ; rdfs:comment "includes quads etc" .
+format:graph-property a owl:Class ;
+    rdfs:subClassOf format:graph-like ; rdfs:comment "has more to do with the internal representation of the graph and the fact that all edges are individuals rather than the way that predicates are used in rdf" .
+format:tree-like a owl:Class;
+    rdfs:subClassOf format:format .
+format:xml a owl:Class ;
+    rdfs:subClassOf format:tree-like .
+format:sexp a owl:Class ;
+    rdfs:subClassOf format:tree-like .
 
-format:ser a owl:Class .
-format:ser-ttl a owl:Class ; rdfs:subClassOf format:ser .
-format:ser-json a owl:Class ; rdfs:subClassOf format:ser .
+format:ser a owl:Class;
+    rdfs:subClassOf format:format .
+format:ser-ttl a owl:Class ;
+    rdfs:subClassOf format:ser .
+format:ser-json a owl:Class ;
+    rdfs:subClassOf format:ser .
 
 ### aws
 s3:bucket a owl:Class .
@@ -385,14 +432,15 @@ ilxtr:alsoAccessibleFrom blackfynn:button-edit-dataset .
 
 blackfynn:dataset-permissions a owl:Class .
 blackfynn:organization-people  a owl:Class ;
-ilxtr:hasInterfaceLabel "People" .
+    ilxtr:hasInterfaceLabel "People" .
 blackfynn:organization-teams a owl:Class ;
-ilxtr:hasInterfaceLabel "Teams" .
+    ilxtr:hasInterfaceLabel "Teams" .
 blackfynn:organization-datasets a owl:Class ;
-ilxtr:hasInterfaceLabel "Datasets" .
-blackfynn:dataset-overview a owl:Class ;
-blackfynn:dataset-records a owl:Class; rdfs:comment "not named as such, has a tiny little records and then the dataset name" .
-blackfynn:dataset-models a owl:Class;
+    ilxtr:hasInterfaceLabel "Datasets" .
+blackfynn:dataset-overview a owl:Class .
+blackfynn:dataset-records a owl:Class;
+    rdfs:comment "not named as such, has a tiny little records and then the dataset name" .
+blackfynn:dataset-models a owl:Class ;
     ilxtr:aka "Data Management", "graph-management", "models", "Models" ;
     ilxtr:uriPathTemplate "https://app.blackfynn.io/{org}/datasets/{dat}/graph-management/models" .
 blackfynn:dataset-files a owl:Class; rdfs:comment "" .
@@ -421,10 +469,9 @@ blackfynn:button-package-link-to-record a owl:Class .
 blackfynn:user a owl:Class ; rdfs:comment "get a list of these from People" .
 
 blackfynn:team a owl:Class ;
-    rdfs:subClassOf [ owl:Restriction;
-    owl:onProperty blackfynn:hasMember ;
-    owl:someValuesFrom blackfynn:user
-        ] .
+    rdfs:subClassOf [ a owl:Restriction ;
+        owl:onProperty blackfynn:hasMember ;
+        owl:someValuesFrom blackfynn:user ] .
 
 # bf persmission roles
 blackfynn:owner a owl:Class .
@@ -492,8 +539,340 @@ c2m2:employed-protocol a owl:ObjectProperty .
 # dandi
 dandi:set a owl:Class .  # heh
 
+# crossref
+crossref:doi-ttl a owl:Class ;
+    ilxtr:hasStreamFormat format:ser-ttl .
+
+ilxtr:hasStreamFormat a owl:ObjectProperty ;
+    rdfs:domain format:format ;
+    rdfs:range ilxtr:stream .
+# datacite
+
 ### things that need to be added
 MISSING:bundle a owl:Class .
 MISSING:hash-algorithm a owl:ObjectProperty .
 MISSING:checksum a owl:AnnotationProperty .
+
+# current mis predicates
+
+bibo:doi a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 2 .
+
+bibo:issn a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 1 .
+
+bibo:pageStart a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 1 .
+
+bibo:volume a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 1 .
+
+dc:date a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 2 .
+
+dc:description a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 158 .
+
+dc:publisher a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 2 .
+
+dc:title a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 153 .
+
+dcterms:creator a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 14 .
+
+dcterms:date a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 2 .
+
+dcterms:identifier a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 2 .
+
+dcterms:isPartOf a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1 .
+
+dcterms:publisher a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 2 .
+
+dcterms:title a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 3 .
+
+definition: a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 54 .
+
+foaf:familyName a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 14 .
+
+foaf:givenName a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 14 .
+
+foaf:name a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 14 .
+
+ilxtr:annotationValue a ilxtr:MISPredicate ;
+    definition: "output of some HypothesisHelper.value for a given annotation" ;
+    ilxtr:numberOfOccurrences 176 .
+
+ilxtr:hasAnnotation a ilxtr:MISPredicate, owl:ObjectProperty ;
+    definition: "the subject has a web annotation that has been made about it with the object id" ;
+    editorNote: "if you want to annotate an rdf resource directly just use an annotation property" ;
+    ilxtr:numberOfOccurrences 176 .
+
+isAbout: a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 889 .
+
+NIFRID:synonym a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 144 .
+
+prism.basic:doi a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 2 .
+
+prism.basic:issn a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 1 .
+
+prism.basic:startingPage a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 1 .
+
+prism.basic:volume a ilxtr:MISPredicate ;
+    ilxtr:predicateAppearsIn crossref:doi-ttl ;
+    ilxtr:numberOfOccurrences 1 .
+
+sparc:animalSubjectHasWeight a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 549 .
+
+sparc:animalSubjectIsOfSpecies a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1382 .
+
+sparc:animalSubjectIsOfStrain a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1160 .
+
+sparc:firstName a ilxtr:MISPredicate ;
+    rdfs:comment "not clear whether this is the same as foaf:givenName (sigh)" ;
+    ilxtr:numberOfOccurrences 539 .
+
+sparc:hasORCIDId a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 209 .
+
+sparc:isContactPerson a ilxtr:MISPredicate ;
+    ilxtr:TODO "this should be modeled as hasRole ContactPerson" ;
+    ilxtr:numberOfOccurrences 817 .
+
+sparc:lastName a ilxtr:MISPredicate ;
+    rdfs:comment "not clear whether this is the same as foaf:familyName (sigh)" ;
+    ilxtr:numberOfOccurrences 549 .
+
+sparc:spatialLocationOfModulator a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 76 .
+
+sparc:specimenHasIdentifier a ilxtr:MISPredicate ;
+    rdfs:comment "this is currently used in owl in such a way that it acts as a kind of uniqueness check but it will only work under certain circumstances and is not the right approach" ;
+    ilxtr:numberOfOccurrences 847 .
+
+sparc:stimulatorUtilized a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 76 .
+
+TEMP:aboutContributor a ilxtr:MISPredicate ;
+    definition: "links a dataset contributor record to the contributor" ;
+    ilxtr:numberOfOccurrences 857 .
+
+TEMP:aboutDataset a ilxtr:MISPredicate ;
+    definition: "links a dataset contributor record to the dataset" ;
+    ilxtr:numberOfOccurrences 857 .
+
+TEMP:acknowledgements a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 40 .
+
+TEMP:asBaseUnits a ilxtr:MISPredicate ;
+    definition: "relates an unnormalized unit representation to a normalized unit representation, currently that representation is MGS to simplify the rules for handling SI prefixes" ;
+    ilxtr:numberOfOccurrences 1231 .
+
+TEMP:collectionTitle a ilxtr:MISPredicate ;
+    definition: "the title of the larger collection to which a dataset belongs" ;
+    ilxtr:numberOfOccurrences 89 .
+
+TEMP:contributorTo a ilxtr:MISPredicate ;
+    rdfs:comment "sparc:Rsearcher is too narrow, and sparc:Resource may be too broad? probably not, could have contributors to files, in which case individuals transitively contribute to a dataset, closer to foaf:person and sparc:Dataset as it is currently used" ;
+    rdfs:domain sparc:Researcher ;
+    rdfs:range sparc:Resource ;
+    ilxtr:numberOfOccurrences 850 .
+
+TEMP:curationIndex a ilxtr:MISPredicate ;
+    definition: "number of curation errors for a dataset at the time of export" ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMP:dereferencesTo a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 29 .
+
+TEMP:errorIndex a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMP:hasAffiliation a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 904 .
+
+TEMP:hasAge a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1067 .
+
+TEMP:hasAgeCategory a ilxtr:MISPredicate ;
+    ilxtr:TODO "NOTE. Nearly everyone has a broken data model for age. Lyuba and I did not catch the mistake until our Nov 2019 meeting in Oslo. The problem is that they make the rdfs:domain the Subject and that breaks as soon as the subject shows up for more than one performance. This is particularly an issue for fields with animal subjects that are used in terminal experiments. The correct way to do this is to associate the age or age category as a measurement of a particular performance of a protocol in which the subject is the primary participant. Note further that :Performance is not as granular as we would like, and :PerformanceWithSubjectAsPrimaryParticipant is equivalent to a performance that has a primary participant that has a birth date, or something like that" ;
+    rdfs:domain MISSING:PerformanceWithSubjectAsPrimaryParticipant ;
+    rdfs:range UBERON:0000105 ;  # life cycle stage
+    ilxtr:numberOfOccurrences 984 .
+
+TEMP:hasAssignedGroup a ilxtr:MISPredicate ;
+    ilxtr:TODO "again here, we cannot do a direct translation from the json to the ttl, it will break because a subject may have more than one assigned group if they are involved in multiple distinct top level experimental processes, the nested nature of the json protects against that, but when we lift it out either the graph always has to be read as a qualified graph (which is a pain) or the relationships have to be made safe (read: unambiguous) for use in a larger context" ;
+    ilxtr:numberOfOccurrences 3275 .
+
+TEMP:hasAwardNumber a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 148 .
+
+TEMP:hasBiologicalSex a ilxtr:MISPredicate ;
+    editorNote: "having looked into human sex karyotyping I now understand why the ontologies use hasPhenotypicSex, it is because there are individuals with mutations such as XX male where the SRY gene is located on the X chromosome inherited from the father because it swapped with the Y chromosome during crossing over. Those individuals are phenotypically male, despite the fact that they are XX -- this is a wonderful example of leaky abstractions in biology. This of course throws a wrench in the works when trying to deal with edge cases. There are multiple levels of phenotypeness that affect these usages." ;
+    ilxtr:numberOfOccurrences 1369 .
+
+TEMP:hasContactPerson a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 264 .
+
+TEMP:hasDerivedInformationAsParticipant a ilxtr:MISPredicate ;
+    definition: "Currently used to indicate the relationship between a subject and a dataset that has data about it, the full chain is :subject-x participatesIn: :performance-x ilxtr:hasInformationOutput :data-x partOf: :dataset-x, though participates in is probably too broad, it probably needs to be primaryParticipantIn. There is nothing that we can do with the aboutness of hasInformationOutput, because the aboutness extends to all participants, so we have to filter on the assertion that :subject-x isPrimaryParticipantIn (or whatever that predicate is in the methods ontology)" ;
+    ilxtr:numberOfOccurrences 5318 .
+
+TEMP:hasDigitalArtifactThatIsAboutIt a ilxtr:MISPredicate ;
+    ilxtr:TODO "specimen-header is a clear indication that sample and subject need to be separate as it stands at the moment and we probably need to use data properties and strings for referencing ttl paths" ;
+    ilxtr:convertedFromJsonIrField MISSING:specimen-header:filename, MISSING:specimen-header:upload_filename ;
+    ilxtr:numberOfOccurrences 141 .
+
+TEMP:hasDigitalArtifactThatIsAboutItWithHash a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 141 .
+
+TEMP:hasDoi a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 75 .
+
+TEMP:hasExperimentalModality a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 96 .
+
+TEMP:hasGenotype a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 69 .
+
+TEMP:hasHumanUri a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1 .
+
+TEMP:hasNumberOfContributors a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 151 .
+
+TEMP:hasNumberOfDirectories a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 160 .
+
+TEMP:hasNumberOfFiles a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 160 .
+
+TEMP:hasNumberOfProtcurAnnotations a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 133 .
+
+TEMP:hasNumberOfSamples a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 68 .
+
+TEMP:hasNumberOfSubjects a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 101 .
+
+TEMP:hasProtocol a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 179 .
+
+TEMP:hasResponsiblePrincipalInvestigator a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 182 .
+
+TEMP:hasRole a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1321 .
+
+TEMP:hasSizeInBytes a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 160 .
+
+TEMP:hasUnit a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 2462 .
+
+TEMP:hasUriApi a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMP:hasUriHuman a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMP:involvesAnatomicalRegion a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 160 .
+
+TEMP:isAboutParticipant a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 5318 .
+
+TEMP:isDescribedBy a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 34 .
+
+TEMP:localExecutionNumber a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 29 .
+
+TEMP:localId a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 5275 .
+
+TEMP:localIdAlt a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 9 .
+
+TEMP:middleName a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 126 .
+
+TEMP:milestoneCompletionDate a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 125 .
+
+TEMP:protocolEmploysTechnique a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 201 .
+
+TEMP:protocolExecutionDate a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 326 .
+
+TEMP:protocolHasNumberOfSteps a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 126 .
+
+TEMP:providerNote a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 27 .
+
+TEMP:subjectHasHeight a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 61 .
+
+TEMP:subjectHasWeight a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 61 .
+
+TEMP:submissionIndex a ilxtr:MISPredicate ;
+    definition: "number of submission errors for a dataset at the time of export" ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMP:TimestampExportStart a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 1 .
+
+TEMP:TODO a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 867 .
+
+TEMP:wasCreatedAtTime a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMP:wasDerivedFromSubject a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 3874 .
+
+TEMP:wasUpdatedAtTime a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 199 .
+
+TEMPRAW:wasExtractedFromAnatomicalRegion a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 3869 .
+
+xsd:maxInclusive a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 136 .
+
+xsd:minInclusive a ilxtr:MISPredicate ;
+    ilxtr:numberOfOccurrences 136 .
+
 ### Serialized using the ttlser deterministic serializer v1.2.0
