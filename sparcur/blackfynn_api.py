@@ -376,11 +376,18 @@ def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_on
     cursor_args = ''
     out_of_order = []
     while True:
-        resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
-                           f'pageSize={pageSize}&'
-                           f'includeSourceFiles={str(includeSourceFiles).lower()}'
-                           f'{filename_args}'
-                           f'{cursor_args}')
+        try:
+            resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
+                            f'pageSize={pageSize}&'
+                            f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                            f'{filename_args}'
+                            f'{cursor_args}')
+        except requests.exceptions.RetryError as e:
+            log.exception(e)
+            # sporadic 504 errors that we probably need to sleep on
+            breakpoint()
+            raise e
+
         #print(resp.url)
         if resp.ok:
             j = resp.json()

@@ -126,6 +126,8 @@ class NormHeader(NormSimple):
         'age_range_minimum': __armi,
         'age_range_maximum': __arma,
         'protocol_io_location': 'protocol_url_or_doi',
+        'protocol_io_location_2': 'protocol_url_or_doi',
+        'protocol_title_2': 'protocol_title',
     }
 
 
@@ -884,6 +886,9 @@ class NormSubjectsFile(NormValues):
                 out['sex'] = out.pop('gender')
 
         return out
+
+    #def experiment_date(self):
+        #pass
 
     def ___iter__(self):
         """ this is still used """

@@ -9,7 +9,7 @@ import idlib
 import htmlfn as hfn
 import augpathlib as aug
 from hyputils import hypothesis as hyp
-from pyontutils.core import OntGraph, OntResIri
+from pyontutils.core import OntGraph, OntRes, OntResIri, OntResPath
 from pyontutils.utils import UTCNOWISO, anyMembers
 from sparcur import sheets
 from sparcur.core import OntId, OntTerm, get_all_errors, adops, register_type, fromJson
@@ -120,24 +120,21 @@ class SparqlQueries:
 
 class TtlFile:
 
-    def __init__(self, uri=None, uri_compare_to=None):
+    def __init__(self, ontres, ontres_compare_to=None):
         import rdflib
         from pyontutils import namespaces as ns
         self.rdflib = rdflib
         self.ns = ns
 
-        if uri is None:
-            uri = 'https://cassava.ucsd.edu/sparc/exports/curation-export.ttl'
-            self.ori = OntResIri(uri)
+        self.ontres = ontres
 
-        if uri_compare_to is None:
-            uri_compare_to = uri
-            self.ori_compare_to = OntResIri(uri_compare_to)
+        if ontres_compare_to is None:
+            self.ontres_compare_to = ontres
         else:
-            self.ori_compare_to = OntResIri(uri_compare_to)
+            self.ontres_compare_to = ontres_compare_to
 
-        self.graph = ori.graph
-        self.graph_compare_to = self.ori_compare_to.graph
+        self.graph = self.ontres.graph
+        self.graph_compare_to = self.ontres_compare_to.graph
 
         self.queries = SparqlQueries(nsm=self.graph.namespace_manager)
 
@@ -154,34 +151,29 @@ class TtlFile:
         res = list(self.graph.query(query))
         rows = sorted(self._to_human(row) for row in res)
         header = [['dataset', 'milestone comp date']]
+        return header + rows
         return self._print_table(header + rows,
                                  title=f'Dataset milestone completion dates')
 
     def mis(self, ext=None):
         rdflib = self.rdflib
         ns = self.ns
-        ori = self.ori
+        ontres = self.ontres
 
-        counts = Counter(ori.graph.predicates())
-        g = OntGraph(namespace_manager=ori.graph.namespace_manager)
+        counts = Counter(ontres.graph.predicates())
+        g = OntGraph(namespace_manager=ontres.graph.namespace_manager)
 
         [(g.add((s, ns.ilxtr.numberOfOccurrences, rdflib.Literal(count))),
-          g.add((s, ns.rdf.type, ns.TEMP.Something)))
+          g.add((s, ns.rdf.type, ns.ilxtr.MISPredicate)))
          for s, count in counts.items()
          if g.namespace_manager.qname(s).split(':')[0]
          not in ('rdf', 'rdfs', 'owl')]
         g.debug()
 
-        rows = [[g.namespace_manager.qname(s), count]
-                for s, count in counts.most_common()]
-        #rows = [[c, count] for c, count in _rows
-                #if not (c.startswith('rdf:') or
-                        #c.startswith('rdfs:') or
-                        #c.startswith('owl:'))]
+        rows = [[g.namespace_manager.qname(s), o.toPython()]
+                for s, o in g[:ns.ilxtr.numberOfOccurrences:]]
         header = [['curie', 'count']]
-        return self._print_table(header + rows,
-                                 title=f'MIS predicates',
-                                 ext=ext)
+        return header + sorted(rows, key=lambda r:-r[-1])  # FIXME only Report has access to -C :/
 
 
 class Report:
@@ -908,15 +900,24 @@ class Report:
     @idlib.utils.cache_result
     def _ttlfile(self):
         # TODO uri/path reconciliation 
-        uri = None
-        uri_compare_to = None
-        return TtlFile(uri, uri_compare_to)
+        if self.options.ttl_file:
+            ontres = OntRes.fromStr(self.options.ttl_file)
+        else:
+            ontres = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+
+        if self.options.ttl_compare:
+            ontres_compare_to = OntRes.fromStr(self.options.ttl_compare)
+        else:
+            ontres_compare_to = None
+
+        return TtlFile(ontres, ontres_compare_to)
 
     def changes(self):
         tout = self._ttlfile.changes()
 
     @sheets.Reports.makeReportSheet('curies')
     def mis(self, ext=None):
-        self._ttlfile()
         tout = self._ttlfile.mis(ext=ext)
-        return tout
+        return self._print_table(tout,
+                                 title=f'MIS predicates',
+                                 ext=ext)

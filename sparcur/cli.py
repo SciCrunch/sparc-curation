@@ -119,7 +119,9 @@ Commands:
                        : --uri
                        : --uri-api
                        : --debug
-                       : --export-file
+                       : --export-file=PATH
+                       : --ttl-file=PATHoURI
+                       : --ttl-compare=PATHoURI
 
     shell       drop into an ipython shell
 
@@ -175,6 +177,8 @@ Options:
     -P --partial            run derived pipelines from the latest partial json export
     -W --raw                run reporting on live data without export
     --to-sheets             push report to google sheets
+    --ttl-file=PATHoURI     location of ttl file (uses latest if not specified)
+    --ttl-compare=PATHoURI  location of ttl file for comparison
 
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
@@ -428,6 +432,7 @@ class Main(Dispatcher):
             self.options.anno_tags or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
+            (self.options.report and not self.options.raw) or
             (self.options.report and self.options.export_file) or
             (self.options.export and self.options.schemas) or
             (self.options.find and not (self.options.fetch or self.options.refresh))):
