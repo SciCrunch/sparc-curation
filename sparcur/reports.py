@@ -9,16 +9,46 @@ import idlib
 import htmlfn as hfn
 import augpathlib as aug
 from hyputils import hypothesis as hyp
+from protcur import document as ptcdoc
 from pyontutils.core import OntGraph, OntRes, OntResIri, OntResPath
 from pyontutils.utils import UTCNOWISO, anyMembers
 from sparcur import sheets
-from sparcur.core import OntId, OntTerm, get_all_errors, adops, register_type, fromJson
+from sparcur.core import (OntId,
+                          OntTerm,
+                          get_all_errors,
+                          adops,
+                          register_type,
+                          fromJson)
 from sparcur.utils import want_prefixes, log as _log
 from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.curation import Integrator, DatasetObject  # FIXME
 
 log = _log.getChild('reports')
+
+
+def normalize_exact(e, *, lower=False):
+    if e is not None:
+        e = e.replace('\n', ' ')  # sigh
+        e = e.replace('\t', ' ')
+        e = e.replace('\xA0', ' ')  # nbsp
+        e = e.strip().rstrip()
+        if lower:
+            e = e.lower()
+        return e
+
+    return ''
+
+
+def normtext(t, *, lower=False):
+    if 'https://' in t:
+        return ''
+    else:
+        t = t.strip().rstrip()
+        if lower:
+            t = t.lower()
+
+        return t
 
 
 class SparqlQueries:
@@ -240,7 +270,8 @@ class Report:
         bf_api_ids = set(d.id for d in remote_datasets)
 
         missing_from_api = sorted(master_sheet_ids - bf_api_ids)
-        missing_datasets = [self.BlackfynnRemote(i, local_only=True) for i in missing_from_api]
+        missing_datasets = [self.BlackfynnRemote(i, local_only=True)
+                            for i in missing_from_api]
         missing_uris = [fmt(d) for d in missing_datasets]
         rows = [['', ''],
                 [fmtmc('Master Count'), len(master_sheet_ids)],
@@ -388,8 +419,8 @@ class Report:
                                     title=title.replace('_', ' ').strip())
 
         all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
-                                Counter([(f.suffix, f.mimetype, f._magic_mimetype)
-                                        for f in paths]).items()], key=key)
+                             Counter([(f.suffix, f.mimetype, f._magic_mimetype)
+                                      for f in paths]).items()], key=key)
 
         header = ['suffix', 'mimetype', 'magic mimetype', 'count']
         return self._print_table((header, *all_counts),
@@ -516,7 +547,8 @@ class Report:
                           'x' if d.path.cache.is_sparse() else '',
                           c['dirs'], c['files'], c['size'], c['size'].hr]
                          for d in intrs
-                         for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
+                         for c in (d.datasetdata.counts,)],
+                        key=lambda r: -r[-2])]
 
         return self._print_table(rows, title='Size Report',
                                  align=['l', 'l', 'r', 'r', 'r', 'r', 'r'],
@@ -584,26 +616,30 @@ class Report:
                     dso = DatasetObject.from_json(dataset_blob)
                     title = f'Errors for {id}'
                     urih = dataset_blob['meta']['uri_human']
-                    formatted_title = (hfn.h2tag(f'Errors for {hfn.atag(urih, id)}<br>\n') +
-                                       (hfn.h3tag(dataset_blob['meta']['title']
-                                        if 'title' in dataset_blob['meta'] else
-                                        dataset_blob['meta']['folder_name'])))
+                    formatted_title = (
+                        hfn.h2tag(f'Errors for {hfn.atag(urih, id)}<br>\n') +
+                        (hfn.h3tag(dataset_blob['meta']['title']
+                                   if 'title' in dataset_blob['meta'] else
+                                   dataset_blob['meta']['folder_name'])))
                     log.info(list(dataset_blob.keys()))
                     errors = list(dso.errors)
-                    return [(self._print_table(e.as_table(), ext=pt)) for e in errors], formatted_title, title
+                    return [(self._print_table(e.as_table(), ext=pt))
+                            for e in errors], formatted_title, title
         else:
-            pprint.pprint(sorted([(d['meta']['folder_name'], [e['message']
-                                                              for e in get_all_errors(d)])
-                                  for d in datasets], key=lambda ab: -len(ab[-1])))
+            pprint.pprint(
+                sorted([(d['meta']['folder_name'],
+                         [e['message'] for e in get_all_errors(d)])
+                        for d in datasets],
+                       key=lambda ab: -len(ab[-1])))
 
     def pathids(self, ext=None):
         base = self.project_path.parent
         rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]
                                          # slower to include the uris
-                                         for c in chain((self.cwd,), self.cwd.rchildren)
+                                         for c in chain((self.cwd,),
+                                                        self.cwd.rchildren)
         )
         return self._print_table(rows, title='Path identifiers', ext=ext)
-
 
     #@sheets.Reports.makeReportSheet('id')  # TODO bad return format right now
     def mbf(self, ext=None):
@@ -620,7 +656,8 @@ class Report:
             from sparcur import export as ex
             blob_ir = self._export(ex.ExportXml).latest_ir  # FIXME need to load?
 
-        mbf_types = tuple(c.mimetype for c in (exml.ExtractMBF, exml.ExtractNeurolucida))
+        mbf_types = tuple(c.mimetype for c in
+                          (exml.ExtractMBF, exml.ExtractNeurolucida))
         if self.options.unique:
             key = lambda p: (p[2], not p[0], p[1].lower(), p[1])
         else:
@@ -631,7 +668,8 @@ class Report:
                                  ''),
                                 c['name'],
                                 settype(metadata_blob['type']),
-                                *((dataset_xml['dataset_id'],) if not self.options.unique else et))
+                                *((dataset_xml['dataset_id'],)
+                                  if not self.options.unique else et))
                                for dataset_xml in blob_ir.values()
                                if dataset_xml['type'] == 'all-xml-files'  # FIXME
                                for metadata_blob in dataset_xml['xml']
@@ -735,8 +773,106 @@ class Report:
         annos = self._annos()
         return [protc(a, annos) for a in annos]
 
+    def _process_protc(self, tags, matches, ext):
+        from protcur.analysis import protc
+        from pysercomb.pyr import units as pyru
+        from pysercomb.parsers import racket
+
+        lowernorm = ('protc:aspect',
+                     'protc:implied-aspect',
+                     'protc:executor-verb',
+                     'protc:parameter*',
+                     'protc:invariant',
+                     )
+
+        self._protc()
+        # FIXME cannot breakpoint with this protc instances around ...
+        pm = [protc.byId(a.id) for _, a in matches]
+
+        # testing
+        if 'protc:input' in tags:
+            input = pm[13]
+            invar = next(next(input.children).children)
+            paramparser = pyru.ParamParser()
+            tv = racket.sexp(invar.parameter())[1]
+            tp = invar._parameter[1]
+            assert tv == tp
+            hrm = paramparser(tv)
+
+        hrm = defaultdict(list)
+        def denone(t): return tuple('' if e is None else e for e in t)
+        for p in pm:
+            pt = [t for t in p.tags if t in tags]
+            if pt:
+                hrm[denone((
+                    pt[0],
+                    normalize_exact(
+                        p.value,
+                        lower=anyMembers(tags, *lowernorm)),
+                    normtext(
+                        p.text,
+                        lower=anyMembers(tags, *lowernorm)),
+                    normalize_exact(
+                        p.exact,
+                        lower=anyMembers(tags,
+                                            *lowernorm))))].append(p)
+            else:
+                log.warning(f'WAT {p.tags}')
+
+        hrmd = dict(hrm)
+        if 'protc:executor-verb' in tags:  # woo past tense
+            ends_with_e = {h[1]:h for h, p in hrmd.items() if h[1].endswith('e')}
+            others = {h[1]:h for h, p in hrmd.items()
+                    if not h[1].endswith('ed') and not h[1].endswith('e')}
+            for k, p in list(hrmd.items()):
+                _, v, _, _ = k
+                if v.endswith('ed'):
+                    ewe = v[:-1]
+                    if ewe in ends_with_e:
+                        nk = ends_with_e[ewe]
+                    elif v[:-2] in others:
+                        nk = others[v[:-2]]
+                    else:
+                        continue
+
+                    hrmd[nk].extend(hrmd.pop(k))
+
+            # this has to come after due to remapping that happens above first
+            wev = sheets.WorkingExecVerb()
+            value_to_key, create = wev.condense()
+            for _key in create:
+                if _key not in hrmd:
+                    hrmd[_key] = []
+
+            for k, p in list(hrmd.items()):
+                _, v, _, _ = k
+                if v in value_to_key:
+                    nk = value_to_key[v]
+                    hrmd[nk].extend(hrmd.pop(k))
+
+        def more(k, v):
+            count = len(v)
+            link = v[0].shareLink if count == 1 else ''
+            facet = 'TODO'
+            return count, link, facet
+
+        header = [['tag', 'value', 'text', 'exact', 'count', 'link', 'facet']]
+        #rows = [[(*k, ' '.join([a.shareLink for a in v]))] for k, v in sorted(hrm.items())]
+        rows = [[*k, *more(k, v)]
+                for k, v in sorted(hrmd.items())]
+        if self.options.sort_count_desc:
+            rows = sorted(rows, key=lambda r: -r[-3])
+
+        return self._print_table(header + rows,
+                                    title=f'Annos for {" ".join(tags)}',
+                                    ext=ext)
+
     def _by_tags(self, *tags, links=True, ext=None):
-        self._annos()
+        annos = self._annos()
+        bannos = [ptcdoc.Annotation(a) for a in annos]  # better annos
+        pool = ptcdoc.Pool(bannos)
+        anno_counts = ptcdoc.AnnoCounts(pool)
+
         self._helpers()
         process_protc = anyMembers(tags,
                                    'protc:executor-verb',
@@ -748,125 +884,13 @@ class Report:
                                    'protc:parameter*',
                                    'protc:invariant',
                                    )
-        lowernorm = ('protc:aspect',
-                     'protc:implied-aspect',
-                     'protc:executor-verb',
-                     'protc:parameter*',
-                     'protc:invariant',
-                     )
-        if process_protc:
-            self._protc()
-
-        def normalize_exact(e, *, lower=False):
-            if e is not None:
-                e = e.replace('\n', ' ')  # sigh
-                e = e.replace('\t', ' ')
-                e = e.replace('\xA0', ' ')  # nbsp
-                e = e.strip().rstrip()
-                if lower:
-                    e = e.lower()
-                return e
-
-            return ''
-
-        def normtext(t, *, lower=False):
-            if 'https://' in t:
-                return ''
-            else:
-                t = t.strip().rstrip()
-                if lower:
-                    t = t.lower()
-
-                return t
 
         # note that HypothesisHelper.byTags is an AND search not and OR search
-        matches = [(normalize_exact(a.exact), a) for tag in tags
-                   for a in hyp.HypothesisHelper.byTags(tag)]
+        matches = [(normalize_exact(a.exact, lower=True), a)
+                   for tag in tags for a in hyp.HypothesisHelper.byTags(tag)]
+
         if process_protc:
-            from protcur.analysis import protc
-            from pysercomb.pyr import units as pyru
-            from pysercomb.parsers import racket
-
-            # FIXME cannot breakpoint with this protc instances around ...
-            pm = [protc.byId(a.id) for _, a in matches]
-
-            # testing
-            if 'protc:input' in tags:
-                input = pm[13]
-                invar = next(next(input.children).children)
-                paramparser = pyru.ParamParser()
-                tv = racket.sexp(invar.parameter())[1]
-                tp = invar._parameter[1]
-                assert tv == tp
-                hrm = paramparser(tv)
-
-            hrm = defaultdict(list)
-            def denone(t): return tuple('' if e is None else e for e in t)
-            for p in pm:
-                pt = [t for t in p.tags if t in tags]
-                if pt:
-                    hrm[denone((
-                        pt[0],
-                        normalize_exact(
-                            p.value,
-                            lower=anyMembers(tags, *lowernorm)),
-                        normtext(
-                            p.text,
-                            lower=anyMembers(tags, *lowernorm)),
-                        normalize_exact(
-                            p.exact,
-                            lower=anyMembers(tags,
-                                             *lowernorm))))].append(p)
-                else:
-                    log.warning(f'WAT {p.tags}')
-
-            hrmd = dict(hrm)
-            if 'protc:executor-verb' in tags:  # woo past tense
-                ends_with_e = {h[1]:h for h, p in hrmd.items() if h[1].endswith('e')}
-                others = {h[1]:h for h, p in hrmd.items()
-                        if not h[1].endswith('ed') and not h[1].endswith('e')}
-                for k, p in list(hrmd.items()):
-                    _, v, _, _ = k
-                    if v.endswith('ed'):
-                        ewe = v[:-1]
-                        if ewe in ends_with_e:
-                            nk = ends_with_e[ewe]
-                        elif v[:-2] in others:
-                            nk = others[v[:-2]]
-                        else:
-                            continue
-
-                        hrmd[nk].extend(hrmd.pop(k))
-
-                # this has to come after due to remapping that happens above first
-                wev = sheets.WorkingExecVerb()
-                value_to_key, create = wev.condense()
-                for _key in create:
-                    if _key not in hrmd:
-                        hrmd[_key] = []
-
-                for k, p in list(hrmd.items()):
-                    _, v, _, _ = k
-                    if v in value_to_key:
-                        nk = value_to_key[v]
-                        hrmd[nk].extend(hrmd.pop(k))
-
-            def more(k, v):
-                count = len(v)
-                link = v[0].shareLink if count == 1 else ''
-                facet = 'TODO'
-                return count, link, facet
-
-            header = [['tag', 'value', 'text', 'exact', 'count', 'link', 'facet']]
-            #rows = [[(*k, ' '.join([a.shareLink for a in v]))] for k, v in sorted(hrm.items())]
-            rows = [[*k, *more(k, v)]
-                    for k, v in sorted(hrmd.items())]
-            if self.options.sort_count_desc:
-                rows = sorted(rows, key=lambda r: -r[-3])
-
-            return self._print_table(header + rows,
-                                     title=f'Annos for {" ".join(tags)}',
-                                     ext=ext)
+            return self._process_protc(tags, matches, ext)
 
         md = defaultdict(list)
         for e, a in matches:
@@ -876,13 +900,22 @@ class Report:
             return ' '.join(sorted(set(t for a in md[e] for t in a.tags
                                        if t in tags)))
 
-        rows = sorted([[gtag(e), e, c, (' '.join(
-            [a.htmlLink if self.options.uri_api else a.shareLink for a in md[e]]
-            if links else ''))] for e, c in
-                       Counter([normalize_exact(e) for e, a in matches]).most_common()],
+        def link(e): pass
+        rows = sorted([[gtag(e),  # tag
+                        e,        # key
+                        c,        # count
+                        (' '.join([a.htmlLink  # links
+                                   if self.options.uri_api else
+                                   a.shareLink for a in md[e]]
+                                  if links else '')),
+                        '',       # docs
+                        '',       # exacts
+                        ]
+                       for e, c in Counter([normalize_exact(e)
+                                            for e, a in matches]).most_common()],
                       key=lambda ab: (ab[0], -ab[2], ab[1].lower()))
 
-        header = [['tag', 'exact', 'count', 'links']]
+        header = [['tag', 'key', 'count', 'links', 'docs', 'exacts']]
         return self._print_table(header + rows,
                                  title=f'Annos for {" ".join(tags)}',
                                  ext=ext)
@@ -903,7 +936,9 @@ class Report:
         if self.options.ttl_file:
             ontres = OntRes.fromStr(self.options.ttl_file)
         else:
-            ontres = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+            # FIXME make this go away and derive it from git
+            iri = 'https://cassava.ucsd.edu/sparc/exports/curation-export.ttl'
+            ontres = OntResIri(iri)
 
         if self.options.ttl_compare:
             ontres_compare_to = OntRes.fromStr(self.options.ttl_compare)
