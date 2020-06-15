@@ -709,7 +709,7 @@ class Main(Dispatcher):
         from joblib import Parallel, delayed
         import logging
 
-        def asdf(ca, d,
+        def clone_single_dataset_helper(ca, d,
                  level='DEBUG' if self.options.verbose else 'INFO',
                  log_name=log.name):
             log = logging.getLogger(log_name)
@@ -719,7 +719,7 @@ class Main(Dispatcher):
             if not hasattr(rc, '_cache_anchor'):
                 rc.anchorTo(ca)
 
-            list(d.rchildren)
+            list(d.rchildren)  # XXX actual pull happens here
 
 
         Parallel(n_jobs=12)(delayed(asdf)(self.anchor, d)
@@ -760,6 +760,51 @@ class Main(Dispatcher):
         return sparse
 
     def pull(self):
+        # TODO the way to fix pull performance is to pull down the remote state
+        # into a new directory and then diff the two all in one pass and calculate
+        # the minimum number of moves/merges, and it should be done for the entire
+        # dataset because it will be faster than checking each folder to see if it
+        # has been renamed since we can't know for sure without checking
+        # XXX and in point of fact, we can just swap them out entirely in the curation
+        # workflow because all the data files are cached in .operations/objects
+
+        if self.cwd.cache.is_dataset():
+            # FIXME dataset/org differences should be handled in the CachePath NOT here
+
+            # FIXME WARNING: if you call pull on a dataset while inside it
+            # and dont pushd ../ && popd you will get cryptic errors
+            if list(self.cwd.children):
+                # instantiate a temporary cache
+                ldd = self.anchor.local_data_dir
+                contain_new = ldd / 'temp-new'
+                contain_new.mkdir(exist_ok=True)
+                #contain_old = ldd / 'temp-old'
+                #contain_old.mkdir(exist_ok=True)
+
+                old = self.cwd
+
+                new = contain_new / old.name
+                new.mkdir()
+                new.setxattrs(old.xattrs())
+                # FIXME error handling
+                new_c_children = list(new.cache.rchildren)
+                new_children = [c.local.relative_to(new) for c in new_c_children]
+                old_children = [c.relative_to(old) for c in old.rchildren]
+                # FIXME TODO comparison/diff and support for non-curation workflows
+                new.swap_carefree(old)
+
+                new_now_old = new
+
+                # neither of these cleanup approaches is remotely desireable
+                suf = f'-{self._time_now.START_TIMESTAMP_LOCAL_SAFE}'
+                new_now_old.rename(new_now_old.parent / (new_now_old.name + suf))  # FIXME
+                #new_now_old.cache.crumple()  # FIXME bad bad bad
+
+            else:
+                list(self.cwd.cache.rchildren)
+
+            return
+
         # TODO folder meta -> org
         from pyontutils.utils import Async, deferred
         only = tuple()

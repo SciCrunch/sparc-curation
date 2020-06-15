@@ -301,7 +301,7 @@ class BlackfynnDatasetData:
         """ retrieve cached results without hitting the network """
         # TODO FIXME error on no cache?
         if not self.cache.exists():
-            msg = 'No cached metadata for {self.id}. Run `spc rmeta` to populate.'
+            msg = f'No cached metadata for {self.id}. Run `spc rmeta` to populate.'
             raise FileNotFoundError(msg)
 
         with open(self.cache, 'rt') as f:
