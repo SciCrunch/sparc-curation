@@ -371,10 +371,18 @@ class BaseElement(Base):
                 assert not isinstance(values, str), f'{values} in {key}'
                 for value in values:
                     if key == 'external':
-                        o = OntId(value).URIRef
-                        yield o, readable.annotates, self.s
+                        try:
+                            o = OntId(value).URIRef
+                            yield o, readable.annotates, self.s
+                        except OntId.UnknownPrefixError as e:
+                            log.exception(e)
+                            continue
                     elif key == 'inheritedExternal':
-                        o = OntId(value).URIRef
+                        try:
+                            o = OntId(value).URIRef
+                        except OntId.UnknownPrefixError as e:
+                            log.exception(e)
+                            continue
                     else:
                         value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                         o = self.context[value]
