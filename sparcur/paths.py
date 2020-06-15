@@ -59,6 +59,46 @@ class BlackfynnCache(PrimaryCache, EatCache):
         return self.organization
 
     @property
+    def _id_parts(self):
+        ntid = self.id
+        if ntid is None:
+            raise exc.NoCachedMetadataError(self)
+
+        N, thing, id = ntid.split(':')
+        return N, thing, id
+
+    @property
+    def _id_uuid(self):
+        N, thing, id = self._id_parts
+        return id  # TODO inverse function
+
+    @property
+    def _fs_safe_id(self):
+        N, thing, id = self._id_parts
+        return thing[0] + '-' + id
+
+    @property
+    def _trashed_path(self):
+        sid = self._fs_safe_id
+        suuid = self._id_uuid
+        try:
+            pid = self.parent._fs_safe_id
+        except exc.NoCachedMetadataError as e:
+            msg = f'Projects cannnot be trashed when trying to trash {self}'
+            raise TypeError(msg) from e
+
+        fid = f'{self.file_id}-' if self.file_id else ''
+        # we use sid as the sparsification folder here to ensure
+        # a more uniform distribution of deletions across folders
+        # therefore if you need to find files deleted from a specific folder
+        # use find -name '*collection-id-part*'
+        return self.trash  / suuid[:2] / f'{sid}-{pid}-{fid}{self.name}'
+
+    @property
+    def _trashed_path_short(self):
+        return self.trash / 'short' / self.name
+
+    @property
     def trash(self):
         return self.local_data_dir / 'trash'
 
