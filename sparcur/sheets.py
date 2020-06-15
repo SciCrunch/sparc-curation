@@ -42,15 +42,6 @@ class Protocols(Master):
     sheet_name = 'Protocol URL--> Blackfynn URL'
 
 
-# reports
-class CurationReports(Sheet):
-    name = 'sparc-curation-reports'
-
-
-class Completeness(Sheet):
-    sheet_name = 'Completeness'
-
-
 # affiliations
 class Affiliations(Sheet):
     name = 'sparc-affiliations'
