@@ -706,14 +706,7 @@ class Main(Dispatcher):
         skip = auth.get_list('datasets-no')  # FIXME this should be materialized as well
 
         # pull all the files
-        from joblib import Parallel, delayed
-        self.project_path.pull(
-            time_now=self._time_now,
-            debug=self.options.debug,
-            n_jobs=12,
-            log_level='DEBUG' if self.options.verbose else 'INFO',
-            Parallel=Parallel,
-            delayed=delayed,)
+        self.pull()
 
     def _total_package_counts(self):
         from sparcur.datasources import BlackfynnDatasetData
@@ -748,14 +741,8 @@ class Main(Dispatcher):
         return sparse
 
     def pull(self):
-        # TODO the way to fix pull performance is to pull down the remote state
-        # into a new directory and then diff the two all in one pass and calculate
-        # the minimum number of moves/merges, and it should be done for the entire
-        # dataset because it will be faster than checking each folder to see if it
-        # has been renamed since we can't know for sure without checking
-        # XXX and in point of fact, we can just swap them out entirely in the curation
-        # workflow because all the data files are cached in .operations/objects
-
+        # FIXME this still isn't quite right because it does not correctly
+        # deal dataset renaming, but it is much closer
         from joblib import Parallel, delayed
         self.cwd.pull(
             time_now=self._time_now,
@@ -764,190 +751,6 @@ class Main(Dispatcher):
             log_level='DEBUG' if self.options.verbose else 'INFO',
             Parallel=Parallel,
             delayed=delayed,)
-        return
-
-    def _pull_older(self):  # XXX remove
-        if self.cwd.cache.is_dataset():
-            # FIXME dataset/org differences should be handled in the CachePath NOT here
-
-            # FIXME WARNING: if you call pull on a dataset while inside it
-            # and dont pushd ../ && popd you will get cryptic errors
-            if list(self.cwd.children):
-                # instantiate a temporary cache
-                ldd = self.anchor.local_data_dir
-                contain_stage = ldd / 'temp-stage'
-                contain_stage.mkdir(exist_ok=True)
-
-                working = self.cwd
-                stage = contain_stage / working.name
-                stage.mkdir()
-                stage.setxattrs(working.xattrs())
-                # FIXME error handling
-                stage_c_children = list(stage.cache.rchildren)
-                stage_children = [c.local.relative_to(stage)
-                                  for c in stage_c_children]
-                working_children = [c.relative_to(working)
-                                    for c in working.rchildren]
-                # FIXME TODO comparison/diff and support for non-curation workflows
-                stage.swap_carefree(working)
-
-                stage_now_old = stage
-
-                # neither of these cleanup approaches is remotely desireable
-                suf = f'-{self._time_now.START_TIMESTAMP_LOCAL_SAFE}'
-                stage_now_old.rename(stage_now_old.parent / (stage_now_old.name + suf))  # FIXME
-
-            else:
-                list(self.cwd.cache.rchildren)
-
-            return
-
-    def _pull_oldest(self):  # XXX remove
-        # TODO folder meta -> org
-        from pyontutils.utils import Async, deferred
-        only = tuple()
-        recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
-        dirs = self.directories
-        cwd = self.cwd
-        skip = auth.get_list('datasets-no')
-        sparse = self._sparse_from_metadata()
-        if self.project_path.parent.name == 'big':
-            only = auth.get_list('datasets-sparse')
-        else:
-            more_sparse = auth.get_list('datasets-sparse')
-            if more_sparse:
-                sparse.extend(more_sparse)
-                sparse = sorted(set(sparse))
-
-        if not dirs:
-            dirs = cwd,
-
-        dirs = sorted(dirs, key=lambda d: d.name)
-        if self.project_path in dirs:
-            check_dirs = [c for d in dirs for c in
-                          (d.children if d == self.project_path else (d,))
-                          if c.is_dir() and True or  # XXX not skipping sparse
-                          (c.cache.id not in sparse
-                           or only and c.cache.id in only)]
-        else:
-            check_dirs = dirs
-
-        existing_locals = set(rc for d in check_dirs for rc in d.rchildren)  # this is fairly quick
-
-        if self.options.profile:
-            from desc.prof import profile_me
-        else:
-            profile_me = lambda f: f
-
-        @profile_me
-        def fast():
-            # 2 seconds on sparse, 8.3 seconds for 223k ids
-            # faster than find getfattr by a long shot
-            existing_d = {e.cache_id:e for e in existing_locals}
-            return existing_d
-
-        @profile_me
-        def slow():
-            # some numbers when excluding the sparse datasets
-            # 33 seconds !!! WAT WAT WAT WAT
-            # now down to 22 by not parsing dates unless we need them
-            # but still a 10x overhead compared to the fast version above
-            # down to ~9 seconds just checking c.cach is not None
-            # so roughly 4x overhead just to instantiate the caches ... ugh
-
-            # FIXME TODO wow calling cache.meta is expensive
-            # is is the overhead for parsing the paths again
-            # probably worth creating a hack to init from local parts directly
-            existing_d = {c:c for c in existing_locals
-                          if c.cache is not None}  # yay null cache
-            return existing_d
-
-        existing_d1 = fast()
-        #existing_d2 = slow()
-        existing_d = existing_d1
-        existing_ids = set(existing_d)
-
-        log.debug(dirs)
-        for d in dirs:
-            if self.options.empty:
-                if list(d.children):
-                    continue
-
-            if not d.is_dir():
-                raise TypeError(f'dir is not a dir?!? {d}')
-
-            if not (d.remote.is_dataset() or d.remote.is_organization()):
-                log.warning('You are pulling recursively from below dataset level.')
-
-            #r = d.remote
-            # FIXME for some reason this does not seem to be working as expected
-            # because new datasets are being added when there is an existing dataset
-            #r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
-            c = d.cache
-            newc = c.refresh()  # this does the move for us now
-            if newc is None:
-                continue  # directory was deleted
-
-            def hrm(child):
-                cd = child
-                if cd.is_dir():
-                    oc = cd.cache  # FIXME getting the cache slow
-                    if oc is None and cd.skip_cache:
-                        return
-
-                    nc = oc.refresh()  # FIXME can't we just build an index off datasets here??
-                    if nc != oc:
-                        log.info(f'Dataset moved!\n{oc} -> {nc}')
-                        # FIXME FIXME FIXME
-                        rnl = self.anchor.local_data_dir / 'renames.log'
-                        with open(rnl, 'at') as f:
-                            f.write(f'{oc} -> {nc} -> {nc.id}\n')
-
-            if d.cache.is_organization():  # FIXME FIXME FIXME hack to mask broken bootstrap handling of existing dirs :/
-                if self.options.debug or self.options.jobs == 1:
-                    _blank = [hrm(cd) for cd in d.children]
-                else:
-                    _blank = Async(rate=self.options.rate)(
-                        deferred(hrm)(cd) for cd in d.children)
-
-            # FIXME something after this point is retaining stale filepaths on dataset rename ...
-            #d = r.local  # in case a folder moved
-            caches = newc.remote.bootstrap(recursive=recursive,
-                                           only=only,
-                                           skip=skip,
-                                           sparse=sparse,)
-
-        new_locals = set(c.local for c in caches if c is not None)  # FIXME 
-        new_ids = {c.id:c for c in caches if c is not None}
-        maybe_removed_ids = set(existing_ids) - set(new_ids)
-        maybe_new_ids = set(new_ids) - set(existing_ids)
-        if maybe_removed_ids:
-            # FIXME pull sometimes has fake file extensions
-            from pathlib import PurePath
-            maybe_removed = [existing_d[id] for id in maybe_removed_ids]
-            maybe_removed_stems = {PurePath(p.parent) / p.stem:p
-                                   for p in maybe_removed}  # FIXME still a risk of collisions?
-            maybe_new = [new_ids[id] for id in maybe_new_ids]
-            maybe_new_stems = {PurePath(p.parent) / p.stem:p for p in maybe_new}
-            for pstem, p in maybe_new_stems.items():
-                if pstem in maybe_removed_stems:
-                    mr_path = maybe_removed_stems[pstem]
-                    #assert p != mr_path, f'wat\n{mr_path}\n{p}'
-                    if p != mr_path:
-                        new_new_path = p.refresh()
-                    else:
-                        new_new_path = p
-                        # TODO check if file_id needs to be updated in some cases ...
-                        # csv files match
-                        log.info(f'wat\n{mr_path}\n{p}')
-
-                    if new_new_path == mr_path:
-                        maybe_removed.remove(mr_path)
-
-            Async(rate=self.options.rate)(deferred(l.cache.refresh)()
-                                          for l in maybe_removed
-                                          # FIXME deal with untracked files
-                                          if l.cache)
 
     def refresh(self):
         paths = self.paths
