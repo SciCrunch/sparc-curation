@@ -707,25 +707,13 @@ class Main(Dispatcher):
 
         # pull all the files
         from joblib import Parallel, delayed
-        import logging
-
-        def clone_single_dataset_helper(ca, d,
-                 level='DEBUG' if self.options.verbose else 'INFO',
-                 log_name=log.name):
-            log = logging.getLogger(log_name)
-            log.setLevel(level)
-
-            rc = d._remote_class
-            if not hasattr(rc, '_cache_anchor'):
-                rc.anchorTo(ca)
-
-            list(d.rchildren)  # XXX actual pull happens here
-
-
-        Parallel(n_jobs=12)(delayed(asdf)(self.anchor, d)
-                            for d in datasets
-                            # FIXME skip should be materialized in xattrs as well
-                            if d.id not in skip)
+        self.project_path.pull(
+            time_now=self._time_now,
+            debug=self.options.debug,
+            n_jobs=12,
+            log_level='DEBUG' if self.options.verbose else 'INFO',
+            Parallel=Parallel,
+            delayed=delayed,)
 
     def _total_package_counts(self):
         from sparcur.datasources import BlackfynnDatasetData
@@ -768,6 +756,17 @@ class Main(Dispatcher):
         # XXX and in point of fact, we can just swap them out entirely in the curation
         # workflow because all the data files are cached in .operations/objects
 
+        from joblib import Parallel, delayed
+        self.cwd.pull(
+            time_now=self._time_now,
+            debug=self.options.debug,
+            n_jobs=12,
+            log_level='DEBUG' if self.options.verbose else 'INFO',
+            Parallel=Parallel,
+            delayed=delayed,)
+        return
+
+    def _pull_older(self):  # XXX remove
         if self.cwd.cache.is_dataset():
             # FIXME dataset/org differences should be handled in the CachePath NOT here
 
@@ -776,35 +775,34 @@ class Main(Dispatcher):
             if list(self.cwd.children):
                 # instantiate a temporary cache
                 ldd = self.anchor.local_data_dir
-                contain_new = ldd / 'temp-new'
-                contain_new.mkdir(exist_ok=True)
-                #contain_old = ldd / 'temp-old'
-                #contain_old.mkdir(exist_ok=True)
+                contain_stage = ldd / 'temp-stage'
+                contain_stage.mkdir(exist_ok=True)
 
-                old = self.cwd
-
-                new = contain_new / old.name
-                new.mkdir()
-                new.setxattrs(old.xattrs())
+                working = self.cwd
+                stage = contain_stage / working.name
+                stage.mkdir()
+                stage.setxattrs(working.xattrs())
                 # FIXME error handling
-                new_c_children = list(new.cache.rchildren)
-                new_children = [c.local.relative_to(new) for c in new_c_children]
-                old_children = [c.relative_to(old) for c in old.rchildren]
+                stage_c_children = list(stage.cache.rchildren)
+                stage_children = [c.local.relative_to(stage)
+                                  for c in stage_c_children]
+                working_children = [c.relative_to(working)
+                                    for c in working.rchildren]
                 # FIXME TODO comparison/diff and support for non-curation workflows
-                new.swap_carefree(old)
+                stage.swap_carefree(working)
 
-                new_now_old = new
+                stage_now_old = stage
 
                 # neither of these cleanup approaches is remotely desireable
                 suf = f'-{self._time_now.START_TIMESTAMP_LOCAL_SAFE}'
-                new_now_old.rename(new_now_old.parent / (new_now_old.name + suf))  # FIXME
-                #new_now_old.cache.crumple()  # FIXME bad bad bad
+                stage_now_old.rename(stage_now_old.parent / (stage_now_old.name + suf))  # FIXME
 
             else:
                 list(self.cwd.cache.rchildren)
 
             return
 
+    def _pull_oldest(self):  # XXX remove
         # TODO folder meta -> org
         from pyontutils.utils import Async, deferred
         only = tuple()

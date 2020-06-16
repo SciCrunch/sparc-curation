@@ -1,3 +1,4 @@
+import logging
 import hashlib
 import pathlib
 from functools import wraps
@@ -306,6 +307,93 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                     self.readlink().parts[1])
         except OSError as e:
             raise exc.NoCachedMetadataError(self) from e
+
+    def pull(self, *args,
+             time_now=None,
+             debug=False,
+             n_jobs=12,
+             cache_anchor=None,
+             log_name=None,
+             log_level='INFO',
+             # pass the paralle in at run time if needed
+             Parallel=None,
+             delayed=None,
+             _in_parallel=False,):
+        # TODO usage errors
+
+        if _in_parallel:
+            _log = logging.getLogger(log_name)
+            _log.setLevel(log_level)
+            rc = self._remote_class
+            if not hasattr(rc, '_cache_anchor'):
+                rc.anchorTo(cache_anchor)
+
+        else:
+            _log = log
+
+        cache = self.cache
+
+        if cache.is_organization():
+            if debug or Parallel is None:
+                for child in self.children:
+                    child.pull()
+            else:
+                Parallel(n_jobs=n_jobs)(
+                    delayed(child.pull)(_in_parallel=True,
+                                        time_now=time_now,
+                                        cache_anchor=cache.anchor,
+                                        log_name=_log.name,
+                                        log_level=log_level,)
+                    for child in self.children)
+
+        elif cache.is_dataset():
+            self._pull_dataset(time_now)  # XXX actual pull happens in here
+
+        else:
+            raise NotImplementedError(self)
+
+    def _pull_dataset(self, time_now):
+        cache = self.cache
+        if cache.is_organization():
+            raise TypeError('can\' use this method on organizations')
+        elif not cache.is_dataset():
+            return self.dataset._pull_dataset()
+
+        children = list(self.children)
+        if not children:
+            return list(self.cache.rchildren)
+
+        # instantiate a temporary staging area for pull
+        ldd = cache.local_data_dir
+        contain_upstream = ldd / 'temp-upstream'
+        contain_upstream.mkdir(exist_ok=True)
+
+        # create the new directory with the xattrs needed to pull
+        working = self
+        upstream = contain_upstream / working.name
+        upstream.mkdir()
+        upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
+
+        # FIXME TODO error handling
+
+        # pull and prep for comparison of relative paths
+        upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
+        upstream_children = [c.local.relative_to(upstream)
+                            for c in upstream_c_children]
+        working_children = [c.relative_to(working)
+                            for c in working.rchildren]
+
+        # FIXME TODO comparison/diff and support for non-curation workflows
+
+        # replace the working tree with the upstream ca
+        upstream.swap_carefree(working)
+
+        upstream_now_old = upstream
+
+        # neither of these cleanup approaches is remotely desireable
+        suf = f'-{time_now.START_TIMESTAMP_LOCAL_SAFE}'
+        upstream_now_old.rename(upstream_now_old.parent /
+                                (upstream_now_old.name + suf))  # FIXME
 
     def updated_cache_transitive(self):
         """ fast get the date for the most recently updated cached path """
