@@ -618,6 +618,7 @@ curl \
 git \
 htop \
 hunspell \
+libmagic \
 pandoc \
 postgres \
 python \
