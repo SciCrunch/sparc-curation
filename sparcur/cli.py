@@ -82,7 +82,8 @@ Commands:
 
                 options: --latest   run derived pipelines from latest json
                        : --partial  run derived pipelines from the latest partial json export
-                       : --open     open the output file using xopen
+                       : --open=P   open the output file with specified command
+                       : --show     open the output file using xopen
                        : --mbf      extract and export mbf embedded metadata
 
     report      generate reports
@@ -183,7 +184,8 @@ Options:
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
 
-    -O --open               open the output file
+    -O --open=PROGRAM       open the output file with program
+    -w --show               open the output file
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
     -D --diff               diff local vs cache
@@ -299,7 +301,9 @@ class Dispatcher(clif.Dispatcher):
                               self._timestamp,
                               self.options.latest,
                               self.options.partial,
-                              self.options.open,
+                              (self.options.open
+                               if self.options.open else
+                               self.options.show),
                               org_id)
         return export
 
@@ -1361,17 +1365,17 @@ done"""
             org_id = self.options.project_id if self.options.project_id else auth.get('blackfynn-organization')
             export = self._export(ex.Export, org_id=org_id)
             if self.options.json:
-                export.latest_export_path.xopen()
+                export.latest_export_path.xopen(self.options.open)
             elif self.options.ttl:
-                export.latest_ttl_path.xopen()
+                export.latest_ttl_path.xopen(self.options.open)
 
         elif self.options.schemas:
             print(self.options.export_schemas_path)
-            self.options.export_schemas_path.xopen()  # NOTE it is a folder
+            self.options.export_schemas_path.xopen(self.options.open)  # NOTE it is a folder
 
         elif self.options.rmeta:
             from sparcur import datasources as ds
-            Path(ds.BlackfynnDatasetData.cache_base).xopen()
+            Path(ds.BlackfynnDatasetData.cache_base).xopen(self.options.open)
 
     def sheets(self):
         from pyontutils import sheets as ps
@@ -1458,6 +1462,8 @@ class Shell(Dispatcher):
         from sparcur import sheets
         wev = sheets.WorkingExecVerb()
         wev.condense()
+        organs = sheets.Organs(readonly=True)
+        breakpoint()
 
     def default(self):
         datasets = list(self.datasets)

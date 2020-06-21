@@ -356,10 +356,17 @@ def JFixKeys(obj):
         return obj
 
 
-def JApplyRecursive(function, obj, *args, condense=False, skip_keys=('errors',), path=None, **kwargs):
+def JApplyRecursive(function, obj, *args,
+                    condense=False,
+                    skip_keys=tuple(),
+                    preserve_keys=tuple(),
+                    path=None,
+                    **kwargs):
     """ *args, **kwargs, and path= are passed to the function """
     def testx(v):
-        return v is not None and not (not v and (is_list_or_tuple(v) or isinstance(v, dict)))
+        return (v is not None and
+                not (not v and
+                     (is_list_or_tuple(v) or isinstance(v, dict))))
 
     if path is None:
         path = []
@@ -368,8 +375,10 @@ def JApplyRecursive(function, obj, *args, condense=False, skip_keys=('errors',),
         out = {k: JApplyRecursive(function, v, *args,
                                   condense=condense,
                                   skip_keys=skip_keys,
+                                  preserve_keys=preserve_keys,
                                   path=path + [k],
                                   **kwargs)
+               if k not in preserve_keys else v
                for k, v in obj.items() if k not in skip_keys}
 
         if condense:
@@ -381,6 +390,7 @@ def JApplyRecursive(function, obj, *args, condense=False, skip_keys=('errors',),
         out = [JApplyRecursive(function, v, *args,
                                condense=condense,
                                skip_keys=skip_keys,
+                               preserve_keys=preserve_keys,
                                path=path + [i],
                                **kwargs)
                for i, v in enumerate(obj)]

@@ -21,9 +21,23 @@ from sparcur.config import auth
 
 def export_schemas(export_schemas_path):
     schemas = (sc.DatasetDescriptionSchema,
+               sc.DatasetDescriptionExportSchema,
+
+               sc.ContributorsSchema,
+               sc.ContributorsExportSchema,
+
                sc.SubjectsSchema,
+               sc.SubjectsExportSchema,
+
                sc.SamplesFileSchema,
-               sc.SubmissionSchema,)
+               sc.SamplesFileExportSchema,
+
+               sc.SubmissionSchema,
+
+               sc.DatasetOutSchema,
+               sc.DatasetOutExportSchema,
+
+               )
 
     if not export_schemas_path.exists():
         export_schemas_path.mkdir()
@@ -303,7 +317,7 @@ class Export(ExportBase):
                 loge.info(f'dataset graph exported to {out}')
 
             if self.open_when_done:
-                out.xopen()
+                out.xopen(self.open_when_done)
 
         symlink_latest(dump_path, latest_path)
         return blob_data, intr

@@ -75,7 +75,7 @@ class ContributorsPipeline(DatasourcePipeline):
     
     @property
     def data(self):
-        for contributor in self.contributors:
+        for contributor in self.contributors['@graph']:
             self._process(contributor)
 
     def _process(self, contributor):
@@ -630,7 +630,7 @@ class SPARCBIDSPipeline(JSONPipeline):
          ['samples_file']],
     ]
 
-    copies = ([['dataset_description_file', 'contributors'], ['contributors']],
+    copies = ([['dataset_description_file', 'contributors'], ['contributors', '@graph']],
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
@@ -661,10 +661,10 @@ class SPARCBIDSPipeline(JSONPipeline):
               ))
 
     moves = ([['dataset_description_file',], ['inputs', 'dataset_description_file']],
-             [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
+             [['subjects_file', 'software'], ['resources', '@graph']],  # FIXME update vs replace
              #[['subjects'], ['subjects_file']],  # first step in ending the confusion
-             [['subjects_file', 'subjects'], ['subjects']],
-             [['samples_file', 'samples'], ['samples']],
+             [['subjects_file', 'subjects'], ['subjects', '@graph']],
+             [['samples_file', 'samples'], ['samples', '@graph']],
     )
 
     cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
@@ -674,34 +674,34 @@ class SPARCBIDSPipeline(JSONPipeline):
                 DT.BOX(De.award_number),
                 [['meta', 'award_number']]],
 
-               [[['contributors']],
+               [[['contributors', '@graph']],
                 (lambda cs: [DT.derive(c, [[[['contributor_name']],  # FIXME [['name]] as missing a nesting level
                                            De.contributor_name,  # and we got no warning ... :/
                                            [['first_name'], ['last_name']]]])
                             for c in cs]),
                 []],
 
-               [[['contributors']],
+               [[['contributors', '@graph']],
                 DT.BOX(De.pi),  # ah lambda and commas ...
                 [['meta', 'principal_investigator']]],
 
-               [[['contributors']],
+               [[['contributors', '@graph']],
                 DT.BOX(De.creators),
                 [['creators']]],
 
-               [[['contributors']],
+               [[['contributors', '@graph']],
                 DT.BOX(len),
                 [['meta', 'contributor_count']]],
 
-               [[['subjects']],
+               [[['subjects', '@graph']],
                 DT.BOX(De.dataset_species),
                 [['meta', 'species']]],
 
-               [[['subjects']],
+               [[['subjects', '@graph']],
                 DT.BOX(len),
                 [['meta', 'subject_count']]],
 
-               [[['samples']],
+               [[['samples', '@graph']],
                 DT.BOX(len),
                 [['meta', 'sample_count']]],
     )
@@ -1161,7 +1161,10 @@ class IrToExportJsonPipeline(JSONPipeline):
     def augmented(self):
         data_in = self.blob_ir
         # XXX NOTE JApplyRecursive is actually functional
-        data = JApplyRecursive(json_identifier_expansion, data_in)
+        data = JApplyRecursive(json_identifier_expansion,
+                               data_in,
+                               skip_keys=('errors',),
+                               preserve_keys=('inputs', 'id'))
         return data
 
     @hasSchema(sc.DatasetOutExportSchema)
