@@ -773,6 +773,56 @@ class Report:
         annos = self._annos()
         return [protc(a, annos) for a in annos]
 
+    def _protc_input(self, hrmd, tags, protc, ext):
+        from pysercomb import exceptions as pexc
+        from pysercomb.parsers import racket
+        import pysercomb.pyr.units as pyru
+        pyru.Hyp.bindImpl(None, HypothesisAnno=protc.byId)
+        protcur_interpreter = pyru.Protc()
+        def more(k, v):  # FIXME these can actually be parsed in parallel
+            count = len(v)
+            link = v[0].shareLink if count == 1 else ''
+            facet = 'TODO'
+            autos = set()
+            for protc_helper in v:
+                ok, expr, rest = racket.exp(repr(protc_helper))
+                #log.critical(v)  # FIXME this induces an infinite loop I think due to a missing child
+                #log.critical(expr)
+                if expr is None or isinstance(expr, str):
+                    continue
+                try:
+                    hrm = protcur_interpreter(expr)
+                except pexc.ParseFailure as e:
+                    log.error(e)
+                    continue
+
+                if isinstance(hrm.black_box, pyru.Term):
+                    autos.add(hrm.black_box)
+
+                continue
+                #ok, expr, rest = racket.exp(hrmd.astValue)
+                if isinstance(expr, tuple):
+                    autos.append(protcur_interpreter(expr))
+                elif isinstance(expr, str):
+                    autos.append(expr)
+
+            #breakpoint()
+            auto_mapping = ';'.join([f'{bb.curie}|{bb.label}' for bb in autos])
+            return count, link, facet, auto_mapping
+
+        header = [['tag', 'value', 'text', 'exact', 'count', 'link', 'facet', 'auto-mapping']]
+        #rows = [[(*k, ' '.join([a.shareLink for a in v]))] for k, v in sorted(hrm.items())]
+        rows = [[*k, *more(k, v)]
+                for k, v in sorted(list(hrmd.items()))]
+
+        if self.options.sort_count_desc:
+            rows = sorted(rows, key=lambda r: -r[-3])
+
+        return self._print_table(header + rows,
+                                 title=f'Annos for {" ".join(tags)}',
+                                 ext=ext)
+
+
     def _process_protc(self, tags, matches, ext):
         from protcur.analysis import protc
         from pysercomb.pyr import units as pyru
@@ -850,6 +900,9 @@ class Report:
                     nk = value_to_key[v]
                     hrmd[nk].extend(hrmd.pop(k))
 
+        if 'protc:input' in tags:
+            return self._protc_input(hrmd, tags, protc, ext)
+
         def more(k, v):
             count = len(v)
             link = v[0].shareLink if count == 1 else ''
@@ -860,6 +913,7 @@ class Report:
         #rows = [[(*k, ' '.join([a.shareLink for a in v]))] for k, v in sorted(hrm.items())]
         rows = [[*k, *more(k, v)]
                 for k, v in sorted(hrmd.items())]
+
         if self.options.sort_count_desc:
             rows = sorted(rows, key=lambda r: -r[-3])
 
