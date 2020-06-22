@@ -20,6 +20,7 @@ from sparcur.config import auth
 
 
 def export_schemas(export_schemas_path):
+    sc.ToExport('master')
     schemas = (sc.DatasetDescriptionSchema,
                sc.DatasetDescriptionExportSchema,
 
@@ -37,6 +38,7 @@ def export_schemas(export_schemas_path):
                sc.DatasetOutSchema,
                sc.DatasetOutExportSchema,
 
+               sc.ToExport,
                )
 
     if not export_schemas_path.exists():
@@ -289,11 +291,18 @@ class Export(ExportBase):
         blob_data = intr.data_for_export(self.timestamp)  # build and cache the data
         epipe = pipes.IrToExportJsonPipeline(blob_data)
         blob_export = epipe.data
+        blob_jsonld = self._dataset_export_jsonld(blob_export)
 
         # always dump the json
         j = lambda f: json.dump(blob_export, f, sort_keys=True, indent=2, cls=JEncode)
         functions.append(j)
         suffixes.append('.json')
+        modes.append('wt')
+
+        # always dump the jsonld
+        j = lambda f: json.dump(blob_jsonld, f, sort_keys=True, indent=2, cls=JEncode)
+        functions.append(j)
+        suffixes.append('.jsonld')
         modes.append('wt')
 
         # always dump the ttl (for single datasets this is probably ok)
@@ -312,6 +321,9 @@ class Export(ExportBase):
 
             if suffix == '.json':
                 symlink_latest(dump_path, latest_partial_path)
+
+            elif suffix == '.jsonld':
+                loge.info(f'dataset graph exported to {out}')
 
             elif suffix == '.ttl':
                 loge.info(f'dataset graph exported to {out}')
@@ -507,6 +519,22 @@ class Export(ExportBase):
             export_ir['datasets'].append(pipe.data)
 
         return export_ir
+
+    def export_jsonld(self, blob):
+        """ works on ir or export """
+
+        datasets = blob['datasets']
+        blob_jsonld = {k:v for k, v in blob.items() if k != 'datasets'}
+        blob_jsonld['datasets'] = []
+        for blob_dataset in datasets:
+            blob_dataset_jsonld = self._dataset_export_jsonld(blob_dataset)
+            blob_jsonld['datasets'].append(blob_dataset_jsonld)
+
+        return blob_jsonld
+
+    def _dataset_export_jsonld(self, blob_dataset):
+        pipe = pipes.ToJsonLdPipeline(blob_dataset)
+        return pipe.data
 
     def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
         summary, previous_latest, previous_latest_datasets = rest

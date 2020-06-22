@@ -1,3 +1,4 @@
+import copy
 import json
 from pathlib import Path
 from collections import deque
@@ -75,7 +76,7 @@ class ContributorsPipeline(DatasourcePipeline):
     
     @property
     def data(self):
-        for contributor in self.contributors['@graph']:
+        for contributor in self.contributors:
             self._process(contributor)
 
     def _process(self, contributor):
@@ -630,7 +631,7 @@ class SPARCBIDSPipeline(JSONPipeline):
          ['samples_file']],
     ]
 
-    copies = ([['dataset_description_file', 'contributors'], ['contributors', '@graph']],
+    copies = ([['dataset_description_file', 'contributors'], ['contributors']],
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
@@ -661,10 +662,10 @@ class SPARCBIDSPipeline(JSONPipeline):
               ))
 
     moves = ([['dataset_description_file',], ['inputs', 'dataset_description_file']],
-             [['subjects_file', 'software'], ['resources', '@graph']],  # FIXME update vs replace
+             [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
              #[['subjects'], ['subjects_file']],  # first step in ending the confusion
-             [['subjects_file', 'subjects'], ['subjects', '@graph']],
-             [['samples_file', 'samples'], ['samples', '@graph']],
+             [['subjects_file', 'subjects'], ['subjects']],
+             [['samples_file', 'samples'], ['samples']],
     )
 
     cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
@@ -674,34 +675,34 @@ class SPARCBIDSPipeline(JSONPipeline):
                 DT.BOX(De.award_number),
                 [['meta', 'award_number']]],
 
-               [[['contributors', '@graph']],
+               [[['contributors']],
                 (lambda cs: [DT.derive(c, [[[['contributor_name']],  # FIXME [['name]] as missing a nesting level
                                            De.contributor_name,  # and we got no warning ... :/
                                            [['first_name'], ['last_name']]]])
                             for c in cs]),
                 []],
 
-               [[['contributors', '@graph']],
+               [[['contributors']],
                 DT.BOX(De.pi),  # ah lambda and commas ...
                 [['meta', 'principal_investigator']]],
 
-               [[['contributors', '@graph']],
+               [[['contributors']],
                 DT.BOX(De.creators),
                 [['creators']]],
 
-               [[['contributors', '@graph']],
+               [[['contributors']],
                 DT.BOX(len),
                 [['meta', 'contributor_count']]],
 
-               [[['subjects', '@graph']],
+               [[['subjects']],
                 DT.BOX(De.dataset_species),
                 [['meta', 'species']]],
 
-               [[['subjects', '@graph']],
+               [[['subjects']],
                 DT.BOX(len),
                 [['meta', 'subject_count']]],
 
-               [[['samples', '@graph']],
+               [[['samples']],
                 DT.BOX(len),
                 [['meta', 'sample_count']]],
     )
@@ -1168,6 +1169,86 @@ class IrToExportJsonPipeline(JSONPipeline):
         return data
 
     @hasSchema(sc.DatasetOutExportSchema)
+    def data(self):
+        return super().data
+
+
+class ToJsonLdPipeline(JSONPipeline):
+    moves = (
+        [['contributors'], ['contributors', '@graph']],
+        [['subjects'], ['subjects', '@graph']],
+        [['samples'], ['samples', '@graph']],
+        [['resources'], ['resources', '@graph']],
+             )
+
+    updates = (
+        [['id'], lambda v: 'dataset:' + v.rsplit(':', 1)[-1] + '/#dataset-graph'],
+    )
+
+    adds = (
+        [['@context'], lambda lifters: sc.base_context],
+        [['meta', '@context'], lambda lifters: sc.MetaOutExportSchema.context()[0]],
+        [['contributors', '@context'], lambda lifters: sc.ContributorExportSchema.context()[0]],
+        [['subjects', '@context'], lambda lifters: sc.SubjectsExportSchema.context()[0]],
+        [['samples', '@context'], lambda lifters: sc.SamplesFileExportSchema.context()[0]],
+        #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()[0]]
+        # TODO add @type owl:NamedIndividual to all these somehow ...
+    )
+
+    derives_after_adds = (
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/'),
+         [['@context', '@base']]],
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: {'@id': uri_api + '/', '@prefix': True}),
+         [['@context', '_bfc']]],
+
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#subjects-graph'),
+         [['subjects', '@id']]],
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/subjects/'}}),
+         [['subjects', '@context', 'subject_id']]],
+
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#samples-graph'),
+         [['samples', '@id']]],
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/samples/'}}),
+         [['samples', '@context', 'primary_key']]],
+
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#contributors-graph'),
+         [['contributors', '@id']]],
+    )
+
+    def __init__(self, blob):
+        self.blob = blob
+        self.runtime_context = self
+        self.lifters = self
+
+    @property
+    def pipeline_start(self):
+        return copy.deepcopy(self.blob)
+
+    @property
+    def added(self):
+        # a hack to avoid need to rewirte the other stuff
+        return self.augmented_after_added
+
+    @property
+    def augmented_after_added(self):
+        data = super().added
+        DictTransformer.derive(data, self.derives_after_adds, source_key_optional=True)
+        return data
+
+    @property
     def data(self):
         return super().data
 

@@ -576,8 +576,8 @@ def JT(blob):
         return j
 
     # additional thought required for how to integrate these into this
-    # shameling abomination
-    #adopts
+    # shambling abomination
+    #adops
     #dt = DictTransformer
 
     #cd = {k:v for k, v in _populate(blob, True)}
@@ -806,7 +806,7 @@ class _DictTransformer:
         for path, function in updates:
             value = adops.get(data, path)
             new = function(value)
-            adopts.update(data, path, new)
+            adops.update(data, path, new)
 
     @staticmethod
     def get(data, gets, source_key_optional=False):
@@ -1104,6 +1104,9 @@ def get_all_errors(_with_errors):
 
 class JPointer(str):
     """ a class to mark json pointers for resolution """
+
+    def asList(self):
+        return self.split('/')
 
 
 # register idlib classes for fromJson

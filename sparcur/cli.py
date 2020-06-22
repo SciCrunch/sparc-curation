@@ -284,6 +284,11 @@ class Options(clif.Options):
         # deal with the fact that both mbf and --mbf are present
         return self._args['--mbf'] or self._default_mbf
 
+    @property
+    def show(self):
+        # deal with the fact that both show and --show are present
+        return self._args['--show'] or self._default_show
+
 
 class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
