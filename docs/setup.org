@@ -1499,6 +1499,7 @@ popd
 #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
 #+HEADER: :var PYROOTS=py-roots
 #+BEGIN_SRC bash :results output :eval no-export
+[ -z $VIRTUAL_ENV ] || pip install --user wheel  # if in a venv wheel will be missing
 pushd ~/git
 for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
 popd
