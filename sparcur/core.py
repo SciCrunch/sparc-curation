@@ -328,6 +328,9 @@ def json_export_type_converter(obj):
             #return obj.asDict()  # FIXME need a no network/scigraph version
     elif isinstance(obj, datetime):
         return isoformat(obj)
+    elif isinstance(obj, BaseException):
+        # FIXME hunt down where these are sneeking in from
+        return repr(obj)
 
 
 class JEncode(json.JSONEncoder):
@@ -338,6 +341,8 @@ class JEncode(json.JSONEncoder):
             return new_obj
         #else:
             #log.critical(f'{type(obj)} -> {obj}')
+        #if isinstance(obj, ValueError):
+            #breakpoint()
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)

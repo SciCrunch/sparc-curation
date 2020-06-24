@@ -1068,6 +1068,7 @@ class PipelineEnd(JSONPipeline):
 
 
         'SubmissionFile',
+        'RawJsonSubmission.data',
 
         'SubmissionFilePipeline._transformer',
         'SubmissionFilePipeline.transformer',
@@ -1088,6 +1089,7 @@ class PipelineEnd(JSONPipeline):
         'DatasetDescriptionFilePipeline.transformer',
         'DatasetDescriptionFilePipeline.data',
 
+        'ContributorsPipeline.data',
 
         'SubjectsFile',
         'RawJsonSubjects.data',
@@ -1153,8 +1155,10 @@ class PipelineEnd(JSONPipeline):
         path_errors = get_all_errors(data)
         (compacted, path_error_report, by_invariant_path,
          errors) = compact_errors(path_errors)
+        unclassified_stages = []
         submission_errors = []
         curation_errors = []
+        unclassified_errors = []
         for error in reversed(errors):
             if error in submission_errors or error in curation_errors:
                 #log.debug('error detected multiple times not counting '
@@ -1198,18 +1202,24 @@ class PipelineEnd(JSONPipeline):
                     curation_errors.append(error)
             else:
                 if blame not in ('pipeline', 'submission', 'debug'):
-                    raise ValueError(f'Unhandled stage {stage}\n{message}')
+                    unclassified_errors.append(error)
+                    unclassified_stages.append(blame)
+                    #raise ValueError(f'Unhandled stage {stage}\n{message}')
 
         si = len(submission_errors)
         ci = len(curation_errors)
+        ui = len(unclassified_errors)
         if 'status' not in data:
             data['status'] = {}
 
         data['status']['submission_index'] = si
         data['status']['curation_index'] = ci
-        data['status']['error_index'] = si + ci
+        data['status']['unclassified_index'] = ui
+        data['status']['error_index'] = si + ci + ui
         data['status']['submission_errors'] = submission_errors
         data['status']['curation_errors'] = curation_errors
+        data['status']['unclassified_errors'] = unclassified_errors
+        data['status']['unclassified_stages'] = unclassified_stages
         data['status']['path_error_report'] = path_error_report
 
         return si + ci
