@@ -375,7 +375,6 @@ class JSONSchema(object):
         except exc.ValidationError as e:
             return False, e, data  # FIXME better format
 
-
     @classmethod
     def context(cls):
         """ return a json-ld context by extracting annotations from nested schemas
