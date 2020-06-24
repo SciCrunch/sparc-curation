@@ -5,7 +5,7 @@ import itertools
 from pathlib import PurePath
 from datetime import datetime
 from functools import wraps
-from collections import deque
+from collections import deque, defaultdict
 import idlib
 import rdflib
 import htmlfn as hfn
@@ -31,7 +31,7 @@ __type_registry = {None: None}
 def register_type(cls, type_name):
     if type_name in __type_registry:
         raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
-                         f'{type_name} -> {__type_registry["type_name"]}')
+                         f'{type_name} -> {__type_registry[type_name]}')
 
     __type_registry[type_name] = cls
 
@@ -1023,6 +1023,9 @@ class _DictTransformer:
                     function(data, target_path, p.data)
                 except BaseException as e:
                     import inspect
+                    if isinstance(pc, object):
+                        pi, pc = pc, pc.__class__
+
                     __file = inspect.getsourcefile(pc)
                     __line = inspect.getsourcelines(pc)[-1]
                     if hasattr(p, 'path'):
@@ -1087,12 +1090,22 @@ def normalize_tabular_format(project_path):
                 log.warning(f'Sheet weirdness in {xf}\n{e}')
 
 
-def extract_errors(dict_):
-    for k, v in dict_.items():
-        if k == 'errors':
-            yield from v
-        elif isinstance(v, dict):
-            yield from extract_errors(v)
+def extract_errors(thing, path=None):
+    """ recursively extract errors """
+    if path is None:
+        path = []
+
+    if isinstance(thing, dict):
+        for k, v in thing.items():
+            if k == 'errors':
+                for error in v:
+                    yield tuple(path), error
+            else:
+                yield from extract_errors(v, path + [k])
+
+    elif isinstance(thing, list):
+        for i, v in enumerate(thing):
+            yield from extract_errors(v, path + [i])
 
 
 def get_all_errors(_with_errors):
@@ -1102,9 +1115,115 @@ def get_all_errors(_with_errors):
     return list(extract_errors(_with_errors))
 
 
+def get_by_invariant_path(errors):
+    dd = defaultdict(list)
+    for e in errors:
+        k = tuple(int if isinstance(element, int)
+                  else element for element in e['path'])
+        dd[k].append(e)
+
+    by_invariant_path = dict(dd)
+    return by_invariant_path
+
+
+def make_path_error_report(by_invariant_path):
+    # FIXME to obtain the full final path you have to know where
+    # if anywhere the schema being validated is located in the output
+    path_error_report = {JPointer.fromList(['-1' if e is int else str(e)
+                                            # -1 to indicate all instead of *
+                                            for e in k]):
+                         {'error_count': len(v),
+                          'messages': sorted(set(e['message'] for e in v))}
+                         for k, v in by_invariant_path.items()}
+    return path_error_report
+
+
+def hashable_converter(v):
+    try:
+        hash(v)
+        return v
+    except TypeError as e:
+        if isinstance(v, dict):
+            return frozenset((k, hashable_converter(v)) for k, v in v.items())
+        else:
+            # HACK will fail on non iterables
+            return tuple(hashable_converter(v) for v in v)
+
+
+def condense_over_stage(errors):
+    """ condense shadoweded errors into their caster """
+    dd = defaultdict(list)
+    for error in errors:
+        #log.critical(error)
+        new_error = {k:hashable_converter(v) for k, v in error.items()}
+        copy.deepcopy(error)
+        new_error.pop('pipeline_stage', None)
+        if 'schema_path' in new_error:  # XXX non json schema errors
+            sp = new_error['schema_path']
+            if 'inputs' in sp:
+                # account for the fact that inputs are checked twice right now
+                index = sp.index('inputs')
+                new_error['schema_path'] = sp[index + 3:]
+                # FIXME somehow the path and schema_path get misaligned
+
+        dd[hashable_converter(new_error.items())].append(error)
+
+    merged = dict(dd)
+    compacted = []
+    for frozen_new_error, these_errors in merged.items():
+        if len(these_errors) > 1:
+            stages = [e['pipeline_stage'] for e in these_errors]
+            error = copy.deepcopy(these_errors[0])
+            error['pipeline_stage'] = stages
+            error['total_stage_errors'] = len(these_errors)
+            compacted.append(error)
+        else:
+            compacted.extend(these_errors)
+
+    return compacted, merged  # for maximum confusion
+
+
+def merge_error_paths(path_errors):
+    for path, error in path_errors:
+        #log.critical((path, error))
+        error = copy.deepcopy(error)
+        oldpath = list(error['path']) if 'path' in error else []  # XXX non json schema errors
+        error['path'] = list(path) + oldpath
+        yield error
+
+
+def compact_errors(path_errors):
+    """ compact repeated errors in lists by lifting the list index
+        to the int type, making it constaint over all indexes and
+        making it possible to identify paths with the same structure """
+
+    errors = list(merge_error_paths(path_errors))
+    condensed, merged = condense_over_stage(errors)
+    by_invariant_path = get_by_invariant_path(condensed)
+    path_error_report = make_path_error_report(by_invariant_path)
+
+    compacted = []
+    for ipath, these_errors in by_invariant_path.items():
+        if int in ipath:
+            index = ipath.index(int)
+            ints = sorted(set(e['path'][index] for e in these_errors))
+            error = copy.deepcopy(these_errors[0])
+            error['path'][index] = ints
+            error['total_errors'] = len(these_errors)
+            compacted.append(error)
+        else:
+            compacted.extend(these_errors)
+
+    return compacted, path_error_report, by_invariant_path, errors
+
+
 class JPointer(str):
     """ a class to mark json pointers for resolution """
 
+    @classmethod
+    def fromList(cls, iterable):
+        return cls('#/' + '/'.join(iterable))
+        
     def asList(self):
         return self.split('/')
 

@@ -576,8 +576,8 @@ class Main(Dispatcher):
 
     @property
     def directories(self):
-        return [Path(string_dir).absolute()
-                for string_dir in self.options.directory]
+        return [Path(string_path).absolute()
+                for string_path in self.options.directory]
 
     @property
     def paths(self):
@@ -753,13 +753,16 @@ class Main(Dispatcher):
         # FIXME this still isn't quite right because it does not correctly
         # deal dataset renaming, but it is much closer
         from joblib import Parallel, delayed
-        self.cwd.pull(
-            time_now=self._time_now,
-            debug=self.options.debug,
-            n_jobs=12,
-            log_level='DEBUG' if self.options.verbose else 'INFO',
-            Parallel=Parallel,
-            delayed=delayed,)
+        dirs = self.directories
+        dirs = dirs if dirs else (self.cwd,)
+        for d in dirs:
+            d.pull(
+                time_now=self._time_now,
+                debug=self.options.debug,
+                n_jobs=12,
+                log_level='DEBUG' if self.options.verbose else 'INFO',
+                Parallel=Parallel,
+                delayed=delayed,)
 
     def refresh(self):
         paths = self.paths
@@ -1032,7 +1035,13 @@ done"""
         dat.SubmissionFile._refresh_on_missing = False
         dat.SubjectsFile._refresh_on_missing = False
         dat.SamplesFile._refresh_on_missing = False
-        droot = dat.DatasetStructure(self.cwd)
+        directories = self.directories
+        directories = directories if directories else (self.cwd,)
+        for directory in directories:
+            self._tables_dir(directory)
+
+    def _tables_dir(self, directory):
+        droot = dat.DatasetStructure(directory)
         if droot.cache.is_dataset():
             datasetdatas = droot,
         elif droot.cache.is_organization():
@@ -1043,31 +1052,29 @@ done"""
         def do_file(d, ft):
             if hasattr(d, ft):
                 f = getattr(d, ft)
-                if hasattr(f, 'object'):
-                    return (f.object._t())
-                else:
-                    message = f'object missing on {ft} for {d}'
-                    log.warning(message)
-                    return message
+                fs = f if isinstance(f, list) else [f]
+                for f in fs:
+                    if hasattr(f, 'object'):
+                        yield (f.object._t())
+                    else:
+                        message = f'object missing on {ft} for {d}'
+                        log.warning(message)
+                        yield message
 
             else:
-                return f'{ft} missing on {d}'
+                yield f'{ft} missing on {d}'
 
         tables = [t for d in datasetdatas for t in
-                  (do_file(d, 'dataset_description'),
-                   do_file(d, 'submission'),
-                   do_file(d, 'subjects'),
-                   do_file(d, 'samples'),
+                  (*do_file(d, 'dataset_description'),
+                   *do_file(d, 'submission'),
+                   *do_file(d, 'subjects'),
+                   *do_file(d, 'samples'),
+                   *do_file(d, 'manifest'),
                    ('\n--------------------------------------------------\n'
                       '=================================================='
                     '\n--------------------------------------------------\n'))]
 
-        [print(t if isinstance(t, str) else repr(t)) for t in tables]
-        return
-        tabular_view_demo = [next(d.dataset_description).t
-                                for d in self.summary
-                                if 'dataset_description' in d.data]
-        print(repr(tabular_view_demo))
+        [print(t if isinstance(t, str) else repr(t)) for t in tables]  # FIXME _print_tables?
 
     def find(self):
         paths = []
@@ -1478,6 +1485,11 @@ class Shell(Dispatcher):
         ds = datasets
         summary = self.summary
         org = Integrator(self.project_path)
+
+        asdf = []
+        for d in datasets:
+            asdf.append(list(d.children))
+
         breakpoint()
 
     def dates(self):

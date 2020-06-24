@@ -28,6 +28,8 @@ class BlackfynnRemote(aug.RemotePath):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
         # org /datasets/ N:dataset /viewer/ N:package
+        if not self.is_absolute():
+            self = self.resolve()  # relative paths should not have to fail here
 
         id = self.id
         N, type, suffix = id.split(':')
@@ -52,7 +54,7 @@ class BlackfynnRemote(aug.RemotePath):
     def uri_api(self):
         if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
             endpoint = 'datasets/' + self.id
-        elif self.is_organization:
+        elif self.is_organization():
             endpoint = 'organizations/' + self.id
         elif self.file_id is not None:
             endpoint = f'packages/{self.id}/files/{self.file_id}'
@@ -66,6 +68,8 @@ class BlackfynnRemote(aug.RemotePath):
         yield from self._errors
         if self.remote_in_error:
             yield 'remote-error'
+        if self.state == 'UNAVAILABLE':
+            yield 'remote-unavailable'
 
     @property
     def remote_in_error(self):
@@ -299,7 +303,13 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self.bfobject, Organization):
             return ''
         else:
-            raise NotImplementedError('should not be needed anymore when using packages')
+            if self.from_packages or not list(self.errors):
+                # still needed for cache.children when remote data is in error
+                msg = 'should not be needed anymore when using packages'
+                raise NotImplementedError(msg)
+            else:
+                log.warning(f'suffix needed for some reason on {self.uri_api}')
+
             if hasattr(self.bfobject, 'type'):
                 type = self.bfobject.type.lower()  # FIXME ... can we match s3key?
             else:

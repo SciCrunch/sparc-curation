@@ -407,7 +407,8 @@ class ExporterSummarizer:
         for dataset_blob in self:
             yield self._completeness(dataset_blob)
 
-    def _completeness(self, data):
+    @staticmethod
+    def _completeness(data):
         accessor = JT(data)  # can go direct if elements are always present
         #organ = accessor.query('meta', 'organ')
         try:

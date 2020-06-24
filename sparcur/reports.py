@@ -22,6 +22,7 @@ from sparcur.core import (OntId,
 from sparcur.utils import want_prefixes, log as _log
 from sparcur.paths import Path
 from sparcur.config import auth
+from sparcur.curation import ExporterSummarizer
 from sparcur.curation import Integrator, DatasetObject  # FIXME
 
 log = _log.getChild('reports')
@@ -217,6 +218,7 @@ class Report:
 
     def all(self):
         #self.access()  # must be on live data
+        # TODO add a prov report for when this was last run etc.
         self.contributors()
         self.filetypes()
         self.samples()
@@ -228,17 +230,23 @@ class Report:
         #self.test()  # just a test
         #self.errors()  # TODO too much for now
         #self.pathids()  # too big/slow
-        self.mbf()
+        if hasattr(self, 'anchor'):  # FIXME hack
+            # branch used to detect if we have a chance of finding the xml export
+            # xml ir is not exported with all the rest at the moment
+            self.mbf()
+
         self.terms()
         self.mis()
-        for tag in ('protc:input',
-                    'protc:input-instance',
-                    'protc:implied-input',
-                    'protc:aspect',
-                    'protc:implied-aspect',
-                    'protc:executor-verb',
-                    'protc:parameter*',
-                    'protc:invariant',):
+        for tag in (
+                'protc:input',  # this is slower now
+                'protc:input-instance',
+                'protc:implied-input',
+                'protc:aspect',
+                'protc:implied-aspect',
+                'protc:executor-verb',
+                'protc:parameter*',
+                'protc:invariant',
+                'protc:output',):
             # FIXME hack around broken anno_tags impl
             self.anno_tags(tag)
 
@@ -281,12 +289,16 @@ class Report:
         ]
         return self._print_table(rows, title='Access Report', ext=ext)
 
+    _pyru_loaded = False
     def _data_ir(self):
         if self.options.raw:
             data = self.summary.data_for_export(UTCNOWISO())
         elif self.options.export_file:
-            from pysercomb.pyr import units as pyru
-            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            if not self.__class__._pyru_loaded:
+                self.__class__._pyru_loaded = True
+                from pysercomb.pyr import units as pyru
+                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+
             with open(self.options.export_file, 'rt') as f:
                 data = fromJson(json.load(f))
         else:
@@ -477,8 +489,8 @@ class Report:
             raw = self.summary.completeness
         else:
             from sparcur import export as ex
-            datasets = self._export(ex.Export).latest_ir['datasets']
-            raw = [self.summary._completeness(data) for data in datasets]
+            datasets = self._data_ir()['datasets']
+            raw = [ExporterSummarizer._completeness(data) for data in datasets]
 
         def rformat(i, si, ci, ei, name, id, award, organ):
             if self.options.server and isinstance(ext, types.FunctionType):
@@ -800,13 +812,7 @@ class Report:
                     autos.add(hrm.black_box)
 
                 continue
-                #ok, expr, rest = racket.exp(hrmd.astValue)
-                if isinstance(expr, tuple):
-                    autos.append(protcur_interpreter(expr))
-                elif isinstance(expr, str):
-                    autos.append(expr)
 
-            #breakpoint()
             auto_mapping = ';'.join([f'{bb.curie}|{bb.label}' for bb in autos])
             return count, link, facet, auto_mapping
 
@@ -816,12 +822,11 @@ class Report:
                 for k, v in sorted(list(hrmd.items()))]
 
         if self.options.sort_count_desc:
-            rows = sorted(rows, key=lambda r: -r[-3])
+            rows = sorted(rows, key=lambda r: -r[-4])
 
         return self._print_table(header + rows,
                                  title=f'Annos for {" ".join(tags)}',
                                  ext=ext)
-
 
     def _process_protc(self, tags, matches, ext):
         from protcur.analysis import protc
@@ -937,6 +942,7 @@ class Report:
                                    'protc:implied-input',
                                    'protc:parameter*',
                                    'protc:invariant',
+                                   'protc:output',
                                    )
 
         # note that HypothesisHelper.byTags is an AND search not and OR search

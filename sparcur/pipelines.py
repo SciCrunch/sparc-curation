@@ -4,6 +4,7 @@ from pathlib import Path
 from collections import deque
 import idlib
 import rdflib
+from joblib import Parallel, delayed
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
@@ -13,7 +14,7 @@ from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import converters as conv
 from sparcur import exceptions as exc
-from sparcur.core import DictTransformer, copy_all, get_all_errors
+from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
 from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
 from sparcur.state import State
@@ -23,6 +24,51 @@ DT = DictTransformer
 De = Derives
 
 a = rdf.type
+
+
+class MapPathsCombinator:
+
+    # FIXME could be implemented as a subpipeline of a subpipeline ?
+    # not quite sure how to do that though
+
+    def __init__(self, PipelineClass, debug=True, n_jobs=12):
+        # FIXME need to figure out how to pass config variables in
+        self.PipelineClass = PipelineClass
+        self.debug = debug
+        self.n_jobs = n_jobs
+
+    def __call__(self, previous_pipeline, lifters, runtime_context,
+                 # FIXME from runtime context or something?
+                 debug=None, n_jobs=None):
+
+        if debug is not None:
+            self.debug = debug
+
+        if n_jobs is not None:
+            self.n_jobs = n_jobs
+
+        class DataWrapper:
+            def __init__(self, data):
+                self.data = data
+
+        data = previous_pipeline.data
+        sv = data['schema_version'] if 'schema_version' in data else None
+        previous_pipelines = [DataWrapper({'path': p, 'schema_version': sv,})
+                              for p in data['paths']]
+        self.pipes = [self.PipelineClass(previous_pipeline,
+                                         lifters,
+                                         runtime_context)
+                      for previous_pipeline in previous_pipelines]
+
+        return self # hack to mimic __init__
+
+    @property
+    def data(self):
+        if self.debug or self.n_jobs == 1:
+            return [p.data for p in self.pipes]
+        else:
+            return Parallel(n_jobs=self.n_jobs)(delayed(lambda :p.data)()
+                                                for p in self.pipes)
 
 
 class Pipeline:
@@ -285,6 +331,24 @@ class SamplesFilePipeline(PathPipeline):
     data_transformer_class = dat.SamplesFile
 
     @hasSchema(sc.SamplesFileSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class ManifestFilePipeline(PathPipeline):
+
+    data_transformer_class = dat.ManifestFile
+
+    @property
+    def transformed(self):
+        dsr_path = self.path.relative_to(self.path.cache.dataset)
+        data = super().transformed
+        self.path.populateJsonMetadata(data)
+        return data
+
+    @hasSchema(sc.ManifestFileSchema)
     def data(self):
         return super().data
 
@@ -629,6 +693,11 @@ class SPARCBIDSPipeline(JSONPipeline):
           [['dataset_description_file', 'schema_version'], ['schema_version']]],
          SamplesFilePipeline,
          ['samples_file']],
+
+        [[[['manifest_file'], ['paths']],
+          [['dataset_description_file', 'schema_version'], ['schema_version']]],
+         MapPathsCombinator(ManifestFilePipeline),
+         ['manifest_file']],
     ]
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
@@ -820,7 +889,7 @@ class PipelineExtras(JSONPipeline):
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
 
-    filter_failures = (
+    filter_failures = (  # XXX TODO implement this for other pipelines as well ?
         lambda p: ('inputs' not in p and 'contributor_role' in p),
         lambda p: ('inputs' not in p and 'contributor_orcid' in p),
     )
@@ -883,6 +952,7 @@ class PipelineExtras(JSONPipeline):
             if m:
                 data['meta']['modality'] = m
 
+        '''  # XXX delete
         if False and 'organ' not in data['meta']:
             # skip here, now attached directly to award
             if 'award_number' in data['meta']:
@@ -897,6 +967,7 @@ class PipelineExtras(JSONPipeline):
 
                     data['meta']['organ'] = o
 
+        '''
         if 'organ' not in data['meta'] or data['meta']['organ'] == 'othertargets':
             o = self.lifters.organ_term
             if o:
@@ -1036,6 +1107,8 @@ class PipelineEnd(JSONPipeline):
         'SamplesFilePipeline.transformer',
         'SamplesFilePipeline.data',
 
+        'ManifestFilePipeline.transformer',
+        'ManifestFilePipeline.data',
     ]
     _curation = [
         'DatasetStructure.curation-error',
@@ -1077,7 +1150,9 @@ class PipelineEnd(JSONPipeline):
     @classmethod
     def _indexes(cls, data):
         """ compute submission and curation error indexes """
-        errors = get_all_errors(data)
+        path_errors = get_all_errors(data)
+        (compacted, path_error_report, by_invariant_path,
+         errors) = compact_errors(path_errors)
         submission_errors = []
         curation_errors = []
         for error in reversed(errors):
@@ -1135,6 +1210,7 @@ class PipelineEnd(JSONPipeline):
         data['status']['error_index'] = si + ci
         data['status']['submission_errors'] = submission_errors
         data['status']['curation_errors'] = curation_errors
+        data['status']['path_error_report'] = path_error_report
 
         return si + ci
 

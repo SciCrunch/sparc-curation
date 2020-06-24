@@ -744,6 +744,7 @@ mkdir -p /var/www/sparc/sparc/archive/exports/
 chown -R nginx:nginx /var/www/sparc
 #+end_src
 
+#+name: &sparc-export-to-server-function
 #+CAPTION: copy export to server location, run as root
 #+BEGIN_SRC bash :eval never
 # export vs exports, no wonder this is so confusing >_<
@@ -759,6 +760,31 @@ function sparc-export-to-server () {
     echo fill-in-the-url-here
 }
 #+END_SRC
+*** Export and report
+You can't run this directly because the venvs create their own subshell.
+#+begin_src bash :dir "/ssh:cassava-sparc:~/files/test2/SPARC Curation" :eval never
+# git repos are in ~/files/venvs/sparcur-dev/git
+# use the development pull code
+source ~/files/venvs/sparcur-dev/bin/activate
+spc pull
+# switch to the production export pipeline
+source ~/files/venvs/sparcur-1/bin/activate
+spc export
+#+end_src
+
+#+begin_src bash :dir /ssh:cassava|sudo:cassava
+<<&sparc-export-to-server-function>>
+sparc-export-to-server
+#+end_src
+
+#+begin_src bash :eval never
+function fetch-and-run-reports () {
+    local FN="/tmp/curation-export-$(date -Is).json"
+    curl https://cassava.ucsd.edu/sparc/exports/curation-export.json -o "${FN}"
+    spc report all --sort-count-desc --to-sheets --export-file "${FN}"
+}
+fetch-and-run-reports
+#+end_src
 *** Reporting
 :PROPERTIES:
 :VISIBILITY: folded
@@ -934,6 +960,24 @@ find . -type l -not -path '*operations*' -exec readlink -n {} \; -print
 **** Path counts per dataset
 #+begin_src bash
 for d in */; do printf "$(find "${d}" -print | wc -l) "; printf "$(getfattr --only-values -n user.bf.id "${d}") ${d}\n" ; done | sort -n
+#+end_src
+** SODA
+Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
+#+header: :var parent_folder="~/files/blackfynn_local/"
+#+header: :var path="./SPARC Consortium/The effect of gastric stimulation location on circulating blood hormone levels in fasted anesthetized rats/source/pool-r1009"
+#+begin_src python :dir ~/git/SODA/src/pysoda :results drawer output
+from pprint import pprint
+import pysoda
+from sparcur.paths import Path
+p = Path(parent_folder, path).expanduser().resolve()
+children = list(p.iterdir())
+blob = pysoda.create_folder_level_manifest(
+    {p.resolve().name: children},
+    {k.name + '_description': ['some description'] * len(children)
+     for k in [p] + list(p.iterdir())})
+manifest_path = Path(blob[p.name][-1])
+manifest_path.xopen()
+pprint(manifest_path)
 #+end_src
 ** Developer
 See also the [[file:./developer-guide.org][sparcur developer guild]]

@@ -359,9 +359,9 @@ class DatasetStructure(Path):
             #paths = list(getattr(self, section_paths_name))
             glob_type = 'rglob' if section_name in self.rglobs else 'glob'
             paths = list(self._abstracted_paths(section_name, glob_type=glob_type))
-            section_key = section_name + '_file'
+            section_key = section_name + '_file'  # XXX _file is added here
             if paths:
-                if len(paths) == 1:
+                if len(paths) == 1 and section_name != 'manifest':  # FIXME manifest is a hack
                     path, = paths
                     out[section_key] = path
                 else:
@@ -440,8 +440,8 @@ class Tabular(HasErrors):
 
     def xlsx(self):
         kwargs = {
-            'delimiter' : '\t',
-            'skip_empty_lines' : True,
+            'delimiter': '\t',
+            'skip_empty_lines': True,
             'outputencoding': 'utf-8',
             'hyperlinks': True,
         }
@@ -517,7 +517,12 @@ class Tabular(HasErrors):
     def _iter_(self, normalize=False):
         try:
             if normalize:
-                gen = self.normalize(getattr(self, self.file_extension)())
+                try:
+                    fef = getattr(self, self.file_extension)
+                except AttributeError as e:
+                    self._bad_filetype(self.file_extension)
+
+                gen = self.normalize(fef())
             else:
                 gen = getattr(self, self.file_extension)()
 
@@ -887,6 +892,7 @@ class MetadataFile(HasErrors):
         for n, rtk, norm_dict in (('alt_header', self.record_type_key_alt, self.norm_to_orig_alt),
                                   ('header', self.record_type_key_header, self.norm_to_orig_header)):
             if rtk not in norm_dict:
+                #breakpoint()  # XXX TODO enable this on debug
                 msg = (f'Could not find record primary key for {n} in\n"{self.path}"\n\n'
                        f'{rtk}\nnot in\n{list(norm_dict)}')
 
@@ -1137,9 +1143,12 @@ class SamplesFilePath(ObjectPath):
 SamplesFilePath._bind_flavours()
 
 
-class ManifestFile:
-    def __init__(self, path):
-        self.path = path
+class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
+    renames_header = {'filename': 'metadata_element',}
+    record_type_key_alt = 'filename'
+    record_type_key_header = 'metadata_element'
+    groups_alt = {'manifest_records': GROUP_ALL}
+    normalize_header = False
 
 
 class ManifestFilePath(ObjectPath):
@@ -1149,6 +1158,7 @@ class ManifestFilePath(ObjectPath):
 ManifestFilePath._bind_flavours()
 
 
+# XXX NOTE *_file is added to all of these keys in DatasetStructure.data
 DatasetStructure.sections = {'submission': SubmissionFilePath,
                              'dataset_description': DatasetDescriptionFilePath,
                              'subjects': SubjectsFilePath,

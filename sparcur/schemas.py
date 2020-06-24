@@ -21,10 +21,14 @@ from pyontutils.namespaces import TEMP, TEMPRAW, sparc, unit, PREFIXES as uPREFI
 
 
 CONTEXT_ROOT = object()  # used to mark where nested context_value statements should be deposited
+prefix_endswith = ['/', '#', '_', '-', ':', '=',
+                   '/fma', '/sao', 'PTHR', '/chebi#2', '/chebi#3',]
+
 base_context = {
     '@version': 1.1,
     'id': '@id',
     'dataset': {'@id': 'https://api.blackfynn.io/datasets/N:dataset:', '@prefix': True},
+    'package': {'@id': 'https://api.blackfynn.io/packages/N:package:', '@prefix': True},
     # @base and _bfc are added at runtime and are dataset:{dataset-id-suffix}
     'meta': '@graph',
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
@@ -33,7 +37,7 @@ base_context = {
     'contributors': '_bfc:#contributors-graph',
     #'N:dataset': {'@id': 'https://api.blackfynn.io/datasets/'},  # darn it multiprefix issues
     **{p: {'@id': n, '@prefix': True}
-       if [c for c in ['/', '#', '_', ':'] if n.endswith(c)]
+       if [c for c in prefix_endswith if n.endswith(c)]
        else n for p, n in {**uPREFIXES, **OntCuries._dict}.items()
        if p != ''},  # FIXME massive data duplication
     'unit': {'@id': 'TEMP:hasUnit',
@@ -614,41 +618,44 @@ class ProvSchema(JSONSchema):
 
 
 class MbfTracingSchema(JSONSchema):
-    schema = {'type': 'object',
-              'required': ['subject', 'atlas', 'images', 'contours'],
-              'properties': {'subject': {'type': 'object',
-                                         'required': ['id'],
-                                         'properties': {'id': {'type': 'string'},
-                                                        'species': {'type': 'string'},
-                                                        'sex': {'type': 'string'},
-                                                        'age': {'type': 'string'},
-                                         },},
-                             'atlas': {'type': 'object',
-                                       'properties': {'organ': {'type': 'string'},
-                                                      'atlas_label': {'type': 'string'},
-                                                      'atlas_rootid': {'type': 'string'},
+    schema = {
+        'type': 'object',
+        'required': ['subject', 'atlas', 'images', 'contours'],
+        'properties': {
+            'subject': {'type': 'object',
+                        'required': ['id'],
+                        'properties': {'id': {'type': 'string'},
+                                       'species': {'type': 'string'},
+                                       'sex': {'type': 'string'},
+                                       'age': {'type': 'string'},
                                        },},
-                             'images': {'type': 'array',
-                                        'items': {'type': 'object',
-                                                  'properties':
-                                                  {'path_mbf': {'type': 'array',
-                                                                'minItems': 1,
-                                                                'items': {'type': 'string'}},
-                                                   'channels':
-                                                   {'type': 'array',
-                                                    'items': {
-                                                        'type': 'object',
-                                                        'properties': {'id': {'type': 'string'},
-                                                                       'source': {'type': 'string'},
-                                                        },},},},},},
-                             'contours': {'type': 'array',
-                                          'items': {'type': 'object',
-                                                    'properties': {
-                                                        'name': string_noltws,
-                                                        'guid': {'type': 'string'},
-                                                        'id_ontology': {'type': 'string'},},
-
-                                          },},},}
+            'atlas': {'type': 'object',
+                      'properties': {'organ': {'type': 'string'},
+                                     'atlas_label': {'type': 'string'},
+                                     'atlas_rootid': {'type': 'string'},
+                                     },},
+            'images': {'type': 'array',
+                       'items': {'type': 'object',
+                                 'properties':
+                                 {'path_mbf': {
+                                     'type': 'array',
+                                     'minItems': 1,
+                                     'items': {'type': 'string'}},
+                                  'channels': {
+                                      'type': 'array',
+                                      'items': {
+                                          'type': 'object',
+                                          'properties': {
+                                              'id': {'type': 'string'},
+                                              'source': {'type': 'string'},
+                                          },},},},},},
+            'contours': {'type': 'array',
+                         'items': {'type': 'object',
+                                   'properties': {
+                                       'name': string_noltws,
+                                       'guid': {'type': 'string'},
+                                       'id_ontology': {'type': 'string'},},
+                                   },},},}
 
 
 class NeurolucidaSchema(JSONSchema):
@@ -668,10 +675,16 @@ class DatasetStructureSchema(JSONSchema):
                                       'pattern': metadata_filename_pattern},
                     'samples_file': {'type': 'string',
                                      'pattern': metadata_filename_pattern},
+                    'manifest_file': {'type': 'array',
+                                      'minItems': 1,
+                                      'items': {
+                                          'type': 'string',
+                                          'pattern': metadata_filename_pattern},
+                                      },
                     #'path_structure': {'type': 'array',
                     # 'items': {'type': 'string', 'pattern': ''}}
-                               'dirs': {'type': 'integer',
-                                        'minimum': 0},
+                    'dirs': {'type': 'integer',
+                             'minimum': 0},
                     'files': {'type': 'integer',
                               'minimum': 0},
                     'size': {'type': 'integer',
@@ -1098,6 +1111,74 @@ class SamplesFileSchema(JSONSchema):
     schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
+class ManifestRecordExportSchema(JSONSchema):
+    schema = {
+        'allOf': [
+            {'type': 'object',
+             'properties': {
+                 'pattern': {
+                     'type': 'string',
+                 },
+                 'filename': {
+                     'type': 'string',
+                 },
+                 'timestamp': {
+                     'type': 'string',
+                     'pattern': iso8601pattern,
+                 },
+                 'description': {
+                     'type': 'string',
+                 },
+                 'file_type': {
+                     'type': 'string',
+                 },
+                 'data_type': {
+                     'type': 'string',
+                 },
+             },
+             },
+            {'oneOf': [
+                {'required': ['pattern']},
+                {'required': ['filename', 'timestamp']},
+            ]},
+        ]
+    }
+
+
+class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
+    schema = {
+        'type': 'object',
+        'required': ['dataset_relative_path', 'manifest_records'],
+        'properties': {
+            'dataset_relative_path': {'type': 'string'},
+            'manifest_records': {
+                'type': 'array',
+                'minItems': 1,
+                'items': ManifestRecordExportSchema.schema,
+            },
+            'errors': ErrorSchema.schema,
+        }
+    }
+
+
+ManifestFileSchema = ManifestFileExportSchema
+
+
+class ManifestFilesExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'required': ['manifest_files'],
+        'properties': {
+            'manifest_files': {
+                'type': 'array',
+                'minItems': 1,
+                'items': ManifestFileExportSchema.schema,
+            },
+            'errors': ErrorSchema.schema,
+        }
+    }
+
+
 class MetaOutExportSchema(JSONSchema):
     __schema = copy.deepcopy(DatasetDescriptionExportSchema.schema)
     extra_required = ['award_number',
@@ -1184,7 +1265,11 @@ class MetaOutExportSchema(JSONSchema):
                     'context_value': idtype('isAbout'),
                     },
         'schema_version': {'type': 'string'},
-        'organ': EIS._allOf(OntTermSchema, context_value=idtype('isAbout')),
+        'organ': {'type': 'array',
+                  'minItems': 1,
+                  'items': EIS._allOf(OntTermSchema),
+                  'context_value': idtype('isAbout'),
+                  },
         'modality': {'type': 'array',
                      'minItems': 1,
                      'items': {

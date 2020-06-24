@@ -151,7 +151,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
             return self
 
         elif self.parent and self.parent != self:  # Path('.') issue
-            log.warning(self.parent)
+            log.debug(self.parent)
             return self.parent.dataset
 
     @property
@@ -286,6 +286,40 @@ class BlackfynnCache(PrimaryCache, EatCache):
         sl = self.stem.lower()
         return bool([an for an in self._sparse_stems if an in sl])
 
+    def populateJsonMetadata(self, blob):
+        """ populate a json blob with file system metadata"""
+        # TODO schema for this
+        if blob is None:
+            blob = {}
+
+        blob.update(self._jsonMetadata())
+
+    def _jsonMetadata(self, do_expensive_operations=False):
+        """ path level json metadata """
+        # FIXME this is going to be very slow due to the local.cache call overhead
+        # it will be much better implement this from Path directly using xattrs()
+        drp = self.local.relative_to(self.dataset.local)
+        meta = self.meta  # TODO see what we need from this
+        N, package = self.id.split(':', 1)
+        uri_api = self.uri_api  # FIXME vs self.uri_api_package ?
+        uri_human = self.uri_human,
+        blob = {
+            'type': 'path',
+            'uri_api': uri_api,  # -> @id in the @context
+            'uri_human': uri_human,
+            'package_id': package,  # FIXME N:package:asdf is nasty for jsonld but ...
+            'dataset_relative_path': drp,
+        }
+
+        mimetype = self.mimetype
+        if mimetype:
+            blob['mimetype'] = mimetype
+
+        if do_expensive_operations:
+            blob['magic_mimetype'] = asdf
+
+        return blob
+
 
 BlackfynnCache._bind_flavours()
 
@@ -307,6 +341,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                     self.readlink().parts[1])
         except OSError as e:
             raise exc.NoCachedMetadataError(self) from e
+
+    def populateJsonMetadata(self, blob):
+        """ populate a json blob with file system metadata"""
+        # FIXME TODO implement this without resolving .cache
+        return self.cache.populateJsonMetadata(blob)
 
     def pull(self, *args,
              time_now=None,
