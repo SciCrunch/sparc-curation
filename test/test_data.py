@@ -100,3 +100,15 @@ class TestCurationExportTtl(unittest.TestCase):
         print('unique affils:', len(set([v for vs in out.values() for v in vs])))
         self.pp(res, unpack=False)
         assert len(res) > 0
+
+    def test_protocol_techniques(self):
+        query = self.spaql_templates.protocol_techniques()
+        res = list(self.graph.query(query))
+        print(res)
+        assert len(res) > 0
+
+    def test_protocol_aspects(self):
+        query = self.spaql_templates.protocol_aspects()
+        res = list(self.graph.query(query))
+        print(res)
+        assert len(res) > 0

@@ -6,7 +6,6 @@ from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update
 from pyontutils.utils import TZLOCAL, utcnowtz, isoformat, isoformat_safe
 from sparcur.config import config
 
-
 log = makeSimpleLogger('sparcur')
 logd = log.getChild('data')
 loge = log.getChild('export')

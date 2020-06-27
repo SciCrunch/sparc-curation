@@ -641,6 +641,7 @@ def datame(d, ca, timestamp, helpers=None):
 
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):
+        rc._setup()
         rc.anchorTo(ca)
 
     if helpers is not None:

@@ -1,6 +1,5 @@
 import copy
 import json
-import shutil
 import itertools
 from pathlib import PurePath
 from datetime import datetime
@@ -8,23 +7,18 @@ from functools import wraps
 from collections import deque, defaultdict
 import idlib
 import rdflib
-import htmlfn as hfn
-import requests
 import ontquery as oq
-import augpathlib as aug
-from idlib.utils import resolution_chain
 from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pysercomb.pyr.types import ProtcurExpression, Quantity  # FIXME import slowdown
-from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
-from pyontutils.utils import isoformat, TZLOCAL
+from pysercomb.pyr.types import ProtcurExpression, Quantity
+from pyontutils.core import OntTerm as OTB, OntId as OIDB
+from pyontutils.utils import isoformat
 from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
-from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
+from pyontutils.namespaces import tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, python_identifier  # FIXME fix other imports
+from sparcur.utils import log, logd  # FIXME fix other imports
 from sparcur.utils import is_list_or_tuple
-from sparcur.config import config, auth
 
 
 __type_registry = {None: None}
@@ -92,6 +86,17 @@ OntCuries({'orcid':'https://orcid.org/',
            'tech': str(tech),
            'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})
+
+
+def curies_runtime(base):
+    """ base is .e.g https://api.blackfynn.io/datasets/{dataset_id}/ """
+
+    return {
+        'local': base,
+        'contributor': base + 'contributors/',
+        'subject': base + 'subjects/',
+        'sample': base + 'samples/',
+    }
 
 
 class OntId(OIDB):
@@ -635,12 +640,25 @@ class AtomicDictOperations:
         # type errors can occur here ...
         # e.g. you try to go to a string
         if not [_ for _ in (list, tuple) if isinstance(target_path, _)]:
-            raise TypeError(f'target_path is not a list or tuple! {type(target_path)}')
+            msg = f'target_path is not a list or tuple! {type(target_path)}'
+            raise TypeError(msg)
+
         target_prefixes = target_path[:-1]
         target_key = target_path[-1]
         target = data
-        for target_name in target_prefixes:
-            if target_name not in target:  # TODO list indicies
+        for i, target_name in enumerate(target_prefixes):
+            if target_name is int:  # add same value to all objects in list
+                if not is_list_or_tuple(target):
+                    msg = (f'attempt to add to all elements of not a list '
+                           f'{type(target)} target_path was {target_path} '
+                           f'target_name was {target_name}')
+                    raise TypeError(msg)
+                # LOL PYTHON namespaces
+                [AtomicDictOperations.add(subtarget, target_path[i + 1:], value)
+                 for subtarget in target]
+                return  # int terminates this level of an add
+
+            if target_name not in target:  # TODO list indicies XXX that is really append though ...
                 target[target_name] = {}
 
             target = target[target_name]
@@ -820,7 +838,7 @@ class _DictTransformer:
 
         for source_path in gets:
             yield adops.apply(adops.get, data, source_path,
-                                              source_key_optional=source_key_optional)
+                              source_key_optional=source_key_optional)
 
     @staticmethod
     def pop(data, pops, source_key_optional=False):
@@ -1224,6 +1242,31 @@ def compact_errors(path_errors):
 
 class JPointer(str):
     """ a class to mark json pointers for resolution """
+
+    @staticmethod
+    def pathFromSchema(schema_path):
+        gen = (e for e in schema_path)
+        while True:
+            try:
+                element = next(gen)
+                if element in ('oneOf', 'anyOf', 'allOf'):
+                    next(gen)
+                    continue
+
+                if element == 'properties':
+                    yield next(gen)
+                elif element == 'items':
+                    # NOTE it is ok to use int in cases like this because even
+                    # though it is in principle ambiguous with a case where
+                    # someone happens to be using the python function int
+                    # as a key in a dict they would never be able to serialize
+                    # that to json without some major conversions, so I am
+                    # ruling that it is safe to lift to type here since this
+                    # is JPointer not rando dict pointer
+                    yield int
+
+            except StopIteration:
+                break
 
     @classmethod
     def fromList(cls, iterable):

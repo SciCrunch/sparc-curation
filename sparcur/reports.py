@@ -148,6 +148,27 @@ class SparqlQueries:
         """
         return self.sparql.prepareQuery(query, initNs=self.prefixes)
 
+    def protocol_techniques(self):
+        query = """
+            SELECT DISTINCT ?protocol ?technique
+            WHERE {
+                ?protocol rdf:type sparc:Protocol .
+                ?protocol TEMP:protocolEmploysTechinque ?technique .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def protocol_aspects(self):
+        query = """
+            SELECT DISTINCT ?protocol ?aspect
+            WHERE {
+                ?protocol rdf:type sparc:Protocol .
+                ?protocol TEMP:protocolInvolvesAspect ?aspect .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+
 
 class TtlFile:
 

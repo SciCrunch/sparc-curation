@@ -1265,20 +1265,28 @@ class ToJsonLdPipeline(JSONPipeline):
         [['subjects'], ['subjects', '@graph']],
         [['samples'], ['samples', '@graph']],
         [['resources'], ['resources', '@graph']],
-             )
+    )
 
     updates = (
         [['id'], lambda v: 'dataset:' + v.rsplit(':', 1)[-1] + '/#dataset-graph'],
     )
 
+    __includes = []
+
+    JApplyRecursive(sc.update_include_paths,
+                    sc.DatasetOutExportSchema.schema,
+                    preserve_keys=('inputs',),
+                    moves=moves,  # have to account for the moves from the defining schema
+                    collect=__includes)
+
     adds = (
-        [['@context'], lambda lifters: sc.base_context],
-        [['meta', '@context'], lambda lifters: sc.MetaOutExportSchema.context()[0]],
-        [['contributors', '@context'], lambda lifters: sc.ContributorExportSchema.context()[0]],
-        [['subjects', '@context'], lambda lifters: sc.SubjectsExportSchema.context()[0]],
-        [['samples', '@context'], lambda lifters: sc.SamplesFileExportSchema.context()[0]],
-        #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()[0]]
-        # TODO add @type owl:NamedIndividual to all these somehow ...
+        [['@context'], lambda l: sc.base_context],
+        [['meta', '@context'], lambda l: sc.MetaOutExportSchema.context()],
+        [['contributors', '@context'], lambda l: sc.ContributorExportSchema.context()],
+        [['subjects', '@context'], lambda l: sc.SubjectsExportSchema.context()],
+        [['samples', '@context'], lambda l: sc.SamplesFileExportSchema.context()],
+        #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()]
+        *__includes  # owl:NamedIndividual in here ... FIXME would be nice to not have to hack it in this way
     )
 
     derives_after_adds = (

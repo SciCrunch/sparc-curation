@@ -10,6 +10,9 @@ class Examples:
         yield {'hello': 'world'}, {}, (['hello'], 'world')
         yield {'hello': {'there': {'general': 'world'}}}, {}, (['hello', 'there', 'general'], 'world')
         yield {'hello': {'there': {'general': 'world'}}}, {'hello': {}}, (['hello', 'there', 'general'], 'world')
+        yield {'world': [{'hello': 'there'},
+                         {'hello': 'there'}]}, {'world': [{},
+                                                          {}]}, (['world', int, 'hello'], 'there')
 
     @property
     def add_error(self):

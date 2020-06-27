@@ -2,7 +2,6 @@ import idlib
 import rdflib
 import requests
 from idlib.cache import cache, COOLDOWN
-from idlib.utils import resolution_chain
 from orthauth.utils import QuietDict
 from pyontutils import combinators as cmb
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr

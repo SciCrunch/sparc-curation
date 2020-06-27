@@ -15,7 +15,7 @@ import ontquery as oq
 from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
 from sparcur.utils import logd
-from sparcur.core import JEncode, JApplyRecursive, OntCuries
+from sparcur.core import JEncode, JApplyRecursive, JPointer, OntCuries
 from pyontutils.utils import asStr
 from pyontutils.namespaces import TEMP, TEMPRAW, sparc, unit, PREFIXES as uPREFIXES, ilxtr
 
@@ -116,6 +116,24 @@ def _defunc(obj, *args, path=None, **kwargs):  # FIXME add tests
         return asStr(ast.parse(inspect.getsource(obj).strip().strip(',')))
     else:
         return obj
+
+
+def update_include_paths(obj, *args, path=None, key='jsonld_include', moves=tuple(), collect=tuple()):
+    """ collect json pointers that need to be updated """
+    if isinstance(obj, dict) and key in obj:
+        path = list(JPointer.pathFromSchema(path))
+        for frm, to in moves:  # sigh python
+            lf = len(frm)
+            if path[:lf] == frm:
+                path = to + path[lf:]
+                break
+
+        for key, value in obj[key].items():
+            path.append(key)
+            collect.append((path, lambda _: value))  # note that collect is really a list
+            # note also that lambda _: value is because pipeline adds currently calls into lifters
+
+    return obj  # have to return this otherwise somehow everything is turned to None?
 
 
 def idtype(id, base=None):
@@ -238,7 +256,6 @@ class HasSchema:
         # TODO switch for normalized output if value passes?
         def decorator(function):
             pipeline_stage_name = function.__qualname__
-            #context_maybe_runtime = schema_class.context()
             @wraps(function)
             def schema_wrapped_property(_self, *args, **kwargs):
                 if schema_wrapped_property.schema == schema_class:
@@ -263,15 +280,7 @@ class HasSchema:
                     data['errors'] += norm_or_error.json(pipeline_stage_name)
                     # TODO make sure the step is noted even if the schema is the same
 
-                if False and context_maybe_runtime:
-                    context, context_runtime = context_maybe_runtime
-                    if context:
-                        base = data['meta']['uri_api'] + '/'  # FIXME FIXME FIXME
-                        data['@context'] = {'@base': base, **context}
-                        if context_runtime:
-                            data['@context'].update(context_runtime(base))
-
-                elif self.normalize:
+                if self.normalize:
                     return norm_or_error
 
                 return data
@@ -281,6 +290,7 @@ class HasSchema:
 
             schema_wrapped_property.schema = schema_class
             return schema_wrapped_property
+
         return decorator
 
 
@@ -380,11 +390,10 @@ class JSONSchema(object):
         """ return a json-ld context by extracting annotations from nested schemas
             those annotations are currently placed under the `context_value' key """
         # FIXME last one wins right now
-        context_runtime = None
-        context_runtimes = {}
+        #context_runtimes = {}
         context = {}
         marker = 'context_value'
-        marker_runtime = 'context_runtime'
+        #marker_runtime = 'context_runtime'
         def inner(schema, key=None):
             if isinstance(schema, dict):
                 if marker in schema:
@@ -394,11 +403,11 @@ class JSONSchema(object):
                     context_value = schema[marker]
                     context[key] = context_value
 
-                if marker_runtime in schema:
-                    if key is None:
-                        raise ValueError('you probably don\'t want to do this ...')
+                #if marker_runtime in schema:
+                    #if key is None:
+                        #raise ValueError('you probably don\'t want to do this ...')
 
-                    context_runtimes[key] = schema[marker_runtime]
+                    #context_runtimes[key] = schema[marker_runtime]
 
                 for k, v in schema.items():
                     if k == marker:
@@ -417,11 +426,27 @@ class JSONSchema(object):
         #if context:  # if there is no context do not add version
             #context.update(base_context)
 
-        if context_runtimes:
-            def context_runtime(base):
-                return {k: v(base) for k, v in context_runtimes.items()}
+        #if context_runtimes:
+            #def context_runtime(base):
+                #return {k: v(base) for k, v in context_runtimes.items()}
 
-        return context, context_runtime
+        return context
+
+
+class JsonLdHelperSchema(JSONSchema):
+    """ documentation of the additions to the json schema draft validator schema
+        that are used for transformation to jsonld """
+    schema = {
+        'properties': {
+            'jsonld_includes': {'type': 'object'},
+            'context_value': {'oneOf': [
+                # re https://github.com/json-ld/json-ld.org/issues/612
+                # https://github.com/json-ld/json-ld.org/blob/master/schemas/jsonld-schema.json
+                {'type': 'string'},  # TODO are there any restrictions? string -> @base/string ?
+                {'type': 'object'},  # TODO this should conform to the jsonld schema for @context
+            ]}
+        }
+    }
 
 
 class RuntimeSchema(JSONSchema):
@@ -699,6 +724,7 @@ class DatasetStructureSchema(JSONSchema):
 class ContributorExportSchema(JSONSchema):
     schema = {
         'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Person', 'owl:NamedIndividual']},
         'properties': {
             'id': {'type': 'string',  # FIXME TODO
                    },
@@ -789,6 +815,7 @@ class ContributorsOutExportSchema(JSONSchema):
 
 class CreatorExportSchema(JSONSchema):
     schema = copy.deepcopy(ContributorExportSchema.schema)
+    schema.pop('jsonld_include')
     schema['properties'].pop('contributor_role')
     schema['properties'].pop('is_contact_person')
 
@@ -996,6 +1023,7 @@ subsam_common_properties = {  # FIXME these should not be in the samples sheet, 
 class SubjectExportSchema(JSONSchema):
     schema = {
         'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Subject', 'owl:NamedIndividual']},
         'required': ['subject_id', 'species'],
         'properties': {
             'subject_id': {'type': 'string',
@@ -1050,6 +1078,7 @@ class SubjectsSchema(JSONSchema):
 class SampleExportSchema(JSONSchema):
     schema = {
         'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Sample', 'owl:NamedIndividual']},
         'required': ['sample_id', 'subject_id'],
         'properties': {
             'sample_id': {'type': 'string',},
@@ -1147,7 +1176,8 @@ class ManifestRecordExportSchema(JSONSchema):
 class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
     schema = {
         'type': 'object',
-        'required': ['dataset_relative_path', 'manifest_records'],
+        'jsonld_include': {'@type': ['sparc:File', 'owl:NamedIndividual']},
+        'required': ['dataset_relative_path', 'manifest_records'],  # TODO uri_api
         'properties': {
             'dataset_relative_path': {'type': 'string'},
             'manifest_records': {
@@ -1345,11 +1375,13 @@ class DatasetOutExportSchema(JSONSchema):
                                   },},}
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
-    schema = {'allOf': [__schema,
-                        {'anyOf': [
-                            {'required': ['subjects']},  # FIXME extract subjects from samples ?
-                            {'required': ['samples']}
-                        ]}]}
+    schema = {
+        'jsonld_include': {'@type': ['sparc:Dataset', 'owl:NamedIndividual']},
+        'allOf': [__schema,
+                  {'anyOf': [
+                      {'required': ['subjects']},  # FIXME extract subjects from samples ?
+                      {'required': ['samples']}
+                  ]}]}
 
 
 class DatasetOutSchema(JSONSchema):

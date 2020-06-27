@@ -875,4 +875,7 @@ xsd:maxInclusive a ilxtr:MISPredicate ;
 xsd:minInclusive a ilxtr:MISPredicate ;
     ilxtr:numberOfOccurrences 136 .
 
+TEMP:DatasetContributor a owl:Class ;
+    replacedBy: sparc:DatasetContribution .
+
 ### Serialized using the ttlser deterministic serializer v1.2.0

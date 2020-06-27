@@ -127,6 +127,7 @@ Commands:
     shell       drop into an ipython shell
 
                 integration     integration subshell with different defaults
+                exit            (use with --profile)
 
     server      reporting server
 
@@ -220,19 +221,18 @@ import htmlfn as hfn
 import ontquery as oq
 start_middle = time()
 import augpathlib as aug
-from augpathlib import RemotePath, AugmentedPath  # for debug
 from pyontutils import clifun as clif
 from pyontutils.core import OntResGit
 from pyontutils.utils import UTCNOWISO, subclasses
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
-from sparcur import reports
+from sparcur import reports  # top level
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import JT
 from sparcur.core import OntId, OntTerm, adops
-from sparcur.utils import GetTimeNow
+from sparcur.utils import GetTimeNow  # top level
 from sparcur.utils import log, logd, bind_file_handler
 from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
@@ -426,6 +426,7 @@ class Main(Dispatcher):
         self.cwdintr = Integrator(self.cwd)
 
         # pass debug along (sigh)
+        from augpathlib import RemotePath, AugmentedPath  # for debug
         AugmentedPath._debug = self.options.debug
         RemotePath._debug = self.options.debug
 
@@ -515,6 +516,7 @@ class Main(Dispatcher):
             Summary._debug = True
 
     def _setup_bfl(self):
+        self.BlackfynnRemote._setup()
         self.BlackfynnRemote.init(self.anchor.id)
 
         self.bfl = self.BlackfynnRemote._api
@@ -1339,15 +1341,19 @@ done"""
             return nall
 
     def apinat(self):
-        from sparcur import apinat
         path_in = Path(self.options.path_in)
         path_out = Path(self.options.path_out)
         with open(path_in) as f:
             resource_map = json.load(f)
 
-        agraph = apinat.Graph(resource_map)
-        graph = agraph.graph()
-        graph.write(path=path_out)
+        if path_in.suffix == '.json':
+            from sparcur import apinat
+            agraph = apinat.Graph(resource_map)
+            graph = agraph.graph()
+            graph.write(path=path_out)
+        elif path_in.suffix == '.jsonld':
+            from pyontutils.core import populateFromJsonLd, OntGraph
+            g = populateFromJsonLd(OntGraph(), path_in).write(path=path_out)
 
     def rmeta(self, use_cache_path=False, exist_ok=False):
         from pyontutils.utils import Async, deferred

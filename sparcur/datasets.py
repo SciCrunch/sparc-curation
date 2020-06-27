@@ -4,7 +4,6 @@ import copy
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
-import requests
 import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
@@ -131,6 +130,21 @@ class DatasetStructure(Path):
     max_childs = 40
     rate = 8  # set by Integrator from cli
     _refresh_on_missing = True
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        DatasetStructure._setup(*args, **kwargs)
+        DatasetStructure.__new__ = DatasetStructure._renew
+        return super().__new__(cls, *args, **kwargs)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        import requests
+        DatasetStructure._requests = requests
 
     @property
     def children(self):
@@ -320,7 +334,7 @@ class DatasetStructure(Path):
                              '\nFIXME batch these using async in cli export ...')
                     try:
                         path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
-                    except requests.exceptions.ConnectionError as e:
+                    except self._requests.exceptions.ConnectionError as e:
                         raise exc.NetworkFailedForPathError(path) from e
 
                 if path.suffix in path.stem:

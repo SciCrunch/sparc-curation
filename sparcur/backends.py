@@ -2,26 +2,49 @@ import os
 from pathlib import PurePosixPath, PurePath
 from datetime import datetime
 import idlib
-import requests
 from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
 from sparcur.core import BlackfynnId
 import augpathlib as aug
 from augpathlib import PathMeta
-from sparcur.blackfynn_api import BFLocal, FakeBFLocal, id_to_type  # FIXME there should be a better way ...
-from blackfynn import Collection, DataPackage, Organization, File
-from blackfynn import Dataset
-from blackfynn.models import BaseNode
-
-from ast import literal_eval
 
 
 class BlackfynnRemote(aug.RemotePath):
 
-    _api_class = BFLocal
+    _api_class = None  # set in _setup
     _async_rate = None
     _local_dataset_name = object()
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        BlackfynnRemote._setup(*args, **kwargs)
+        return super().__new__(cls)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        import requests
+        BlackfynnRemote._requests = requests
+
+        from blackfynn import Collection, DataPackage, Organization, File
+        from blackfynn import Dataset
+        from blackfynn.models import BaseNode
+        BlackfynnRemote._Collection = Collection
+        BlackfynnRemote._DataPackage = DataPackage
+        BlackfynnRemote._Organization = Organization
+        BlackfynnRemote._File = File
+        BlackfynnRemote._Dataset = Dataset
+        BlackfynnRemote._BaseNode = BaseNode
+
+        # FIXME there should be a better way ...
+        from sparcur.blackfynn_api import BFLocal, id_to_type
+        BlackfynnRemote._api_class = BFLocal
+        BlackfynnRemote._id_to_type = staticmethod(id_to_type)
+        BlackfynnRemote.__new__ = BlackfynnRemote._renew
 
     @property
     def uri_human(self):
@@ -105,7 +128,7 @@ class BlackfynnRemote(aug.RemotePath):
     @classmethod
     def get_file_by_url(cls, url):
         """ NOTE THAT THE FIRST YIELD IS HEADERS """
-        resp = requests.get(url, stream=True)
+        resp = self._requests.get(url, stream=True)
         headers = resp.headers
         yield headers
         log.debug(f'reading from {url}')
@@ -117,7 +140,7 @@ class BlackfynnRemote(aug.RemotePath):
         self._seed = id_bfo_or_bfr
         self._file_id = file_id
         if not [type_ for type_ in (self.__class__,
-                                    BaseNode,
+                                    self._BaseNode,
                                     str,
                                     PathMeta)
                 if isinstance(self._seed, type_)]:
@@ -151,7 +174,7 @@ class BlackfynnRemote(aug.RemotePath):
         if isinstance(self._seed, self.__class__):
             bfobject = self._seed.bfobject
 
-        elif isinstance(self._seed, BaseNode):
+        elif isinstance(self._seed, self._BaseNode):
             bfobject = self._seed
 
         elif isinstance(self._seed, str):
@@ -159,8 +182,8 @@ class BlackfynnRemote(aug.RemotePath):
                 bfobject = self._api.get(self._seed)
             except Exception as e:  # sigh
                 if self._local_only:
-                    _class = id_to_type(self._seed)
-                    if issubclass(_class, Dataset):
+                    _class = self._id_to_type(self._seed)
+                    if issubclass(_class, self._Dataset):
                         bfobject = _class(self._local_dataset_name)
                         bfobject.id = self._seed
                     else:
@@ -180,7 +203,7 @@ class BlackfynnRemote(aug.RemotePath):
             self._bfobject = bfobject
             return self._bfobject
 
-        if isinstance(bfobject, DataPackage):
+        if isinstance(bfobject, self._DataPackage):
             def transfer(file, bfobject):
                 file.parent = bfobject.parent
                 file.dataset = bfobject.dataset
@@ -243,10 +266,10 @@ class BlackfynnRemote(aug.RemotePath):
         return self._organization
 
     def is_organization(self):
-        return isinstance(self.bfobject, Organization)
+        return isinstance(self.bfobject, self._Organization)
 
     def is_dataset(self):
-        return isinstance(self.bfobject, Dataset)
+        return isinstance(self.bfobject, self._Dataset)
 
     @property
     def dataset_id(self):
@@ -285,7 +308,7 @@ class BlackfynnRemote(aug.RemotePath):
     def stem(self):
         name = PurePosixPath(self._name)
         return name.stem
-        #if isinstance(self.bfobject, File) and not self.from_packages:
+        #if isinstance(self.bfobject, self._File) and not self.from_packages:
             #return name.stem
         #else:
             #return name.stem
@@ -294,13 +317,13 @@ class BlackfynnRemote(aug.RemotePath):
     def suffix(self):
         # fixme loads of shoddy logic in here
         name = PurePosixPath(self._name)
-        if isinstance(self.bfobject, File) and not self.from_packages:
+        if isinstance(self.bfobject, self._File) and not self.from_packages:
             return name.suffix
-        elif isinstance(self.bfobject, Collection):
+        elif isinstance(self.bfobject, self._Collection):
             return ''
-        elif isinstance(self.bfobject, Dataset):
+        elif isinstance(self.bfobject, self._Dataset):
             return ''
-        elif isinstance(self.bfobject, Organization):
+        elif isinstance(self.bfobject, self._Organization):
             return ''
         else:
             if self.from_packages or not list(self.errors):
@@ -329,7 +352,7 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def _name(self):
         name = self.bfobject.name
-        if isinstance(self.bfobject, File) and not self.from_packages:
+        if isinstance(self.bfobject, self._File) and not self.from_packages:
             realname = os.path.basename(self.bfobject.s3_key)
             if name != realname:  # mega weirdness
                 if realname.startswith(name):
@@ -361,7 +384,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def name(self):
-        if isinstance(self.bfobject, File) and self.from_packages:
+        if isinstance(self.bfobject, self._File) and self.from_packages:
             return self.bfobject.filename
         else:
             return self.stem + self.suffix
@@ -371,8 +394,8 @@ class BlackfynnRemote(aug.RemotePath):
         if isinstance(self._seed, self.__class__):
             id = self._seed.bfobject.id
 
-        elif isinstance(self._seed, BaseNode):
-            if isinstance(self._seed, File):
+        elif isinstance(self._seed, self._BaseNode):
+            if isinstance(self._seed, self._File):
                 id = self._seed.pkg_id
             else:
                 id = self._seed.id
@@ -402,22 +425,22 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def size(self):
-        if isinstance(self.bfobject, File):
+        if isinstance(self.bfobject, self._File):
             return self.bfobject.size
 
     @property
     def created(self):
-        if not isinstance(self.bfobject, Organization):
+        if not isinstance(self.bfobject, self._Organization):
             return self.bfobject.created_at
 
     @property
     def updated(self):
-        if not isinstance(self.bfobject, Organization):
+        if not isinstance(self.bfobject, self._Organization):
             return self.bfobject.updated_at
 
     @property
     def file_id(self):
-        if isinstance(self.bfobject, File):
+        if isinstance(self.bfobject, self._File):
             return self.bfobject.id
 
     @property
@@ -427,7 +450,7 @@ class BlackfynnRemote(aug.RemotePath):
     def exists(self):
         try:
             bfo = self.bfobject
-            if not isinstance(bfo, BaseNode):
+            if not isinstance(bfo, self._BaseNode):
                 _cache = bfo.refresh(force=True)
                 bf = _cache.remote.bfo
 
@@ -438,15 +461,15 @@ class BlackfynnRemote(aug.RemotePath):
     def is_dir(self):
         try:
             bfo = self.bfobject
-            return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
+            return not isinstance(bfo, self._File) and not isinstance(bfo, self._DataPackage)
         except Exception as e:
             breakpoint()
             raise e
 
     def is_file(self):
         bfo = self.bfobject
-        return (isinstance(bfo, File) or
-                isinstance(bfo, DataPackage) and
+        return (isinstance(bfo, self._File) or
+                isinstance(bfo, self._DataPackage) and
                 (hasattr(bfo, 'fake_files') and bfo.fake_files
                     or
                  not hasattr(bfo, '_json') and
@@ -457,7 +480,7 @@ class BlackfynnRemote(aug.RemotePath):
     def _has_remote_files(self):
         """ this will fetch """
         bfobject = self.bfobject
-        if not isinstance(bfobject, DataPackage):
+        if not isinstance(bfobject, self._DataPackage):
             return False
 
         files = bfobject.files
@@ -504,7 +527,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def owner_id(self):
-        if not isinstance(self.bfobject, Organization):
+        if not isinstance(self.bfobject, self._Organization):
             # This seems like an oversight ...
             return self.bfobject.owner_id
 
@@ -516,10 +539,10 @@ class BlackfynnRemote(aug.RemotePath):
             # for rchildren though
             return self._c_parent
 
-        if isinstance(self.bfobject, Organization):
+        if isinstance(self.bfobject, self._Organization):
             return self  # match behavior of Path
 
-        elif isinstance(self.bfobject, Dataset):
+        elif isinstance(self.bfobject, self._Dataset):
             return self.organization
             #parent = self.bfobject._api._context
 
@@ -544,11 +567,11 @@ class BlackfynnRemote(aug.RemotePath):
         yield from self._children()
 
     def _children(self, create_cache=True):
-        if isinstance(self.bfobject, File):
+        if isinstance(self.bfobject, self._File):
             return
-        elif isinstance(self.bfobject, DataPackage):
+        elif isinstance(self.bfobject, self._DataPackage):
             return  # we conflate data packages and files
-        elif isinstance(self.bfobject, Organization):
+        elif isinstance(self.bfobject, self._Organization):
             for dataset in self.bfobject.datasets:
                 child = self.__class__(dataset)
                 if create_cache:
@@ -598,15 +621,16 @@ class BlackfynnRemote(aug.RemotePath):
                    create_cache=True,
                    exclude_uploaded=True,
                    sparse=False,):
-        if isinstance(self.bfobject, File):
+        if isinstance(self.bfobject, self._File):
             return
-        elif isinstance(self.bfobject, DataPackage):
+        elif isinstance(self.bfobject, self._DataPackage):
             return  # should we return files inside packages? are they 1:1?
-        elif any(isinstance(self.bfobject, t) for t in (Organization, Collection)):
+        elif any(isinstance(self.bfobject, t)
+                 for t in (self._Organization, self._Collection)):
             for child in self._children(create_cache=create_cache):
                 yield child
                 yield from child._rchildren(create_cache=create_cache)
-        elif isinstance(self.bfobject, Dataset):
+        elif isinstance(self.bfobject, self._Dataset):
             sparse = sparse or self.cache.is_sparse()
             deleted = []
             if sparse:
@@ -814,13 +838,13 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def _single_file(self):
-        if isinstance(self.bfobject, DataPackage):
+        if isinstance(self.bfobject, self._DataPackage):
             files = list(self.bfobject.files)
             if len(files) > 1:
                 raise BaseException('TODO too many files')
 
             file = files[0]
-        elif isinstance(self.bfobject, File):
+        elif isinstance(self.bfobject, self._File):
             file = self.bfobject
         else:
             file = None
@@ -959,7 +983,7 @@ class BlackfynnRemote(aug.RemotePath):
         # FIXME hack around instantiation-existence issue
         child = object.__new__(self.__class__)
         child._parent = self
-        class TempBFObject(BaseNode):  # this will cause a type error if actually used
+        class TempBFObject(self._BaseNode):  # this will cause a type error if actually used
             name = child_name
             exists = False
 
@@ -1159,7 +1183,7 @@ class BlackfynnRemote(aug.RemotePath):
                         try:
                             remote.bfobject.package.update()
                             break
-                        except requests.exceptions.HTTPError as e:
+                        except self._requests.exceptions.HTTPError as e:
                             if e.response.text != 'package name is already taken':  # ugh
                                 raise e
                             elif i == 99:

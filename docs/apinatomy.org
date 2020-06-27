@@ -24,9 +24,10 @@ Run this block in emacs with =C-c C-c= or tangle and run with the block below
 # look backward up the folder hierarchy to find it
 #+name: apinat-export
 #+header: :shebang "#!/usr/bin/env bash" :tangle-mode (identity #o0755)
-#+begin_src bash :dir ../ :tangle ../export-apinatomy-tests
-spc apinat ./test/apinatomy/data/keast-spinal-map.json keast-spinal.ttl
-spc apinat ./test/apinatomy/data/bolser-lewis-map.json test-bolew.ttl
+#+begin_src bash :dir ../ :tangle ../export-apinatomy-tests :async
+spc apinat ./test/apinatomy/keast-spinal-map.json keast-spinal.ttl
+spc apinat ./test/apinatomy/bolser-lewis-map.json test-bolew.ttl
+spc apinat keast-spinal-full.jsonld keast-spinal-full.ttl
 #+end_src
 
 You can also tangle this file to produce [[file:../export-apinatomy-tests]]
@@ -46,6 +47,7 @@ Then
 #+begin_src bash :results none :noweb yes
 scp ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
 scp ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
+scp ~/git/sparc-curation/keast-spinal-full.ttl cassava:/tmp/
 #+end_src
 
 #+begin_src bash :dir /ssh:cassava|sudo:cassava:
@@ -55,12 +57,15 @@ FOLDER="/var/www/sparc/ApiNATOMY/${ARCHIVE_PATH}"
 mkdir $FOLDER
 mv "/tmp/test-bolew.ttl" $FOLDER
 mv "/tmp/keast-spinal.ttl" $FOLDER
+mv "/tmp/keast-spinal-full.ttl" $FOLDER
 chown -R nginx:nginx $FOLDER
 pushd /var/www/sparc/ApiNATOMY/ontologies
 unlink test-bolew.ttl
 ln -s "../${ARCHIVE_PATH}/test-bolew.ttl"
 unlink keast-spinal.ttl
 ln -s "../${ARCHIVE_PATH}/keast-spinal.ttl"
+unlink keast-spinal-full.ttl
+ln -s "../${ARCHIVE_PATH}/keast-spinal-full.ttl"
 popd
 #+end_src
 

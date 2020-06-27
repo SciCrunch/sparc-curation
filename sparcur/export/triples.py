@@ -13,7 +13,8 @@ from pyontutils.namespaces import (TEMP,
                                    dc,)
 from sparcur import converters as conv
 from sparcur.core import (adops,
-                          OntCuries)
+                          OntCuries,
+                          curies_runtime,)
 from sparcur.utils import loge, log
 from sparcur.protocols import ProtcurData
 
@@ -104,6 +105,10 @@ class TriplesExport(ProtcurData):
             return triple
 
         OntCuries.populate(graph)  # ah smalltalk thinking
+        if hasattr(self, 'uri_api'):
+            base = self.uri_api + '/'
+            graph.namespace_manager.populate_from(curies_runtime(base))
+
         [graph.add(t) for t in self.triples_header if warn(t)]
         for t in self.triples:
             if warn(t):
@@ -192,7 +197,7 @@ class TriplesExportDataset(TriplesExport):
             yield s, TEMP.hasBlackfynnUserId, userid
 
         yield s, rdf.type, owl.NamedIndividual
-        yield s, rdf.type, sparc.Researcher
+        yield s, rdf.type, sparc.Person
         yield s, TEMP.contributorTo, dsid  # TODO other way around too? hasContributor
         converter = conv.ContributorConverter(contributor)
         yield from converter.triples_gen(s)
@@ -203,7 +208,7 @@ class TriplesExportDataset(TriplesExport):
         dcs = rdflib.BNode()
 
         yield dcs, rdf.type, owl.NamedIndividual
-        yield dcs, rdf.type, TEMP.DatasetContributor
+        yield dcs, rdf.type, sparc.DatasetContribution
         yield dcs, TEMP.aboutDataset, dsid  # FIXME forDataset?
         yield dcs, TEMP.aboutContributor, s
         dconverter = conv.DatasetContributorConverter(contributor)
@@ -245,7 +250,7 @@ class TriplesExportDataset(TriplesExport):
         def id_(v):
             s = rdflib.URIRef(dsid)
             yield s, rdf.type, owl.NamedIndividual
-            yield s, rdf.type, sparc.Resource
+            yield s, rdf.type, sparc.Dataset
             yield s, rdfs.label, rdflib.Literal(self.folder_name)  # not all datasets have titles
 
         yield from id_(self.id)
