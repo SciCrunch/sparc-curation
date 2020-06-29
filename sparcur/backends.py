@@ -25,8 +25,16 @@ class BlackfynnRemote(aug.RemotePath):
         BlackfynnRemote._setup(*args, **kwargs)
         return super().__new__(cls)
 
+    @classmethod
+    def init(cls, *args, **kwargs):
+        cls._setup(*args, **kwargs)
+        super().init(*args, **kwargs)
+
     @staticmethod
     def _setup(*args, **kwargs):
+        if BlackfynnRemote.__new__ == BlackfynnRemote._renew:
+            return  # we already ran the imports here
+
         import requests
         BlackfynnRemote._requests = requests
 
@@ -128,7 +136,7 @@ class BlackfynnRemote(aug.RemotePath):
     @classmethod
     def get_file_by_url(cls, url):
         """ NOTE THAT THE FIRST YIELD IS HEADERS """
-        resp = self._requests.get(url, stream=True)
+        resp = cls._requests.get(url, stream=True)
         headers = resp.headers
         yield headers
         log.debug(f'reading from {url}')
