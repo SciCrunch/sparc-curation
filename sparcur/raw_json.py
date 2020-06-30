@@ -9,7 +9,10 @@ class RawJson:
     @property
     def data(self):
         with open(self.path, 'rt') as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.decoder.JSONDecodeError as e:
+                raise exc.NoDataError(f'{self.path}') from e
 
 
 hasSchema = sc.HasSchema()
