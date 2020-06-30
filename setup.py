@@ -43,7 +43,7 @@ setup(name='sparcur',
           'beautifulsoup4',
           'blackfynn>=3.0.0',
           'dicttoxml',
-          'idlib>=0.0.1.dev5',
+          'idlib>=0.0.1.dev6',
           "ipython; python_version < '3.7'",
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'protcur>=0.0.6',
