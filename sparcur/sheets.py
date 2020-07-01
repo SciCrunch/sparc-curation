@@ -293,8 +293,11 @@ class Organs(FieldAlignment):
         if row:
             ot = row[organ_term] if row[organ_term] else None
             if ot:
-                ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
-                return ts
+                try:
+                    ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
+                    return ts
+                except OntId.BadCurieError:
+                    log.error(ot)
 
     def award(self, dataset_id):
         row = self._lookup(dataset_id)

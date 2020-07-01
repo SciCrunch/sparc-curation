@@ -834,7 +834,7 @@ class MetadataFile(HasErrors):
                   for k, v in transformed.items()}
         return culled
 
-    def _transformed(self):
+    def _transformed(self):  # FIXME this whole approach makes it very difficult to test individual stages
         keyed = self._keyed()
         naccounted_baseline = set(e for g in self.groups_alt.values()
                                   if g != GROUP_ALL for e in g)
@@ -925,9 +925,18 @@ class MetadataFile(HasErrors):
         # there are very likely to be duplicate keys
         gen = self._headers()
 
+        indexes = {}
         def normb(k):
             if k in self.orig_to_norm_alt:
                 nk = self.orig_to_norm_alt[k]
+                if isinstance(nk, tuple):
+                    if k in indexes:
+                        indexes[k] += 1
+                    else:
+                        indexes[k] = 0
+
+                    return nk[indexes[k]]  # this is safe because _headers is ordered
+
             else:
                 nk = k
 
@@ -937,6 +946,20 @@ class MetadataFile(HasErrors):
             yield (normb(row[0]), *row[1:])
 
     def _headers(self):
+        def safe_invert(d):
+            out = {}
+            for v, k in d.items():
+                if k in out:
+                    ev = out[k]
+                    if isinstance(ev, tuple):
+                        out[k] += (v,)
+                    else:
+                        out[k] = (ev, v)
+                else:
+                    out[k] = v
+
+            return out
+
         t = self._t()
 
         if self.default_record_type == ROW_TYPE:
@@ -960,7 +983,7 @@ class MetadataFile(HasErrors):
 
         self._alt_header = Header(self.alt_header, normalize=self.normalize_alt)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
-        self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
+        self.orig_to_norm_alt = safe_invert(self.norm_to_orig_alt)
 
         if self.primary_key_rule is not None:
             nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
@@ -973,7 +996,7 @@ class MetadataFile(HasErrors):
         self.header = next(gen)
         self._header = Header(self.header, normalize=self.normalize_header)
         self.norm_to_orig_header = self._header.lut(**self.renames_header)
-        self.orig_to_norm_header = {v:k for k, v in self.norm_to_orig_header.items()}
+        self.orig_to_norm_header = safe_invert(self.norm_to_orig_header)
 
         yield self.header
         yield from gen
