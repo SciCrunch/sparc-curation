@@ -621,6 +621,7 @@ hunspell \
 libmagic \
 pandoc \
 postgres \
+pyenv \
 python \
 redland \
 rxvt-unicode \
