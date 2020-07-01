@@ -224,7 +224,8 @@ class PathPipeline(PrePipeline):
     def _transformer(self):
         try:
             return self.data_transformer_class(self.path, schema_version=self.schema_version)
-        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError, Exception) as e:
+        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
+            # sigh code duplication
             class NoData:  # FIXME
                 data = {}
                 t = f'No data for {self.path}'
@@ -232,6 +233,20 @@ class PathPipeline(PrePipeline):
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
             if he.addError(e, path=self.path):
                 logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+
+            he.embedErrors(NoData.data)
+            return NoData
+
+        except Exception as e:
+            # sigh code duplication
+            class NoData:  # FIXME
+                data = {}
+                t = f'No data for {self.path}'
+
+            he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
+            if he.addError(e, path=self.path):
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+                log.critical(f'Unhandled nearly fatal error in {self.path} {e} {type(e)}')
 
             he.embedErrors(NoData.data)
             return NoData
