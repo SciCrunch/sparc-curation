@@ -1167,7 +1167,7 @@ class ManifestRecordExportSchema(JSONSchema):
              },
             {'oneOf': [
                 {'required': ['pattern']},
-                {'required': ['filename', 'timestamp']},
+                {'required': ['filename']},  # timestamp not required for now
             ]},
         ]
     }
