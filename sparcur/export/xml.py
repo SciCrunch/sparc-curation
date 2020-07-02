@@ -61,7 +61,7 @@ def xml(dataset_blobs):
 
         if 'errors' in dowe:
             ers = get_all_errors(dowe)
-            for er in ers:
+            for path, er in ers:
                 if er['pipeline_stage'] == 'SPARCBIDSPipeline.data':
                     continue
 
