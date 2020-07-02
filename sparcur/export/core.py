@@ -57,7 +57,7 @@ def latest_ir(org_id=None):
                     None,
                     None,
                     latest=True,
-                    org_id=auth.get('blackfynn-organization'))
+                    org_id=org_id)
 
     return export.latest_ir
 

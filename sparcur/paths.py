@@ -14,6 +14,7 @@ from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
+from sparcur.core import register_type
 from sparcur.utils import log
 
 
@@ -300,15 +301,24 @@ class BlackfynnCache(PrimaryCache, EatCache):
         # it will be much better implement this from Path directly using xattrs()
         drp = self.local.relative_to(self.dataset.local)
         meta = self.meta  # TODO see what we need from this
-        N, package = self.id.split(':', 1)
+        N, bf_id = self.id.split(':', 1)  # FIXME SODA use case
         uri_api = self.uri_api  # FIXME vs self.uri_api_package ?
-        uri_human = self.uri_human,
+        uri_human = self.uri_human
         blob = {
             'type': 'path',
+            'dataset_relative_path': drp,
             'uri_api': uri_api,  # -> @id in the @context
             'uri_human': uri_human,
-            'package_id': package,  # FIXME N:package:asdf is nasty for jsonld but ...
-            'dataset_relative_path': drp,
+            'remote_id': bf_id,
+            # FIXME N:package:asdf is nasty for jsonld but ...
+            # yes the bf_id will have to be parsed to know what
+            # endpoint to send it to ... yay for scala thinking amirite !? >_<
+            # but at least for this particular structure it
+
+            # NOTE packages are collections of size 1 > more
+            # and and when they happend to have only a single
+            # member they are conflated with the single file
+            # they contain
         }
 
         mimetype = self.mimetype
@@ -329,6 +339,18 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         needs of the curation process. """
 
     _cache_class = BlackfynnCache
+
+    @classmethod
+    def fromJson(cls, blob):
+        # TODO check
+        if (hasattr(cls, '_cache_class') and
+            hasattr(cls._cache_class, '_anchor') and
+            cls._cache_class._anchor is not None):
+            l = cls._cache_class._anchor.local
+            path_relative_string = blob['dataset_relative_path']
+            return l / path_relative_string
+        else:
+            return blob  # FIXME TODO
 
     @property
     def cache_id(self):
@@ -490,6 +512,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
 
 Path._bind_flavours()
+register_type(Path, 'path')
 
 
 class StashCache(BlackfynnCache):

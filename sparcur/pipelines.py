@@ -359,7 +359,8 @@ class ManifestFilePipeline(PathPipeline):
     @property
     def transformed(self):
         dsr_path = self.path.relative_to(self.path.cache.dataset)
-        data = super().transformed
+        contents = super().transformed
+        data = {'contents': contents}
         self.path.populateJsonMetadata(data)
         return data
 

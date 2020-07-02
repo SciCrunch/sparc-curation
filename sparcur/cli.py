@@ -123,6 +123,7 @@ Commands:
                        : --export-file=PATH
                        : --ttl-file=PATHoURI
                        : --ttl-compare=PATHoURI
+                       : --published
 
     shell       drop into an ipython shell
 
@@ -178,6 +179,7 @@ Options:
     -A --latest             run derived pipelines from latest json
     -P --partial            run derived pipelines from the latest partial json export
     -W --raw                run reporting on live data without export
+    --published             run on the latest published export
     --to-sheets             push report to google sheets
     --ttl-file=PATHoURI     location of ttl file (uses latest if not specified)
     --ttl-compare=PATHoURI  location of ttl file for comparison

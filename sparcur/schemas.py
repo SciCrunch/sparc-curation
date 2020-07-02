@@ -1173,20 +1173,55 @@ class ManifestRecordExportSchema(JSONSchema):
     }
 
 
+class PathSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Path', 'owl:NamedIndividual']},
+        'required': ['type',
+                     'dataset_relative_path',
+                     'uri_api',
+                     'uri_human',
+                     ],
+        'properties': {
+            'type': {'type': 'string',
+                     'enum': ['path']},
+            'dataset_relative_path': {'type': 'string'},
+            'uri_api': {'type': 'string',
+                        'pattern': simple_url_pattern},
+            'uri_human': {'type': 'string',
+                          'pattern': simple_url_pattern},
+            'remote_id': {'type': 'string'},
+            'mimetype': {'type': 'string'},
+            'magic_mimetype': {'type': 'string'},
+            'contents': {'type': 'object'},  # opqaue here
+            'errors': ErrorSchema.schema,
+        }
+    }
+
+
 class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
     schema = {
         'type': 'object',
         'jsonld_include': {'@type': ['sparc:File', 'owl:NamedIndividual']},
-        'required': ['dataset_relative_path', 'manifest_records'],  # TODO uri_api
-        'properties': {
-            'dataset_relative_path': {'type': 'string'},
-            'manifest_records': {
-                'type': 'array',
-                'minItems': 1,
-                'items': ManifestRecordExportSchema.schema,
-            },
-            'errors': ErrorSchema.schema,
-        }
+        'allOf': [
+            PathSchema.schema,
+            {'required': ['manifest_records', 'contents'],  # TODO uri_api
+             'properties': {
+                 'errors': ErrorSchema.schema,
+                 'contents':  {
+                     'type': 'object',
+                     'required': ['manifest_records'],
+                     'properties': {
+                         'manifest_records': {
+                             'type': 'array',
+                             'minItems': 1,
+                             'items': ManifestRecordExportSchema.schema,
+                         },
+                     },
+                 },
+             },
+             },
+        ]
     }
 
 
