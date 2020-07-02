@@ -64,6 +64,7 @@ def disco(dataset_blobs, graphs):
     subjects = [['id', 'blob']]
     errors = [['id', 'blob']]
     resources = [['id', 'blob']]
+    error_reports = [['path', 'message']]
 
     #cje = JEncode()
     def normv(v):
@@ -175,9 +176,17 @@ def disco(dataset_blobs, graphs):
                 row.append(json.dumps(er, cls=JEncode))
                 errors.append(row)
 
+        if 'status' in dowe:
+            if 'path_error_report' in dowe['status']:
+                per = dowe['status']['path_error_report']
+                for path, report in sorted(per.items(), key=lambda kv: kv[0]):
+                    for message in report['messages']:
+                        error_reports.append([path, message])
+
     # TODO samples resources
     return (('datasets', datasets),
             ('contributors', contributors),
             ('subjects', subjects),
             ('resources', resources),
-            ('errors', errors))
+            ('errors', errors),
+            ('error_reports', error_reports),)

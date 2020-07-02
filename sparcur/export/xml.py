@@ -11,8 +11,9 @@ def xml(dataset_blobs):
     #datasets = []
     #contributors = []
     subjects = []
-    errors = []
     resources = []
+    errors = []
+    error_reports = []
 
     def normv(v):
         if is_list_or_tuple(v):
@@ -69,9 +70,15 @@ def xml(dataset_blobs):
                 er = {k:normv(v) for k, v in er.items()}
                 errors.append(er)
 
+        if 'status' in dowe:
+            if 'path_error_report' in dowe['status']:
+                error_reports.append(dowe['status']['path_error_report'])
+
     xs = dicttoxml.dicttoxml({'subjects': subjects})
     xr = dicttoxml.dicttoxml({'resources': resources})
     xe = dicttoxml.dicttoxml({'errors': errors})
+    xer = dicttoxml.dicttoxml({'error_reports': error_reports})
     return (('subjects', xs),
             ('resources', xr),
-            ('errors', xe))
+            ('errors', xe),
+            ('error_reports', xer),)
