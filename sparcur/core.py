@@ -1,6 +1,7 @@
 import copy
 import json
 import itertools
+from types import GeneratorType
 from pathlib import PurePath
 from datetime import datetime
 from functools import wraps
@@ -827,9 +828,53 @@ class _DictTransformer:
         """
 
         for path, function in updates:
-            value = adops.get(data, path)
+            if int in path:  # unlike adops.add, this has to be implemented in DT
+                pivot = path.index(int)
+                before = path[:pivot]
+                after = path[pivot + 1:]
+                try:
+                    collection = adops.get(data, before)
+                except exc.NoSourcePathError as e:
+                    if source_key_optional:
+                        continue
+                    else:
+                        raise e
+
+                assert is_list_or_tuple(collection)
+
+                if pivot + 1 == len(path):
+                    # have to update list in place not just its elements
+                    # because int is the terminal element in the path
+                    # NOTE this is NOT functional, this modifies in place
+                    _DictTransformer.update(
+                        collection,
+                        # fun rewite here
+                        [[[i], function] for i in range(len(collection))],
+                        source_key_optional=source_key_optional)
+                else:
+                    # nominally safe to run in parallel here
+                    # if python could actually do it
+                    for obj in collection:
+                        _DictTransformer.update(
+                            obj,
+                            [[after, function]],  # construct mini updates spec
+                            source_key_optional=source_key_optional)
+
+                continue
+
+            try:
+                value = adops.get(data, path)
+            except exc.NoSourcePathError as e:
+                if source_key_optional:
+                    continue
+                else:
+                    raise e
+
             new = function(value)
-            adops.update(data, path, new)
+            if isinstance(new, GeneratorType):
+                new = tuple(new)
+
+            adops.update(data, path, new)  # this will fail if data is immutable
 
     @staticmethod
     def get(data, gets, source_key_optional=False):

@@ -13,7 +13,6 @@ class Examples:
         yield {'world': [{'hello': 'there'},
                          {'hello': 'there'}]}, {'world': [{},
                                                           {}]}, (['world', int, 'hello'], 'there')
-
     @property
     def add_error(self):
         yield {'hello':'1'}, {'hello':'1'}, (['hello'], 'there')
@@ -61,6 +60,15 @@ class Examples:
         yield {'another':'1'}, {}, (['hello'], ['another'])
         yield {'another':'2'}, {'another':0, 'hello':'world'}, (['hello'], ['another'])
 
+    @property
+    def update(self):
+        yield [0, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6], ([0], 0)
+
+    @property
+    def update_error(self):
+        # tuple object does not support item assignment
+        yield (0, 2, 3, 4, 5, 6), (1, 2, 3, 4, 5, 6), ([0], 0)
+
 
 class TestDer(unittest.TestCase):
     def test_der(self):
@@ -94,6 +102,21 @@ class ExamplesDT:
     @property
     def lift(self):
         yield {'hello':'there'}, {'hello': 'world'}, [[['hello'], lambda v: 'there']]
+
+    @property
+    def update(self):
+        yield {'hello':[
+            'there',
+            'there',]}, {'hello': [
+                'general',
+                'kenobi',
+            ]}, [[['hello', int], lambda v: 'there']]
+
+        yield {'hello':[
+            {'n': 1},
+            {'n': 1}]}, {'hello': [
+                {'n': 0},
+                {'n': 0}]}, [[['hello', int, 'n'], lambda v: v + 1]]
 
 
 def failed_to_error(function, data, args):
@@ -145,13 +168,13 @@ class Populator:
 
 
 class TestAdops(Examples, Populator, unittest.TestCase):
-    functions = 'add', 'copy', 'move'
+    functions = 'add', 'copy', 'move', 'update'
     to_test = adops
 TestAdops.populate()
 
 
 class TestDictTransformer(ExamplesDT, Populator, unittest.TestCase):
-    functions = 'lift', 'derive'
+    functions = 'lift', 'derive', 'update'
     to_test = DictTransformer
     apply = False
 TestDictTransformer.populate()
