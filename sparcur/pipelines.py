@@ -1483,6 +1483,8 @@ class ProtcurPipeline(Pipeline):
         na = hrm['not-ast']
         nested = hrm[None]  # TODO
 
+        data['TEMP:hasNumberOfProtcurAnnotations'] = len(anp)
+
         for tag, predicate, *norm in (
                 ('ilxtr:technique', 'TEMP:protocolEmploysTechnique', normalize_tech),
 

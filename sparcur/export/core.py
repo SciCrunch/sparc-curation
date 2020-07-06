@@ -583,19 +583,21 @@ class Export(ExportBase):
         blob_id_met = self.export_identifier_metadata(dump_path, previous_latest, dataset_blobs)
         teim = self.export_identifier_rdf(dump_path, blob_id_met)
 
-        # protcur
-        blob_protcur = self.export_protcur(dump_path, 'sparc-curation')  # FIXME  # handle orthogonally
-
-        # protocol  # handled orthogonally ??
-        #blob_protocol = self.export_protocols(dump_path, dataset_blobs, blob_protcur)
-
         # rdf
         teds = self.export_rdf(dump_path, previous_latest_datasets, dataset_blobs)
         tes = ex.TriplesExportSummary(blob_ir, teds=teds + [teim])
-        populateFromJsonLd(tes, blob_protcur)  # this makes me so happy
+
+        # protcur  # FIXME running after because rdf export side effects anno sync
+        blob_protcur = self.export_protcur(dump_path, 'sparc-curation')  # FIXME  # handle orthogonally
+
+        blob_protcur_path = dump_path / 'protcur.json'  # FIXME SIGH
+        populateFromJsonLd(tes.graph, blob_protcur_path)  # this makes me so happy
 
         with open(filepath_ir.with_suffix('.ttl'), 'wb') as f:
             f.write(tes.ttl)
+
+        # protocol  # handled orthogonally ??
+        #blob_protocol = self.export_protocols(dump_path, dataset_blobs, blob_protcur)
 
         # xml
         self.export_xml(filepath_ir, dataset_blobs)
