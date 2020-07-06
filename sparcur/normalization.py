@@ -15,6 +15,38 @@ BLANK_VALUE = object()
 NOT_APPLICABLE = object()
 
 
+def protocol_url_or_doi(value):
+    # FIXME can't use idlib.get_right_id because it is
+    # totally broken with regard to dereferencing
+    if not is_list_or_tuple(value):
+        value = value,
+        out = None
+    else:
+        out = []
+
+    for v in value:
+        if not isinstance(v, idlib.Stream):
+            raise TypeError(f'should already be in stream form {v}')
+
+        normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
+        if not isinstance(normed, idlib.Pio) and isinstance(v, idlib.Doi):
+            # ensure that regular dois are returned, not their referents
+            # if it is a protocol id, use that as primary and reference the doi
+            # using hasDoi, because the doi metadata is technically different
+            # from the protocol metadata/data
+            normed = v
+
+        if out is None:
+            return normed
+
+        out.append(normed)
+
+    if isinstance(value, tuple):
+        out = tuple(out)  # preserve types prevent errors!
+
+    return out
+
+
 class _Unknown(str):
     def __new__(cls, value=None):
         return str.__new__(cls, 'UNKNOWN')

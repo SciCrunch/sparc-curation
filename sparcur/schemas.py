@@ -34,7 +34,7 @@ base_context = {
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
     'subjects': 'TEMP:hasSubGraph',  #'_bfc:#subjects-graph',  # FIXME I think the fragment is the right thing to do here ...
     'samples': 'TEMP:hasSubGraph',  #'_bfc:#samples-graph',
-    'contributors': '_bfc:#contributors-graph',
+    'contributors': '_bfc:#contributors-graph',  # FIXME broken I think
     #'N:dataset': {'@id': 'https://api.blackfynn.io/datasets/'},  # darn it multiprefix issues
     **{p: {'@id': n, '@prefix': True}
        if [c for c in prefix_endswith if n.endswith(c)]

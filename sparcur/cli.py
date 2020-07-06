@@ -11,7 +11,7 @@ Usage:
     spc status   [options]
     spc meta     [options] [<path>...]
     spc rmeta    [options]
-    spc export   [schemas] [options] [<path>...]
+    spc export   [schemas protcur protocols] [options] [<path>...]
     spc report   size    [options] [<path>...]
     spc report   tofetch [options] [<directory>...]
     spc report   terms   [anatomy cells subcelluar] [options]
@@ -25,7 +25,7 @@ Usage:
     spc server   [options]
     spc apinat   [options] <path-in> <path-out>
     spc tables   [options] [<directory>...]
-    spc annos    [options] [export shell]
+    spc annos    [options] [fetch export shell]
     spc feedback <feedback-file> <feedback>...
     spc missing  [options]
     spc xattrs   [options]
@@ -206,6 +206,10 @@ Options:
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
     --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
+
+    --project-id=PID        alternate way to pass project id  [default: {auth.get('blackfynn-organization')}]
+
+    --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: sparc-curation]
 """
 
 from time import time
@@ -258,6 +262,18 @@ class Options(clif.Options):
         return Path(self.export_path) / 'schemas'  # FIXME not sure if correct
 
     @property
+    def export_protcur_base(self):
+        return Path(self.export_path) / 'protcur'  # FIXME not sure if correct
+
+    @property
+    def export_protocols_base(self):
+        return Path(self.export_path) / 'protocols'  # FIXME not sure if correct
+
+    @property
+    def project_id(self):
+        return self._args['<project-id>'] or self._args['--project-id']
+
+    @property
     def jobs(self):
         return int(self._args['--jobs'])
 
@@ -280,6 +296,10 @@ class Options(clif.Options):
     @property
     def rate(self):
         return int(self._args['--rate']) if self._args['--rate'] else None
+
+    @property
+    def fetch(self):
+        return self._args['--fetch'] or self._default_fetch
 
     @property
     def mbf(self):
@@ -444,9 +464,11 @@ class Main(Dispatcher):
             self.options.anno_tags or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
+            self.options.annos or
             (self.options.report and not self.options.raw) or
             (self.options.report and self.options.export_file) or
             (self.options.export and self.options.schemas) or
+            (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
             (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
@@ -926,6 +948,36 @@ done"""
         if self.options.schemas:
             ex.core.export_schemas(self.options.export_schemas_path)
 
+        elif self.options.protcur or self.options.protocols:
+            export = self._export(ex.Export, org_id=self.options.project_id)  # FIXME org_id not needed ...
+            # FIXME dump_path shouldn't need to be passed explicitly
+            dump_path = (self.options.export_protcur_base /
+                         self._folder_timestamp)
+            dump_path.mkdir(parents=True)
+            hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
+            blob_protcur = export.export_protcur(dump_path, hgn)
+            # NOTE --latest will also pull from latest protcur export
+            # if it exists I think, the issue is with repeated export
+            # of the same content ... as usual, which will confuse
+            # EVERYTHING if we want the latest protcur export but
+            # not the latest dataset export, this will have to be
+            # dealt with when we move to the default state being
+            # to update datasets independently where there will only
+            # be a fully integrated dataset when we do the conversion
+            # to ttl or bulk load into foundry etc.
+            if self.options.protocols:  # TODO
+                protcur_dump_path = dump_path
+                dataset_blob = []  # FIXME FIXME
+                dump_path = (self.options.export_protocols_base /
+                             self._folder_timestamp)
+                dump_path.mkdir(parents=True)
+                export.export_protocols(dump_path,
+                                        dataset_blobs,
+                                        blob_protcur)
+                # need to be able to run this from arbitrary dataset blobs
+                # in a way that is marginally sane
+                raise NotImplementedError('dataset blobs inclusion please')
+
         elif self.options.mbf:
             export = self._export(ex.ExportXml)
             dataset_paths = self._datasets_with_extension('xml')
@@ -953,6 +1005,53 @@ done"""
             breakpoint()
 
     def annos(self):
+        hgn = self.options.hypothesis_group_name
+        if self.options.fetch:
+            from hyputils import hypothesis as hyp
+            group_id = auth.user_config.secrets('hypothesis', 'group', hgn)
+            cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+            get_annos = hyp.Memoizer(cache_file, group=group_id)
+            get_annos.api_token = auth.get('hypothesis-api-key')  # FIXME ?
+            annos = get_annos()
+            return
+
+        from protcur.analysis import protc
+        from sparcur import pipelines as pipes
+        pipe = pipes.ProtcurPipeline(hgn)
+        _annos = pipe.load()
+
+        # using _annos here as we transition to use ptcdoc.Annotation
+        # instead of the base hypothesis annotation as the substrate
+        annos, idints, pidints = pipe._idints(_annos)
+
+        pidints = None  # repr issues
+        # the per doc use case is rather different from the traditional
+        # protcur use case because the traditional protcur use case
+        # assumes that protocols routinely cross document boundaries
+        # which is absolutely the case when curating from the literature
+        # from protocols.io not quite so much
+
+        per_pid = {pid:protc.protcurLang([a.id for a in idannos])
+                   # FIXME protcur export has been insanely
+                   # slow for a long time and continues to be
+                   for pid, idannos in idints.items()}
+
+        if self.options.export:
+            base = Path('/tmp/protcur-rkt/')
+            base.mkdir(exist_ok=True)
+
+            for pid, string in per_pid.items():
+                fn = (pid.identifier.suffix
+                    if isinstance(pid, idlib.Pio) and pid.identifier.is_int() else
+                      (pid.suffix if isinstance(pid, idlib.Pio._id_class) else
+                       pid.replace('/', '_').replace(':', '_'))) + '.ptc'
+                with open(base / fn, 'wt') as f:
+                    f.write(string)
+
+            with open('/tmp/sparc-protcur.rkt', 'wt') as f:
+                f.write(protc.parsed())
+
+        """
         if self.options.raw:
             data = self.summary.data()
         else:
@@ -974,10 +1073,6 @@ done"""
                     except exc.NoSourcePathError:
                         pass
 
-        if self.options.export:
-            with open('/tmp/sparc-protcur.rkt', 'wt') as f:
-                f.write(protc.parsed())
-
         pa = ProtocolActual()
         all_blackfynn_uris = set(pa.protocol_uris_resolved)
         all_hypothesis_uris = set(a.uri for a in protc)
@@ -987,6 +1082,7 @@ done"""
             all_annos = [list(protc.byIri(uri))
                          for uri in f.protocol_uris_resolved]
             breakpoint()
+        """
 
     def demos(self):
         # get the first dataset
@@ -1382,8 +1478,7 @@ done"""
     def show(self):
         if self.options.export:
             from sparcur import export as ex
-            org_id = self.options.project_id if self.options.project_id else auth.get('blackfynn-organization')
-            export = self._export(ex.Export, org_id=org_id)
+            export = self._export(ex.Export, org_id=self.options.project_id)
             if self.options.json:
                 export.latest_export_path.xopen(self.options.open)
             elif self.options.ttl:
@@ -1405,8 +1500,7 @@ done"""
             data = self.summary.data()
         else:
             from sparcur import export as ex
-            org_id = auth.get('blackfynn-organization')
-            export = self._export(ex.Export, org_id=org_id)
+            export = self._export(ex.Export, org_id=self.options.project_id)
             data = export.latest_ir
 
         # check that the ir is sane
@@ -1475,6 +1569,7 @@ class Shell(Dispatcher):
 
     def exit(self):
         """ useful for profiling startup time issues """
+        self.options.project_id
         print('Peace.')
         return
 

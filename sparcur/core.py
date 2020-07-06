@@ -76,6 +76,7 @@ OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
            'DOI':'https://doi.org/',
            'ror':'https://ror.org/',
+           'pio.api': 'https://www.protocols.io/api/v3/protocols/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
@@ -118,7 +119,7 @@ class OntTerm(OTB, OntId):
 
     @classmethod
     def fromJson(cls, blob):
-        assert blob['identifier_type'] == cls.__name__
+        assert blob['system'] == cls.__name__
         identifier = blob['id']
         if isinstance(identifier, cls):
             return identifier
@@ -365,6 +366,20 @@ def JFixKeys(obj):
         return [JFixKeys(v) for v in obj]
     else:
         return obj
+
+
+def get_nested_by_key(obj, key, *args, path=None, collect=tuple()):
+    if isinstance(obj, dict) and key in obj:
+        value = obj[key]
+        if is_list_or_tuple(value):
+            for v in value:
+                n = json_export_type_converter(v)
+                collect.append(n if n is not None else v)
+        else:
+            n = json_export_type_converter(value)
+            collect.append(n if n is not None else value)
+
+    return obj  # have to return this otherwise somehow everything is turned to None?
 
 
 def JApplyRecursive(function, obj, *args,

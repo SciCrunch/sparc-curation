@@ -7,7 +7,7 @@ from itertools import chain
 from collections import Counter
 import idlib
 import requests
-from pyontutils.core import OntGraph
+from pyontutils.core import OntGraph, populateFromJsonLd
 from pyontutils.utils import Async, deferred
 from sparcur import export as ex
 from sparcur import schemas as sc
@@ -260,6 +260,15 @@ class Export(ExportBase):
             return json.load(f)
 
     @property
+    def latest_protcur_path(self):
+        return self.base_path / 'protcur.json'
+
+    @property
+    def latest_protcur(self):
+        with open(self.latest_protcur_path, 'rt') as f:
+            return json.load(f)
+
+    @property
     def latest_id_met_path(self):
         return self.base_path / self.id_metadata
 
@@ -377,20 +386,25 @@ class Export(ExportBase):
 
         return teds
 
-    def export_protocols(self, dump_path, dataset_blobs, summary):
+    def export_protocols(self, dump_path, dataset_blobs, blob_protcur):
 
         if (self.latest and
             self.latest_protocols_path.exists()):
             blob_protocols = self.latest_protocols
         else:
-            protocols = list(summary.protocols(dataset_blobs))
-            # FIXME regularize summary structure for discoverability
+            pios = pipes.ExtractProtocolIds(dataset_blobs).data
+            protocols = []
+            for p in pios:
+                d = p.data()
+                protocols.append(d)
+            # FIXME regularize top level structure for discoverability
             blob_protocols = {
                 'meta': {'count': len(protocols)},
                 'prov': {'timestamp_export_start': self.timestamp,
                          'export_system_identifier': Path.sysid,
                          'export_hostname': gethostname(),
-                         'export_project_path': self.export_source_path.cache.anchor,},
+                         'export_datasets_identity': 'TODO',
+                         'export_protcur_identity': 'TODO',},
                 'protocols': protocols,  # FIXME regularize elements ?
             }
 
@@ -398,6 +412,31 @@ class Export(ExportBase):
             json.dump(blob_protocols, f, sort_keys=True, indent=2, cls=JEncode)
 
         return blob_protocols
+
+    def export_protcur(self, dump_path, *hypothesis_groups):
+        if (self.latest and
+            self.latest_protcur_path.exists()):
+            blob_protcur = self.latest_protocols
+        else:
+            pipeline = pipes.ProtcurPipeline(*hypothesis_groups)
+            protcur = pipeline.data
+            context = {**sc.base_context}
+            for f in ('meta', 'subjects', 'samples', 'contributors'):
+                context.pop(f)  # FIXME HACK meta @graph for datasets
+
+            blob_protcur = {
+                '@context': context,
+                'meta': {'count': len(protcur)},  # FIXME adjust to structure
+                'prov': {'timestamp_export_start': self.timestamp,
+                         'export_system_identifier': Path.sysid,
+                         'export_hostname': gethostname(),},
+                '@graph': protcur,  # FIXME regularize elements ?
+            }
+
+        with open(dump_path / 'protcur.json', 'wt') as f:
+            json.dump(blob_protcur, f, sort_keys=True, indent=2, cls=JEncode)
+
+        return blob_protcur
 
     def export_identifier_metadata(self, dump_path, latest_path, dataset_blobs):
 
@@ -544,12 +583,16 @@ class Export(ExportBase):
         blob_id_met = self.export_identifier_metadata(dump_path, previous_latest, dataset_blobs)
         teim = self.export_identifier_rdf(dump_path, blob_id_met)
 
-        # protocol
-        #blob_protocol = self.export_protocols(dump_path, dataset_blobs, summary)
+        # protcur
+        blob_protcur = self.export_protcur(dump_path, 'sparc-curation')  # FIXME  # handle orthogonally
+
+        # protocol  # handled orthogonally ??
+        #blob_protocol = self.export_protocols(dump_path, dataset_blobs, blob_protcur)
 
         # rdf
         teds = self.export_rdf(dump_path, previous_latest_datasets, dataset_blobs)
         tes = ex.TriplesExportSummary(blob_ir, teds=teds + [teim])
+        populateFromJsonLd(tes, blob_protcur)  # this makes me so happy
 
         with open(filepath_ir.with_suffix('.ttl'), 'wb') as f:
             f.write(tes.ttl)

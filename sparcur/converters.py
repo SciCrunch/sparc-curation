@@ -287,7 +287,8 @@ class MetaConverter(TripleConverter):
             else:
                 pioid = value
 
-            s = self.c.l(pioid)
+            pioid_int = pioid.uri_api_int
+            s = self.c.l(pioid_int)
 
             # FIXME needs to be a pipeline so that we can export errors
             try:

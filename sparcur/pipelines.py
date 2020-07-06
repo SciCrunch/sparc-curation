@@ -1,23 +1,29 @@
 import copy
 import json
 from pathlib import Path
-from collections import deque
+from itertools import chain
+from collections import deque, defaultdict
 import idlib
 import rdflib
 from joblib import Parallel, delayed
+from hyputils import hypothesis as hyp
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
 from pyontutils.closed_namespaces import rdf, rdfs, owl
+from protcur import document as ptcdoc
+from protcur.analysis import protc
 from sparcur import apinat
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import converters as conv
 from sparcur import exceptions as exc
+from sparcur import normalization as norm
 from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
 from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
 from sparcur.state import State
+from sparcur.config import auth
 from sparcur.derives import Derives
 
 DT = DictTransformer
@@ -792,7 +798,15 @@ class SPARCBIDSPipeline(JSONPipeline):
                 [['meta', 'sample_count']]],
     )
 
-    updates = []
+    updates = [
+        # this is the stage at which normalization should actually happen I think
+        # or at least normalization that is not required to prevent pipelines from
+        # breaking themselves
+        # TODO a way to indicate any key matching ? or does that seem like a bad idea?
+        [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+    ]
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
     adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],]
@@ -1010,7 +1024,8 @@ class PipelineExtras(JSONPipeline):
                 _test_path = deque(['meta', 'protocol_url_or_doi'])
                 if not [e for e in data['errors']
                         if 'path' in e and e['path'] == _test_path]:
-                    raise ext.ShouldNotHappenError('urg')
+                    breakpoint()
+                    raise exc.ShouldNotHappenError('urg')
 
             else:
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
@@ -1361,6 +1376,168 @@ class ToJsonLdPipeline(JSONPipeline):
     @property
     def data(self):
         return super().data
+
+
+class ExtractProtocolIds(Pipeline):
+
+    def __init__(self, blob):
+        self._blob = blob
+
+    @property
+    def data(self):
+        data = self._blob
+        collect = []
+        JApplyRecursive(get_nested_by_key,
+                        data,
+                        'protocol_url_or_doi',
+                        collect=collect)
+        unique = sorted(set(collect))  # already dereferenced and normalized at this point
+        return [i for i in ids if isinstance(i, idlib.Pio)]
+
+
+class ProtcurPipeline(Pipeline):
+
+    # there is no previous pipeline here
+    # FIXME cleanup and align naming with path pipeline probably?
+
+    def __init__(self, *hypothesis_group_names):
+        self._hypothesis_group_names = hypothesis_group_names
+
+    def load(self):  # if the dereferenced resource is remote, get a local copy
+        annos = []
+        for group_name in self._hypothesis_group_names:
+            group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
+            cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+            get_annos = hyp.AnnoReader(cache_file, group_id)
+            annos.extend(get_annos())
+            # FIXME hyputils has never been engineered to work with
+            # multiple groups at the same time using the same auth
+            # so everything is backwards from what it should be since
+            # the perspective of the original imlementation was focused
+            # on groups (and because no implementation should be focused
+            # on auth, which should be handled orthgonally)
+
+        return annos
+
+    def _idints(self, annos=None):
+        if annos is None:
+            annos = self.load()
+
+        _annos = annos
+        annos = [ptcdoc.Annotation(a) for a in annos]
+        #pool = ptcdoc.Pool(annos)
+        #anno_counts = ptcdoc.AnnoCounts(pool)
+        #idn = ptcdoc.IdNormalization(anno_counts.all())
+        idn = ptcdoc.IdNormalization(annos)
+        protcs = [protc(f, annos) for f in annos]
+        idints = idn._uri_api_ints()
+        nones = idints.pop(None)
+        nidn = ptcdoc.IdNormalization(nones)
+        idints.update(nidn.normalized())
+        pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
+        return annos, idints, pidints
+
+    @staticmethod
+    def _annos_to_json(data, annos):
+        def partition(a):
+            return ('ast-no-parents'
+                    if a.is_protcur_lang() else
+                    ('not-ast' if not a.isAstNode else None))
+
+        def normalize_tech(a):
+            have_value = False
+            cands = (
+                'tech:',
+                'NLXINV:',
+                'BIRNLEX:',
+            )
+            for tag in chain(a.tags, (t for c in a.replies for t in c.tags)):
+                if tag == 'ilxtr:technique':
+                    continue
+                elif any(tag.startswith(t) for t in cands):
+                    return OntTerm(tag)  # FIXME jsonld string issue ...
+                elif 'technique' in tag:
+                    return tag
+
+            return a.value
+
+        def normalize_other(a):
+            for tag in a.tags:
+                if tag.startswith('UBERON:'):
+                    return OntTerm(tag)  # FIXME jsonld string issue
+
+            if a.value:
+                return a.value
+            elif a.exact:
+                return a.exact
+            else:
+                return a.text
+
+        def clean(v):
+            nbsp = '\xa0'  # the vails of the non breaking space for formatting :/
+            return v.strip().replace(nbsp, ' ')
+
+        hrm = defaultdict(list)
+        _ = [hrm[partition(a)].append(a) for a in annos]
+        anp = hrm['ast-no-parents']  # TODO
+        na = hrm['not-ast']
+        nested = hrm[None]  # TODO
+
+        for tag, predicate, *norm in (
+                ('ilxtr:technique', 'TEMP:protocolEmploysTechnique', normalize_tech),
+
+                ('protc:aspect', 'TEMP:protocolInvolvesAspect'),  # FIXME source from protcs
+                ('protc:implied-aspect', 'TEMP:protocolInvolvesAspect'),  # FIXME source from protcs
+                # TODO aspects of subjects vs reagents, primary particiant in the
+                # core protocols vs subprotocols
+
+                ('sparc:AnatomicalLocation', 'TEMP:involvesAnatomicalRegion'),
+                ('sparc:Measurement', 'TEMP:protocolMakesMeasurement'),
+                ('sparc:Reagent', 'TEMP:protocolUsesReagent'),
+                ('sparc:Tool', 'TEMP:protocolUsesTool'),
+                ('sparc:Sample', 'TEMP:protocolInvolvesSampleType'),
+                ('sparc:OrganismSubject', 'TEMP:protocolInvolvesSubjectType'),
+                ('sparc:Procedure', 'TEMP:whatIsThisDoingHere'),
+        ):
+            if not norm:
+                norm = normalize_other
+            else:
+                norm, = norm
+
+            vals = sorted(set([clean(norm(a)) for a in annos if tag in a.tags]))
+            if vals:
+                data[predicate] = vals
+
+    def _hrm(self):
+        annos, idints, pidints = self._idints()
+        out = []
+        for pio, pannos in pidints.items():
+            data = {}
+            if type(pio) != str:
+                _id = pio.asStr()
+            else:
+                _id = pio
+
+            data['id'] = pio
+            data['@type'] = ['sparc:Protocol', 'owl:NamedIndividual']
+            self._annos_to_json(data, pannos)
+            log.debug(data)
+            out.append(data)
+
+        return out
+
+    @property
+    def data(self):
+        return self._hrm()
+
+
+class ProtocolPipeline(Pipeline):
+
+    # previous pipeline is pipeline end, but
+    # it doesn't run that way
+
+    def __init__(self, blob):
+        pass
 
 
 class ListAllDatasetsPipeline(Pipeline):
