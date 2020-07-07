@@ -168,12 +168,12 @@ class TriplesExportDataset(TriplesExport):
                 creators = data['creators']
             else:
                 creators = []
-            for c in data['contributors']:
+            for i, c in enumerate(data['contributors']):
                 creator = ('name' in c and
                            [cr for cr in creators if 'name' in cr and cr['name'] == c['name']])
-                yield from self.triples_contributors(c, creator=creator)
+                yield from self.triples_contributors(c, i, creator=creator)
 
-    def triples_contributors(self, contributor, creator=False):
+    def triples_contributors(self, contributor, contributor_order_index, creator=False):
         try:
             dsid = self.dsid  # FIXME json reload needs to deal with this
         except BaseException as e:  # FIXME ...
@@ -211,6 +211,7 @@ class TriplesExportDataset(TriplesExport):
         yield dcs, rdf.type, sparc.DatasetContribution
         yield dcs, TEMP.aboutDataset, dsid  # FIXME forDataset?
         yield dcs, TEMP.aboutContributor, s
+        yield dcs, TEMP.contributorOrderIndex, rdflib.Literal(contributor_order_index)
         dconverter = conv.DatasetContributorConverter(contributor)
         for _s, p, o in dconverter.triples_gen(dcs):
             if p == sparc.isContactPerson and o._value == True:
