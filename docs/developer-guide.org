@@ -6,7 +6,7 @@
 
 * Demos
 ** Remote only connection
-This is the simplest way to get a remote only connection to Blackfynn
+This is the simplest way to get a remote only connection to Blackfynn.
 #+BEGIN_SRC python
 from sparcur.paths import BlackfynnCache, Path
 from sparcur.config import auth
@@ -51,3 +51,325 @@ print(sorted(data.keys()))
 
 #+RESULTS:
 : ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'samples', 'size', 'subjects']
+* Internal Structure
+** Utility
+#+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes
+#+end_src
+
+#+name: simple-utils
+#+begin_src python :tangle ../sparcur/simple/utils.py
+from sparcur.paths import Path, BlackfynnCache
+from sparcur.backends import BlackfynnRemote
+
+
+def backend_blackfynn(Local=Path, Cache=BlackfynnCache):
+    """ return a configured blackfynn backend
+        calling this is sufficient to get everything set up correclty """
+
+    RemotePath = BlackfynnRemote._new(Local, Cache)
+    return RemotePath
+#+end_src
+** Pipelines
+Easier to read, harder to debug. The python paradox.
+*** Retrieve
+**** Protocols
+Cache annotations.
+#+begin_src python :tangle ../sparcur/simple/fetch_annotations.py
+from pathlib import Path
+from hyputils import hypothesis as hyp
+from sparcur.config import auth
+
+
+def from_group_name_fetch_annotations(group_name):
+    """ pull hypothesis annotations from remote to local """
+    group_id = auth.user_config.secrets('hypothesis', 'group', hgn)
+    cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+    get_annos = hyp.Memoizer(cache_file, group=group_id)
+    get_annos.api_token = auth.get('hypothesis-api-key')  # FIXME ?
+    annos = get_annos()
+    return cache_file  # needed for next phase, annos are not
+
+
+def main():
+    from_group_name_fetch_annotations('sparc-curation')
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+**** Datasets
+***** Rmeta
+Remote metadata can be retrieved using only a project_id. However,
+it is usually more effective to retrieve it at the same time as
+fetching metadata files since it runs in parallel per dataset.
+#+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata.py
+from joblib import Parallel, delayed
+from sparcur.backends import BlackfynnDatasetData
+
+
+# fetch remote metadata
+def from_id_fetch_remote_metadata(id):
+    if
+    BlackfynnDatasetData(id)
+
+def main():
+    pass
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+***** Clone
+This is an example of how to clone the top level of a project.
+See ref:simple-utils for a good way to instantiate =RemotePath=.
+#+name: simple-clone
+#+begin_src python :tangle ../sparcur/simple/clone.py
+from pathlib import Path
+
+
+# sparse clone top level
+def from_path_id_and_backend_project_top_level(parent_path, project_id, RemotePath, symlink_objects_to=None):
+    """ given the enclosing path to clone to, the project_id, and a fully
+        configured (with Local and Cache) backend remote path, anchor the
+        project pointed to by project_id along with the first level of children """
+
+    RemotePath.init(project_id)  # calling init is required to bind RemotePath._api
+    anchor = RemotePath.smartAnchor(parent_path)
+    anchor.local_data_dir_init(symlink_objects_to=symlink_objects_to)
+    list(anchor.children)
+    project_path = anchor.local
+    return project_path  # returned instead of anchor & children because it is needed by next phase
+
+
+def main(parent_path=None, parent_parent_path=Path.cwd(), organization_auth_var='blackfynn-organization'):
+    """ clone a project into a random subfolder of the current folder
+        or specify the parent path to clone into """
+    import tempfile
+    from sparcur.config import auth
+    from sparcur.simple.utils import backend_blackfynn
+
+    if parent_path is None:
+        parent_path = Path(tempfile.mkdtemp(dir=parent_parent_path))
+
+    project_id = auth.get(organization_auth_var)
+    RemotePath = backend_blackfynn()
+    symlink_objects_to = None  # TODO
+    project_path = from_path_id_and_backend_project_top_level(
+        parent_path,
+        project_id,
+        RemotePath,
+        symlink_objects_to,)
+
+    return project_path
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+***** Pull
+****** All datasets
+Pull all datasets or clone and pull all datasets if 
+#+begin_src python :tangle ../sparcur/simple/pull_all.py
+from joblib import Parallel, delayed
+from sparcur.paths import Path
+from sparcur.utils import GetTimeNow
+
+
+# pull all in parallel
+def from_path_dataset_file_structure_all(project_path, time_now=None):
+    """ pull all of the file structure and file system metadata for a project """
+    if time_now is None:
+        time_now = GetTimeNow()
+
+    project_path.pull(
+        time_now=None,  # TODO
+        debug=False,  # TODO
+        n_jobs=12,
+        log_level='DEBUG' if False else 'INFO',  # TODO
+        Parallel=Parallel,
+        delayed=delayed,)
+
+
+def main(project_path=Path.cwd(), **kwargs):
+    if project_path is None or not project_path.find_cache_root() == project_path:
+        from sparcur.simple.clone import main as clone
+        project_path = clone(**kwargs)
+
+    from_path_dataset_file_structure_all(project_path)
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+****** Single dataset
+Pull an single dataset.
+#+begin_src python :tangle ../sparcur/simple/pull_dataset.py
+from sparcur.paths import Path
+from sparcur.utils import GetTimeNow
+
+
+# pull dataset
+def from_path_dataset_file_structure(path, time_now=GetTimeNow()):
+    """ pull the file structure and file system metadata for a single dataset
+        right now only works from a dataset path """
+    path._pull_dataset(time_now)
+
+
+def main(dataset_path=Path.cwd()):
+    from_path_dataset_file_structure(dataset_path)
+
+
+if __name__ == '__main__':
+    from sparcur.simple.utils import backend_blackfynn
+    backend_blackfynn()
+    from sparcur.datasets import DatasetStructure
+    ds = DatasetStructure('.')
+    print(ds)
+    try:
+        qq = next(ds._abstracted_paths('dataset_description'))
+    except StopIteration:
+        pass
+    #from sparcur import datasets
+    #datasets.DatasetStructure('.')
+    remote = Path.cwd().cache.anchor.remote
+    print(remote)
+    main(Path.cwd())
+#+end_src
+***** Fetch
+****** Metadata files
+# ugh I gave myself the name in a loop variable colliding with
+# name at higher level of indentation still in a loop bug, so
+# totally will overwrite the name and cause madness to ensue
+#+begin_src python :tangle ../sparcur/simple/fetch_metadata_files.py
+from joblib import Parallel, delayed
+from sparcur.paths import Path
+from sparcur.datasets import DatasetStructure
+
+# fetch metadata files
+fetch_prefixes = (
+    'dataset_description',
+    'subjects',
+    'samples',
+    'submission',
+    'manifest',
+)
+
+
+def _from_path_fetch_metadata_files_simple(path, fetch=True):
+    for glob_prefix in fetch_prefixes:
+        ds = DatasetStructure(path)
+        for path_to_metadata in ds._abstracted_paths(glob_prefix, fetch=fetch):
+            yield path_to_metadata
+
+
+def _from_path_fetch_metadata_files_parallel(path, n_jobs=12):
+    paths_to_fetch = list(_from_path_fetch_metadata_files_simple(path, fetch=False))
+    fetch = lambda cache: cache.fetch(size_limit_mb=cache.meta.size.mb + 1)
+    fetch_path = lambda path: fetch(path.cache)
+    Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths_to_fetch)
+
+
+def from_path_fetch_metadata_files(path, n_jobs=12):
+    """ fetch metadata files located in a dataset """
+    if n_jobs <= 1:
+        _from_path_fetch_metadata_files_simple(path)
+    else:
+        _from_path_fetch_metadata_files_parallel(path, n_jobs=n_jobs)
+
+
+def main(dataset_path=Path.cwd(), n_jobs=12):
+    from_path_fetch_metadata_files(dataset_path, n_jobs=12)
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+****** Remote metadata
+#+begin_src python
+from sparcur.paths import BlackfynnCache
+from_path_fetch_remote_metadata = lambda path: path.cache._dataset_metadata()
+#+end_src
+****** unused :noexport:
+#+begin_src python
+from_id_remote_metadata = lambda id: ds.BlackfynnDatasetData(id)()
+compose = lambda f, g: (lambda *x: f(g(*x)))
+#from_path_remote_metadata = compose(lambda id: from_id_remote_metadata(id),
+                                    #lambda path: path.cache.id)
+#+end_src
+*** Validate
+#+begin_src python
+def from_path_summary(project_path):
+    dataset_path_structure
+    summary((
+        dataset(
+            dataset_path_structure
+            dataset_description
+            subjects
+            samples
+            submission
+            manifests
+            *rest
+)))
+
+
+#def dataset(path_structure, description, subjects, samples, submission, manifests, *rest):
+def dataset(*objects):
+    data = {}
+    #path_structure, description, subjects, samples, submission, manifests, *rest = objects
+    for obj in objects:
+        data
+    return
+
+def from_path_dataset(dataset_path):
+    return dataset(*comb_dataset(dataset_path))
+
+def data_from_find_path(glob_prefix, data_from_path_function, glob_type='glob'):
+    if glob_prefix not in fetch_prefixes:
+        raise ValueError('glob_prefix not in fetch_prefixes! '
+                         f'{glob_prefix!r} not in {fetch_prefixes}')
+    def func(path):
+        ds = dat.DatasetStructure(path)
+        for path in ds._abstracted_paths(glob_prefix, sandbox=True):
+            yield data_from_path_function(path)
+
+    return func
+
+# TODO how to attach and validate schemas orthogonally in this setting?
+# e.g. so that we can write dataset_1_0_0 dataset_1_2_3 etc.
+# FIXME it is never this simple :/ have to dispatch on template version
+# which we can only know at runtime
+def description(path): return dat.DatasetDescriptionFilePath(path).object
+def submission(path):  return dat.SubmissionFilePath(path).object
+def subjects(path):    return dat.SubjectsFilePath(path).object
+def samples(path):     return dat.SamplesFilePath(path).object
+def manifest(path):    return dat.ManifestFilePath(path).object
+
+def from_path_dataset_path_structure(path):
+    return
+
+from_path_dataset_description    = data_from_find_path('dataset_description', description)
+from_path_subjects               = data_from_find_path('subjects',            subjects)
+from_path_samples                = data_from_find_path('samples',             samples)
+from_path_submission             = data_from_find_path('submission',          submission)
+from_path_manifests              = data_from_find_path('manifest',            manifest, 'rglob')
+from_path_remote_metadata        = lambda path: ds.BlackfynnDatasetData(path.cache).fromCache()
+
+comb_dataset = combinate(
+    from_path_dataset_path_structure,
+    from_path_dataset_description,
+    from_path_subjects,
+    from_path_samples,
+    from_path_submission,
+    from_path_manifests,
+    from_path_remote_metadata,)
+
+def from_export_path_protocols_io_data(curation_export_json_path)
+def protocols_io_ids(datasets)
+def protocols_io_data(protocols_io_ids)
+
+def from_group_name_protcur(group_name)
+def protcur_output()
+
+def summary(datasets, protocols_io_data, protcur_output)
+#+end_src
+*** Export

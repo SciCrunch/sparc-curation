@@ -1589,9 +1589,9 @@ class Shell(Dispatcher):
         summary = self.summary
         org = Integrator(self.project_path)
 
-        asdf = []
-        for d in datasets:
-            asdf.append(list(d.children))
+        #asdf = []
+        #for d in datasets:
+            #asdf.append(list(d.children))
 
         breakpoint()
 

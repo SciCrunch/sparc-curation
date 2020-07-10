@@ -3,8 +3,8 @@ import pathlib
 from lxml import etree  # python3.7 0m38.388s
 from pyontutils.utils import subclasses
 from .. import schemas as sc
-from ..core import HasErrors, register_type
-from ..utils import log, logd
+from ..core import HasErrors
+from ..utils import log, logd, register_type
 
 if etree.__name__ == 'lxml.etree':
     parser = etree.XMLParser(

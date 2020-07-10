@@ -4,25 +4,13 @@ import unittest
 import pytest
 from pyontutils.utils import Async, deferred
 from sparcur.core import JEncode
-from sparcur.paths import BlackfynnCache, Path
-from sparcur.backends import BlackfynnRemote
-from sparcur.config import auth
 from sparcur.extract import xml as exml
-from .common import path_project_container, examples_root
+from .common import examples_root, RealDataHelper
 
 export = False
 
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
-class TestExtractMetadata(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        cls.organization_id = auth.get('blackfynn-organization')
-        cls.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
-        cls.BlackfynnRemote.init(cls.organization_id)
-        cls.anchor = cls.BlackfynnRemote.smartAnchor(path_project_container)
-        cls.anchor.local_data_dir_init()
-        cls.datasets = list(cls.anchor.children)
+class TestExtractMetadata(unittest.TestCase):
 
     def test_new_mbf_format(self):
         x = examples_root / 'mbf-example.xml'
@@ -31,6 +19,9 @@ class TestExtractMetadata(unittest.TestCase):
         errors = d.pop('errors') if 'errors' in d else tuple()
         error_types = set(e['validator'] for es in errors for e in es)
         assert error_types == {'not'} or not error_types, f'unexpected error type! {error_types}'
+
+
+class TestExtractMetadataReal(RealDataHelper, unittest.TestCase):
 
     def test_mbf_header(self):
         test_id = 'N:dataset:bec4d335-9377-4863-9017-ecd01170f354'

@@ -431,9 +431,38 @@ class JSONPipeline(Pipeline):
         #log.debug(lj(sources))
 
         if self.previous_pipeline_classes:
-            #not isinstance(previous_pipeline, self.previous_pipeline_classes)):
+            # FIXME this is a flagrant violation of inversion of control
+            # HOWEVER it does allow a pipeline to ensure that it knows what it is getting
+            # but that is much better done as a type check than forcing execution from
+            # the input that the string of previous pipelines expects
+            # p4(p3(p2(p1(some-static-input)))) has its own problems but is easier to
+            # understand than what we do here which is
+            # p1(ssi): do1(ssi)
+            # p2(ssi): do2(p1(ssi))
+            # p3(ssi): do3(p2(ssi))
+            # p4(ssi): do4(p3(ssi))
+            # p4(ssi) -> do4(do3(do2(do1(ssi))))
+            # this makes access to the do functions inaccessible and uncomposable which is bad
+            # better to specify the do functions directy and then wrap them in a function
+            # that takes the arguments that we want to start from than forcing the ordering
+
+            # of course because python doesn't have a reasonable way to reuse code
+            # the tradeoff here is that if you want to actually reuse code you have to
+            # obscure the do4
+
             previous_pipeline = Merge([p(previous_pipeline, lifters, runtime_context)
-                                       for p in self.previous_pipeline_classes])
+                                        for p in self.previous_pipeline_classes])
+
+        if False:
+            # unfortunately this breaks assumptions about the pipeline structure
+            # as predicated on my comment in PipelineExtras.added so we can't use
+            # it right now
+            if len(self.previous_pipeline_classes) > 1:
+                previous_pipeline = Merge([p(previous_pipeline, lifters, runtime_context)
+                                           for p in self.previous_pipeline_classes])
+            else:
+                PPC, = self.previous_pipeline_classes
+                previous_pipeline = PPC(previous_pipeline, lifters, runtime_context)
 
         if not isinstance(previous_pipeline, Pipeline):
             breakpoint()
@@ -1429,6 +1458,8 @@ class ProtcurPipeline(Pipeline):
         #anno_counts = ptcdoc.AnnoCounts(pool)
         #idn = ptcdoc.IdNormalization(anno_counts.all())
         idn = ptcdoc.IdNormalization(annos)
+        protc.reset(reset_annos_dict=True)  # sigh, yes we have to do this here
+        breakpoint()
         protcs = [protc(f, annos) for f in annos]
         idints = idn._uri_api_ints()
         nones = idints.pop(None)
@@ -1555,6 +1586,9 @@ hasSchema = sc.HasSchema()
 @hasSchema.mark
 class SummaryPipeline(JSONPipeline):
     #previous_pipeline_classes = ListAllDatasetsPipeline
+
+    def __init__(self):
+        pass
 
     @property
     def pipeline_end(self):

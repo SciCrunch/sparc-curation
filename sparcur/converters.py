@@ -7,8 +7,8 @@ from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc, NIFRID
 from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import OntId, OntTerm, lj, fromJson
-from sparcur.utils import log, logd
+from sparcur.core import OntId, OntTerm, lj
+from sparcur.utils import log, logd, fromJson
 from sparcur.protocols import ProtocolData
 
 

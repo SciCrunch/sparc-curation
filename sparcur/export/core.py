@@ -13,9 +13,10 @@ from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
 from sparcur import pipelines as pipes
-from sparcur.core import JEncode, JFixKeys, adops, register_type, fromJson
+from sparcur.core import JEncode, JFixKeys, adops
 from sparcur.paths import Path
-from sparcur.utils import symlink_latest, loge, logd
+from sparcur.utils import symlink_latest, loge, logd, register_type
+from sparcur.utils import register_type, fromJson
 from sparcur.config import auth
 
 
@@ -65,7 +66,7 @@ def latest_ir(org_id=None):
 class ExportBase:
 
     export_type = None
-    filename_ir = None
+    filename_json = None
 
     def __init__(self,
                  export_path,
@@ -96,9 +97,9 @@ class ExportBase:
             dump_path.mkdir(parents=True)
 
     @staticmethod
-    def write_json(filepath, blob):
+    def write_json(filepath, blob, suffix='.json'):
         # FIXME we still create a new export folder every time even if the json didn't change ...
-        with open(filepath.with_suffix('.json'), 'wt') as f:
+        with open(filepath.with_suffix(suffix), 'wt') as f:
             json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
     @property
@@ -120,7 +121,7 @@ class ExportBase:
 
     @property
     def latest_export_path(self):
-        return self.base_path / self.filename_ir
+        return self.base_path / self.filename_json
 
     @property
     def latest_export(self):
@@ -138,8 +139,8 @@ class ExportBase:
         return self.export_base / self.folder_timestamp
 
     @property
-    def filepath_ir(self):
-        return self.dump_path / self.filename_ir
+    def filepath_json(self):
+        return self.dump_path / self.filename_json
 
     def export(self, *args, **kwargs):
         dump_path = self.dump_path
@@ -147,15 +148,15 @@ class ExportBase:
         self.make_dump_path(dump_path)
         symlink_latest(dump_path, self.LATEST_RUN)
 
-        filepath_ir = self.filepath_ir
+        filepath_json = self.filepath_json
         # build or load the export of the internal representation
         blob_ir, *rest_ir = self.make_ir(**kwargs)
-        export_ir = self.export_ir(blob_ir)
-        self.write_json(filepath_ir, export_ir)
+        blob_export_json = self.make_export_json(blob_ir)
+        self.write_json(filepath_json, blob_export_json)
         symlink_latest(dump_path, self.LATEST_PARTIAL)
 
         # build or load derived exports
-        self.export_other_formats(dump_path, filepath_ir, blob_ir, *rest_ir)
+        self.export_other_formats(dump_path, filepath_json, blob_ir, blob_export_json, *rest_ir)
         symlink_latest(dump_path, self.LATEST)
 
         return (blob_ir, *rest_ir)  # FIXME :/
@@ -163,15 +164,15 @@ class ExportBase:
     def make_ir(self, *args, **kwargs):
         raise NotImplementedError('implement in subclass')
 
-    def export_ir(self, *args, **kwargs):
+    def make_export_json(self, *args, **kwargs):
         """
-        if your ir is identical to your export
+        if your ir is identical to your export json
         just implement this as
-        def export_ir(self, blob_ir): return blob_ir
+        def make_export_json(self, blob_ir): return blob_ir
         """
         raise NotImplementedError('implement in subclass')
 
-    def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
+    def export_other_formats(self, dump_path, filepath_json, blob_ir, blob_export_json, *rest):
         """ explicitly make this a noop if there aren't other formats you care about """
         raise NotImplementedError('implement in subclass')
 
@@ -180,7 +181,7 @@ class ExportXml(ExportBase):
     """ convert and export metadata embedded in xml files """
 
     export_type = 'filetype'
-    filename_ir = 'xml-export.json'
+    filename_json = 'xml-export.json'
 
     def export(self, dataset_paths=tuple(), **kwargs):
         return super().export(dataset_paths=dataset_paths, **kwargs)
@@ -232,7 +233,7 @@ class ExportXml(ExportBase):
 class Export(ExportBase):
 
     export_type = 'integrated'
-    filename_ir = 'curation-export.json'
+    filename_json = 'curation-export.json'
     id_metadata = 'identifier-metadata.json'
 
     _pyru_loaded = False
@@ -433,8 +434,13 @@ class Export(ExportBase):
                 '@graph': protcur,  # FIXME regularize elements ?
             }
 
-        with open(dump_path / 'protcur.json', 'wt') as f:
+        fn = dump_path / 'protcur.json'
+        with open(fn, 'wt') as f:
             json.dump(blob_protcur, f, sort_keys=True, indent=2, cls=JEncode)
+
+        populateFromJsonLd(OntGraph(), fn).write(fn.with_suffix('.ttl'))
+
+        # TODO also need latest symlinking here as well
 
         return blob_protcur
 
@@ -545,23 +551,30 @@ class Export(ExportBase):
 
         return blob_data, summary, previous_latest, previous_latest_datasets
 
-    def export_ir(self, blob_ir):
+    def make_export_json(self, blob_ir):
         # if the ir contains python objects then we probably want an explicit transform step
 
         # FIXME hack
         datasets = blob_ir['datasets']
-        export_ir = {k:v for k, v in blob_ir.items() if k != 'datasets'}
-        export_ir['datasets'] = []
+        blob_export_json = {k:v for k, v in blob_ir.items() if k != 'datasets'}
+        blob_export_json['datasets'] = []
         for blob_dataset in datasets:
             pipe = pipes.IrToExportJsonPipeline(blob_dataset)
             data = pipe.data
-            export_ir['datasets'].append(pipe.data)
+            blob_export_json['datasets'].append(pipe.data)
 
-        return export_ir
+        return blob_export_json
 
-    def export_jsonld(self, blob):
+    def export_jsonld(self, filepath_json, blob_export_json):
+        """ currently this requires the export json blob NOT the ir """
+        blob_export_jsonld = self.make_jsonld(blob_export_json)
+        self.write_json(filepath_json, blob_export_jsonld, '.jsonld')
+        return blob_export_json
+
+    def make_jsonld(self, blob):
         """ works on ir or export """
 
+        # TODO @context for other bits
         datasets = blob['datasets']
         blob_jsonld = {k:v for k, v in blob.items() if k != 'datasets'}
         blob_jsonld['datasets'] = []
@@ -575,9 +588,12 @@ class Export(ExportBase):
         pipe = pipes.ToJsonLdPipeline(blob_dataset)
         return pipe.data
 
-    def export_other_formats(self, dump_path, filepath_ir, blob_ir, *rest):
+    def export_other_formats(self, dump_path, filepath_json, blob_ir, blob_export_json, *rest):
         summary, previous_latest, previous_latest_datasets = rest
         dataset_blobs = blob_ir['datasets']
+
+        # jsonld
+        blob_export_jsonld = self.export_jsonld(filepath_json, blob_export_json)
 
         # identifier metadata
         blob_id_met = self.export_identifier_metadata(dump_path, previous_latest, dataset_blobs)
@@ -593,14 +609,14 @@ class Export(ExportBase):
         blob_protcur_path = dump_path / 'protcur.json'  # FIXME SIGH
         populateFromJsonLd(tes.graph, blob_protcur_path)  # this makes me so happy
 
-        with open(filepath_ir.with_suffix('.ttl'), 'wb') as f:
+        with open(filepath_json.with_suffix('.ttl'), 'wb') as f:
             f.write(tes.ttl)
 
         # protocol  # handled orthogonally ??
         #blob_protocol = self.export_protocols(dump_path, dataset_blobs, blob_protcur)
 
         # xml
-        self.export_xml(filepath_ir, dataset_blobs)
+        self.export_xml(filepath_json, dataset_blobs)
 
         # disco
-        self.export_disco(filepath_ir, dataset_blobs, teds)
+        self.export_disco(filepath_json, dataset_blobs, teds)

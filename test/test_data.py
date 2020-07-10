@@ -1,3 +1,4 @@
+""" test the actual output of the curation export pipeline """
 import unittest
 from pprint import pprint
 import idlib

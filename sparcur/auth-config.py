@@ -13,5 +13,6 @@
   'datasets-noexport': None,
   'datasets-sparse': None,
   'datasets-no': None,
+  'datasets-test': None,
   'sparse-limit': {'default': 10000,
                    'environment-variables': 'SPARCUR_SPARSE_LIMIT SPARSE_LIMIT'},}}

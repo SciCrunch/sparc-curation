@@ -16,7 +16,7 @@ from sparcur.state import State
 from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
 from sparcur.blackfynn_api import FakeBFLocal
-this_file = Path(__file__)
+this_file = Path(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
@@ -99,6 +99,7 @@ def mk_required_files(path, suffix='.csv'):
             attrs = mk_file_meta(file_path)
             file_path.setxattrs(attrs)
 
+
 if project_path.exists():
     # too much time wasted over stale test data
     # like ACSF just make it fresh every time
@@ -139,3 +140,20 @@ for root in ds_roots:
 fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
 State.bind_blackfynn(fbfl)
 #Integrator.setup()  # not needed for tests it seems
+
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class RealDataHelper:
+
+    @classmethod
+    def setUpClass(cls):
+        from sparcur.paths import BlackfynnCache, Path
+        from sparcur.config import auth
+        from sparcur.backends import BlackfynnRemote
+        cls.organization_id = auth.get('blackfynn-organization')
+        cls.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+        cls.BlackfynnRemote.init(cls.organization_id)
+        cls.anchor = cls.BlackfynnRemote.smartAnchor(path_project_container)
+        cls.anchor.local_data_dir_init()
+        cls.project_path = cls.anchor.local
+        cls.datasets = list(cls.anchor.children)

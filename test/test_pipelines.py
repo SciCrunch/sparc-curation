@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from sparcur import apinat
 from sparcur import pipelines as pipes
-from .common import examples_root
+from .common import examples_root, project_path, RealDataHelper
 
 
 class TestApiNAT(unittest.TestCase):
@@ -36,3 +36,23 @@ class TestDatasetDescription(unittest.TestCase):
         p = pipes.DatasetDescriptionFilePipeline(self.source, None, None)
         data = p.data
         # TODO test as subpipeline ?
+
+
+class PipelineHelper:
+
+    @classmethod
+    def setUpClass(cls):
+        cls.project_path = project_path
+        cls.datasets = list(cls.project_path.children)
+
+    def test_pipeline_end(self):
+        pipes.PipelineEnd()
+        pass
+
+
+class TestPipelines(unittest.TestCase):
+
+
+class TestPipelinesReal(RealDataHelper, PipelineHelper, unittest.TestCase):
+    # RealDataHelper needs to resolve first to get correct setUpClass
+    pass

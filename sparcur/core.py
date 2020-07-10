@@ -19,47 +19,7 @@ from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
 from pyontutils.namespaces import tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd  # FIXME fix other imports
-from sparcur.utils import is_list_or_tuple
-
-
-__type_registry = {None: None}
-def register_type(cls, type_name):
-    if type_name in __type_registry:
-        raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
-                         f'{type_name} -> {__type_registry[type_name]}')
-
-    __type_registry[type_name] = cls
-
-
-def fromJson(blob):
-    if isinstance(blob, dict):
-        if 'type' in blob:
-            t = blob['type']
-
-            if t == 'identifier':
-                type_name = blob['system']
-            elif t in ('quantity', 'range'):
-                type_name = t
-            elif t not in __type_registry:
-                breakpoint()
-                raise NotImplementedError(f'TODO fromJson for type {t} '
-                                          f'currently not implemented\n{blob}')
-            else:
-                type_name = t
-
-            cls = __type_registry[type_name]
-            if cls is not None:
-                return cls.fromJson(blob)
-
-        return {k:v
-                if k == 'errors' or k.endswith('_errors') else
-                fromJson(v)
-                for k, v in blob.items()}
-
-    elif isinstance(blob, list):
-        return [fromJson(_) for _ in blob]
-    else:
-        return blob
+from sparcur.utils import is_list_or_tuple, register_type
 
 
 xsd = rdflib.XSD
@@ -289,14 +249,21 @@ def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **k
 
 def _json_identifier_expansion(obj, *args, **kwargs):
     if isinstance(obj, oq.OntTerm):
+        oc = obj.__class__
         obj.__class__ = OntTerm  # that this works is amazing/terrifying
-        return obj.asDict()
+        try:
+            return obj.asDict()
+        finally:
+            obj.__class__ = oc
 
     elif isinstance(obj, idlib.Stream):
         if obj._id_class is str:
             return obj.identifier
         else:
-            return obj.asDict()
+            try:
+                return obj.asDict()
+            except idlib.exc.RemoteError as e:
+                logd.error(e)
     else:
         return obj
 
@@ -445,48 +412,6 @@ def zipeq(*iterables):
                                           f'{iterables}')
 
         yield zipped
-
-
-class BlackfynnId(str):
-    """ put all static information derivable from a blackfynn id here """
-    def __new__(cls, id):
-        # TODO validate structure
-        self = super().__new__(cls, id)
-        gotem = False
-        for type_ in ('package', 'collection', 'dataset', 'organization'):
-            name = 'is_' + type_
-            if not gotem:
-                gotem = self.startswith(f'N:{type_}:')
-                setattr(self, name, gotem)
-            else:
-                setattr(self, name, False)
-
-        return self
-
-    @property
-    def uri_api(self):
-        # NOTE: this cannot handle file ids
-        if self.is_dataset:
-            endpoint = 'datasets/' + self.id
-        elif self.is_organization:
-            endpoint = 'organizations/' + self.id
-        else:
-            endpoint = 'packages/' + self.id
-
-        return 'https://api.blackfynn.io/' + endpoint
-
-    def uri_human(self, prefix):
-        # a prefix is required to construct these
-        return self  # TODO
-
-
-class BlackfynnInst(BlackfynnId):
-    # This isn't equivalent to BlackfynnRemote
-    # because it needs to be able to obtain the
-    # post pipeline data about that identifier
-    @property
-    def uri_human(self):
-        pass
 
 
 class JTList:

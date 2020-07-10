@@ -1099,8 +1099,14 @@ class SampleExportSchema(JSONSchema):
                             },
             'specimen': {'type': 'string',
                          },  # what are we expecting here?
-            'specimen_anatomical_location': {'type': 'string',
-                                             },
+            'specimen_anatomical_location': {'oneOf':
+                                             [{'type': 'string',},
+                                              # FIXME not seeing an easy wawy out of this
+                                              # other than switching many of these over to arrays
+                                              # by default
+                                              {'type': 'array',
+                                               'items': {'type': 'string'},},
+                                              ],},
 
                         'disease': {'type': 'string',
                                     },
@@ -1415,7 +1421,18 @@ class DatasetOutExportSchema(JSONSchema):
         'allOf': [__schema,
                   {'anyOf': [
                       {'required': ['subjects']},  # FIXME extract subjects from samples ?
-                      {'required': ['samples']}
+                      {'required': ['samples']},
+                      {'properties': {
+                          'meta': {'properties': {
+                              'number_of_subjects': {'type': 'integer',
+                                                     'minimum': 0,
+                                                     'maximum': 0,
+                                                     },
+                              'number_of_samples': {'type': 'integer',
+                                                    'minimum': 0,
+                                                    'maximum': 0,
+                                                    },
+                          }}}},
                   ]}]}
 
 

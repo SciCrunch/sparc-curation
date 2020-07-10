@@ -16,10 +16,9 @@ from sparcur import sheets
 from sparcur.core import (OntId,
                           OntTerm,
                           get_all_errors,
-                          adops,
-                          register_type,
-                          fromJson)
-from sparcur.utils import want_prefixes, log as _log
+                          adops,)
+from sparcur.utils import want_prefixes, log as _log, register_type
+from sparcur.utils import register_type, fromJson
 from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.curation import ExporterSummarizer

@@ -127,7 +127,7 @@ class DatasetStructure(Path):
     sections = None  # NOTE assigned in at end of file
     rglobs = 'manifest',
     default_glob = 'glob'
-    max_childs = 40
+    max_childs = None  # 40 was used when we didn't have sparse pulls
     rate = 8  # set by Integrator from cli
     _refresh_on_missing = True
 
@@ -270,7 +270,9 @@ class DatasetStructure(Path):
                 if not paths:  # apparently the empty case recurses forever
                     return
 
-                if len(paths) > self.max_childs:
+                if (self.max_childs is not None and
+                    self.max_childs > 0 and
+                    len(paths) > self.max_childs):
                     log.warning(f'Not globing in a folder with > {self.max_childs} children! '
                                 f'{self.as_posix()!r}')
                     return
@@ -303,7 +305,7 @@ class DatasetStructure(Path):
         elif self.parent:  # organization has no parent
             return self.parent.bids_root
 
-    def _abstracted_paths(self, name_prefix, glob_type=None):
+    def _abstracted_paths(self, name_prefix, glob_type=None, fetch=True, sandbox=False):
         """ A bottom up search for the closest file in the parent directory.
             For datasets, if the bids root and path do not match, use the bids root.
             In the future this needs to be normalized because the extra code required
@@ -313,10 +315,18 @@ class DatasetStructure(Path):
             glob_type = self.default_glob
 
         path = self
-        if (self.cache and
-            self.cache.is_dataset and
-            self.bids_root is not None and
-            self.bids_root != self):
+        cache = self.cache
+        if cache and cache == cache.anchor:  # organization
+            for child in self.children:
+                yield from child._abstracted_paths(name_prefix,
+                                                   glob_type,
+                                                   fetch,
+                                                   sandbox,)
+            return
+        elif (self.cache and
+              self.cache.is_dataset and
+              self.bids_root is not None and
+              self.bids_root != self):
             path = self.bids_root
 
         first = name_prefix[0]
@@ -330,6 +340,14 @@ class DatasetStructure(Path):
             for path in chain((path,), gen):
                 path = path_class(path)
                 if path.is_broken_symlink():
+                    if not fetch:
+                        yield path
+                        continue
+                    elif sandbox:
+                        msg = ('A required metadata path was not fetched '
+                               f'in advance. {path}')
+                        raise exc.NetworkSandboxError(msg)
+
                     log.info(f'fetching unretrieved metadata path {path.as_posix()!r}'
                              '\nFIXME batch these using async in cli export ...')
                     try:
@@ -357,6 +375,10 @@ class DatasetStructure(Path):
             if (self.cache.parent.meta is not None and
                 self.parent.cache != self.cache.anchor and
                 self.parent != self):
+                # FIXME 99% sure that this never triggers during normal use
+                # if you hit this there is a good chance that the path you
+                # fed to the DatasetStructure is not a dataset path which
+                # will break things
                 yield from getattr(self.parent, name_prefix + '_paths')
 
     @property

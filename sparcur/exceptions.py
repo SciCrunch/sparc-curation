@@ -148,3 +148,8 @@ class LostChildError(SparCurError):
 
 class NetworkFailedForPathError(SparCurError):
     """ the network failed while trying to retrieve a specfic path """
+
+
+class NetworkSandboxError(SparCurError):
+    """ we are in a phase of the process where fetching remote
+        files is not allowed """

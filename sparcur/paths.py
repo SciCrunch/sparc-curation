@@ -14,8 +14,7 @@ from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
-from sparcur.core import register_type
-from sparcur.utils import log
+from sparcur.utils import log, GetTimeNow, register_type
 
 
 def cleanup(func):
@@ -175,7 +174,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
         dataset = self.dataset
         if dataset == self:
             if not hasattr(self, '_c__dataset_metadata'):
-                bdd = BlackfynnDatasetData(self)
+                bdd = backends.BlackfynnDatasetData(self)
                 try:
                     blob = bdd.fromCache()
                 except FileNotFoundError as e:
@@ -246,6 +245,13 @@ class BlackfynnCache(PrimaryCache, EatCache):
             gen = chain((f'from local cache {self.local_object_cache_path}',),
                         self.local_object_cache_path.data)
         else:
+            if not hasattr(self._remote_class, '_api'):
+                # NOTE we do not want to dereference self.remote
+                # in this situation because we just want the file
+                # not the FS metadata, so we have to ensure that _api
+                # is bound
+                self._remote_class.anchorToCache(self.anchor)
+
             gen = self._remote_class.get_file_by_id(meta.id, meta.file_id)
 
         try:
@@ -381,6 +387,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
              delayed=None,
              _in_parallel=False,):
         # TODO usage errors
+
+        if time_now is None:
+            time_now = GetTimeNow()
+            log.debug('No time provided to pull so using '
+                      f'{time_now.START_TIMESTAMP}')
 
         if _in_parallel:
             _log = logging.getLogger(log_name)
@@ -540,6 +551,3 @@ backends.BlackfynnRemote._new(Path, BlackfynnCache)
 backends.BlackfynnRemote.cache_key = BlackfynnCache.cache_key
 backends.BlackfynnRemote._sparse_stems = BlackfynnCache._sparse_stems
 backends.BlackfynnRemote._sparse_include = BlackfynnCache._sparse_include
-
-# end imports (woo circular deps)
-from sparcur.datasources import BlackfynnDatasetData
