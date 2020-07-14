@@ -22,7 +22,7 @@ ontologies:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
       removeUnsatisfiableClasses: true
-  - url: https://cassava.ucsd.edu/sparc/exports/curation-export.ttl
+  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-spinal-full.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
@@ -32,3 +32,8 @@ ontologies:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
       removeUnsatisfiableClasses: true
+#  - url: https://cassava.ucsd.edu/sparc/exports/curation-export.ttl
+#    reasonerConfiguration:
+#      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
+#      addDirectInferredEdges: true
+#      removeUnsatisfiableClasses: true

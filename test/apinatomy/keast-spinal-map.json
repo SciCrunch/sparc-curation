@@ -146,7 +146,6 @@
     "keastSpinalTest": {
       "id": "keastSpinalTest",
       "name": "Keast Flatmap Test",
-      "abbreviation": "keast",
       "class": "Graph",
       "external": [
         "UBERON:0005844",
@@ -739,7 +738,9 @@
       "sourceOf": [
         "ch1_lnk_1"
       ],
-      "rootOf": "ch1",
+      "rootOf": [
+        "ch1"
+      ],
       "hidden": true
     },
     "n2": {
@@ -753,7 +754,9 @@
       "targetOf": [
         "ch1_lnk_16"
       ],
-      "leafOf": "ch1",
+      "leafOf": [
+        "ch1"
+      ],
       "hidden": true
     },
     "ch1_node_1": {
@@ -1333,6 +1336,9 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "next": [
+        "ch1_lnk_2"
+      ],
       "hidden": true
     },
     "ch1_lnk_2": {
@@ -1350,6 +1356,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_1"
+      ],
+      "next": [
+        "ch1_lnk_3"
+      ],
       "hidden": true
     },
     "ch1_lnk_3": {
@@ -1367,6 +1379,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_2"
+      ],
+      "next": [
+        "ch1_lnk_4"
+      ],
       "hidden": true
     },
     "ch1_lnk_4": {
@@ -1384,6 +1402,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_3"
+      ],
+      "next": [
+        "ch1_lnk_5"
+      ],
       "hidden": true
     },
     "ch1_lnk_5": {
@@ -1401,6 +1425,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_4"
+      ],
+      "next": [
+        "ch1_lnk_6"
+      ],
       "hidden": true
     },
     "ch1_lnk_6": {
@@ -1418,6 +1448,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_5"
+      ],
+      "next": [
+        "ch1_lnk_7"
+      ],
       "hidden": true
     },
     "ch1_lnk_7": {
@@ -1435,6 +1471,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_6"
+      ],
+      "next": [
+        "ch1_lnk_8"
+      ],
       "hidden": true
     },
     "ch1_lnk_8": {
@@ -1452,6 +1494,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_7"
+      ],
+      "next": [
+        "ch1_lnk_9"
+      ],
       "hidden": true
     },
     "ch1_lnk_9": {
@@ -1469,6 +1517,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_8"
+      ],
+      "next": [
+        "ch1_lnk_10"
+      ],
       "hidden": true
     },
     "ch1_lnk_10": {
@@ -1486,6 +1540,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_9"
+      ],
+      "next": [
+        "ch1_lnk_11"
+      ],
       "hidden": true
     },
     "ch1_lnk_11": {
@@ -1503,6 +1563,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_10"
+      ],
+      "next": [
+        "ch1_lnk_12"
+      ],
       "hidden": true
     },
     "ch1_lnk_12": {
@@ -1520,6 +1586,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_11"
+      ],
+      "next": [
+        "ch1_lnk_13"
+      ],
       "hidden": true
     },
     "ch1_lnk_13": {
@@ -1537,6 +1609,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_12"
+      ],
+      "next": [
+        "ch1_lnk_14"
+      ],
       "hidden": true
     },
     "ch1_lnk_14": {
@@ -1554,6 +1632,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_13"
+      ],
+      "next": [
+        "ch1_lnk_15"
+      ],
       "hidden": true
     },
     "ch1_lnk_15": {
@@ -1571,6 +1655,12 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_14"
+      ],
+      "next": [
+        "ch1_lnk_16"
+      ],
       "hidden": true
     },
     "ch1_lnk_16": {
@@ -1588,6 +1678,9 @@
       "length": 100,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "ch1_lnk_15"
+      ],
       "hidden": true
     },
     "nn1_lnk_1": {
@@ -1602,6 +1695,9 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "next": [
+        "nn1_lnk_2"
+      ],
       "hidden": true
     },
     "nn1_lnk_2": {
@@ -1616,6 +1712,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn1_lnk_1"
+      ],
+      "next": [
+        "nn1_lnk_3"
+      ],
       "hidden": true
     },
     "nn1_lnk_3": {
@@ -1630,6 +1732,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn1_lnk_2"
+      ],
+      "next": [
+        "nn1_lnk_4"
+      ],
       "hidden": true
     },
     "nn1_lnk_4": {
@@ -1644,6 +1752,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn1_lnk_3"
+      ],
+      "next": [
+        "nn1_lnk_5"
+      ],
       "hidden": true
     },
     "nn1_lnk_5": {
@@ -1658,6 +1772,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn1_lnk_4"
+      ],
+      "next": [
+        "nn1_lnk_6"
+      ],
       "hidden": true
     },
     "nn1_lnk_6": {
@@ -1672,6 +1792,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn1_lnk_5"
+      ],
+      "next": [
+        "nn1_lnk_7"
+      ],
       "hidden": true
     },
     "nn1_lnk_7": {
@@ -1686,6 +1812,9 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn1_lnk_6"
+      ],
       "hidden": true
     },
     "nn2_lnk_1": {
@@ -1700,6 +1829,9 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "next": [
+        "nn2_lnk_2"
+      ],
       "hidden": true
     },
     "nn2_lnk_2": {
@@ -1714,6 +1846,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_1"
+      ],
+      "next": [
+        "nn2_lnk_3"
+      ],
       "hidden": true
     },
     "nn2_lnk_3": {
@@ -1728,6 +1866,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_2"
+      ],
+      "next": [
+        "nn2_lnk_4"
+      ],
       "hidden": true
     },
     "nn2_lnk_4": {
@@ -1742,6 +1886,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_3"
+      ],
+      "next": [
+        "nn2_lnk_5"
+      ],
       "hidden": true
     },
     "nn2_lnk_5": {
@@ -1756,6 +1906,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_4"
+      ],
+      "next": [
+        "nn2_lnk_6"
+      ],
       "hidden": true
     },
     "nn2_lnk_6": {
@@ -1770,6 +1926,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_5"
+      ],
+      "next": [
+        "nn2_lnk_7"
+      ],
       "hidden": true
     },
     "nn2_lnk_7": {
@@ -1784,6 +1946,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_6"
+      ],
+      "next": [
+        "nn2_lnk_8"
+      ],
       "hidden": true
     },
     "nn2_lnk_8": {
@@ -1798,6 +1966,12 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_7"
+      ],
+      "next": [
+        "nn2_lnk_9"
+      ],
       "hidden": true
     },
     "nn2_lnk_9": {
@@ -1812,6 +1986,9 @@
       "length": 64,
       "geometry": "link",
       "lineWidth": "0.003",
+      "prev": [
+        "nn2_lnk_8"
+      ],
       "hidden": true
     },
     "K_129": {
@@ -15323,7 +15500,9 @@
         "lnk-soma",
         "nn1_lnk_1"
       ],
-      "rootOf": "nn1",
+      "rootOf": [
+        "nn1"
+      ],
       "hidden": true
     },
     "ns2": {
@@ -15340,7 +15519,9 @@
       "targetOf": [
         "lnk-soma"
       ],
-      "rootOf": "nn2",
+      "rootOf": [
+        "nn2"
+      ],
       "hidden": true
     },
     "UBERON:0005844": {

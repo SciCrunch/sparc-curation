@@ -1,0 +1,24 @@
+title: sparc-curation documentation index
+repos:
+  sparc-curation: https://github.com/SciCrunch/sparc-curation.git
+skip:
+  sparc-curation:
+    - README.md                      # insubstantial
+    - docs/notes.org                 # not relevant
+    - test/apinatomy/README.org      # insubstantial
+    - resources/scigraph/README.org  # replaced by the nifstd scigraph readme
+
+index:
+  - Setup
+  - Background
+  - Other
+titles:
+  Developer docs: Developer docs
+  sparc-curation/docs/setup.html: 'Developer and curator setup (START HERE!)'
+  sparc-curation/docs/developer-guide.html: Developer guide
+  docstrings.html: Command line programs
+  Background: Background
+  sparc-curation/docs/background.html: SPARC curation background
+  Other: Other
+  sparc-curation/README.html: sparc-curation readme
+  sparc-curation/docs/apinatomy.html: ApiNATOMY converter

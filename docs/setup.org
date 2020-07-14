@@ -618,8 +618,10 @@ curl \
 git \
 htop \
 hunspell \
+libmagic \
 pandoc \
 postgres \
+pyenv \
 python \
 redland \
 rxvt-unicode \
@@ -639,7 +641,7 @@ Add the following to your ~/.bash_profile
 Add the following to your ~/.bashrc
 #+CAPTION: .bashrc
 #+begin_src bash :exports code :eval never
-export PATH=${HOME}/bin:${HAOME}/Library/Python/3.7/bin:${PATH}
+export PATH=${HOME}/bin:${HOME}/Library/Python/3.7/bin:${PATH}
 #+end_src
 
 Run the following to symlink python3 to python
@@ -699,10 +701,16 @@ find -maxdepth 1 -type d -name '[C-Z]*' -exec spc refresh -r 8 {} \;
 find \( -name '*.xlsx' -o -name '*.csv' -o -name '*.tsv' \) -exec ls -hlS {} \+
 #+END_SRC
 
+Open the dataset page for all empty directories in the browser.
+#+begin_src bash
+find -maxdepth 1 -type d -empty -exec spc pull {} \+
+find -maxdepth 1 -type d -empty -exec spc meta -u --browser {} \+
+#+end_src
+
+# temp fix for summary making folders when it should skip
 #+CAPTION: clean up empty directories
-#+CAPTION: temp fix for summary making folders when it should skip
 #+BEGIN_SRC bash :results none
-find -maxdepth 1 -type d -exec rmdir {} \;
+find -maxdepth 1 -type d -empty -exec rmdir {} \;
 #+END_SRC
 
 Pull local copy of data to a new computer. Note the double escape needed for the space.
@@ -737,12 +745,13 @@ mkdir -p /var/www/sparc/sparc/archive/exports/
 chown -R nginx:nginx /var/www/sparc
 #+end_src
 
+#+name: &sparc-export-to-server-function
 #+CAPTION: copy export to server location, run as root
 #+BEGIN_SRC bash :eval never
 # export vs exports, no wonder this is so confusing >_<
 function sparc-export-to-server () {
     : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
-    EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/
+    EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/integrated/
     FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
     FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
     pushd /var/www/sparc/sparc
@@ -752,6 +761,31 @@ function sparc-export-to-server () {
     echo fill-in-the-url-here
 }
 #+END_SRC
+*** Export and report
+You can't run this directly because the venvs create their own subshell.
+#+begin_src bash :dir "/ssh:cassava-sparc:~/files/test2/SPARC Curation" :eval never
+# git repos are in ~/files/venvs/sparcur-dev/git
+# use the development pull code
+source ~/files/venvs/sparcur-dev/bin/activate
+spc pull
+# switch to the production export pipeline
+source ~/files/venvs/sparcur-1/bin/activate
+spc export
+#+end_src
+
+#+begin_src bash :dir /ssh:cassava|sudo:cassava
+<<&sparc-export-to-server-function>>
+sparc-export-to-server
+#+end_src
+
+#+begin_src bash :eval never
+function fetch-and-run-reports () {
+    local FN="/tmp/curation-export-$(date -Is).json"
+    curl https://cassava.ucsd.edu/sparc/exports/curation-export.json -o "${FN}"
+    spc report all --sort-count-desc --to-sheets --export-file "${FN}"
+}
+fetch-and-run-reports
+#+end_src
 *** Reporting
 :PROPERTIES:
 :VISIBILITY: folded
@@ -883,14 +917,28 @@ jq -r '[ .datasets[] |
 :PROPERTIES:
 :VISIBILITY: folded
 :END:
-Get a list of all file extensions for symlinks (usually data)
+***** List all file extensions
+Get a list of all file extensions.
 #+begin_src bash
-find -type l | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
+find -type l -o -type f | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
 #+end_src
-
-Find datasets with unknown file types.
+***** Get ids with files matching a specific extension
+Arbitrary information about a dataset with files matching a pattern.
+The example here gives ids for all datasets that contain xml files.
+Nesting =find -exec= does not work so the first pattern here uses shell
+globing to get the datasets.
 #+begin_src bash
-find -name '*.roi' -exec spc meta --context --uri {} \+
+function datasets-matching () {
+    for d in */; do
+        find "$d" \( -type l -o -type f \) -name "*.$1" \
+        -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
+    done
+}
+#+end_src
+***** Fetch files matching a specific pattern
+Fetch files that have zero size (indication that fetch is broken).
+#+begin_src bash
+find -type f -name '*.xml' -empty -exec spc fetch {} \+
 #+end_src
 **** Sort of manifest generation
 :PROPERTIES:
@@ -909,6 +957,28 @@ Maintaining the backup database of the mappings would make this much faster.
 find . -not -type l -not -path '*operations*' -exec getfattr -n user.bf.id --only-values {} \; -print
 # broken symlink format, needs work, hard to parse
 find . -type l -not -path '*operations*' -exec readlink -n {} \; -print
+#+end_src
+**** Path counts per dataset
+#+begin_src bash
+for d in */; do printf "$(find "${d}" -print | wc -l) "; printf "$(getfattr --only-values -n user.bf.id "${d}") ${d}\n" ; done | sort -n
+#+end_src
+** SODA
+Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
+#+header: :var parent_folder="~/files/blackfynn_local/"
+#+header: :var path="./SPARC Consortium/The effect of gastric stimulation location on circulating blood hormone levels in fasted anesthetized rats/source/pool-r1009"
+#+begin_src python :dir ~/git/SODA/src/pysoda :results drawer output
+from pprint import pprint
+import pysoda
+from sparcur.paths import Path
+p = Path(parent_folder, path).expanduser().resolve()
+children = list(p.iterdir())
+blob = pysoda.create_folder_level_manifest(
+    {p.resolve().name: children},
+    {k.name + '_description': ['some description'] * len(children)
+     for k in [p] + list(p.iterdir())})
+manifest_path = Path(blob[p.name][-1])
+manifest_path.xopen()
+pprint(manifest_path)
 #+end_src
 ** Developer
 See also the [[file:./developer-guide.org][sparcur developer guild]]
@@ -1308,6 +1378,8 @@ google:
     sparc-master: *replace-me-with:document-hash-id*
     sparc-affiliations: *replace-me-with:document-hash-id*
     sparc-field-alignment: *replace-me-with:document-hash-id*
+    spc-reports: *replace-me-with:document-hash-id*
+    anno-tags: *replace-me-with:document-hash-id*
 hypothesis:
   api:
     user-default-hypothesis: *replace-me-with:your-hypothesis-api-key*
@@ -1472,6 +1544,7 @@ popd
 #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
 #+HEADER: :var PYROOTS=py-roots
 #+BEGIN_SRC bash :results output :eval no-export
+[ -z $VIRTUAL_ENV ] || pip install --user wheel  # if in a venv wheel will be missing
 pushd ~/git
 for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
 popd

@@ -1,6 +1,8 @@
+from collections import defaultdict
+from functools import wraps
 import idlib
 from pyontutils.sheets import Sheet
-from sparcur.core import OntId, OntTerm
+from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
 from urllib.parse import quote
 
@@ -40,15 +42,6 @@ class Protocols(Master):
     sheet_name = 'Protocol URL--> Blackfynn URL'
 
 
-# reports
-class CurationReports(Sheet):
-    name = 'sparc-curation-reports'
-
-
-class Completeness(Sheet):
-    sheet_name = 'Completeness'
-
-
 # affiliations
 class Affiliations(Sheet):
     name = 'sparc-affiliations'
@@ -80,6 +73,125 @@ class Affiliations(Sheet):
         return {a:idlib.Ror(r) if r else None
                 for a, r in zip(self.byCol.affiliation_string,
                                 self.byCol.ror_id)}
+
+
+# class sparc reports
+
+class Reports(Sheet):
+    """ spreadsheet that contains all spc reports as tabs """
+    name = 'spc-reports'
+
+    @classmethod
+    def makeReportSheet(cls, *index_cols):
+        """ Decorator to build a Sheet class for a cli.Report method
+
+            NOTE reports that do not have index columns will update
+            the entire sheet every time, so probabaly don't edit those
+        """
+        def _rowcellify(cell_value):
+            if isinstance(cell_value, idlib.Stream):
+                try:
+                    return cell_value.asUri()
+                except AttributeError as e:
+                    breakpoint()
+            elif isinstance(cell_value, str):
+                if cell_value.lower() == 'x':
+                    return True
+
+            return cell_value
+
+        def rowcellify(rows):
+            return [[_rowcellify(cell_value) for cell_value in columns]
+                    for columns in rows]
+
+        def decorator(method):
+            tags = method.__name__ == 'anno_tags'
+
+            class ReportSheet(cls):
+                __name__ = f'Report{method.__name__.capitalize()}'
+                sheet_name = method.__name__
+                index_columns = index_cols
+
+            method._report_class = ReportSheet
+
+            @wraps(method)
+            def inner(self, *args, **kwargs):
+                if 'ext' not in kwargs or kwargs['ext'] is None:
+                    kwargs['ext'] = True
+                else:
+                    msg = 'Should not have extension and export to sheets.'
+                    raise TypeError(msg)
+
+                out = method(self, *args, **kwargs)
+
+                if self.options.to_sheets:
+                    if tags:
+                        if args:
+                            method._report_class.sheet_name = args[0]
+                        else:
+                            method._report_class.sheet_name = self.options.tag[0]
+
+                    rows, title = out
+                    # fetch=False since the remote sheet may not exist
+                    # TODO improve the ergonimcs here
+                    report = method._report_class(fetch=False, readonly=False)
+                    report.metadata()  # idlib.Stream vs ? behavior not decided
+                    rows_stringified = rowcellify(rows)
+                    if report.sheetId() is None:
+                        report.createRemoteSheet()
+                        report.update(rows_stringified)
+                    else:
+                        report.fetch()
+                        if report.index_columns:
+                            report.upsert(*rows_stringified[1:])
+                        else:
+                            report.update(rows)
+
+                    report.commit()
+
+                return out
+
+            return inner
+
+        return decorator
+
+
+class AnnoTags(Reports):
+    name = 'anno-tags'
+
+
+class WorkingExecVerb(AnnoTags):
+    sheet_name = 'working-protc:executor-verb'
+    index_columns = 'value',
+
+    def condense(self):
+        marked_as_done = '-'
+        mapping = defaultdict(list)
+
+        def make_key(row):
+            return tuple(c.value for c in [row.tag(), row.value(), row.text(), row.exact()])
+
+        create = []
+        for mt_cell in self.row_object(0).map_to().column.cells[1:]:
+            if (mt_cell.value and mt_cell.value != marked_as_done and
+                mt_cell.value != mt_cell.row.value().value):
+                try:
+                    row, iv = self._row_from_index(value=mt_cell.value)
+                    key = make_key(row)
+                except AttributeError as e:  # value not in index
+                    key = ('protc:executor-verb', mt_cell.value, '', '')
+                    if key not in create:
+                        create.append(key)
+                        log.exception(e)
+
+                mapping[key].append(mt_cell.row.value().value)  # cells don't move so we're ok
+
+        mapping = dict(mapping)
+        value_to_map_to = {value:k for k, values in mapping.items()
+                           for value in values}
+
+        #breakpoint()
+        return value_to_map_to, create  # old -> new, original -> correct
 
 
 # field alignment
@@ -118,18 +230,51 @@ class Organs(FieldAlignment):
     fetch_grid = True
     #fetch_grid = False
 
-    def _lookup(self, dataset_id):
+    def _lookup(self, dataset_id, fail=False, raw=True):
         try:
-            return self.byCol.searchIndex('id', dataset_id)
+            row = self.byCol.searchIndex('id', dataset_id, raw=raw)
+            return row
         except KeyError as e:
             # TODO update the sheet automatically
             log.critical(f'New dataset! {dataset_id}')
+            if fail:
+                raise e
 
     def _dataset_row_index(self, dataset_id):
         # FIXME dict or cache this for performance
-        for i, id in enumerate(self.byCol.id):
-            if id == dataset_id:
-                return i + 1
+        row = self._lookup(dataset_id, fail=True)
+        return self.values.index(row)
+
+    def _update_dataset_metadata(self, id, name, award):
+        try:
+            row_index = self._dataset_row_index(id)
+            row = self.row_object(row_index)
+
+            cell_dsn = row.dataset_name()
+            if cell_dsn.value != name:
+                cell_dsn.value = name
+
+            cell_award = row.award()
+            if cell_award.value != award:
+                cell_award.value = award
+
+        except KeyError as e:
+            row = ['', '', name, id, award]
+            self._appendRow(row)
+
+    def update_from_ir(self, ir):
+        dataset_blobs = ir['datasets']
+        self._wat = self.values[8]
+        for blob in dataset_blobs:
+            meta = blob['meta']
+            self._update_dataset_metadata(
+                id=blob['id'],
+                name=adops.get(blob, ['meta', 'folder_name'], on_failure=''),
+                award=adops.get(blob, ['meta', 'award_number'], on_failure=''),
+            )
+
+        #log.debug(self.uncommitted())
+        self.commit()
 
     def modality(self, dataset_id):
         """ tuple of modalities """
@@ -148,8 +293,11 @@ class Organs(FieldAlignment):
         if row:
             ot = row[organ_term] if row[organ_term] else None
             if ot:
-                ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
-                return ts
+                try:
+                    ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
+                    return ts
+                except OntId.BadCurieError:
+                    log.error(ot)
 
     def award(self, dataset_id):
         row = self._lookup(dataset_id)

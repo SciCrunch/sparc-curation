@@ -1,26 +1,80 @@
+import copy
 import json
 from pathlib import Path
-from collections import deque
+from itertools import chain
+from collections import deque, defaultdict
 import idlib
 import rdflib
-import requests
+from joblib import Parallel, delayed
+from hyputils import hypothesis as hyp
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
 from pyontutils.closed_namespaces import rdf, rdfs, owl
+from protcur import document as ptcdoc
+from protcur.analysis import protc
+from sparcur import apinat
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import converters as conv
 from sparcur import exceptions as exc
-from sparcur.core import DictTransformer, copy_all, get_all_errors
+from sparcur import normalization as norm
+from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
+from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
 from sparcur.state import State
+from sparcur.config import auth
 from sparcur.derives import Derives
 
 DT = DictTransformer
 De = Derives
 
 a = rdf.type
+
+
+class MapPathsCombinator:
+
+    # FIXME could be implemented as a subpipeline of a subpipeline ?
+    # not quite sure how to do that though
+
+    def __init__(self, PipelineClass, debug=True, n_jobs=12):
+        # FIXME need to figure out how to pass config variables in
+        self.PipelineClass = PipelineClass
+        self.debug = debug
+        self.n_jobs = n_jobs
+
+    def __call__(self, previous_pipeline, lifters, runtime_context,
+                 # FIXME from runtime context or something?
+                 debug=None, n_jobs=None):
+
+        if debug is not None:
+            self.debug = debug
+
+        if n_jobs is not None:
+            self.n_jobs = n_jobs
+
+        class DataWrapper:
+            def __init__(self, data):
+                self.data = data
+
+        data = previous_pipeline.data
+        sv = data['schema_version'] if 'schema_version' in data else None
+        previous_pipelines = [DataWrapper({'path': p, 'schema_version': sv,})
+                              for p in data['paths']]
+        self.pipes = [self.PipelineClass(previous_pipeline,
+                                         lifters,
+                                         runtime_context)
+                      for previous_pipeline in previous_pipelines]
+
+        return self # hack to mimic __init__
+
+    @property
+    def data(self):
+        if self.debug or self.n_jobs == 1:
+            return [p.data for p in self.pipes]
+        else:
+            return Parallel(n_jobs=self.n_jobs)(delayed(lambda :p.data)()
+                                                for p in self.pipes)
 
 
 class Pipeline:
@@ -93,8 +147,10 @@ class ContributorsPipeline(DatasourcePipeline):
                 fn, mn = fn.split(' ', 1)
                 mn, _mn = mn.rstrip('.'), mn
                 if mn != _mn:
-                    he.addError(f'Middle initials don\'t need periods :) {name!r}',
-                                logfunc=logd.error)
+                    msg = f'Middle initials don\'t need periods :) {name!r}'
+                    #if he.addError(msg):
+                    logd.debug(msg)
+
                 contributor['middle_name'] = mn
                 contributor['first_name'] = fn
 
@@ -175,13 +231,29 @@ class PathPipeline(PrePipeline):
         try:
             return self.data_transformer_class(self.path, schema_version=self.schema_version)
         except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
+            # sigh code duplication
             class NoData:  # FIXME
                 data = {}
                 t = f'No data for {self.path}'
 
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
-            logd.exception(e)  # FIXME isn't this were we should accumulate errors?
-            he.addError(e, path=self.path)
+            if he.addError(e, path=self.path):
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+
+            he.embedErrors(NoData.data)
+            return NoData
+
+        except Exception as e:
+            # sigh code duplication
+            class NoData:  # FIXME
+                data = {}
+                t = f'No data for {self.path}'
+
+            he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
+            if he.addError(e, path=self.path):
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+                log.critical(f'Unhandled nearly fatal error in {self.path} {e} {type(e)}')
+
             he.embedErrors(NoData.data)
             return NoData
 
@@ -194,12 +266,11 @@ class PathPipeline(PrePipeline):
             # since they are properly pipelined
             data = {}
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.transformer')
-            logd.exception(e)  # FIXME isn't this were we should accumulate errors?
-            he.addError(e, path=self.path)
+            if he.addError(e, path=self.path):
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+
             he.embedErrors(data)
             return data
-
-
 
     # @hasSchema(sc.TransformerSchema)
     @property  # transformer out schema goes here
@@ -281,6 +352,25 @@ class SamplesFilePipeline(PathPipeline):
     data_transformer_class = dat.SamplesFile
 
     @hasSchema(sc.SamplesFileSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class ManifestFilePipeline(PathPipeline):
+
+    data_transformer_class = dat.ManifestFile
+
+    @property
+    def transformed(self):
+        dsr_path = self.path.relative_to(self.path.cache.dataset)
+        contents = super().transformed
+        data = {'contents': contents}
+        self.path.populateJsonMetadata(data)
+        return data
+
+    @hasSchema(sc.ManifestFileSchema)
     def data(self):
         return super().data
 
@@ -394,6 +484,7 @@ class JSONPipeline(Pipeline):
         data = self.moved
         removed = list(DictTransformer.pop(data, self.cleans, source_key_optional=True))
         #log.debug(f'cleaned the following values from {self}' + lj(removed))
+        #log.debug(log.handlers)
         log.debug(f'cleaned {len(removed)} values from {self}')
         return data
 
@@ -539,7 +630,7 @@ class ApiNATOMY(JSONPipeline):
 # is one way to solve this problem
 class ApiNATOMY_rdf(RdfPipeline):
 
-    converter_class = conv.ApiNATOMYConverter
+    converter_class = lambda self, a, b: apinat.Graph(a)
 
     @property
     def id(self):
@@ -550,33 +641,8 @@ class ApiNATOMY_rdf(RdfPipeline):
         return self._pipeline_start.object.id
 
     @property
-    def ontid(self):
-        # FIXME TODO
-        return rdflib.URIRef(f'https://sparc.olympiangods.org/ApiNATOMY/ontologies/{self.id}')
-
-    @property
     def triples_header(self):
-        # TODO TODO
-        ontid = self.ontid
-        nowish = utcnowtz()  # FIXME pass in so we can align all times per export??
-        epoch = nowish.timestamp()
-        iso = isoformat(nowish)
-        ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
-        #sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
-                                      #'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
-
-        pos = (
-            (a, owl.Ontology),
-            (owl.versionIRI, ver_ontid),
-            (owl.versionInfo, rdflib.Literal(iso)),
-            #(isAbout, rdflib.URIRef(self.uri_api)),
-            #(TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
-            (rdfs.label, rdflib.Literal(f'TODO export graph')),
-            #(rdfs.comment, self.header_graph_description),
-            #(owl.imports, sparc_methods),
-        )
-        for p, o in pos:
-            yield ontid, p, o
+        yield from tuple()
 
 
 class LoadIR(JSONPipeline):
@@ -649,6 +715,11 @@ class SPARCBIDSPipeline(JSONPipeline):
           [['dataset_description_file', 'schema_version'], ['schema_version']]],
          SamplesFilePipeline,
          ['samples_file']],
+
+        [[[['manifest_file'], ['paths']],
+          [['dataset_description_file', 'schema_version'], ['schema_version']]],
+         MapPathsCombinator(ManifestFilePipeline),
+         ['manifest_file']],
     ]
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
@@ -727,7 +798,15 @@ class SPARCBIDSPipeline(JSONPipeline):
                 [['meta', 'sample_count']]],
     )
 
-    updates = []
+    updates = [
+        # this is the stage at which normalization should actually happen I think
+        # or at least normalization that is not required to prevent pipelines from
+        # breaking themselves
+        # TODO a way to indicate any key matching ? or does that seem like a bad idea?
+        [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+    ]
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
     adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],]
@@ -811,6 +890,15 @@ class SPARCBIDSPipeline(JSONPipeline):
     @hasSchema(sc.DatasetOutSchema)
     def data(self):
         data = super().data
+
+        # dereference should happen here not at the end of PiplineStart
+        # though harder to work backwards to the offending file right now
+
+        # FIXME pure side effecting going on here, also definitely wrong place
+        he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.data')
+        JApplyRecursive(dereference_all_identifiers, data, self, addError=he.addError)
+        he.embedErrors(data)
+
         return data
 
 
@@ -831,7 +919,7 @@ class PipelineExtras(JSONPipeline):
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
 
-    filter_failures = (
+    filter_failures = (  # XXX TODO implement this for other pipelines as well ?
         lambda p: ('inputs' not in p and 'contributor_role' in p),
         lambda p: ('inputs' not in p and 'contributor_orcid' in p),
     )
@@ -894,6 +982,7 @@ class PipelineExtras(JSONPipeline):
             if m:
                 data['meta']['modality'] = m
 
+        '''  # XXX delete
         if False and 'organ' not in data['meta']:
             # skip here, now attached directly to award
             if 'award_number' in data['meta']:
@@ -908,6 +997,7 @@ class PipelineExtras(JSONPipeline):
 
                     data['meta']['organ'] = o
 
+        '''
         if 'organ' not in data['meta'] or data['meta']['organ'] == 'othertargets':
             o = self.lifters.organ_term
             if o:
@@ -934,7 +1024,8 @@ class PipelineExtras(JSONPipeline):
                 _test_path = deque(['meta', 'protocol_url_or_doi'])
                 if not [e for e in data['errors']
                         if 'path' in e and e['path'] == _test_path]:
-                    raise ext.ShouldNotHappenError('urg')
+                    breakpoint()
+                    raise exc.ShouldNotHappenError('urg')
 
             else:
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
@@ -943,6 +1034,7 @@ class PipelineExtras(JSONPipeline):
 
         # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
         # and indeed, when we added PipelineStart this shifted and broke everything
+        # FIXME use the rmeta
         local = (self
                  .previous_pipeline.pipelines[0]
                  .previous_pipeline.pipelines[0]
@@ -955,8 +1047,8 @@ class PipelineExtras(JSONPipeline):
                 try:
                     metadata = doi.metadata()
                     if metadata is not None:
-                        data['meta']['doi'] = doi.identifier
-                except requests.exceptions.HTTPError:
+                        data['meta']['doi'] = doi
+                except idlib.exceptions.ResolutionError:
                     pass
 
         if 'status' not in data:
@@ -1007,6 +1099,7 @@ class PipelineEnd(JSONPipeline):
 
 
         'SubmissionFile',
+        'RawJsonSubmission.data',
 
         'SubmissionFilePipeline._transformer',
         'SubmissionFilePipeline.transformer',
@@ -1014,24 +1107,27 @@ class PipelineEnd(JSONPipeline):
 
 
         'DatasetDescriptionFile',
+        'RawJsonDatasetDescription.data',
 
         'NormDatasetDescriptionFile',
         #'NormDatasetDescriptionFile.contributor_orcid_id',
         #'NormDatasetDescriptionFile.contributor_role',
         #'NormDatasetDescriptionFile.funding',
         #'NormDatasetDescriptionFile.originating_article_doi',
-        #'NormDatasetDescriptionFile.protocol_url_or_doi',
+        'NormDatasetDescriptionFile.protocol_url_or_doi',
 
         'DatasetDescriptionFilePipeline._transformer',
         'DatasetDescriptionFilePipeline.transformer',
         'DatasetDescriptionFilePipeline.data',
 
+        'ContributorsPipeline.data',
 
         'SubjectsFile',
         'RawJsonSubjects.data',
 
         'NormSubjectsFile',
         'NormSubjectsFile.age',
+        'NormSubjectsFile.protocol_url_or_doi',
 
         'SubjectsFilePipeline._transformer',
         'SubjectsFilePipeline.transformer',
@@ -1044,6 +1140,8 @@ class PipelineEnd(JSONPipeline):
         'SamplesFilePipeline.transformer',
         'SamplesFilePipeline.data',
 
+        'ManifestFilePipeline.transformer',
+        'ManifestFilePipeline.data',
     ]
     _curation = [
         'DatasetStructure.curation-error',
@@ -1085,13 +1183,17 @@ class PipelineEnd(JSONPipeline):
     @classmethod
     def _indexes(cls, data):
         """ compute submission and curation error indexes """
-        errors = get_all_errors(data)
+        path_errors = get_all_errors(data)
+        (compacted, path_error_report, by_invariant_path,
+         errors) = compact_errors(path_errors)
+        unclassified_stages = []
         submission_errors = []
         curation_errors = []
+        unclassified_errors = []
         for error in reversed(errors):
             if error in submission_errors or error in curation_errors:
-                log.debug('error detected multiple times not counting '
-                          'subsequent occurances' + lj(error))
+                #log.debug('error detected multiple times not counting '
+                          #'subsequent occurances' + lj(error))
                 continue
 
             if 'blame' not in error:
@@ -1131,18 +1233,25 @@ class PipelineEnd(JSONPipeline):
                     curation_errors.append(error)
             else:
                 if blame not in ('pipeline', 'submission', 'debug'):
-                    raise ValueError(f'Unhandled stage {stage}\n{message}')
+                    unclassified_errors.append(error)
+                    unclassified_stages.append(blame)
+                    #raise ValueError(f'Unhandled stage {stage}\n{message}')
 
         si = len(submission_errors)
         ci = len(curation_errors)
+        ui = len(unclassified_errors)
         if 'status' not in data:
             data['status'] = {}
 
         data['status']['submission_index'] = si
         data['status']['curation_index'] = ci
-        data['status']['error_index'] = si + ci
+        data['status']['unclassified_index'] = ui
+        data['status']['error_index'] = si + ci + ui
         data['status']['submission_errors'] = submission_errors
         data['status']['curation_errors'] = curation_errors
+        data['status']['unclassified_errors'] = unclassified_errors
+        data['status']['unclassified_stages'] = unclassified_stages
+        data['status']['path_error_report'] = path_error_report
 
         return si + ci
 
@@ -1158,6 +1267,279 @@ class PipelineEnd(JSONPipeline):
     @hasSchema(sc.PostSchema, fail=True)
     def data(self):
         return super().data
+
+
+class IrToExportJsonPipeline(JSONPipeline):
+    """ transform json ir -> json export """
+
+    def __init__(self, blob_ir):
+        self.blob_ir = blob_ir
+
+    @property
+    def augmented(self):
+        data_in = self.blob_ir
+        # XXX NOTE JApplyRecursive is actually functional
+        data = JApplyRecursive(json_identifier_expansion,
+                               data_in,
+                               skip_keys=('errors',),
+                               preserve_keys=('inputs', 'id'))
+        return data
+
+    @hasSchema(sc.DatasetOutExportSchema)
+    def data(self):
+        return super().data
+
+
+class ToJsonLdPipeline(JSONPipeline):
+    moves = (
+        [['contributors'], ['contributors', '@graph']],
+        [['subjects'], ['subjects', '@graph']],
+        [['samples'], ['samples', '@graph']],
+        [['resources'], ['resources', '@graph']],
+    )
+
+    updates = (
+        [['id'], lambda v: 'dataset:' + v.rsplit(':', 1)[-1] + '/#dataset-graph'],
+    )
+
+    __includes = []
+
+    JApplyRecursive(sc.update_include_paths,
+                    sc.DatasetOutExportSchema.schema,
+                    preserve_keys=('inputs',),
+                    moves=moves,  # have to account for the moves from the defining schema
+                    collect=__includes)
+
+    adds = (
+        [['@context'], lambda l: sc.base_context],
+        [['meta', '@context'], lambda l: sc.MetaOutExportSchema.context()],
+        [['contributors', '@context'], lambda l: sc.ContributorExportSchema.context()],
+        [['subjects', '@context'], lambda l: sc.SubjectsExportSchema.context()],
+        [['samples', '@context'], lambda l: sc.SamplesFileExportSchema.context()],
+        #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()]
+        *__includes  # owl:NamedIndividual in here ... FIXME would be nice to not have to hack it in this way
+    )
+
+    derives_after_adds = (
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/'),
+         [['@context', '@base']]],
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: {'@id': uri_api + '/', '@prefix': True}),
+         [['@context', '_bfc']]],
+
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#subjects-graph'),
+         [['subjects', '@id']]],
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/subjects/'}}),
+         [['subjects', '@context', 'subject_id']]],
+
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#samples-graph'),
+         [['samples', '@id']]],
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/samples/'}}),
+         [['samples', '@context', 'primary_key']]],
+
+
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#contributors-graph'),
+         [['contributors', '@id']]],
+    )
+
+    def __init__(self, blob):
+        self.blob = blob
+        self.runtime_context = self
+        self.lifters = self
+
+    @property
+    def pipeline_start(self):
+        return copy.deepcopy(self.blob)
+
+    @property
+    def added(self):
+        # a hack to avoid need to rewirte the other stuff
+        return self.augmented_after_added
+
+    @property
+    def augmented_after_added(self):
+        data = super().added
+        DictTransformer.derive(data, self.derives_after_adds, source_key_optional=True)
+        return data
+
+    @property
+    def data(self):
+        return super().data
+
+
+class ExtractProtocolIds(Pipeline):
+
+    def __init__(self, blob):
+        self._blob = blob
+
+    @property
+    def data(self):
+        data = self._blob
+        collect = []
+        JApplyRecursive(get_nested_by_key,
+                        data,
+                        'protocol_url_or_doi',
+                        collect=collect)
+        unique = sorted(set(collect))  # already dereferenced and normalized at this point
+        return [i for i in ids if isinstance(i, idlib.Pio)]
+
+
+class ProtcurPipeline(Pipeline):
+
+    # there is no previous pipeline here
+    # FIXME cleanup and align naming with path pipeline probably?
+
+    def __init__(self, *hypothesis_group_names):
+        self._hypothesis_group_names = hypothesis_group_names
+
+    def load(self):  # if the dereferenced resource is remote, get a local copy
+        annos = []
+        for group_name in self._hypothesis_group_names:
+            group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
+            cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+            get_annos = hyp.AnnoReader(cache_file, group_id)
+            annos.extend(get_annos())
+            # FIXME hyputils has never been engineered to work with
+            # multiple groups at the same time using the same auth
+            # so everything is backwards from what it should be since
+            # the perspective of the original imlementation was focused
+            # on groups (and because no implementation should be focused
+            # on auth, which should be handled orthgonally)
+
+        return annos
+
+    def _idints(self, annos=None):
+        if annos is None:
+            annos = self.load()
+
+        _annos = annos
+        annos = [ptcdoc.Annotation(a) for a in annos]
+        #pool = ptcdoc.Pool(annos)
+        #anno_counts = ptcdoc.AnnoCounts(pool)
+        #idn = ptcdoc.IdNormalization(anno_counts.all())
+        idn = ptcdoc.IdNormalization(annos)
+        protcs = [protc(f, annos) for f in annos]
+        idints = idn._uri_api_ints()
+        nones = idints.pop(None)
+        nidn = ptcdoc.IdNormalization(nones)
+        idints.update(nidn.normalized())
+        pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
+        return annos, idints, pidints
+
+    @staticmethod
+    def _annos_to_json(data, annos):
+        def partition(a):
+            return ('ast-no-parents'
+                    if a.is_protcur_lang() else
+                    ('not-ast' if not a.isAstNode else None))
+
+        def normalize_tech(a):
+            have_value = False
+            cands = (
+                'tech:',
+                'NLXINV:',
+                'BIRNLEX:',
+            )
+            for tag in chain(a.tags, (t for c in a.replies for t in c.tags)):
+                if tag == 'ilxtr:technique':
+                    continue
+                elif any(tag.startswith(t) for t in cands):
+                    return OntTerm(tag)  # FIXME jsonld string issue ...
+                elif 'technique' in tag:
+                    return tag
+
+            return a.value
+
+        def normalize_other(a):
+            for tag in a.tags:
+                if tag.startswith('UBERON:'):
+                    return OntTerm(tag)  # FIXME jsonld string issue
+
+            if a.value:
+                return a.value
+            elif a.exact:
+                return a.exact
+            else:
+                return a.text
+
+        def clean(v):
+            nbsp = '\xa0'  # the vails of the non breaking space for formatting :/
+            return v.strip().replace(nbsp, ' ')
+
+        hrm = defaultdict(list)
+        _ = [hrm[partition(a)].append(a) for a in annos]
+        anp = hrm['ast-no-parents']  # TODO
+        na = hrm['not-ast']
+        nested = hrm[None]  # TODO
+
+        data['TEMP:hasNumberOfProtcurAnnotations'] = len(anp)
+
+        for tag, predicate, *norm in (
+                ('ilxtr:technique', 'TEMP:protocolEmploysTechnique', normalize_tech),
+
+                ('protc:aspect', 'TEMP:protocolInvolvesAspect'),  # FIXME source from protcs
+                ('protc:implied-aspect', 'TEMP:protocolInvolvesAspect'),  # FIXME source from protcs
+                # TODO aspects of subjects vs reagents, primary particiant in the
+                # core protocols vs subprotocols
+
+                ('sparc:AnatomicalLocation', 'TEMP:involvesAnatomicalRegion'),
+                ('sparc:Measurement', 'TEMP:protocolMakesMeasurement'),
+                ('sparc:Reagent', 'TEMP:protocolUsesReagent'),
+                ('sparc:Tool', 'TEMP:protocolUsesTool'),
+                ('sparc:Sample', 'TEMP:protocolInvolvesSampleType'),
+                ('sparc:OrganismSubject', 'TEMP:protocolInvolvesSubjectType'),
+                ('sparc:Procedure', 'TEMP:whatIsThisDoingHere'),
+        ):
+            if not norm:
+                norm = normalize_other
+            else:
+                norm, = norm
+
+            vals = sorted(set([clean(norm(a)) for a in annos if tag in a.tags]))
+            if vals:
+                data[predicate] = vals
+
+    def _hrm(self):
+        annos, idints, pidints = self._idints()
+        out = []
+        for pio, pannos in pidints.items():
+            data = {}
+            if type(pio) != str:
+                _id = pio.asStr()
+            else:
+                _id = pio
+
+            data['id'] = pio
+            data['@type'] = ['sparc:Protocol', 'owl:NamedIndividual']
+            self._annos_to_json(data, pannos)
+            log.debug(data)
+            out.append(data)
+
+        return out
+
+    @property
+    def data(self):
+        return self._hrm()
+
+
+class ProtocolPipeline(Pipeline):
+
+    # previous pipeline is pipeline end, but
+    # it doesn't run that way
+
+    def __init__(self, blob):
+        pass
 
 
 class ListAllDatasetsPipeline(Pipeline):

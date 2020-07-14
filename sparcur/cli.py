@@ -3,31 +3,39 @@ from sparcur.config import auth
 __doc__ = f"""
 SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
-    spc clone <project-id>
-    spc pull [options] [<directory>...]
-    spc refresh [options] [<path>...]
-    spc fetch [options] [<path>...]
-    spc find [options] --name=<PAT>...
-    spc status [options]
-    spc meta [options] [--uri] [--browser] [--human] [--diff] [<path>...]
-    spc export [schemas] [options] [<path>...]
-    spc report size [options] [<path>...]
-    spc report tofetch [options] [<directory>...]
-    spc report terms [anatomy cells subcelluar] [options]
-    spc report [access filetypes pathids test] [options]
-    spc report [completeness keywords subjects samples errors] [options]
-    spc report [contributors] [options]
-    spc shell [affil integration protocols exit] [options]
-    spc server [options]
-    spc tables [<directory>...]
-    spc annos [export shell]
+    spc clone    [options] <project-id>
+    spc pull     [options] [<directory>...]
+    spc refresh  [options] [<path>...]
+    spc fetch    [options] [<path>...]
+    spc find     [options] --name=<PAT>...
+    spc status   [options]
+    spc meta     [options] [<path>...]
+    spc rmeta    [options]
+    spc export   [schemas protcur protocols] [options] [<path>...]
+    spc report   size    [options] [<path>...]
+    spc report   tofetch [options] [<directory>...]
+    spc report   terms   [anatomy cells subcelluar] [options]
+    spc report   [access filetypes pathids test]    [options]
+    spc report   [completeness keywords subjects]   [options]
+    spc report   [contributors samples errors mbf]  [options]
+    spc report   [(anno-tags <tag>...) changes mis] [options]
+    spc report   [(overview [<path>...]) all]       [options]
+    spc shell    [affil integration protocols exit] [options]
+    spc shell    [(dates [<path>...]) sheets]       [options]
+    spc server   [options]
+    spc apinat   [options] <path-in> <path-out>
+    spc tables   [options] [<directory>...]
+    spc annos    [options] [fetch export shell]
     spc feedback <feedback-file> <feedback>...
-    spc missing [options]
-    spc xattrs [options]
-    spc demos [options]
-    spc goto <remote-id>
-    spc fix [options] [duplicates mismatch] [<path>...]
-    spc stash [options --restore] <path>...
+    spc missing  [options]
+    spc xattrs   [options]
+    spc demos    [options]
+    spc goto     <remote-id>
+    spc fix      [options] [duplicates mismatch] [<path>...]
+    spc stash    [options --restore] <path>...
+    spc make-url [options] [<id-or-path>...]
+    spc show     [schemas rmeta (export [json ttl])] [options] [<project-id>]
+    spc sheets   [update] [options] <sheet-name>
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -35,6 +43,7 @@ Commands:
     pull        retrieve remote file structure
 
                 options: --empty
+                       : --sparse-limit
 
     refresh     retrieve remote file sizes and fild ids (can also fetch using the new data)
 
@@ -45,6 +54,7 @@ Commands:
     fetch       fetch remote data based on local metadata (NOTE does NOT refresh first)
 
                 options: --level
+                       : --mbf      fetch mbf xml metadata and only for specific datasets
 
     find        list unfetched files with option to fetch
 
@@ -59,22 +69,26 @@ Commands:
     meta        display the metadata the current folder or specified paths
 
                 options: --diff     diff the local and cached metadata
+                       : --uri      render the uri for the remote
                        : --browser  navigate to the human uri for this file
                        : --human
                        : --context  include context, e.g. dataset
 
+    rmeta       retrieve metadata about files/folders from the remote
+
     export      export extracted data to json (and everything else)
 
-                datasets        ttl for individual datasets in addition to full export
-                json            json for a single dataset
-                ttl             turtle for a single dataset
+                schemas         export schemas from python to json
 
                 options: --latest   run derived pipelines from latest json
                        : --partial  run derived pipelines from the latest partial json export
-                       : --open     open the output file using xopen
+                       : --open=P   open the output file with specified command
+                       : --show     open the output file using xopen
+                       : --mbf      extract and export mbf embedded metadata
 
-    report      print a report on all datasets
+    report      generate reports
 
+                all             generate all reports (use with --to-sheets)
                 size            dataset sizes and file counts
                 completeness    submission and curation completeness
                 filetypes       filetypes used across datasets
@@ -87,20 +101,40 @@ Commands:
                                 subcelluar
 
                 subjects        all headings from subjects files
+                samples         all headings from samples files
+                contributors    report on all contributors
                 errors          list of all errors per dataset
+                test            do as little as possible (use with --profile)
+                mbf             mbf term report (can use with --unique)
+                anno-tags       list anno exact for a curation tag
+                changes         diff two curation exports
+                mis             list summary predicates used per dataset
+                access          report on dataset access master vs pipelines
+                overview        general dataset information
 
                 options: --raw  run reports on live data without export
                        : --tab-table
+                       : --to-sheets
                        : --sort-count-desc
+                       : --unique
+                       : --uri
+                       : --uri-api
                        : --debug
+                       : --export-file=PATH
+                       : --ttl-file=PATHoURI
+                       : --ttl-compare=PATHoURI
+                       : --published
 
     shell       drop into an ipython shell
 
                 integration     integration subshell with different defaults
+                exit            (use with --profile)
 
     server      reporting server
 
                 options: --raw  run server on live data without export
+
+    apinat      convert ApiNATOMY json to rdf and serialize to ttl
 
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
@@ -113,13 +147,14 @@ Commands:
                 mismatch
                 duplicates
     stash       stash a copy of the specific files and their parents
+    make-url    return urls for blackfynn dataset ids, or paths
 
 Options:
     -f --fetch              fetch matching files
     -R --refresh            refresh matching files
     -r --rate=HZ            sometimes we can go too fast when fetching [default: 5]
     -l --limit=SIZE_MB      the maximum size to download in megabytes [default: 2]
-                            use negative numbers to indicate no limit
+                            use zero or negative numbers to indicate no limit
     -L --level=LEVEL        how deep to go in a refresh
                             used by any command that acceps <path>...
     -p --pretend            if the defult is to act, dont, opposite of fetch
@@ -136,16 +171,24 @@ Options:
     -z --only-no-file-id    only pull files missing file_id
     -o --overwrite          fetch even if the file exists
     --project-path=<PTH>    set the project path manually
+    --sparse-limit=COUNT    package count that forces a sparse pull [default: {auth.get('sparse-limit')}]
+                            use zero or negative numbers to indicate no limit
 
+    -F --export-file=PATH   run reports on a specific export file
     -t --tab-table          print simple table using tabs for copying
     -A --latest             run derived pipelines from latest json
     -P --partial            run derived pipelines from the latest partial json export
     -W --raw                run reporting on live data without export
+    --published             run on the latest published export
+    --to-sheets             push report to google sheets
+    --ttl-file=PATHoURI     location of ttl file (uses latest if not specified)
+    --ttl-compare=PATHoURI  location of ttl file for comparison
 
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
 
-    -O --open               open the output file
+    -O --open=PROGRAM       open the output file with program
+    -w --show               open the output file
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
     -D --diff               diff local vs cache
@@ -157,62 +200,57 @@ Options:
     -v --verbose            print extra information
     --profile               profile startup performance
     --local                 ignore network issues
+    --mbf                   fetch/export mbf related metadata
+    --unique                return a unique set of values without additional info
 
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
     --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
+
+    --project-id=PID        alternate way to pass project id  [default: {auth.get('blackfynn-organization')}]
+
+    --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: sparc-curation]
 """
 
 from time import time
 start = time()
 
-import re
+import os
 import sys
 import json
 import errno
 import types
-import pprint
 from itertools import chain
 from collections import Counter, defaultdict
 import idlib
-import requests
 import htmlfn as hfn
 import ontquery as oq
 start_middle = time()
 import augpathlib as aug
-from augpathlib import FileSize
-from augpathlib import RemotePath, AugmentedPath  # for debug
-
 from pyontutils import clifun as clif
-from pyontutils.core import OntResGit, OntGraph
-from pyontutils.utils import UTCNOWISO
+from pyontutils.core import OntResGit
+from pyontutils.utils import UTCNOWISO, subclasses
 from pyontutils.config import auth as pauth
 from terminaltables import AsciiTable
 
-from sparcur import config
-from sparcur import export as ex
-from sparcur import schemas as sc
+from sparcur import reports  # top level
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
-from sparcur.core import JT, JPointer, lj, DictTransformer as DT
-from sparcur.core import OntId, OntTerm, get_all_errors, adops
-from sparcur.utils import log, logd, SimpleFileHandler, GetTimeNow
-from sparcur.utils import python_identifier, want_prefixes, symlink_latest
-from sparcur.paths import Path, BlackfynnCache, PathMeta, StashPath
+from sparcur.core import JT
+from sparcur.core import OntId, OntTerm, adops
+from sparcur.utils import GetTimeNow  # top level
+from sparcur.utils import log, logd, bind_file_handler
+from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
-from sparcur.derives import Derives as De
 from sparcur.backends import BlackfynnRemote
 from sparcur.curation import Summary, Integrator
-from sparcur.curation import DatasetObject
 from sparcur.protocols import ProtocolData
 from sparcur.blackfynn_api import FakeBFLocal
-from IPython import embed
 
-
-slow = False
-if slow:
-    # this sucker takes .4 seconds to start up and isn't used
-    from pysercomb.pyr import units as pyru
+try:
+    breakpoint
+except NameError:
+    from IPython import embed as breakpoint
 
 stop = time()
 
@@ -220,46 +258,95 @@ stop = time()
 class Options(clif.Options):
 
     @property
+    def export_schemas_path(self):
+        return Path(self.export_path) / 'schemas'  # FIXME not sure if correct
+
+    @property
+    def export_protcur_base(self):
+        return Path(self.export_path) / 'protcur'  # FIXME not sure if correct
+
+    @property
+    def export_protocols_base(self):
+        return Path(self.export_path) / 'protocols'  # FIXME not sure if correct
+
+    @property
+    def project_id(self):
+        return self._args['<project-id>'] or self._args['--project-id']
+
+    @property
     def jobs(self):
-        return int(self.args['--jobs'])
+        return int(self._args['--jobs'])
 
     @property
     def limit(self):
-        l = int(self.args['--limit'])
+        l = int(self._args['--limit'])
+        if l >= 0:
+            return l
+
+    @property
+    def sparse_limit(self):
+        l = int(self._args['--sparse-limit'])
         if l >= 0:
             return l
 
     @property
     def level(self):
-        return int(self.args['--level']) if self.args['--level'] else None
+        return int(self._args['--level']) if self._args['--level'] else None
 
     @property
     def rate(self):
-        return int(self.args['--rate']) if self.args['--rate'] else None
+        return int(self._args['--rate']) if self._args['--rate'] else None
+
+    @property
+    def fetch(self):
+        return self._args['--fetch'] or self._default_fetch
+
+    @property
+    def mbf(self):
+        # deal with the fact that both mbf and --mbf are present
+        return self._args['--mbf'] or self._default_mbf
+
+    @property
+    def show(self):
+        # deal with the fact that both show and --show are present
+        return self._args['--show'] or self._default_show
 
 
 class Dispatcher(clif.Dispatcher):
     spcignore = ('.git',
                  '.~lock',)
 
-    def _export(self, export_source_path=None):
+    def _export(self, export_class, export_source_path=None, org_id=None):
+
         if export_source_path is None:
             export_source_path = self.cwd
 
         export_source_path = self.cwd
-        export = ex.Export(self.options.export_path,
-                           export_source_path,
-                           self._folder_timestamp,
-                           self._timestamp,
-                           self.options.latest,
-                           self.options.partial,
-                           self.options.open,)
+        export = export_class(self.options.export_path,
+                              export_source_path,
+                              self._folder_timestamp,
+                              self._timestamp,
+                              self.options.latest,
+                              self.options.partial,
+                              (self.options.open
+                               if self.options.open else
+                               self.options.show),
+                              org_id)
         return export
 
     def _print_table(self, rows, title=None, align=None, ext=None):
         """ ext is only used when self.options.server -> True """
+        def asStr(c):
+            if hasattr(c, 'asStr'):
+                return c.asStr()
+            else:
+                return str(c)
+
+        def asAsciiRows(rows):
+            return [[asStr(cell) for cell in row] for row in rows]
+
         def simple_tsv(rows):
-            return '\n'.join('\t'.join((str(c) for c in r)) for r in rows) + '\n'
+            return '\n'.join('\t'.join(asAsciiRows(rows))) + '\n'
 
         if self.options.tab_table:
             if title:
@@ -282,9 +369,8 @@ class Dispatcher(clif.Dispatcher):
                     return 'Not found', 404
 
             return hfn.render_table(rows[1:], *rows[0]), title
-
         else:
-            table = AsciiTable(rows, title=title)
+            table = AsciiTable(asAsciiRows(rows), title=title)
             if align:
                 assert len(align) == len(rows[0])
                 table.justify_columns = {i:('left' if v == 'l'
@@ -294,6 +380,8 @@ class Dispatcher(clif.Dispatcher):
                                                         'left')))
                                          for i, v in enumerate(align)}
             print(table.table)
+            if ext:
+                return rows, title
 
     def _print_paths(self, paths, title=None):
         if self.options.sort_size_desc:
@@ -301,9 +389,13 @@ class Dispatcher(clif.Dispatcher):
         else:
             key = lambda ps: ps
 
+        def derp(p):
+            if p.cache is None:
+                raise exc.NoCachedMetadataError(p)
+
         rows = [['Path', 'size', '?'],
                 *((p, s.hr
-                   if isinstance(s, FileSize) else
+                   if isinstance(s, aug.FileSize) else
                    s, 'x' if p.exists() else '')
                   for p, s in
                   sorted(([p, ('/' if p.is_dir() else
@@ -311,7 +403,7 @@ class Dispatcher(clif.Dispatcher):
                                 if p.cache.meta.size else
                                 '??')
                                if p.cache.meta else '_')]
-                          for p in paths), key=key))]
+                          for p in paths if not derp(p)), key=key))]
         self._print_table(rows, title)
 
 
@@ -324,6 +416,7 @@ class Main(Dispatcher):
                         'summary',
                         'cwd',
                         'cwdintr',
+                        '_datasets_with_extension',
                         '_timestamp',
                         '_folder_timestamp',)
 
@@ -354,14 +447,28 @@ class Main(Dispatcher):
 
         self.cwdintr = Integrator(self.cwd)
 
+        # pass debug along (sigh)
+        from augpathlib import RemotePath, AugmentedPath  # for debug
+        AugmentedPath._debug = self.options.debug
+        RemotePath._debug = self.options.debug
+
         # FIXME populate this via decorator
         if (self.options.clone or
             self.options.meta or
+            self.options.show or
+            self.options.sheets or
             self.options.goto or
+            self.options.apinat or
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
+            self.options.anno_tags or
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
+            self.options.annos or
+            (self.options.report and not self.options.raw) or
+            (self.options.report and self.options.export_file) or
+            (self.options.export and self.options.schemas) or
+            (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
             (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
             Integrator.no_google = True
@@ -371,12 +478,15 @@ class Main(Dispatcher):
               self.options.mismatch or
               self.options.stash or
               self.options.contributors or
+              self.options.make_url or
               self.options.missing):
             Integrator.no_google = True
 
         self._setup_local()  # if this isn't run up here the internal state of the program get's wonky
 
-        if self.options.report and not self.options.raw and not self.options.access:
+        if (self.options.report and
+            not self.options.raw and
+            not self.options.access):
             Integrator.setup(local_only=True)  # FIXME sigh
         else:
             try:
@@ -385,6 +495,7 @@ class Main(Dispatcher):
                 if self.options.local:
                     log.exception(e)
                     self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
+                    self.BlackfynnRemote.anchorTo(self.anchor)
                 else:
                     raise e
 
@@ -393,9 +504,6 @@ class Main(Dispatcher):
             self._setup_ontquery()
 
     def _setup_local(self):
-        # pass debug along (sigh)
-        AugmentedPath._debug = True
-        RemotePath._debug = True
         self.BlackfynnRemote = BlackfynnCache._remote_class
         self.BlackfynnRemote._async_rate = self.options.rate
 
@@ -407,6 +515,7 @@ class Main(Dispatcher):
             _cpath = local.cache  # FIXME project vs subfolder
             if _cpath is None:
                 raise exc.NoCachedMetadataError  # FIXME somehow we decided not to raise this!??!
+
             self.anchor = _cpath.anchor
         except exc.NoCachedMetadataError as e:
             root = local.find_cache_root()
@@ -421,7 +530,9 @@ class Main(Dispatcher):
                 print(f'{local} is not in a project!')
                 sys.exit(111)
 
-        self.anchor.anchorClassHere()  # replace a bottom up anchoring rule with top down
+        # replace a bottom up anchoring rule with top down
+        self.anchor.anchorClassHere(remote_init=False)
+
         self.project_path = self.anchor.local
         self.summary = Summary(self.project_path)
         Summary._n_jobs = self.options.jobs
@@ -429,14 +540,14 @@ class Main(Dispatcher):
             Summary._debug = True
 
     def _setup_bfl(self):
-        self.BlackfynnRemote.anchorTo(self.anchor)
+        self.BlackfynnRemote._setup()
+        self.BlackfynnRemote.init(self.anchor.id)
 
         self.bfl = self.BlackfynnRemote._api
         State.bind_blackfynn(self.bfl)
 
     def _setup_export(self):
         Integrator.setup()
-        ProtocolData.setup()  # FIXME this suggests that we need a more generic setup file than this cli
 
     def _setup_ontquery(self):
         # FIXME this should be in its own setup method
@@ -460,7 +571,17 @@ class Main(Dispatcher):
 
     @property
     def datasets(self):
-        yield from self.anchor.children  # ok to yield from cache now that it is the bridge
+        # XXX DO NOT YIELD DIRECTLY FROM self.anchor.children
+        # unless you are cloning or something like that
+        # because cache.children completely ignores existing
+        # files and folders and there really isn't a safe way
+        # to use it once files already exist because then
+        # viewing the cached children would move all the folders
+        # around, file under sigh, yes fix CachePath construction
+        for local in self.datasets_local:
+            yield local.cache
+
+        #yield from self.anchor.children  # NOT OK TO YIELD FROM THIS URG
 
     @property
     def datasets_remote(self):
@@ -481,8 +602,8 @@ class Main(Dispatcher):
 
     @property
     def directories(self):
-        return [Path(string_dir).absolute()
-                for string_dir in self.options.directory]
+        return [Path(string_path).absolute()
+                for string_path in self.options.directory]
 
     @property
     def paths(self):
@@ -573,15 +694,18 @@ class Main(Dispatcher):
 
         # make sure that we aren't in a project already
         existing_root = self.cwd.find_cache_root()
-        if existing_root is not None:
-            message = f'fatal: already in project located at {root.resolve()!r}'
+        if existing_root is not None and existing_root != self.cwd:
+            message = f'fatal: already in project located at {existing_root.resolve()!r}'
             print(message)
             sys.exit(3)
 
         try:
-            anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
+            if self.options.project_path:
+                anchor = self.BlackfynnRemote.anchorTo(self.cwd, create=True)
+            else:
+                anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
         except exc.DirectoryNotEmptyError:
-            message = (f'fatal: destination path {anchor} already '
+            message = (f'fatal: destination path already '
                        'exists and is not an empty directory.')
             print(message)
             sys.exit(2)
@@ -594,120 +718,77 @@ class Main(Dispatcher):
         self.anchor = anchor
         self.project_path = self.anchor.local
         with anchor:
-            self.cwd = Path.cwd()  # have to update self.cwd so pull sees the right thing
-            self.pull()
+            # update self.cwd so pull sees the right thing
+            self.cwd = Path.cwd()
+            self._clone_pull()
+
+    def _clone_pull(self):
+        """ wow this really shows that the pull -> bootstrap workflow
+            is completely broken and stupidly slow """
+
+        # populate just the dataset folders
+        datasets = list(self.anchor.children)
+        # populate the dataset metadata
+        self.rmeta(use_cache_path=True, exist_ok=True)
+
+        # mark sparse datasets so that we don't have to
+        # fiddle with detecting sparseness during bootstrap
+        sparse_limit = self.options.sparse_limit
+        [d._sparse_materialize(sparse_limit=sparse_limit) for d in datasets]
+        sparse = [d for d in datasets if d.is_sparse()]  # sanity check
+
+
+        skip = auth.get_list('datasets-no')  # FIXME this should be materialized as well
+
+        # pull all the files
+        self.pull()
+
+    def _total_package_counts(self):
+        from sparcur.datasources import BlackfynnDatasetData
+
+        def total_packages(cache):
+            bdd = BlackfynnDatasetData(cache)
+            try:
+                blob = bdd.fromCache()
+            except FileNotFoundError as e:
+                # FIXME TODO also check cached rmeta dates during pull
+                log.warning(e)
+                blob = bdd()
+
+            return sum(blob['package_counts'].values())
+
+        totals = []
+        for cache in self.datasets:
+            totals.append((cache, total_packages(cache)))
+
+        return totals
+
+    def _sparse_from_metadata(self, sparse_limit:int=None):
+        if sparse_limit is None:
+            sparse_limit = self.options.sparse_limit
+
+        if sparse_limit is None:
+            return []
+
+        totals = self._total_package_counts()
+        #tps = sorted([ for d in self.datasets], key= lambda ab: ab[1])
+        sparse = [r.id for r, pc in totals if pc >= sparse_limit]
+        return sparse
 
     def pull(self):
-        # TODO folder meta -> org
-        only = tuple()
-        recursive = self.options.level is None  # FIXME we offer levels zero and infinite!
+        # FIXME this still isn't quite right because it does not correctly
+        # deal dataset renaming, but it is much closer
+        from joblib import Parallel, delayed
         dirs = self.directories
-        cwd = self.cwd
-        if self.project_path.parent.name == 'big':
-            skip = self.skip
-            only = self.skip_big
-        else:
-            skip = self.skip_big + self.skip
-
-        if not dirs:
-            dirs = cwd,
-
-        dirs = sorted(dirs, key=lambda d: d.name)
-
-        existing_locals = set(rc for d in dirs for rc in d.rchildren)
-        # FIXME don't parse the fucking dates unless someone needs them you idiot
-        existing_d = {c.cache.id:c for c in existing_locals
-                      if c.cache is not None}  # yay null cache
-        existing_ids = set(existing_d)
-
-        log.debug(dirs)
+        dirs = dirs if dirs else (self.cwd,)
         for d in dirs:
-            if self.options.empty:
-                if list(d.children):
-                    continue
-
-            if not d.is_dir():
-                raise TypeError(f'dir is not a dir?!? {d}')
-
-            if not (d.remote.is_dataset() or d.remote.is_organization()):
-                log.warning('You are pulling recursively from below dataset level.')
-
-            #r = d.remote
-            # FIXME for some reason this does not seem to be working as expected
-            # because new datasets are being added when there is an existing dataset
-            #r.refresh(update_cache=True)  # if the parent folder has moved make sure to move it first
-            c = d.cache
-            newc = c.refresh()  # this does the move for us now
-            if newc is None:
-                continue  # directory was deleted
-
-            if d.cache.is_organization():  # FIXME FIXME FIXME hack to mask broken bootstrap handling of existing dirs :/
-                for cd in d.children:
-                    if cd.is_dir():
-                        oc = cd.cache
-                        if oc is None and cd.skip_cache:
-                            continue
-
-                        nc = oc.refresh()  # FIXME can't we just build an index off datasets here??
-                        if nc != oc:
-                            log.info(f'Dataset moved!\n{oc} -> {nc}')
-                            # FIXME FIXME FIXME
-                            rnl = self.anchor.local_data_dir / 'renames.log'
-                            with open(rnl, 'at') as f:
-                                f.write(f'{oc} -> {nc} -> {nc.id}\n')
-
-            # FIXME something after this point is retaining stale filepaths on dataset rename ...
-            #d = r.local  # in case a folder moved
-            caches = newc.remote.bootstrap(recursive=recursive, only=only, skip=skip)
-
-        new_locals = set(c.local for c in caches if c is not None)  # FIXME 
-        new_ids = {c.id:c for c in caches if c is not None}
-        maybe_removed_ids = set(existing_ids) - set(new_ids)
-        maybe_new_ids = set(new_ids) - set(existing_ids)
-        if maybe_removed_ids:
-            # FIXME pull sometimes has fake file extensions
-            from pyontutils.utils import Async, deferred
-            from pathlib import PurePath
-            maybe_removed = [existing_d[id] for id in maybe_removed_ids]
-            maybe_removed_stems = {PurePath(p.parent) / p.stem:p
-                                   for p in maybe_removed}  # FIXME still a risk of collisions?
-            maybe_new = [new_ids[id] for id in maybe_new_ids]
-            maybe_new_stems = {PurePath(p.parent) / p.stem:p for p in maybe_new}
-            for pstem, p in maybe_new_stems.items():
-                if pstem in maybe_removed_stems:
-                    mr_path = maybe_removed_stems[pstem]
-                    #assert p != mr_path, f'wat\n{mr_path}\n{p}'
-                    if p != mr_path:
-                        new_new_path = p.refresh()
-                    else:
-                        new_new_path = p
-                        # TODO check if file_id needs to be updated in some cases ...
-                        # csv files match
-                        log.info(f'wat\n{mr_path}\n{p}')
-
-                    if new_new_path == mr_path:
-                        maybe_removed.remove(mr_path)
-
-            Async(rate=self.options.rate)(deferred(l.cache.refresh)()
-                                          for l in maybe_removed
-                                          # FIXME deal with untracked files
-                                          if l.cache)
-
-    ###
-    skip = (
-            'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053',  # hackathon
-            'N:dataset:a896935a-4718-4906-8a7b-b6d76fb260b6',  # test computational resource
-            'N:dataset:8bcf659c-f4b3-425f-ac33-8c560e02d4aa',  # test dataset
-        )
-
-    skip_big = (
-            'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb',  # big max
-            'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded',  # big max 2
-            'N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',  # big rna
-            'N:dataset:ca9afa19-b616-41a9-a532-3ae5aaf4088f',  # big tif
-            #'N:dataset:a7b035cf-e30e-48f6-b2ba-b5ee479d4de3',  # powley done
-        )
-    ###
+            d.pull(
+                time_now=self._time_now,
+                debug=self.options.debug,
+                n_jobs=12,
+                log_level='DEBUG' if self.options.verbose else 'INFO',
+                Parallel=Parallel,
+                delayed=delayed,)
 
     def refresh(self):
         paths = self.paths
@@ -787,7 +868,35 @@ class Main(Dispatcher):
             for path in self._not_dirs:
                 path.cache.refresh(update_data=fetch, size_limit_mb=limit)
 
+    def _datasets_with_extension(self, extension):
+        """ Hack around the absurd slowness of python's rglob """
+
+        command = fr"""for d in */; do
+    find "$d" \( -type l -o -type f \) -name '*.{extension}' \
+    -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
+done"""
+        with os.popen(command) as p:
+            string = p.read()
+
+        has_extension = string.split('\n')
+        datasets = [d for d in self.datasets if d.id in has_extension]
+        return datasets
+
+    def _fetch_mbf(self):
+        from pyontutils.utils import Async, deferred
+        def fetch_mbf_metadata(dataset):
+            xmls = dataset.rglob('*.xml')
+            Async(rate=5)(deferred(x.fetch)(size_limit_mb=None)
+                          for x in xmls if not x.exists())
+
+        for dataset in self._datasets_with_extension('xml'):
+            fetch_mbf_metadata(dataset)
+
     def fetch(self):
+        if self.options.mbf:  # FIXME hack -> fetch '*.xml' or something
+            self._fetch_mbf()
+            return
+
         paths = [p for p in self._paths if not p.is_dir()]
         self._print_paths(paths)
         if self.options.pretend:
@@ -797,9 +906,38 @@ class Main(Dispatcher):
         hz = self.options.rate
         Async(rate=hz)(deferred(path.cache.fetch)(
             size_limit_mb=self.options.limit)
-                       for path in paths)
+                       for path in paths
+                       if not path.exists()
+                       # FIXME need a staging area ...
+                       # FIXME also, the fact that we sometimes need content_different
+                       # means that there may be silent fetch failures
+                       or path.content_different())
+
+    def _check_duplicates(self, datasets):
+        # NOTE this is an ok sanity check
+        # but cannot catch the duplicate dataset issue
+        # which actually comes from calling refresh
+        # while iterating through the list of dataset paths
+        # which can and does cause datasets move due to
+        # changes in their folder name
+        if not datasets:
+            datasets = list(self.datasets_local)
+
+        counts = Counter([d['id'] if isinstance(d, dict) else d.id
+                          for d in datasets])
+        bads = [(id, c) for id, c in counts.most_common() if c > 1]
+        if bads:
+            # FIXME sys.exit ?
+            raise BaseException(f'duplicate datasets {bads}')
+
+    def _check_exists(self, dataset_paths):
+        bads = [p for p in dataset_paths if not p.exists()]
+        if bads:
+            raise FileNotFoundError(f'The following do not exist!\n{bads}')
 
     def export(self):
+        from sparcur import export as ex  # FIXME very slow to import
+        from sparcur import schemas as sc
 
         # FIXME export should be able to run without needing any external
         # data the fetch step should happen before the export so that
@@ -808,48 +946,159 @@ class Main(Dispatcher):
         # TODO export source path without having to be in that folder
 
         if self.options.schemas:
-            ex.export_schemas(self.options.export_path)
+            ex.core.export_schemas(self.options.export_schemas_path)
+
+        elif self.options.protcur or self.options.protocols:
+            export = self._export(ex.Export, org_id=self.options.project_id)  # FIXME org_id not needed ...
+            # FIXME dump_path shouldn't need to be passed explicitly
+            dump_path = (self.options.export_protcur_base /
+                         self._folder_timestamp)
+            dump_path.mkdir(parents=True)
+            hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
+            blob_protcur = export.export_protcur(dump_path, hgn)
+            # NOTE --latest will also pull from latest protcur export
+            # if it exists I think, the issue is with repeated export
+            # of the same content ... as usual, which will confuse
+            # EVERYTHING if we want the latest protcur export but
+            # not the latest dataset export, this will have to be
+            # dealt with when we move to the default state being
+            # to update datasets independently where there will only
+            # be a fully integrated dataset when we do the conversion
+            # to ttl or bulk load into foundry etc.
+            if self.options.protocols:  # TODO
+                protcur_dump_path = dump_path
+                dataset_blob = []  # FIXME FIXME
+                dump_path = (self.options.export_protocols_base /
+                             self._folder_timestamp)
+                dump_path.mkdir(parents=True)
+                export.export_protocols(dump_path,
+                                        dataset_blobs,
+                                        blob_protcur)
+                # need to be able to run this from arbitrary dataset blobs
+                # in a way that is marginally sane
+                raise NotImplementedError('dataset blobs inclusion please')
+
+        elif self.options.mbf:
+            export = self._export(ex.ExportXml)
+            dataset_paths = self._datasets_with_extension('xml')
+            self._check_duplicates(dataset_paths)
+            self._check_exists(dataset_paths)
+            blob_ir, *rest = export.export(dataset_paths=dataset_paths,
+                                           jobs=self.options.jobs,
+                                           debug=self.options.debug)
+
+            return blob_ir
 
         else:
-            export = self._export()
-            int_or_sum = export.export()
+            export = self._export(ex.Export)
+            dataset_paths = tuple(self.paths)
+            self._check_duplicates(dataset_paths)  # NOTE can be empty
+            self._check_exists(dataset_paths)
+            noexport = (auth.get_list('datasets-noexport') +
+                        auth.get_list('datasets-no'))
+            blob_ir, *rest = export.export(dataset_paths=dataset_paths,
+                                           exclude=noexport)
+
+            sc.SummarySchema().validate_strict(export.latest_export)
 
         if self.options.debug:
-            embed()
+            breakpoint()
 
     def annos(self):
-        from protcur.analysis import protc, Hybrid
-        from sparcur.protocols import ProtcurSource
-        ProtcurSource.populate_annos()
+        hgn = self.options.hypothesis_group_name
+        if self.options.fetch:
+            from hyputils import hypothesis as hyp
+            group_id = auth.user_config.secrets('hypothesis', 'group', hgn)
+            cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+            get_annos = hyp.Memoizer(cache_file, group=group_id)
+            get_annos.api_token = auth.get('hypothesis-api-key')  # FIXME ?
+            annos = get_annos()
+            return
+
+        from protcur.analysis import protc
+        from sparcur import pipelines as pipes
+        pipe = pipes.ProtcurPipeline(hgn)
+        _annos = pipe.load()
+
+        # using _annos here as we transition to use ptcdoc.Annotation
+        # instead of the base hypothesis annotation as the substrate
+        annos, idints, pidints = pipe._idints(_annos)
+
+        pidints = None  # repr issues
+        # the per doc use case is rather different from the traditional
+        # protcur use case because the traditional protcur use case
+        # assumes that protocols routinely cross document boundaries
+        # which is absolutely the case when curating from the literature
+        # from protocols.io not quite so much
+
+        per_pid = {pid:protc.protcurLang([a.id for a in idannos])
+                   # FIXME protcur export has been insanely
+                   # slow for a long time and continues to be
+                   for pid, idannos in idints.items()}
+
         if self.options.export:
+            base = Path('/tmp/protcur-rkt/')
+            base.mkdir(exist_ok=True)
+
+            for pid, string in per_pid.items():
+                fn = (pid.identifier.suffix
+                    if isinstance(pid, idlib.Pio) and pid.identifier.is_int() else
+                      (pid.suffix if isinstance(pid, idlib.Pio._id_class) else
+                       pid.replace('/', '_').replace(':', '_'))) + '.ptc'
+                with open(base / fn, 'wt') as f:
+                    f.write(string)
+
             with open('/tmp/sparc-protcur.rkt', 'wt') as f:
                 f.write(protc.parsed())
 
-        all_blackfynn_uris = set(u for d in self.summary
-                                 for u in d.protocol_uris_resolved)
-        all_hypotehsis_uris = set(a.uri for a in protc)
+        """
+        if self.options.raw:
+            data = self.summary.data()
+        else:
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_ir
+
+        dataset_blobs = data['datasets']
+
+        from protcur.analysis import protc
+        from sparcur.protocols import ProtcurData
+        ProtcurData.populate_annos()
+
+        class ProtocolActual(ProtocolData):  # FIXME so ... bad ...
+            @property
+            def protocol_uris(self, outer_self=self):  # FIXME this needs to be pipelined
+                for d in dataset_blobs:
+                    try:
+                        yield from adops.get(d, ['meta', 'protocol_url_or_doi'])
+                    except exc.NoSourcePathError:
+                        pass
+
+        pa = ProtocolActual()
+        all_blackfynn_uris = set(pa.protocol_uris_resolved)
+        all_hypothesis_uris = set(a.uri for a in protc)
         if self.options.shell or self.options.debug:
             p, *rest = self._paths
             f = Integrator(p)
             all_annos = [list(protc.byIri(uri))
                          for uri in f.protocol_uris_resolved]
-            embed()
+            breakpoint()
+        """
 
     def demos(self):
         # get the first dataset
-        dataset = next(iter(summary))
+        dataset = next(iter(self.summary))
 
         # another way to get the first dataset
-        dataset_alt = next(org.children)
+        dataset_alt = next(self.anchor.children)
 
         # view all dataset descriptions call repr(tabular_view_demo)
+        ds = self.datasets
         tabular_view_demo = [next(d.dataset_description).t
-                                for d in ds[:1]
-                                if 'dataset_description' in d.data]  # FIXME
+                             for d in ds[:1]
+                             if 'dataset_description' in d.data]  # FIXME
 
         # get package testing
-        bigskip = ['N:dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d',
-                   'N:dataset:ec2e13ae-c42a-4606-b25b-ad4af90c01bb']
+        bigskip = auth.get_list('datasets-sparse') + auth.get_list('datasets-no')
         bfds = self.bfl.bf.datasets()
         packages = [list(d.packages) for d in bfds[:3]
                     if d.id not in bigskip]
@@ -864,7 +1113,7 @@ class Main(Dispatcher):
         if False:
             ### this is the equivalent of export, quite slow to run
             # export everything
-            dowe = summary.data()
+            dowe = self.summary.data()
 
             # show all the errors from export everything
             error_id_messages = [(d['id'], e['message'])
@@ -886,7 +1135,13 @@ class Main(Dispatcher):
         dat.SubmissionFile._refresh_on_missing = False
         dat.SubjectsFile._refresh_on_missing = False
         dat.SamplesFile._refresh_on_missing = False
-        droot = dat.DatasetStructure(self.cwd)
+        directories = self.directories
+        directories = directories if directories else (self.cwd,)
+        for directory in directories:
+            self._tables_dir(directory)
+
+    def _tables_dir(self, directory):
+        droot = dat.DatasetStructure(directory)
         if droot.cache.is_dataset():
             datasetdatas = droot,
         elif droot.cache.is_organization():
@@ -897,35 +1152,33 @@ class Main(Dispatcher):
         def do_file(d, ft):
             if hasattr(d, ft):
                 f = getattr(d, ft)
-                if hasattr(f, 'object'):
-                    return (f.object._t())
-                else:
-                    message = f'object missing on {ft} for {d}'
-                    log.warning(message)
-                    return message
+                fs = f if isinstance(f, list) else [f]
+                for f in fs:
+                    if hasattr(f, 'object'):
+                        yield (f.object._t())
+                    else:
+                        message = f'object missing on {ft} for {d}'
+                        log.warning(message)
+                        yield message
 
             else:
-                return f'{ft} missing on {d}'
+                yield f'{ft} missing on {d}'
 
         tables = [t for d in datasetdatas for t in
-                  (do_file(d, 'dataset_description'),
-                   do_file(d, 'submission'),
-                   do_file(d, 'subjects'),
-                   do_file(d, 'samples'),
+                  (*do_file(d, 'dataset_description'),
+                   *do_file(d, 'submission'),
+                   *do_file(d, 'subjects'),
+                   *do_file(d, 'samples'),
+                   *do_file(d, 'manifest'),
                    ('\n--------------------------------------------------\n'
                       '=================================================='
                     '\n--------------------------------------------------\n'))]
 
-        [print(t if isinstance(t, str) else repr(t)) for t in tables]
-        return
-        tabular_view_demo = [next(d.dataset_description).t
-                                for d in summary
-                                if 'dataset_description' in d.data]
-        print(repr(tabular_view_demo))
+        [print(t if isinstance(t, str) else repr(t)) for t in tables]  # FIXME _print_tables?
 
     def find(self):
         paths = []
-        if self.options.name:
+        if self.options.name:  # has to always be true now
             patterns = self.options.name
             path = self.cwd
             for pattern in patterns:
@@ -1067,7 +1320,12 @@ class Main(Dispatcher):
 
     def goto(self):
         # TODO this needs an inverted index
-        for rc in self.cwd.rchildren:
+        if self.options.remote_id.startswith('N:dataset:'):
+            gen = self.cwd.children
+        else:
+            gen = self.cwd.rchildren
+
+        for rc in gen:
             try:
                 if rc.cache.id == self.options.remote_id:
                     if rc.is_broken_symlink() or rc.is_file():
@@ -1113,7 +1371,8 @@ class Main(Dispatcher):
             self.dataset_index = {d.meta.id:Integrator(d)
                                   for d in self.datasets}
         else:
-            data = self._export().latest_export
+            from sparcur import export as ex
+            data = self._export(ex.Export).latest_ir
             self.dataset_index = {d['id']:d for d in data['datasets']}
 
         report = Report(self)
@@ -1179,419 +1438,124 @@ class Main(Dispatcher):
             nall = list(new_anchor.rchildren)
             return nall
 
+    def apinat(self):
+        path_in = Path(self.options.path_in)
+        path_out = Path(self.options.path_out)
+        with open(path_in) as f:
+            resource_map = json.load(f)
+
+        if path_in.suffix == '.json':
+            from sparcur import apinat
+            agraph = apinat.Graph(resource_map)
+            graph = agraph.graph()
+            graph.write(path=path_out)
+        elif path_in.suffix == '.jsonld':
+            from pyontutils.core import populateFromJsonLd, OntGraph
+            g = populateFromJsonLd(OntGraph(), path_in).write(path=path_out)
+
+    def rmeta(self, use_cache_path=False, exist_ok=False):
+        from pyontutils.utils import Async, deferred
+        from sparcur.datasources import BlackfynnDatasetData
+        dsr = self.datasets if use_cache_path else self.datasets_remote
+        all_ = [BlackfynnDatasetData(r) for r in dsr]
+        prepared = [bdd for bdd in all_ if not (exist_ok and bdd.cache_path.exists())]
+        hz = self.options.rate
+        if not self.options.debug:
+            blobs = Async(rate=hz)(deferred(d)() for d in prepared)
+        else:
+            blobs = [d() for d in  prepared]
+
+    def make_url(self):
+        lu = {d.cache.id:d.cache for d in self.datasets_local}
+        for iop in self.options.id_or_path:
+            if iop.startswith('N:dataset:'):
+                cache = lu[iop]
+            else:
+                cache = Path(iop).cache
+
+            print(hfn.atag(cache.uri_human, cache.id))
+
+    def show(self):
+        if self.options.export:
+            from sparcur import export as ex
+            export = self._export(ex.Export, org_id=self.options.project_id)
+            if self.options.json:
+                export.latest_export_path.xopen(self.options.open)
+            elif self.options.ttl:
+                export.latest_ttl_path.xopen(self.options.open)
+
+        elif self.options.schemas:
+            print(self.options.export_schemas_path)
+            self.options.export_schemas_path.xopen(self.options.open)  # NOTE it is a folder
+
+        elif self.options.rmeta:
+            from sparcur import datasources as ds
+            Path(ds.BlackfynnDatasetData.cache_base).xopen(self.options.open)
+
+    def sheets(self):
+        from pyontutils import sheets as ps
+
+        # get ir
+        if self.options.raw:
+            data = self.summary.data()
+        else:
+            from sparcur import export as ex
+            export = self._export(ex.Export, org_id=self.options.project_id)
+            data = export.latest_ir
+
+        # check that the ir is sane
+        self._check_duplicates(data['datasets'])
+
+        # get sheets
+        sheets = {(s.name, s.sheet_name):s for s in subclasses(ps.Sheet)
+                  if not s.__name__.startswith('_')}
+        by_sn = {sn:s for (n, sn), s in sheets.items()}
+        sn = self.options.sheet_name
+        Sheet = by_sn[sn]
+        Sheet.fetch_grid = False
+
+        if self.options.update:
+            sheet = Sheet(readonly=False)
+            sheet.update_from_ir(data)
+        else:
+            sheet = Sheet()
+
+        if sheet.sheet_name == 'Organs':
+            h = sheet.row_object(0)
+            tech_cells = [
+                cell
+                for hcell in h.cells if 'technique' in hcell.value
+                for cell in hcell.column.cells[1:] if cell.value]
+            sheet.fetch_grid = True
+            sheet.fetch()
+
+        if self.options.debug:
+            breakpoint()
+
+        return sheet
+
     ### sub dispatchers
 
     def report(self):
         report = Report(self)
-        report('report')
+        return report('report')
 
     def shell(self):
         """ drop into an shell with classes loaded """
         shell = Shell(self)
-        shell('shell')
+        return shell('shell')
 
     def fix(self):
         fix = Fix(self)
-        fix('fix')
+        return fix('fix')
 
 
-class Report(Dispatcher):
+class Report(reports.Report, Dispatcher):
 
     paths = Main.paths
     _paths = Main._paths
 
     _print_table = Main._print_table
-
-    @property
-    def _sort_key(self):
-        if self.options.sort_count_desc:
-            return lambda kv: -kv[-1]
-        else:
-            return lambda kv: kv
-
-    def access(self, ext=None):
-        """ Report on datasets that are in the master sheet but which the
-            automated pipelines do not have access to. """
-        if self.anchor.id == 'N:organization:fake-organization-id':
-            # FIXME need a way to generalize/fix this so that organization
-            # can vary ...
-            print('Not in correct organization for running access report.')
-            sys.exit(9999)
-
-        from sparcur.sheets import Overview, Master
-        if self.options.server:
-            def fmt(d): return hfn.atag(d.uri_human, d.id, new_tab=True)
-        else:
-            def fmt(d): return d.uri_human
-
-        if self.options.server:
-            uri_human = Master._uri_human()
-            def fmtmc(s): return hfn.atag(uri_human, s, new_tab=True)
-        else:
-            def fmtmc(s): return s
-
-        o = Overview()
-        remote = self.anchor.remote
-        remote_datasets = remote.children
-
-        master_sheet_ids = o.dataset_ids()
-        bf_api_ids = set(d.id for d in remote_datasets)
-
-        missing_from_api = sorted(master_sheet_ids - bf_api_ids)
-        missing_datasets = [self.BlackfynnRemote(i, local_only=True) for i in missing_from_api]
-        missing_uris = [fmt(d) for d in missing_datasets]
-        rows = [['', ''],
-                [fmtmc('Master Count'), len(master_sheet_ids)],
-                ['BF API Count', len(bf_api_ids)],
-                ['No API Count', len(missing_from_api)],
-                *[[i, u] for i, u in zip(missing_from_api, missing_uris)]
-        ]
-        return self._print_table(rows, title='Access Report', ext=ext)
-
-    def contributors(self, ext=None):
-        data = (self.summary.data_for_export(UTCNOWISO())
-                if self.options.raw else
-                self._export().latest_export)
-        datasets = data['datasets']
-        unique = {c['id']:c for d in datasets
-                  if 'contributors' in d
-                  for c in d['contributors']}
-        contribs = sorted(unique.values(),
-                          key=lambda c: c['last_name'] if 'last_name' in c else (c['contributor_name'] if 'contributor_name' in c else 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz'))
-        #contribs = sorted((dict(c) for c in
-                           #set(frozenset({k:tuple(v) if isinstance(v, list) else
-                                          #(frozenset(v.items()) if isinstance(v, dict) else v)
-                                          #for k, v in c.items()}.items())
-                               #for d in datasets
-                               #if 'contributors' in d
-                               #for c in d['contributors']
-                               #if not log.info(lj(c)))),
-                          #key=lambda c: c['last_name'] if 'last_name' in c else c['name'])
-
-        if self.options.debug:
-            breakpoint()
-
-        rows = [['id', 'last', 'first', 'PI', 'No Orcid']] + [[
-            c['id'],
-            c['last_name'] if 'last_name' in c else '',
-            c['first_name'] if 'first_name' in c else '',
-            'x' if 'contributor_role' in c and 'PrincipalInvestigator' in c['contributor_role'] else '',
-            'x' if 'orcid' not in c['id'] else '']
-            for c in contribs]
-
-        return self._print_table(rows, title='Contributors Report', ext=ext)
-
-    def tofetch(self, dirs=None):
-        if dirs is None:
-            dirs = self.options.directory
-            if not dirs:
-                dirs.append(self.cwd.as_posix())
-
-        data = []
-
-        def dead(p):
-            raise ValueError(p)
-
-        for d in dirs:
-            if not Path(d).is_dir():
-                continue  # helper files at the top level, and the symlinks that destory python
-            path = Path(d).resolve()
-            paths = path.rchildren #list(path.rglob('*'))
-            path_meta = {p:p.cache.meta if p.cache else dead(p) for p in paths
-                         if p.suffix not in ('.swp',)}
-            outstanding = 0
-            total = 0
-            tf = 0
-            ff = 0
-            td = 0
-            uncertain = False  # TODO
-            for p, m in path_meta.items():
-                #if p.is_file() and not any(p.stem.startswith(pf) for pf in self.spcignore):
-                if p.is_file() or p.is_broken_symlink():
-                    s = m.size
-                    if s is None:
-                        uncertain = True
-                        continue
-
-                    tf += 1
-                    if s:
-                        total += s
-
-                    #if '.fake' in p.suffixes:
-                    if p.is_broken_symlink():
-                        ff += 1
-                        if s:
-                            outstanding += s
-
-                elif p.is_dir():
-                    td += 1
-
-            data.append([path.name,
-                         FileSize(total - outstanding),
-                         FileSize(outstanding),
-                         FileSize(total),
-                         uncertain,
-                         (tf - ff),
-                         ff,
-                         tf,
-                         td])
-
-        formatted = [[n, l.hr, o.hr, t.hr if not u else '??', lf, ff, tf, td]
-                     for n, l, o, t, u, lf, ff, tf, td in
-                     sorted(data, key=lambda r: (r[4], -r[3]))]
-        rows = [['Folder', 'Local', 'To Retrieve', 'Total', 'L', 'R', 'T', 'TD'],
-                *formatted]
-
-        return self._print_table(rows, title='File size counts', ext=ext)
-
-    def filetypes(self, ext=None):
-        key = self._sort_key
-        paths = self.paths if self.paths else (self.cwd,)
-        paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
-        rex = re.compile('^\.[0-9][0-9][0-9A-Z]$')
-        rex_paths = [p for p in paths if re.match(rex, p.suffix)]
-        paths = [p for p in paths if not re.match(rex, p.suffix)]
-
-        def count(thing):
-            return sorted([(k if k else '', v) for k, v in
-                            Counter([getattr(f, thing)
-                                     for f in paths]).items()], key=key)
-
-        each = {t:count(t) for t in ('suffix', 'mimetype', '_magic_mimetype')}
-        each['suffix'].append((rex.pattern, len(rex_paths)))
-
-        for title, rows in each.items():
-            yield self._print_table(((title, 'count'), *rows),
-                                    title=title.replace('_', ' ').strip())
-
-        all_counts = sorted([(*[m if m else '' for m in k], v) for k, v in
-                                Counter([(f.suffix, f.mimetype, f._magic_mimetype)
-                                        for f in paths]).items()], key=key)
-
-        header = ['suffix', 'mimetype', 'magic mimetype', 'count']
-        return self._print_table((header, *all_counts),
-                                 title='All types aligned (has duplicates)',
-                                 ext=ext)
-
-    def samples(self, ext=None):
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export().latest_export)
-        datasets = data['datasets']
-        key = self._sort_key
-        # FIXME we need the blob wrapper in addition to the blob generator
-        # FIXME these are the normalized ones ...
-        samples_headers = tuple(k for dataset_blob in datasets
-                                 if 'samples' in dataset_blob  # FIXME inputs?
-                                 for samples_blob in dataset_blob['samples']
-                                 for k in samples_blob)
-        counts = tuple(kv for kv in sorted(Counter(samples_headers).items(),
-                                            key=key))
-
-        rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-        return self._print_table(rows, title='Samples Report', ext=ext)
-
-    def subjects(self, ext=None):
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export().latest_export)
-        datasets = data['datasets']
-        key = self._sort_key
-        # FIXME we need the blob wrapper in addition to the blob generator
-        # FIXME these are the normalized ones ...
-        subjects_headers = tuple(k for dataset_blob in datasets
-                                 if 'subjects' in dataset_blob  # FIXME inputs?
-                                 for subject_blob in dataset_blob['subjects']
-                                 for k in subject_blob)
-        counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
-                                            key=key))
-
-        rows = ((f'Column Name unique = {len(counts)}', '#'), *counts)
-        return self._print_table(rows, title='Subjects Report', ext=ext)
-
-    def completeness(self, ext=None):
-        if self.options.raw:
-            raw = self.summary.completeness
-        else:
-            datasets = self._export().latest_export['datasets']
-            raw = [self.summary._completeness(data) for data in datasets]
-
-        def rformat(i, si, ci, ei, name, id, award, organ):
-            if self.options.server and isinstance(ext, types.FunctionType):
-                rsurl = 'https://projectreporter.nih.gov/reporter_searchresults.cfm'
-                dataset_dash_url = self.url_for('route_datasets_id', id=id)
-                errors_url = self.url_for('route_reports_errors_id', id=id)
-                si = hfn.atag(errors_url + '#submission', si)
-                ci = hfn.atag(errors_url + '#curation', ci)
-                ei = hfn.atag(errors_url + '#total', ei)
-                name = hfn.atag(dataset_dash_url, name)
-                id = hfn.atag(dataset_dash_url, id[:10] + '...')
-                award = (
-                    hfn.atag(('https://scicrunch.org/scicrunch/data/source/'
-                              f'nif-0000-10319-1/search?q={award}'), award)
-                    if award else 'MISSING')
-                organ = organ if organ else ''
-                if isinstance(organ, list) or isinstance(organ, tuple):
-                    organ = ' '.join([o.atag() for o in organ])
-                if isinstance(organ, OntTerm):
-                    organ = organ.atag()
-            else:
-                award = award if award else ''
-                organ = ((repr(organ) if isinstance(organ, OntTerm) else organ)
-                         if organ else '')
-                if isinstance(organ, list):
-                    organ = ' '.join([repr(o) for o in organ])
-                    
-
-            return (i + 1, si, ci, ei, name, id, award, organ)
-
-        rows = [('', 'SI', 'CI', 'EI', 'name', 'id', 'award', 'organ')]
-        rows += [rformat(i, *cols) for i, cols in enumerate(sorted(
-            raw, key=lambda t: (t[0], t[1], t[5] if t[5] else 'z' * 999, t[3])))]
-
-        return self._print_table(rows, title='Completeness Report', ext=ext)
-
-    def keywords(self, ext=None):
-        data = (self.summary.data()
-                if self.options.raw else
-                self._export().latest_export)
-        datasets = data['datasets']
-        _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
-                        key=lambda v: -len(v))
-                    for dataset_blob in datasets]
-        rows = [list(r) for r in sorted(
-            set(tuple(r) for r in _rows if r),
-            key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
-        header = [[f'{i + 1}' for i, _ in enumerate(rows[-1])]]
-        rows = header + rows
-        return self._print_table(rows, title='Keywords Report')
-
-    def size(self, dirs=None, ext=None):
-        if dirs is None:
-            dirs = self.paths
-        intrs = [Integrator(p) for p in dirs]
-        if not intrs:
-            intrs = self.cwdintr,
-
-        rows = [['path', 'id', 'dirs', 'files', 'size', 'hr'],
-                *sorted([[d.name, d.id, c['dirs'], c['files'], c['size'], c['size'].hr]
-                         for d in intrs
-                         for c in (d.datasetdata.counts,)], key=lambda r: -r[-2])]
-
-        return self._print_table(rows, title='Size Report',
-                                 align=['l', 'l', 'r', 'r', 'r', 'r'], ext=ext)
-
-    def test(self, ext=None):
-        rows = [['hello', 'world'], [1, 2]]
-        return self._print_table(rows, title='Report Test', ext=ext)
-
-    def errors(self, *, id=None, ext=None):
-        if self.options.raw:
-            self.summary.data()['datasets']
-        else:
-            datasets = self._export().latest_export['datasets']
-
-        if self.cwd != self.anchor:
-            id = self.cwd.cache.dataset.id
-            
-        if id is not None:
-            if not id.startswith('N:dataset:'):
-                return []
-
-            def pt(rendered_table, title=None):
-                """ passthrough """
-                return rendered_table
-
-            import htmlfn as hfn
-            for dataset_blob in datasets:
-                if dataset_blob['id'] == id:
-                    dso = DatasetObject.from_json(dataset_blob)
-                    title = f'Errors for {id}'
-                    urih = dataset_blob['meta']['uri_human']
-                    formatted_title = (hfn.h2tag(f'Errors for {hfn.atag(urih, id)}<br>\n') +
-                                       (hfn.h3tag(dataset_blob['meta']['title']
-                                        if 'title' in dataset_blob['meta'] else
-                                        dataset_blob['meta']['folder_name'])))
-                    log.info(list(dataset_blob.keys()))
-                    errors = list(dso.errors)
-                    return [(self._print_table(e.as_table(), ext=pt)) for e in errors], formatted_title, title
-        else:
-            pprint.pprint(sorted([(d['meta']['folder_name'], [e['message']
-                                                              for e in get_all_errors(d)])
-                                  for d in datasets], key=lambda ab: -len(ab[-1])))
-
-    def pathids(self, ext=None):
-        base = self.project_path.parent
-        rows = [['path', 'id']] + sorted([c.relative_to(base), c.cache.id]#, c.cache.uri_api, c.cache.uri_human]
-                                         # slower to include the uris
-                                         for c in chain((self.cwd,), self.cwd.rchildren)
-        )
-        return self._print_table(rows, title='Path identifiers', ext=ext)
-
-    def terms(self, ext=None):
-        # anatomy
-        # cells
-        # subcelluar
-        import rdflib
-        # FIXME cache these results and only recompute if latest changes?
-        if self.options.raw:
-            graph = self.summary.triples_exporter.graph
-        else:
-            graph = OntGraph()
-            self._export().latest_export_ttl_populate(graph)
-
-        objects = set()
-        skipped_prefixes = set()
-        for t in graph:
-            for e in t:
-                if isinstance(e, rdflib.URIRef):
-                    oid = OntId(e)
-                    if oid.prefix in want_prefixes:
-                        objects.add(oid)
-                    else:
-                        skipped_prefixes.add(oid.prefix)
-
-        if self.options.server and isinstance(ext, types.FunctionType):
-            def reformat(ot):
-                return [ot.label
-                        if hasattr(ot, 'label') and ot.label else
-                        '',
-                        ot.atag(curie=True)]
-
-        else:
-            def reformat(ot):
-                return [ot.label
-                        if hasattr(ot, 'label') and ot.label else
-                        '',
-                        ot.curie]
-
-        log.info(' '.join(sorted(skipped_prefixes)))
-        objs = [OntTerm(o) if o.prefix not in ('TEMP', 'sparc') or
-                o.prefix == 'TEMP' and o.suffix.isdigit() else
-                o for o in objects]
-        term_sets = {title:[o for o in objs if o.prefix == prefix]
-                     for prefix, title in
-                     (('NCBITaxon', 'Species'),
-                      ('UBERON', 'Anatomy and age category'),  # FIXME
-                      ('FMA', 'Anatomy (FMA)'),
-                      ('PATO', 'Qualities'),
-                      ('tech', 'Techniques'),
-                      ('unit', 'Units'),
-                      ('sparc', 'MIS terms'),
-                      ('TEMP', 'Suggested terms'),
-                     )}
-
-        term_sets['Other'] = set(objs) - set(ot for v in term_sets.values()
-                                             for ot in v)
-
-        for title, terms in term_sets.items():
-            header = [['Label', 'CURIE']]
-            rows = header + [reformat(ot) for ot in
-                            sorted(terms,
-                                   key=lambda ot: (ot.prefix, ot.label.lower()
-                                                   if hasattr(ot, 'label') and ot.label else ''))]
-
-            yield self._print_table(rows, title=title, ext=ext)
 
 
 class Shell(Dispatcher):
@@ -1605,8 +1569,16 @@ class Shell(Dispatcher):
 
     def exit(self):
         """ useful for profiling startup time issues """
+        self.options.project_id
         print('Peace.')
         return
+
+    def sheets(self):
+        from sparcur import sheets
+        wev = sheets.WorkingExecVerb()
+        wev.condense()
+        organs = sheets.Organs(readonly=True)
+        breakpoint()
 
     def default(self):
         datasets = list(self.datasets)
@@ -1616,7 +1588,21 @@ class Shell(Dispatcher):
         ds = datasets
         summary = self.summary
         org = Integrator(self.project_path)
-        embed()
+
+        asdf = []
+        for d in datasets:
+            asdf.append(list(d.children))
+
+        breakpoint()
+
+    def dates(self):
+        paths = self.paths
+        paths = paths if paths else list(self.datasets_local)
+        asdf = {p:p.updated_cache_transitive() for p in paths}
+        s = sorted(asdf.items(),
+                   key=lambda kv: (1, kv[0]) if kv[-1] is None else (0, kv[-1]),
+                   reverse=True)
+        breakpoint()
 
     def more(self):
         p, *rest = self._paths
@@ -1627,9 +1613,13 @@ class Shell(Dispatcher):
             #triples = list(f.triples)
 
         try:
-            latest_datasets = self._export().latest_export['datasets']
+            latest_datasets = self._export(None).latest_export['datasets']
         except:
             pass
+
+        datasets = self.datasets
+        datas = [Integrator(d).datasetdata for d in datasets]
+        dsd = {d.meta.id:d for d in datasets}
 
         rcs = list(datasets[-1].rchildren)
         asdf = rcs[-1]
@@ -1660,17 +1650,17 @@ class Shell(Dispatcher):
         except AttributeError as e:
             logd.error(f'{d} is missing some file')
 
-        embed()
+        breakpoint()
 
     def affil(self):
         from pyontutils.utils import Async, deferred
-        from sparcur.sheets import Affiliations
-        a = Affiliations()
+        from sparcur import sheets
+        a = sheets.Affiliations()
         m = a.mapping
         rors = sorted(set(_ for _ in m.values() if _))
         #dat = Async(rate=5)(deferred(lambda r:r.data)(i) for i in rors)
         dat = [r.data for r in rors]  # once the cache has been populated
-        embed()
+        breakpoint()
 
     def protocols(self):
         """ test protocol identifier functionality """
@@ -1686,11 +1676,10 @@ class Shell(Dispatcher):
         #dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
         #dois = [d['protocol']['doi'] for d in dat if d]
         dois = [p.doi for p in pis]
-        embed()
+        breakpoint()
 
     def integration(self):
         from protcur.analysis import protc, Hybrid
-        from sparcur import sheets
         #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
         from sparcur.protocols import ProtcurData
         p, *rest = self._paths
@@ -1699,7 +1688,7 @@ class Shell(Dispatcher):
         pj = list(intr.protocol_jsons)
         pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
-        embed()
+        breakpoint()
 
 
 class Fix(Shell):
@@ -1718,13 +1707,13 @@ class Fix(Shell):
         paths = [p for p, *_ in oops]
 
         def sf(cmeta):
-            nmeta = PathMeta(id=cmeta.old_id)
-            assert nmeta.id, f'No old_id for {pathmeta}'
+            nmeta = aug.PathMeta(id=cmeta.old_id)
+            assert nmeta.id, f'No old_id for {cmeta}'
             return nmeta
 
         nall = self.stash(paths, stashmetafunc=sf)
         [print(n.cache.meta.as_pretty(n)) for n in nall]
-        embed()
+        breakpoint()
         # once everything is in order and backed up 
         # [p.cache.fetch() for p in paths]
 
@@ -1763,32 +1752,19 @@ class Fix(Shell):
         breakpoint()
 
 
-def bind_file_handler(log_file):
-    # FIXME the this does not work with joblib at the moment
-    from idlib.utils import log as idlog
-    from protcur.core import log as prlog
-    from orthauth.utils import log as oalog
-    from ontquery.utils import log as oqlog
-    from augpathlib.utils import log as alog
-    from pyontutils.utils import log as pylog
-
-    sfh = SimpleFileHandler(log_file, log, logd)
-    sfh(alog, idlog, oalog, oqlog, prlog, pylog)
-
-
 def main():
     time_now = GetTimeNow()
     from docopt import docopt, parse_defaults
     args = docopt(__doc__, version='spc 0.0.0')
     defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(__doc__)}
 
-    log_path = Path(args['--log-path'])
-    if not log_path.exists():
-        log_path.mkdir(parents=True)
+    logpath = Path(args['--log-path'])
+    if not logpath.exists():
+        logpath.mkdir(parents=True)
 
     try:
-        log_file = log_path / time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
-        bind_file_handler(log_file)
+        logfile = logpath / time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
+        bind_file_handler(logfile)
 
         options = Options(args, defaults)
         main = Main(options, time_now)
@@ -1801,8 +1777,8 @@ def main():
         print()
         raise e
     finally:
-        if log_file.size == 0:
-            log_file.unlink()
+        if logfile.size == 0:
+            logfile.unlink()
 
     if options.profile:
         exit = time()
@@ -1813,6 +1789,7 @@ def main():
         e = (exit - start)
         s = f'{a} + {b} = {c}\n{c} + {d} = {e}'
         print(s)
+
 
 if __name__ == '__main__':
     main()

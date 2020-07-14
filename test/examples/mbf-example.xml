@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mbf version="4.0" xmlns="http://www.mbfbioscience.com" xmlns:nl="http://www.mbfbioscience.com" appname="Tissue Mapper" appversion="2020.1.1 (64-bit)">
+<description><![CDATA[]]></description>
+<filefacts>
+  <sectionmanager currentsection="" sectioninterval="0" startingsection="0"/>
+</filefacts>
+<sparcdata>
+    <subject species="http://purl.obolibrary.org/obo/NCBITaxon_10090" subjectid="Test-1" sex="Female" age="4 Weeks"/>
+    <atlas organ="Urinary bladder" label="Species Independent" rootid="http://purl.org/sig/ont/fma/fma15900"/>
+</sparcdata>
+<property name="TimePointManager"><n>1</n><s>-1</s><s>-1</s><n>0</n></property>
+<images>
+  <image>
+    <filename>C:\Program Files\MBF Bioscience\Neurolucida 360\MBF_NeuronTracing.jpx</filename>
+    <channels merge="no">
+      <channel id="red" source="none"/>
+      <channel id="green" source="none"/>
+      <channel id="blue" source="none"/>
+    </channels>
+    <scale x="0.241631" y="0.241129"/>
+    <coord x="0.000000" y="0.000000" z="0.000000"/>
+    <zspacing z="-0.500000" slices="159"/>
+  </image>
+</images>
+<thumbnail cols="64" rows="64">
+  Thumbnail removed by Tom to reduce size of test file.
+</thumbnail>
+<contour name="Lumen of left ureter" color="#00FFFF" closed="true" shape="Contour">
+  <property name="GUID"><s></s></property>
+  <property name="FillDensity"><n>0</n></property>
+  <resolution>0.247757</resolution>
+  <property name="TraceAssociation"><s>http://purl.org/sig/ont/fma/fma17610</s></property>
+  <point x="94.97" y="-209.66" z="0.00" d="0.25"/>
+  <point x="89.77" y="-198.04" z="0.00" d="0.25"/>
+  <point x="86.80" y="-186.91" z="0.00" d="0.25"/>
+  <point x="85.31" y="-167.63" z="0.00" d="0.25"/>
+  <point x="89.77" y="-144.39" z="0.00" d="0.25"/>
+  <point x="91.26" y="-125.35" z="0.00" d="0.25"/>
+  <point x="86.05" y="-98.90" z="0.00" d="0.25"/>
+  <point x="81.10" y="-87.52" z="0.00" d="0.25"/>
+  <point x="74.41" y="-83.32" z="0.00" d="0.25"/>
+  <point x="65.98" y="-98.40" z="0.00" d="0.25"/>
+  <point x="58.55" y="-124.12" z="0.00" d="0.25"/>
+  <point x="52.61" y="-151.56" z="0.00" d="0.25"/>
+  <point x="54.09" y="-179.74" z="0.00" d="0.25"/>
+</contour>
+<contour name="Lumen of ureter" color="#0080FF" closed="true" shape="Contour">
+  <property name="GUID"><s></s></property>
+  <property name="FillDensity"><n>0</n></property>
+  <resolution>0.247757</resolution>
+  <property name="TraceAssociation"><s>http://purl.org/sig/ont/fma/fma17608</s></property>
+  <point x="107.11" y="-72.94" z="-2.00" d="0.25"/>
+  <point x="86.80" y="-75.90" z="-2.00" d="0.25"/>
+  <point x="75.65" y="-90.74" z="-2.00" d="0.25"/>
+  <point x="68.71" y="-108.29" z="-2.00" d="0.25"/>
+  <point x="68.96" y="-127.58" z="-2.00" d="0.25"/>
+  <point x="72.92" y="-149.33" z="-2.00" d="0.25"/>
+  <point x="99.18" y="-150.08" z="-2.00" d="0.25"/>
+  <point x="105.13" y="-145.13" z="-2.00" d="0.25"/>
+  <point x="112.56" y="-117.69" z="-2.00" d="0.25"/>
+  <point x="117.77" y="-92.47" z="-2.00" d="0.25"/>
+</contour>
+<contour name="Wall of left ureter" color="#00FFFF" closed="false" shape="Contour">
+  <property name="GUID"><s></s></property>
+  <property name="FillDensity"><n>0</n></property>
+  <resolution>0.247757</resolution>
+  <property name="TraceAssociation"><s>http://purl.org/sig/ont/fma/fma15890</s></property>
+  <point x="91.50" y="-55.13" z="-2.00" d="0.25"/>
+  <point x="66.48" y="-58.10" z="-2.00" d="0.25"/>
+  <point x="48.15" y="-79.61" z="-2.00" d="0.25"/>
+  <point x="35.76" y="-131.78" z="-2.00" d="0.25"/>
+  <point x="36.01" y="-147.36" z="-2.00" d="0.25"/>
+  <point x="39.72" y="-177.52" z="-2.00" d="0.25"/>
+  <point x="43.93" y="-198.29" z="-2.00" d="0.25"/>
+  <point x="50.87" y="-216.09" z="-2.00" d="0.25"/>
+</contour>
+<contour name="urinary bladder urothelium" color="#95C2C8" closed="true" shape="Contour">
+  <property name="GUID"><s></s></property>
+  <property name="FillDensity"><n>0</n></property>
+  <resolution>0.247757</resolution>
+  <property name="TraceAssociation"><s>http://purl.org/sig/ont/fma/fma15936</s></property>
+  <point x="99.43" y="-59.59" z="-2.00" d="0.25"/>
+  <point x="95.22" y="-62.55" z="-2.00" d="0.25"/>
+  <point x="73.66" y="-71.70" z="-2.00" d="0.25"/>
+  <point x="69.95" y="-78.62" z="-2.00" d="0.25"/>
+  <point x="66.73" y="-86.78" z="-2.00" d="0.25"/>
+  <point x="65.74" y="-91.23" z="-2.00" d="0.25"/>
+  <point x="58.06" y="-103.35" z="-2.00" d="0.25"/>
+  <point x="56.32" y="-111.26" z="-2.00" d="0.25"/>
+  <point x="55.33" y="-116.70" z="-2.00" d="0.25"/>
+  <point x="54.34" y="-121.89" z="-2.00" d="0.25"/>
+  <point x="55.58" y="-124.61" z="-2.00" d="0.25"/>
+  <point x="59.54" y="-117.93" z="-2.00" d="0.25"/>
+  <point x="67.22" y="-102.11" z="-2.00" d="0.25"/>
+  <point x="72.18" y="-86.04" z="-2.00" d="0.25"/>
+  <point x="78.12" y="-76.89" z="-2.00" d="0.25"/>
+  <point x="87.79" y="-70.96" z="-2.00" d="0.25"/>
+  <point x="97.94" y="-67.25" z="-2.00" d="0.25"/>
+  <point x="104.88" y="-65.02" z="-2.00" d="0.25"/>
+  <point x="106.37" y="-61.32" z="-2.00" d="0.25"/>
+</contour>
+</mbf>

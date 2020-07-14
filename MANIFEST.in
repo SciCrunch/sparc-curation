@@ -1,8 +1,13 @@
 recursive-include test *
 exclude .gitignore
+exclude test/.gitignore
 exclude .travis.yml
 exclude MANIFEST.in
+recursive-exclude test/test_local *
+recursive-exclude test/test_local-* *
+recursive-exclude test/test-operation *
 recursive-exclude resources *
 recursive-exclude * *.pyc
 recursive-exclude * *.swp
 recursive-exclude * *.swo
+recursive-include resources/filesystem *

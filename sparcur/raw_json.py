@@ -9,7 +9,10 @@ class RawJson:
     @property
     def data(self):
         with open(self.path, 'rt') as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.decoder.JSONDecodeError as e:
+                raise exc.NoDataError(f'{self.path}') from e
 
 
 hasSchema = sc.HasSchema()
@@ -29,6 +32,32 @@ class RawJsonSubmission(RawJson):
             blob = {'submission': blob}
         except:
             pass
+
+        return blob
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class RawJsonDatasetDescription(RawJson):
+
+    @hasSchema(sc.DatasetDescriptionSchema)
+    def data(self):
+        blob = super().data
+        # TODO lift everything we can back to the ir
+        class RawDatasetDescriptionSchema(sc.JSONSchema):
+            schema = sc.DatasetDescriptionSchema.schema
+
+        rds = RawDatasetDescriptionSchema()
+        blob = super().data
+        try:
+            rds.validate_strict(blob)
+        except:
+            pass
+
+        if not isinstance(blob['contributors'], list):
+            # TODO this needs to be an error with an easy fix
+            blob['contributors'] = [blob['contributors']]
+            breakpoint()
 
         return blob
 

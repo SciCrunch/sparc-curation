@@ -1,36 +1,46 @@
+import pathlib
+import idlib
 import rdflib
 import dicttoxml
-from pysercomb.pyr.units import Expr, _Quant as Quantity
+from pysercomb.pyr.types import ProtcurExpression, Quantity
 from sparcur.core import OntTerm, get_all_errors
+from sparcur.utils import loge, is_list_or_tuple
 
 
 def xml(dataset_blobs):
-    import pathlib
     #datasets = []
     #contributors = []
     subjects = []
-    errors = []
     resources = []
+    errors = []
+    error_reports = []
 
     def normv(v):
+        if is_list_or_tuple(v):
+            return [normv(_) for _ in v]
+        if isinstance(v, dict):
+            return {k:normv(v) for k, v in v.items()}
         if isinstance(v, str) and v.startswith('http'):
             # needed for loading from json that has been serialized
             # rather than from our internal representation
             # probably better to centralized the reload ...
             v = OntTerm(v)
-            return v.tabular()
-
+            return v.asCell()
         if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
-            return ot.tabular()
-        if isinstance(v, Expr):
+            return ot.asCell()
+        if isinstance(v, ProtcurExpression):
             return str(v)  # FIXME for xml?
         if isinstance(v, Quantity):
             return str(v)
         elif isinstance(v, pathlib.Path):
             return str(v)
+        elif isinstance(v, idlib.Stream):
+            return v.asCell()
+        #elif isinstance(v, list) or isinstance(v, str):
+            #return v
         else:
-            #log.debug(repr(v))
+            #loge.debug(repr(v))
             return v
 
     for dataset_blob in dataset_blobs:
@@ -52,7 +62,7 @@ def xml(dataset_blobs):
 
         if 'errors' in dowe:
             ers = get_all_errors(dowe)
-            for er in ers:
+            for path, er in ers:
                 if er['pipeline_stage'] == 'SPARCBIDSPipeline.data':
                     continue
 
@@ -60,9 +70,15 @@ def xml(dataset_blobs):
                 er = {k:normv(v) for k, v in er.items()}
                 errors.append(er)
 
+        if 'status' in dowe:
+            if 'path_error_report' in dowe['status']:
+                error_reports.append(dowe['status']['path_error_report'])
+
     xs = dicttoxml.dicttoxml({'subjects': subjects})
     xr = dicttoxml.dicttoxml({'resources': resources})
     xe = dicttoxml.dicttoxml({'errors': errors})
+    xer = dicttoxml.dicttoxml({'error_reports': error_reports})
     return (('subjects', xs),
             ('resources', xr),
-            ('errors', xe))
+            ('errors', xe),
+            ('error_reports', xer),)

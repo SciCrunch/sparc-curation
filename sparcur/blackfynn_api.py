@@ -114,11 +114,15 @@ def check_files(files):
 transfers.check_files = check_files
 
 
+#_orgid = auth.get('blackfynn-organization')  # HACK
+# this works, but then we have to do the multipart upload dance
+# which the bf client does not implement at the moment
 def get_preview(self, files, append):
     paths = files
 
     params = dict(
         append = append,
+        # dataset_id=?,
     )
 
     payload = { "files": [
@@ -126,12 +130,18 @@ def get_preview(self, files, append):
             "fileName": p.name,
             "size": p.size,
             "uploadId": i,
+            "processing": True,
         } for i, p in enumerate(paths)
     ]}
 
+    # current web dance
+    # /upload/preview/organizations/{_orgid}?append= append ?dataset_id= integer???
+    # /upload/fineuploaderchunk/organizations/{_orgid}/id/{importId}?multipartId= from-prev-resp
+    # /upload/complete/organizations/{_orgid}/id/{importId}?datasetId=
     response = self._post(
-        endpoint = self._uri('/files/upload/preview'),
-        params = params,
+        endpoint=self._uri('/files/upload/preview'),
+        #endpoint=self._uri(f'/upload/preview/organizations/{_orgid}'),
+        params=params,
         json=payload,
         )
 
@@ -318,8 +328,21 @@ def get(self, pkg, include='files,source'):
 
 PackagesAPI.get = get
 
+
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
+    yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles)
+
+
+def packagesByName(self, pageSize=1000, includeSourceFiles=True, filenames=tuple()):
+    if filenames:
+        for filename in filenames:
+            yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles, filename=filename)
+    else:
+        yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles)
+
+
+def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_only=False, filename=None):
     """ python implementation to make use of /dataset/{id}/packages """
     remapids = {}
     def restructure(j):
@@ -348,17 +371,34 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
     #pageSize
     #includeSourceFiles
     #types
+    #filename
+    filename_args = f'&filename={filename}' if filename is not None else ''
     cursor_args = ''
     out_of_order = []
     while True:
-        resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
-                           f'pageSize={pageSize}&'
-                           f'includeSourceFiles={str(includeSourceFiles).lower()}'
-                           f'{cursor_args}')
+        try:
+            resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
+                            f'pageSize={pageSize}&'
+                            f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                            f'{filename_args}'
+                            f'{cursor_args}')
+        except requests.exceptions.RetryError as e:
+            log.exception(e)
+            # sporadic 504 errors that we probably need to sleep on
+            breakpoint()
+            raise e
+
         #print(resp.url)
         if resp.ok:
             j = resp.json()
             packages = j['packages']
+            if raw:
+                yield from packages
+                if latest_only:
+                    break
+                else:
+                    continue
+
             if out_of_order:
                 packages += out_of_order
                 # if a parent is on the other side of a
@@ -370,7 +410,9 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                 if out_of_order[0] is None:
                     out_of_order.remove(None)
                 elif packages == out_of_order:
-                    if 'cursor' not in j:
+                    if filename is not None:
+                        out_of_order = None
+                    elif 'cursor' not in j:
                         raise RuntimeError('We are going nowhere!')
                     else:
                         # the missing parent is in another castle!
@@ -383,13 +425,21 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                         id = package['content']['nodeId']
                         name = package['content']['name']
                         bftype = id_to_type(id)
+                        dcp = deepcopy(package)
                         try:
                             #if id.startswith('N:package:'):
                                 #log.debug(lj(package))
-                            rdp = restructure(deepcopy(package))
+                            rdp = restructure(dcp)
                         except KeyError as e:
-                            out_of_order.append(package)
-                            continue
+                            if out_of_order is None:  # filename case
+                                # parents will simply not be listed
+                                # if you are using filename then beware
+                                if 'parentId' in dcp['content']:
+                                    dcp['content'].pop('parentId')
+                                rdp = restructure(dcp)
+                            else:
+                                out_of_order.append(package)
+                                continue
 
                         bfobject = bftype.from_dict(rdp, api=self._api)
                         if name != bfobject.name:
@@ -417,6 +467,8 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
                                 bfobject.state = 'PARENT-DELETING'
 
                         yield bfobject  # only yield if we can get a parent
+                    elif out_of_order is None:  # filename case
+                        yield bfobject
                     elif bfobject.parent is None:
                         # both collections and packages can be at the top level
                         # dataset was set to its bfobject repr above so safe to yield
@@ -456,8 +508,22 @@ def packages(self, pageSize=1000, includeSourceFiles=True):
             break
 
 
+@property
+def packageTypeCounts(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packageTypeCounts')
+    if resp.ok:
+        j = resp.json()
+        return j
+    else:
+        resp.raise_for_status()
+
+
 # monkey patch Dataset to implement packages endpoint
+Dataset._packages = _packages
 Dataset.packages = packages
+Dataset.packagesByName = packagesByName
+Dataset.packageTypeCounts = packageTypeCounts
 
 
 @property
@@ -510,6 +576,61 @@ def delete(self):
 
 # monkey patch Dataset to implement delete
 Dataset.delete = delete
+
+
+@property
+def contributors(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/contributors')
+    return resp.json()
+
+
+# monkey patch Dataset to implement contributors endpoint
+Dataset.contributors = contributors
+
+
+@property
+def banner(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/banner')
+    return resp.json()
+
+
+# monkey patch Dataset to implement banner endpoint
+Dataset.banner = banner
+
+
+@property
+def readme(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/readme')
+    return resp.json()
+
+
+# monkey patch Dataset to implement readme endpoint
+Dataset.readme = readme
+
+
+@property
+def status_log(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/status-log')
+    return resp.json()
+
+
+# monkey patch Dataset to implement status_log endpoint
+Dataset.status_log = status_log
+
+
+@property
+def meta(self):
+    session = self._api.session
+    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}')
+    return resp.json()
+
+
+# monkey patch Dataset to implement just the dataset metadata endpoint
+Dataset.meta = meta
 
 
 @property
@@ -905,6 +1026,17 @@ class BFLocal:
     @property
     def root(self):
         return self.organization.id
+
+    def create_package(self, local_path):
+        pkg = DataPackage(local_path.name, package_type='Generic')  # TODO mimetype -> package_type ...
+        pcache = local_path.parent.cache
+        pkg.dataset = pcache.dataset.id
+        if pcache.id != pkg.dataset:
+            pkg.parent = pcache.id
+
+        # FIXME this seems to create an empty package with no files?
+        # have to do aws upload first or something?
+        return self.bf._api.packages.create(pkg)
 
     def get(self, id, attempt=1, retry_limit=3):
         log.debug('We have gone to the network!')

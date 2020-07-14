@@ -40,7 +40,9 @@ def make_app(report, project_path, name='spc-server'):
         return wrap_tables(table, title=title)
 
     @app.route(f'{bp}/datasets/<id>')
-    def route_datasets_id(id):
+    @app.route(f'{bp}/datasets/<id>/ttl')
+    @app.route(f'{bp}/datasets/<id>/json')
+    def route_datasets_id(id, ext=None):
         dataset_index = get_dataset_index(project_path)
         if id not in dataset_index:
             return abort(404)
@@ -170,3 +172,12 @@ def make_app(report, project_path, name='spc-server'):
     @app.route(f'{bp}/reports/access<ext>')
     def route_reports_access(ext=wrap_tables):
         return report.access(ext=ext)
+
+    @app.route(f'{bp}/run/datasets/')
+    @app.route(f'{bp}/run/datasets/<id>')
+    def route_run_datasets(id=None):
+        # TODO permissioning
+        if id is None:
+            pass
+
+        # TODO send a message to/fork a process to run an export of a specific dataset

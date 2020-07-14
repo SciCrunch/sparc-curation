@@ -505,7 +505,7 @@ cypherResources:
       -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
       -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
-      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+      -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
       -[:apinatomy:fasciculatesIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
@@ -541,7 +541,7 @@ cypherResources:
       WITH path1, nodeRoot
       MATCH path3 = (chain)
       <-[:apinatomy:rootOf]-(nodeRoot)
-      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)
+      -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)
       -[:apinatomy:fasciculatesIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
@@ -564,7 +564,7 @@ cypherResources:
       -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
       -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
-      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+      -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
       -[:apinatomy:fasciculatesIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
@@ -585,7 +585,7 @@ cypherResources:
       -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
       -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
-      -[:apinatomy:sourceOf|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+      -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
       -[:apinatomy:fasciculatesIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()

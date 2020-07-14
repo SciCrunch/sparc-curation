@@ -13,7 +13,8 @@ from pyontutils.namespaces import (TEMP,
                                    dc,)
 from sparcur import converters as conv
 from sparcur.core import (adops,
-                          OntCuries)
+                          OntCuries,
+                          curies_runtime,)
 from sparcur.utils import loge, log
 from sparcur.protocols import ProtcurData
 
@@ -42,7 +43,7 @@ class TriplesExport(ProtcurData):
 
     @property
     def ontid(self):
-        return rdflib.URIRef(f'https://sparc.olympiangods.org/sparc/ontologies/{self.id}')
+        return rdflib.URIRef(f'https://cassava.ucsd.edu/sparc/ontologies/{self.id}')
 
     @property
     def header_graph_description(self):
@@ -95,7 +96,8 @@ class TriplesExport(ProtcurData):
                     (hasattr(element, '_value') and (isinstance(element._value, dict) or
                                                      isinstance(element._value, list) or
                                                      isinstance(element._value, tuple))) or
-                    (isinstance(element, rdflib.URIRef) and element.startswith('<'))):
+                    (isinstance(element, rdflib.URIRef) and (element.startswith('<') or
+                                                             not rdflib.term._is_valid_uri(element)))):
                     #if (isinstance(element, rdflib.URIRef) and element.startswith('<')):
                         #breakpoint()
                     loge.critical(element)
@@ -103,6 +105,10 @@ class TriplesExport(ProtcurData):
             return triple
 
         OntCuries.populate(graph)  # ah smalltalk thinking
+        if hasattr(self, 'uri_api'):
+            base = self.uri_api + '/'
+            graph.namespace_manager.populate_from(curies_runtime(base))
+
         [graph.add(t) for t in self.triples_header if warn(t)]
         for t in self.triples:
             if warn(t):
@@ -175,8 +181,14 @@ class TriplesExportDataset(TriplesExport):
             return
 
         cid = contributor['id']
+
         if isinstance(cid, idlib.Stream):  # FIXME nasty branch
-            s = cid.asType(rdflib.URIRef)
+            s = cid.asUri(rdflib.URIRef)
+        elif isinstance(cid, dict):
+            if isinstance(cid['id'], idlib.Stream):  # FIXME nasty branch
+                s = cid['id'].asUri(rdflib.URIRef)
+            else:
+                raise NotImplementedError(f'{type(cid["id"])}: {cid["id"]}')
         else:
             s = rdflib.URIRef(cid)  # FIXME json reload needs to deal with this
 
@@ -185,7 +197,7 @@ class TriplesExportDataset(TriplesExport):
             yield s, TEMP.hasBlackfynnUserId, userid
 
         yield s, rdf.type, owl.NamedIndividual
-        yield s, rdf.type, sparc.Researcher
+        yield s, rdf.type, sparc.Person
         yield s, TEMP.contributorTo, dsid  # TODO other way around too? hasContributor
         converter = conv.ContributorConverter(contributor)
         yield from converter.triples_gen(s)
@@ -196,7 +208,7 @@ class TriplesExportDataset(TriplesExport):
         dcs = rdflib.BNode()
 
         yield dcs, rdf.type, owl.NamedIndividual
-        yield dcs, rdf.type, TEMP.DatasetContributor
+        yield dcs, rdf.type, sparc.DatasetContribution
         yield dcs, TEMP.aboutDataset, dsid  # FIXME forDataset?
         yield dcs, TEMP.aboutContributor, s
         dconverter = conv.DatasetContributorConverter(contributor)
@@ -238,7 +250,7 @@ class TriplesExportDataset(TriplesExport):
         def id_(v):
             s = rdflib.URIRef(dsid)
             yield s, rdf.type, owl.NamedIndividual
-            yield s, rdf.type, sparc.Resource
+            yield s, rdf.type, sparc.Dataset
             yield s, rdfs.label, rdflib.Literal(self.folder_name)  # not all datasets have titles
 
         yield from id_(self.id)
@@ -393,12 +405,16 @@ class TriplesExportIdentifierMetadata(TriplesExport):
 
     @property
     def triples(self):
+        crossref_doi_pred = rdflib.term.URIRef('http://prismstandard.org/namespaces/basic/2.1/doi')
         for blob in self.data['identifier_metadata']:
             id = blob['id']
             if not isinstance(id, idlib.Stream):
                 id = idlib.Auto(id)
 
-            s = id.asType(rdflib.URIRef)
+            if not hasattr(id, 'asUri'):
+                breakpoint()
+
+            s = id.asUri(rdflib.URIRef)
             if 'source' in blob:
                 source = blob['source']  # FIXME we need to wrap this in our normalized representation
                 if source == 'Crossref':  # FIXME CrossrefConvertor etc. OR put it in idlib as a an alternate ttl
@@ -412,10 +428,23 @@ class TriplesExportIdentifierMetadata(TriplesExport):
                     )
                     g = OntGraph()
                     doi = idlib.Doi(id) if not isinstance(id, idlib.Doi) else id  # FIXME idlib streams need to recognize their own type in __new__
-                    g.parse(data=doi.ttl(), format='ttl')  # FIXME network bad
-                    _their_record_s = [s for s, p, o in g if p == rdflib.term.URIRef('http://prismstandard.org/namespaces/basic/2.1/doi')][0]
-                    yield s, owl.sameAs, _their_record_s
-                    yield from g
+                    data = doi.ttl()
+                    if data is None:  # blackfynn has some bad settings on their doi records ...
+                        return
+
+                    try:
+                        g.parse(data=data, format='ttl')  # FIXME network bad
+                    except BaseException as e:
+                        loge.exception(e)
+
+                    _tr = [s for s, p, o in g if p == crossref_doi_pred]
+                    if _tr:
+                        _their_record_s = _tr[0]
+                        yield s, owl.sameAs, _their_record_s
+                        yield from g
+                    else:
+                        g.debug()
+                        log.critical('No crossref doi section in graph!')
                 else:
                     msg = f'dont know what to do with {source}'
                     log.error(msg)

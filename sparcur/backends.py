@@ -2,33 +2,65 @@ import os
 from pathlib import PurePosixPath, PurePath
 from datetime import datetime
 import idlib
-import requests
 from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log
 from sparcur.core import BlackfynnId
 import augpathlib as aug
 from augpathlib import PathMeta
-from augpathlib.remotes import RemoteFactory
-from sparcur.blackfynn_api import BFLocal, FakeBFLocal, id_to_type  # FIXME there should be a better way ...
-from blackfynn import Collection, DataPackage, Organization, File
-from blackfynn import Dataset
-from blackfynn.models import BaseNode
-
-from ast import literal_eval
 
 
 class BlackfynnRemote(aug.RemotePath):
 
-    _api_class = BFLocal
+    _api_class = None  # set in _setup
     _async_rate = None
     _local_dataset_name = object()
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        BlackfynnRemote._setup(*args, **kwargs)
+        return super().__new__(cls)
+
+    @classmethod
+    def init(cls, *args, **kwargs):
+        cls._setup(*args, **kwargs)
+        super().init(*args, **kwargs)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        if BlackfynnRemote.__new__ == BlackfynnRemote._renew:
+            return  # we already ran the imports here
+
+        import requests
+        BlackfynnRemote._requests = requests
+
+        from blackfynn import Collection, DataPackage, Organization, File
+        from blackfynn import Dataset
+        from blackfynn.models import BaseNode
+        BlackfynnRemote._Collection = Collection
+        BlackfynnRemote._DataPackage = DataPackage
+        BlackfynnRemote._Organization = Organization
+        BlackfynnRemote._File = File
+        BlackfynnRemote._Dataset = Dataset
+        BlackfynnRemote._BaseNode = BaseNode
+
+        # FIXME there should be a better way ...
+        from sparcur.blackfynn_api import BFLocal, id_to_type
+        BlackfynnRemote._api_class = BFLocal
+        BlackfynnRemote._id_to_type = staticmethod(id_to_type)
+        BlackfynnRemote.__new__ = BlackfynnRemote._renew
 
     @property
     def uri_human(self):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
         # org /datasets/ N:dataset /viewer/ N:package
+        if not self.is_absolute():
+            self = self.resolve()  # relative paths should not have to fail here
 
         id = self.id
         N, type, suffix = id.split(':')
@@ -53,7 +85,7 @@ class BlackfynnRemote(aug.RemotePath):
     def uri_api(self):
         if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
             endpoint = 'datasets/' + self.id
-        elif self.is_organization:
+        elif self.is_organization():
             endpoint = 'organizations/' + self.id
         elif self.file_id is not None:
             endpoint = f'packages/{self.id}/files/{self.file_id}'
@@ -67,6 +99,8 @@ class BlackfynnRemote(aug.RemotePath):
         yield from self._errors
         if self.remote_in_error:
             yield 'remote-error'
+        if self.state == 'UNAVAILABLE':
+            yield 'remote-unavailable'
 
     @property
     def remote_in_error(self):
@@ -102,7 +136,7 @@ class BlackfynnRemote(aug.RemotePath):
     @classmethod
     def get_file_by_url(cls, url):
         """ NOTE THAT THE FIRST YIELD IS HEADERS """
-        resp = requests.get(url, stream=True)
+        resp = cls._requests.get(url, stream=True)
         headers = resp.headers
         yield headers
         log.debug(f'reading from {url}')
@@ -114,7 +148,7 @@ class BlackfynnRemote(aug.RemotePath):
         self._seed = id_bfo_or_bfr
         self._file_id = file_id
         if not [type_ for type_ in (self.__class__,
-                                    BaseNode,
+                                    self._BaseNode,
                                     str,
                                     PathMeta)
                 if isinstance(self._seed, type_)]:
@@ -148,7 +182,7 @@ class BlackfynnRemote(aug.RemotePath):
         if isinstance(self._seed, self.__class__):
             bfobject = self._seed.bfobject
 
-        elif isinstance(self._seed, BaseNode):
+        elif isinstance(self._seed, self._BaseNode):
             bfobject = self._seed
 
         elif isinstance(self._seed, str):
@@ -156,8 +190,8 @@ class BlackfynnRemote(aug.RemotePath):
                 bfobject = self._api.get(self._seed)
             except Exception as e:  # sigh
                 if self._local_only:
-                    _class = id_to_type(self._seed)
-                    if issubclass(_class, Dataset):
+                    _class = self._id_to_type(self._seed)
+                    if issubclass(_class, self._Dataset):
                         bfobject = _class(self._local_dataset_name)
                         bfobject.id = self._seed
                     else:
@@ -177,7 +211,7 @@ class BlackfynnRemote(aug.RemotePath):
             self._bfobject = bfobject
             return self._bfobject
 
-        if isinstance(bfobject, DataPackage):
+        if isinstance(bfobject, self._DataPackage):
             def transfer(file, bfobject):
                 file.parent = bfobject.parent
                 file.dataset = bfobject.dataset
@@ -240,15 +274,15 @@ class BlackfynnRemote(aug.RemotePath):
         return self._organization
 
     def is_organization(self):
-        return isinstance(self.bfobject, Organization)
+        return isinstance(self.bfobject, self._Organization)
 
     def is_dataset(self):
-        return isinstance(self.bfobject, Dataset)
+        return isinstance(self.bfobject, self._Dataset)
 
     @property
     def dataset_id(self):
         """ save a network transit if we don't need it """
-        dataset = self.bfobject.dataset
+        dataset = self._bfobject.dataset
         if isinstance(dataset, str):
             return dataset
         else:
@@ -256,7 +290,11 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def dataset(self):
-        dataset = self.bfobject.dataset
+        remote = self.__class__(self.dataset_id)
+        remote.cache_init()
+        return remote
+
+        dataset = self._bfobject.dataset
         if isinstance(dataset, str):
             dataset = self.organization.get_child_by_id(dataset)
             self.bfobject.dataset = dataset.bfobject
@@ -278,7 +316,7 @@ class BlackfynnRemote(aug.RemotePath):
     def stem(self):
         name = PurePosixPath(self._name)
         return name.stem
-        #if isinstance(self.bfobject, File) and not self.from_packages:
+        #if isinstance(self.bfobject, self._File) and not self.from_packages:
             #return name.stem
         #else:
             #return name.stem
@@ -287,16 +325,22 @@ class BlackfynnRemote(aug.RemotePath):
     def suffix(self):
         # fixme loads of shoddy logic in here
         name = PurePosixPath(self._name)
-        if isinstance(self.bfobject, File) and not self.from_packages:
+        if isinstance(self.bfobject, self._File) and not self.from_packages:
             return name.suffix
-        elif isinstance(self.bfobject, Collection):
+        elif isinstance(self.bfobject, self._Collection):
             return ''
-        elif isinstance(self.bfobject, Dataset):
+        elif isinstance(self.bfobject, self._Dataset):
             return ''
-        elif isinstance(self.bfobject, Organization):
+        elif isinstance(self.bfobject, self._Organization):
             return ''
         else:
-            raise NotImplementedError('should not be needed anymore when using packages')
+            if self.from_packages or not list(self.errors):
+                # still needed for cache.children when remote data is in error
+                msg = 'should not be needed anymore when using packages'
+                raise NotImplementedError(msg)
+            else:
+                log.warning(f'suffix needed for some reason on {self.uri_api}')
+
             if hasattr(self.bfobject, 'type'):
                 type = self.bfobject.type.lower()  # FIXME ... can we match s3key?
             else:
@@ -316,7 +360,7 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def _name(self):
         name = self.bfobject.name
-        if isinstance(self.bfobject, File) and not self.from_packages:
+        if isinstance(self.bfobject, self._File) and not self.from_packages:
             realname = os.path.basename(self.bfobject.s3_key)
             if name != realname:  # mega weirdness
                 if realname.startswith(name):
@@ -348,7 +392,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def name(self):
-        if isinstance(self.bfobject, File) and self.from_packages:
+        if isinstance(self.bfobject, self._File) and self.from_packages:
             return self.bfobject.filename
         else:
             return self.stem + self.suffix
@@ -358,8 +402,8 @@ class BlackfynnRemote(aug.RemotePath):
         if isinstance(self._seed, self.__class__):
             id = self._seed.bfobject.id
 
-        elif isinstance(self._seed, BaseNode):
-            if isinstance(self._seed, File):
+        elif isinstance(self._seed, self._BaseNode):
+            if isinstance(self._seed, self._File):
                 id = self._seed.pkg_id
             else:
                 id = self._seed.id
@@ -379,7 +423,7 @@ class BlackfynnRemote(aug.RemotePath):
     def doi(self):
         try:
             blob = self.bfobject.doi
-            print(blob)
+            #print(blob)
             if blob:
                 return idlib.Doi(blob['doi'])
         except exc.NoRemoteFileWithThatIdError as e:
@@ -389,22 +433,22 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def size(self):
-        if isinstance(self.bfobject, File):
+        if isinstance(self.bfobject, self._File):
             return self.bfobject.size
 
     @property
     def created(self):
-        if not isinstance(self.bfobject, Organization):
+        if not isinstance(self.bfobject, self._Organization):
             return self.bfobject.created_at
 
     @property
     def updated(self):
-        if not isinstance(self.bfobject, Organization):
+        if not isinstance(self.bfobject, self._Organization):
             return self.bfobject.updated_at
 
     @property
     def file_id(self):
-        if isinstance(self.bfobject, File):
+        if isinstance(self.bfobject, self._File):
             return self.bfobject.id
 
     @property
@@ -414,7 +458,7 @@ class BlackfynnRemote(aug.RemotePath):
     def exists(self):
         try:
             bfo = self.bfobject
-            if not isinstance(bfo, BaseNode):
+            if not isinstance(bfo, self._BaseNode):
                 _cache = bfo.refresh(force=True)
                 bf = _cache.remote.bfo
 
@@ -423,13 +467,17 @@ class BlackfynnRemote(aug.RemotePath):
             return False
 
     def is_dir(self):
-        bfo = self.bfobject
-        return not isinstance(bfo, File) and not isinstance(bfo, DataPackage)
+        try:
+            bfo = self.bfobject
+            return not isinstance(bfo, self._File) and not isinstance(bfo, self._DataPackage)
+        except Exception as e:
+            breakpoint()
+            raise e
 
     def is_file(self):
         bfo = self.bfobject
-        return (isinstance(bfo, File) or
-                isinstance(bfo, DataPackage) and
+        return (isinstance(bfo, self._File) or
+                isinstance(bfo, self._DataPackage) and
                 (hasattr(bfo, 'fake_files') and bfo.fake_files
                     or
                  not hasattr(bfo, '_json') and
@@ -440,7 +488,7 @@ class BlackfynnRemote(aug.RemotePath):
     def _has_remote_files(self):
         """ this will fetch """
         bfobject = self.bfobject
-        if not isinstance(bfobject, DataPackage):
+        if not isinstance(bfobject, self._DataPackage):
             return False
 
         files = bfobject.files
@@ -487,16 +535,22 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def owner_id(self):
-        if not isinstance(self.bfobject, Organization):
+        if not isinstance(self.bfobject, self._Organization):
             # This seems like an oversight ...
             return self.bfobject.owner_id
 
     @property
     def parent(self):
-        if isinstance(self.bfobject, Organization):
-            return None
+        if hasattr(self, '_c_parent'):
+            # WARNING staleness could occure because of this
+            # wow does it save on the network roundtrips
+            # for rchildren though
+            return self._c_parent
 
-        elif isinstance(self.bfobject, Dataset):
+        if isinstance(self.bfobject, self._Organization):
+            return self  # match behavior of Path
+
+        elif isinstance(self.bfobject, self._Dataset):
             return self.organization
             #parent = self.bfobject._api._context
 
@@ -513,65 +567,144 @@ class BlackfynnRemote(aug.RemotePath):
 
         if parent:
             parent_cache = self.cache.parent if self.cache is not None else None
-            return self.__class__(parent, cache=parent_cache)
+            self._c_parent = self.__class__(parent, cache=parent_cache)
+            return self._c_parent
 
     @property
     def children(self):
-        if isinstance(self.bfobject, File):
+        yield from self._children()
+
+    def _children(self, create_cache=True):
+        if isinstance(self.bfobject, self._File):
             return
-        elif isinstance(self.bfobject, DataPackage):
+        elif isinstance(self.bfobject, self._DataPackage):
             return  # we conflate data packages and files
-        elif isinstance(self.bfobject, Organization):
+        elif isinstance(self.bfobject, self._Organization):
             for dataset in self.bfobject.datasets:
                 child = self.__class__(dataset)
-                self.cache / child  # construction will cause registration without needing to assign
-                assert child.cache
+                if create_cache:
+                    self.cache / child  # construction will cause registration without needing to assign
+                    assert child.cache
+
                 yield child
+
         else:
             for bfobject in self.bfobject:
                 child = self.__class__(bfobject)
-                self.cache / child  # construction will cause registration without needing to assign
-                assert child.cache
+                if create_cache:
+                    self.cache / child  # construction will cause registration without needing to assign
+                    assert child.cache
+
                 yield child
 
     @property
     def rchildren(self):
         yield from self._rchildren()
 
-    def _rchildren(self, create_cache=True):
-        if isinstance(self.bfobject, File):
+    def _dir_or_file(self, child, deleted, exclude_uploaded):
+        state = child.bfobject.state
+        if state != 'READY':
+            log.debug (f'{state} {child.name} {child.id}')
+            if state == 'DELETING' or state == 'PARENT-DELETING':
+                deleted.append(child)
+                return
+            if exclude_uploaded and state == 'UPLOADED':
+                return
+
+        if child.is_file():
+            cid = child.id
+            existing = [c for c in self.cache.local.children
+                        if (c.is_file() and c.cache or c.is_broken_symlink())
+                        and c.cache.id == cid]
+            if existing:
+                unmatched = [e for e in existing if child.name != e.name]
+                if unmatched:
+                    log.debug(f'skipping {child.name} becuase a file with that '
+                                f'id already exists {unmatched}')
+                    return
+
+        return True
+
+    def _rchildren(self,
+                   create_cache=True,
+                   exclude_uploaded=True,
+                   sparse=False,):
+        if isinstance(self.bfobject, self._File):
             return
-        elif isinstance(self.bfobject, DataPackage):
+        elif isinstance(self.bfobject, self._DataPackage):
             return  # should we return files inside packages? are they 1:1?
-        elif any(isinstance(self.bfobject, t) for t in (Organization, Collection)):
-            for child in self.children:
+        elif any(isinstance(self.bfobject, t)
+                 for t in (self._Organization, self._Collection)):
+            for child in self._children(create_cache=create_cache):
                 yield child
-                yield from child.rchildren
-        elif isinstance(self.bfobject, Dataset):
+                yield from child._rchildren(create_cache=create_cache)
+        elif isinstance(self.bfobject, self._Dataset):
+            sparse = sparse or self.cache.is_sparse()
             deleted = []
+            if sparse:
+                filenames = self._sparse_stems
+                sbfo = self.bfobject
+                _parents_yielded = set()
+                _int_id_map = {}
+                for bfobject in self.bfobject.packagesByName(filenames=filenames):
+                    child = self.__class__(bfobject)
+                    if child.is_dir() or child.is_file():
+                        if not self._dir_or_file(child, deleted, exclude_uploaded):
+                            continue
+                    else:
+                        # probably a package that has files
+                        #log.debug(f'skipping {child} becuase it is neither a directory nor a file')
+                        continue
+
+                    parent = child
+                    parents = []
+                    while True:
+                        log.debug(parent)
+                        parent_int_id = None
+                        if (parent.from_packages and
+                            'parentId' in parent.bfobject.package._json['content']):
+                            # FIXME HACK
+                            # FIXME incredibly slow, but still faster than non-sparse
+                            parent_int_id = parent.bfobject.package._json['content']['parentId']
+                            if parent_int_id not in _int_id_map:
+                                parent = self.__class__(parent.id)
+                                parent.bfobject
+                                _int_id_map[parent_int_id] = parent.parent
+
+                        if not parents:  # add the child as the last parent
+                            parents.append(parent)
+
+                        if parent.parent_id in (sbfo, self.id):
+                            break  # child yielded below
+                        else:
+                            if parent_int_id is not None:
+                                parent = _int_id_map[parent_int_id]
+                            else:
+                                parent = parent.parent
+                            # TODO create cache
+                            if parent.id not in _parents_yielded:
+                                _parents_yielded.add(parent.id)
+                                # actually yield below in the reverse order
+                                parents.append(parent)
+                                #yield parent
+                            else:
+                                break
+
+                    if create_cache:
+                        pcache = self.cache
+                        for parent in reversed(parents):
+                            yield parent
+                            pcache = pcache / parent
+                    else:
+                        yield from reversed(parents)
+
+                return
+
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
                 if child.is_dir() or child.is_file():
-                    state = child.bfobject.state
-                    if state != 'READY':
-                        log.debug (f'{state} {child.name} {child.id}')
-                        if state == 'DELETING' or state == 'PARENT-DELETING':
-                            deleted.append(child)
-                            continue
-                        if state == 'UPLOADED':
-                            continue
-
-                    if child.is_file():
-                        cid = child.id
-                        existing = [c for c in self.cache.local.children
-                                    if (c.is_file() and c.cache or c.is_broken_symlink())
-                                    and c.cache.id == cid]
-                        if existing:
-                            unmatched = [e for e in existing if child.name != e.name]
-                            if unmatched:
-                                log.debug(f'skipping {child.name} becuase a file with that '
-                                          f'id already exists {unmatched}')
-                                continue
+                    if not self._dir_or_file(child, deleted, exclude_uploaded):
+                        continue
 
                     if create_cache:
                         # FIXME I don't think existing detection is working
@@ -590,7 +723,12 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.UnhandledTypeError  # TODO
 
-    def children_pull(self, existing_caches=tuple(), only=tuple(), skip=tuple()):
+    def children_pull(self,
+                      existing_caches=tuple(),
+                      only=tuple(),
+                      skip=tuple(),
+                      sparse=tuple()):
+        """ ONLY USE FOR organization level """
         # FIXME this is really a recursive pull for organization level only ...
         sname = lambda gen: sorted(gen, key=lambda c: c.name)
         def refresh(c):
@@ -621,7 +759,10 @@ class BlackfynnRemote(aug.RemotePath):
 
         if not self._debug:
             yield from (rc for d in Async(rate=self._async_rate)(
-                deferred(child.bootstrap)(recursive=True, only=only, skip=skip)
+                deferred(child.bootstrap)(recursive=True,
+                                          only=only,
+                                          skip=skip,
+                                          sparse=sparse)
                 for child in sname(self.children)
                 #if child.id in skipexisting
                 # TODO when dataset's have a 'anything in me updated'
@@ -630,7 +771,7 @@ class BlackfynnRemote(aug.RemotePath):
                 ) for rc in d)
         else:  # debug
              yield from (rc for d in (
-                child.bootstrap(recursive=True, only=only, skip=skip)
+                child.bootstrap(recursive=True, only=only, skip=skip, sparse=sparse)
                 for child in sname(self.children))
                 #if child.id in skipexisting
                 # TODO when dataset's have a 'anything in me updated'
@@ -678,48 +819,40 @@ class BlackfynnRemote(aug.RemotePath):
 
         return self.cache  # when a cache calls refresh it needs to know if it no longer exists
 
-    def update_cache(self):
-        log.debug(f'maybe updating cache for {self.name}')
-        file_is_different = self.cache._meta_updater(self.meta)
-        # update the cache first
-        # then move to the new name if relevant
-        # prevents moving partial metadata onto existing files
-        parent_changed = (hasattr(self._bfobject, 'parent') and
-                          self._bfobject.parent != self.cache.parent.id)
-        if self.cache.name != self.name or parent_changed:  # this is localy correct
-            # the issue is that move is now smarter
-            # and will detect if a parent path has changed
-            try:
-                self.cache.move(remote=self)
-            except exc.WhyDidntThisGetMovedBeforeError as e:
-                # AAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-                # deal with the sadness that is non-unique filenames
-                # I am 99.999999999999999% certain that users do not
-                # expect this behavior ...
-                log.error(e)
-                if self.bfobject.package.name != self.bfobject.name:
-                    argh = self.bfobject.name
-                    self.bfobject.name = self.bfobject.package.name
-                    try:
-                        log.critical(f'Non unique filename :( '
-                                     f'{self.cache.name} -> {argh} -> {self.bfobject.name}')
-                        self.cache.move(remote=self)
-                    finally:
-                        self.bfobject.name = argh
-                else:
-                    raise e
+    @property
+    def parent_id(self):
+        # work around inhomogenous
+        if self == self.organization:
+            return self.id  # this behavior is consistent with how Path.parent works
+        elif not hasattr(self._bfobject, 'dataset'):
+            return self.organization.id
+        else:
+            pid = getattr(self._bfobject, 'parent')
+            if pid is None:
+                return self._bfobject.dataset
 
-        return file_is_different
+    def _on_cache_move_error(self, error, cache):
+        if self.bfobject.package.name != self.bfobject.name:
+            argh = self.bfobject.name
+            self.bfobject.name = self.bfobject.package.name
+            try:
+                log.critical(f'Non unique filename :( '
+                                f'{cache.name} -> {argh} -> {self.bfobject.name}')
+                cache.move(remote=self)
+            finally:
+                self.bfobject.name = argh
+        else:
+            raise error
 
     @property
     def _single_file(self):
-        if isinstance(self.bfobject, DataPackage):
+        if isinstance(self.bfobject, self._DataPackage):
             files = list(self.bfobject.files)
             if len(files) > 1:
                 raise BaseException('TODO too many files')
 
             file = files[0]
-        elif isinstance(self.bfobject, File):
+        elif isinstance(self.bfobject, self._File):
             file = self.bfobject
         else:
             file = None
@@ -759,6 +892,36 @@ class BlackfynnRemote(aug.RemotePath):
             # for many useful references
             raise NotImplementedError('TODO')
 
+    def _lchildmeta(self, child):
+        # FIXME all of this should be accessible from local and/or cache directly ...
+        lchild = self.cache.local / child.name  # TODO LocalPath.__truediv__ ?
+        excache = None
+        lchecksum = None
+        echecksum = None
+        modified = False
+        if lchild.exists() and False:  # TODO XXX
+            lmeta = lchild.meta
+            lchecksum = lmeta.checksum
+            excache = lchild.cache
+            if excache is None:
+                lmeta = lchild.meta
+                lmeta.id = None
+                echecksum = lmeta.checksum
+            else:
+                echecksum = excache.checksum
+
+            if lchecksum != echecksum:
+                log.debug(f'file has been modified {lchild}')
+                modified = True
+        return lchild, excache, lmeta, lchecksum, echecksum, modified
+
+    def _lchild(self, child):
+        l = self.cache.local
+        if l is None:
+            l = self.cache.parent.local / self.name
+        
+        return l / child.name
+
     def __truediv__(self, other):  # XXX
         """ this is probably the we want to use for this at all
             it is kept around as a reminder NOT to do this
@@ -770,33 +933,94 @@ class BlackfynnRemote(aug.RemotePath):
         # since it is the one that knows that the file doesn't
         # exist at the remote and can provide a way to move data
         # to the remote using copy_to or something like that
-        children = list(self.children)
-        names = {c.name:c for c in children}
+        children = list(self._children(create_cache=False))
+        names = {}
+        for c in children:
+            if c.name not in names:
+                names[c.name] = []
+
+            names[c.name].append(c)
+
         opath = PurePath(other)
         if len(opath.parts) > 1:
             # FIXME ... handle/paths/like/this
             raise NotImplementedError('TODO')
         else:
             if other in names:
-                return names[other]
-            else:  # create an empty
-                child = object.__new__(self.__class__)
-                child._parent = self
-                class TempBFObject:  # this will cause a type error if actually used
-                    name = other
-                    def exists(self):
-                        return False
+                childs = names[other]
+                if len(childs) > 1:
+                    op = PurePath(other)
+                    # TODO I think it might make sense for this to come first?
+                    # of course the remote checksums aren't actually implemented
+                    # unless it is at the dataset package level (sigh)
 
-                tbfo = TempBFObject()
-                child._bfobject = tbfo
-                child._seed = tbfo
+                    #if lchecksum is not None and False:  # TODO XXX
+                        #matches = [c for c in childs if c.checksum == lchecksum]
+
+                    package_names = {c._bfobject.package.name
+                                     if c.is_file() else
+                                     c.name
+                                     :c for c in childs}
+
+                    if op.stem in package_names:
+                        child = package_names[op.stem]
+                    else:
+                        # there are 3 possible values that we could return here
+                        # 1. None
+                        # 2. self._temp_child()
+                        # 3. the oldest/newest/arbitrary child
+                        # returning the newest child seems to be the right
+                        # behavior because it is possible to check at a later
+                        # time (e.g. in _stream_from_local) whether there is a
+                        # package id conflict or not
+
+                        # FIXME test vs updated or vs created?
+                        oldest_first = sorted(childs, key=lambda c: c.updated)
+                        child = oldest_first[-1]
+                else:
+                    child = childs[0]
+
+                self.cache / child  # THIS SIDE EFFECTS TO UPDATE THE CHILD CACHE
                 return child
+
+            else:  # create an empty
+                return self._temp_child(other)
+
+    def _temp_child(self, child_name):
+        """ construct child with a fake placeholder bfobject """
+        # FIXME hack around instantiation-existence issue
+        child = object.__new__(self.__class__)
+        child._parent = self
+        class TempBFObject(self._BaseNode):  # this will cause a type error if actually used
+            name = child_name
+            exists = False
+
+        if self != self.organization:
+            if self.id.startswith('N:dataset:'):  # FIXME sigh
+                TempBFObject.dataset = self.id
+            else:
+                TempBFObject.dataset = self._bfobject.dataset
+                TempBFObject.parent = self.id
+
+        tbfo = TempBFObject()
+        child._bfobject = tbfo
+        child._seed = tbfo
+        return child
 
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """
         if self.is_organization():
             bfobject = self._api.bf.create_dataset(child_name)
         elif self.is_dir():  # all other possible dirs are already handled
+            # sigh it would be nice if creation would just fail
+            # if a folder with that name already existed :/
+            maybe_child = self / child_name
+            if maybe_child.exists():
+                log.warning(f'folder with name {child_name} already exists '
+                            'one level of its children have been included')
+                list(maybe_child.children)  # force a single level of instantiation
+                return maybe_child
+
             bfobject = self.bfobject.create_collection(child_name)
         else:
             raise exc.NotADirectoryError(f'{self}')
@@ -831,21 +1055,155 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.NotADirectoryError(f'{self}')
 
-    def _stream_child(self, local_child, replace=True):
+    @classmethod
+    def _prepare_package_for(cls, local_file, mkdir=False):
+        # TODO maybe ???
+        raise NotImplementedError('I think doing it this way requires uploading to s3 first ...')
+        if not isinstance(local_file, cls._local_class):
+            raise TypeError(f'{local_file} {type(local_file)} is not a {cls._local_class}')
+
+        local_file.name
+        local_file.parent.remote  # FIXME recursively mkdir ???
+        bfobject = cls._api.create_package(local_file)
+        remote = cls(bfobject)
+        return remote.cache
+
+    @classmethod
+    def _stream_from_local(cls, local_path, replace=True, local_backup=False):
         # FIXME touch_child -> stream data ??? as a bridge to sanity?
-        if not self.is_dir():
-            raise exc.NotADirectoryError(f'{self} is not a directory!')
+        # /packages/ endpoint should allow us to create a new empty package
+        self = local_path.parent.remote
 
-        if child.parent != self.local:
-            raise exc.LostChildError('{child.parent} != {self.local}')
+        if type(self) != cls:
+            raise TypeError(f'{type(self)} != {cls}')
 
-        if replace and (self / local_child.name).exists():  # FIXME nasty performance cost here ...
-            # oh man the concurrency story for multiple people adding files with the same name
-            # wow ...
-            raise NotImplementedError('not quite ready')
+        # FIXME BAD forces us to read file twice
+        checksum = local_path.checksum()
 
-        bfobject = self.bfobject.upload(local_child)
-        return self.__class__(bfobject)
+        try:
+            old_remote = self / local_path.name
+        except NotImplementedError as e:
+            # well now this isn't failing ...
+            #breakpoint()
+            raise e
+
+        rchecksum = None
+        if old_remote is not None:
+            rchecksum = old_remote.checksum
+            if rchecksum is None and old_remote.cache is not None:
+                # has side effect of caching the object on the off chance that
+                # a local copy has not already been stashed (e.g. if we didn't
+                # upload it using this function)
+                rchecksum = old_remote.cache.checksum()
+
+        if checksum == rchecksum:
+            # TODO check to make sure nothing else has changed ???
+            # also how does this interact with replace = true?
+            raise exc.FileHasNotChangedError('no changes have been made, not uploading')
+
+        manifests = self.bfobject.upload(local_path, use_agent=False)
+        blob = manifests[0][0]  # there is other stuff in here but ignore for now
+        id = blob['package']['content']['nodeId']
+        remote = cls(id)
+        if False:  # the web api endpoints are old and busted and don't ensure checksum generation
+            for i in range(100):
+                # sometimes you just need a blocking call ...
+                # FIXME looks like there is a websocket connection that
+                # will notify when a package _actually_ finished uploading ...
+                if remote.state == 'READY':
+                    break
+                elif remote.state == 'UPLOADED':
+                    try:
+                        remote.bfobject.package.process()  # processing required to get a checksum
+                    except BaseException as e:
+                        log.exception(e)
+                        break
+                else:
+                    # even if the remote state says uploaded we get 400 error bad url ...
+                    log.debug(remote.state)
+                    remote = cls(id)
+            else:
+                raise BaseException('too many retires when uploading {remote}')
+
+            for i in range(100):
+                if remote.state == 'READY':
+                    log.debug(f'finally ready after {i + 1}')
+                    with_checksum_maybe = [  # FIXME sigh ...
+                        p for p in remote.dataset.bfobject._packages(filename=remote.stem)
+                        if p.id == remote.id or hasattr(p, 'pkg_id') and p.pkg_id == remote.id]
+
+                    with_checksum_maybe = with_checksum_maybe[-1] if with_checksum_maybe else None
+                    if with_checksum_maybe.checksum:
+                        remote.bfobject.checksum = with_checksum_maybe.checksum
+                        breakpoint()
+
+                    break
+                else:
+                    log.debug(remote.state)
+                    #sleep(1)
+                    remote = cls(id)
+
+        if remote.meta.checksum is None:
+            if hasattr(remote.bfobject, 'checksum'):
+                raise BaseException('what is going on here!?')
+
+            # FIXME EVIL the local path checksum could have changed
+            # because we do not lock
+            # the real fix is to make sure we are telling the blackfynn remote
+            # the right things when we upload so that the packages endpoint will
+            # generate the hashes for us ... the fact that it is possible to somehow
+            # not generate the hashes is not good ...
+
+            log.warning('FIX THIS NONSENSE')
+            remote.bfobject.checksum = checksum.hex()  # FIXME HACK HACK HACK
+            # this hack avoids us going to retrieve the remote after it
+            # has been deleted since the upload code is broken at the moment
+            # it is COMPLETELY BROKEN there are ZERO gurantees about remote
+            # data integrity
+
+        try:
+            # do a little dance to update the name back to what it is supposed to be
+            stem_diff = local_path.stem != remote.bfobject.package.name
+            if replace and stem_diff:
+                if old_remote.exists():  # FIXME nasty performance cost here ...
+                    # oh man the concurrency story for multiple people adding files with the same name
+                    # wow ... in restrospect this comment was not nearly cynical enough
+
+                    # FIXME if checksum does not exist compute it before delete
+                    # this is an issue because you usually can only get the checksum
+                    # from the packages endpoint not for an individual file (sigh)
+                    old_remote.bfobject.package.delete()  # FIXME this is terrifying ...
+                    # though not as terrifying as running it before the upload
+                    # of course now there is the renaming issue I'm sure ...
+
+                    # LOL OH NO its a post https://developer.blackfynn.io/api/#/Data/deleteItems
+                    assert not old_remote.bfobject.package.exists, 'delete failed?'
+
+                    # FIXME OH NO concurrent package.delete is non-blocking !
+
+                    # the fact that this can fail tells me that there is no
+                    # synchronization on the blackfynn backend AT ALL
+                    # operations seem to be executed as they arrive without
+                    # any notion of consistency or ordering WAT
+                    remote.bfobject.package.name = remote.bfobject.name
+                    for i in range(100):
+                        # I love spinlocks for concurency don't you?
+                        try:
+                            remote.bfobject.package.update()
+                            break
+                        except self._requests.exceptions.HTTPError as e:
+                            if e.response.text != 'package name is already taken':  # ugh
+                                raise e
+                            elif i == 99:
+                                raise BaseException('LOL') from e
+
+            elif not stem_diff and old_remote.exists():
+                log.critical(f'YOU MAY HAVE FUNKY DATA IN {local_path.cache.parent.uri_human}')
+
+        except BaseException as e:
+            log.exception(e)
+
+        return remote, old_remote
 
     @property
     def meta(self):

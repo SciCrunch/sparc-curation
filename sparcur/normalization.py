@@ -4,7 +4,7 @@ import numbers
 from types import GeneratorType
 from html.parser import HTMLParser
 import idlib
-from pysercomb.pyr import units as pyru
+from pysercomb.pyr.types import Quantity
 from . import exceptions as exc
 from .core import log, logd, HasErrors
 from .core import OntId
@@ -13,6 +13,38 @@ from .utils import is_list_or_tuple
 
 BLANK_VALUE = object()
 NOT_APPLICABLE = object()
+
+
+def protocol_url_or_doi(value):
+    # FIXME can't use idlib.get_right_id because it is
+    # totally broken with regard to dereferencing
+    if not is_list_or_tuple(value):
+        value = value,
+        out = None
+    else:
+        out = []
+
+    for v in value:
+        if not isinstance(v, idlib.Stream):
+            raise TypeError(f'should already be in stream form {v}')
+
+        normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
+        if not isinstance(normed, idlib.Pio) and isinstance(v, idlib.Doi):
+            # ensure that regular dois are returned, not their referents
+            # if it is a protocol id, use that as primary and reference the doi
+            # using hasDoi, because the doi metadata is technically different
+            # from the protocol metadata/data
+            normed = v
+
+        if out is None:
+            return normed
+
+        out.append(normed)
+
+    if isinstance(value, tuple):
+        out = tuple(out)  # preserve types prevent errors!
+
+    return out
 
 
 class _Unknown(str):
@@ -126,6 +158,8 @@ class NormHeader(NormSimple):
         'age_range_minimum': __armi,
         'age_range_maximum': __arma,
         'protocol_io_location': 'protocol_url_or_doi',
+        'protocol_io_location_2': 'protocol_url_or_doi',
+        'protocol_title_2': 'protocol_title',
     }
 
 
@@ -299,10 +333,10 @@ class NormValues(HasErrors):
                         else:
                             kmsg = f'.{key}'
 
-                        self.addError(e,
-                                      pipeline_stage=f'{self.__class__.__name__}{kmsg}',
-                                      logfunc=log.critical,
-                                      blame='submission')
+                        if self.addError(str(e),
+                                         pipeline_stage=f'{self.__class__.__name__}{kmsg}',
+                                         blame='submission'):
+                            log.critical(e)
                         #if isinstance(out[k], dict):
                             #self.embedLastError(out[k])
 
@@ -330,9 +364,19 @@ class NormValues(HasErrors):
         elif is_list_or_tuple(thing):
             # normal json not the tabular conversion case
             # or arrays at the bottom
-            out = [self._normv(v, key, i, path + (list,)) for i, v in enumerate(thing)]
+            out = []
+            _errors = []
+            for i, v in enumerate(thing):
+                try:
+                    o = self._normv(v, key, i, path + (list,))
+                    out.append(o)
+                except exc.TabularCellError as e:
+                    out.append(None)  # will be replaced in the if errors block
+                    _errors.append((i, e))
+
             errors = [(i, e) for i, e in enumerate(out)
                       if isinstance(e, exc.TabularCellError)]
+            errors = errors + _errors
 
             if errors:
                 cell_errors = [e for i, e in errors]
@@ -376,7 +420,7 @@ class NormValues(HasErrors):
                         raise e
 
                     if (len(out) == 1 and (key in self._obj_inst._expect_single or
-                                           isinstance(out[0], pyru._Quant))
+                                           isinstance(out[0], Quantity))
                         or path[-1] == list):
                         # lists of lists might encounter issues here, but we almost never
                         # encounter those cases with metadata, especially in the tabular conversion
@@ -389,10 +433,10 @@ class NormValues(HasErrors):
 
                         if thing is not None and thing != '':
                             msg = f'Normalization {key} returned None for input "{thing}"'
-                            self.addError(msg,
-                                          pipeline_stage=f'{self.__class__.__name__}.{key}',
-                                          logfunc=log.critical,
-                                          blame='pipeline',)
+                            if self.addError(msg,
+                                             pipeline_stage=f'{self.__class__.__name__}.{key}',
+                                             blame='pipeline',):
+                                log.critical(msg)
 
                         out = None
 
@@ -449,10 +493,11 @@ class NormDatasetDescriptionFile(NormValues):
         try:
             return int(value)
         except ValueError as e:
-            self.addError(e,
-                          pipeline_stage=f'{self.__class__.__name__}',
-                          logfunc=logd.exception,
-                          blame='submission',)
+            if self.addError(str(e),
+                             pipeline_stage=f'{self.__class__.__name__}',
+                             blame='submission',):
+                logd.exception(e)
+
             return value  # and let the schema sort them out
 
     number_of_samples = number_of_subjects
@@ -505,8 +550,9 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(v) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.Orcid._id_class.OrcidLengthError(msg))
-                logd.error(msg)
+                if self.addError(idlib.Orcid._id_class.OrcidLengthError(msg)):
+                    logd.error(msg)
+
                 return
 
             v = 'ORCID:' + v
@@ -521,8 +567,8 @@ class NormDatasetDescriptionFile(NormValues):
                 return
             elif len(numeric) != 19:
                 msg = f'orcid wrong length {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.Orcid._id_class.OrcidLengthError(msg))
-                logd.error(msg)
+                if self.addError(idlib.Orcid._id_class.OrcidLengthError(msg)):
+                    logd.error(msg)
                 return
 
         try:
@@ -531,16 +577,16 @@ class NormDatasetDescriptionFile(NormValues):
             if not orcid.identifier.checksumValid:  # FIXME should not handle this with ifs ...
                 # FIXME json schema can't do this ...
                 msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
-                self.addError(idlib.Orcid._id_class.OrcidChecksumError(msg))
-                logd.error(msg)
+                if self.addError(idlib.Orcid._id_class.OrcidChecksumError(msg)):
+                    logd.error(msg)
                 return
 
             yield orcid
 
         except (OntId.BadCurieError, idlib.Orcid._id_class.OrcidMalformedError) as e:
             msg = f'orcid malformed {value!r} {self._path.as_posix()!r}'
-            self.addError(idlib.Orcid._id_class.OrcidMalformedError(msg))
-            logd.error(msg)
+            if self.addError(idlib.Orcid._id_class.OrcidMalformedError(msg)):
+                logd.error(msg)
             yield value
 
     def contributor_role(self, value):
@@ -626,13 +672,15 @@ class NormDatasetDescriptionFile(NormValues):
                 except BaseException as e:
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...
-                    self.addError(e,
-                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.error)
-                    self.addError(self._path.as_posix(),
-                                  pipeline_stage=f'{self.__class__.__name__}.protocol_url_or_doi',
-                                  logfunc=logd.critical,
-                                  blame='debug')
+                    _ps = f'{self.__class__.__name__}.protocol_url_or_doi'
+                    if self.addError(str(e), pipeline_stage=_ps):
+                        logd.error(e)
+
+                    _pp = self._path.as_posix()
+                    if self.addError(_pp,
+                                     pipeline_stage=_ps,
+                                     blame='debug'):
+                        logd.critical(_pp)
                     # TODO raise exc.BadDataError from e
 
     def originating_article_doi(self, value):
@@ -668,13 +716,23 @@ class NormDatasetDescriptionFile(NormValues):
 
 class NormSubjectsFile(NormValues):
 
+    _protocol_url_or_doi = NormDatasetDescriptionFile._protocol_url_or_doi
+    protocol_url_or_doi = NormDatasetDescriptionFile.protocol_url_or_doi
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not hasattr(self.__class__, 'pyru'):
+            from pysercomb.pyr import units as pyru
+            self.__class__.pyru = pyru
+
     def subject_id(self, value):
         if not isinstance(value, str):
             msg = f'Bad type for subject_id: {type(value)}'
-            self.addError(msg,
-                          pipeline_stage=self.__class__.__name__,
-                          blame='submission',
-                          logfunc=logd.error,)
+            if self.addError(msg,
+                             pipeline_stage=self.__class__.__name__,
+                             blame='submission',):
+                logd.error(msg)
+
             return str(value)
         else:
             return value
@@ -682,6 +740,9 @@ class NormSubjectsFile(NormValues):
     def software_url(self, value):
         value, _j = self._deatag(value)
         return value
+
+    def software_rrid(self, value):
+        yield from self._rrid(value)
 
     def species(self, value):
         nv = NormSpecies(value)
@@ -723,17 +784,22 @@ class NormSubjectsFile(NormValues):
         self._error_on_na(value)
 
         if isinstance(value, numbers.Number):
-            yield pyru.ur.Quantity(value)
+            yield self.pyru.ur.Quantity(value)
             return
 
         try:
-            pv = pyru.UnitsParser(value).asPython()
-        except pyru.UnitsParser.ParseFailure as e:
+            pv = self.pyru.UnitsParser(value).asPython()
+        except self.pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
             msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
-            log.error(msg)
-            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline')
-            yield value
+            if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline'):
+                log.error(msg)
+
+            if value.strip().lower() in ('unknown', 'uknown'):
+                yield UNKNOWN
+            else:
+                yield value
+
             return
 
         #if not pv[0] == 'param:parse-failure':
@@ -779,9 +845,9 @@ class NormSubjectsFile(NormValues):
             msg = (f'Bad value for age_range_max: {value}\n'
                    'did you want to put that in age_cagegory instead?\n'
                    f'"{self._path}"')
-            logd.error(msg)
-            self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
-                          path=self._path)
+            if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
+                             path=self._path):
+                logd.error(msg)
             return value
 
         yield from self._param(value)
@@ -803,7 +869,26 @@ class NormSubjectsFile(NormValues):
         yield from self._param_unit(value, 'in')
 
     def rrid_for_strain(self, value):
-        yield value
+        yield from self._rrid(value)
+
+    def _rrid(self, value):
+        # OF COURSE RRIDS ARE SPECIAL
+        if value.strip().lower() in ('unknown', 'uknown'):
+            yield UNKNOWN
+        else:
+            try:
+                rrid = idlib.Rrid(value)
+                yield rrid
+            except idlib.exceptions.MalformedIdentifierError as e:
+                msg = f'malformed RRID: {value}'
+                if self.addError(msg,
+                                 pipeline_stage=self.__class__.__name__,
+                                 blame='submission',
+                                 path=self._path):
+                    log.error(msg)
+
+                if not value.startswith('RRID:'):
+                    yield from self.rrid_for_strain('RRID:' + value)
 
     #def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
         #yield value
@@ -822,7 +907,7 @@ class NormSubjectsFile(NormValues):
                 except ValueError as e:
                     raise exc.UnhandledTypeError(f'{h_value} {dhv!r} was not parsed!') from e
 
-            compose = dhv * pyru.ur.parse_units(dict_[h_unit])
+            compose = dhv * self.pyru.ur.parse_units(dict_[h_unit])
             #_, v, rest = parameter_expression(compose)
             #out[h_value] = str(UnitsParser(compose).for_text)  # FIXME sparc repr
             #breakpoint()
@@ -833,6 +918,9 @@ class NormSubjectsFile(NormValues):
                 out['sex'] = out.pop('gender')
 
         return out
+
+    #def experiment_date(self):
+        #pass
 
     def ___iter__(self):
         """ this is still used """

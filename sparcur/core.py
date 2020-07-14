@@ -1,35 +1,65 @@
 import copy
 import json
-import shutil
 import itertools
+from types import GeneratorType
 from pathlib import PurePath
 from datetime import datetime
 from functools import wraps
-from collections import deque
+from collections import deque, defaultdict
 import idlib
 import rdflib
-import htmlfn as hfn
-import requests
 import ontquery as oq
-import augpathlib as aug
-#from joblib import Memory
-from idlib.utils import resolution_chain
 from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pysercomb.pyr.units import Expr as ProtcurExpression, _Quant as Quantity  # FIXME import slowdown
-from pyontutils.core import OntTerm as OTB, OntId as OIDB, cull_prefixes, makeGraph
-from pyontutils.utils import isoformat, TZLOCAL
-from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID
-from pyontutils.namespaces import prot, proc, tech, asp, dim, unit, rdf, owl, rdfs
+from pysercomb.pyr.types import ProtcurExpression, Quantity
+from pyontutils.core import OntTerm as OTB, OntId as OIDB
+from pyontutils.utils import isoformat
+from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
+from pyontutils.namespaces import tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, cache, python_identifier  # FIXME fix other imports
+from sparcur.utils import log, logd  # FIXME fix other imports
 from sparcur.utils import is_list_or_tuple
-from sparcur.config import config, auth
 
 
-# disk cache decorator
-#memory = Memory(config.cache_dir, verbose=0)
+__type_registry = {None: None}
+def register_type(cls, type_name):
+    if type_name in __type_registry:
+        raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
+                         f'{type_name} -> {__type_registry[type_name]}')
+
+    __type_registry[type_name] = cls
+
+
+def fromJson(blob):
+    if isinstance(blob, dict):
+        if 'type' in blob:
+            t = blob['type']
+
+            if t == 'identifier':
+                type_name = blob['system']
+            elif t in ('quantity', 'range'):
+                type_name = t
+            elif t not in __type_registry:
+                breakpoint()
+                raise NotImplementedError(f'TODO fromJson for type {t} '
+                                          f'currently not implemented\n{blob}')
+            else:
+                type_name = t
+
+            cls = __type_registry[type_name]
+            if cls is not None:
+                return cls.fromJson(blob)
+
+        return {k:v
+                if k == 'errors' or k.endswith('_errors') else
+                fromJson(v)
+                for k, v in blob.items()}
+
+    elif isinstance(blob, list):
+        return [fromJson(_) for _ in blob]
+    else:
+        return blob
 
 
 xsd = rdflib.XSD
@@ -46,6 +76,7 @@ OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
            'DOI':'https://doi.org/',
            'ror':'https://ror.org/',
+           'pio.api': 'https://www.protocols.io/api/v3/protocols/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
@@ -57,6 +88,17 @@ OntCuries({'orcid':'https://orcid.org/',
            'tech': str(tech),
            'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})
+
+
+def curies_runtime(base):
+    """ base is .e.g https://api.blackfynn.io/datasets/{dataset_id}/ """
+
+    return {
+        'local': base,
+        'contributor': base + 'contributors/',
+        'subject': base + 'subjects/',
+        'sample': base + 'samples/',
+    }
 
 
 class OntId(OIDB):
@@ -73,26 +115,78 @@ class OntTerm(OTB, OntId):
     #def atag(self, curie=False, **kwargs):
         #return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
+    _logged = set()
+
+    @classmethod
+    def fromJson(cls, blob):
+        assert blob['system'] == cls.__name__
+        identifier = blob['id']
+        if isinstance(identifier, cls):
+            return identifier
+        else:
+            return cls(identifier, label=blob['label'])
+
+    @classmethod
+    def _already_logged(cls, thing):
+        case = thing in cls._logged
+        if not case:
+            cls._logged.add(thing)
+
+        return case
+
+    def asType(self, _class):
+        return _class(self.iri)
+
+    def asUri(self, asType=None):
+        return (self.iri
+                if asType is None else
+                asType(self.iri))
+
     def asDict(self):
-        return {
-            'type': 'OntTerm',  # TODO -> idlib
-            'id': self.iri,
+        out = {
+            'type': 'identifier',
+            'system': self.__class__.__name__,
+            #'id': self.iri,
+            'id': self,  # XXX
             'label': self.label,
-            'synonyms': self.synonyms,
         }
+        if hasattr(self, 'synonyms') and self.synonyms:
+            out['synonyms'] = self.synonyms
 
-    def tabular(self, sep='|'):
+        return out
+
+    def asCell(self, sep='|'):
         if self.label is None:
+            _id = self.curie if self.curie else self.iri
             if self.prefix not in self._known_no_label:
-                log.error(f'No label {self.curie if self.curie else self.iri}')
+                if not self._already_logged(_id):
+                    log.error(f'No label {_id}')
 
-            return self.curie if self.curie else self.iri
+            return _id
 
         return self.label + sep + self.curie
+
+    @property
+    def triples_simple(self):
+        # method name matches convention from neurondm
+        # but I still don't really like this pattern
+        # especially since this wouldn't be derived directly
+        # from the json from but would/could hit the network again
+        s = self.asUri(rdflib.URIRef)
+        yield s, rdf.type, owl.Class
+        if self.label:
+            yield s, rdfs.label, rdflib.Literal(self.label)
+        if self.definition:
+            yield s, definition, rdflib.Literal(self.definition)
+        if self.deprecated:
+            yield s, owl.deprecated, rdflib.Literal(True)
+        for syn in self.synonyms:
+            s, NIFRID.synonyms, rdflib.Literal(syn)
 
 
 class HasErrors:
     message_passing_key = 'keys_with_errors'
+    _already_logged = set()
 
     def __init__(self, *args, pipeline_stage=None, **kwargs):
         try:
@@ -112,6 +206,10 @@ class HasErrors:
             data[mpk] = [key]
 
     def addError(self, error, pipeline_stage=None, logfunc=None, blame=None, path=None):
+        do_log = error not in self._already_logged
+        if do_log:
+            self._already_logged.add(error)
+
         stage = (pipeline_stage if pipeline_stage is not None
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
@@ -120,8 +218,7 @@ class HasErrors:
         self._last_error = et
         self._errors_set.add(et)
         a = len(self._errors_set)
-        if logfunc is not None and a != b:  # only log on new errors
-            logfunc(error)
+        return a != b and do_log
 
     def _render(self, e, stage, blame, path):
         o = {'pipeline_stage': stage,
@@ -168,25 +265,168 @@ def lj(j):
     return '\n' + json.dumps(j, indent=2, cls=JEncode)
 
 
-class JEncode(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, deque):
-            return list(obj)
-        elif isinstance(obj, ProtcurExpression):
-            return obj.json()
-        elif isinstance(obj, PurePath):
-            return obj.as_posix()
-        elif isinstance(obj, Quantity):
-            return obj.json()
-        elif isinstance(obj, idlib.Stream):
+def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **kwargs):
+    try:
+        dict_literal = _json_identifier_expansion(obj)
+    except idlib.exceptions.ResolutionError as e:
+        if hasattr(obj, '_cooldown'):
+            return obj._cooldown()  # trigger cooldown to simplify issues down the line
+
+        oops = json_export_type_converter(obj)
+        msg = (f'{stage.lifters.id} could not resolve '  # FIXME lifters sigh
+               f'{type(obj)}: {oops} {obj.asUri()}')
+        error = dict(error=msg,
+                     pipeline_stage=stage.__class__.__name__,
+                     blame='submission',
+                     path=tuple(path))
+
+        if addError:
+            if addError(**error):
+                logd.error(msg)
+        else:
+            return {'errors': [error]}
+
+
+def _json_identifier_expansion(obj, *args, **kwargs):
+    if isinstance(obj, oq.OntTerm):
+        obj.__class__ = OntTerm  # that this works is amazing/terrifying
+        return obj.asDict()
+
+    elif isinstance(obj, idlib.Stream):
+        if obj._id_class is str:
             return obj.identifier
-        elif isinstance(obj, datetime):
-            return isoformat(obj)
+        else:
+            return obj.asDict()
+    else:
+        return obj
+
+
+def json_identifier_expansion(obj, *args, path=None, **kwargs):
+    """ expand identifiers to json literal form """
+    try:
+        return _json_identifier_expansion(obj, *args, **kwargs)
+    except idlib.exceptions.ResolutionError as e:
+        oops = json_export_type_converter(obj)
+        msg = f'could not resolve {type(obj)}: {oops}'
+        out = {'id': obj,
+               'type': 'identifier',
+               'system': obj.__class__.__name__,
+               'errors': [{'message': msg, 'path': path}]}
+        return out
+
+
+def json_export_type_converter(obj):
+    if isinstance(obj, deque):
+        return list(obj)
+    elif isinstance(obj, ProtcurExpression):
+        return obj.json()
+    elif isinstance(obj, PurePath):
+        return obj.as_posix()
+    elif isinstance(obj, Quantity):
+        return obj.json()
+    elif isinstance(obj, oq.OntTerm):
+        return obj.iri
+        #return obj.asDict()  # FIXME need a no network/scigraph version
+    elif isinstance(obj, idlib.Stream) and hasattr(obj, '_id_class'):
+        if obj._id_class is str:
+            return obj.identifier
+        else:
+            return json_export_type_converter(obj.identifier)
+            #return obj.asDict()  # FIXME need a no network/scigraph version
+    elif isinstance(obj, datetime):
+        return isoformat(obj)
+    elif isinstance(obj, BaseException):
+        # FIXME hunt down where these are sneeking in from
+        return repr(obj)
+
+
+class JEncode(json.JSONEncoder):
+
+    def default(self, obj):
+        new_obj = json_export_type_converter(obj)
+        if new_obj is not None:
+            return new_obj
         #else:
             #log.critical(f'{type(obj)} -> {obj}')
+        #if isinstance(obj, ValueError):
+            #breakpoint()
 
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
+
+
+def JFixKeys(obj):
+    def jetc(o):
+        out = json_export_type_converter(o)
+        return out if out else o
+
+    if isinstance(obj, dict):
+        return {jetc(k): JFixKeys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [JFixKeys(v) for v in obj]
+    else:
+        return obj
+
+
+def get_nested_by_key(obj, key, *args, path=None, collect=tuple()):
+    if isinstance(obj, dict) and key in obj:
+        value = obj[key]
+        if is_list_or_tuple(value):
+            for v in value:
+                n = json_export_type_converter(v)
+                collect.append(n if n is not None else v)
+        else:
+            n = json_export_type_converter(value)
+            collect.append(n if n is not None else value)
+
+    return obj  # have to return this otherwise somehow everything is turned to None?
+
+
+def JApplyRecursive(function, obj, *args,
+                    condense=False,
+                    skip_keys=tuple(),
+                    preserve_keys=tuple(),
+                    path=None,
+                    **kwargs):
+    """ *args, **kwargs, and path= are passed to the function """
+    def testx(v):
+        return (v is not None and
+                not (not v and
+                     (is_list_or_tuple(v) or isinstance(v, dict))))
+
+    if path is None:
+        path = []
+
+    if isinstance(obj, dict):
+        out = {k: JApplyRecursive(function, v, *args,
+                                  condense=condense,
+                                  skip_keys=skip_keys,
+                                  preserve_keys=preserve_keys,
+                                  path=path + [k],
+                                  **kwargs)
+               if k not in preserve_keys else v
+               for k, v in obj.items() if k not in skip_keys}
+
+        if condense:
+            out = {k:v for k, v in out.items() if testx(v)}
+
+        return function(out, *args, path=path, **kwargs)
+
+    elif is_list_or_tuple(obj):
+        out = [JApplyRecursive(function, v, *args,
+                               condense=condense,
+                               skip_keys=skip_keys,
+                               preserve_keys=preserve_keys,
+                               path=path + [i],
+                               **kwargs)
+               for i, v in enumerate(obj)]
+        if condense:
+            out = [v for v in out if testx(v)]
+
+        return function(out, *args, path=path, **kwargs)
+
+    else:
+        return function(obj, *args, path=path, **kwargs)
 
 
 def zipeq(*iterables):
@@ -362,8 +602,8 @@ def JT(blob):
         return j
 
     # additional thought required for how to integrate these into this
-    # shameling abomination
-    #adopts
+    # shambling abomination
+    #adops
     #dt = DictTransformer
 
     #cd = {k:v for k, v in _populate(blob, True)}
@@ -416,12 +656,25 @@ class AtomicDictOperations:
         # type errors can occur here ...
         # e.g. you try to go to a string
         if not [_ for _ in (list, tuple) if isinstance(target_path, _)]:
-            raise TypeError(f'target_path is not a list or tuple! {type(target_path)}')
+            msg = f'target_path is not a list or tuple! {type(target_path)}'
+            raise TypeError(msg)
+
         target_prefixes = target_path[:-1]
         target_key = target_path[-1]
         target = data
-        for target_name in target_prefixes:
-            if target_name not in target:  # TODO list indicies
+        for i, target_name in enumerate(target_prefixes):
+            if target_name is int:  # add same value to all objects in list
+                if not is_list_or_tuple(target):
+                    msg = (f'attempt to add to all elements of not a list '
+                           f'{type(target)} target_path was {target_path} '
+                           f'target_name was {target_name}')
+                    raise TypeError(msg)
+                # LOL PYTHON namespaces
+                [AtomicDictOperations.add(subtarget, target_path[i + 1:], value)
+                 for subtarget in target]
+                return  # int terminates this level of an add
+
+            if target_name not in target:  # TODO list indicies XXX that is really append though ...
                 target[target_name] = {}
 
             target = target[target_name]
@@ -590,9 +843,53 @@ class _DictTransformer:
         """
 
         for path, function in updates:
-            value = adops.get(data, path)
+            if int in path:  # unlike adops.add, this has to be implemented in DT
+                pivot = path.index(int)
+                before = path[:pivot]
+                after = path[pivot + 1:]
+                try:
+                    collection = adops.get(data, before)
+                except exc.NoSourcePathError as e:
+                    if source_key_optional:
+                        continue
+                    else:
+                        raise e
+
+                assert is_list_or_tuple(collection)
+
+                if pivot + 1 == len(path):
+                    # have to update list in place not just its elements
+                    # because int is the terminal element in the path
+                    # NOTE this is NOT functional, this modifies in place
+                    _DictTransformer.update(
+                        collection,
+                        # fun rewite here
+                        [[[i], function] for i in range(len(collection))],
+                        source_key_optional=source_key_optional)
+                else:
+                    # nominally safe to run in parallel here
+                    # if python could actually do it
+                    for obj in collection:
+                        _DictTransformer.update(
+                            obj,
+                            [[after, function]],  # construct mini updates spec
+                            source_key_optional=source_key_optional)
+
+                continue
+
+            try:
+                value = adops.get(data, path)
+            except exc.NoSourcePathError as e:
+                if source_key_optional:
+                    continue
+                else:
+                    raise e
+
             new = function(value)
-            adopts.update(data, path, new)
+            if isinstance(new, GeneratorType):
+                new = tuple(new)
+
+            adops.update(data, path, new)  # this will fail if data is immutable
 
     @staticmethod
     def get(data, gets, source_key_optional=False):
@@ -601,7 +898,7 @@ class _DictTransformer:
 
         for source_path in gets:
             yield adops.apply(adops.get, data, source_path,
-                                              source_key_optional=source_key_optional)
+                              source_key_optional=source_key_optional)
 
     @staticmethod
     def pop(data, pops, source_key_optional=False):
@@ -809,6 +1106,9 @@ class _DictTransformer:
                     function(data, target_path, p.data)
                 except BaseException as e:
                     import inspect
+                    if isinstance(pc, object):
+                        pi, pc = pc, pc.__class__
+
                     __file = inspect.getsourcefile(pc)
                     __line = inspect.getsourcelines(pc)[-1]
                     if hasattr(p, 'path'):
@@ -873,12 +1173,22 @@ def normalize_tabular_format(project_path):
                 log.warning(f'Sheet weirdness in {xf}\n{e}')
 
 
-def extract_errors(dict_):
-    for k, v in dict_.items():
-        if k == 'errors':
-            yield from v
-        elif isinstance(v, dict):
-            yield from extract_errors(v)
+def extract_errors(thing, path=None):
+    """ recursively extract errors """
+    if path is None:
+        path = []
+
+    if isinstance(thing, dict):
+        for k, v in thing.items():
+            if k == 'errors':
+                for error in v:
+                    yield tuple(path), error
+            else:
+                yield from extract_errors(v, path + [k])
+
+    elif isinstance(thing, list):
+        for i, v in enumerate(thing):
+            yield from extract_errors(v, path + [i])
 
 
 def get_all_errors(_with_errors):
@@ -888,5 +1198,144 @@ def get_all_errors(_with_errors):
     return list(extract_errors(_with_errors))
 
 
+def get_by_invariant_path(errors):
+    dd = defaultdict(list)
+    for e in errors:
+        k = tuple(int if isinstance(element, int)
+                  else element for element in e['path'])
+        dd[k].append(e)
+
+    by_invariant_path = dict(dd)
+    return by_invariant_path
+
+
+def make_path_error_report(by_invariant_path):
+    # FIXME to obtain the full final path you have to know where
+    # if anywhere the schema being validated is located in the output
+    path_error_report = {JPointer.fromList(['-1' if e is int else str(e)
+                                            # -1 to indicate all instead of *
+                                            for e in k]):
+                         {'error_count': len(v),
+                          'messages': sorted(set(e['message'] for e in v))}
+                         for k, v in by_invariant_path.items()}
+    return path_error_report
+
+
+def hashable_converter(v):
+    try:
+        hash(v)
+        return v
+    except TypeError as e:
+        if isinstance(v, dict):
+            return frozenset((k, hashable_converter(v)) for k, v in v.items())
+        else:
+            # HACK will fail on non iterables
+            return tuple(hashable_converter(v) for v in v)
+
+
+def condense_over_stage(errors):
+    """ condense shadoweded errors into their caster """
+    dd = defaultdict(list)
+    for error in errors:
+        #log.critical(error)
+        new_error = {k:hashable_converter(v) for k, v in error.items()}
+        copy.deepcopy(error)
+        new_error.pop('pipeline_stage', None)
+        if 'schema_path' in new_error:  # XXX non json schema errors
+            sp = new_error['schema_path']
+            if 'inputs' in sp:
+                # account for the fact that inputs are checked twice right now
+                index = sp.index('inputs')
+                new_error['schema_path'] = sp[index + 3:]
+                # FIXME somehow the path and schema_path get misaligned
+
+        dd[hashable_converter(new_error.items())].append(error)
+
+    merged = dict(dd)
+    compacted = []
+    for frozen_new_error, these_errors in merged.items():
+        if len(these_errors) > 1:
+            stages = [e['pipeline_stage'] for e in these_errors]
+            error = copy.deepcopy(these_errors[0])
+            error['pipeline_stage'] = stages
+            error['total_stage_errors'] = len(these_errors)
+            compacted.append(error)
+        else:
+            compacted.extend(these_errors)
+
+    return compacted, merged  # for maximum confusion
+
+
+def merge_error_paths(path_errors):
+    for path, error in path_errors:
+        #log.critical((path, error))
+        error = copy.deepcopy(error)
+        oldpath = list(error['path']) if 'path' in error else []  # XXX non json schema errors
+        error['path'] = list(path) + oldpath
+        yield error
+
+
+def compact_errors(path_errors):
+    """ compact repeated errors in lists by lifting the list index
+        to the int type, making it constaint over all indexes and
+        making it possible to identify paths with the same structure """
+
+    errors = list(merge_error_paths(path_errors))
+    condensed, merged = condense_over_stage(errors)
+    by_invariant_path = get_by_invariant_path(condensed)
+    path_error_report = make_path_error_report(by_invariant_path)
+
+    compacted = []
+    for ipath, these_errors in by_invariant_path.items():
+        if int in ipath:
+            index = ipath.index(int)
+            ints = sorted(set(e['path'][index] for e in these_errors))
+            error = copy.deepcopy(these_errors[0])
+            error['path'][index] = ints
+            error['total_errors'] = len(these_errors)
+            compacted.append(error)
+        else:
+            compacted.extend(these_errors)
+
+    return compacted, path_error_report, by_invariant_path, errors
+
+
 class JPointer(str):
     """ a class to mark json pointers for resolution """
+
+    @staticmethod
+    def pathFromSchema(schema_path):
+        gen = (e for e in schema_path)
+        while True:
+            try:
+                element = next(gen)
+                if element in ('oneOf', 'anyOf', 'allOf'):
+                    next(gen)
+                    continue
+
+                if element == 'properties':
+                    yield next(gen)
+                elif element == 'items':
+                    # NOTE it is ok to use int in cases like this because even
+                    # though it is in principle ambiguous with a case where
+                    # someone happens to be using the python function int
+                    # as a key in a dict they would never be able to serialize
+                    # that to json without some major conversions, so I am
+                    # ruling that it is safe to lift to type here since this
+                    # is JPointer not rando dict pointer
+                    yield int
+
+            except StopIteration:
+                break
+
+    @classmethod
+    def fromList(cls, iterable):
+        return cls('#/' + '/'.join(iterable))
+        
+    def asList(self):
+        return self.split('/')
+
+
+# register idlib classes for fromJson
+[register_type(i, i.__name__) for i in
+ (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm)]

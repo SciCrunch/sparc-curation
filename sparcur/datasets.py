@@ -1,16 +1,15 @@
 import io
-import ast
 import csv
 import copy
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
+import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
 from pyontutils.utils import byCol, Async, deferred, python_identifier
 from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
 from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
-from augpathlib import FileSize
 from . import schemas as sc
 from . import raw_json as rj
 from . import exceptions as exc
@@ -101,12 +100,15 @@ class DatasetMetadata(Path, HasErrors):
     def data(self):
         if self.cache is not None:
             cmeta = self.cache.meta
-            return dict(id=self.cache.id,
-                        meta=dict(folder_name=self.name,
-                                  uri_human=self.cache.uri_human,
-                                  uri_api=self.cache.uri_api,
-                                  timestamp_created=cmeta.created,
-                                  timestamp_updated=cmeta.updated,
+            return dict(
+                id=self.cache.id,
+                meta=dict(
+                    folder_name=self.name,
+                    uri_human=self.cache.uri_human,
+                    uri_api=self.cache.uri_api,
+                    timestamp_created=cmeta.created,
+                    timestamp_updated=cmeta.updated,
+                    timestamp_updated_contents=self.updated_cache_transitive(),
                         ))
         else:
             return dict(id=self.id,
@@ -128,6 +130,21 @@ class DatasetStructure(Path):
     max_childs = 40
     rate = 8  # set by Integrator from cli
     _refresh_on_missing = True
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        DatasetStructure._setup(*args, **kwargs)
+        DatasetStructure.__new__ = DatasetStructure._renew
+        return super().__new__(cls, *args, **kwargs)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        import requests
+        DatasetStructure._requests = requests
 
     @property
     def children(self):
@@ -157,6 +174,13 @@ class DatasetStructure(Path):
 
             setattr(cls, section, sec)
 
+    def files_last_updated(self):
+        # FIXME TODO can we get this more efficiently during pull?
+        all_updated = [c.cache.meta.updated for c in
+                       chain((self,), self.rchildren) if c.is_file()]
+        if all_updated:
+            return max(all_updated)
+
     @property
     def counts(self):
         if not hasattr(self, '_counts'):
@@ -173,10 +197,21 @@ class DatasetStructure(Path):
             for c in gen:
                 if c.is_dir():
                     dirs += 1
+                    maybe_size = 0  # the remote size of a folder is zero for bf
                 else:
                     files += 1  # testing for broken symlinks is hard
                     try:
-                        maybe_size = c.cache.meta.size
+                        if c.is_broken_symlink():
+                            maybe_size = (aug.PathMeta
+                                          .from_symlink(c)
+                                          .size)
+                        else:
+                            maybe_size = (aug.PathMeta
+                                          .from_xattrs(c.xattrs(),
+                                                        prefix='bf')
+                                          .size)
+
+                        #maybe_size = c.cache.meta.size
                     except AttributeError as e:
                         log.error(f'no cache or no meta for {c}\n{e}')
                         continue
@@ -187,9 +222,12 @@ class DatasetStructure(Path):
                         size += maybe_size
 
             if need_meta and self._refresh_on_missing:
+                log.critical(f'OH NO THIS IS GOING TO CAUSE DUPLICATES (probably)\n{self}')
                 nl = '\n'
                 log.info(f'refreshing {len(need_meta)} files with missing metadata in {self}'
                          f'\n{nl.join(_.as_posix() for _ in need_meta)}')
+                breakpoint()
+                raise TypeError('fuck')
                 new_caches = Async(rate=self.rate)(deferred(c.cache.refresh)() for c in need_meta)
                 for c in new_caches:  # FIXME first time around meta doesn't get updated ??
                     if c is None:
@@ -201,7 +239,7 @@ class DatasetStructure(Path):
 
                     size += c.meta.size
 
-            self._counts = dict(size=FileSize(size), dirs=dirs, files=files)
+            self._counts = dict(size=aug.FileSize(size), dirs=dirs, files=files)
 
         return self._counts
 
@@ -294,7 +332,10 @@ class DatasetStructure(Path):
                 if path.is_broken_symlink():
                     log.info(f'fetching unretrieved metadata path {path.as_posix()!r}'
                              '\nFIXME batch these using async in cli export ...')
-                    path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
+                    try:
+                        path.cache.fetch(size_limit_mb=path.cache.meta.size.mb + 1)
+                    except self._requests.exceptions.ConnectionError as e:
+                        raise exc.NetworkFailedForPathError(path) from e
 
                 if path.suffix in path.stem:
                     msg = f'path has duplicate suffix {path.as_posix()!r}'
@@ -305,10 +346,10 @@ class DatasetStructure(Path):
 
                 if path.name[0].isupper():
                     msg = f'path has bad casing {path.as_posix()!r}'
-                    self.addError(msg,
-                                  blame='submission',
-                                  path=path)
-                    logd.error(msg)
+                    if self.addError(msg,
+                                     blame='submission',
+                                     path=path):
+                        logd.error(msg)
 
                 yield path
 
@@ -332,9 +373,9 @@ class DatasetStructure(Path):
             #paths = list(getattr(self, section_paths_name))
             glob_type = 'rglob' if section_name in self.rglobs else 'glob'
             paths = list(self._abstracted_paths(section_name, glob_type=glob_type))
-            section_key = section_name + '_file'
+            section_key = section_name + '_file'  # XXX _file is added here
             if paths:
-                if len(paths) == 1:
+                if len(paths) == 1 and section_name != 'manifest':  # FIXME manifest is a hack
                     path, = paths
                     out[section_key] = path
                 else:
@@ -387,17 +428,17 @@ class Tabular(HasErrors):
                     # LOL THE FILE WITH > 1 million empty rows, 8mb of commas
                     # totally the maximum errors champion
                     message = f'There are {diff} empty rows in {self.path.as_posix()!r}'
-                    self.addError(message,
-                                  logfunc=logd.error,
-                                  blame='submission',
-                                  path=self.path)
+                    if self.addError(message,
+                                     blame='submission',
+                                     path=self.path):
+                        logd.error(message)
 
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
-                    self.addError(exc.EncodingError(message),
-                                  blame='submission',
-                                  path=self.path)
-                    logd.error(message)
+                    if self.addError(exc.EncodingError(message),
+                                     blame='submission',
+                                     path=self.path):
+                        logd.error(message)
 
                 yield from rows
                 return
@@ -406,15 +447,15 @@ class Tabular(HasErrors):
             except csv.Error as e:
                 logd.exception(e)
                 message = f'WHAT HAVE YOU DONE {e!r} {self.path.as_posix()!r}'
-                self.addError(message,
-                              blame='EVERYONE',
-                              path=self.path)
-                logd.error(message)
+                if self.addError(message,
+                                 blame='EVERYONE',
+                                 path=self.path):
+                    logd.error(message)
 
     def xlsx(self):
         kwargs = {
-            'delimiter' : '\t',
-            'skip_empty_lines' : True,
+            'delimiter': '\t',
+            'skip_empty_lines': True,
             'outputencoding': 'utf-8',
             'hyperlinks': True,
         }
@@ -427,10 +468,10 @@ class Tabular(HasErrors):
         ns = len(xlsx2csv.workbook.sheets)
         if ns > 1:
             message = f'too many sheets ({ns}) in {self.path.as_posix()!r}'
-            self.addError(exc.EncodingError(message),
-                          blame='submission',
-                          path=self.path)
-            logd.error(message)
+            if self.addError(exc.EncodingError(message),
+                             blame='submission',
+                             path=self.path):
+                logd.error(message)
 
         f = io.StringIO()
         try:
@@ -439,8 +480,17 @@ class Tabular(HasErrors):
             gen = csv.reader(f, delimiter='\t')
             yield from gen
         except SheetNotFoundException as e:
-            log.warning(f'Sheet weirdness in{self.path}')
+            log.warning(f'Sheet weirdness in {self.path}')
             log.warning(str(e))
+        except AttributeError as e:
+            message = ('Major sheet weirdness (maybe try resaving, '
+                       'probably a bug in the xlsx2csv converter)? '
+                       f'in {self.path}')
+            if self.addError(exc.EncodingError(message),
+                             blame='submission',
+                             path=self.path):
+                log.exception(e)
+                logd.critical(message)
 
     def _bad_filetype(self, type_):
         message = f'bad filetype {type_}\n{self.path.as_posix()!r}'
@@ -459,7 +509,7 @@ class Tabular(HasErrors):
         cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
         for row in cleaned_rows:
             n_row = [c.strip().replace('\ufeff', '') for c in row
-                     if (not self.addError(error, logfunc=logd.error)  # FIXME will probably append multiple ...
+                     if ((not logd.error(error) if self.addError(error) else True)  # FIXME will probably append multiple ...
                          if '\ufeff' in c else True)]
             if not all(not(c) for c in n_row):  # skip totally empty rows
                 yield n_row
@@ -481,7 +531,12 @@ class Tabular(HasErrors):
     def _iter_(self, normalize=False):
         try:
             if normalize:
-                gen = self.normalize(getattr(self, self.file_extension)())
+                try:
+                    fef = getattr(self, self.file_extension)
+                except AttributeError as e:
+                    self._bad_filetype(self.file_extension)
+
+                gen = self.normalize(fef())
             else:
                 gen = getattr(self, self.file_extension)()
 
@@ -779,7 +834,7 @@ class MetadataFile(HasErrors):
                   for k, v in transformed.items()}
         return culled
 
-    def _transformed(self):
+    def _transformed(self):  # FIXME this whole approach makes it very difficult to test individual stages
         keyed = self._keyed()
         naccounted_baseline = set(e for g in self.groups_alt.values()
                                   if g != GROUP_ALL for e in g)
@@ -851,6 +906,7 @@ class MetadataFile(HasErrors):
         for n, rtk, norm_dict in (('alt_header', self.record_type_key_alt, self.norm_to_orig_alt),
                                   ('header', self.record_type_key_header, self.norm_to_orig_header)):
             if rtk not in norm_dict:
+                #breakpoint()  # XXX TODO enable this on debug
                 msg = (f'Could not find record primary key for {n} in\n"{self.path}"\n\n'
                        f'{rtk}\nnot in\n{list(norm_dict)}')
 
@@ -869,9 +925,18 @@ class MetadataFile(HasErrors):
         # there are very likely to be duplicate keys
         gen = self._headers()
 
+        indexes = {}
         def normb(k):
             if k in self.orig_to_norm_alt:
                 nk = self.orig_to_norm_alt[k]
+                if isinstance(nk, tuple):
+                    if k in indexes:
+                        indexes[k] += 1
+                    else:
+                        indexes[k] = 0
+
+                    return nk[indexes[k]]  # this is safe because _headers is ordered
+
             else:
                 nk = k
 
@@ -881,6 +946,20 @@ class MetadataFile(HasErrors):
             yield (normb(row[0]), *row[1:])
 
     def _headers(self):
+        def safe_invert(d):
+            out = {}
+            for v, k in d.items():
+                if k in out:
+                    ev = out[k]
+                    if isinstance(ev, tuple):
+                        out[k] += (v,)
+                    else:
+                        out[k] = (ev, v)
+                else:
+                    out[k] = v
+
+            return out
+
         t = self._t()
 
         if self.default_record_type == ROW_TYPE:
@@ -904,7 +983,7 @@ class MetadataFile(HasErrors):
 
         self._alt_header = Header(self.alt_header, normalize=self.normalize_alt)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
-        self.orig_to_norm_alt = {v:k for k, v in self.norm_to_orig_alt.items()}
+        self.orig_to_norm_alt = safe_invert(self.norm_to_orig_alt)
 
         if self.primary_key_rule is not None:
             nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
@@ -917,7 +996,7 @@ class MetadataFile(HasErrors):
         self.header = next(gen)
         self._header = Header(self.header, normalize=self.normalize_header)
         self.norm_to_orig_header = self._header.lut(**self.renames_header)
-        self.orig_to_norm_header = {v:k for k, v in self.norm_to_orig_header.items()}
+        self.orig_to_norm_header = safe_invert(self.norm_to_orig_header)
 
         yield self.header
         yield from gen
@@ -974,7 +1053,8 @@ SubmissionFilePath._bind_flavours()
 _props = sc.DatasetDescriptionSchema.schema['properties']
 _props2 = sc.ContributorSchema.schema['properties']  # FIXME recurse ...
 _nddfes = [k for k, v in chain(_props.items(), _props2.items())
-           if isinstance(v, dict) and 'type' in v and v['type'] not in ('array',)]
+           if isinstance(v, dict) and sc.not_array(v)]
+_nddfes = sorted(set(_nddfes))
 
 
 class DatasetDescriptionFile(MetadataFile):
@@ -996,6 +1076,7 @@ class DatasetDescriptionFile(MetadataFile):
                                'example_image_description'),}
 
     ignore_header = 'metadata_element', 'example', 'description_header'
+    raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
     _expect_single = _nddfes
 
@@ -1015,10 +1096,11 @@ DatasetDescriptionFilePath._bind_flavours()
 
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
 _props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
-_nsffes = [k for k, v in chain(_props.items(), _props2.items())
-           if isinstance(v, dict) and ('type' in v and v['type'] not in ('array',)
-                                       # FIXME hack to get UnitsSchema in
-                                       or 'oneOf' in v)]
+_props3 = sc._software_schema['items']['properties']
+_nsffes = [k for k, v in chain(_props.items(), _props2.items(), _props3.items())
+           if isinstance(v, dict) and sc.not_array(v)]
+_nsffes = sorted(set(_nsffes))
+
 
 class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE
@@ -1088,6 +1170,7 @@ class SamplesFile(SubjectsFile):
                       'handedness': 'right',}]]
     normalization_class = nml.NormSamplesFile
     normalize_header = False
+    _expect_single = _nsffes
 
 
 class SamplesFilePath(ObjectPath):
@@ -1097,9 +1180,12 @@ class SamplesFilePath(ObjectPath):
 SamplesFilePath._bind_flavours()
 
 
-class ManifestFile:
-    def __init__(self, path):
-        self.path = path
+class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
+    renames_header = {'filename': 'metadata_element',}
+    record_type_key_alt = 'filename'
+    record_type_key_header = 'metadata_element'
+    groups_alt = {'manifest_records': GROUP_ALL}
+    normalize_header = False
 
 
 class ManifestFilePath(ObjectPath):
@@ -1109,6 +1195,7 @@ class ManifestFilePath(ObjectPath):
 ManifestFilePath._bind_flavours()
 
 
+# XXX NOTE *_file is added to all of these keys in DatasetStructure.data
 DatasetStructure.sections = {'submission': SubmissionFilePath,
                              'dataset_description': DatasetDescriptionFilePath,
                              'subjects': SubjectsFilePath,

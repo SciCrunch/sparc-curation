@@ -1,5 +1,8 @@
+import ast
 import copy
 import json
+import types
+import inspect
 from functools import wraps
 import jsonschema
 
@@ -8,18 +11,155 @@ from pathlib import PurePath
 import idlib
 import rdflib
 import requests
-from pyontutils.core import OntId, OntTerm
-from pysercomb.pyr.core import Expr
+import ontquery as oq
+from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
 from sparcur.utils import logd
-from sparcur.core import JEncode
+from sparcur.core import JEncode, JApplyRecursive, JPointer, OntCuries
+from pyontutils.utils import asStr
+from pyontutils.namespaces import TEMP, TEMPRAW, sparc, unit, PREFIXES as uPREFIXES, ilxtr
+
+
+CONTEXT_ROOT = object()  # used to mark where nested context_value statements should be deposited
+prefix_endswith = ['/', '#', '_', '-', ':', '=',
+                   '/fma', '/sao', 'PTHR', '/chebi#2', '/chebi#3',]
+
+base_context = {
+    '@version': 1.1,
+    'id': '@id',
+    'dataset': {'@id': 'https://api.blackfynn.io/datasets/N:dataset:', '@prefix': True},
+    'package': {'@id': 'https://api.blackfynn.io/packages/N:package:', '@prefix': True},
+    # @base and _bfc are added at runtime and are dataset:{dataset-id-suffix}
+    'meta': '@graph',
+    #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
+    'subjects': 'TEMP:hasSubGraph',  #'_bfc:#subjects-graph',  # FIXME I think the fragment is the right thing to do here ...
+    'samples': 'TEMP:hasSubGraph',  #'_bfc:#samples-graph',
+    'contributors': '_bfc:#contributors-graph',  # FIXME broken I think
+    #'N:dataset': {'@id': 'https://api.blackfynn.io/datasets/'},  # darn it multiprefix issues
+    **{p: {'@id': n, '@prefix': True}
+       if [c for c in prefix_endswith if n.endswith(c)]
+       else n for p, n in {**uPREFIXES, **OntCuries._dict}.items()
+       if p != ''},  # FIXME massive data duplication
+    'unit': {'@id': 'TEMP:hasUnit',
+             '@type': '@id',
+             '@context': {'@base': str(unit)}},
+    'value': {'@id': 'rdf:value'},  # FIXME maybe include this in a dedicated quantity @context?
+    'type': {'@id': 'ilxtr:jsonRecordType',  # FIXME ...
+             '@type': '@id',
+             '@context': {'@base': str(ilxtr['sparcur/types/'])},},
+    'quantity': 'sparc:Measurement',  # for some reason this isn't working, and is captured by @base
+    #'identifier': 'owl:Class',
+    'system': {'@id': 'ilxtr:identifierType',  # FIXME see what predicate we used for this
+               '@type': '@id',
+               '@context': {'@base': str(ilxtr['idlib/systems/'])},},
+    'OntTerm': 'owl:Class',
+    #'uri_api': {'@id': '@id', '@type': '@id'},  # klobbered below, now fixed
+}
+
+
+def json_version(version):
+    """ version should be a branch or a release tag e.g. schema-0.0.1 """
+    return {
+        '$schema': 'http://json-schema.org/draft-06/schema#',
+        '$id': ('https://raw.githubusercontent.com/SciCrunch/sparc-curation/'
+                f'{version}/resources/defs.schema.json'),
+        'title': 'Common definitions for the SDS json schemas, including mappings to json-ld @context',
+        'description': 'JSON-LD mappings are under the `context_value` key by convention',
+        '@context': {
+            'sparc': str(sparc),
+            'TEMP': str(TEMP),
+            'TEMPRAW': str(TEMPRAW),
+        },
+        'definitions': {
+            'patterns': {
+                'metadata_filename': metadata_filename_pattern,
+                'simple_url': simple_url_pattern ,
+                #'doi': idlib.Doi._id_class.canonical_regex,
+                #'orcid': idlib.Orcid._id_class.canonical_regex,
+                #'ror': idlib.Ror._id_class.canonical_regex,
+            'iso8601_date': iso8601datepattern,
+                'iso8601_datetime': iso8601pattern,
+                'whitespace_lead_trail': pattern_whitespace_lead_trail,
+            },
+            'NoLTWhitespace': NoLTWhitespaceSchema.schema,
+            'EmbeddedIdentifier': EmbeddedIdentifierSchema.schema,
+
+        'meta': MetaOutExportSchema.schema,
+            'prov': ProvSchema.schema,
+            'errors': ErrorSchema.schema,
+            'contributor': ContributorOutExportSchema.schema,
+            'subject': SubjectExportSchema.schema,
+            'sample': SampleExportSchema.schema,
+            'dataset_description_file': DatasetDescriptionSchema.schema,
+            'submission_file': SubmissionSchema.schema,
+            'subjects_file': SubjectsSchema.schema,
+            'samples_file': SamplesFileSchema.schema,
+            'dataset': {
+                'meta': {'$ref': '#/definitions/meta'},
+                'prov': {'$ref': '#/definitions/prov'},
+                'errors': {'$ref': '#/definitions/errors'},
+                'contributor': {'$ref': '#/definitions/contributor'},
+                'subject': {'$ref': '#/definitions/subject'},
+                'sample': {'$ref': '#/definitions/sample'},
+                'dataaset_description_file': {'$ref': '#/definitions/dataaset_description_file'},
+                'submission_file': {'$ref': '#/definitions/submission_file'},
+                'subjects_file': {'$ref': '#/definitions/subjects_file'},
+                'samples_file': {'$ref': '#/definitions/samples_file'},
+                'errors': {'$ref': '#/definitions/errors'},
+            }
+        }
+    }
+
+
+def _defunc(obj, *args, path=None, **kwargs):  # FIXME add tests
+    if isinstance(obj, types.FunctionType):
+        return asStr(ast.parse(inspect.getsource(obj).strip().strip(',')))
+    else:
+        return obj
+
+
+def update_include_paths(obj, *args, path=None, key='jsonld_include', moves=tuple(), collect=tuple()):
+    """ collect json pointers that need to be updated """
+    if isinstance(obj, dict) and key in obj:
+        path = list(JPointer.pathFromSchema(path))
+        for frm, to in moves:  # sigh python
+            lf = len(frm)
+            if path[:lf] == frm:
+                path = to + path[lf:]
+                break
+
+        for key, value in obj[key].items():
+            path.append(key)
+            collect.append((path, lambda _: value))  # note that collect is really a list
+            # note also that lambda _: value is because pipeline adds currently calls into lifters
+
+    return obj  # have to return this otherwise somehow everything is turned to None?
+
+
+def idtype(id, base=None):
+    out = {'@id': id, '@type': '@id'}
+    if base:
+        out['@context'] = {'@base': str(base)}
+
+    return out
+
+
+def strcont(id):
+    return {'type': 'string', 'context_value': id}
+
+
+def inttype(id):
+    return {'@id': id, '@type': 'xsd:integer'}
 
 
 def not_array(schema, in_all=False):
     """ hacked way to determine that the blob in question cannot be an array """
     return ('type' in schema and schema['type'] != 'array' or
+            'properties' in schema and 'items' not in schema or
             # FIXME hack hard to maintain
             'allOf' in schema and all(not_array(s, True) for s in schema['allOf']) or
+            'oneOf' in schema and all(not_array(s, True) for s in schema['oneOf']) or
+            'anyOf' in schema and all(not_array(s, True) for s in schema['anyOf']) or
             'not' in schema and (not not_array(schema['not'], in_all) or in_all)
     )
 
@@ -67,7 +207,7 @@ class hproperty:
 class HasSchema:
     """ decorator for classes with methods whose output can be validated by jsonschema """
     def __init__(self, input_schema_class=None, fail=True, normalize=False):
-        self.input_schema = input_schema_class() if input_schema_class is not None else None
+        self.input_schema_class = input_schema_class
         self.fail = fail
         self.normalize = normalize
         self.schema = None  # deprecated output schema ...
@@ -75,12 +215,17 @@ class HasSchema:
     def mark(self, cls):
         """ note that this runs AFTER all the methods """
 
-        if self.input_schema is not None:
+        if self.input_schema_class is not None:
             # FIXME probably better to do this as types
             # and check that schemas match at class time
             cls._pipeline_start = cls.pipeline_start
+
             @hproperty
-            def pipeline_start(self, schema=self.input_schema, fail=self.fail):
+            def pipeline_start(self, isc=self.input_schema_class, fail=self.fail):
+                if pipeline_start.schema == isc:
+                    pipeline_start.schema = isc()
+
+                schema = pipeline_start.schema
                 data = self._pipeline_start
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok and fail:
@@ -88,7 +233,7 @@ class HasSchema:
 
                 return data
 
-            pipeline_start.schema = self.input_schema
+            pipeline_start.schema = self.input_schema_class
             cls.pipeline_start = pipeline_start
 
         return cls
@@ -109,11 +254,14 @@ class HasSchema:
 
     def __call__(self, schema_class, fail=False, _property=True):
         # TODO switch for normalized output if value passes?
-        schema = schema_class()
         def decorator(function):
             pipeline_stage_name = function.__qualname__
             @wraps(function)
             def schema_wrapped_property(_self, *args, **kwargs):
+                if schema_wrapped_property.schema == schema_class:
+                    schema_wrapped_property.schema = schema_class()
+
+                schema = schema_wrapped_property.schema
                 data = function(_self, *args, **kwargs)
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
@@ -131,7 +279,8 @@ class HasSchema:
                         
                     data['errors'] += norm_or_error.json(pipeline_stage_name)
                     # TODO make sure the step is noted even if the schema is the same
-                elif self.normalize:
+
+                if self.normalize:
                     return norm_or_error
 
                 return data
@@ -139,8 +288,9 @@ class HasSchema:
             if _property:
                 schema_wrapped_property = hproperty(schema_wrapped_property)
 
-            schema_wrapped_property.schema = schema
+            schema_wrapped_property.schema = schema_class
             return schema_wrapped_property
+
         return decorator
 
 
@@ -161,12 +311,12 @@ class JSONSchema(object):
     string_types = [  # add more types here
         str,
         PurePath,
-        idlib.Stream,
+        idlib.Stream,  # FIXME str/dict
         rdflib.URIRef,
         rdflib.Literal,
-        OntId,
-        OntTerm,
-        Expr,
+        oq.OntId,
+        oq.OntTerm,  # FIXME str/dict
+        ProtcurExpression,
     ]
 
     def __init__(self):
@@ -202,6 +352,15 @@ class JSONSchema(object):
         pop_errors(schema)
         cls._add_meta(schema)
 
+        def debug(obj, *args, path=None, **kwargs):
+            if isinstance(obj, types.FunctionType):
+                raise TypeError(path + [obj])
+            else:
+                return obj
+
+        schema = JApplyRecursive(_defunc, schema)
+        JApplyRecursive(debug, schema)
+
         with open((base_path / cls.__name__).with_suffix('.json'), 'wt') as f:
             json.dump(schema, f, sort_keys=True, indent=2)
 
@@ -226,19 +385,122 @@ class JSONSchema(object):
         except exc.ValidationError as e:
             return False, e, data  # FIXME better format
 
+    @classmethod
+    def context(cls):
+        """ return a json-ld context by extracting annotations from nested schemas
+            those annotations are currently placed under the `context_value' key """
+        # FIXME last one wins right now
+        #context_runtimes = {}
+        context = {}
+        marker = 'context_value'
+        #marker_runtime = 'context_runtime'
+        def inner(schema, key=None):
+            if isinstance(schema, dict):
+                if marker in schema:
+                    if key is None:
+                        raise ValueError('you probably don\'t want to do this ...')
 
-class RemoteSchema(JSONSchema):
-    schema = ''
+                    context_value = schema[marker]
+                    context[key] = context_value
+
+                #if marker_runtime in schema:
+                    #if key is None:
+                        #raise ValueError('you probably don\'t want to do this ...')
+
+                    #context_runtimes[key] = schema[marker_runtime]
+
+                for k, v in schema.items():
+                    if k == marker:
+                        continue
+                    inner(v, k)
+
+            elif isinstance(schema, list):
+                for ss in schema:
+                    inner(ss, key)
+
+            else:
+                pass
+
+        inner(cls.schema)
+
+        #if context:  # if there is no context do not add version
+            #context.update(base_context)
+
+        #if context_runtimes:
+            #def context_runtime(base):
+                #return {k: v(base) for k, v in context_runtimes.items()}
+
+        return context
+
+
+class JsonLdHelperSchema(JSONSchema):
+    """ documentation of the additions to the json schema draft validator schema
+        that are used for transformation to jsonld """
+    schema = {
+        'properties': {
+            'jsonld_includes': {'type': 'object'},
+            'context_value': {'oneOf': [
+                # re https://github.com/json-ld/json-ld.org/issues/612
+                # https://github.com/json-ld/json-ld.org/blob/master/schemas/jsonld-schema.json
+                {'type': 'string'},  # TODO are there any restrictions? string -> @base/string ?
+                {'type': 'object'},  # TODO this should conform to the jsonld schema for @context
+            ]}
+        }
+    }
+
+
+class RuntimeSchema(JSONSchema):
+    """ finally a zero (runtime) cost first time only init
+    with reasonable debugability and readability """
+
+    schema = None
+
     def __new__(cls):
-        if isinstance(cls.schema, str):
-            cls.schema = requests.get(cls.schema).json()
-
         return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        cls.setup(*args, **kwargs)
+        cls.__new__ = cls._renew
+        return super().__new__(cls)
+
+    def __init__(self):
+        super().__init__()
+
+    _reinit = __init__
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.__class__.__init__ = self.__class__._reinit
+
+    @classmethod
+    def setup(cls):
+        raise NotImplementedError('subclassit')
+
+
+class RemoteSchema(RuntimeSchema):
+    schema = ''
+    # FIXME TODO these need to be cached locally
+    @classmethod
+    def setup(cls):
+        cls.schema = requests.get(cls.schema).json()
 
 
 class ApiNATOMYSchema(RemoteSchema):
     schema = ('https://raw.githubusercontent.com/open-physiology/'
               'open-physiology-viewer/master/src/model/graphScheme.json')
+
+
+class ToExport(RuntimeSchema):
+    """ version should match the github release tag i.e. schema-0.0.1 """
+
+    @classmethod
+    def setup(cls, version=None):
+        if version is None:
+            version = 'master'
+        #cls.schema = JApplyRecursive(_defunc, json_version(version))
+        cls.schema = json_version(version)
 
 
 metadata_filename_pattern = r'^.+\/[a-z_\/]+\.(xlsx|csv|tsv|json)$'
@@ -247,14 +509,14 @@ simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
 # NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
+iso8601datepattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]'
 
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
-doi_pattern = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
+doi_pattern = idlib.Doi._id_class.canonical_regex
 
-orcid_pattern = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
-                 '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
+orcid_pattern = idlib.Orcid._id_class.canonical_regex
 
-ror_pattern = ('^https://ror.org/0[0-9a-z]{6}[0-9]{2}$')
+ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
@@ -275,35 +537,78 @@ class ErrorSchema(JSONSchema):
               'items': {'type': 'object'},}
 
 
+
+def make_id_schema(cls, pattern=None, format=None):
+    id_schema = {'type': 'string'}
+    if format is not None:
+        id_schema['format'] = format
+
+    if pattern is not None:
+        id_schema['pattern'] = pattern
+    elif hasattr(cls, '_id_class') and hasattr(cls._id_class, 'canonical_regex'):
+        id_schema['pattern'] = cls._id_class.canonical_regex
+
+    class _IdSchema(JSONSchema):
+        __name__ = cls.__name__ + 'Schema'
+        schema = {'properties': {'system': {'type': 'string',
+                                            'enum': [cls.__name__],},
+                                 'id': id_schema},}
+
+    return _IdSchema
+
+
+OntTermSchema = make_id_schema(oq.OntTerm, format='iri')
+DoiSchema = make_id_schema(idlib.Doi)
+RorSchema = make_id_schema(idlib.Ror)
+OrcidSchema = make_id_schema(idlib.Orcid)
+PioSchema = make_id_schema(idlib.Pio)
+RridSchema = make_id_schema(idlib.Rrid)
+
+
 class EmbeddedIdentifierSchema(JSONSchema):
-    schema = {'allOf':
-              [{'type': 'object',
-                'required': ['type', 'id', 'label'],
-                'properties': {
-                       'lable': {'type': 'string'},
-                       'synonyms': {'type': 'array',
-                                    'minItems': 1},},},
-               {'oneOf': [
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['OntTerm']},
-                                   'id': {'type': 'string',
-                                          'format': 'iri'}}},
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['Ror']},
-                                   'id': {'type': 'string',
-                                          'pattern': ror_pattern}}},
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['Orcid']},
-                                   'id': {'type': 'string',
-                                          'pattern': orcid_pattern}}},
-                   {'properties': {'type': {'type': 'string',
-                                            'enum': ['Doi']},  # TODO
-                                   'id': {'type': 'string',
-                                          'pattern': doi_pattern}}},
+    schema = {'type': 'object',
+              'required': ['type', 'id', 'label'],
+              'properties': {
+                  'id': {'type': 'string'},
+                  'type': {'type': 'string',
+                           'enum': ['identifier']},
+                  'system': {'type': 'string'},
+                  'label': {'type': 'string'},
+                  'synonyms': {'type': 'array',
+                               'minItems': 1},
+                  # NOTE: description is the normalized form name ofr
+                  # ontology term definitions
+                  'description': {'type': 'string'},},}
 
-               ]}]}
+    @classmethod
+    def _to_pattern(cls, obj, *args, path=None, **kwargs):  # FIXME add tests
+        if (isinstance(obj, dict) and
+            'allOf' in obj and
+            (len(obj) == 1 or len(obj) == 2 and 'context_value' in obj) and  # FIXME extremely brittle
+            len(obj['allOf']) == 2 and
+            obj['allOf'][0] == cls.schema):
+            return obj['allOf'][1]['properties']['id']
+
+        else:
+            return obj
+
+    @classmethod
+    def _allOf(cls, schema, context_value=None):
+        ao = {'allOf': [cls.schema, schema.schema,]}
+        if context_value:
+            ao['context_value'] = context_value
+
+        return ao
+
+    @classmethod
+    def allOf(cls, schema_):
+        class _SCM(JSONSchema):
+            schema = cls._allOf(schema_)  # LOL PYTHON
+
+        return _SCM
 
 
+EIS = EmbeddedIdentifierSchema
 EISs = EmbeddedIdentifierSchema.schema
 
 
@@ -337,61 +642,78 @@ class ProvSchema(JSONSchema):
 
 
 class MbfTracingSchema(JSONSchema):
-    schema = {'type': 'object',
-              'required': ['subject', 'atlas', 'images', 'contours'],
-              'properties': {'subject': {'type': 'object',
-                                         'required': ['id'],
-                                         'properties': {'id': {'type': 'string'},
-                                                        'species': {'type': 'string'},
-                                                        'sex': {'type': 'string'},
-                                                        'age': {'type': 'string'},
-                                         },},
-                             'atlas': {'type': 'object',
-                                       'properties': {'organ': {'type': 'string'},
-                                                      'atlas_label': {'type': 'string'},
-                                                      'atlas_rootid': {'type': 'string'},
+    schema = {
+        'type': 'object',
+        'required': ['subject', 'atlas', 'images', 'contours'],
+        'properties': {
+            'subject': {'type': 'object',
+                        'required': ['id'],
+                        'properties': {'id': {'type': 'string'},
+                                       'species': {'type': 'string'},
+                                       'sex': {'type': 'string'},
+                                       'age': {'type': 'string'},
                                        },},
-                             'images': {'type': 'array',
-                                        'items': {'type': 'object',
-                                                  'properties':
-                                                  {'path_mbf': {'type': 'string'},
-                                                   'channels':
-                                                   {'type': 'array',
-                                                    'items': {
-                                                        'type': 'object',
-                                                        'properties': {'id': {'type': 'string'},
-                                                                       'source': {'type': 'string'},
-                                                        },},},},},},
-                             'contours': {'type': 'array',
-                                          'items': {'type': 'object',
-                                                    'properties': {
-                                                        'name': string_noltws,
-                                                        'guid': {'type': 'string'},
-                                                        'id_ontology': {'type': 'string'},},
+            'atlas': {'type': 'object',
+                      'properties': {'organ': {'type': 'string'},
+                                     'atlas_label': {'type': 'string'},
+                                     'atlas_rootid': {'type': 'string'},
+                                     },},
+            'images': {'type': 'array',
+                       'items': {'type': 'object',
+                                 'properties':
+                                 {'path_mbf': {
+                                     'type': 'array',
+                                     'minItems': 1,
+                                     'items': {'type': 'string'}},
+                                  'channels': {
+                                      'type': 'array',
+                                      'items': {
+                                          'type': 'object',
+                                          'properties': {
+                                              'id': {'type': 'string'},
+                                              'source': {'type': 'string'},
+                                          },},},},},},
+            'contours': {'type': 'array',
+                         'items': {'type': 'object',
+                                   'properties': {
+                                       'name': string_noltws,
+                                       'guid': {'type': 'string'},
+                                       'id_ontology': {'type': 'string'},},
+                                   },},},}
 
-                                          },},},}
+
+class NeurolucidaSchema(JSONSchema):
+    schema = copy.deepcopy(MbfTracingSchema.schema)
+    schema['required'] = ['images', 'contours']
 
 
 class DatasetStructureSchema(JSONSchema):
     __schema = {'type': 'object',
                 'required': ['submission_file', 'dataset_description_file'],
-                'properties': {'submission_file': {'type': 'string',
-                                                   'pattern': metadata_filename_pattern},
-                               'dataset_description_file': {'type': 'string',
-                                                            'pattern': metadata_filename_pattern},
-                               'subjects_file': {'type': 'string',
+                'properties': {
+                    'submission_file': {'type': 'string',
+                                        'pattern': metadata_filename_pattern},
+                    'dataset_description_file': {'type': 'string',
                                                  'pattern': metadata_filename_pattern},
-                               'samples_file': {'type': 'string',
-                                                'pattern': metadata_filename_pattern},
-                               #'path_structure': {'type': 'array',
-                                                 # 'items': {'type': 'string', 'pattern': ''}}
-                               'dirs': {'type': 'integer',
-                                        'minimum': 0},
-                               'files': {'type': 'integer',
-                                         'minimum': 0},
-                               'size': {'type': 'integer',
-                                        'minimum': 0},
-                               'errors': ErrorSchema.schema,
+                    'subjects_file': {'type': 'string',
+                                      'pattern': metadata_filename_pattern},
+                    'samples_file': {'type': 'string',
+                                     'pattern': metadata_filename_pattern},
+                    'manifest_file': {'type': 'array',
+                                      'minItems': 1,
+                                      'items': {
+                                          'type': 'string',
+                                          'pattern': metadata_filename_pattern},
+                                      },
+                    #'path_structure': {'type': 'array',
+                    # 'items': {'type': 'string', 'pattern': ''}}
+                    'dirs': {'type': 'integer',
+                             'minimum': 0},
+                    'files': {'type': 'integer',
+                              'minimum': 0},
+                    'size': {'type': 'integer',
+                             'minimum': 0},
+                    'errors': ErrorSchema.schema,
                 }}
     schema = {'allOf': [__schema,
                         {'anyOf': [
@@ -399,52 +721,72 @@ class DatasetStructureSchema(JSONSchema):
                             {'required': ['samples_file']}]}]}
 
 
+class ContributorExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Person', 'owl:NamedIndividual']},
+        'properties': {
+            'id': {'type': 'string',  # FIXME TODO
+                   },
+            'affiliation': EIS._allOf(RorSchema,
+                                      context_value=idtype('TEMP:hasAffiliation')),
+            'contributor_name': {'type': 'string'},
+            'first_name': {'type': 'string',
+                           'context_value': 'sparc:firstName',},
+            'middle_name': strcont('TEMP:middleName'),
+            'last_name': {'type': 'string',
+                          'context_value': 'sparc:lastName',},
+            'contributor_orcid_id': EIS._allOf(OrcidSchema, context_value=idtype('sparc:hasORCIDId')),
+            'blackfynn_user_id': strcont(idtype('TEMP:hasBlackfynnUserId')),
+            'contributor_affiliation': {'anyOf': [EIS._allOf(RorSchema),
+                                                  {'type': 'string'}],
+                                        'context_value': idtype('TEMP:hasAffiliation')
+                                        },
+            'contributor_role': {
+                'type':'array',
+                'context_value': idtype('TEMP:hasRole', base=str(TEMP)),
+                'minItems': 1,
+                'items': {
+                    'type': 'string',
+                    'enum': ['ContactPerson',
+                             'Creator',  # allowed here, moved later
+                             'DataCollector',
+                             'DataCurator',
+                             'DataManager',
+                             'Distributor',
+                             'Editor',
+                             'HostingInstitution',
+                             'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
+                             'CoInvestigator', # added for sparc, to distingusih ResponsibleInvestigator
+                             'Producer',
+                             'ProjectLeader',
+                             'ProjectManager',
+                             'ProjectMember',
+                             'RegistrationAgency',
+                             'RegistrationAuthority',
+                             'RelatedPerson',
+                             'Researcher',
+                             'ResearchGroup',
+                             'RightsHolder',
+                             'Sponsor',
+                             'Supervisor',
+                             'WorkPackageLeader',
+                             'Other',]}
+            },
+            'is_contact_person': {'type': 'boolean'},
+            'errors': ErrorSchema.schema,
+        }}
+
+
 class ContributorSchema(JSONSchema):
-    schema = {'type': 'object',
-              'properties': {
-                  'contributor_name': {'type': 'string'},
-                  'first_name': {'type': 'string'},
-                  'last_name': {'type': 'string'},
-                  'contributor_orcid_id': {'type': 'string',
-                                           'pattern': orcid_pattern},
-                  'contributor_affiliation': {'type': 'string'},
-                  'contributor_role': {
-                      'type':'array',
-                      'minItems': 1,
-                      'items': {
-                          'type': 'string',
-                          'enum': ['ContactPerson',
-                                   'Creator',  # allowed here, moved later
-                                   'DataCollector',
-                                   'DataCurator',
-                                   'DataManager',
-                                   'Distributor',
-                                   'Editor',
-                                   'HostingInstitution',
-                                   'PrincipalInvestigator',  # added for sparc map to ProjectLeader probably?
-                                   'CoInvestigator', # added for sparc, to distingusih ResponsibleInvestigator
-                                   'Producer',
-                                   'ProjectLeader',
-                                   'ProjectManager',
-                                   'ProjectMember',
-                                   'RegistrationAgency',
-                                   'RegistrationAuthority',
-                                   'RelatedPerson',
-                                   'Researcher',
-                                   'ResearchGroup',
-                                   'RightsHolder',
-                                   'Sponsor',
-                                   'Supervisor',
-                                   'WorkPackageLeader',
-                                   'Other',]}
-                  },
-                  'is_contact_person': {'type': 'boolean'},
-                  'errors': ErrorSchema.schema,
-              }}
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(ContributorExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
-class ContributorsSchema(JSONSchema):
+class ContributorsExportSchema(JSONSchema):
     schema = {'type': 'array',
+              #'context_runtime': lambda base: {'@id': f'{base}contributors',},
               'contains': {
                   'type': 'object',
                   'required': ['is_contact_person'],
@@ -452,33 +794,58 @@ class ContributorsSchema(JSONSchema):
                       'is_contact_person': {'type': 'boolean', 'enum': [True]},
                   },
               },
-              'items': ContributorSchema.schema,
+              'items': ContributorExportSchema.schema,
             }
 
+class ContributorsSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(ContributorsExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
-class ContributorOutSchema(JSONSchema):
-    schema = copy.deepcopy(ContributorSchema.schema)
+
+class ContributorOutExportSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorExportSchema.schema)
     schema['properties']['contributor_role']['items']['enum'].remove('Creator')
 
 
-class ContributorsOutSchema(JSONSchema):
-    schema = copy.deepcopy(ContributorsSchema.schema)
-    schema['items'] = ContributorOutSchema.schema
+class ContributorsOutExportSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorsExportSchema.schema)
+    schema['items'] = ContributorOutExportSchema.schema
 
 
-class CreatorSchema(JSONSchema):
-    schema = copy.deepcopy(ContributorSchema.schema)
+class CreatorExportSchema(JSONSchema):
+    schema = copy.deepcopy(ContributorExportSchema.schema)
+    schema.pop('jsonld_include')
     schema['properties'].pop('contributor_role')
     schema['properties'].pop('is_contact_person')
 
 
-class CreatorsSchema(JSONSchema):
+class CreatorSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(CreatorExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+
+class CreatorsExportSchema(JSONSchema):
     schema = {'type': 'array',
               'minItems': 1,
-              'items': CreatorSchema.schema}
+              'items': CreatorExportSchema.schema}
 
 
-class DatasetDescriptionSchema(JSONSchema):
+class CreatorsSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(CreatorsExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+_protocol_url_or_doi_schema = {'anyOf':[EIS._allOf(DoiSchema),
+                                        EIS._allOf(PioSchema),
+                                        {'type': 'string',
+                                         'pattern': simple_url_pattern,}]}
+
+
+class DatasetDescriptionExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
@@ -495,7 +862,7 @@ class DatasetDescriptionSchema(JSONSchema):
         'properties': {
             'errors': ErrorSchema.schema,
             'schema_version': {'type': 'string'},
-            'name': {'type': 'string'},
+            'name': string_noltws,
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
             'acknowledgements': {'type': 'string'},
@@ -505,15 +872,18 @@ class DatasetDescriptionSchema(JSONSchema):
             'completeness_of_data_set': {'type': 'string'},
             'prior_batch_number': {'type': 'string'},
             'title_for_complete_data_set': {'type': 'string'},
-            'originating_article_doi': {'type': 'array', 'items': {'type': 'string'}},  # TODO doi matching? maybe types?
+            'originating_article_doi': {'type': 'array',
+                                        'items': EIS._allOf(DoiSchema),
+                                        #'context_value': idtype('TEMP:hasDoi'),  # FIXME convert here?
+                                        },
             'number_of_subjects': {'type': 'integer'},
             'number_of_samples': {'type': 'integer'},
             'parent_dataset_id': {'type': 'string'},  # blackfynn id
-            'protocol_url_or_doi': {
-                'type': 'array',
-                'minItems': 1,
-                'items': {'type': 'string',
-                          'pattern': simple_url_pattern}},
+            'protocol_url_or_doi': {'type': 'array',
+                                    'minItems': 1,
+                                    'items': _protocol_url_or_doi_schema,
+                                    #'context_value': idtype('TEMP:hasProtocol'),  # FIXME convert here?
+                                    },
             'links': {
                 'type': 'array',
                 'minItems': 1,
@@ -537,12 +907,19 @@ class DatasetDescriptionSchema(JSONSchema):
                     }
                 }
             },
-            'contributors': ContributorsSchema.schema,
+            'contributors': ContributorsExportSchema.schema,
         }
     }
 
 
+class DatasetDescriptionSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(DatasetDescriptionExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
 class SubmissionSchema(JSONSchema):
+    context = lambda : ({}, None)
     schema = {
         'type': 'object',
         'additionalProperties': False,
@@ -556,7 +933,9 @@ class SubmissionSchema(JSONSchema):
                 # TODO allOf?
                 'properties': {'sparc_award_number': {'type': 'string'},
                                'milestone_achieved': {'type': 'string'},
-                               'milestone_completion_date': {'type': 'string'},}}}}
+                               'milestone_completion_date': {'type': 'string',
+                                                             'context_value': 'TEMP:milestoneCompletionDate',
+                                                             'pattern': iso8601datepattern,},}}}}
 
 
 class UnitSchema(JSONSchema):
@@ -568,105 +947,304 @@ class UnitSchema(JSONSchema):
                                         'unit': {'type': 'string'}}}]}
 
 
-class SubjectsSchema(JSONSchema):
+_software_schema = {'type': 'array',
+                    'minItems': 1,
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'software_version': {'type': 'string'},
+                            'software_vendor': {'type': 'string'},
+                            'software_url': {'type': 'string'},
+                            'software_rrid': EIS._allOf(RridSchema),
+                        },},}
+
+
+subsam_common_properties = {  # FIXME these should not be in the samples sheet, or if they are they refer to the sample
+    'species': strcont('sparc:animalSubjectIsOfSpecies'),
+    'strain': strcont('sparc:animalSubjectIsOfStrain'),
+    'rrid_for_strain': EIS._allOf(RridSchema, context_value=idtype('TEMP:specimenRRID')),  # XXX CHANGE from sparc:specimenHasIdentifier
+    'genus': strcont('sparc:animalSubjectIsOfGenus'),
+    'sex': {'type': 'string',
+            'context_value': 'TEMP:hasBiologicalSex',  # FIXME idtype
+            },  # sex as a variable ?
+
+    'body_mass':{'context_value': 'sparc:animalSubjectHasWeight',
+                 **UnitSchema.schema},
+    'body_weight': {'context_value': 'sparc:animalSubjectHasWeight',
+                    **UnitSchema.schema},
+    'age': {'context_value': 'TEMP:hasAge',
+            **UnitSchema.schema},
+    'age_years': {'context_value': 'TEMP:hasAge',
+                  **UnitSchema.schema},
+    'age_category': {'type': 'string',
+                     'context_value': idtype('TEMP:hasAgeCategory'),
+                     },  # TODO uberon
+    'age_range_min': {'context_value': 'TEMP:hasAgeMin',
+                      **UnitSchema.schema},
+    'age_range_max': {'context_value': 'TEMP:hasAgeMax',
+                      **UnitSchema.schema},
+    'handedness': strcont('TEMP:hasHandedness'),
+
+    # ambiguous
+    # genotype is ambiguous when dealing with tissue from chimeric subjects or experimentally manipulated cell populations
+    'genotype': strcont('TEMP:hasGenotype'),
+    'mass': {'context_value': 'sparc:animalSubjectHasWeight',
+             # XXX NOTE subjects will require their own context
+             # since mass can clearly have other meanings elsewhere
+             **UnitSchema.schema},
+    'weight': {'context_value': 'sparc:animalSubjectHasWeight',
+               **UnitSchema.schema},
+    'experimental_group': strcont('TEMP:hasAssignedGroup'),
+    'group': strcont('TEMP:hasAssignedGroup'),
+    'organism_rrid': strcont('TEMP:organismRRID'),
+
+    # fields that require additional information
+    'experiment_date': strcont('TEMP:protocolExecutionDate'),  # FIXME needs to reference a protocol
+    'injection_date': strcont('TEMP:protocolExecutionDate'),  # FIXME needs to reference a protocol
+    'date_of_euthanasia': strcont('TEMP:protocolExecutionDate'),
+    'date_of_injection': strcont('TEMP:protocolExecutionDate'),
+
+    # fields that are actually about files
+    'sha1': strcont('TEMP:hasDigitalArtifactThatIsAboutItWithHash'),
+    'filename': strcont('TEMP:hasDigitalArtifactThatIsAboutIt'),
+    'upload_filename': strcont('TEMP:hasDigitalArtifactThatIsAboutIt'),
+    'dataset_id': strcont('TEMP:providerDatasetIdentifier'),  # FIXME need a global convention for this
+
+    # fields that are actually about performances
+    'experiment_number': strcont('TEMP:localPerformanceNumber'),  # FIXME TODO
+    'session': strcont('TEMP:localPerformanceNumber'),
+
+    # extra
+    'comment': strcont('TEMP:providerNote'),
+    'note': strcont('TEMP:providerNote'),
+}
+
+
+class SubjectExportSchema(JSONSchema):
     schema = {
         'type': 'object',
-        'required': ['subjects'],
-        'properties': {'subjects': {'type': 'array',
-                                    'minItems': 1,
-                                    # FIXME there is currently no way to require that
-                                    # a key be unique among all objects
-                                    'items': {
-                                        'type': 'object',
-                                        'required': ['subject_id', 'species'],
-                                        'properties': {
-                                            'subject_id': {'type': 'string'},
-                                            'species': {'type': 'string'},
-                                            'strain': {'type': 'string'},  # TODO RRID
-                                            'sex': {'type': 'string'},  # sex as a variable ?
-                                            'mass': UnitSchema.schema,
-                                            'body_mass': UnitSchema.schema,
-                                            'weight': UnitSchema.schema,
-                                            'body_weight': UnitSchema.schema,
-                                            'age': UnitSchema.schema,
-                                            'age_category': {'type': 'string'},  # TODO uberon
-                                        },},},
+        'jsonld_include': {'@type': ['sparc:Subject', 'owl:NamedIndividual']},
+        'required': ['subject_id', 'species'],
+        'properties': {
+            'subject_id': {'type': 'string',
+                           #'context_runtime':
+                           #lambda base: {'@id': '@id',
+                                         #'@type': '@id',
+                                         #'@context': {'@base': f'{base}subjects/'}}
+                           },
+            'ear_tag_number': strcont('TEMP:localIdAlt'),
+            'treatment': strcont('TEMP:hadExperimentalTreatmentApplied'),
+            'initial_weight': strcont('sparc:animalSubjectHasWeight'),
+            'height_inches': strcont('TEMP:subjectHasHeight'),
+            'gender': strcont('sparc:hasGender'),
+            'body_mass_weight': strcont('TEMP:subjectHasWeight'),
 
-                       'errors': ErrorSchema.schema,
-                       'software': {'type': 'array',
-                                    'minItems': 1,
-                                    'items': {
-                                        'type': 'object',
-                                        'properties': {
-                                            'software_version': {'type': 'string'},
-                                            'software_vendor': {'type': 'string'},
-                                            'software_url': {'type': 'string'},
-                                            'software_rrid': {'type': 'string'},
-                                        },},}}}
+                        'anesthesia': strcont('TEMP:wasAdministeredAnesthesia'),
+            'stimulation_site': strcont('sparc:spatialLocationOfModulator'),  # TODO ontology
+            'stimulator': strcont('sparc:stimulatorUtilized'),
+            'stimulating_electrode_type': strcont('sparc:stimulatorUtilized'),  # FIXME instance vs type
+
+            'nerve': strcont('TEMPRAW:involvesAnatomicalRegion'),  # FIXME can be more specific than this
+            **subsam_common_properties
+        },}
+
+
+class SubjectsExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        #'context_value': {'@id': 'graph-subjects', CONTEXT_ROOT: None},  # not needed, schemas have their own context
+        'required': ['subjects'],
+        'properties': {
+            'subjects': {
+                'type': 'array',
+                #'context_runtime': lambda base: {'@id': f'{base}subjects',},
+                'minItems': 1,
+                # FIXME there is currently no way to require that
+                # a key be unique among all objects
+                'items': SubjectExportSchema.schema,},
+            'errors': ErrorSchema.schema,
+            'software': _software_schema}}
 
     # FIXME not implemented
     extras = [['unique', ['subjects', '*', 'subject_id']]]
 
 
-class SamplesFileSchema(JSONSchema):
+class SubjectsSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(SubjectsExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class SampleExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Sample', 'owl:NamedIndividual']},
+        'required': ['sample_id', 'subject_id'],
+        'properties': {
+            'sample_id': {'type': 'string',},
+            'subject_id': {'type': 'string',},
+            'primary_key': {'type': 'string',
+                            'context_runtime': [  # TODO -> derive after add ?
+                                '#/meta/uri_api',
+                                # FIXME the @id mapping seems to break the @context !?
+                                (lambda uri_api: {
+                                    '@id': '@id',
+                                    '@context': {
+                                        '@base': uri_api + '/samples/'}}),
+                                '#/samples/@context/primary_key'],
+                            #'context_runtime':
+                            #lambda base: {'@id': '@id',
+                                          #'@type': '@id',
+                                          #'@context': {'@base': f'{base}samples/'}}
+                            },
+            'specimen': {'type': 'string',
+                         },  # what are we expecting here?
+            'specimen_anatomical_location': {'type': 'string',
+                                             },
+
+                        'disease': {'type': 'string',
+                                    },
+            'reference_atlas': {'type': 'string',
+                                },
+            'protocol_title': {'type': 'string',
+                               },
+            'protocol_url_or_doi': _protocol_url_or_doi_schema 
+            ,
+            'experimental_log_file_name': {'type': 'string',
+                                           },
+            **subsam_common_properties
+        },}
+
+
+class SamplesFileExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'required': ['samples'],
-        'properties': {'samples': {'type': 'array',
-                                    'minItems': 1,
-                                    'items': {
-                                        'type': 'object',
-                                        'required': ['sample_id', 'subject_id'],
-                                        'properties': {
-                                            'sample_id': {'type': 'string'},
-                                            'subject_id': {'type': 'string'},
-                                            'group': {'type': 'string'},  # FIXME required ??
-
-                                            'specimen': {'type': 'string'},  # what are we expecting here?
-                                            'specimen_anatomical_location': {'type': 'string'},
-
-                                            'species': {'type': 'string'},
-                                            'strain': {'type': 'string'},  # TODO RRID
-                                            'RRID_for_strain': {'type': 'string'},  # FIXME why is this in samples and not subjects?
-                                            'genotype': {'type': 'string'},
-
-                                            'sex': {'type': 'string'},  # sex as a variable ?
-
-                                            'mass': UnitSchema.schema,
-                                            'weight': UnitSchema.schema,
-
-                                            'age': UnitSchema.schema,
-                                            'age_category': {'type': 'string'},  # TODO uberon
-                                            'age_range_min': UnitSchema.schema,
-                                            'age_range_max': UnitSchema.schema,
-
-                                            'handedness': {'type': 'string'},
-                                            'disease': {'type': 'string'},
-                                            'reference_atlas': {'type': 'string'},
-                                            'protocol_title': {'type': 'string'},
-                                            'protocol_url_or_doi': {'type': 'string'},  # protocols_io_location ??
-
-                                            'experimental_log_file_name': {'type': 'string'},
-                                        },},},
-
-                       'errors': ErrorSchema.schema,
-                       'software': {'type': 'array',
-                                    'minItems': 1,
-                                    'items': {
-                                        'type': 'object',
-                                        'properties': {
-                                            'software_version': {'type': 'string'},
-                                            'software_vendor': {'type': 'string'},
-                                            'software_url': {'type': 'string'},
-                                            'software_rrid': {'type': 'string'},
-                                        },},}}}
+        'properties': {
+            'samples': {
+                'type': 'array',
+                #'context_runtime': lambda base: {'@id': f'{base}samples',},
+                'minItems': 1,
+                'items': SampleExportSchema.schema,},
+            'errors': ErrorSchema.schema,
+            'software': _software_schema}}
 
     # FIXME not implemented
     extras = [['unique', ['samples', '*', 'sample_id']]]
 
 
-class MetaOutSchema(JSONSchema):
-    __schema = copy.deepcopy(DatasetDescriptionSchema.schema)
+class SamplesFileSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(SamplesFileExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class ManifestRecordExportSchema(JSONSchema):
+    schema = {
+        'allOf': [
+            {'type': 'object',
+             'properties': {
+                 'pattern': {
+                     'type': 'string',
+                 },
+                 'filename': {
+                     'type': 'string',
+                 },
+                 'timestamp': {
+                     'type': 'string',
+                     'pattern': iso8601pattern,
+                 },
+                 'description': {
+                     'type': 'string',
+                 },
+                 'file_type': {
+                     'type': 'string',
+                 },
+                 'data_type': {
+                     'type': 'string',
+                 },
+             },
+             },
+            {'oneOf': [
+                {'required': ['pattern']},
+                {'required': ['filename']},  # timestamp not required for now
+            ]},
+        ]
+    }
+
+
+class PathSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Path', 'owl:NamedIndividual']},
+        'required': ['type',
+                     'dataset_relative_path',
+                     'uri_api',
+                     'uri_human',
+                     ],
+        'properties': {
+            'type': {'type': 'string',
+                     'enum': ['path']},
+            'dataset_relative_path': {'type': 'string'},
+            'uri_api': {'type': 'string',
+                        'pattern': simple_url_pattern},
+            'uri_human': {'type': 'string',
+                          'pattern': simple_url_pattern},
+            'remote_id': {'type': 'string'},
+            'mimetype': {'type': 'string'},
+            'magic_mimetype': {'type': 'string'},
+            'contents': {'type': 'object'},  # opqaue here
+            'errors': ErrorSchema.schema,
+        }
+    }
+
+
+class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:File', 'owl:NamedIndividual']},
+        'allOf': [
+            PathSchema.schema,
+            {'required': ['manifest_records', 'contents'],  # TODO uri_api
+             'properties': {
+                 'errors': ErrorSchema.schema,
+                 'contents':  {
+                     'type': 'object',
+                     'required': ['manifest_records'],
+                     'properties': {
+                         'manifest_records': {
+                             'type': 'array',
+                             'minItems': 1,
+                             'items': ManifestRecordExportSchema.schema,
+                         },
+                     },
+                 },
+             },
+             },
+        ]
+    }
+
+
+ManifestFileSchema = ManifestFileExportSchema
+
+
+class ManifestFilesExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'required': ['manifest_files'],
+        'properties': {
+            'manifest_files': {
+                'type': 'array',
+                'minItems': 1,
+                'items': ManifestFileExportSchema.schema,
+            },
+            'errors': ErrorSchema.schema,
+        }
+    }
+
+
+class MetaOutExportSchema(JSONSchema):
+    __schema = copy.deepcopy(DatasetDescriptionExportSchema.schema)
     extra_required = ['award_number',
                       'principal_investigator',
                       'species',
@@ -674,8 +1252,8 @@ class MetaOutSchema(JSONSchema):
                       'modality',
                       'techniques',
                       'contributor_count',
-                      'uri_human',  # from DatasetMetadat
-                      'uri_api',  # from DatasetMetadat
+                      'uri_human',  # from DatasetMetadata
+                      'uri_api',  # from DatasetMetadata
                       'files',
                       'dirs',
                       'size',
@@ -686,6 +1264,7 @@ class MetaOutSchema(JSONSchema):
                       'number_of_samples',
                       'timestamp_created',
                       'timestamp_updated',
+                      'timestamp_updated_contents',
                       #'subject_count',
                       #'sample_count',
     ]
@@ -697,54 +1276,90 @@ class MetaOutSchema(JSONSchema):
     __schema['properties'].update({
         'errors': ErrorSchema.schema,
         'dirs': {'type': 'integer'},
-        'doi': {'type': 'string',
-                'pattern': doi_pattern,},
-        'files': {'type': 'integer'},
-        'size': {'type': 'integer'},
-        'folder_name': {'type': 'string'},
-        'title': {'type': 'string'},
+        'doi': EIS._allOf(DoiSchema, context_value='TEMP:hasDoi'),
+        'files': {'type': 'integer',
+                  'context_value': inttype('TEMP:numberOfFiles'),
+                  },
+        'size': {'type': 'integer',
+                 'context_value': inttype('TEMP:hasSizeInBytes'),
+                 },
+        'folder_name': {'context_value': 'rdfs:label',
+                        **string_noltws},
+        'title': {'context_value': 'dc:title',
+                  **string_noltws},
         'timestamp_created': {'type': 'string',
-                              'pattern': iso8601pattern,},
+                              'pattern': iso8601pattern,
+                              'context_value': 'TEMP:wasCreatedAtTime',
+                              },
         'timestamp_updated': {'type': 'string',
-                              'pattern': iso8601pattern,},
+                              'pattern': iso8601pattern,
+                              'context_value': 'TEMP:wasUpdatedAtTime',
+                              },
+        'timestamp_updated_contents': {'type': 'string',
+                                       'pattern': iso8601pattern,
+                                       'context_value': 'TEMP:contentsWereUpdatedAtTime',
+                                       },
         'uri_human': {'type': 'string',
                       'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
+                      'context_value': idtype('TEMP:hasUriHuman'),
         },
         'uri_api': {'type': 'string',
                     'pattern': r'^https://api\.blackfynn\.io/(datasets|packages)/',  # FIXME proper regex
+                    #'context_value': idtype('TEMP:hasUriApi'),
+                    'context_value': idtype('@id'),
         },
         'award_number': {'type': 'string',
-                         'pattern': '^OT|^U18',},
-        'principal_investigator': {'type': 'string'},
+                         'pattern': '^OT|^U18',
+                         'context_value': idtype('TEMP:hasAwardNumber', base=TEMP['awards/']),
+                         },
+        'principal_investigator': {'type': 'string',
+                                   'context_value': idtype('TEMP:hasResponsiblePrincipalInvestigator'),
+                                   },
         'protocol_url_or_doi': {'type': 'array',
                                 'minItems': 1,
-                                'items': {'type': 'string',
-                                          'pattern': simple_url_pattern,}},
+                                'items': _protocol_url_or_doi_schema,
+                                'context_value': idtype('TEMP:hasProtocol'),
+                                },
         'additional_links': {'type': 'array',
                              'minItems': 1,
-                             'items': {'type': 'string'}},
-        'species': {'type': 'string'},
+                             'items': {'type': 'string'},
+                             'context_value': idtype('TEMP:hasAdditionalLinks'),  # TODO
+                             },
+        'species': {'type': 'string',
+                    'context_value': idtype('isAbout'),
+                    },
         'schema_version': {'type': 'string'},
-        'organ': {'type': 'string'},
+        'organ': {'type': 'array',
+                  'minItems': 1,
+                  'items': EIS._allOf(OntTermSchema),
+                  'context_value': idtype('isAbout'),
+                  },
         'modality': {'type': 'array',
                      'minItems': 1,
                      'items': {
                          'type': 'string',
                      },
+                    'context_value': idtype('TEMP:hasExperimentalModality'),
         },
         'techniques': {'type': 'array',
                        'minItems': 1,
-                       'items': {
-                           'type': 'string',
-                       },
+                       'items': EIS._allOf(OntTermSchema),
+                       # FIXME usedProtocolThatEmployedTechniques ...
+                       'context_value': idtype('TEMP:protocolEmploysTechnique'),
         },
 
         # TODO $ref these w/ pointer?
         # in contributor etc?
 
-        'subject_count': {'type': 'integer'},
-        'sample_count': {'type': 'integer'},
-        'contributor_count': {'type': 'integer'},})
+        'subject_count': {'type': 'integer',
+                          'context_value': inttype('TEMP:hasNumberOfSubjects'),
+                          },
+        'sample_count': {'type': 'integer',
+                         'context_value': inttype('TEMP:hasNumberOfSamples'),
+                         },
+        'contributor_count': {'type': 'integer',
+                              'context_value': inttype('TEMP:hasNumberOfSamples'),
+                              },})
 
     schema = {'allOf': [__schema,
                         {'anyOf': [
@@ -755,7 +1370,13 @@ class MetaOutSchema(JSONSchema):
                         ]}]}
 
 
-class DatasetOutSchema(JSONSchema):
+class MetaOutSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(MetaOutExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
+class DatasetOutExportSchema(JSONSchema):
     """ Schema that adds the id field since investigators shouldn't need to know
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
@@ -765,31 +1386,43 @@ class DatasetOutSchema(JSONSchema):
                             'meta',
                             'contributors',
                             'prov']
-    __schema['properties'] = {'id': {'type': 'string',  # ye old multiple meta/bf id issue
-                                     'pattern': '^N:dataset:'},
-                              'meta': MetaOutSchema.schema,
-                              'prov': ProvSchema.schema,
-                              'errors': ErrorSchema.schema,
-                              'contributors': ContributorsOutSchema.schema,
-                              'creators': CreatorsSchema.schema,
-                              # FIXME subjects_file might make the name overlap clearer
-                              'subjects': SubjectsSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
-                              'samples': SamplesFileSchema.schema['properties']['samples'],
-                              # 'identifier_metadata': {'type': 'array'},  # FIXME temporary
-                              'resources': {'type':'array',
-                                            'items': {'type': 'object'},},
-                              'inputs': {'type': 'object',
-                                         # TODO do we need errors at this level?
-                                         'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
-                                                        'submission_file': SubmissionSchema.schema,
-                                                        'subjects_file': SubjectsSchema.schema,},},}
+    __schema['properties'] = {
+        'id': {'type': 'string',  # ye old multiple meta/bf id issue
+               'pattern': '^N:dataset:'},
+        'meta': MetaOutExportSchema.schema,
+        'prov': ProvSchema.schema,
+        'errors': ErrorSchema.schema,
+        'contributors': ContributorsOutExportSchema.schema,
+        'creators': CreatorsExportSchema.schema,
+        # FIXME subjects_file might make the name overlap clearer
+        'subjects': SubjectsExportSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
+        'samples': SamplesFileExportSchema.schema['properties']['samples'],
+        # 'identifier_metadata': {'type': 'array'},  # FIXME temporary
+        'resources': {'type': 'array',
+                      'items': {'type': 'object'},},
+        'submission': {'type': 'object',},
+        'inputs': {'type': 'object',
+                   # TODO do we need errors at this level?
+                   'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
+                                  'submission_file': SubmissionSchema.schema,
+                                  'subjects_file': SubjectsSchema.schema,
+                                  'samples_file':SamplesFileSchema.schema,
+                                  },},}
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
-    schema = {'allOf': [__schema,
-                        {'anyOf': [
-                            {'required': ['subjects']},  # FIXME extract subjects from samples ?
-                            {'required': ['samples']}
-                        ]}]}
+    schema = {
+        'jsonld_include': {'@type': ['sparc:Dataset', 'owl:NamedIndividual']},
+        'allOf': [__schema,
+                  {'anyOf': [
+                      {'required': ['subjects']},  # FIXME extract subjects from samples ?
+                      {'required': ['samples']}
+                  ]}]}
+
+
+class DatasetOutSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(DatasetOutExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
 class StatusSchema(JSONSchema):
@@ -797,14 +1430,24 @@ class StatusSchema(JSONSchema):
               'required': ['submission_index', 'curation_index', 'error_index',
                            'submission_errors', 'curation_errors'],
               'properties': {
-                  'status_on_platform': {'type': 'string'},
-                  'submission_index': {'type': 'integer', 'minimum': 0},
-                  'curation_index': {'type': 'integer', 'minimum': 0},
-                  'error_index': {'type': 'integer', 'minimum': 0},
+                  'status_on_platform': {'type': 'string',
+                                         'context_value': 'TEMP:blackfynnPlatformStatus',
+                                         },
+                  'submission_index': {'type': 'integer', 'minimum': 0,
+                                       'context_value': inttype('TEMP:submissionIndex'),
+                                       },
+                  'curation_index': {'type': 'integer', 'minimum': 0,
+                                     'context_value': inttype('TEMP:curationIndex'),
+                                     },
+                  'error_index': {'type': 'integer', 'minimum': 0,
+                                  'context_value': inttype('TEMP:errorIndex'),
+                                  },
                   'submission_errors':{'type':'array',  # allow these to be empty
-                                       'items': {'type': 'object'},},
+                                       'items': {'type': 'object'},
+                                       },
                   'curation_errors':{'type':'array',  # allow these to be empty
-                                     'items': {'type': 'object'},},
+                                     'items': {'type': 'object'},
+                                     },
               }}
 
 

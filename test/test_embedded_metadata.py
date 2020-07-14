@@ -7,15 +7,14 @@ from sparcur.core import JEncode
 from sparcur.paths import BlackfynnCache, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.config import auth
-from sparcur import mbf
-from sparcur import schemas as sc
-from .common import path_project_container
+from sparcur.extract import xml as exml
+from .common import path_project_container, examples_root
 
 export = False
 
-
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestExtractMetadata(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         cls.organization_id = auth.get('blackfynn-organization')
@@ -24,6 +23,14 @@ class TestExtractMetadata(unittest.TestCase):
         cls.anchor = cls.BlackfynnRemote.smartAnchor(path_project_container)
         cls.anchor.local_data_dir_init()
         cls.datasets = list(cls.anchor.children)
+
+    def test_new_mbf_format(self):
+        x = examples_root / 'mbf-example.xml'
+        embf = exml.ExtractXml(x)
+        d = embf.asDict()
+        errors = d.pop('errors') if 'errors' in d else tuple()
+        error_types = set(e['validator'] for es in errors for e in es)
+        assert error_types == {'not'} or not error_types, f'unexpected error type! {error_types}'
 
     def test_mbf_header(self):
         test_id = 'N:dataset:bec4d335-9377-4863-9017-ecd01170f354'
@@ -39,10 +46,10 @@ class TestExtractMetadata(unittest.TestCase):
             if any(p for p in local_xmls if not p.exists()):
                 raise BaseException('unfetched children')
 
-        embfs = [mbf.ExtractMBF(x) for x in local_xmls]
+        embfs = [exml.ExtractXml(x) for x in local_xmls]
         d = embfs[0].asDict()
         blob = [e.asDict() for e in embfs]
-        errors = [b.pop('errors') for b in blob]
+        errors = [b.pop('errors') for b in blob if 'errors' in b]
         error_types = set(e['validator'] for es in errors for e in es)
         if export:
             with open('mbf-test.json', 'wt') as f:

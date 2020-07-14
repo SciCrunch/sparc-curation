@@ -1,12 +1,12 @@
 from types import MappingProxyType
 import rdflib
 from ontquery.utils import mimicArgs
-from pyontutils.core import OntGraph, OntId, OntTerm
+from pyontutils.core import OntGraph
 from pyontutils.utils import Async, deferred
 from pyontutils.namespaces import rdf, rdfs, owl, OntCuries
 from pyontutils import combinators as cmb
 import sparcur.schemas as sc
-from sparcur.core import adops
+from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
 from ttlser import CustomTurtleSerializer
 
@@ -36,9 +36,6 @@ OntCuries({'apinatomy': str(readable),
 
 class NoIdError(Exception):
     """ blob has no id """
-
-
-apinscm = sc.ApiNATOMYSchema()
 
 
 def make_classes(schema):
@@ -289,6 +286,8 @@ class Graph(Base):
         for e in externals:
             yield from e.triples()
 
+    triples_gen = triples  # match the converters interface
+
     def populate(self, graph):
         #[graph.add(t) for t in self.triples]
         for t in self.triples:
@@ -372,10 +371,18 @@ class BaseElement(Base):
                 assert not isinstance(values, str), f'{values} in {key}'
                 for value in values:
                     if key == 'external':
-                        o = OntId(value).URIRef
-                        yield o, readable.annotates, self.s
+                        try:
+                            o = OntId(value).URIRef
+                            yield o, readable.annotates, self.s
+                        except OntId.UnknownPrefixError as e:
+                            log.exception(e)
+                            continue
                     elif key == 'inheritedExternal':
-                        o = OntId(value).URIRef
+                        try:
+                            o = OntId(value).URIRef
+                        except OntId.UnknownPrefixError as e:
+                            log.exception(e)
+                            continue
                     else:
                         value = value.replace(' ', '-')  # FIXME require no spaces in internal ids
                         o = self.context[value]
@@ -409,8 +416,8 @@ class BaseElement(Base):
 class Node(BaseElement):
     key = 'nodes'
     annotations = 'skipLabel', 'color', 'generated'
-    objects = 'cloneOf', 'hostedBy', 'internalIn', 'rootOf', 'leafOf',
-    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external'
+    objects = 'cloneOf', 'hostedBy', 'internalIn',
+    objects_multi = 'sourceOf', 'targetOf', 'clones', 'external', 'rootOf', 'leafOf',
 
     def triples(self):
         yield from super().triples()
@@ -421,7 +428,7 @@ class Lyph(BaseElement):
     key = 'lyphs'
     generics = 'topology',
     annotations = 'width', 'height', 'layerWidth', 'internalLyphColumns', 'isTemplate', 'generated'
-    objects = 'layerIn', 'conveys', 'border', 'cloneOf', 'supertype'
+    objects = 'layerIn', 'conveys', 'border', 'cloneOf', 'supertype', 'internalIn'
     objects_multi = ('inCoalescences', 'subtypes', 'layers', 'clones', 'external', 'inheritedExternal'
                      'internalNodes', 'bundles', 'bundlesTrees', 'bundlesChains', 'subtypes')
 
@@ -435,7 +442,7 @@ class Link(BaseElement):
     annotations = 'generated',
     generics = 'conveyingType',
     objects = 'source', 'target', 'conveyingLyph', 'fasciculatesIn'
-    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external', 'inheritedExternal'
+    objects_multi = 'conveyingMaterials', 'hostedNodes', 'external', 'inheritedExternal',  'next', 'prev'
 
 
 Graph.Link = Link
@@ -468,8 +475,8 @@ class Chain(BaseElement):
     #internal_references = 'housingLayers',   # FIXME TODO
     objects = 'root', 'leaf', 'lyphTemplate', 'group', 'housingChain'
     objects_multi = 'housingLyphs', 'external', 'levels', 'lyphs', 'inheritedExternal'
-    objects_ordered_succession = {'lyphs': readable.nextLyph,
-                                  'levels': readable['next']}
+    #objects_ordered_succession = {'lyphs': readable.nextLyph,
+                                  #'levels': readable['next']}
 
 
 Graph.Chain = Chain
@@ -579,4 +586,12 @@ class Channel(BaseElement):
 
 
 Graph.Channel = Channel
-hrm = make_classes(apinscm.schema)
+
+
+if __name__ == '__main__':
+    # FIXME this eternal annoyance of dealing with the network at top level
+    # of course if you want to generate some code based on something from the
+    # network then of course you have to do this at some point otherwise
+    # you have to figure out how to defer loading until the last possible moment
+    apinscm = sc.ApiNATOMYSchema()
+    hrm = make_classes(apinscm.schema)

@@ -10,6 +10,8 @@
   'hypothesis-api-key': {'environment-variables': 'HYP_API_KEY HYP_API_TOKEN'},
   'hypothesis-group': {'environment-variables': 'HYP_GROUP'},
   'hypothesis-user': {'environment-variables': 'HYP_USER'},
-  'protocols-io-api-creds-file': None,
-  'protocols-io-api-store-file': None,
- }}
+  'datasets-noexport': None,
+  'datasets-sparse': None,
+  'datasets-no': None,
+  'sparse-limit': {'default': 10000,
+                   'environment-variables': 'SPARCUR_SPARSE_LIMIT SPARSE_LIMIT'},}}

@@ -1,38 +1,24 @@
-#!/usr/bin/env python3
-import copy
 import json
-import math
-import hashlib
 import logging
-from types import GeneratorType
 from socket import gethostname
-from datetime import datetime
 from functools import wraps
-from itertools import chain
-from collections import defaultdict, deque
+import idlib
 from joblib import Parallel, delayed
-from pyontutils.utils import byCol as _byCol, Async, deferred
-from protcur.analysis import parameter_expression
-from protcur.core import annoSync
-from protcur.analysis import protc, Hybrid
-from terminaltables import AsciiTable
-from hyputils.hypothesis import group_to_memfile, HypothesisHelper
-from sparcur import config
+from pyontutils.utils import byCol as _byCol, Async, deferred, makeSimpleLogger
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
-from sparcur.core import JT, log, logd, lj
+from sparcur.core import JT
 from sparcur.core import adops, OntTerm
 from sparcur.paths import Path
 from sparcur.state import State
+from sparcur.utils import log
 from sparcur import schemas as sc
 from sparcur.export.triples import TriplesExportDataset, TriplesExportSummary
-from sparcur.datasources import OrganData, OntologyData, MembersData
-from sparcur.protocols import ProtocolData, ProtcurData
-from sparcur.schemas import SummarySchema, MetaOutSchema  # XXX deprecate
+from sparcur.datasources import OrganData, OntologyData
+from sparcur.protocols import ProtocolData
 from sparcur import schemas as sc
 from sparcur import pipelines as pipes
 from sparcur import sheets
-from pysercomb.pyr import units as pyru
 
 
 class PathData:
@@ -187,7 +173,6 @@ class Integrator(PathData, OntologyData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasetdata = dat.DatasetStructure(self.path)
-        #self.protcur = ProtcurData(self)
 
     @property
     def triples(self):
@@ -422,7 +407,8 @@ class ExporterSummarizer:
         for dataset_blob in self:
             yield self._completeness(dataset_blob)
 
-    def _completeness(self, data):
+    @staticmethod
+    def _completeness(data):
         accessor = JT(data)  # can go direct if elements are always present
         #organ = accessor.query('meta', 'organ')
         try:
@@ -469,30 +455,41 @@ hasSchema = sc.HasSchema()
 @hasSchema.mark
 class Summary(Integrator, ExporterSummarizer):
     """ A class that summarizes members of its __base__ class """
-    #schema_class = MetaOutSchema  # FIXME clearly incorrect
-    schema_class = SummarySchema
-    schema_out_class = SummarySchema
+    schema_class = sc.SummarySchema
+    schema_out_class = sc.SummarySchema
     triples_class = TriplesExportSummary
     _debug = False
     _n_jobs = 12
 
-    def __new__(cls, path):
+    def __new__(cls, path, dataset_paths=tuple(), exclude=tuple()):
         #cls.schema = cls.schema_class()
         cls.schema_out = cls.schema_out_class()
         return super().__new__(cls, path)
 
-    def __init__(self, path):
+    def __init__(self, path, dataset_paths=tuple(), exclude=tuple()):
         super().__init__(path)
         # not sure if this is kosher ... but it works
 
         # avoid infinite recursion of calling self.anchor.path
         super().__init__(self.path.cache.anchor.local) # FIXME ugh
+        self._use_these_datasets = dataset_paths
+        self._exclude = exclude
  
     @property
     def iter_datasets_safe(self):
-        for i, path in enumerate(self.anchor.path.iterdir()):
+        if self._use_these_datasets:
+            gen = enumerate(self._use_these_datasets)
+        else:
+            gen = enumerate(self.anchor.path.iterdir())
+
+        for i, path in gen:
             # FIXME non homogenous, need to find a better way ...
             if path.cache is None and path.skip_cache:
+                continue
+
+            if path.cache.id in self._exclude:
+                log.info(f'skipping export of {path} because '
+                         f'{path.cache.id} is in noexport')
                 continue
 
             yield IntegratorSafe(path)
@@ -503,19 +500,23 @@ class Summary(Integrator, ExporterSummarizer):
             of the current Integrator regardless of whether that
             Integrator is itself an organization node """
 
+        if self._use_these_datasets:
+            gen = enumerate(self._use_these_datasets)
+        else:
+            gen = enumerate(self.anchor.path.children)
+
         # when going up or down the tree _ALWAYS_
         # use the filesystem as the source of truth
         # do not cache in here
-        for i, path in enumerate(self.anchor.path.iterdir()):
+        for i, path in gen:
             # FIXME non homogenous, need to find a better way ...
             if path.cache is None and path.skip_cache:
-                # FIXME just as anticipated nullability of cache is BAD
-                # probably better to switch out cache is None for cache is NullCache
-                # to make treatment of cache homogenous for all local files so that
-                # handling the None case doesn't spread througout the codebase :/
                 continue
 
-            #if path.cache.id == 'N:dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded':
+            if path.cache.id in self._exclude:
+                log.info(f'skipping export of {path} because {path.cache.id} is in noexport')
+                continue
+
             yield self.__class__.__base__(path)
 
     def __iter__(self):
@@ -602,8 +603,9 @@ class Summary(Integrator, ExporterSummarizer):
                 # dataset and then reload them all at once and possibly even do
                 # the per-dataset ttl conversion as well, parsing the ttl is probably
                 # a bad call though
-                hrm = Parallel(n_jobs=self._n_jobs)(delayed(datame)(d, ca, timestamp, helpers)
-                                                    for d in self.iter_datasets_safe)
+                hrm = Parallel(n_jobs=self._n_jobs)(
+                    delayed(datame)(d, ca, timestamp, helpers)
+                    for d in self.iter_datasets_safe)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
             else:
@@ -632,9 +634,14 @@ def datame(d, ca, timestamp, helpers=None):
         log = logging.getLogger(log_name)
         if not log.handlers:
             log = makeSimpleLogger(log_name)
+            log.info(f'{log_name} had no handler')
+        else:
+            #log.debug(log.handlers)
+            pass
 
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):
+        rc._setup()
         rc.anchorTo(ca)
 
     if helpers is not None:

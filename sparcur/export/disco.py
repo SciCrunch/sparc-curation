@@ -12,55 +12,59 @@ from sparcur.utils import want_prefixes, log, logd, loge
 def disco(dataset_blobs, graphs):
     #dsh = sorted(MetaOutSchema.schema['allOf'][0]['properties'])
     dsh = ['acknowledgements',
-            'additional_links',
-            'award_number',
-            'completeness_of_data_set',
-            'contributor_count',
-            'description',
-            'dirs',
-            'errors',
-            'examples',
-            'files',
-            'funding',
-            'keywords',
-            'links',
-            'modality',
-            'name',  # -> title
-            'organ',
-            'originating_article_doi',
-            'principal_investigator',
-            'prior_batch_number',
-            'protocol_url_or_doi',
-            'sample_count',
-            'size',
-            'species',
-            'subject_count',
-            'title_for_complete_data_set',
-            'uri_api',
-            'uri_human',
-            'error_index',  # (sum *_index)
-            'dataset_completeness_index',  # dead
-            'is_about',
-            'involves_anatomical_region',
-            'title',
-            'folder_name',
+           'additional_links',
+           'award_number',
+           'completeness_of_data_set',
+           'contributor_count',
+           'description',
+           'dirs',
+           'errors',
+           'examples',
+           'files',
+           'funding',
+           'keywords',
+           'links',
+           'modality',
+           'name',  # -> title
+           'organ',
+           'originating_article_doi',
+           'principal_investigator',
+           'prior_batch_number',
+           'protocol_url_or_doi',
+           'sample_count',
+           'size',
+           'species',
+           'subject_count',
+           'title_for_complete_data_set',
+           'uri_api',
+           'uri_human',
+           'error_index',  # (sum *_index)
+           'dataset_completeness_index',  # dead
+           'is_about',
+           'involves_anatomical_region',
+           'title',
+           'folder_name',
+           'timestamp_created',
+           'timestamp_updated',
+           'timestamp_updated_contents',
     ]
     chs = ['contributor_affiliation',
-            'contributor_orcid_id',
-            'contributor_role',
-            'is_contact_person',
-            'name',
-            'first_name',
-            'last_name',
-            'middle_name',
-            'id',
-            'blackfynn_user_id',]
+           'contributor_orcid_id',
+           'contributor_role',
+           'is_contact_person',
+           'name',
+           'first_name',
+           'last_name',
+           'middle_name',
+           'id',
+           'blackfynn_user_id',]
 
     datasets = [['id', 'submission_index', 'curation_index'] + dsh]
     contributors = [['id'] + chs]
     subjects = [['id', 'blob']]
     errors = [['id', 'blob']]
     resources = [['id', 'blob']]
+    error_reports = [['path', 'message']]
 
     #cje = JEncode()
     def normv(v):
@@ -70,22 +74,22 @@ def disco(dataset_blobs, graphs):
             # probably better to centralized the reload ...
             oid = OntId(v)
             if oid.prefix in want_prefixes:
-                return OntTerm(v).tabular()
+                return OntTerm(v).asCell()
             else:
                 return oid.iri
 
         if isinstance(v, idlib.Stream):
-            if hasattr(v, 'asTabular'):
-                return v.asTabular()
+            if hasattr(v, 'asCell'):
+                return v.asCell()
             else:
-                loge.debug(f'{type(v)} does not implement a tabular representation')
+                loge.debug(f'{type(v)} does not implement an asCell representation')
                 return v.asType(str)
 
         if isinstance(v, OntId):
             if not isinstance(v, OntTerm):
                 v = OntTerm(v)
 
-            v = v.tabular()
+            v = v.asCell()
         if isinstance(v, list) or isinstance(v, tuple):
             v = ','.join(json.dumps(_, cls=JEncode)
                          if isinstance(_, dict) else
@@ -107,8 +111,8 @@ def disco(dataset_blobs, graphs):
         is_about = [OntTerm(o) for s, o in graph[:isAbout:] if isinstance(o, rdflib.URIRef)]
         involves = [OntTerm(o) for s, o in graph[:TEMP.involvesAnatomicalRegion:]]
 
-        inv = ','.join(i.tabular() for i in involves)
-        ia = ','.join(a.tabular() for a in is_about)
+        inv = ','.join(i.asCell() for i in involves)
+        ia = ','.join(a.asCell() for a in is_about)
         #row = [id, dowe['error_index'], dowe['submission_completeness_index']]  # FIXME this doubles up on the row
         row = [id, dowe['status']['submission_index'], dowe['status']['curation_index']]  # FIXME this doubles up on the row
         if 'meta' in dowe:
@@ -172,9 +176,17 @@ def disco(dataset_blobs, graphs):
                 row.append(json.dumps(er, cls=JEncode))
                 errors.append(row)
 
+        if 'status' in dowe:
+            if 'path_error_report' in dowe['status']:
+                per = dowe['status']['path_error_report']
+                for path, report in sorted(per.items(), key=lambda kv: kv[0]):
+                    for message in report['messages']:
+                        error_reports.append([path, message])
+
     # TODO samples resources
     return (('datasets', datasets),
             ('contributors', contributors),
             ('subjects', subjects),
             ('resources', resources),
-            ('errors', errors))
+            ('errors', errors),
+            ('error_reports', error_reports),)

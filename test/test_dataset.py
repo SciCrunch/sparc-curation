@@ -1,5 +1,6 @@
 import pprint
 import unittest
+import pytest
 import augpathlib as aug
 from sparcur.datasets import (Tabular,
                               DatasetDescriptionFile,
@@ -46,7 +47,11 @@ class Helper:
         bads = []
         for ref in self.refs:
             if ref.startswith('d8a'):
-                file = template_root.working_dir / template_root.name / self.template
+                wd = template_root.working_dir
+                if wd is None:
+                    pytest.skip('not in repo')
+
+                file = wd / template_root.name / self.template
                 version = None
             else:
                 file = self.file
@@ -74,6 +79,21 @@ class TestSubmissionFile(Helper, unittest.TestCase):
     template = 'submission.xlsx'
     metadata_file_class = SubmissionFile
     pipe = pipes.SubmissionFilePipeline
+
+    def test_submission_multi_row_error_no_values(self):
+        tf = examples_root / 'submission-multi-row-error-no-values.csv'
+        obj = self.metadata_file_class(tf)
+        value = obj.data
+        pprint.pprint(value)
+        assert not [k for k in value if not isinstance(k, str)]
+
+    def test_submission_data_in_definition(self):
+        tf = examples_root / 'submission-data-in-definition.csv'
+        obj = self.metadata_file_class(tf)
+        value = obj.data
+        pprint.pprint(value)
+        assert not [k for k in value if not isinstance(k, str)]
+
     def test_sm_ot(self):
         tf = examples_root / 'sm-ot.csv'
         obj = self.metadata_file_class(tf)
@@ -130,11 +150,22 @@ class TestSamplesFile(Helper, unittest.TestCase):
     metadata_file_class = SamplesFile
     pipe = pipes.SamplesFilePipeline
 
+    def test_samples_duplicate_ids(self):
+        tf = examples_root / 'samples-duplicate-ids.csv'
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, 'should have failed due to duplicate keys'
+        except:
+            pass
+
     def test_sa_pie(self):
         tf = examples_root / 'sa-pie.csv'
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        derp = list(value['samples'][0])
+        assert 'same_header' in derp, derp
 
     def test_versions(self):
         self._versions()

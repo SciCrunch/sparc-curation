@@ -1,23 +1,31 @@
 import os
+import secrets
 import unittest
 import augpathlib as aug
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow
-from sparcur.paths import BlackfynnCache as BFC, LocalPath
+from sparcur.paths import BlackfynnCache as BFC, LocalPath, Path
 from sparcur.backends import BlackfynnRemote
 from sparcur.blackfynn_api import BFLocal
-from .common import test_organization, test_dataset
+from .common import test_organization, test_dataset, _pid
 import pytest
 
 
 class _TestOperation:
+    @classmethod
+    def tearDownClass(cls):
+        base = aug.AugmentedPath(__file__).parent / f'test-operation-{_pid}'
+        if base.exists():
+            base.popd()  # in case we were inside it pop back out first
+            base.rmtree()
+
     def setUp(self):
         class BlackfynnCache(BFC):
             pass
 
         BlackfynnCache._bind_flavours()
 
-        base = aug.AugmentedPath(__file__).parent / 'test-operation'
+        base = aug.AugmentedPath(__file__).parent / f'test-operation-{_pid}'
 
         if base.exists():
             base.popd()  # in case we were inside it pop back out first
@@ -30,15 +38,12 @@ class _TestOperation:
         self.BlackfynnRemote.init(test_organization)
         self.anchor = self.BlackfynnRemote.dropAnchor(base)
 
-        # FIXME this needs to be implemented as part of local
-        self.anchor.local_data_dir.mkdir()
-        self.anchor.local_objects_dir.mkdir()
-        self.anchor.trash.mkdir()
-
         self.root = self.anchor.remote
         self.project_path = self.anchor.local
         list(self.root.children)  # populate datasets
         self.test_base = [p for p in self.project_path.children if p.cache.id == test_dataset][0]
+        list(self.test_base.rchildren)  # populate test dataset
+
         asdf = self.root / 'lol' / 'lol' / 'lol (1)'
 
         class Fun(os.PathLike):
@@ -61,10 +66,10 @@ class _TestOperation:
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
-class TestDelete(_TestOperation):
+class TestDelete(_TestOperation, unittest.TestCase):
 
-    def test(self):
-        pass
+    def test_0(self):
+        assert True
 
     def test_1_case(self):
         # this is an old scenario that happens because of how the old system worked
@@ -73,14 +78,78 @@ class TestDelete(_TestOperation):
         # remote | o
         pass
 
+
+def make_rand(n, width=80):
+    lw = width + 1
+    hex_lw = lw // 2
+    n_lines = n // lw
+    n_accounted = n_lines * lw
+    h_lines = n // (hex_lw * 2)
+    h_accounted = h_lines * (hex_lw * 2)
+    ldiff = n_lines - h_lines
+    adiff = n_accounted - h_accounted
+    accounted = n_accounted
+    missing = n - accounted
+    hex_missing = (missing + 1) // 2
+    diff = hex_missing * 2 - missing
+    hexstart = width % 2  # almost there fails on 71
+    # also fails len(make_rand(102, 101)) - 102
+
+    print(adiff, ldiff, missing, diff)
+    string = '\n'.join([secrets.token_hex(hex_lw)[hexstart:]
+                        for i in range(n_lines)]
+                       + [secrets.token_hex(hex_missing)[diff:-1] + '\n'])
+    return string.encode()
+
+
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestUpdate(_TestOperation, unittest.TestCase):
 
-    def test(self):
+    @pytest.mark.skip('the question has been answered')
+    def test_process_filesize_limit(self):
+        # so the 1 mb size file works, eventually, something else is wrong
+        test_folder = self.test_base / 'hrm'
+        test_folder.mkdir_remote()
+        test_folder.__class__.upload = Path.upload
+        for i in range(1024 ** 2, 5 * 1024 ** 2, 1024 ** 2):
+            test_file = test_folder / f'size-{i}'
+            if test_file.is_broken_symlink():
+                test_file.remote.bfobject.package.delete()
+                test_file.unlink()
+                test_file = test_folder / f'size-{i}'  # remove stale cache
+
+            test_file.data = iter((make_rand(i),))
+            remote = test_file.upload()
+
+    def test_upload_noreplace(self):
+        for i in range(2):
+            test_file = self.test_base / 'dataset_description.csv'
+            test_file.data = iter((make_rand(100),))
+            # FIXME temp sandboxing for upload until naming gets sorted
+            test_file.__class__.upload = Path.upload
+            # create some noise
+            remote = test_file.upload(replace=False)
+            print(remote.bfobject.package.name)
+
+    def test_upload_noreplace_fail(self):
+        # some persistent state from other tests is causing this to fail
         test_file = self.test_base / 'dataset_description.csv'
-        test_file.data = iter(('lol'.encode(),))
-        test_file.remote.data = test_file.data
-        pass
+        test_file.data = iter((make_rand(100),))
+        # FIXME temp sandboxing for upload until naming gets sorted
+        test_file.__class__.upload = Path.upload
+        test_file.upload(replace=False)
+        try:
+            test_file.upload(replace=False)
+            assert False, 'should have failed'
+        except exc.FileHasNotChangedError:
+            pass
+
+    def test_upload_replace(self):
+        test_file = self.test_base / 'dataset_description.csv'
+        test_file.data = iter((make_rand(100),))
+        # FIXME temp sandboxing for upload until naming gets sorted
+        test_file.__class__.upload = Path.upload
+        test_file.upload()
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
@@ -199,7 +268,12 @@ class TestRemote(_TestOperation, unittest.TestCase):
     def test_remote_path_does_not_exist(self):
         new_thing = self.root / 'does not exist'
 
+    @pytest.mark.skip('Not ready.')
     def test_cache_path_does_not_exist(self):
+        """ This should not produce an error.
+            Path objects should be able to be instantiated without
+            po.exists() -> True at a point in time prior to instantiation.
+        """
         new_thing = self.anchor / 'does not exist'
 
     def __test_cache_path_fake_id(self):

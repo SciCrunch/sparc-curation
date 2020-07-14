@@ -20,7 +20,25 @@ class ValidationError(SparCurError):
     def json(self, pipeline_stage_name=None, blame='stage'):
         """ update this to change how errors appear in the validation pipeline """
         skip = 'schema', 'instance', 'context'  # have to skip context because it has unserializable content
-        return [{k:v if k not in skip else k + ' REMOVED'
+
+        def norm(k, v):
+            if k == 'message':
+                mess = v
+                lm = len(mess)
+                dangerzone = 'is not valid under any of the given schemas'
+                if (mess.endswith(dangerzone) and
+                    lm > 120 and mess.startswith('{')):
+                    ld = len(dangerzone)
+                    new_mess = (mess[:20] +
+                                f' ... {lm - 40 - ld} bytes later ... ' +
+                                mess[-(20 + ld):])
+                    return new_mess
+                else:
+                    return mess
+            else:
+                return v
+
+        return [{k:norm(k, v) if k not in skip else k + ' REMOVED'
                  for k, v in chain(e._contents().items(),
                                    (('pipeline_stage', pipeline_stage_name),
                                     ('blame', blame)))
@@ -35,6 +53,7 @@ class ValidationError(SparCurError):
             dotted_path = ".".join([str(c) for c in error.path])
             return "{path}: {message}".format(path=dotted_path, message=error.message)
         return error.message
+
 
 
 class MissingSecretError(SparCurError):
@@ -125,3 +144,7 @@ class NoTripleError(SparCurError):
 
 class LostChildError(SparCurError):
     """ someone attempting to upload a child to the wrong parent """
+
+
+class NetworkFailedForPathError(SparCurError):
+    """ the network failed while trying to retrieve a specfic path """
