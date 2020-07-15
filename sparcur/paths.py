@@ -15,6 +15,7 @@ from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, GetTimeNow, register_type
+from sparcur.config import auth
 
 
 def cleanup(func):
@@ -202,7 +203,6 @@ class BlackfynnCache(PrimaryCache, EatCache):
         """ use data from the remote mark or clear datasets as sparse """
         if sparse_limit is None:
             sparse_limit = auth.get('sparse-limit')  # yay for yaml having int type
-            #sparse_limit = _sl if _sl is None else int_(sl)
 
         if self.is_dataset():
             package_count = self._package_count()
@@ -373,7 +373,36 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
     def populateJsonMetadata(self, blob):
         """ populate a json blob with file system metadata"""
         # FIXME TODO implement this without resolving .cache
-        return self.cache.populateJsonMetadata(blob)
+        if self.cache is not None:
+            return self.cache.populateJsonMetadata(blob)
+        else:
+            return self._jsonMetadata()
+
+    def _jsonMetadata(self, do_expensive_operations=False):
+        self = self.resolve()  # safety since we have to go hunting paths
+        project_path = self.find_cache_root()
+        if project_path is None:
+            # FIXME TODO I think we used dataset_description as a hint?
+            project_path = Path('/')  # FIXME FIXME
+            log.critical('No dataset path found for {self}!')
+            #raise NotImplementedError('current implementation cant anchor with current info')
+
+        dataset_path = [p for p in self.parents if p.parent == project_path][0]
+        drp = self.relative_path_from(dataset_path)  # FIXME ...
+
+        blob = {
+            'type': 'path',
+            'dataset_relative_path': drp,
+        }
+
+        mimetype = self.mimetype
+        if mimetype:
+            blob['mimetype'] = mimetype
+
+        if do_expensive_operations:
+            blob['magic_mimetype'] = asdf
+
+        return blob
 
     def pull(self, *args,
              time_now=None,

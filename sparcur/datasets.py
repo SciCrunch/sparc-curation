@@ -206,10 +206,12 @@ class DatasetStructure(Path):
                                           .from_symlink(c)
                                           .size)
                         else:
-                            maybe_size = (aug.PathMeta
-                                          .from_xattrs(c.xattrs(),
-                                                        prefix='bf')
-                                          .size)
+                            _meta = aug.PathMeta.from_xattrs(c.xattrs(),
+                                                             prefix='bf')
+                            if _meta.size is not None:
+                                maybe_size = _meta.size
+                            elif c.is_file():  # running an export on a local dataset
+                                maybe_size = c.size
 
                         #maybe_size = c.cache.meta.size
                     except AttributeError as e:

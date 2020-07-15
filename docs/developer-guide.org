@@ -1,8 +1,10 @@
 #+TITLE: sparcur developer guide
 #+AUTHOR: Tom Gillespie
-#+OPTIONS: num:nil ^:nil
-#+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
+#+OPTIONS: num:nil ^:nil h:7
+#+LATEX_HEADER: \usepackage[margin=0.8in]{geometry}
 #+STARTUP: showall
+
+# [[file:developer-guide.pdf]]
 
 * Demos
 ** Remote only connection
@@ -22,7 +24,7 @@ return datasets
 You can run this example block and it will validate the DatasetTemplate. \\
 To see the full results =from pprint import pprint=
 and change the last line to =pprint(data)=.
-#+BEGIN_SRC python :results output :exports both
+#+BEGIN_SRC python :results output :exports both :cache yes :tangle ./broken.py
 from sparcur import pipelines as pipes
 from sparcur.paths import Path
 
@@ -39,6 +41,7 @@ def makeValidator(dataset_path):
         folder_name = context.path.name
         uri_api = context.uri_api
         uri_human = context.uri_human
+        timestamp_export_start = None
 
     return pipes.SPARCBIDSPipeline(dataset_path, lifters, context)
 
@@ -49,15 +52,15 @@ data = pipeline.data
 print(sorted(data.keys()))
 #+END_SRC
 
-#+RESULTS:
-: ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'samples', 'size', 'subjects']
+#+RESULTS[cc32c2f62cd7a758207c6368bc90a6742db681e3]:
+: ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'prov', 'size']
+
 * Internal Structure
 :PROPERTIES:
-:header-args: :comments link
+:header-args: :comments link :exports code
 :END:
-
 ** Utility
-#+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes
+#+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes :exports none
 #+end_src
 
 #+name: simple-utils
@@ -82,6 +85,7 @@ Options:
 
     --jobs=N                        number joblib jobs [default: 12]
     --sparse-limit=N                package count that forces a sparse pull
+    --symlink-objects=PATH          path to an existing objects directory
 """
 
 
@@ -140,92 +144,11 @@ def test_pipe_main():
 ** Pipelines
 Easier to read, harder to debug. The python paradox.
 *** Retrieve
-**** Workflow
-***** All datasets
-# FIXME this is really an env file not a bin file ...
-#+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
-function sparcur-get-all-remote-data () {
-    # NOTE not quite all the remote data, the google sheets
-    # don't have caching functionality yet
-
-    # TODO parse args
-    local TIME_START=$(date -In)
-    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START}" || { CODE=$?; echo 'mv failed'; return $CODE; }
-    local PARENT_PATH=${TIME_START}
-    local LOG_PATH="${PARENT_PATH}/logs"
-    #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
-    local PROJECT_ID=$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")
-
-    echo ${PARENT_PATH}  # needed to be able to follow logs
-
-    if [ ! -d "${LOG_PATH}" ]; then
-        mkdir "${LOG_PATH}"
-    fi
-
-    # fetch annotations
-    python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
-    local pids_final[0]=$!
-
-    # fetch remote metadata
-    python -m sparcur.simple.fetch_remote_metadata_all \
-           --project-id ${PROJECT_ID} \
-           > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
-    local pids[0]=$!
-
-    # clone aka fetch top level
-    local FAIL=0
-    local PROJECT_PATH=$(python -m sparcur.simple.clone \
-                                --project-id ${PROJECT_ID} \
-                                --parent-path "${PARENT_PATH}" \
-                                > "${LOG_PATH}/clone.log" 2>&1) || FAIL=$((FAIL+1))
-    for pid in ${pids[*]}; do
-        wait $pid || FAIL=$((FAIL+1))
-    done
-
-    if [[ $FAIL -ne 0 ]]; then
-        echo "${FAIL} commands failed. Cannot continue."
-        echo "${PROJECT_PATH}"
-        return 1
-    fi
-
-    # pull aka fetch file system metadata
-    python -m sparcur.simple.pull \
-           --project-path "${PROJECT_PATH}" \
-           > "${LOG_PATH}/pull.log" 2>&1 || { CODE=$?;
-                                              echo 'pull failed!';
-                                              echo "${PROJECT_PATH}";
-                                              return $CODE; }
-
-    # fetch metadata files
-    python -m sparcur.simple.fetch_metadata_files \
-           --project-path "${PROJECT_PATH}" \
-           > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
-
-    pids_final[1]=$!
-    local FAIL=0
-    for pid in ${pids_final[*]}; do
-        wait $pid || FAIL=$((FAIL+1))
-    done
-
-    if [[ $FAIL -ne 0 ]]; then
-        echo "${FAIL} commands failed. Cannot continue."
-        echo "${PROJECT_PATH}"
-        return 1
-    fi
-}
-#+end_src
-***** Single dataset
-#+begin_src bash
-DATASET_PATH=$(python -m sparcur.simple.clone --dataset-id ${DATASET_ID})
-python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
-
-#+end_src
 **** Protocols
 :PROPERTIES:
 :header-args: :shebang "#!/usr/bin/env python3"
 :END:
 Cache annotations.
-#+header: :shebang "#!/usr/bin/env python3"
 #+begin_src python :tangle ../sparcur/simple/fetch_annotations.py
 from pathlib import Path
 from hyputils import hypothesis as hyp
@@ -446,7 +369,8 @@ def from_path_dataset_file_structure_all(project_path, time_now=None):
 
 # mark datasets as sparse 
 def sparse_materialize(path, sparse_limit=None):
-    """ given a path mark it as sparse if it is a dataset beyond the sparse limit """
+    """ given a path mark it as sparse if it is a dataset and
+        beyond the sparse limit """
 
     cache = path.cache
     if cache.is_organization():
@@ -652,12 +576,12 @@ def from_path_dataset_path_structure(path):
     return
 
 
-from_path_dataset_description    = object_from_find_path('dataset_description', description)
-from_path_subjects               = object_from_find_path('subjects',            subjects)
-from_path_samples                = object_from_find_path('samples',             samples)
-from_path_submission             = object_from_find_path('submission',          submission)
-from_path_manifests              = object_from_find_path('manifest',            manifest, 'rglob')
-from_path_remote_metadata        = lambda path: ds.BlackfynnDatasetData(path.cache).fromCache()
+from_path_dataset_description = object_from_find_path('dataset_description', description)
+from_path_subjects            = object_from_find_path('subjects',            subjects)
+from_path_samples             = object_from_find_path('samples',             samples)
+from_path_submission          = object_from_find_path('submission',          submission)
+from_path_manifests           = object_from_find_path('manifest',            manifest, 'rglob')
+from_path_remote_metadata     = lambda path: ds.BlackfynnDatasetData(path.cache).fromCache()
 
 
 def combinate(*functions):
@@ -700,4 +624,156 @@ if __name__ == '__main__':
 #+end_src
 **** Network resources
 *** Export
-*** 
+* Workflow
+** All datasets
+The dependency DAG is as follows.
+# NOTE the workflow for generating these diagrams takes multiple steps
+# first write the graph in racket, where we can use dashes in names
+# conver to dot and add clusters as needed
+#+name: racket-graph
+#+header: :wrap "src dot :file ./images/pipeline-fetch-dag.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g (unweighted-graph/directed
+           (graph-notation
+            fetch-all -> fetch-annotations
+            fetch-all -> fetch-metadata-files
+            fetch-all -> fetch-remote-metadata
+            fetch-metadata-files -> pull
+            pull -> sparse-materialize
+            sparse-materialize -> fetch-remote-metadata
+            pull -> clone)))
+
+(graphviz g)
+#+end_src
+
+#+RESULTS[e29666f9fbc8046ebab291bb30916242ab20cfeb]: racket-graph
+#+begin_src dot :file ./images/pipeline-fetch-dag.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="fetch-metadata-files"];
+	node1 [label="clone"];
+	node2 [label="fetch-all"];
+	node3 [label="fetch-remote-metadata"];
+	node4 [label="pull"];
+	node5 [label="fetch-annotations"];
+	node6 [label="sparse-materialize"];
+	subgraph cluster_F {
+        color=none;
+        node2;
+	}
+	subgraph cluster_D {
+        label="Dataset";
+        color=green;
+		node0 -> node4;
+		node2 -> node0;
+		node2 -> node3;
+		node4 -> node1;
+		node4 -> node6;
+		node6 -> node3;
+	}
+	subgraph cluster_P {
+        label="Protcur";
+        color=purple;
+		node2 -> node5;
+    }
+}
+#+end_src
+
+#+RESULTS[041cb032103aa97b8bf26a7397abce2271f685b5]:
+[[file:./images/pipeline-fetch-dag.png]]
+
+# FIXME this is really an env file not a bin file ...
+#+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
+function sparcur-get-all-remote-data () {
+    # NOTE not quite all the remote data, the google sheets
+    # don't have caching functionality yet
+
+    # TODO parse args
+    local TIME_START=$(date -In)
+    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START}" || \
+        { CODE=$?; echo 'mv failed'; return $CODE; }
+    local PARENT_PATH=${TIME_START}
+    local LOG_PATH="${PARENT_PATH}/logs"
+    #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
+    local PROJECT_ID=$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")
+    local SYMLINK_OBJECTS_TO=$()
+
+    echo ${PARENT_PATH}  # needed to be able to follow logs
+
+    if [ ! -d "${LOG_PATH}" ]; then
+        mkdir "${LOG_PATH}"
+    fi
+
+    # fetch annotations
+    python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
+    local pids_final[0]=$!
+
+    # fetch remote metadata
+    python -m sparcur.simple.fetch_remote_metadata_all \
+           --project-id ${PROJECT_ID} \
+           > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
+    local pids[0]=$!
+
+    # clone aka fetch top level
+    local FAIL=0
+    local PROJECT_PATH=$(python -m sparcur.simple.clone \
+                                --project-id ${PROJECT_ID} \
+                                --parent-path "${PARENT_PATH}" \
+                                > "${LOG_PATH}/clone.log" 2>&1) || FAIL=$((FAIL+1))
+
+    for pid in ${pids[*]}; do
+        wait $pid || FAIL=$((FAIL+1))
+    done
+    if [[ $FAIL -ne 0 ]]; then
+        echo "${FAIL} commands failed. Cannot continue."
+        echo "${PROJECT_PATH}"
+        return 1
+    fi
+
+    # pull aka fetch file system metadata
+    python -m sparcur.simple.pull \
+           --project-path "${PROJECT_PATH}" \
+           > "${LOG_PATH}/pull.log" 2>&1 || { CODE=$?;
+                                              echo 'pull failed!';
+                                              echo "${PROJECT_PATH}";
+                                              return $CODE; }
+
+    # fetch metadata files
+    python -m sparcur.simple.fetch_metadata_files \
+           --project-path "${PROJECT_PATH}" \
+           > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
+
+    pids_final[1]=$!
+    local FAIL=0
+    for pid in ${pids_final[*]}; do
+        wait $pid || FAIL=$((FAIL+1))
+    done
+    if [[ $FAIL -ne 0 ]]; then
+        echo "${FAIL} commands failed. Cannot continue."
+        echo "${PROJECT_PATH}"
+        return 1
+    fi
+}
+#+end_src
+** Single dataset
+#+begin_src bash
+DATASET_PATH=$(python -m sparcur.simple.clone --dataset-id ${DATASET_ID})
+python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
+python -m sparcur.simple.pull ${DATASET_PATH}
+python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
+#+end_src
+* Code :noexport:
+#+name: racket-graph-helper
+#+begin_src racket :lang racket/base :exports none
+(require graph ; rack pkg install graph
+         (for-syntax racket/base
+                     syntax/parse))
+
+(define-syntax (graph-notation stx)
+  (syntax-parse stx
+    #:datum-literals (->)
+    [(_ (~seq left -> right) ...)
+     #'(quote ((left right) ...))]))
+#+end_src
+
+
