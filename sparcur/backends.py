@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import PurePosixPath, PurePath
 from datetime import datetime
 import idlib
@@ -196,6 +197,10 @@ class BlackfynnRemote(aug.RemotePath):
                         bfobject.id = self._seed
                     else:
                         raise NotImplementedError(f'{_class}') from e
+                elif (not hasattr(self, '_api') and
+                      self._seed.startswith('N:organization:')):
+                    self.__class__.init(self._seed)
+                    return self.bfobject
                 else:
                     raise e
 
@@ -1238,6 +1243,21 @@ class BlackfynnDatasetData:
     cache_path = auth.get_path('cache-path')
     cache_base = cache_path / 'blackfynn-meta'
 
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        BlackfynnDatasetData._setup(*args, **kwargs)
+        BlackfynnDatasetData.__new__ = BlackfynnDatasetData._renew
+        return super().__new__(cls)
+
+    @classmethod
+    def _setup(cls, *args, **kwargs):
+        from sparcur.core import JEncode
+        cls._JEncode = JEncode
+
     def __init__(self, remote_cache_or_id):
         if isinstance(remote_cache_or_id, aug.RemotePath):
             self._remote = remote_cache_or_id
@@ -1316,6 +1336,6 @@ class BlackfynnDatasetData:
             blob['doi'] = self.remote.doi
 
         with open(self.cache, 'wt') as f:
-            json.dump(blob, f, indent=2, sort_keys=True, cls=JEncode)
+            json.dump(blob, f, indent=2, sort_keys=True, cls=self._JEncode)
 
         return blob

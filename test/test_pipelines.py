@@ -51,6 +51,7 @@ class PipelineHelper:
 
 
 class TestPipelines(unittest.TestCase):
+    pass
 
 
 class TestPipelinesReal(RealDataHelper, PipelineHelper, unittest.TestCase):

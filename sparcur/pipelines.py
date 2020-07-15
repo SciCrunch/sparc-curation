@@ -1038,7 +1038,16 @@ class PipelineExtras(JSONPipeline):
                     _o = OntId(_o)
                     if _o.prefix == 'FMA':
                         ot = OntTerm(_o)
-                        _o = next(OntTerm.query(label=ot.label, prefix='UBERON'))
+                        try:
+                            if ot.curie == 'FMA:7202':
+                                label = 'gall bladder'
+                            else:
+                                lable = ot.label
+
+                            _o = next(OntTerm.query(label=label, prefix='UBERON'))
+                        except BaseException as e:
+                            log.critical(ot)
+                            continue
 
                     out += (_o,)
 
@@ -1459,7 +1468,7 @@ class ProtcurPipeline(Pipeline):
         #idn = ptcdoc.IdNormalization(anno_counts.all())
         idn = ptcdoc.IdNormalization(annos)
         protc.reset(reset_annos_dict=True)  # sigh, yes we have to do this here
-        breakpoint()
+        #breakpoint()
         protcs = [protc(f, annos) for f in annos]
         idints = idn._uri_api_ints()
         nones = idints.pop(None)

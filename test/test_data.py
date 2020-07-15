@@ -4,7 +4,7 @@ from pprint import pprint
 import idlib
 import rdflib
 import pytest
-from pyontutils.core import OntResIri, OntGraph
+from pyontutils.core import OntResIri, OntGraph, OntResPath
 from pyontutils.namespaces import UBERON
 from sparcur.reports import SparqlQueries
 from .common import skipif_no_net
@@ -19,6 +19,7 @@ class TestCurationExportTtl(unittest.TestCase):
         cls.graph = cls.ori.graph
         cls.nsm = cls.graph.namespace_manager
         cls.spaql_templates = SparqlQueries(cls.nsm)
+        cls._q_protocol_aspects =  cls.spaql_templates.protocol_aspects()
 
     @classmethod
     def pp(cls, res, unpack=False):
@@ -113,3 +114,50 @@ class TestCurationExportTtl(unittest.TestCase):
         res = list(self.graph.query(query))
         print(res)
         assert len(res) > 0
+
+
+@skipif_no_net
+class TestProtcurTtl(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        #cls.orp = OntResPath()
+        #cls.graph = cls.orp.graph
+        cls.graph = OntGraph().parse('/home/tom/.local/share/sparcur/export/protcur/2020-07-06T11:57:37,602579-07:00/protcur.ttl', format='ttl')
+        cls.nsm = cls.graph.namespace_manager
+        cls.spaql_templates = SparqlQueries(cls.nsm)
+        cls._q_protocol_aspects =  cls.spaql_templates.protocol_aspects()
+
+    def test_protcur_techniques(self):
+        query = self.spaql_templates.protocol_techniques()
+        #res = list(self.graph.query(query))
+        res = list(self.graph.query(
+            query,
+            initBindings={
+                'technique':
+                #rdflib.Literal('confocal microscopy technique')
+                #rdflib.Literal('microscopy')
+                rdflib.Literal('Microscopy')
+                #rdflib.Literal('microscopy technique')
+            }))
+        print(res)
+        assert len(res) > 0
+
+    def _query_protocol_aspect(self, aspect):
+        query = self._q_protocol_aspects
+        res = list(self.graph.query(query, initBindings={'aspect': rdflib.Literal(aspect)}))
+        return res
+
+    def test_protocol_aspect_terms(self):
+        aspects = ['magnification',
+                   #'temperature',
+                   'fold',
+                   ]
+        results = []
+        for aspect in aspects:
+            res = self._query_protocol_aspect(aspect)
+            results.append(res)
+
+        pids = [[pid for pid, lit in rs] for rs in results]
+        [print(p) for p in pids]
+        print(set().intersection(*pids))
+        _ = [print(r) for rs in results for r in rs]

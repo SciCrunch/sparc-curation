@@ -152,7 +152,7 @@ class SparqlQueries:
             SELECT DISTINCT ?protocol ?technique
             WHERE {
                 ?protocol rdf:type sparc:Protocol .
-                ?protocol TEMP:protocolEmploysTechinque ?technique .
+                ?protocol TEMP:protocolEmploysTechnique ?technique .
             }
         """
         return self.sparql.prepareQuery(query, initNs=self.prefixes)

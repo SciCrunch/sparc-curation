@@ -743,38 +743,6 @@ class Main(Dispatcher):
         # pull all the files
         self.pull()
 
-    def _total_package_counts(self):
-        from sparcur.datasources import BlackfynnDatasetData
-
-        def total_packages(cache):
-            bdd = BlackfynnDatasetData(cache)
-            try:
-                blob = bdd.fromCache()
-            except FileNotFoundError as e:
-                # FIXME TODO also check cached rmeta dates during pull
-                log.warning(e)
-                blob = bdd()
-
-            return sum(blob['package_counts'].values())
-
-        totals = []
-        for cache in self.datasets:
-            totals.append((cache, total_packages(cache)))
-
-        return totals
-
-    def _sparse_from_metadata(self, sparse_limit:int=None):
-        if sparse_limit is None:
-            sparse_limit = self.options.sparse_limit
-
-        if sparse_limit is None:
-            return []
-
-        totals = self._total_package_counts()
-        #tps = sorted([ for d in self.datasets], key= lambda ab: ab[1])
-        sparse = [r.id for r, pc in totals if pc >= sparse_limit]
-        return sparse
-
     def pull(self):
         # FIXME this still isn't quite right because it does not correctly
         # deal dataset renaming, but it is much closer
@@ -1455,7 +1423,7 @@ done"""
 
     def rmeta(self, use_cache_path=False, exist_ok=False):
         from pyontutils.utils import Async, deferred
-        from sparcur.datasources import BlackfynnDatasetData
+        from sparcur.backends import BlackfynnDatasetData
         dsr = self.datasets if use_cache_path else self.datasets_remote
         all_ = [BlackfynnDatasetData(r) for r in dsr]
         prepared = [bdd for bdd in all_ if not (exist_ok and bdd.cache_path.exists())]

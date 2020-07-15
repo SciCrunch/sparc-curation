@@ -457,7 +457,9 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
         # FIXME TODO comparison/diff and support for non-curation workflows
 
-        # replace the working tree with the upstream ca
+        # replace the working tree with the upstream
+        # FIXME this has nasty and confusing consequences if
+        # working == aug.AugmentedPath.cwd()
         upstream.swap_carefree(working)
 
         upstream_now_old = upstream

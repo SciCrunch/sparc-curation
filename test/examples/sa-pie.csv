@@ -1,12 +1,12 @@
-subject_id,sample_id,wasDerivedFromSample,pool_id,experimental group,specimen type,specimen anatomical location,Additional Fields (e.g. MINDS),species,sex,age,age category,age range (min),age range (max),handedness,strain,RRID for strain,genotype,reference atlas,protocol title,protocol.io location,experimental log file name,same header,same header,same header
+subject_id,sample_id,wasDerivedFromSample,pool_id,experimental group,specimen type,specimen anatomical location,Additional Fields (e.g. MINDS),species,sex,age,age category,age range (min),age range (max),handedness,strain,RRID for strain,genotype,reference atlas,protocol title,protocol.io location,experimental log file name,same header,same header,same header,sample anatomical location
 Lab-based schema for identifying each subject,"Lab-based schema for identifying each sample, must be unique","sample_id of the sample from which the current sample was derived (e.g., slice, tissue punch, biopsy, etc.)",If data is collected on multiple samples at the same time include the identifier of the pool where the data file will be found.,Experimental group subject is assigned to in research project. If you have experimental groups for samples please add another column.,Physical type of the specimen from which the data were extracted,"The organ, or subregion of organ from which the data were extracted",,Subject species,"Sex of the subject, or if unknown fill in with “Unknown” ","Age of the subject  (e.g., hours, days, weeks, years old) or if unknown fill in with “unknown”",Qualitative description of age category from derived from UBERON life cycle stage,The minimal age (youngest) of the research subjects. The format for this field: numerical value + space + unit (spelled out) ,The maximal age (oldest) of the research subjects. The format for this field: numerical value + space + unit (spelled out) ,"Preference of the subject to use the right or left hand, if applicable ",Organism strain of the subject,RRID for the strain For this field,"Ignore if RRID is filled in, Genetic makeup of genetically modified alleles in transgenic animals belonging to the same subject group",The reference atlas and organ,"Once the research protocol is uploaded to Protocols.io, the title of the protocol within Protocols.io must be noted in this field.","The Protocol.io URL for the protocol. Once the protocol is uploaded to Protocols.io, the protocol must be shared with the SPARC group and the Protocol.io URL is noted in this field. Please share with the SPARC group.","A file containing experimental records for each sample.
-",OH,NO,!!!
-sub-1,sub-1_sam-2,sub-1_sam-1,pool-1,Control,tissue,dentate gyrus,,Rattus norvegicus,Female,4 weeks,prime adult stage,10 days,20 day,right,Sprague-Dawley,RRID:RGD_10395233,MGI:3851780,Paxinos Rat V3,Spinal Cord extraction,https://www.protocols.io/view/corchea-paper-based-microfluidic-device-vtwe6pe,,1,a,third
-pie-1,slice-1,,,,baked good,,,food,,2 hrs,,N/A,,,,,,,,,,2,b,time’s
-pie-1,slice-2,,,,baked good,,,food,,2 hrs,,2 days,,,,,,,,,,3,c,the
-pie-1,slice-3,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,4,d,charm
-pie-1,slice-4,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,5,e,don’t
-pie-1,slice-5,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,6,f,you
-pie-1,slice-6,,,,baked good,,,food,,2 hrs,,,,beak,,,,,,,,7,g,know
-pie-1,slice-7,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,8,h,it
-pie-1,slice-8,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,9,I,heh
+",OH,NO,!!!,
+sub-1,sub-1_sam-2,sub-1_sam-1,pool-1,Control,tissue,dentate gyrus,,Rattus norvegicus,Female,4 weeks,prime adult stage,10 days,20 day,right,Sprague-Dawley,RRID:RGD_10395233,MGI:3851780,Paxinos Rat V3,Spinal Cord extraction,https://www.protocols.io/view/corchea-paper-based-microfluidic-device-vtwe6pe,,1,a,third,
+pie-1,slice-1,,,,baked good,,,food,,2 hrs,,N/A,,,,,,,,,,2,b,time’s,"twelve, one thirty"
+pie-1,slice-2,,,,baked good,,,food,,2 hrs,,2 days,,,,,,,,,,3,c,the,"one thirty, three"
+pie-1,slice-3,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,4,d,charm,"three, four thirty"
+pie-1,slice-4,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,5,e,don’t,"four thirty, six"
+pie-1,slice-5,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,6,f,you,"six, seven thirty"
+pie-1,slice-6,,,,baked good,,,food,,2 hrs,,,,beak,,,,,,,,7,g,know,"seven thirty, nine"
+pie-1,slice-7,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,8,h,it,"nine, ten thirty"
+pie-1,slice-8,,,,baked good,,,food,,2 hrs,,,,,,,,,,,,9,I,heh,"ten thirty, twelve"
