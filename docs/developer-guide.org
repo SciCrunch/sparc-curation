@@ -626,29 +626,30 @@ if __name__ == '__main__':
 *** Export
 * Workflow
 ** All datasets
+*** Retrieve                                                         :ignore:
+**** Overview                                                        :ignore:
 The dependency DAG is as follows.
 # NOTE the workflow for generating these diagrams takes multiple steps
 # first write the graph in racket, where we can use dashes in names
 # conver to dot and add clusters as needed
-#+name: racket-graph
-#+header: :wrap "src dot :file ./images/pipeline-fetch-dag.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+name: graph-retrieve-all
+#+header: :wrap "src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes"
 #+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
 <<racket-graph-helper>>
-(define g (unweighted-graph/directed
-           (graph-notation
-            fetch-all -> fetch-annotations
-            fetch-all -> fetch-metadata-files
-            fetch-all -> fetch-remote-metadata
-            fetch-metadata-files -> pull
-            pull -> sparse-materialize
-            sparse-materialize -> fetch-remote-metadata
-            pull -> clone)))
+(define g (dag-notation
+           fetch-all -> fetch-annotations
+           fetch-all -> fetch-metadata-files
+           fetch-all -> fetch-remote-metadata
+           fetch-metadata-files -> pull
+           pull -> sparse-materialize
+           sparse-materialize -> fetch-remote-metadata
+           pull -> clone))
 
 (graphviz g)
 #+end_src
 
-#+RESULTS[e29666f9fbc8046ebab291bb30916242ab20cfeb]: racket-graph
-#+begin_src dot :file ./images/pipeline-fetch-dag.png :cmdline -Kdot -Tpng :exports results :cache yes
+#+RESULTS[e29666f9fbc8046ebab291bb30916242ab20cfeb]: graph-retrieve-all
+#+begin_src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes
 digraph G {
 	node0 [label="fetch-metadata-files"];
 	node1 [label="clone"];
@@ -680,8 +681,8 @@ digraph G {
 #+end_src
 
 #+RESULTS[041cb032103aa97b8bf26a7397abce2271f685b5]:
-[[file:./images/pipeline-fetch-dag.png]]
-
+[[file:./images/graph-retrieve-all.png]]
+**** Bash implementation                                             :ignore:
 # FIXME this is really an env file not a bin file ...
 #+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
 function sparcur-get-all-remote-data () {
@@ -755,25 +756,235 @@ function sparcur-get-all-remote-data () {
     fi
 }
 #+end_src
+*** Validate                                                         :ignore:
+This is the graph of the existing approach. A slightly more sane version
+is implemented above and tangled as =sparcur.simple=.
+
+# runs both but I'm fairly cerain that it fails to update the second code block
+# #+name: graph-validate-run-both
+# #+begin_src elisp :var one=graph-validate-all() two=graph-validate-all-dot() :results none
+# #+end_src
+
+#+name: graph-validate-all
+#+header: :wrap "src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g (dag-notation
+           ; I had description listed depending on dataset-structure
+           ; but that is really an implementation detail
+
+           pipeline-end -> pipeline-extras -> sparc-ds -> pipeline-start -> description -> fetch-all
+                                                          pipeline-start -> dataset-structure -> fetch-all
+                                                          pipeline-start -> dataset-metadata -> fetch-all
+
+                                              ; note that this is the idealized flow
+                                              ; the actual flow is through pipeline-start
+                                              sparc-ds -> submission -> description
+                                                          submission -> fetch-all
+                                              sparc-ds -> subjects -> description
+                                                          subjects -> fetch-all
+                                              sparc-ds -> samples -> description
+                                                          samples -> fetch-all
+                                              sparc-ds -> manifest -> description
+                                                          manifest -> fetch-all
+
+                           pipeline-extras -> submission-normalized -> submission
+                           pipeline-extras -> extras-added
+                           pipeline-extras -> lifters
+                           pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> network
+                                              contributors -> member #;lifters -> blackfynn-api -> network
+                                              contributors -> description
+                           pipeline-extras -> meta -> organ-term #;lifters -> organs-sheet -> network
+                                              meta -> modality #;lifters -> organs-sheet
+                                              meta -> techniques #;lifters -> organs-sheet
+                                              meta -> protocol-uris #;lifters -> organs-sheet
+                                              meta -> award-manual #;lifters -> organs-sheet
+                                              meta -> dataset-doi -> blackfynn-api ; path.cache.remote.bfobject.doi ; what a hack :x 
+                                              ; FIXME TODO this is how dataset-doi _should_ work
+                                              ; uncomment when it _actually_ works like this
+                                              ; meta -> dataset-doi -> cache-remote-metadata -> fetch-all
+                                              meta -> award-organ -> scraped-award-organ
+                                                      award-organ -> submission-normalized
+           ??? -> overview-sheet -> network))
+(graphviz g)
+#+end_src
+
+#+name: graph-validate-all-dot
+#+RESULTS[90c92629fb562228be77ac598ef3bc30470a5afc]: graph-validate-all
+#+begin_src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="description"];
+	node1 [label="extras-added"];
+	node2 [label="dataset-doi"];
+	node3 [label="blackfynn-api"];
+	node4 [label="dataset-metadata"];
+	node5 [label="meta"];
+	node6 [label="samples"];
+	node7 [label="subjects"];
+	node8 [label="award-manual"];
+	node9 [label="submission-normalized"];
+	node10 [label="organs-sheet"];
+	node11 [label="scraped-award-organ"];
+	node12 [label="member"];
+	node13 [label="lifters"];
+	node14 [label="award-organ"];
+	node15 [label="network"];
+	node16 [label="submission"];
+	node17 [label="fetch-all"];
+	node18 [label="manifest"];
+	node19 [label="techniques"];
+	node20 [label="overview-sheet"];
+	node21 [label="pipeline-end"];
+	node22 [label="pipeline-start"];
+	node23 [label="protocol-uris"];
+	node24 [label="pipeline-extras"];
+	node25 [label="dataset-structure"];
+	node26 [label="contributors"];
+	node27 [label="organ-term"];
+	node28 [label="affiliations"];
+	node29 [label="affiliations-sheet"];
+	node30 [label="???"];
+	node31 [label="sparc-ds"];
+	node32 [label="modality"];
+	subgraph U {
+		edge [dir=none];
+	}
+	subgraph D {
+		node0 -> node17;
+		node2 -> node3;
+		node3 -> node15;
+		node4 -> node17;
+		node5 -> node32;
+		node5 -> node2;
+		node5 -> node19;
+		node5 -> node14;
+		node5 -> node23;
+		node5 -> node8;
+		node5 -> node27;
+		node6 -> node0;
+		node6 -> node17;
+		node7 -> node0;
+		node7 -> node17;
+		node8 -> node10;
+		node9 -> node16;
+		node10 -> node15;
+		node12 -> node3;
+		node14 -> node11;
+		node14 -> node9;
+		node16 -> node0;
+		node16 -> node17;
+		node18 -> node0;
+		node18 -> node17;
+		node19 -> node10;
+		node20 -> node15;
+		node21 -> node24;
+		node22 -> node0;
+		node22 -> node25;
+		node22 -> node4;
+		node23 -> node10;
+		node24 -> node5;
+		node24 -> node13;
+		node24 -> node1;
+		node24 -> node31;
+		node24 -> node26;
+		node24 -> node9;
+		node25 -> node17;
+		node26 -> node0;
+		node26 -> node12;
+		node26 -> node28;
+		node27 -> node10;
+		node28 -> node29;
+		node29 -> node15;
+		node30 -> node20;
+		node31 -> node18;
+		node31 -> node6;
+		node31 -> node16;
+		node31 -> node22;
+		node31 -> node7;
+		node32 -> node10;
+	}
+}
+#+end_src
+
+#+RESULTS[0fda54b4f1f55a0506b6a6fc085ce04622515764]: graph-validate-all-dot
+[[file:./images/graph-validate-all.png]]
+
+*** Export                                                           :ignore:
 ** Single dataset
+*** Retrieve                                                         :ignore:
+**** Overview                                                        :ignore:
+**** Bash implementation                                             :ignore:
 #+begin_src bash
 DATASET_PATH=$(python -m sparcur.simple.clone --dataset-id ${DATASET_ID})
 python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
 python -m sparcur.simple.pull ${DATASET_PATH}
 python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
 #+end_src
+*** Validate                                                         :ignore:
+*** Export                                                           :ignore:
 * Code :noexport:
+See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
+for more direct mapping of graphviz functionality but one that is also way more verbose.
+
 #+name: racket-graph-helper
-#+begin_src racket :lang racket/base :exports none
+#+header: :prologue "#lang racket/base"
+#+begin_src racket :lang racket/base :exports none :tangle ./y-u-no-compile-from-buffer.rkt :tangle no
 (require graph ; rack pkg install graph
          (for-syntax racket/base
                      syntax/parse))
 
-(define-syntax (graph-notation stx)
+(define-for-syntax (list-to-pairs l)
+  (for/list ([a l] [b (cdr l)]) (list a b)))
+
+(define-syntax (dag-notation stx)
   (syntax-parse stx
     #:datum-literals (->)
-    [(_ (~seq left -> right) ...)
-     #'(quote ((left right) ...))]))
+    [(_ (~seq left (~seq -> right) ...) ...)
+     #:with (pairs ...) (datum->syntax this-syntax (apply append (map list-to-pairs (syntax->datum #'((left right ...) ...)))))
+     #'(unweighted-graph/directed (quote (pairs ...)))]))
+
+(module+ test
+  (require racket/pretty)
+  (define g (dag-notation a -> b -> c
+                          b -> d -> e -> f))
+  (pretty-print g)
+  (graphviz g))
+
+(module+ test
+  ; TODO explor possibility of using -^ or -> ^ or | syntax
+  ; to point up to the most recent definition chain containing
+  ; the start of the chain in question and having one more
+  ; elment than the current chain
+
+  #;
+  (dag-notation
+   ; for example
+   a -> b -> c -> d
+        b -> q |
+        b -> p |
+
+   ; expands to
+   a -> b -> c -> d
+        b -> q -> d
+        b -> p -> d)
+
+  ; in theory this notation could also be used in reverse, but I'm worried about
+  ; accidental hard to debug errors if a line accidentally ends with an arrow
+
+  #;
+  (dag-notation
+   ; clearly confusing
+   a -> b -> c -> d
+   | -> d
+        | -> e
+   ; this would probably read as
+   a -> b -> c -> d
+   a -> d
+   a -> e
+   ; hrm
+   a -> b -> c -> d
+             a |
+   | e ; not sure if I like this pretty sure I dont ...
+   )
+  )
 #+end_src
-
-
