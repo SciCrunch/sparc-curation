@@ -1673,8 +1673,8 @@ class Shell(Dispatcher):
         inst = [i for i in wat]
         res = Async(rate=5)(deferred(i.dereference)(idlib.Auto) for i in inst)
         pis = [i for i in res if isinstance(i, idlib.Pio)]
-        #dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
-        #dois = [d['protocol']['doi'] for d in dat if d]
+        # dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
+        # dois = [d['protocol']['doi'] for d in dat if d]
         dois = [p.doi for p in pis]
         breakpoint()
 
@@ -1689,6 +1689,33 @@ class Shell(Dispatcher):
         pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         breakpoint()
+
+    def ontologyIDPopulation(self):
+        import gspread  # https://gspread.readthedocs.io/en/latest/oauth2.html#oauth-client-id
+                        # with google drive api enabled you can access each google sheet by name!
+        import pandas as pd
+        from pyontutils.scigraph import Graph, Vocabulary
+        sgv = Vocabulary(cache=True, verbose=False)
+
+        gc = gspread.oauth()
+        sparc_proctur = gc.open('sparc protcur annotation tags')
+        worksheet = sparc_proctur.worksheet('working-ilxtr:technique')
+        df = pd.DataFrame(worksheet.get_all_values())
+        df.columns = df.iloc[0]  # first row is actually the header
+        df.drop(df.index[0], inplace=True)  # drop first row that was the header
+
+        iris = []
+        for row in df.itertuples():
+            matches = sgv.findByTerm(term=row.exact)
+            _iris = [match['iri'] for match in matches]
+            if not iris:
+                iris.append(None)
+            elif len(iris) == 0:
+                iris.append(_iris[0])
+            else:
+                iris.append(', '.join(_iris))
+        df['ontology id'] = iris
+        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
 
 
 class Fix(Shell):
