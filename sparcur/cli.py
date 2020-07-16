@@ -1691,13 +1691,18 @@ class Shell(Dispatcher):
         breakpoint()
 
     def ontologyIDPopulation(self):
-        import gspread  # https://gspread.readthedocs.io/en/latest/oauth2.html#oauth-client-id
-                        # with google drive api enabled you can access each google sheet by name!
+        """ Update ontology id col based on exact column label
+
+             # https://gspread.readthedocs.io/en/latest/oauth2.html#oauth-client-id
+             # with google drive api enabled you can access each google sheet by name!
+        """
+        import gspread
         import pandas as pd
         from pyontutils.scigraph import Graph, Vocabulary
-        sgv = Vocabulary(cache=True, verbose=False)
 
-        gc = gspread.oauth()
+        sgv = Vocabulary(cache=True, verbose=False)  # direct import seemed simple
+
+        gc = gspread.oauth()  # uses ~/.config/gspread/credentials.json; will prop if missing something
         sparc_proctur = gc.open('sparc protcur annotation tags')
         worksheet = sparc_proctur.worksheet('working-ilxtr:technique')
         df = pd.DataFrame(worksheet.get_all_values())
@@ -1715,6 +1720,7 @@ class Shell(Dispatcher):
             else:
                 iris.append(', '.join(_iris))
         df['ontology id'] = iris
+
         worksheet.update([df.columns.values.tolist()] + df.values.tolist())
 
 
