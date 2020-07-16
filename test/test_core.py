@@ -13,6 +13,8 @@ class Examples:
         yield {'world': [{'hello': 'there'},
                          {'hello': 'there'}]}, {'world': [{},
                                                           {}]}, (['world', int, 'hello'], 'there')
+        yield {'world': {'oh': 'no'}}, {'world': {'oh': 'no'}}, (['world', 'hello', int, 'mr'], 'there')
+
     @property
     def add_error(self):
         yield {'hello':'1'}, {'hello':'1'}, (['hello'], 'there')
@@ -78,6 +80,30 @@ class TestDer(unittest.TestCase):
 class ExamplesDT:
 
     @property
+    def move(self):
+        # after before command
+        sko = dict(source_key_optional=True)
+        yield ({'other-key': 'something'},
+               {'other-key': 'something'},
+               [[['not-here'], ['not-here', 'over-there']]],
+               sko)
+
+        yield ({'not-here': {'over-there': {}}},
+               {'not-here': {}},
+               [[['not-here'], ['not-here', 'over-there']]],
+               sko)
+
+        yield ({'not-here': {'over-there': []}},
+               {'not-here': []},
+               [[['not-here'], ['not-here', 'over-there']]],
+               sko)
+
+        yield ({'not-here': {'over-there': None}},
+               {'not-here': None},
+               [[['not-here'], ['not-here', 'over-there']]],
+               sko)
+
+    @property
     def derive(self):
         yield ({'a': 2, 'b': 3, 'c': 5, 'd': 6, 'e': 1},
                {'a': 2, 'b': 3}, [[[['a'], ['b']],
@@ -119,9 +145,9 @@ class ExamplesDT:
                 {'n': 0}]}, [[['hello', int, 'n'], lambda v: v + 1]]
 
 
-def failed_to_error(function, data, args):
+def failed_to_error(function, data, args, kwargs):
     try:
-        function(data, *args)
+        function(data, *args, **kwargs)
         print(function, data, args)
         return True
     except BaseException as e:
@@ -140,8 +166,11 @@ class Populator:
             function_to_test = getattr(cls.to_test, name)
             def fun(self, name=name, function=function_to_test):
                 bads = [(expect, data, args)
-                        for expect, data, args in getattr(self, name)
-                        if not function(data, *(args if cls.apply else (args,))) and data != expect]
+                        for expect, data, args, *kwargs in getattr(self, name)
+                        if not function(data,
+                                        *(args if cls.apply else (args,)),
+                                        **{k:v for kw in kwargs for k, v in kw.items()})
+                        and data != expect]
                 assert not bads, bads
 
             setattr(cls, test_name, fun)
@@ -150,8 +179,11 @@ class Populator:
                 test_name_error = 'test_' + name_error
                 def efun(self, name=name_error, function=function_to_test):
                     bads = [(expect, data, args)
-                            for expect, data, args in getattr(self, name)
-                            if failed_to_error(function, data, (args if cls.apply else (args,)))]
+                            for expect, data, args, *kwargs in getattr(self, name)
+                            if failed_to_error(function,
+                                               data,
+                                               (args if cls.apply else (args,)),
+                                               {k:v for kw in kwargs for k, v in kw.items()})]
                     assert not bads, bads
 
                 setattr(cls, test_name_error, efun)
@@ -160,8 +192,11 @@ class Populator:
                 test_name_negative = 'test_' + name_negative
                 def nfun(self, name=name_negative, function=function_to_test):
                     bads = [(expect, data, args)
-                            for expect, data, args in getattr(self, name)
-                            if not function(data, *(args if cls.apply else (args,))) and data == expect]
+                            for expect, data, args, *kwargs in getattr(self, name)
+                            if not function(data,
+                                            *(args if cls.apply else (args,)),
+                                            **{k:v for kw in kwargs for k, v in kw.items()})
+                            and data == expect]
                     assert not bads, bads
 
                 setattr(cls, test_name_negative, nfun)
@@ -174,7 +209,7 @@ TestAdops.populate()
 
 
 class TestDictTransformer(ExamplesDT, Populator, unittest.TestCase):
-    functions = 'lift', 'derive', 'update'
+    functions = 'lift', 'derive', 'update', 'move',
     to_test = DictTransformer
     apply = False
 TestDictTransformer.populate()

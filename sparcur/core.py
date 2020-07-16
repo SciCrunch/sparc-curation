@@ -578,6 +578,16 @@ class AtomicDictOperations:
 
     @staticmethod
     def add(data, target_path, value, fail_on_exists=True, update=False):
+        """ Note on semantics when target_path contains the type int.
+            Normally when adding a path all the parents are added because
+            we are expecting a direct path down. However, if the path
+            contains int then it implicitly expects the list to alread
+            exist. Therefore any failure on the way TO a list will
+            immediately abort and not add the keys to the non-existent list.
+            This is consistent with the approach where keys are not required
+            but if their value is a list it must not be empty. Thus we abort
+            so that we don't go around creating a bunch of empty lists that
+            will show up later as errors when validating the schema. """
         # type errors can occur here ...
         # e.g. you try to go to a string
         if not [_ for _ in (list, tuple) if isinstance(target_path, _)]:
@@ -587,6 +597,7 @@ class AtomicDictOperations:
         target_prefixes = target_path[:-1]
         target_key = target_path[-1]
         target = data
+        is_subpath_add = int in target_path
         for i, target_name in enumerate(target_prefixes):
             if target_name is int:  # add same value to all objects in list
                 if not is_list_or_tuple(target):
@@ -600,6 +611,14 @@ class AtomicDictOperations:
                 return  # int terminates this level of an add
 
             if target_name not in target:  # TODO list indicies XXX that is really append though ...
+                if is_subpath_add:
+                    # if we are targeting objects in a list for addition
+                    # abort the first time we would have to create a key
+                    # because we will eventually create an empty list
+                    # which we won't be able to add anything to and will
+                    # likely cause schema validation errors
+                    return
+
                 target[target_name] = {}
 
             target = target[target_name]

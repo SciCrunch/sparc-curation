@@ -391,6 +391,12 @@ class DatasetStructure(Path):
 
     @property
     def data(self):
+        # XXX beware if you ever try to call checksum on this it will
+        # fail because this is no longer a path in the way that the path
+        # checksum exists because this data returns a dict, this could
+        # be remedied by coming up with a convention for hashing arbitrary
+        # python objects, but we aren't there yet
+
         out = self.counts
         for section_name in self.sections:
             #section_paths_name = section_name + '_paths'

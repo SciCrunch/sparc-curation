@@ -1501,6 +1501,13 @@ class ProtcurPipeline(Pipeline):
 
             return a.value
 
+        def normalize_param(a):
+            try:
+                return a.asPython().asPython()
+            except Exception as e:
+                log.exception(e)
+                return normalize_other(a)
+
         def normalize_other(a):
             for tag in a.tags:
                 if tag.startswith('UBERON:'):
@@ -1514,8 +1521,11 @@ class ProtcurPipeline(Pipeline):
                 return a.text
 
         def clean(v):
-            nbsp = '\xa0'  # the vails of the non breaking space for formatting :/
-            return v.strip().replace(nbsp, ' ')
+            if isinstance(v, str):
+                nbsp = '\xa0'  # the vails of the non breaking space for formatting :/
+                return v.strip().replace(nbsp, ' ')
+            else:
+                return v
 
         hrm = defaultdict(list)
         _ = [hrm[partition(a)].append(a) for a in annos]
@@ -1525,22 +1535,44 @@ class ProtcurPipeline(Pipeline):
 
         data['TEMP:hasNumberOfProtcurAnnotations'] = len(anp)
 
-        for tag, predicate, *norm in (
-                ('ilxtr:technique', 'TEMP:protocolEmploysTechnique', normalize_tech),
+        tpn = (
+                ('ilxtr:technique', 'TEMPRAW:protocolEmploysTechnique'),
 
-                ('protc:aspect', 'TEMP:protocolInvolvesAspect'),  # FIXME source from protcs
-                ('protc:implied-aspect', 'TEMP:protocolInvolvesAspect'),  # FIXME source from protcs
+                ('protc:aspect',         'TEMPRAW:protocolInvolvesAspect'),        # FIXME source from protcs
+                ('protc:implied-aspect', 'TEMPRAW:protocolInvolvesAspect'),        # FIXME source from protcs
+                ('protc:input',          'TEMPRAW:protocolInvolvesInput'),         # FIXME source from protcs
+                ('protc:implied-input',  'TEMPRAW:protocolInvolvesInput'),         # FIXME source from protcs
+                ('protc:input-instance', 'TEMPRAW:protocolInvolvesInputInstance'), # FIXME source from protcs
+                ('protc:output',         'TEMPRAW:protocolInvolvesOutput'),        # FIXME source from protcs
+                ('protc:parameter*',     'TEMPRAW:protocolInvolvesParameter'),     # FIXME source from protcs
+                ('protc:invariant',      'TEMPRAW:protocolInvolvesInvariant'),     # FIXME source from protcs
+                ('protc:executor-verb',  'TEMPRAW:protocolInvolvesAction'),        # FIXME source from protcs
+
                 # TODO aspects of subjects vs reagents, primary particiant in the
                 # core protocols vs subprotocols
 
-                ('sparc:AnatomicalLocation', 'TEMP:involvesAnatomicalRegion'),
-                ('sparc:Measurement', 'TEMP:protocolMakesMeasurement'),
-                ('sparc:Reagent', 'TEMP:protocolUsesReagent'),
-                ('sparc:Tool', 'TEMP:protocolUsesTool'),
-                ('sparc:Sample', 'TEMP:protocolInvolvesSampleType'),
-                ('sparc:OrganismSubject', 'TEMP:protocolInvolvesSubjectType'),
-                ('sparc:Procedure', 'TEMP:whatIsThisDoingHere'),
-        ):
+                ('sparc:AnatomicalLocation', 'TEMPRAW:involvesAnatomicalRegion'),
+                ('sparc:Measurement',        'TEMPRAW:protocolMakesMeasurement'),
+                ('sparc:Reagent',            'TEMPRAW:protocolUsesReagent'),
+                ('sparc:Tool',               'TEMPRAW:protocolUsesTool'),
+                ('sparc:Sample',             'TEMPRAW:protocolInvolvesSampleType'),
+                ('sparc:OrganismSubject',    'TEMPRAW:protocolInvolvesSubjectType'),
+                ('sparc:Procedure',          'TEMPRAW:whatIsThisDoingHere'),
+        )
+
+        norms = {
+            'ilxtr:technique': normalize_tech,
+
+            'protc:parameter*': normalize_param,
+            'protc:invariant': normalize_param,
+        }
+
+        tpn += tuple(
+            (k, [pred for tag, pred, *norm in tpn
+                 if tag == k][0].replace('TEMPRAW:', 'TEMP:'),
+             n) for k, n in norms.items())
+
+        for tag, predicate, *norm in tpn:
             if not norm:
                 norm = normalize_other
             else:

@@ -507,8 +507,20 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         else:
             gen = chain((self,), self.rchildren)
 
-        simple_meta = [aug.PathMeta(updated=c.getxattr('bf.updated').decode())
-                       if not c.is_broken_symlink() else aug.PathMeta.from_symlink(c)
+        def updated_hierarchy(local):
+            """ try to get the cache updated time, if the cache doesn't exist,
+                e.g. because the file has been overwritten and there are no
+                xattrs, then use the local updated time """
+            try:
+                updated = local.getxattr('bf.updated').decode()
+                return aug.PathMeta(updated=updated)
+            except exc.NoStreamError:
+                return local.meta_no_checksum
+
+
+        simple_meta = [updated_hierarchy(c)
+                       if not c.is_broken_symlink() else
+                       aug.PathMeta.from_symlink(c)
                        for c in gen]
         if simple_meta:
             return max(m.updated for m in simple_meta)
