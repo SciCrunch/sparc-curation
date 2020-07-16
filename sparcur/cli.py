@@ -1693,8 +1693,8 @@ class Shell(Dispatcher):
     def ontologyIDPopulation(self):
         """ Update ontology id col based on exact column label
 
-             # https://gspread.readthedocs.io/en/latest/oauth2.html#oauth-client-id
-             # with google drive api enabled you can access each google sheet by name!
+            # https://gspread.readthedocs.io/en/latest/oauth2.html#oauth-client-id
+            # with google drive api enabled you can access each google sheet by name!
         """
         import gspread
         import pandas as pd
@@ -1702,7 +1702,7 @@ class Shell(Dispatcher):
 
         sgv = Vocabulary(cache=True, verbose=False)  # direct import seemed simple
 
-        gc = gspread.oauth()  # uses ~/.config/gspread/credentials.json; will prop if missing something
+        gc = gspread.oauth()  # add OAuth2 as ~/.config/gspread/credentials.json; will prop if missing something
         sparc_proctur = gc.open('sparc protcur annotation tags')
         worksheet = sparc_proctur.worksheet('working-ilxtr:technique')
         df = pd.DataFrame(worksheet.get_all_values())
