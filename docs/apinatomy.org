@@ -1,5 +1,18 @@
 #+title: ApiNATOMY model RDF export and deployment
 #+options: num:nil
+
+* Using this file :noexport:
+You can also tangle this file to produce [[file:../export-apinatomy-tests]]
+and then run that file from the working directory of this sparc-curation repo.
+#+begin_src bash
+emacs --batch \
+      --load org \
+      --load ob-shell \
+      --load ob-python \
+      --eval '(org-babel-tangle-file "./docs/apinatomy.org")'
+
+./export-apinatomy-tests
+#+end_src
 * ApiNATOMY to RDF/OWL2 conversion
 ** Basic strategy
    JSON -> RDF -> OWL2 \\
@@ -15,13 +28,14 @@ mkdir /var/www/sparc/ApiANTOMY/archive/manual
 mkdir /var/www/sparc/ApiANTOMY/ontologies
 chown -R nginx:nginx /var/www/sparc/ApiANTOMY
 #+end_src
-* Export
+* SciGraph pipeline
+** Export to ttl
+Until this is fully automated you need to obtain the flattened jsonld
+export of any files to be converted to ttl.
+
 Make sure SciGraph services and InterLex are accessible for OntTerm.
 
 Run this block in emacs with =C-c C-c= or tangle and run with the block below
-# note have to export to working dir not ../bin/ because
-# there is no test folder inside of bin and python can't
-# look backward up the folder hierarchy to find it
 #+name: apinat-export
 #+header: :shebang "#!/usr/bin/env bash" :tangle-mode (identity #o0755)
 #+begin_src bash :dir ../ :tangle ../export-apinatomy-tests :async
@@ -29,27 +43,20 @@ spc apinat ./test/apinatomy/keast-spinal-map.json keast-spinal.ttl
 spc apinat ./test/apinatomy/bolser-lewis-map.json test-bolew.ttl
 spc apinat keast-spinal-full.jsonld keast-spinal-full.ttl
 #+end_src
+# note have to export to working dir not ../bin/ because
+# there is no test folder inside of bin and python can't
+# look backward up the folder hierarchy to find it
+** Deploy ttl
+After running the ttl export via [[apinat-export][apinat-export]]
+scp the files to the server hosting the ttl files.
 
-You can also tangle this file to produce [[file:../export-apinatomy-tests]]
-and then run that file from the working directory of this sparc-curation repo.
-#+begin_src bash
-emacs --batch \
-      --load org \
-      --load ob-shell \
-      --load ob-python \
-      --eval '(org-babel-tangle-file "./docs/apinatomy.org")'
-
-./export-apinatomy-tests
-#+end_src
-* Deploy ttl
-First run the export via [[apinat-export][apinat-export]].
-Then
 #+begin_src bash :results none :noweb yes
 scp ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
 scp ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
 scp ~/git/sparc-curation/keast-spinal-full.ttl cassava:/tmp/
 #+end_src
 
+And then put move them to the right place.
 #+begin_src bash :dir /ssh:cassava|sudo:cassava:
 DATE=$(date +%Y%m%dT%H%M%S)
 ARCHIVE_PATH="archive/manual/${DATE}"
@@ -69,8 +76,8 @@ ln -s "../${ARCHIVE_PATH}/keast-spinal-full.ttl"
 popd
 #+end_src
 
-Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success.
-* Load and deploy graph
+Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success if needed.
+** Load and deploy graph
 Then run
 [[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
 to load and deploy in one shot.
@@ -80,6 +87,13 @@ An example run is
 ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-data
 ~/git/pyontutils/nifstd/scigraph/bin/run-deploy-graph-sparc-data
 #+end_src
+# TODO consider ob-screen ... for cases like this
+# where we aren't really writing bash so much as just
+# running commands
+** Review query output
+[[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/somas][All somas]]
+[[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/soma-processes][Soma processes]]
+[[http://ontology.neuinfo.org/trees/sparc/simple/dynamic/demos/apinat/soma-processes][Soma processes simple]]
 * Dynamic cypher queries
 NOTE: this section contains temporary instructions.
 This should really be done on a development instance of data services.
@@ -104,6 +118,7 @@ to match the name of the file that you scp to cassava.
       removeUnsatisfiableClasses: true
 #+end_src
 * ApiNATOMY model server specification
+** Intro
 While an ApiNATOMY server has been on the roadmap for some time, there have not been
 clear requirements and use cases to drive the development in a way that is productive.
 As the conversion of ApiNATOMY models to RDF has progressed, some of the requirements
@@ -143,6 +158,7 @@ how to deal with json/ttl and model, generated, map
 ** transformed models/copies need to be able to point back to the exact commit
 for deposition on blackfynn, export to scigraph, etc.
 the source model hash needs to be separat
+** Serve the JSONLD context
 ** return authoring metadata
 ** store the source model
 ** have endpoint for resource-map and generated
