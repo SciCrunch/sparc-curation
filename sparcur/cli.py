@@ -1705,9 +1705,8 @@ class Shell(Dispatcher):
         gc = gspread.oauth()  # add OAuth2 as ~/.config/gspread/credentials.json; will prop if missing something
         sparc_proctur = gc.open('sparc protcur annotation tags')
         worksheet = sparc_proctur.worksheet('working-ilxtr:technique')
-        df = pd.DataFrame(worksheet.get_all_values())
-        df.columns = df.iloc[0]  # first row is actually the header
-        df.drop(df.index[0], inplace=True)  # drop first row that was the header
+        row_list = worksheet.get_all_values()
+        df = pd.DataFrame(row_list[1:], columns=row_list[0])
 
         iris = []
         for row in df.itertuples():
