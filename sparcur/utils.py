@@ -112,9 +112,10 @@ def bind_file_handler(log_file):
     from ontquery.utils import log as oqlog
     from augpathlib.utils import log as alog
     from pyontutils.utils import log as pylog
+    from blackfynn.log import get_logger; bflog = get_logger()
 
     sfh = SimpleFileHandler(log_file, log)
-    sfh(alog, idlog, oalog, oqlog, prlog, pylog)
+    sfh(alog, idlog, oalog, oqlog, prlog, pylog, bflog)
 
 
 class _log:

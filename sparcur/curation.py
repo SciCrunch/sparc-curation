@@ -224,7 +224,7 @@ class Integrator(PathData, OntologyData):
 
             # aux
             organ = self.organ
-            member = self.member
+            #member = self.member  # not used via lifters, instead used via state
             affiliations = self.affiliations
 
             # hypothesis that the calling of methods was the issue

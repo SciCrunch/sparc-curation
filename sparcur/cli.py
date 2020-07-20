@@ -12,14 +12,16 @@ Usage:
     spc meta     [options] [<path>...]
     spc rmeta    [options]
     spc export   [schemas protcur protocols] [options] [<path>...]
+    spc report   all     [options]
     spc report   size    [options] [<path>...]
     spc report   tofetch [options] [<directory>...]
     spc report   terms   [anatomy cells subcelluar] [options]
-    spc report   [access filetypes pathids test]    [options]
+    spc report   overview [<path>...]               [options]
+    spc report   anno-tags <tag>...                 [options]
+    spc report   [access filetypes pathids errors]  [options]
     spc report   [completeness keywords subjects]   [options]
-    spc report   [contributors samples errors mbf]  [options]
-    spc report   [(anno-tags <tag>...) changes mis] [options]
-    spc report   [(overview [<path>...]) all]       [options]
+    spc report   [contributors samples mbf mis]     [options]
+    spc report   [protocols changes test]           [options]
     spc shell    [affil integration protocols exit] [options]
     spc shell    [(dates [<path>...]) sheets]       [options]
     spc server   [options]
@@ -121,6 +123,7 @@ Commands:
                        : --uri-api
                        : --debug
                        : --export-file=PATH
+                       : --protcur-file=PATH
                        : --ttl-file=PATHoURI
                        : --ttl-compare=PATHoURI
                        : --published
@@ -181,6 +184,7 @@ Options:
     -W --raw                run reporting on live data without export
     --published             run on the latest published export
     --to-sheets             push report to google sheets
+    --protcur-file=PATH     location of protcur jsonld file
     --ttl-file=PATHoURI     location of ttl file (uses latest if not specified)
     --ttl-compare=PATHoURI  location of ttl file for comparison
 
@@ -467,6 +471,7 @@ class Main(Dispatcher):
             self.options.annos or
             (self.options.report and not self.options.raw) or
             (self.options.report and self.options.export_file) or
+            (self.options.report and self.options.protocols) or
             (self.options.export and self.options.schemas) or
             (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
             (self.options.find and not (self.options.fetch or self.options.refresh))):
@@ -945,6 +950,8 @@ done"""
                 # need to be able to run this from arbitrary dataset blobs
                 # in a way that is marginally sane
                 raise NotImplementedError('dataset blobs inclusion please')
+            else:
+                return blob_protcur
 
         elif self.options.mbf:
             export = self._export(ex.ExportXml)

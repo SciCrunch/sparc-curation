@@ -415,11 +415,12 @@ class Export(ExportBase):
         return blob_protocols
 
     def export_protcur(self, dump_path, *hypothesis_groups):
-        if (self.latest and
+        if (self.latest and  # FIXME NOTE this only points to the latest integrated release
             self.latest_protcur_path.exists()):
             blob_protcur = self.latest_protocols
         else:
             pipeline = pipes.ProtcurPipeline(*hypothesis_groups)
+            # FIXME NOTE this does not do the identifier expansion pass
             protcur = pipeline.data
             context = {**sc.base_context}
             for f in ('meta', 'subjects', 'samples', 'contributors'):

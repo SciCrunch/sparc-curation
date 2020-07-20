@@ -12,7 +12,7 @@ import ontquery as oq
 from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pysercomb.pyr.types import ProtcurExpression, Quantity
+from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ
 from pyontutils.core import OntTerm as OTB, OntId as OIDB
 from pyontutils.utils import isoformat
 from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
@@ -285,6 +285,8 @@ def json_identifier_expansion(obj, *args, path=None, **kwargs):
 def json_export_type_converter(obj):
     if isinstance(obj, deque):
         return list(obj)
+    elif isinstance(obj, AJ):
+        return obj.asJson()
     elif isinstance(obj, ProtcurExpression):
         return obj.json()
     elif isinstance(obj, PurePath):

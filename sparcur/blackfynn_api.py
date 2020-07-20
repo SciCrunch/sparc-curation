@@ -19,16 +19,30 @@ from joblib import Parallel, delayed
 if 'BLACKFYNN_LOG_LEVEL' not in os.environ:
     # silence agent import warning
     os.environ['BLACKFYNN_LOG_LEVEL'] = 'CRITICAL'
+from blackfynn import log as _bflog
+# blackfynn.log sets logging.basicConfig which pollutes logs from
+# other programs that are sane and do not use the root logger
+# so we have to undo the damage done by basic config here
+# we add the sparcur local handlers back in later
+__bflog = _bflog.get_logger()
+__parent = __bflog
+while __parent:
+    [__parent.removeHandler(h) for h in __parent.handlers]
+    __parent = __parent.parent
+
+from sparcur.utils import log
+__bflog.addHandler(log.handlers[0])
+
 from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset, BaseNode
-from blackfynn.models import BaseCollection
 from blackfynn import base as bfb
 from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
+from blackfynn.models import BaseCollection
 from pyontutils.utils import Async, deferred, async_getter, chunk_list
 from pyontutils.iterio import IterIO
 from sparcur import exceptions as exc
-from sparcur.core import log, lj
+from sparcur.core import lj
 from sparcur.metastore import MetaStore
 from .config import auth
 

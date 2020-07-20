@@ -20,7 +20,7 @@ from sparcur import converters as conv
 from sparcur import exceptions as exc
 from sparcur import normalization as norm
 from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
-from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
+from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries, get_nested_by_key
 from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
 from sparcur.state import State
 from sparcur.config import auth
@@ -1457,26 +1457,6 @@ class ProtcurPipeline(Pipeline):
 
         return annos
 
-    def _idints(self, annos=None):
-        if annos is None:
-            annos = self.load()
-
-        _annos = annos
-        annos = [ptcdoc.Annotation(a) for a in annos]
-        #pool = ptcdoc.Pool(annos)
-        #anno_counts = ptcdoc.AnnoCounts(pool)
-        #idn = ptcdoc.IdNormalization(anno_counts.all())
-        idn = ptcdoc.IdNormalization(annos)
-        protc.reset(reset_annos_dict=True)  # sigh, yes we have to do this here
-        #breakpoint()
-        protcs = [protc(f, annos) for f in annos]
-        idints = idn._uri_api_ints()
-        nones = idints.pop(None)
-        nidn = ptcdoc.IdNormalization(nones)
-        idints.update(nidn.normalized())
-        pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
-        return annos, idints, pidints
-
     @staticmethod
     def _annos_to_json(data, annos):
         def partition(a):
@@ -1503,7 +1483,19 @@ class ProtcurPipeline(Pipeline):
 
         def normalize_param(a):
             try:
-                return a.asPython().asPython()
+                racket = a.asPython()
+            except a.pyru.RacketParser.ParseFailure as e:
+                log.exception(e)  # bigger deal than the parse errors below
+                return
+
+            if racket is None:
+                log.debug(f'bad protc:parameter* value {a.value}')
+                return
+
+            try:
+                return racket.asPython()
+            except racket.ParseFailure as e:
+                log.debug(repr(e))
             except Exception as e:
                 log.exception(e)
                 return normalize_other(a)
@@ -1578,11 +1570,42 @@ class ProtcurPipeline(Pipeline):
             else:
                 norm, = norm
 
-            vals = sorted(set([clean(norm(a)) for a in annos if tag in a.tags]))
+            vals = sorted(set([clean(n) for n in [norm(a) for a in annos if tag in a.tags] if n]))
             if vals:
                 data[predicate] = vals
 
+    def _idints(self, annos=None):
+        if annos is None:
+            annos = self.load()
+
+        _annos = annos
+        annos = [ptcdoc.Annotation(a) for a in annos]
+        #pool = ptcdoc.Pool(annos)
+        #anno_counts = ptcdoc.AnnoCounts(pool)
+        #idn = ptcdoc.IdNormalization(anno_counts.all())
+        idn = ptcdoc.IdNormalization(annos)
+        protc.reset(reset_annos_dict=True)  # sigh, yes we have to do this here
+        #breakpoint()
+        protcs = [protc(f, annos) for f in annos]
+        idints = idn._uri_api_ints()
+        nones = idints.pop(None)
+        nidn = ptcdoc.IdNormalization(nones)
+        idints.update(nidn.normalized())
+        pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
+        return annos, idints, pidints
+
     def _hrm(self):
+        def urih(data, pio):
+            if (hasattr(pio, '_progenitors') and
+                'id-converted-from' in pio._progenitors):
+                orig_pio = pio._progenitors['id-converted-from']
+                if orig_pio.asStr() != pio.asStr():
+                    if hasattr(orig_pio, 'uri_human') and orig_pio.uri_human:
+                        data['uri_human'] = orig_pio.uri_human
+                    elif orig_pio.slug_tail:
+                        data['uri_human'] = orig_pio
+
+
         annos, idints, pidints = self._idints()
         out = []
         for pio, pannos in pidints.items():
@@ -1594,6 +1617,39 @@ class ProtcurPipeline(Pipeline):
 
             data['id'] = pio
             data['@type'] = ['sparc:Protocol', 'owl:NamedIndividual']
+            try:
+                if hasattr(pio, 'uri_human') and pio.uri_human:
+                    # calling hasattr on a property evokes sideffects !? # file under LOL PYTHON
+                    data['uri_human'] = pio.uri_human
+                else:
+                    urih(data, pio)
+                    if 'uri_human' not in data:
+                        msg = ('No uri_human for '
+                               f'{pio.asStr() if hasattr(pio, "asStr") else pio}')
+                        log.error(msg)
+                        #annos = None
+                        #idints = None
+                        #pidints = None
+                        #pannos = None
+                        #breakpoint()
+            except idlib.exc.RemoteError as e:
+                urih(data, pio)
+                if 'uri_human' not in data:
+                    log.error(f'No uri_human for {pio.asStr()}')
+                    # TODO embed error status
+                    #annos = None
+                    #idints = None
+                    #pidints = None
+                    #pannos = None
+                    #breakpoint()
+
+            try:
+                if hasattr(pio, 'doi') and pio.doi:
+                    data['doi'] = pio.doi
+            except idlib.exc.RemoteError as e:
+                # TODO embed error status
+                pass
+
             self._annos_to_json(data, pannos)
             log.debug(data)
             out.append(data)

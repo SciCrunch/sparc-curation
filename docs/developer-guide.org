@@ -789,124 +789,157 @@ is implemented above and tangled as =sparcur.simple=.
                                                           manifest -> fetch-all
 
                            pipeline-extras -> submission-normalized -> submission
-                           pipeline-extras -> extras-added
-                           pipeline-extras -> lifters
-                           pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> network
-                                              contributors -> member #;lifters -> blackfynn-api -> network
+                           pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> sheets -> network
+                                              contributors -> member #;state -> blackfynn-api -> network
                                               contributors -> description
-                           pipeline-extras -> meta -> organ-term #;lifters -> organs-sheet -> network
-                                              meta -> modality #;lifters -> organs-sheet
-                                              meta -> techniques #;lifters -> organs-sheet
-                                              meta -> protocol-uris #;lifters -> organs-sheet
-                                              meta -> award-manual #;lifters -> organs-sheet
-                                              meta -> dataset-doi -> blackfynn-api ; path.cache.remote.bfobject.doi ; what a hack :x 
+                           pipeline-extras -> meta-extra -> organ-term #;lifters -> organs-sheet -> sheets
+                                              meta-extra -> modality #;lifters -> organs-sheet
+                                              meta-extra -> techniques #;lifters -> organs-sheet
+                                              meta-extra -> protocol-uris #;lifters -> organs-sheet
+                                              meta-extra -> award-manual #;lifters -> organs-sheet
+                                              meta-extra -> dataset-doi -> blackfynn-api ; path.cache.remote.bfobject.doi ; what a hack :x
                                               ; FIXME TODO this is how dataset-doi _should_ work
                                               ; uncomment when it _actually_ works like this
-                                              ; meta -> dataset-doi -> cache-remote-metadata -> fetch-all
-                                              meta -> award-organ -> scraped-award-organ
-                                                      award-organ -> submission-normalized
-           ??? -> overview-sheet -> network))
+                                              ; meta-extra -> dataset-doi -> cache-remote-metadata -> fetch-all
+                                              meta-extra -> award-organ #; lifters -> submission-normalized
+                                                            award-organ -> scraped-award-organ
+           ??? -> overview-sheet -> sheets))
+
+;; subgraphs
+(define lifters '(affiliations organ-term modality techniques protocol-uris award-manual award-organ))
+(define state '(member))
+(define network '(network blackfynn-api sheets affiliation-sheet organs-sheet overview-sheet))
+
+(define-vertex-property g vertex-id #:init $id)  ; doesn't work to get the graphviz node numbering
+
+(define-vertex-property g in-lifters?)
+(for-each (λ (v) (in-lifters?-set! v #t)) lifters)
+
+(define-vertex-property g in-state?)
+(for-each (λ (v) (in-state?-set! v #t)) state)
+
+(define-vertex-property g in-network?)
+(for-each (λ (v) (in-network?-set! v #t)) network)
+
 (graphviz g)
 #+end_src
 
 #+name: graph-validate-all-dot
-#+RESULTS[90c92629fb562228be77ac598ef3bc30470a5afc]: graph-validate-all
+#+RESULTS[16bcd2566c9bc6aca9c4c547144fe50c5a542558]: graph-validate-all
 #+begin_src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes
 digraph G {
 	node0 [label="description"];
-	node1 [label="extras-added"];
+	node1 [label="modality"];
 	node2 [label="dataset-doi"];
 	node3 [label="blackfynn-api"];
 	node4 [label="dataset-metadata"];
-	node5 [label="meta"];
-	node6 [label="samples"];
-	node7 [label="subjects"];
-	node8 [label="award-manual"];
-	node9 [label="submission-normalized"];
-	node10 [label="organs-sheet"];
-	node11 [label="scraped-award-organ"];
-	node12 [label="member"];
-	node13 [label="lifters"];
-	node14 [label="award-organ"];
-	node15 [label="network"];
-	node16 [label="submission"];
-	node17 [label="fetch-all"];
-	node18 [label="manifest"];
-	node19 [label="techniques"];
-	node20 [label="overview-sheet"];
+	node5 [label="samples"];
+	node6 [label="subjects"];
+	node7 [label="award-manual"];
+	node8 [label="submission-normalized"];
+	node9 [label="organs-sheet"];
+	node10 [label="scraped-award-organ"];
+	node11 [label="member"];
+	node12 [label="sheets"];
+	node13 [label="award-organ"];
+	node14 [label="network"];
+	node15 [label="submission"];
+	node16 [label="fetch-all"];
+	node17 [label="manifest"];
+	node18 [label="techniques"];
+	node19 [label="overview-sheet"];
+	node20 [label="pipeline-extras"];
 	node21 [label="pipeline-end"];
 	node22 [label="pipeline-start"];
 	node23 [label="protocol-uris"];
-	node24 [label="pipeline-extras"];
-	node25 [label="dataset-structure"];
+	node24 [label="affiliations"];
+	node25 [label="affiliations-sheet"];
 	node26 [label="contributors"];
 	node27 [label="organ-term"];
-	node28 [label="affiliations"];
-	node29 [label="affiliations-sheet"];
-	node30 [label="???"];
-	node31 [label="sparc-ds"];
-	node32 [label="modality"];
+	node28 [label="meta-extra"];
+	node29 [label="dataset-structure"];
+	node30 [label="sparc-ds"];
+	node31 [label="???"];
 	subgraph U {
 		edge [dir=none];
 	}
+	subgraph cluster_M {
+		label="Metadata Files";
+		color=green;
+        node0;
+        node5;
+        node6;
+        node15;
+        node17;
+	}
+	subgraph cluster_L {
+		label="Lifters (bad design)";
+		color=red;
+        node1;
+        node7;
+        node13;
+        node18;
+        node24;
+        node23;
+        node27;
+	}
 	subgraph D {
-		node0 -> node17;
+		node0 -> node16;
+		node1 -> node9;
 		node2 -> node3;
-		node3 -> node15;
-		node4 -> node17;
-		node5 -> node32;
-		node5 -> node2;
-		node5 -> node19;
-		node5 -> node14;
-		node5 -> node23;
-		node5 -> node8;
-		node5 -> node27;
+		node3 -> node14;
+		node4 -> node16;
+		node5 -> node0;
+		node5 -> node16;
 		node6 -> node0;
-		node6 -> node17;
-		node7 -> node0;
-		node7 -> node17;
-		node8 -> node10;
-		node9 -> node16;
-		node10 -> node15;
-		node12 -> node3;
-		node14 -> node11;
-		node14 -> node9;
-		node16 -> node0;
-		node16 -> node17;
-		node18 -> node0;
-		node18 -> node17;
-		node19 -> node10;
-		node20 -> node15;
-		node21 -> node24;
+		node6 -> node16;
+		node7 -> node9;
+		node8 -> node15;
+		node9 -> node12;
+		node11 -> node3;
+		node12 -> node14;
+		node13 -> node10;
+		node13 -> node8;
+		node15 -> node0;
+		node15 -> node16;
+		node17 -> node0;
+		node17 -> node16;
+		node18 -> node9;
+		node19 -> node12;
+		node20 -> node30;
+		node20 -> node28;
+		node20 -> node26;
+		node20 -> node8;
+		node21 -> node20;
 		node22 -> node0;
-		node22 -> node25;
+		node22 -> node29;
 		node22 -> node4;
-		node23 -> node10;
-		node24 -> node5;
-		node24 -> node13;
-		node24 -> node1;
-		node24 -> node31;
-		node24 -> node26;
-		node24 -> node9;
-		node25 -> node17;
+		node23 -> node9;
+		node24 -> node25;
+		node25 -> node12;
 		node26 -> node0;
-		node26 -> node12;
-		node26 -> node28;
-		node27 -> node10;
-		node28 -> node29;
-		node29 -> node15;
-		node30 -> node20;
-		node31 -> node18;
-		node31 -> node6;
-		node31 -> node16;
-		node31 -> node22;
-		node31 -> node7;
-		node32 -> node10;
+		node26 -> node11;
+		node26 -> node24;
+		node27 -> node9;
+		node28 -> node1;
+		node28 -> node2;
+		node28 -> node18;
+		node28 -> node13;
+		node28 -> node23;
+		node28 -> node7;
+		node28 -> node27;
+		node29 -> node16;
+		node30 -> node17;
+		node30 -> node5;
+		node30 -> node15;
+		node30 -> node22;
+		node30 -> node6;
+		node31 -> node19;
 	}
 }
 #+end_src
 
-#+RESULTS[0fda54b4f1f55a0506b6a6fc085ce04622515764]: graph-validate-all-dot
+#+RESULTS[20008f92af2cbbe5a5aa89221885829ea3bd0f11]: graph-validate-all-dot
 [[file:./images/graph-validate-all.png]]
 
 *** Export                                                           :ignore:
@@ -925,11 +958,13 @@ python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
 * Code :noexport:
 See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
 for more direct mapping of graphviz functionality but one that is also way more verbose.
-
 #+name: racket-graph-helper
 #+header: :prologue "#lang racket/base"
 #+begin_src racket :lang racket/base :exports none :tangle ./y-u-no-compile-from-buffer.rkt :tangle no
 (require graph ; rack pkg install graph
+         (only-in racket/string
+                  string-trim
+                  string-replace)
          (for-syntax racket/base
                      syntax/parse))
 
@@ -943,12 +978,42 @@ for more direct mapping of graphviz functionality but one that is also way more 
      #:with (pairs ...) (datum->syntax this-syntax (apply append (map list-to-pairs (syntax->datum #'((left right ...) ...)))))
      #'(unweighted-graph/directed (quote (pairs ...)))]))
 
+(define (subgraph->graphviz subgraph->hash)
+  (let ([members (for/list ([(k v) (in-hash (subgraph->hash))] #:when v) k)]
+        [label (string-replace (string-trim (symbol->string (object-name subgraph->hash)) "->hash")
+                               #rx"[-_?>]"
+                               "_")])
+    (string-append (format "subgraph cluster_~a" label)
+                   ; FIXME this won't quite work because we need to know
+                   ; the ids to which the nodes were assigned :/
+                   )
+    ))
+
+(define (graphviz-subgraphs graph #:subgraphs [subgraph->hash-functions '()])
+  "wrap graphviz since it is too simple for our needs at the moment
+subgraphs should be specified using vertext properties or edge properties"
+  ;; XXX really more clusters
+  (define s (graphviz graph))
+  (let* ([sl (string-length s)]
+         [split-at (- sl 2)]
+         [start (substring s 0 split-at)]
+         [end (substring s split-at sl)]
+         [extra (map subgraph->graphviz subgraph->hash-functions)])
+         (apply string-append `(,start ,@extra ,end))))
+
 (module+ test
   (require racket/pretty)
   (define g (dag-notation a -> b -> c
                           b -> d -> e -> f))
   (pretty-print g)
-  (graphviz g))
+  (graphviz g)
+
+  (define-vertex-property g my-subgraph)
+  (for-each (λ (v) (my-subgraph-set! v #t)) '(b c d))
+
+  (define sgh (list my-subgraph->hash))
+  (graphviz-subgraphs g #:subgraphs sgh)
+)
 
 (module+ test
   ; TODO explor possibility of using -^ or -> ^ or | syntax
