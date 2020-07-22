@@ -183,21 +183,3 @@ class ProtocolData(dat.HasErrors):
             j = self._get_protocol_json(uri)
             if j:
                 yield j
-
-    def _get_protocol_json(self, uri):
-        #juri = uri + '.json'
-        logd.info(uri.identifier if isinstance(uri, idlib.Stream) else uri)  # FIXME
-        pi = idlib.get_right_id(uri)
-        if 'protocols.io' in pi:
-            out = pi.data()
-            if out is None and hasattr(pi, '_failure_message'):
-                msg = pi._failure_message  # FIXME HACK use progenitor
-                msg += ' {self.id!r}'
-                if self.addError(msg):
-                    logd.error(msg)
-
-            return out
-        else:
-            msg = f'protocol uri is not from protocols.io {pi} {self.id}'
-            if self.addError(msg):
-                logd.error(msg)

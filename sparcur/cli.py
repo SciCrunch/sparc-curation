@@ -422,7 +422,10 @@ class Main(Dispatcher):
                         'cwdintr',
                         '_datasets_with_extension',
                         '_timestamp',
-                        '_folder_timestamp',)
+                        '_folder_timestamp',
+                        '_data_ir',
+                        '_protcur',
+                        )
 
     # any attr forced on children must be set before super().__init__ is called
     # set timestamp early so that the loggers can use it
@@ -563,6 +566,49 @@ class Main(Dispatcher):
         for fn in ('methods', 'methods-helper', 'methods-core'):
             org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
             OntTerm.query.ladd(RDFL(org.graph, OntId))
+
+    def _data_ir(self, org_id=None):  # FIXME org_id should NOT implicitly indicate that we are in no_export
+        if self.options.raw:
+            data = self.summary.data_for_export(UTCNOWISO())
+        elif self.options.export_file:
+            if not self.__class__._pyru_loaded:
+                self.__class__._pyru_loaded = True
+                from pysercomb.pyr import units as pyru
+                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+
+            with open(self.options.export_file, 'rt') as f:
+                data = fromJson(json.load(f))
+        else:
+            from sparcur import export as ex
+            data = self._export(ex.Export, org_id=org_id).latest_ir
+        return data
+
+    def _protcur(self):
+        from sparcur import export as ex
+        export = self._export(ex.Export, org_id=self.options.project_id)  # FIXME org_id not needed ...
+        if self.options.raw:  # FIXME currently lacking impl of LATEST for protcur export
+            if not self.options.protcur:
+                self.options._args['protcur'] = True  # FIXME hack
+
+            blob_protcur = self.parent.export()
+
+        elif self.options.protcur_file:
+            # not sure if we are expanding identifiers and such right now ...
+            if False and not self.__class__._pyru_loaded:  # FIXME do we need this ?
+                self.__class__._pyru_loaded = True
+                from pysercomb.pyr import units as pyru
+                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+
+            with open(self.options.protcur_file, 'rt') as f:
+                blob_protcur = json.load(f)
+                #blob_protcur = fromJson(json.load(f))  # FIXME do we need to run fromJson on this?
+
+        else:
+            raise NotImplementedError("latest protcur doesn't point to the right place")
+            from sparcur import export as ex
+            blob_protcur = self._export(ex.Export).latest_protcur
+
+        return blob_protcur
 
     @property
     def project_name(self):
@@ -1470,13 +1516,7 @@ done"""
     def sheets(self):
         from pyontutils import sheets as ps
 
-        # get ir
-        if self.options.raw:
-            data = self.summary.data()
-        else:
-            from sparcur import export as ex
-            export = self._export(ex.Export, org_id=self.options.project_id)
-            data = export.latest_ir
+        data = self._data_ir(self.org_id)
 
         # check that the ir is sane
         self._check_duplicates(data['datasets'])
