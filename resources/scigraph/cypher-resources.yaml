@@ -273,7 +273,8 @@ cypherResources:
               "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
               "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
               "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
-              "http://purl.org/sig/ont/fma/fma50801"  // brain
+              "http://purl.org/sig/ont/fma/fma50801", // brain
+              "http://purl.org/sig/ont/fma/fma5889"   // autonomic ganglion
               ]
       RETURN n
 
@@ -406,7 +407,7 @@ cypherResources:
       -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
       -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
       -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
-      -[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
+      -[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
       -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
@@ -431,7 +432,7 @@ cypherResources:
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, root
       MATCH path2 = (root)
-      -[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
+      -[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
       -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
       RETURN path1, path2
