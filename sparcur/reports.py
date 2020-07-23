@@ -837,6 +837,7 @@ class Report:
         from protcur.analysis import protc
         from pysercomb.pyr import units as pyru
         from pysercomb.parsers import racket
+        pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
         lowernorm = ('protc:aspect',
                      'protc:implied-aspect',

@@ -104,6 +104,14 @@ class SimpleFileHandler:
         self.log_file_handler.setFormatter(log.handlers[0].formatter)
 
 
+def silence_loggers(*logs):
+    for log in logs:
+        parent = log
+        while parent:
+            [parent.removeHandler(h) for h in parent.handlers]
+            parent = parent.parent
+
+
 def bind_file_handler(log_file):
     # FIXME the this does not work with joblib at the moment
     from idlib.utils import log as idlog
@@ -112,10 +120,11 @@ def bind_file_handler(log_file):
     from ontquery.utils import log as oqlog
     from augpathlib.utils import log as alog
     from pyontutils.utils import log as pylog
-    from blackfynn.log import get_logger; bflog = get_logger()
+    #from blackfynn.log import get_logger; bflog = get_logger()
+    #silence_loggers(bflog.parent)  # let's not
 
     sfh = SimpleFileHandler(log_file, log)
-    sfh(alog, idlog, oalog, oqlog, prlog, pylog, bflog)
+    sfh(alog, idlog, oalog, oqlog, prlog, pylog)#, bflog)
 
 
 class _log:

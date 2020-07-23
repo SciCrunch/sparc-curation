@@ -1481,7 +1481,7 @@ class ProtcurPipeline(Pipeline):
 
             return a.value
 
-        def normalize_param(a):
+        def normalize_node(a):
             try:
                 racket = a.asPython()
             except a.pyru.RacketParser.ParseFailure as e:
@@ -1555,8 +1555,14 @@ class ProtcurPipeline(Pipeline):
         norms = {
             'ilxtr:technique': normalize_tech,
 
-            'protc:parameter*': normalize_param,
-            'protc:invariant': normalize_param,
+            'protc:input': normalize_node,
+            'protc:implied-input': normalize_node,
+
+            'protc:aspect': normalize_node,
+            'protc:implied-aspect': normalize_node,
+
+            'protc:parameter*': normalize_node,
+            'protc:invariant': normalize_node,
         }
 
         tpn += tuple(
@@ -1564,13 +1570,30 @@ class ProtcurPipeline(Pipeline):
                  if tag == k][0].replace('TEMPRAW:', 'TEMP:'),
              n) for k, n in norms.items())
 
+        class Derp(str):
+            def __lt__(self, other):
+                try:
+                    return super().__le__(self, other)
+                except TypeError:
+                    return not other >= self
+
+        def key(v):
+            if isinstance(v, str):
+                return Derp(v)
+            else:
+                return v
+
         for tag, predicate, *norm in tpn:
             if not norm:
                 norm = normalize_other
             else:
                 norm, = norm
 
-            vals = sorted(set([clean(n) for n in [norm(a) for a in annos if tag in a.tags] if n]))
+            # FIXME not at all clear that these should be sorted
+            # it added tons of complexity to the pyru implementation
+            vals = sorted(set([clean(n) for n in
+                               [norm(a) for a in annos if tag in a.tags] if n]),
+                          key=key)
             if vals:
                 data[predicate] = vals
 
@@ -1587,6 +1610,10 @@ class ProtcurPipeline(Pipeline):
         protc.reset(reset_annos_dict=True)  # sigh, yes we have to do this here
         #breakpoint()
         protcs = [protc(f, annos) for f in annos]
+        protc.pyru.Term._OntTerm = OntTerm  # FIXME this is and EXTREMELY obscure
+        # place to doing what is effectively an import :/ talk about bad engineering
+        # decisions and requirements interacting to produce completely pathalogical
+        # behavior :/ slow startup from cli are the primary issue :/
         idints = idn._uri_api_ints()
         nones = idints.pop(None)
         nidn = ptcdoc.IdNormalization(nones)

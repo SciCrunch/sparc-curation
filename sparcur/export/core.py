@@ -13,7 +13,7 @@ from sparcur import export as ex
 from sparcur import schemas as sc
 from sparcur import curation as cur  # FIXME implicit state must be set in cli
 from sparcur import pipelines as pipes
-from sparcur.core import JEncode, JFixKeys, adops
+from sparcur.core import JEncode, JFixKeys, adops, OntTerm
 from sparcur.paths import Path
 from sparcur.utils import symlink_latest, loge, logd, register_type
 from sparcur.utils import register_type, fromJson
@@ -244,6 +244,7 @@ class Export(ExportBase):
             self.__class__._pyru_loaded = True
             from pysercomb.pyr import units as pyru
             [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
         return super().latest_ir
 
@@ -435,13 +436,56 @@ class Export(ExportBase):
                 '@graph': protcur,  # FIXME regularize elements ?
             }
 
+        if False:
+            from protcur.analysis import protc
+            from protcur import document as ptcdoc
+            asdf = id(thing)
+            asdf = 140622727296400
+            trouble = [b for b in blob_protcur['@graph']
+                    if 'TEMP:protocolInvolvesAspect' in b and
+                    asdf in [id(a) for a in b['TEMP:protocolInvolvesAspect']]]
+            pio = trouble[0]['id']
+            #a, i, p = pipeline._idints()  # FIXME some way to materialize these to the Pio ...
+            idn = ptcdoc.IdNormalization([p._anno for p in protc.objects.values()])
+            idints = idn._uri_api_ints()
+            nones = idints.pop(None)
+            nidn = ptcdoc.IdNormalization(nones)
+            idints.update(nidn.normalized())
+            pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
+
+            pannos = pidints[pio.uri_api_int]
+            asps = [c for p in pannos for c in (p, *p.rchildren) if c.astType == 'protc:aspect']
+            invars = [c for p in pannos for c in (p, *p.rchildren) if c.astType == 'protc:invariant']
+
+            testout = json.dumps(blob_protcur, sort_keys=True, indent=2, cls=JEncode)
+            from sparcur.core import JApplyRecursive, get_nested_by_type
+            from pysercomb.pyr.types import AJ
+            collect = []
+            _ = JApplyRecursive(get_nested_by_type, blob_protcur, AJ, collect=collect)
+            hrm = [c for c in collect if hasattr(c, 'body') and None in c.body]
+            problems = [c._value for c in collect
+                        if not isinstance(c._value, str) and
+                        'surement' in c._value.__class__.__name__]
+            prb = problems[0]
+
+
+        breakpoint()
+
+        dump_path.mkdir(parents=True)
+        # FIXME TODO make these latest paths accessible
+        # probably by splitting protcur export out into
+        # its own class
+        latest_path = dump_path.parent / 'LATEST'
+        latest_partial_path = dump_path.parent / 'LATEST_PARTIAL'
         fn = dump_path / 'protcur.json'
         with open(fn, 'wt') as f:
             json.dump(blob_protcur, f, sort_keys=True, indent=2, cls=JEncode)
 
+        symlink_latest(dump_path, latest_partial_path)
+
         populateFromJsonLd(OntGraph(), fn).write(fn.with_suffix('.ttl'))
 
-        # TODO also need latest symlinking here as well
+        symlink_latest(dump_path, latest_path)
 
         return blob_protcur
 

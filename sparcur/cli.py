@@ -36,7 +36,8 @@ Usage:
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
-    spc show     [schemas rmeta (export [json ttl])] [options] [<project-id>]
+    spc show     [schemas rmeta protcur (export [json ttl])] [options] [<project-id>]
+    spc show     protcur  [json ttl]                         [options]
     spc sheets   [update] [options] <sheet-name>
 
 Commands:
@@ -249,7 +250,6 @@ from sparcur.state import State
 from sparcur.backends import BlackfynnRemote
 from sparcur.curation import Summary, Integrator
 from sparcur.protocols import ProtocolData
-from sparcur.blackfynn_api import FakeBFLocal
 
 try:
     breakpoint
@@ -501,6 +501,7 @@ class Main(Dispatcher):
                 self._setup_bfl()
             except BaseException as e:
                 if self.options.local:
+                    from sparcur.blackfynn_api import FakeBFLocal
                     log.exception(e)
                     self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
                     self.BlackfynnRemote.anchorTo(self.anchor)
@@ -575,6 +576,7 @@ class Main(Dispatcher):
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
                 [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+                pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
             with open(self.options.export_file, 'rt') as f:
                 data = fromJson(json.load(f))
@@ -592,21 +594,26 @@ class Main(Dispatcher):
 
             blob_protcur = self.parent.export()
 
-        elif self.options.protcur_file:
+        else:
             # not sure if we are expanding identifiers and such right now ...
             if False and not self.__class__._pyru_loaded:  # FIXME do we need this ?
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
                 [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+                pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
-            with open(self.options.protcur_file, 'rt') as f:
-                blob_protcur = json.load(f)
-                #blob_protcur = fromJson(json.load(f))  # FIXME do we need to run fromJson on this?
 
-        else:
-            raise NotImplementedError("latest protcur doesn't point to the right place")
-            from sparcur import export as ex
-            blob_protcur = self._export(ex.Export).latest_protcur
+            if self.options.protcur_file:
+                with open(self.options.protcur_file, 'rt') as f:
+                    blob_protcur = json.load(f)
+                    #blob_protcur = fromJson(json.load(f))  # FIXME do we need to run fromJson on this?
+
+            else:
+                latest_path = self.options.export_protcur_base / 'LATEST'
+                latest_partial_path = self.options.export_protcur_base / 'LATEST_PARTIAL'
+                path = latest_partial_path if self.options.partial else latest_path
+                with open(path, 'rt') as f:
+                    blob_protcur = json.load(f)
 
         return blob_protcur
 
@@ -972,7 +979,6 @@ done"""
             # FIXME dump_path shouldn't need to be passed explicitly
             dump_path = (self.options.export_protcur_base /
                          self._folder_timestamp)
-            dump_path.mkdir(parents=True)
             hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
             blob_protcur = export.export_protcur(dump_path, hgn)
             # NOTE --latest will also pull from latest protcur export
@@ -1512,6 +1518,13 @@ done"""
         elif self.options.rmeta:
             from sparcur import datasources as ds
             Path(ds.BlackfynnDatasetData.cache_base).xopen(self.options.open)
+
+        elif self.options.protcur:
+            latest_path = self.options.export_protcur_base / 'LATEST'
+            latest_partial_path = self.options.export_protcur_base / 'LATEST_PARTIAL'
+            path = (latest_partial_path if self.options.partial else latest_path) / 'protcur'
+            suffix = '.json' if self.options.json else '.ttl'
+            path.with_suffix(suffix).xopen(self.options.open)
 
     def sheets(self):
         from pyontutils import sheets as ps

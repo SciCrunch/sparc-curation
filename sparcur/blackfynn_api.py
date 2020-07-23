@@ -19,18 +19,15 @@ from joblib import Parallel, delayed
 if 'BLACKFYNN_LOG_LEVEL' not in os.environ:
     # silence agent import warning
     os.environ['BLACKFYNN_LOG_LEVEL'] = 'CRITICAL'
+
 from blackfynn import log as _bflog
 # blackfynn.log sets logging.basicConfig which pollutes logs from
 # other programs that are sane and do not use the root logger
 # so we have to undo the damage done by basic config here
 # we add the sparcur local handlers back in later
+from sparcur.utils import log, silence_loggers(_bflog)
 __bflog = _bflog.get_logger()
-__parent = __bflog
-while __parent:
-    [__parent.removeHandler(h) for h in __parent.handlers]
-    __parent = __parent.parent
-
-from sparcur.utils import log
+silence_loggers(__bflog)
 __bflog.addHandler(log.handlers[0])
 
 from blackfynn import Blackfynn, Collection, DataPackage, Organization, File

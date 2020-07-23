@@ -9,6 +9,7 @@ from collections import deque, defaultdict
 import idlib
 import rdflib
 import ontquery as oq
+from pint.measurement import Measurement
 from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -293,6 +294,8 @@ def json_export_type_converter(obj):
         return obj.as_posix()
     elif isinstance(obj, Quantity):
         return obj.json()
+    elif isinstance(obj, Measurement):
+        return str(obj)  # FIXME FIXME FIXME
     elif isinstance(obj, oq.OntTerm):
         return obj.iri
         #return obj.asDict()  # FIXME need a no network/scigraph version
@@ -349,6 +352,13 @@ def get_nested_by_key(obj, key, *args, path=None, collect=tuple()):
             collect.append(n if n is not None else value)
 
     return obj  # have to return this otherwise somehow everything is turned to None?
+
+
+def get_nested_by_type(obj, type, *args, path=None, collect=tuple()):
+    if isinstance(obj, type):
+        collect.append(obj)
+
+    return obj
 
 
 def JApplyRecursive(function, obj, *args,
