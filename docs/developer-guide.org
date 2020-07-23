@@ -952,7 +952,7 @@ def pipe_main(main, after=None, argv=None):
 from sparcur.simple.utils import pipe_main
 
 def test_pipe_main():
-    def main(id, project_path, **kwargs):
+    def main(id=None, project_path=None, **kwargs):
         print(id, project_path, kwargs)
 
     pipe_main(main, argv=['sparcur-simple'])
