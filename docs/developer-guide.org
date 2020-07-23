@@ -55,6 +55,337 @@ print(sorted(data.keys()))
 #+RESULTS[cc32c2f62cd7a758207c6368bc90a6742db681e3]:
 : ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'prov', 'size']
 
+* Workflow
+** All datasets
+*** Retrieve                                                         :ignore:
+**** Overview                                                        :ignore:
+The dependency DAG is as follows.
+# NOTE the workflow for generating these diagrams takes multiple steps
+# first write the graph in racket, where we can use dashes in names
+# conver to dot and add clusters as needed
+#+name: graph-retrieve-all
+#+header: :wrap "src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g (dag-notation
+           fetch-all -> fetch-annotations
+           fetch-all -> fetch-metadata-files
+           fetch-all -> fetch-remote-metadata
+           fetch-metadata-files -> pull
+           pull -> sparse-materialize
+           sparse-materialize -> fetch-remote-metadata
+           pull -> clone))
+
+(graphviz g)
+#+end_src
+
+#+RESULTS[e29666f9fbc8046ebab291bb30916242ab20cfeb]: graph-retrieve-all
+#+begin_src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="fetch-metadata-files"];
+	node1 [label="clone"];
+	node2 [label="fetch-all"];
+	node3 [label="fetch-remote-metadata"];
+	node4 [label="pull"];
+	node5 [label="fetch-annotations"];
+	node6 [label="sparse-materialize"];
+	subgraph cluster_F {
+        color=none;
+        node2;
+	}
+	subgraph cluster_D {
+        label="Dataset";
+        color=green;
+		node0 -> node4;
+		node2 -> node0;
+		node2 -> node3;
+		node4 -> node1;
+		node4 -> node6;
+		node6 -> node3;
+	}
+	subgraph cluster_P {
+        label="Protcur";
+        color=purple;
+		node2 -> node5;
+    }
+}
+#+end_src
+
+#+RESULTS[041cb032103aa97b8bf26a7397abce2271f685b5]:
+[[file:./images/graph-retrieve-all.png]]
+**** Bash implementation                                             :ignore:
+# FIXME this is really an env file not a bin file ...
+#+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
+function sparcur-get-all-remote-data () {
+    # NOTE not quite all the remote data, the google sheets
+    # don't have caching functionality yet
+
+    # TODO parse args
+    local TIME_START=$(date -In)
+    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START}" || \
+        { CODE=$?; echo 'mv failed'; return $CODE; }
+    local PARENT_PATH=${TIME_START}
+    local LOG_PATH="${PARENT_PATH}/logs"
+    #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
+    local PROJECT_ID=$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")
+    local SYMLINK_OBJECTS_TO=$()
+
+    echo ${PARENT_PATH}  # needed to be able to follow logs
+
+    if [ ! -d "${LOG_PATH}" ]; then
+        mkdir "${LOG_PATH}"
+    fi
+
+    # fetch annotations
+    python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
+    local pids_final[0]=$!
+
+    # fetch remote metadata
+    python -m sparcur.simple.fetch_remote_metadata_all \
+           --project-id ${PROJECT_ID} \
+           > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
+    local pids[0]=$!
+
+    # clone aka fetch top level
+    local FAIL=0
+    local PROJECT_PATH=$(python -m sparcur.simple.clone \
+                                --project-id ${PROJECT_ID} \
+                                --parent-path "${PARENT_PATH}" \
+                                > "${LOG_PATH}/clone.log" 2>&1) || FAIL=$((FAIL+1))
+
+    for pid in ${pids[*]}; do
+        wait $pid || FAIL=$((FAIL+1))
+    done
+    if [[ $FAIL -ne 0 ]]; then
+        echo "${FAIL} commands failed. Cannot continue."
+        echo "${PROJECT_PATH}"
+        return 1
+    fi
+
+    # pull aka fetch file system metadata
+    python -m sparcur.simple.pull \
+           --project-path "${PROJECT_PATH}" \
+           > "${LOG_PATH}/pull.log" 2>&1 || { CODE=$?;
+                                              echo 'pull failed!';
+                                              echo "${PROJECT_PATH}";
+                                              return $CODE; }
+
+    # fetch metadata files
+    python -m sparcur.simple.fetch_metadata_files \
+           --project-path "${PROJECT_PATH}" \
+           > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
+
+    pids_final[1]=$!
+    local FAIL=0
+    for pid in ${pids_final[*]}; do
+        wait $pid || FAIL=$((FAIL+1))
+    done
+    if [[ $FAIL -ne 0 ]]; then
+        echo "${FAIL} commands failed. Cannot continue."
+        echo "${PROJECT_PATH}"
+        return 1
+    fi
+}
+#+end_src
+*** Validate                                                         :ignore:
+This is the graph of the existing approach. A slightly more sane version
+is implemented above and tangled as =sparcur.simple=.
+
+# runs both but I'm fairly cerain that it fails to update the second code block
+# #+name: graph-validate-run-both
+# #+begin_src elisp :var one=graph-validate-all() two=graph-validate-all-dot() :results none
+# #+end_src
+
+#+name: graph-validate-all
+#+header: :wrap "src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g (dag-notation
+           ; I had description listed depending on dataset-structure
+           ; but that is really an implementation detail
+
+           pipeline-end -> pipeline-extras -> sparc-ds -> pipeline-start -> description -> fetch-all
+                                                          pipeline-start -> dataset-structure -> fetch-all
+                                                          pipeline-start -> dataset-metadata -> fetch-all
+
+                                              ; note that this is the idealized flow
+                                              ; the actual flow is through pipeline-start
+                                              sparc-ds -> submission -> description
+                                                          submission -> fetch-all
+                                              sparc-ds -> subjects -> description
+                                                          subjects -> fetch-all
+                                              sparc-ds -> samples -> description
+                                                          samples -> fetch-all
+                                              sparc-ds -> manifest -> description
+                                                          manifest -> fetch-all
+
+                           pipeline-extras -> submission-normalized -> submission
+                           pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> sheets -> network
+                                              contributors -> member #;state -> blackfynn-api -> network
+                                              contributors -> description
+                           pipeline-extras -> meta-extra -> organ-term #;lifters -> organs-sheet -> sheets
+                                              meta-extra -> modality #;lifters -> organs-sheet
+                                              meta-extra -> techniques #;lifters -> organs-sheet
+                                              meta-extra -> protocol-uris #;lifters -> organs-sheet
+                                              meta-extra -> award-manual #;lifters -> organs-sheet
+                                              meta-extra -> dataset-doi -> blackfynn-api ; path.cache.remote.bfobject.doi ; what a hack :x
+                                              ; FIXME TODO this is how dataset-doi _should_ work
+                                              ; uncomment when it _actually_ works like this
+                                              ; meta-extra -> dataset-doi -> cache-remote-metadata -> fetch-all
+                                              meta-extra -> award-organ #; lifters -> submission-normalized
+                                                            award-organ -> scraped-award-organ
+           ??? -> overview-sheet -> sheets))
+
+;; subgraphs
+(define lifters '(affiliations organ-term modality techniques protocol-uris award-manual award-organ))
+(define state '(member))
+(define network '(network blackfynn-api sheets affiliation-sheet organs-sheet overview-sheet))
+
+(define-vertex-property g vertex-id #:init $id)  ; doesn't work to get the graphviz node numbering
+
+(define-vertex-property g in-lifters?)
+(for-each (λ (v) (in-lifters?-set! v #t)) lifters)
+
+(define-vertex-property g in-state?)
+(for-each (λ (v) (in-state?-set! v #t)) state)
+
+(define-vertex-property g in-network?)
+(for-each (λ (v) (in-network?-set! v #t)) network)
+
+(graphviz g)
+#+end_src
+
+#+name: graph-validate-all-dot
+#+RESULTS[16bcd2566c9bc6aca9c4c547144fe50c5a542558]: graph-validate-all
+#+begin_src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="description"];
+	node1 [label="modality"];
+	node2 [label="dataset-doi"];
+	node3 [label="blackfynn-api"];
+	node4 [label="dataset-metadata"];
+	node5 [label="samples"];
+	node6 [label="subjects"];
+	node7 [label="award-manual"];
+	node8 [label="submission-normalized"];
+	node9 [label="organs-sheet"];
+	node10 [label="scraped-award-organ"];
+	node11 [label="member"];
+	node12 [label="sheets"];
+	node13 [label="award-organ"];
+	node14 [label="network"];
+	node15 [label="submission"];
+	node16 [label="fetch-all"];
+	node17 [label="manifest"];
+	node18 [label="techniques"];
+	node19 [label="overview-sheet"];
+	node20 [label="pipeline-extras"];
+	node21 [label="pipeline-end"];
+	node22 [label="pipeline-start"];
+	node23 [label="protocol-uris"];
+	node24 [label="affiliations"];
+	node25 [label="affiliations-sheet"];
+	node26 [label="contributors"];
+	node27 [label="organ-term"];
+	node28 [label="meta-extra"];
+	node29 [label="dataset-structure"];
+	node30 [label="sparc-ds"];
+	node31 [label="???"];
+	subgraph U {
+		edge [dir=none];
+	}
+	subgraph cluster_M {
+		label="Metadata Files";
+		color=green;
+        node0;
+        node5;
+        node6;
+        node15;
+        node17;
+	}
+	subgraph cluster_L {
+		label="Lifters (bad design)";
+		color=red;
+        node1;
+        node7;
+        node13;
+        node18;
+        node24;
+        node23;
+        node27;
+	}
+	subgraph D {
+		node0 -> node16;
+		node1 -> node9;
+		node2 -> node3;
+		node3 -> node14;
+		node4 -> node16;
+		node5 -> node0;
+		node5 -> node16;
+		node6 -> node0;
+		node6 -> node16;
+		node7 -> node9;
+		node8 -> node15;
+		node9 -> node12;
+		node11 -> node3;
+		node12 -> node14;
+		node13 -> node10;
+		node13 -> node8;
+		node15 -> node0;
+		node15 -> node16;
+		node17 -> node0;
+		node17 -> node16;
+		node18 -> node9;
+		node19 -> node12;
+		node20 -> node30;
+		node20 -> node28;
+		node20 -> node26;
+		node20 -> node8;
+		node21 -> node20;
+		node22 -> node0;
+		node22 -> node29;
+		node22 -> node4;
+		node23 -> node9;
+		node24 -> node25;
+		node25 -> node12;
+		node26 -> node0;
+		node26 -> node11;
+		node26 -> node24;
+		node27 -> node9;
+		node28 -> node1;
+		node28 -> node2;
+		node28 -> node18;
+		node28 -> node13;
+		node28 -> node23;
+		node28 -> node7;
+		node28 -> node27;
+		node29 -> node16;
+		node30 -> node17;
+		node30 -> node5;
+		node30 -> node15;
+		node30 -> node22;
+		node30 -> node6;
+		node31 -> node19;
+	}
+}
+#+end_src
+
+#+RESULTS[20008f92af2cbbe5a5aa89221885829ea3bd0f11]: graph-validate-all-dot
+[[file:./images/graph-validate-all.png]]
+
+*** Export                                                           :ignore:
+** Single dataset
+*** Retrieve                                                         :ignore:
+**** Overview                                                        :ignore:
+**** Bash implementation                                             :ignore:
+#+begin_src bash
+DATASET_PATH=$(python -m sparcur.simple.clone --dataset-id ${DATASET_ID})
+python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
+python -m sparcur.simple.pull ${DATASET_PATH}
+python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
+#+end_src
+*** Validate                                                         :ignore:
+*** Export                                                           :ignore:
 * Internal Structure
 :PROPERTIES:
 :header-args: :comments link :exports code
@@ -624,337 +955,6 @@ if __name__ == '__main__':
 #+end_src
 **** Network resources
 *** Export
-* Workflow
-** All datasets
-*** Retrieve                                                         :ignore:
-**** Overview                                                        :ignore:
-The dependency DAG is as follows.
-# NOTE the workflow for generating these diagrams takes multiple steps
-# first write the graph in racket, where we can use dashes in names
-# conver to dot and add clusters as needed
-#+name: graph-retrieve-all
-#+header: :wrap "src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes"
-#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
-<<racket-graph-helper>>
-(define g (dag-notation
-           fetch-all -> fetch-annotations
-           fetch-all -> fetch-metadata-files
-           fetch-all -> fetch-remote-metadata
-           fetch-metadata-files -> pull
-           pull -> sparse-materialize
-           sparse-materialize -> fetch-remote-metadata
-           pull -> clone))
-
-(graphviz g)
-#+end_src
-
-#+RESULTS[e29666f9fbc8046ebab291bb30916242ab20cfeb]: graph-retrieve-all
-#+begin_src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes
-digraph G {
-	node0 [label="fetch-metadata-files"];
-	node1 [label="clone"];
-	node2 [label="fetch-all"];
-	node3 [label="fetch-remote-metadata"];
-	node4 [label="pull"];
-	node5 [label="fetch-annotations"];
-	node6 [label="sparse-materialize"];
-	subgraph cluster_F {
-        color=none;
-        node2;
-	}
-	subgraph cluster_D {
-        label="Dataset";
-        color=green;
-		node0 -> node4;
-		node2 -> node0;
-		node2 -> node3;
-		node4 -> node1;
-		node4 -> node6;
-		node6 -> node3;
-	}
-	subgraph cluster_P {
-        label="Protcur";
-        color=purple;
-		node2 -> node5;
-    }
-}
-#+end_src
-
-#+RESULTS[041cb032103aa97b8bf26a7397abce2271f685b5]:
-[[file:./images/graph-retrieve-all.png]]
-**** Bash implementation                                             :ignore:
-# FIXME this is really an env file not a bin file ...
-#+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
-function sparcur-get-all-remote-data () {
-    # NOTE not quite all the remote data, the google sheets
-    # don't have caching functionality yet
-
-    # TODO parse args
-    local TIME_START=$(date -In)
-    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START}" || \
-        { CODE=$?; echo 'mv failed'; return $CODE; }
-    local PARENT_PATH=${TIME_START}
-    local LOG_PATH="${PARENT_PATH}/logs"
-    #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
-    local PROJECT_ID=$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")
-    local SYMLINK_OBJECTS_TO=$()
-
-    echo ${PARENT_PATH}  # needed to be able to follow logs
-
-    if [ ! -d "${LOG_PATH}" ]; then
-        mkdir "${LOG_PATH}"
-    fi
-
-    # fetch annotations
-    python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
-    local pids_final[0]=$!
-
-    # fetch remote metadata
-    python -m sparcur.simple.fetch_remote_metadata_all \
-           --project-id ${PROJECT_ID} \
-           > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
-    local pids[0]=$!
-
-    # clone aka fetch top level
-    local FAIL=0
-    local PROJECT_PATH=$(python -m sparcur.simple.clone \
-                                --project-id ${PROJECT_ID} \
-                                --parent-path "${PARENT_PATH}" \
-                                > "${LOG_PATH}/clone.log" 2>&1) || FAIL=$((FAIL+1))
-
-    for pid in ${pids[*]}; do
-        wait $pid || FAIL=$((FAIL+1))
-    done
-    if [[ $FAIL -ne 0 ]]; then
-        echo "${FAIL} commands failed. Cannot continue."
-        echo "${PROJECT_PATH}"
-        return 1
-    fi
-
-    # pull aka fetch file system metadata
-    python -m sparcur.simple.pull \
-           --project-path "${PROJECT_PATH}" \
-           > "${LOG_PATH}/pull.log" 2>&1 || { CODE=$?;
-                                              echo 'pull failed!';
-                                              echo "${PROJECT_PATH}";
-                                              return $CODE; }
-
-    # fetch metadata files
-    python -m sparcur.simple.fetch_metadata_files \
-           --project-path "${PROJECT_PATH}" \
-           > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
-
-    pids_final[1]=$!
-    local FAIL=0
-    for pid in ${pids_final[*]}; do
-        wait $pid || FAIL=$((FAIL+1))
-    done
-    if [[ $FAIL -ne 0 ]]; then
-        echo "${FAIL} commands failed. Cannot continue."
-        echo "${PROJECT_PATH}"
-        return 1
-    fi
-}
-#+end_src
-*** Validate                                                         :ignore:
-This is the graph of the existing approach. A slightly more sane version
-is implemented above and tangled as =sparcur.simple=.
-
-# runs both but I'm fairly cerain that it fails to update the second code block
-# #+name: graph-validate-run-both
-# #+begin_src elisp :var one=graph-validate-all() two=graph-validate-all-dot() :results none
-# #+end_src
-
-#+name: graph-validate-all
-#+header: :wrap "src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes"
-#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
-<<racket-graph-helper>>
-(define g (dag-notation
-           ; I had description listed depending on dataset-structure
-           ; but that is really an implementation detail
-
-           pipeline-end -> pipeline-extras -> sparc-ds -> pipeline-start -> description -> fetch-all
-                                                          pipeline-start -> dataset-structure -> fetch-all
-                                                          pipeline-start -> dataset-metadata -> fetch-all
-
-                                              ; note that this is the idealized flow
-                                              ; the actual flow is through pipeline-start
-                                              sparc-ds -> submission -> description
-                                                          submission -> fetch-all
-                                              sparc-ds -> subjects -> description
-                                                          subjects -> fetch-all
-                                              sparc-ds -> samples -> description
-                                                          samples -> fetch-all
-                                              sparc-ds -> manifest -> description
-                                                          manifest -> fetch-all
-
-                           pipeline-extras -> submission-normalized -> submission
-                           pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> sheets -> network
-                                              contributors -> member #;state -> blackfynn-api -> network
-                                              contributors -> description
-                           pipeline-extras -> meta-extra -> organ-term #;lifters -> organs-sheet -> sheets
-                                              meta-extra -> modality #;lifters -> organs-sheet
-                                              meta-extra -> techniques #;lifters -> organs-sheet
-                                              meta-extra -> protocol-uris #;lifters -> organs-sheet
-                                              meta-extra -> award-manual #;lifters -> organs-sheet
-                                              meta-extra -> dataset-doi -> blackfynn-api ; path.cache.remote.bfobject.doi ; what a hack :x
-                                              ; FIXME TODO this is how dataset-doi _should_ work
-                                              ; uncomment when it _actually_ works like this
-                                              ; meta-extra -> dataset-doi -> cache-remote-metadata -> fetch-all
-                                              meta-extra -> award-organ #; lifters -> submission-normalized
-                                                            award-organ -> scraped-award-organ
-           ??? -> overview-sheet -> sheets))
-
-;; subgraphs
-(define lifters '(affiliations organ-term modality techniques protocol-uris award-manual award-organ))
-(define state '(member))
-(define network '(network blackfynn-api sheets affiliation-sheet organs-sheet overview-sheet))
-
-(define-vertex-property g vertex-id #:init $id)  ; doesn't work to get the graphviz node numbering
-
-(define-vertex-property g in-lifters?)
-(for-each (λ (v) (in-lifters?-set! v #t)) lifters)
-
-(define-vertex-property g in-state?)
-(for-each (λ (v) (in-state?-set! v #t)) state)
-
-(define-vertex-property g in-network?)
-(for-each (λ (v) (in-network?-set! v #t)) network)
-
-(graphviz g)
-#+end_src
-
-#+name: graph-validate-all-dot
-#+RESULTS[16bcd2566c9bc6aca9c4c547144fe50c5a542558]: graph-validate-all
-#+begin_src dot :file ./images/graph-validate-all.png :cmdline -Kdot -Tpng :exports results :cache yes
-digraph G {
-	node0 [label="description"];
-	node1 [label="modality"];
-	node2 [label="dataset-doi"];
-	node3 [label="blackfynn-api"];
-	node4 [label="dataset-metadata"];
-	node5 [label="samples"];
-	node6 [label="subjects"];
-	node7 [label="award-manual"];
-	node8 [label="submission-normalized"];
-	node9 [label="organs-sheet"];
-	node10 [label="scraped-award-organ"];
-	node11 [label="member"];
-	node12 [label="sheets"];
-	node13 [label="award-organ"];
-	node14 [label="network"];
-	node15 [label="submission"];
-	node16 [label="fetch-all"];
-	node17 [label="manifest"];
-	node18 [label="techniques"];
-	node19 [label="overview-sheet"];
-	node20 [label="pipeline-extras"];
-	node21 [label="pipeline-end"];
-	node22 [label="pipeline-start"];
-	node23 [label="protocol-uris"];
-	node24 [label="affiliations"];
-	node25 [label="affiliations-sheet"];
-	node26 [label="contributors"];
-	node27 [label="organ-term"];
-	node28 [label="meta-extra"];
-	node29 [label="dataset-structure"];
-	node30 [label="sparc-ds"];
-	node31 [label="???"];
-	subgraph U {
-		edge [dir=none];
-	}
-	subgraph cluster_M {
-		label="Metadata Files";
-		color=green;
-        node0;
-        node5;
-        node6;
-        node15;
-        node17;
-	}
-	subgraph cluster_L {
-		label="Lifters (bad design)";
-		color=red;
-        node1;
-        node7;
-        node13;
-        node18;
-        node24;
-        node23;
-        node27;
-	}
-	subgraph D {
-		node0 -> node16;
-		node1 -> node9;
-		node2 -> node3;
-		node3 -> node14;
-		node4 -> node16;
-		node5 -> node0;
-		node5 -> node16;
-		node6 -> node0;
-		node6 -> node16;
-		node7 -> node9;
-		node8 -> node15;
-		node9 -> node12;
-		node11 -> node3;
-		node12 -> node14;
-		node13 -> node10;
-		node13 -> node8;
-		node15 -> node0;
-		node15 -> node16;
-		node17 -> node0;
-		node17 -> node16;
-		node18 -> node9;
-		node19 -> node12;
-		node20 -> node30;
-		node20 -> node28;
-		node20 -> node26;
-		node20 -> node8;
-		node21 -> node20;
-		node22 -> node0;
-		node22 -> node29;
-		node22 -> node4;
-		node23 -> node9;
-		node24 -> node25;
-		node25 -> node12;
-		node26 -> node0;
-		node26 -> node11;
-		node26 -> node24;
-		node27 -> node9;
-		node28 -> node1;
-		node28 -> node2;
-		node28 -> node18;
-		node28 -> node13;
-		node28 -> node23;
-		node28 -> node7;
-		node28 -> node27;
-		node29 -> node16;
-		node30 -> node17;
-		node30 -> node5;
-		node30 -> node15;
-		node30 -> node22;
-		node30 -> node6;
-		node31 -> node19;
-	}
-}
-#+end_src
-
-#+RESULTS[20008f92af2cbbe5a5aa89221885829ea3bd0f11]: graph-validate-all-dot
-[[file:./images/graph-validate-all.png]]
-
-*** Export                                                           :ignore:
-** Single dataset
-*** Retrieve                                                         :ignore:
-**** Overview                                                        :ignore:
-**** Bash implementation                                             :ignore:
-#+begin_src bash
-DATASET_PATH=$(python -m sparcur.simple.clone --dataset-id ${DATASET_ID})
-python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
-python -m sparcur.simple.pull ${DATASET_PATH}
-python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
-#+end_src
-*** Validate                                                         :ignore:
-*** Export                                                           :ignore:
 * Code :noexport:
 See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
 for more direct mapping of graphviz functionality but one that is also way more verbose.
