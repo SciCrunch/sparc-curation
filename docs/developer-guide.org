@@ -5,6 +5,7 @@
 #+STARTUP: showall
 
 # [[file:developer-guide.pdf]]
+# [[file:developer-guide.html]]
 
 * Demos
 ** Remote only connection
@@ -57,7 +58,7 @@ print(sorted(data.keys()))
 
 * Workflow
 ** All datasets
-*** Retrieve                                                         :ignore:
+*** _*Retrieve*_
 **** Overview                                                        :ignore:
 The dependency DAG is as follows.
 # NOTE the workflow for generating these diagrams takes multiple steps
@@ -187,7 +188,7 @@ function sparcur-get-all-remote-data () {
     fi
 }
 #+end_src
-*** Validate                                                         :ignore:
+*** _*Validate*_
 This is the graph of the existing approach. A slightly more sane version
 is implemented above and tangled as =sparcur.simple=.
 
@@ -373,9 +374,9 @@ digraph G {
 #+RESULTS[20008f92af2cbbe5a5aa89221885829ea3bd0f11]: graph-validate-all-dot
 [[file:./images/graph-validate-all.png]]
 
-*** Export                                                           :ignore:
+*** _*Export*_
 ** Single dataset
-*** Retrieve                                                         :ignore:
+*** _*Retrieve*_
 **** Overview                                                        :ignore:
 **** Bash implementation                                             :ignore:
 #+begin_src bash
@@ -384,98 +385,16 @@ python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
 python -m sparcur.simple.pull ${DATASET_PATH}
 python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
 #+end_src
-*** Validate                                                         :ignore:
-*** Export                                                           :ignore:
+*** _*Validate*_
+*** _*Export*_
 * Internal Structure
 :PROPERTIES:
 :header-args: :comments link :exports code
 :END:
-** Utility
-#+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes :exports none
-#+end_src
-
-#+name: simple-utils
-#+begin_src python :tangle ../sparcur/simple/utils.py
-"""Common command line options for all sparcur.simple modules
-Usage:
-    sparcur-simple [options] [<path>...]
-
-Options:
-    -h --help                       show this
-
-    --hypothesis-group-name=NAME    the hypotheis group name
-
-    --project-id=ID                 the project id
-    --dataset-id=ID                 one or more datset ids
-    --project-id-auth-var=VAR       name of the auth variable holding the project-id
-
-    --project-path=PATH             the project path
-    --parent-path=PATH              the parent path of the
-    --parent-parent-path=PATH       parent in which a random tempdir is generated
-                                    to be the parent path, don't use this ...
-
-    --jobs=N                        number joblib jobs [default: 12]
-    --sparse-limit=N                package count that forces a sparse pull
-    --symlink-objects=PATH          path to an existing objects directory
-"""
-
-
-from pyontutils import clifun as clif
-from sparcur.paths import Path, BlackfynnCache
-from sparcur.backends import BlackfynnRemote
-
-
-def backend_blackfynn(Local=Path, Cache=BlackfynnCache):
-    """ return a configured blackfynn backend
-        calling this is sufficient to get everything set up correclty """
-
-    RemotePath = BlackfynnRemote._new(Local, Cache)
-    return RemotePath
-
-
-class Options(clif.Options):
-
-    @property
-    def id(self):
-        return self.project_id if self.project_id else self.dataset_id
-
-    @property
-    def jobs(self):
-        return int(self._args['--jobs'])
-
-    @property
-    def paths(self):
-        return [Path(p) for p in self._args['<path>']]
-
-    @property
-    def path(self):
-        paths = self.paths
-        if paths:
-            return paths[0]
-
-
-def pipe_main(main, after=None, argv=None):
-    options, args, defaults = Options.setup(__doc__, argv=argv)
-    out = main(**options.asKwargs())
-    if after:
-        after(out)
-
-    return out
-#+end_src
-*** Test
-#+begin_src python :tangle ../test/simple/test_utils.py :mkdirp yes
-from sparcur.simple.utils import pipe_main
-
-def test_pipe_main():
-    def main(id, project_path, **kwargs):
-        print(id, project_path, kwargs)
-
-    pipe_main(main, argv=['sparcur-simple'])
-#+end_src
 ** Pipelines
 Easier to read, harder to debug. The python paradox.
-*** Retrieve
-**** Protocols
+*** _*Retrieve*_
+**** _Protocols_
 :PROPERTIES:
 :header-args: :shebang "#!/usr/bin/env python3"
 :END:
@@ -507,7 +426,7 @@ if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main)
 #+end_src
-**** Datasets
+**** _Datasets_
 :PROPERTIES:
 :header-args: :shebang "#!/usr/bin/env python3"
 :END:
@@ -843,9 +762,9 @@ compose = lambda f, g: (lambda *x: f(g(*x)))
 #from_path_remote_metadata = compose(lambda id: from_id_remote_metadata(id),
                                     #lambda path: path.cache.id)
 #+end_src
-*** Validate
-**** Protocols
-**** Datasets
+*** _*Validate*_
+**** _Protocols_
+**** _Datasets_
 #+begin_src python
 from sparcur.paths import Path
 from sparcur.datasets import DatasetStructure
@@ -954,7 +873,90 @@ if __name__ == '__main__':
     main()
 #+end_src
 **** Network resources
-*** Export
+*** _*Export*_
+** Utility
+*** _*Init*_
+#+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes :exports none
+#+end_src
+*** _*Utils*_
+#+name: simple-utils
+#+begin_src python :tangle ../sparcur/simple/utils.py
+"""Common command line options for all sparcur.simple modules
+Usage:
+    sparcur-simple [options] [<path>...]
+
+Options:
+    -h --help                       show this
+
+    --hypothesis-group-name=NAME    the hypotheis group name
+
+    --project-id=ID                 the project id
+    --dataset-id=ID                 one or more datset ids
+    --project-id-auth-var=VAR       name of the auth variable holding the project-id
+
+    --project-path=PATH             the project path
+    --parent-path=PATH              the parent path of the
+    --parent-parent-path=PATH       parent in which a random tempdir is generated
+                                    to be the parent path, don't use this ...
+
+    --jobs=N                        number joblib jobs [default: 12]
+    --sparse-limit=N                package count that forces a sparse pull
+    --symlink-objects=PATH          path to an existing objects directory
+"""
+
+
+from pyontutils import clifun as clif
+from sparcur.paths import Path, BlackfynnCache
+from sparcur.backends import BlackfynnRemote
+
+
+def backend_blackfynn(Local=Path, Cache=BlackfynnCache):
+    """ return a configured blackfynn backend
+        calling this is sufficient to get everything set up correclty """
+
+    RemotePath = BlackfynnRemote._new(Local, Cache)
+    return RemotePath
+
+
+class Options(clif.Options):
+
+    @property
+    def id(self):
+        return self.project_id if self.project_id else self.dataset_id
+
+    @property
+    def jobs(self):
+        return int(self._args['--jobs'])
+
+    @property
+    def paths(self):
+        return [Path(p) for p in self._args['<path>']]
+
+    @property
+    def path(self):
+        paths = self.paths
+        if paths:
+            return paths[0]
+
+
+def pipe_main(main, after=None, argv=None):
+    options, args, defaults = Options.setup(__doc__, argv=argv)
+    out = main(**options.asKwargs())
+    if after:
+        after(out)
+
+    return out
+#+end_src
+*** _*Test*_
+#+begin_src python :tangle ../test/simple/test_utils.py :mkdirp yes
+from sparcur.simple.utils import pipe_main
+
+def test_pipe_main():
+    def main(id, project_path, **kwargs):
+        print(id, project_path, kwargs)
+
+    pipe_main(main, argv=['sparcur-simple'])
+#+end_src
 * Code :noexport:
 See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
 for more direct mapping of graphviz functionality but one that is also way more verbose.
