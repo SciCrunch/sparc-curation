@@ -415,13 +415,14 @@ class Export(ExportBase):
 
         return blob_protocols
 
-    def export_protcur(self, dump_path, *hypothesis_groups):
+    def export_protcur(self, dump_path, *hypothesis_groups, no_network=False):
+        # FIXME no_network passed in here is dumb
         #if (self.latest and  # FIXME NOTE this only points to the latest integrated release
             #self.latest_protcur_path.exists()):
             #blob_protcur = self.latest_protocols
         #else:
 
-        pipeline = pipes.ProtcurPipeline(*hypothesis_groups)
+        pipeline = pipes.ProtcurPipeline(*hypothesis_groups, no_network=no_network)
         # FIXME NOTE this does not do the identifier expansion pass
         protcur = pipeline.data
         context = {**sc.base_context,
@@ -462,14 +463,14 @@ class Export(ExportBase):
 
             testout = json.dumps(blob_protcur, sort_keys=True, indent=2, cls=JEncode)
 
-            from sparcur.core import JApplyRecursive, get_nested_by_type
-            from pysercomb.pyr.types import AJ, Quantity
             def derp(u):
                 try:
                     return u.asDerived()
                 except:
                     pass
 
+            from sparcur.core import JApplyRecursive, get_nested_by_type
+            from pysercomb.pyr.types import AJ, Quantity
             collect = []
             _ = JApplyRecursive(get_nested_by_type, blob_protcur, AJ, collect=collect)
 
@@ -482,8 +483,17 @@ class Export(ExportBase):
             thans = [n for n in nodes if 'Than' in n._value.__class__.__name__]
             qs = [c.quantity for c in collect if hasattr(c, 'quantity')]
             hd = list(filter(all, [(q, derp(q)) for q in qs]))
+            issue = [c._value.magnitude for c in collect
+                     if c.__class__.__name__ == 'Parameter' and
+                     hasattr(c._value, 'magnitude') if ' ' in str(c._value)]
+            pvalues = [c._value for c in collect
+                       if c.__class__.__name__ == 'Parameter']
+            mes = [p for p in pvalues
+                   if p.__class__.__name__ != '_Quant' and '+/-' in str(p)]
+            ames = [c for c in collect if c._value.__class__.__name__ == '_Measurement']
+            m = ames[0]
 
-        elif False:
+        elif True:
             from sparcur.core import JApplyRecursive, json_export_type_converter
             def enc(obj, *args, path=None):
                 v = json_export_type_converter(obj)

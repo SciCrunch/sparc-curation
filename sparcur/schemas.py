@@ -73,11 +73,11 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
     'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
     #'sparcur': {'@id': 'https://uilx.org/tgbugs/u/sparcur/', '@prefix': True},
-    'aspect': {'@id': 'https://uilx.org/tgbugs/u/aspect/', '@prefix': True},
+    #'aspect': {'@id': 'https://uilx.org/tgbugs/u/aspect/', '@prefix': True},
     'aspect-raw': {'@id': 'https://uilx.org/tgbugs/u/aspect-raw/', '@prefix': True},
 
     'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},
-    'value': {'@id': 'TEMP:hasValue', '@type': '@id'},
+    'ast_value': {'@id': 'TEMP:hasValue', '@type': '@id'},
     'raw_value': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
 
     'protcur_anno_count': {'@id': 'TEMP:hasNumberOfProtcurAnnotations'},

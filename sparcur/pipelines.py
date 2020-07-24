@@ -1438,8 +1438,9 @@ class ProtcurPipeline(Pipeline):
     # there is no previous pipeline here
     # FIXME cleanup and align naming with path pipeline probably?
 
-    def __init__(self, *hypothesis_group_names):
+    def __init__(self, *hypothesis_group_names, no_network=False):
         self._hypothesis_group_names = hypothesis_group_names
+        self._no_network = no_network
 
     def load(self):  # if the dereferenced resource is remote, get a local copy
         annos = []
@@ -1507,14 +1508,18 @@ class ProtcurPipeline(Pipeline):
             at = ast.prov.astType
             key = 'working-' + at
             if key in sheets_lookup:
-                aligned = sheets_lookup[key].map(a)
-                if aligned is not None:
-                    # TODO label
-                    alt = Term(aligned, aligned, ast._value)
-                    nast = ast.__class__(alt, *ast.body, prov=ast.prov)
-                    return nast
+                try:
+                    aligned = sheets_lookup[key].map(a)
+                    if aligned is not None:
+                        # TODO label
+                        alt = Term(aligned, None, ast._value)  # None to avoid mismatch in OntTerm
+                        nast = ast.__class__(alt, *ast.body, prov=ast.prov)
+                        return nast
+                except AttributeError as e:
+                    # TODO
+                    pass
             else:
-                log.error(f'no working sheet for {at}')
+                log.debug(f'no working sheet for {at}')
 
             return ast
 
@@ -1689,6 +1694,9 @@ class ProtcurPipeline(Pipeline):
         return annos, idints, pidints
 
     def _sheets_lookup(self):
+        if self._no_network:  # FIXME HACK
+            return {}
+
         from sparcur import sheets  # FIXME EVIL EVIL EVIL
         sheets_lookup = {S.sheet_name:S()
                          for S in subclasses(sheets.AnnoTags)

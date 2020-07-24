@@ -983,7 +983,7 @@ done"""
             dump_path = (self.options.export_protcur_base /
                          self._folder_timestamp)
             hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
-            blob_protcur = export.export_protcur(dump_path, hgn)
+            blob_protcur = export.export_protcur(dump_path, hgn, no_network=self.options.no_google)
             # NOTE --latest will also pull from latest protcur export
             # if it exists I think, the issue is with repeated export
             # of the same content ... as usual, which will confuse

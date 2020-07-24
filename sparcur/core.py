@@ -9,11 +9,10 @@ from collections import deque, defaultdict
 import idlib
 import rdflib
 import ontquery as oq
-from pint.measurement import Measurement
 from idlib.formats import rdf as _bind_rdf
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
-from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ
+from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ, Measurement
 from pyontutils.core import OntTerm as OTB, OntId as OIDB
 from pyontutils.utils import isoformat
 from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
@@ -45,6 +44,7 @@ OntCuries({'orcid':'https://orcid.org/',
            'unit': str(unit),
            'dim': str(dim),
            'asp': str(asp),
+           'aspect-raw': 'https://uilx.org/tgbugs/u/aspect-raw/',
            'tech': str(tech),
            'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})
@@ -294,7 +294,7 @@ def json_export_type_converter(obj):
     elif isinstance(obj, Quantity):
         return obj.json()
     elif isinstance(obj, Measurement):
-        return str(obj)  # FIXME FIXME FIXME
+        return obj.json()
     elif isinstance(obj, oq.OntTerm):
         return obj.iri
         #return obj.asDict()  # FIXME need a no network/scigraph version

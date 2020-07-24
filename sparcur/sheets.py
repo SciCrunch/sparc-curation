@@ -175,7 +175,11 @@ class AnnoTags(Reports):
         if value in index._trouble:
             row = index._trouble[value]
         else:
-            row = getattr(index, value)().row
+            try:
+                row = getattr(index, value)().row
+            except AttributeError as e:
+                # TODO
+                raise
 
         return row
 
@@ -256,9 +260,9 @@ class WorkingAspects(AnnoTags):
 
         if not (bad or notes_help):
             if aspect:
-                return 'aspect:' + aspect.replace(' ', '-')
+                return 'asp:' + aspect.replace(' ', '-')
             elif parent_aspect:
-                return 'aspect:' + parent_aspect.replace(' ', '-')
+                return 'asp:' + parent_aspect.replace(' ', '-')
 
 
 class WorkingAspectsImplied(AnnoTags):
@@ -275,7 +279,7 @@ class WorkingAspectsImplied(AnnoTags):
             else:
                 suffix = map_to
 
-            return 'aspect:' + suffix.replace(' ', '-')
+            return 'asp:' + suffix.replace(' ', '-')
 
 
 class WorkingInputs(AnnoTags):
