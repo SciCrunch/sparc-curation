@@ -416,25 +416,28 @@ class Export(ExportBase):
         return blob_protocols
 
     def export_protcur(self, dump_path, *hypothesis_groups):
-        if (self.latest and  # FIXME NOTE this only points to the latest integrated release
-            self.latest_protcur_path.exists()):
-            blob_protcur = self.latest_protocols
-        else:
-            pipeline = pipes.ProtcurPipeline(*hypothesis_groups)
-            # FIXME NOTE this does not do the identifier expansion pass
-            protcur = pipeline.data
-            context = {**sc.base_context}
-            for f in ('meta', 'subjects', 'samples', 'contributors'):
-                context.pop(f)  # FIXME HACK meta @graph for datasets
+        #if (self.latest and  # FIXME NOTE this only points to the latest integrated release
+            #self.latest_protcur_path.exists()):
+            #blob_protcur = self.latest_protocols
+        #else:
 
-            blob_protcur = {
-                '@context': context,
-                'meta': {'count': len(protcur)},  # FIXME adjust to structure
-                'prov': {'timestamp_export_start': self.timestamp,
-                         'export_system_identifier': Path.sysid,
-                         'export_hostname': gethostname(),},
-                '@graph': protcur,  # FIXME regularize elements ?
-            }
+        pipeline = pipes.ProtcurPipeline(*hypothesis_groups)
+        # FIXME NOTE this does not do the identifier expansion pass
+        protcur = pipeline.data
+        context = {**sc.base_context,
+                    **sc.protcur_context,
+                    }
+        for f in ('meta', 'subjects', 'samples', 'contributors'):
+            context.pop(f)  # FIXME HACK meta @graph for datasets
+
+        blob_protcur = {  # FIXME this should not be defined here so confusing that it is not with the pipeline ...
+            '@context': context,
+            'meta': {'count': len(protcur)},  # FIXME adjust to structure
+            'prov': {'timestamp_export_start': self.timestamp,
+                        'export_system_identifier': Path.sysid,
+                        'export_hostname': gethostname(),},
+            '@graph': protcur,  # FIXME regularize elements ?
+        }
 
         if False:
             from protcur.analysis import protc
@@ -458,18 +461,43 @@ class Export(ExportBase):
             invars = [c for p in pannos for c in (p, *p.rchildren) if c.astType == 'protc:invariant']
 
             testout = json.dumps(blob_protcur, sort_keys=True, indent=2, cls=JEncode)
+
             from sparcur.core import JApplyRecursive, get_nested_by_type
-            from pysercomb.pyr.types import AJ
+            from pysercomb.pyr.types import AJ, Quantity
+            def derp(u):
+                try:
+                    return u.asDerived()
+                except:
+                    pass
+
             collect = []
             _ = JApplyRecursive(get_nested_by_type, blob_protcur, AJ, collect=collect)
+
             hrm = [c for c in collect if hasattr(c, 'body') and None in c.body]
             problems = [c._value for c in collect
                         if not isinstance(c._value, str) and
                         'surement' in c._value.__class__.__name__]
             prb = problems[0]
+            nodes = [n for c in collect for n in c.rchildren]
+            thans = [n for n in nodes if 'Than' in n._value.__class__.__name__]
+            qs = [c.quantity for c in collect if hasattr(c, 'quantity')]
+            hd = list(filter(all, [(q, derp(q)) for q in qs]))
 
+        elif False:
+            from sparcur.core import JApplyRecursive, json_export_type_converter
+            def enc(obj, *args, path=None):
+                v = json_export_type_converter(obj)
+                if v is not None:
+                    return v
 
-        breakpoint()
+                return obj
+
+            sorta_out = JApplyRecursive(enc, blob_protcur)
+
+            from protcur.analysis import protc
+            tags = [t for p in protc._annos_list for t in p.tags]
+
+        #breakpoint()
 
         dump_path.mkdir(parents=True)
         # FIXME TODO make these latest paths accessible
@@ -483,7 +511,7 @@ class Export(ExportBase):
 
         symlink_latest(dump_path, latest_partial_path)
 
-        populateFromJsonLd(OntGraph(), fn).write(fn.with_suffix('.ttl'))
+        g = populateFromJsonLd(OntGraph(), fn).write(fn.with_suffix('.ttl'))
 
         symlink_latest(dump_path, latest_path)
 

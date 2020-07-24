@@ -1,6 +1,38 @@
 import unittest
 
 from sparcur import schemas as sc
+from pyld import jsonld
+
+
+class TestContext(unittest.TestCase):
+
+    def _doit(self, j):
+        proc = jsonld.JsonLdProcessor()
+        context = j['@context']
+        bads = []
+        try:
+            ctx = proc.process_context(proc._get_initial_context({}),
+                                       context, {})
+        except jsonld.JsonLdError as e:
+            for k, v in context.items():
+                c = {k: v, '@version': context['@version']}
+                try:
+                    ctx = proc.process_context(proc._get_initial_context({}),
+                                               c, {})
+                except jsonld.JsonLdError as e:
+                    bads.append((k, v))
+
+        assert not bads, bads
+
+    def test_base(self):
+        j = {'@context': sc.base_context,
+             '@graph': []}
+        self._doit(j)
+
+    def test_protcur(self):
+        j = {'@context': sc.protcur_context,
+             '@graph': []}
+        self._doit(j)
 
 
 class OrcidSchema(sc.JSONSchema):

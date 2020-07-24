@@ -1455,10 +1455,10 @@ class ProtcurPipeline(Pipeline):
             # on groups (and because no implementation should be focused
             # on auth, which should be handled orthgonally)
 
-        return annos
+        return annos#[:5000]  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     @staticmethod
-    def _annos_to_json(data, annos):
+    def _annos_to_json(data, annos, sheets_lookup, Term):
         def partition(a):
             return ('ast-no-parents'
                     if a.is_protcur_lang() else
@@ -1476,12 +1476,13 @@ class ProtcurPipeline(Pipeline):
                     continue
                 elif any(tag.startswith(t) for t in cands):
                     return OntTerm(tag)  # FIXME jsonld string issue ...
-                elif 'technique' in tag:
+                elif 'technique' in tag and ' ' not in tag:
                     return tag
 
-            return a.value
+            #return a.value
 
         def normalize_node(a):
+
             try:
                 racket = a.asPython()
             except a.pyru.RacketParser.ParseFailure as e:
@@ -1493,12 +1494,36 @@ class ProtcurPipeline(Pipeline):
                 return
 
             try:
-                return racket.asPython()
+                ast = racket.asPython()
             except racket.ParseFailure as e:
                 log.debug(repr(e))
+                return
             except Exception as e:
                 log.exception(e)
-                return normalize_other(a)
+                return
+                #return normalize_other(a)  # we already have this under TEMPRAW
+
+            # FIXME FIXME EVIL NETWORK
+            at = ast.prov.astType
+            key = 'working-' + at
+            if key in sheets_lookup:
+                aligned = sheets_lookup[key].map(a)
+                if aligned is not None:
+                    # TODO label
+                    alt = Term(aligned, aligned, ast._value)
+                    nast = ast.__class__(alt, *ast.body, prov=ast.prov)
+                    return nast
+            else:
+                log.error(f'no working sheet for {at}')
+
+            return ast
+
+        def normalize_working(a):
+            # TODO alignment
+            # FIXME need to sandbox the network access here
+            # do it by attaching everything to the hypothesis annotations
+            #lookup(a.value)
+            return
 
         def normalize_other(a):
             for tag in a.tags:
@@ -1512,8 +1537,13 @@ class ProtcurPipeline(Pipeline):
             else:
                 return a.text
 
+
+        def lift_urls(a):
+            if isinstance(a, OntTerm):
+                return a
+
         def clean(v):
-            if isinstance(v, str):
+            if isinstance(v, str) and not isinstance(v, OntId):  # sigh, yep, idlib has the better design
                 nbsp = '\xa0'  # the vails of the non breaking space for formatting :/
                 return v.strip().replace(nbsp, ' ')
             else:
@@ -1525,7 +1555,8 @@ class ProtcurPipeline(Pipeline):
         na = hrm['not-ast']
         nested = hrm[None]  # TODO
 
-        data['TEMP:hasNumberOfProtcurAnnotations'] = len(anp)
+        #data['TEMP:hasNumberOfProtcurAnnotations'] = len(anp)
+        data['protcur_anno_count'] = len(anp)
 
         tpn = (
                 ('ilxtr:technique', 'TEMPRAW:protocolEmploysTechnique'),
@@ -1539,6 +1570,9 @@ class ProtcurPipeline(Pipeline):
                 ('protc:parameter*',     'TEMPRAW:protocolInvolvesParameter'),     # FIXME source from protcs
                 ('protc:invariant',      'TEMPRAW:protocolInvolvesInvariant'),     # FIXME source from protcs
                 ('protc:executor-verb',  'TEMPRAW:protocolInvolvesAction'),        # FIXME source from protcs
+
+                ('protc:black-box',  'TEMPRAW:lol'),
+                ('protc:black-box-component',  'TEMPRAW:lol'),
 
                 # TODO aspects of subjects vs reagents, primary particiant in the
                 # core protocols vs subprotocols
@@ -1563,11 +1597,19 @@ class ProtcurPipeline(Pipeline):
 
             'protc:parameter*': normalize_node,
             'protc:invariant': normalize_node,
+
+            'sparc:Tool': normalize_working,
+            'sparc:Reagent': normalize_working,
+
+            'sparc:AnatomicalLocation': lift_urls,
         }
 
         tpn += tuple(
-            (k, [pred for tag, pred, *norm in tpn
-                 if tag == k][0].replace('TEMPRAW:', 'TEMP:'),
+            (k,
+             #[pred for tag, pred, *norm in tpn if tag == k][0].replace('TEMPRAW:', 'TEMP:'),
+             ('protocolEmploysTechnique'
+              if k == 'ilxtr:technique' else
+              k.replace('protc:', 'protcur:').replace('sparc:', 'sparcur:')),
              n) for k, n in norms.items())
 
         class Derp(str):
@@ -1584,18 +1626,40 @@ class ProtcurPipeline(Pipeline):
                 return v
 
         for tag, predicate, *norm in tpn:
+            #log.critical((tag, predicate, *norm))
             if not norm:
                 norm = normalize_other
             else:
                 norm, = norm
 
+            normed = [norm(a) for a in annos if tag in a.tags]
             # FIXME not at all clear that these should be sorted
             # it added tons of complexity to the pyru implementation
-            vals = sorted(set([clean(n) for n in
-                               [norm(a) for a in annos if tag in a.tags] if n]),
+            vals = sorted(set([clean(n) for n in normed if n]),
                           key=key)
             if vals:
-                data[predicate] = vals
+                #if [p for p in ('ilxtr:', 'protc:', 'sparc:') if tag.startswith(p)]:
+                if predicate.startswith('TEMPRAW:'):
+                    pred = tag
+                else:
+                    pred = predicate
+
+                pred = pred.replace(':', '_')  # FIXME sigh
+                if predicate.startswith('TEMPRAW:'):
+                    data[pred] = vals
+                else:
+                    #log.critical((tag, pred, norm, vals))
+                    #if [v for v in vals if isinstance(v, str)]:
+                        #breakpoint()
+
+                    data[pred] = ['protcur:' + v.prov.id
+                                  if hasattr(v, 'prov') else
+                                  v  # assume it is an id probably wrongly
+                                  for v in vals]  # FIXME
+                    yield from vals  # they go in the graph
+                #data[tag] = vals
+            #else:
+                #log.critical([t for a in annos for t in a.tags])
 
     def _idints(self, annos=None):
         if annos is None:
@@ -1615,11 +1679,21 @@ class ProtcurPipeline(Pipeline):
         # decisions and requirements interacting to produce completely pathalogical
         # behavior :/ slow startup from cli are the primary issue :/
         idints = idn._uri_api_ints()
-        nones = idints.pop(None)
-        nidn = ptcdoc.IdNormalization(nones)
-        idints.update(nidn.normalized())
+
+        if None in idints:
+            nones = idints.pop(None)
+            nidn = ptcdoc.IdNormalization(nones)
+            idints.update(nidn.normalized())
+
         pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
         return annos, idints, pidints
+
+    def _sheets_lookup(self):
+        from sparcur import sheets  # FIXME EVIL EVIL EVIL
+        sheets_lookup = {S.sheet_name:S()
+                         for S in subclasses(sheets.AnnoTags)
+                         if 'working' in S.sheet_name}
+        return sheets_lookup
 
     def _hrm(self):
         def urih(data, pio):
@@ -1632,7 +1706,7 @@ class ProtcurPipeline(Pipeline):
                     elif orig_pio.slug_tail:
                         data['uri_human'] = orig_pio
 
-
+        sheets_lookup = self._sheets_lookup()
         annos, idints, pidints = self._idints()
         out = []
         for pio, pannos in pidints.items():
@@ -1677,9 +1751,11 @@ class ProtcurPipeline(Pipeline):
                 # TODO embed error status
                 pass
 
-            self._annos_to_json(data, pannos)
-            log.debug(data)
+            from pysercomb.pyr.units import Term
+            extras = list(self._annos_to_json(data, pannos, sheets_lookup, Term))
+            #log.debug(data)
             out.append(data)
+            out.extend(extras)
 
         return out
 

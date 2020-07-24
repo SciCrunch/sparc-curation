@@ -2,8 +2,13 @@ import io
 import logging
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
-from pyontutils.utils import makeSimpleLogger, python_identifier  # FIXME update imports
-from pyontutils.utils import TZLOCAL, utcnowtz, isoformat, isoformat_safe
+from pyontutils.utils import (makeSimpleLogger,
+                              python_identifier,  # FIXME update imports
+                              TZLOCAL,
+                              utcnowtz,
+                              isoformat,
+                              isoformat_safe,
+                              timeformat_friendly)
 from sparcur.config import config
 
 log = makeSimpleLogger('sparcur')
@@ -76,12 +81,20 @@ class GetTimeNow:
         return isoformat_safe(self._start_time)
 
     @property
+    def START_TIMESTAMP_FRIENDLY(self):
+        return timeformat_friendly(self._start_time)
+
+    @property
     def START_TIMESTAMP_LOCAL(self):
         return isoformat(self._start_time_local)
 
     @property
     def START_TIMESTAMP_LOCAL_SAFE(self):
         return isoformat_safe(self._start_time_local)
+
+    @property
+    def START_TIMESTAMP_LOCAL_FRIENDLY(self):
+        return timeformat_friendly(self._start_time_local)
 
 
 class SimpleFileHandler:

@@ -245,6 +245,7 @@ from sparcur.core import JT
 from sparcur.core import OntId, OntTerm, adops
 from sparcur.utils import GetTimeNow  # top level
 from sparcur.utils import log, logd, bind_file_handler
+from sparcur.utils import register_type, fromJson
 from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
 from sparcur.backends import BlackfynnRemote
@@ -462,7 +463,7 @@ class Main(Dispatcher):
         # FIXME populate this via decorator
         if (self.options.clone or
             self.options.meta or
-            self.options.show or
+            (self.options.show and not self.options.export) or
             self.options.sheets or
             self.options.goto or
             self.options.apinat or
@@ -567,6 +568,8 @@ class Main(Dispatcher):
         for fn in ('methods', 'methods-helper', 'methods-core'):
             org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
             OntTerm.query.ladd(RDFL(org.graph, OntId))
+
+    _pyru_loaded = False
 
     def _data_ir(self, org_id=None):  # FIXME org_id should NOT implicitly indicate that we are in no_export
         if self.options.raw:
@@ -1529,7 +1532,7 @@ done"""
     def sheets(self):
         from pyontutils import sheets as ps
 
-        data = self._data_ir(self.org_id)
+        data = self._data_ir(self.options.project_id)
 
         # check that the ir is sane
         self._check_duplicates(data['datasets'])

@@ -159,6 +159,26 @@ class Reports(Sheet):
 class AnnoTags(Reports):
     name = 'anno-tags'
 
+    def _annotation_row(self, anno):
+        key = self.index_columns[0]
+        value = getattr(anno, key)
+        value = value.strip()  # FIXME align with id normalization maybe?
+
+        header = self.row_object(0)
+        #index = getattr(header, key)().column  # ;_; but it was so elegant
+        #row = getattr(index, value)().row
+        if key in header._trouble:
+            index = header._trouble[key]().column
+        else:
+            index = getattr(header, key)().column
+
+        if value in index._trouble:
+            row = index._trouble[value]
+        else:
+            row = getattr(index, value)().row
+
+        return row
+
 
 class WorkingExecVerb(AnnoTags):
     sheet_name = 'working-protc:executor-verb'
@@ -192,6 +212,97 @@ class WorkingExecVerb(AnnoTags):
 
         #breakpoint()
         return value_to_map_to, create  # old -> new, original -> correct
+
+    def map(self, anno):
+        row = self._annotation_row(anno)
+        bad = row.bad().value
+        help__ = row.help__().value
+        map_to = row.map_to().value
+
+        if not (bad or help__):
+            if map_to:
+                if map_to == '-':
+                    suffix = getattr(anno, self.index_cols[0])
+                else:
+                    suffix = map_to
+            elif merge:
+                suffix = merge
+
+            return 'verb:' + suffix.replace(' ', '-')
+
+
+class WorkingTechniques(AnnoTags):
+    sheet_name = 'working-ilxtr:technique'
+    index_columns = 'exact',  # FIXME pull index_columns the reports sheets decorator somehow?
+
+    def map(self, anno):
+        row = self._annotation_row(anno)
+        oid = row.ontology_id().value
+        label = row.ontology_label().value
+        ilx_curie = row.interlex_id().value
+        return OntTerm(oid, label=label), OntTerm(interlex_curie)
+
+
+class WorkingAspects(AnnoTags):
+    sheet_name = 'working-protc:aspect'
+    index_columns = 'value',
+
+    def map(self, anno):
+        row = self._annotation_row(anno)
+        bad = row.bad_().value
+        notes_help = row.notes_help().value
+        aspect = row.aspect().value
+        parent_aspect = row.parent_aspect().value
+
+        if not (bad or notes_help):
+            if aspect:
+                return 'aspect:' + aspect.replace(' ', '-')
+            elif parent_aspect:
+                return 'aspect:' + parent_aspect.replace(' ', '-')
+
+
+class WorkingAspectsImplied(AnnoTags):
+    sheet_name = 'working-protc:implied-aspect'
+    index_columns = 'value',
+
+    def map(self, anno):
+        row = self._annotation_row(anno)
+        map_to = row.map_to().value
+        bad = row.bad().value
+        if not bad and map_to:
+            if map_to == '-':
+                suffix = getattr(anno, self.index_cols[0])
+            else:
+                suffix = map_to
+
+            return 'aspect:' + suffix.replace(' ', '-')
+
+
+class WorkingInputs(AnnoTags):
+    sheet_name = 'working-protc:input'
+    index_columns = 'value',
+
+    def map(self, anno):
+        row = self._annotation_row(anno)
+        mapping_ok = row.mapping_ok().value
+        not_input = row.not_input_().value
+        bad_for_mapping = row.bad_for_mapping_().value
+        if mapping_ok and not not_input:
+            pass
+
+
+class WorkingInputInstances(AnnoTags):
+    sheet_name = 'working-protc:input-instance'
+    index_columns = 'exact',
+
+    def map(self, anno):
+        row = self._annotation_row(anno)
+        proposed_category = row.proposed_category().value
+        interlex = row.interlex().value
+        rrid = row.rrid().value
+        # TODO multiple returns
+        if rrid:
+            return rrid
 
 
 # field alignment

@@ -4,6 +4,7 @@ import copy
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
+import openpyxl
 import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
@@ -483,6 +484,46 @@ class Tabular(HasErrors):
                     logd.error(message)
 
     def xlsx(self):
+        try:
+            one = list(self.xlsx1())
+        except Exception as e:
+            e1 = e
+            one = None
+
+        try:
+            two = list(self.xlsx2())
+        except Exception as e:
+            e2 = e
+            two = None
+
+        offset = 2
+        if one is not None:
+            one_test = [['' if c is None else c for c in r[offset:]] for r in one[offset:]]
+        else:
+            one_test = None
+
+        if two is not None:
+            two_test = [['' if c is None else c for c in r[offset:]] for r in two[offset:]]
+        else:
+            two_test = None
+
+        #if one_test != two_test:
+            #breakpoint()
+
+        if one is None and two is None:
+            raise e1 from e2  # sigh, can't raise both
+        elif two is None:
+            raise e2
+
+        yield from two
+
+    def xlsx2(self):
+        wb = openpyxl.load_workbook(self.path)
+        sheet = wb.get_active_sheet()
+        for row in sheet.rows:
+            yield [cell.value for cell in row]
+
+    def xlsx1(self):
         kwargs = {
             'delimiter': '\t',
             'skip_empty_lines': True,
@@ -519,7 +560,7 @@ class Tabular(HasErrors):
             if self.addError(exc.EncodingError(message),
                              blame='submission',
                              path=self.path):
-                log.exception(e)
+                #log.exception(e)
                 logd.critical(message)
 
     def _bad_filetype(self, type_):
@@ -538,9 +579,13 @@ class Tabular(HasErrors):
         error = exc.EncodingError(f"encoding feff error in '{self.path}'")
         cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
         for row in cleaned_rows:
-            n_row = [c.strip().replace('\ufeff', '') for c in row
-                     if ((not logd.error(error) if self.addError(error) else True)  # FIXME will probably append multiple ...
-                         if '\ufeff' in c else True)]
+            n_row = [c.strip().replace('\ufeff', '') if c and isinstance(c, str) else c
+                     for c in row
+                     if ((not logd.error(error)
+                          if self.addError(error) else
+                          True)  # FIXME will probably append multiple ...
+                         if c and isinstance(c, str) and '\ufeff' in c else
+                         True)]
             if not all(not(c) for c in n_row):  # skip totally empty rows
                 yield n_row
 
@@ -1171,13 +1216,21 @@ class SubjectsFilePath(ObjectPath):
 SubjectsFilePath._bind_flavours()
 
 
+def join_cast(sep):
+    """ oh look, you still can't use list comprehension in class scope """
+    def sigh(t, sep=sep):
+        return sep.join(tuple(str(_) for _ in t))
+
+    return sigh
+
+
 class SamplesFile(SubjectsFile):
     """ TODO ... """
 
     # TODO merge
     __internal_id_1 = object()
     __primary_key = 'primary_key'
-    primary_key_rule = __primary_key, ('subject_id', 'sample_id'), '_'.join
+    primary_key_rule = __primary_key, ('subject_id', 'sample_id'), join_cast('_')
     __rename_1 = primary_key_rule[2](('Lab-based schema for identifying each subject',
                                       ('Lab-based schema for identifying each sample, must '
                                        'be unique')))

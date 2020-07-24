@@ -3,7 +3,7 @@ import json
 import itertools
 from types import GeneratorType
 from pathlib import PurePath
-from datetime import datetime
+from datetime import datetime, time
 from functools import wraps
 from collections import deque, defaultdict
 import idlib
@@ -21,7 +21,6 @@ from pyontutils.namespaces import tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd  # FIXME fix other imports
 from sparcur.utils import is_list_or_tuple, register_type
-
 
 xsd = rdflib.XSD
 po = CustomTurtleSerializer.predicateOrder
@@ -85,7 +84,7 @@ class OntTerm(OTB, OntId):
         if isinstance(identifier, cls):
             return identifier
         else:
-            return cls(identifier, label=blob['label'])
+            return cls(identifier, label=blob['label'])  # FIXME need the .fetch() impl
 
     @classmethod
     def _already_logged(cls, thing):
@@ -306,6 +305,8 @@ def json_export_type_converter(obj):
             return json_export_type_converter(obj.identifier)
             #return obj.asDict()  # FIXME need a no network/scigraph version
     elif isinstance(obj, datetime):
+        return isoformat(obj)
+    elif isinstance(obj, time):
         return isoformat(obj)
     elif isinstance(obj, BaseException):
         # FIXME hunt down where these are sneeking in from

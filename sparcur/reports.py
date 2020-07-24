@@ -17,8 +17,7 @@ from sparcur.core import (OntId,
                           OntTerm,
                           get_all_errors,
                           adops,)
-from sparcur.utils import want_prefixes, log as _log, register_type
-from sparcur.utils import register_type, fromJson
+from sparcur.utils import want_prefixes, log as _log
 from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.curation import ExporterSummarizer
@@ -266,7 +265,14 @@ class Report:
                 'protc:executor-verb',
                 'protc:parameter*',
                 'protc:invariant',
-                'protc:output',):
+                'protc:output',
+                'protc:black-box',
+                'protc:black-box-component',
+                'protc:objective*',
+                'protc:*measure',
+                'protc:symbolic-input',
+                'protc:symbolic-output',
+        ):
             # FIXME hack around broken anno_tags impl
             self.anno_tags(tag)
 
@@ -308,8 +314,6 @@ class Report:
                 *[[i, u] for i, u in zip(missing_from_api, missing_uris)]
         ]
         return self._print_table(rows, title='Access Report', ext=ext)
-
-    _pyru_loaded = False
 
     @sheets.Reports.makeReportSheet('id')
     def contributors(self, ext=None):
@@ -834,7 +838,7 @@ class Report:
                                  ext=ext)
 
     def _process_protc(self, tags, matches, ext):
-        from protcur.analysis import protc
+        from protcur.analysis import protc, ParameterValue
         from pysercomb.pyr import units as pyru
         from pysercomb.parsers import racket
         pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
@@ -855,9 +859,13 @@ class Report:
             input = pm[13]
             invar = next(next(input.children).children)
             paramparser = pyru.ParamParser()
-            tv = racket.sexp(invar.parameter())[1]
+            param = invar.parameter()
+            if isinstance(param, ParameterValue):  # FIXME how the heck ...
+                tv = param.v
+            else:
+                tv = racket.sexp(param)[1]
             tp = invar._parameter[1]
-            assert tv == tp
+            assert tv == tp, breakpoint()
             hrm = paramparser(tv)
 
         hrm = defaultdict(list)
@@ -949,6 +957,8 @@ class Report:
                                    'protc:parameter*',
                                    'protc:invariant',
                                    'protc:output',
+                                   'protc:black-box',
+                                   'protc:black-box-component',
                                    )
 
         # note that HypothesisHelper.byTags is an AND search not and OR search

@@ -122,11 +122,18 @@ function sparcur-get-all-remote-data () {
     # don't have caching functionality yet
 
     # TODO parse args
-    local TIME_START=$(date -In)
-    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START}" || \
+    # gnu coreutils gdate needed for osx support/freebsd
+    # gdate on darwin only has millisecond resolution?
+    # this also won't work on freebsd without gnu coreutils
+    iso8601millis="+%FT%T,%6N%:z"  # FIXME do we _really_ need millis!? yemaybe? concurrent startups?
+    local TIME_START=$(date ${iso8601millis} || gdate ${iso8601millis})
+    local TIME_START_SAFE=$(echo ${TIME_START} | sed 's/[:-]//g')
+    local TIME_START_FRIENDLY=$(echo ${TIME_START} | sed 's/://g')
+    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START_FRIENDLY}" || \
         { CODE=$?; echo 'mv failed'; return $CODE; }
-    local PARENT_PATH=${TIME_START}
+    local PARENT_PATH=${TIME_START_FRIENDLY}
     local LOG_PATH="${PARENT_PATH}/logs"
+
     #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
     local PROJECT_ID=$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")
     local SYMLINK_OBJECTS_TO=$()
@@ -134,7 +141,7 @@ function sparcur-get-all-remote-data () {
     echo ${PARENT_PATH}  # needed to be able to follow logs
 
     if [ ! -d "${LOG_PATH}" ]; then
-        mkdir "${LOG_PATH}"
+        mkdir "${LOG_PATH}" || { CODE=$?; echo 'mkdir of ${LOG_PATH} failed'; return $CODE; }
     fi
 
     # fetch annotations
@@ -143,14 +150,14 @@ function sparcur-get-all-remote-data () {
 
     # fetch remote metadata
     python -m sparcur.simple.fetch_remote_metadata_all \
-           --project-id ${PROJECT_ID} \
+           --project-id "${PROJECT_ID}" \
            > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
     local pids[0]=$!
 
     # clone aka fetch top level
     local FAIL=0
     local PROJECT_PATH=$(python -m sparcur.simple.clone \
-                                --project-id ${PROJECT_ID} \
+                                --project-id "${PROJECT_ID}" \
                                 --parent-path "${PARENT_PATH}" \
                                 > "${LOG_PATH}/clone.log" 2>&1) || FAIL=$((FAIL+1))
 
@@ -166,10 +173,12 @@ function sparcur-get-all-remote-data () {
     # pull aka fetch file system metadata
     python -m sparcur.simple.pull \
            --project-path "${PROJECT_PATH}" \
-           > "${LOG_PATH}/pull.log" 2>&1 || { CODE=$?;
-                                              echo 'pull failed!';
-                                              echo "${PROJECT_PATH}";
-                                              return $CODE; }
+           > "${LOG_PATH}/pull.log" 2>&1 || {
+        CODE=$?;
+        tail -n "${LOG_PATH}/pull.log";
+        echo "Pull failed! The last 100 lines of ${LOG_PATH}/pull.log are listed above.";
+        echo "${PROJECT_PATH}";
+        return $CODE; }
 
     # fetch metadata files
     python -m sparcur.simple.fetch_metadata_files \
@@ -450,8 +459,25 @@ def from_path_id_and_backend_project_top_level(parent_path,
     RemotePath.init(project_id)  # calling init is required to bind RemotePath._api
     anchor = RemotePath.smartAnchor(parent_path)
     anchor.local_data_dir_init(symlink_objects_to=symlink_objects_to)
-    list(anchor.children)
     project_path = anchor.local
+    return _from_project_path_top_level(project_path)
+
+
+def _from_project_path_top_level(project_path):
+    """ given a project path with existing cached metadata
+        pull the top level children
+
+        WARNING: be VERY careful about using this because it
+        does not gurantee that rmeta is available to mark
+        sparse datasets. It may be the case that the process
+        will fail if the rmeta is missing, or it may not. Until
+        we are clear on the behavior this warning will stay
+        in place. """
+    # this is a separate function in case the previous step fails
+    # which is also why it is hidden, it makes too many assuptions
+    # to be used by itself
+    anchor = project_path.cache
+    list(anchor.children)  # this fetchs data from the remote path to the local path
     return project_path  # returned instead of anchor & children because it is needed by next phase
 
 
@@ -459,6 +485,7 @@ def main(parent_path=None,
          project_id=None,
          parent_parent_path=Path.cwd(),
          project_id_auth_var='blackfynn-organization',
+         symlink_objects_to=None,
          **kwargs):
     """ clone a project into a random subfolder of the current folder
         or specify the parent path to clone into """
@@ -472,7 +499,6 @@ def main(parent_path=None,
 
     project_id = auth.get(project_id_auth_var)
     RemotePath = backend_blackfynn()
-    symlink_objects_to = None  # TODO
     project_path = from_path_id_and_backend_project_top_level(
         parent_path,
         project_id,
@@ -495,6 +521,7 @@ Remote metadata can be retrieved using only a project_id. However,
 for all retrieval after the first pull it is usually more effective
 to retrieve it at the same time as fetching metadata files since it
 runs in parallel per dataset.
+
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata_all.py
 from joblib import Parallel, delayed
 from sparcur.backends import BlackfynnDatasetData
@@ -618,7 +645,7 @@ def from_path_dataset_file_structure_all(project_path, time_now=None):
 
 
 # mark datasets as sparse 
-def sparse_materialize(path, sparse_limit=None):
+def sparse_materialize(path, sparse_limit:int=None):
     """ given a path mark it as sparse if it is a dataset and
         beyond the sparse limit """
 
@@ -631,7 +658,7 @@ def sparse_materialize(path, sparse_limit=None):
         cache._sparse_materialize(sparse_limit=sparse_limit)
 
 
-def main(path=Path.cwd(), time_now=None, sparse_limit=None, **kwargs):
+def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, **kwargs):
     project_path = None
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.fetch_remote_metadata import main as remote_metadata
@@ -646,6 +673,13 @@ def main(path=Path.cwd(), time_now=None, sparse_limit=None, **kwargs):
                 'to get a sane view of the filesystem if you ran this'
                 'from within a dataset folder')
             return path
+
+    if not list(project_path.children):
+        raise FileNotFoundError(f'{project_path} has no children.')
+        # somehow clone failed
+        # WARNING if rmeta failed you may get weirdness  # FIXME
+        from sparcur.simple.clone import _from_project_path_top_level
+        _from_project_path_top_level(project_path)
 
     sparse_materialize(project_path, sparse_limit=sparse_limit)
     from_path_dataset_file_structure_all(project_path)
@@ -900,8 +934,8 @@ Options:
                                     to be the parent path, don't use this ...
 
     --jobs=N                        number joblib jobs [default: 12]
-    --sparse-limit=N                package count that forces a sparse pull
-    --symlink-objects=PATH          path to an existing objects directory
+    --sparse-limit=N                package count that forces a sparse pull [default: 10000]
+    --symlink-objects-to=PATH       path to an existing objects directory
 """
 
 
@@ -937,6 +971,25 @@ class Options(clif.Options):
         paths = self.paths
         if paths:
             return paths[0]
+        else:
+            # if no paths were listed default to cwd
+            # consistent with how the default kwargs
+            # are set on a number of mains
+            # this is preferable to allow path=None
+            # to be overwritten by the conventions of
+            # individual pipeline mains
+            return Path.cwd()
+
+    @property
+    def symlink_objects_to(self):
+        paths = self.paths
+        if paths:
+            return paths[0]
+
+
+    @property
+    def sparse_limit(self):
+        return int(self._args['--sparse-limit'])
 
 
 def pipe_main(main, after=None, argv=None):

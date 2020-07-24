@@ -34,16 +34,25 @@ base_context = {
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
     'subjects': 'TEMP:hasSubGraph',  #'_bfc:#subjects-graph',  # FIXME I think the fragment is the right thing to do here ...
     'samples': 'TEMP:hasSubGraph',  #'_bfc:#samples-graph',
-    'contributors': '_bfc:#contributors-graph',  # FIXME broken I think
+    #'contributors': '_bfc:#contributors-graph',  # FIXME broken I think
+    'contributors': 'TEMP:hasSubGraph',  # FIXME broken I think
     #'N:dataset': {'@id': 'https://api.blackfynn.io/datasets/'},  # darn it multiprefix issues
     **{p: {'@id': n, '@prefix': True}
        if [c for c in prefix_endswith if n.endswith(c)]
        else n for p, n in {**uPREFIXES, **OntCuries._dict}.items()
        if p != ''},  # FIXME massive data duplication
+
+    # OLD convention
     'unit': {'@id': 'TEMP:hasUnit',
              '@type': '@id',
              '@context': {'@base': str(unit)}},
     'value': {'@id': 'rdf:value'},  # FIXME maybe include this in a dedicated quantity @context?
+    # END OLD
+
+    'units': {'@id': 'TEMP:hasUnit',
+             '@type': '@id',
+             '@context': {'@base': str(unit)}},
+    'magnitude': {'@id': 'rdf:value'},  # FIXME maybe include this in a dedicated quantity @context?
     'type': {'@id': 'ilxtr:jsonRecordType',  # FIXME ...
              '@type': '@id',
              '@context': {'@base': str(ilxtr['sparcur/types/'])},},
@@ -54,6 +63,70 @@ base_context = {
                '@context': {'@base': str(ilxtr['idlib/systems/'])},},
     'OntTerm': 'owl:Class',
     #'uri_api': {'@id': '@id', '@type': '@id'},  # klobbered below, now fixed
+}
+
+
+protcur_context = {  # FIXME how is the protcur -> mis related to a native protcur schema?
+    '@version': 1.1,
+    #'TEMP:':
+
+    #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
+    'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
+    #'sparcur': {'@id': 'https://uilx.org/tgbugs/u/sparcur/', '@prefix': True},
+    'aspect': {'@id': 'https://uilx.org/tgbugs/u/aspect/', '@prefix': True},
+    'aspect-raw': {'@id': 'https://uilx.org/tgbugs/u/aspect-raw/', '@prefix': True},
+
+    'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},
+    'value': {'@id': 'TEMP:hasValue', '@type': '@id'},
+    'raw_value': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
+
+    'protcur_anno_count': {'@id': 'TEMP:hasNumberOfProtcurAnnotations'},
+
+    'ilxtr_technique': {'@id': 'TEMPRAW:protocolEmploysTechnique'},
+    'protocolEmploysTechnique': {'@id': 'TEMP:protocolEmploysTechnique', '@type': '@id'},
+
+    # https://www.w3.org/TR/json-ld11/#example-32-using-vocabularies
+    # explains the issues associated with trying to use a context to
+    # to identifier remapping directly, you have to use an intermediate
+    # context which compacts a form where keys are not curies at all
+    'protc_aspect': {'@id': 'TEMPRAW:protocolInvolvesAspect'},
+    'protc_implied-aspect': {'@id': 'TEMPRAW:protocolInvolvesAspect'},
+    'protc_input': {'@id': 'TEMPRAW:protocolInvolvesInput'},
+    'protc_implied-input': {'@id': 'TEMPRAW:protocolInvolvesInput'},
+    'protc_input-instance': {'@id': 'TEMPRAW:protocolInvolvesInputInstance'},
+    'protc_output': {'@id': 'TEMPRAW:protocolInvolvesOutput'},
+    'protc_parameter*': {'@id': 'TEMPRAW:protocolInvolvesParameter'},
+    'protc_invariant': {'@id': 'TEMPRAW:protocolInvolvesInvariant'},
+    'protc_executor-verb': {'@id': 'TEMPRAW:protocolInvolvesAction'},
+
+    'protcur_aspect': {'@id': 'TEMP:protocolInvolvesAspect', '@type': '@id'},
+    'protcur_implied-aspect': {'@id': 'TEMP:protocolInvolvesAspect', '@type': '@id'},
+    'protcur_input': {'@id': 'TEMP:protocolInvolvesInput', '@type': '@id'},
+    'protcur_implied-input': {'@id': 'TEMP:protocolInvolvesInput', '@type': '@id'},
+    'protcur_input-instance': {'@id': 'TEMP:protocolInvolvesInputInstance', '@type': '@id'},
+    'protcur_output': {'@id': 'TEMP:protocolInvolvesOutput', '@type': '@id'},
+    'protcur_parameter*': {'@id': 'TEMP:protocolInvolvesParameter', '@type': '@id'},
+    'protcur_invariant': {'@id': 'TEMP:protocolInvolvesInvariant', '@type': '@id'},
+    'protcur_executor-verb': {'@id': 'TEMP:protocolInvolvesAction', '@type': '@id'},
+
+    #TODO aspects of subjects vs reagents: {'@id': primary particiant in the
+    #core protocols vs subprotocols
+
+    'sparc_AnatomicalLocation': {'@id': 'TEMPRAW:involvesAnatomicalRegion'},
+    'sparc_Measurement': {'@id': 'TEMPRAW:protocolMakesMeasurement'},
+    'sparc_Reagent': {'@id': 'TEMPRAW:protocolUsesReagent'},
+    'sparc_Tool': {'@id': 'TEMPRAW:protocolUsesTool'},
+    'sparc_Sample': {'@id': 'TEMPRAW:protocolInvolvesSampleType'},
+    'sparc_OrganismSubject': {'@id': 'TEMPRAW:protocolInvolvesSubjectType'},
+    'sparc_Procedure': {'@id': 'TEMPRAW:whatIsThisDoingHere'},
+
+    'sparcur_AnatomicalLocation': {'@id': 'TEMP:involvesAnatomicalRegion', '@type': '@id'},
+    'sparcur_Measurement': {'@id': 'TEMP:protocolMakesMeasurement', '@type': '@id'},
+    'sparcur_Reagent': {'@id': 'TEMP:protocolUsesReagent', '@type': '@id'},
+    'sparcur_Tool': {'@id': 'TEMP:protocolUsesTool', '@type': '@id'},
+    'sparcur_Sample': {'@id': 'TEMP:protocolInvolvesSampleType', '@type': '@id'},
+    'sparcur_OrganismSubject': {'@id': 'TEMP:protocolInvolvesSubjectType', '@type': '@id'},
+    'sparcur_Procedure': {'@id': 'TEMP:whatIsThisDoingHere', '@type': '@id'},
 }
 
 

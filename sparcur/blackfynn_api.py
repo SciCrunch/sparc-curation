@@ -25,7 +25,7 @@ from blackfynn import log as _bflog
 # other programs that are sane and do not use the root logger
 # so we have to undo the damage done by basic config here
 # we add the sparcur local handlers back in later
-from sparcur.utils import log, silence_loggers(_bflog)
+from sparcur.utils import log, silence_loggers
 __bflog = _bflog.get_logger()
 silence_loggers(__bflog)
 __bflog.addHandler(log.handlers[0])
