@@ -59,6 +59,10 @@ class SparqlQueries:
 
         self.nsm = nsm if nsm else OntGraph().namespace_manager
         self.prefixes = dict(self.nsm)
+        self.prefixes.update(
+            {
+                'protcur': 'https://uilx.org/tgbugs/u/protcur/',
+             },)
 
     def dataset_about(self):
         # FIXME this will return any resource matching isAbout:
@@ -161,7 +165,41 @@ class SparqlQueries:
             SELECT DISTINCT ?protocol ?aspect
             WHERE {
                 ?protocol rdf:type sparc:Protocol .
-                ?protocol TEMP:protocolInvolvesAspect ?aspect .
+                ?protocol TEMP:protocolInvolvesAspect ?ast .
+                ?ast rdf:type protcur:aspect .
+                ?ast TEMP:hasValue ?aspect .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def protocol_inputs(self):
+        query = """
+            SELECT DISTINCT ?protocol ?ast ?input
+            WHERE {
+                ?protocol rdf:type sparc:Protocol .
+                ?protocol TEMP:protocolInvolvesInput ?ast .
+                ?ast rdf:type protcur:input .
+                ?ast TEMP:hasValue ?input .
+            }
+        """
+        return self.sparql.prepareQuery(query, initNs=self.prefixes)
+
+    def protocol_inputs(self):
+        # powle euth ket xyl negative
+        query = """
+            SELECT DISTINCT ?protocol
+            WHERE {
+                ?protocol rdf:type sparc:Protocol .
+                ?protocol TEMP:protocolInvolvesAspect asp:anaesthetized .
+                ?protocol TEMP:protocolInvolvesInput ?ast_rat .
+                ?protocol TEMP:protocolInvolvesInput ?ast_ana .
+                ?ast_rat rdf:type protcur:input .  # FIXME or black-box
+                ?ast_rat TEMP:hasValue BIRNLEX:160 . # NCBITaxon:10090 .
+                ?ast_ana rdf:type protcur:input .
+                ?ast_ana TEMP:hasValue NIFSTD:DB01221 . # CHEBI:92386 .
+                ?ast_ana TEMP:protcurChildren ?child .
+                ?child rdf:type protcur:parameter .
+                ?child ?rdf:value 10 .
             }
         """
         return self.sparql.prepareQuery(query, initNs=self.prefixes)

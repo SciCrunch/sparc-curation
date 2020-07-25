@@ -5,7 +5,8 @@ import idlib
 import rdflib
 import pytest
 from pyontutils.core import OntResIri, OntGraph, OntResPath
-from pyontutils.namespaces import UBERON
+from pyontutils.namespaces import UBERON, NIFSTD, asp, TEMP, TEMPRAW
+from sparcur.paths import Path
 from sparcur.reports import SparqlQueries
 from .common import skipif_no_net
 
@@ -122,10 +123,13 @@ class TestProtcurTtl(unittest.TestCase):
     def setUpClass(cls):
         #cls.orp = OntResPath()
         #cls.graph = cls.orp.graph
-        cls.graph = OntGraph().parse('/home/tom/.local/share/sparcur/export/protcur/2020-07-06T11:57:37,602579-07:00/protcur.ttl', format='ttl')
+        path = Path('/home/tom/.local/share/sparcur/export/protcur/LATEST/protcur.ttl')
+        path = Path('/home/tom/git/NIF-Ontology/ttl/protcur.ttl')
+        cls.graph = OntGraph(path=path).parse()  # fixme the heck
         cls.nsm = cls.graph.namespace_manager
         cls.spaql_templates = SparqlQueries(cls.nsm)
         cls._q_protocol_aspects =  cls.spaql_templates.protocol_aspects()
+        cls._q_protocol_inputs =  cls.spaql_templates.protocol_inputs()
 
     def test_protcur_techniques(self):
         query = self.spaql_templates.protocol_techniques()
@@ -142,22 +146,96 @@ class TestProtcurTtl(unittest.TestCase):
         print(res)
         assert len(res) > 0
 
-    def _query_protocol_aspect(self, aspect):
+    def _query_protocol_aspect(self, aspect=None):
         query = self._q_protocol_aspects
-        res = list(self.graph.query(query, initBindings={'aspect': rdflib.Literal(aspect)}))
+        bindings = {'aspect': rdflib.Literal(aspect)} if aspect else {}
+        res = list(self.graph.query(query, initBindings=bindings))
         return res
 
     def test_protocol_aspect_terms(self):
-        aspects = ['magnification',
-                   #'temperature',
-                   'fold',
+        aspects = [
+            #'magnification',
+            #'temperature',
+            #'fold',
                    ]
+
         results = []
         for aspect in aspects:
             res = self._query_protocol_aspect(aspect)
             results.append(res)
 
+        pids = [[pid for pid, lit in sorted(rs)] for rs in results]
+        [print(p) for p in pids]
+        print(set().intersection(*pids))
+        _ = [print(r) for rs in results for r in rs]
+
+    def _query_protocol_input(self, inp):
+        query = self._q_protocol_inputs
+        res = list(self.graph.query(query, initBindings={'input': inp}))
+        return res
+
+    def test_protcur_aspects(self):
+        res = self._query_protocol_aspect()
+        results = [res]
+
         pids = [[pid for pid, lit in rs] for rs in results]
         [print(p) for p in pids]
         print(set().intersection(*pids))
         _ = [print(r) for rs in results for r in rs]
+
+    def test_stain_hack(self):
+        stain = sorted(set([s for s, o in self.graph[:TEMPRAW.protocolInvolvesAction:]
+                            if 'stain' in o.lower()]))
+        [print(s) for s in stain]
+
+    def test_protcur_aspects_mic(self):
+        aspects = [
+            #NIFSTD.DB01221,  # ketamine
+            #'NIFSTD:DB01221',  # ketamine  # doesn't work
+            asp.magnification,
+            asp.contrast,
+                   ]
+
+        results = []
+        for aspect in aspects:
+            res = self._query_protocol_aspect(aspect)
+            results.append(res)
+
+        pids = [[pid for pid, lit in sorted(rs)] for rs in results]
+        [print(p) for p in pids]
+        print(set().intersection(*pids))
+        _ = [print(r) for rs in results for r in rs]
+
+    def test_protcur_aspects_ana(self):
+        aspects = [
+            #NIFSTD.DB01221,  # ketamine
+            #'NIFSTD:DB01221',  # ketamine  # doesn't work
+            asp.anaesthetized
+                   ]
+
+        results = []
+        for aspect in aspects:
+            res = self._query_protocol_aspect(aspect)
+            results.append(res)
+
+        pids = [[pid for pid, lit in sorted(rs)] for rs in results]
+        [print(p) for p in pids]
+        print(set().intersection(*pids))
+        _ = [print(r) for rs in results for r in rs]
+
+    def test_protcur_inputs(self):
+        inputs = [
+            NIFSTD.DB01221,  # ketamine
+            #'NIFSTD:DB01221',  # ketamine  # doesn't work
+                   ]
+
+        results = []
+        for inp in inputs:
+            res = self._query_protocol_input(inp)
+            results.append(res)
+
+        pids = [[pid for pid, ast, lit in sorted(rs)] for rs in results]
+        [print(p) for p in pids]
+        print(set().intersection(*pids))
+        _ = [print(r) for rs in results for r in rs]
+

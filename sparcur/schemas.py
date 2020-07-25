@@ -70,11 +70,16 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     '@version': 1.1,
     #'TEMP:':
 
+    '@base': 'https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/',  # FIXME per subsection?
+
+    'label': 'rdfs:label',
+
     #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
     'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
     #'sparcur': {'@id': 'https://uilx.org/tgbugs/u/sparcur/', '@prefix': True},
     #'aspect': {'@id': 'https://uilx.org/tgbugs/u/aspect/', '@prefix': True},
     'aspect-raw': {'@id': 'https://uilx.org/tgbugs/u/aspect-raw/', '@prefix': True},
+    'fuzzy': {'@id': 'https://uilx.org/tgbugs/u/fuzzy-quantity/', '@prefix': True},
 
     'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},
     'ast_value': {'@id': 'TEMP:hasValue', '@type': '@id'},
@@ -98,6 +103,9 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'protc_parameter*': {'@id': 'TEMPRAW:protocolInvolvesParameter'},
     'protc_invariant': {'@id': 'TEMPRAW:protocolInvolvesInvariant'},
     'protc_executor-verb': {'@id': 'TEMPRAW:protocolInvolvesAction'},
+    'protc_black-box': {'@id': 'TEMPRAW:protocolInvolvesBlackBox'},
+    'protc_black-box-component': {'@id': 'TEMPRAW:protocolInvolvesBlackBoxComponent'},
+    'protc_objective*': {'@id': 'TEMPRAW:protocolInvolvesObjective'},
 
     'protcur_aspect': {'@id': 'TEMP:protocolInvolvesAspect', '@type': '@id'},
     'protcur_implied-aspect': {'@id': 'TEMP:protocolInvolvesAspect', '@type': '@id'},
@@ -105,9 +113,12 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'protcur_implied-input': {'@id': 'TEMP:protocolInvolvesInput', '@type': '@id'},
     'protcur_input-instance': {'@id': 'TEMP:protocolInvolvesInputInstance', '@type': '@id'},
     'protcur_output': {'@id': 'TEMP:protocolInvolvesOutput', '@type': '@id'},
-    'protcur_parameter*': {'@id': 'TEMP:protocolInvolvesParameter', '@type': '@id'},
+    'protcur_parameter': {'@id': 'TEMP:protocolInvolvesParameter', '@type': '@id'},
     'protcur_invariant': {'@id': 'TEMP:protocolInvolvesInvariant', '@type': '@id'},
     'protcur_executor-verb': {'@id': 'TEMP:protocolInvolvesAction', '@type': '@id'},
+    'protcur_black-box': {'@id': 'TEMP:protocolInvolvesBlackBox', '@type': '@id'},
+    'protcur_black-box-component': {'@id': 'TEMP:protocolInvolvesBlackBoxComponent', '@type': '@id'},
+    'protcur_objective': {'@id': 'TEMP:protocolInvolvesObjective', '@type': '@id'},
 
     #TODO aspects of subjects vs reagents: {'@id': primary particiant in the
     #core protocols vs subprotocols
