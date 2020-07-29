@@ -188,6 +188,8 @@ Options:
     --protcur-file=PATH     location of protcur jsonld file
     --ttl-file=PATHoURI     location of ttl file (uses latest if not specified)
     --ttl-compare=PATHoURI  location of ttl file for comparison
+    --preview               run export and reporting in preview mode
+                            if not set auth.get('preview') takes priority
 
     -S --sort-size-desc     sort by file size, largest first
     -C --sort-count-desc    sort by count, largest first
@@ -315,6 +317,12 @@ class Options(clif.Options):
     def show(self):
         # deal with the fact that both show and --show are present
         return self._args['--show'] or self._default_show
+
+    @property
+    def preview(self):
+        # FIXME this should also be determined by
+        # checking the schema version of the data being run
+        return self._args['--preview'] or auth.get('preview')
 
 
 class Dispatcher(clif.Dispatcher):

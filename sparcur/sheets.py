@@ -82,6 +82,15 @@ class Reports(Sheet):
     name = 'spc-reports'
 
     @classmethod
+    def asPreviewClass(cls):
+        class ReportPreviewClass(ReportsPreview, cls):
+            pass
+
+        assert ReportPreviewClass.name != cls.name
+
+        return ReportPreviewClass
+
+    @classmethod
     def makeReportSheet(cls, *index_cols):
         """ Decorator to build a Sheet class for a cli.Report method
 
@@ -116,6 +125,11 @@ class Reports(Sheet):
 
             @wraps(method)
             def inner(self, *args, **kwargs):
+                if self.options.preview:
+                    RC = method._report_class.asPreviewClass()
+                else:
+                    RC = method._report_class
+
                 if 'ext' not in kwargs or kwargs['ext'] is None:
                     kwargs['ext'] = True
                 else:
@@ -127,14 +141,14 @@ class Reports(Sheet):
                 if self.options.to_sheets:
                     if tags:
                         if args:
-                            method._report_class.sheet_name = args[0]
+                            RC.sheet_name = args[0]
                         else:
-                            method._report_class.sheet_name = self.options.tag[0]
+                            RC.sheet_name = self.options.tag[0]
 
                     rows, title = out
                     # fetch=False since the remote sheet may not exist
                     # TODO improve the ergonimcs here
-                    report = method._report_class(fetch=False, readonly=False)
+                    report = RC(fetch=False, readonly=False)
                     report.metadata()  # idlib.Stream vs ? behavior not decided
                     rows_stringified = rowcellify(rows)
                     if report.sheetId() is None:
@@ -154,6 +168,11 @@ class Reports(Sheet):
             return inner
 
         return decorator
+
+
+class ReportsPreview(Reports):
+    """ reporting for the preview of the next iteration of the pipelines """
+    name = 'spc-reports-preview'
 
 
 class Mis(Reports):

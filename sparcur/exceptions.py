@@ -153,3 +153,7 @@ class NetworkFailedForPathError(SparCurError):
 class NetworkSandboxError(SparCurError):
     """ we are in a phase of the process where fetching remote
         files is not allowed """
+
+class PreviewModeError(SparCurError):
+    """ sparcur is running in preview mode and code
+        tried to access some non-preview resource """
