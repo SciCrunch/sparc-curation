@@ -719,9 +719,9 @@ class MetadataFile(HasErrors):
     normalize_header = True
     _expect_single = tuple()
 
-    def __new__(cls, path, schema_version=None):
-        if schema_version is not None:  # and schema_version < latest  # TODO
-            logd.info(schema_version)  # TODO warn
+    def __new__(cls, path, template_schema_version=None):
+        if template_schema_version is not None:  # and template_schema_version < latest  # TODO
+            logd.info(template_schema_version)  # TODO warn
 
         if cls.record_type_key_header is None or cls.record_type_key_alt is None:
             raise TypeError(f'record_type_key_? should not be None on {cls.__name__}')
@@ -731,10 +731,10 @@ class MetadataFile(HasErrors):
 
         return super().__new__(cls)
 
-    def __init__(self, path, schema_version=None):
+    def __init__(self, path, template_schema_version=None):
         super().__init__()
         self.path = path
-        self.schema_version = schema_version
+        self.template_schema_version = template_schema_version
 
     def xopen(self):
         self.path.xopen()
@@ -1135,9 +1135,9 @@ _nddfes = sorted(set(_nddfes))
 class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     renames_alt = {'contributors': 'contributor_name',  # watch out for name collisions (heu heu heu)
-                   'metadata_version_do_not_change': 'schema_version'}
+                   'metadata_version_do_not_change': 'template_schema_version'}
     renames_header = {'description': 'description_header'}
-    missing_add = {'schema_version': ('1.0', 1)}
+    missing_add = {'template_schema_version': ('1.0', 1)}
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
     groups_alt = {'contributors': ('contributor_name',

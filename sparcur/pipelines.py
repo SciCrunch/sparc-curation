@@ -58,8 +58,8 @@ class MapPathsCombinator:
                 self.data = data
 
         data = previous_pipeline.data
-        sv = data['schema_version'] if 'schema_version' in data else None
-        previous_pipelines = [DataWrapper({'path': p, 'schema_version': sv,})
+        sv = data['template_schema_version'] if 'template_schema_version' in data else None
+        previous_pipelines = [DataWrapper({'path': p, 'template_schema_version': sv,})
                               for p in data['paths']]
         self.pipes = [self.PipelineClass(previous_pipeline,
                                          lifters,
@@ -212,24 +212,24 @@ class PathPipeline(PrePipeline):
         #log.debug(lj(previous_pipeline.data))
         if isinstance(previous_pipeline, Path):
             path = previous_pipeline
-            schema_version = None
+            template_schema_version = None
         else:
             path = previous_pipeline.data['path']  # we already caught the duplicate error
             try:
-                schema_version = previous_pipeline.data['schema_version']
+                template_schema_version = previous_pipeline.data['template_schema_version']
             except KeyError:
-                schema_version = None
+                template_schema_version = None
 
         if isinstance(path, list):
             path, *_ = path
 
         self.path = path
-        self.schema_version = schema_version
+        self.template_schema_version = template_schema_version
 
     @property
     def _transformer(self):
         try:
-            return self.data_transformer_class(self.path, schema_version=self.schema_version)
+            return self.data_transformer_class(self.path, template_schema_version=self.template_schema_version)
         except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
             # sigh code duplication
             class NoData:  # FIXME
@@ -329,8 +329,8 @@ class DatasetDescriptionFilePipeline(PathPipeline):
     @hasSchema(sc.DatasetDescriptionSchema)
     def data(self):
         out = super().data
-        if 'schema_version' not in out:  # schema version MUST be present or downstream pipelines break
-            out['schema_version'] = None
+        if 'template_schema_version' not in out:  # schema version MUST be present or downstream pipelines break
+            out['template_schema_version'] = None
         return out
 
 
@@ -760,22 +760,22 @@ class SPARCBIDSPipeline(JSONPipeline):
          #['dataset_description_file']],
 
         [[[['submission_file'], ['path']],
-          [['dataset_description_file', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          SubmissionFilePipeline,
          ['submission_file']],
 
         [[[['subjects_file'], ['path']],
-          [['dataset_description_file', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          SubjectsFilePipeline,
          ['subjects_file']],
 
         [[[['samples_file'], ['path']],
-          [['dataset_description_file', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          SamplesFilePipeline,
          ['samples_file']],
 
         [[[['manifest_file'], ['paths']],
-          [['dataset_description_file', 'schema_version'], ['schema_version']]],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          MapPathsCombinator(ManifestFilePipeline),
          ['manifest_file']],
     ]
@@ -791,7 +791,7 @@ class SPARCBIDSPipeline(JSONPipeline):
               [['size',], ['meta', 'size']],
               [['dataset_description_file', 'name'], ['meta', 'title']],
               *copy_all(['dataset_description_file'], ['meta'],
-                        'schema_version',
+                        'template_schema_version',
                         'species',  # TODO validate all source paths against schema
                         'organ',
                         'modality',

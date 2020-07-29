@@ -416,8 +416,8 @@ class JSONSchema(object):
     def _add_meta(cls, blob):
         """ In place modification of a schema blob to add schema level metadata """
         # TODO schema metadata, I don't know enough to do this correctly yet
-        #schema_version = cls.validator_class.ID_OF(cls.validator_class.META_SCHEMA)
-        #schema['$schema'] = schema_version
+        #template_schema_version = cls.validator_class.ID_OF(cls.validator_class.META_SCHEMA)
+        #schema['$schema'] = template_schema_version
 
         #schema_id = '#/temp/' + cls.__name__ + '.json'  # FIXME version ...
         #schema['$id'] = schema_id
@@ -938,7 +938,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'additionalProperties': False,
-        'required': ['schema_version',  # missing should fail for this one ...
+        'required': ['template_schema_version',  # missing should fail for this one ...
                      'name',
                      'description',
                      'funding',
@@ -950,7 +950,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
             'errors': ErrorSchema.schema,
-            'schema_version': {'type': 'string'},
+            'template_schema_version': {'type': 'string'},
             'name': string_noltws,
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
@@ -1359,7 +1359,7 @@ class MetaOutExportSchema(JSONSchema):
                       'size',
                       'folder_name',  # from DatasetMetadat
                       'title',
-                      'schema_version',
+                      'template_schema_version',
                       'number_of_subjects',
                       'number_of_samples',
                       'timestamp_created',
@@ -1428,7 +1428,7 @@ class MetaOutExportSchema(JSONSchema):
         'species': {'type': 'string',
                     'context_value': idtype('isAbout'),
                     },
-        'schema_version': {'type': 'string'},
+        'template_schema_version': {'type': 'string'},
         'organ': {'type': 'array',
                   'minItems': 1,
                   'items': EIS._allOf(OntTermSchema),
