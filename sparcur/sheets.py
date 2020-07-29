@@ -156,6 +156,53 @@ class Reports(Sheet):
         return decorator
 
 
+class Mis(Reports):
+    sheet_name = 'mis'
+
+    # NOTE a ReportSheet for this sheet is generated as well
+    # it is simple write-only functionality, so we create
+    # another one here instead of hacking around
+    # reports.Report.mis._report_class
+
+    def triples(self):
+        from pyontutils import namespaces as ns
+        import rdflib
+        for row in self.rows()[1:]:
+            yield from self._rowhack(row, ns, rdflib)
+
+    @staticmethod
+    def _rowhack(self, ns, rdflib):
+        # can't overwrite pyontutils.sheets.Row like we do in other cases sigh
+        oid = OntId(self.curie().value)
+        s = oid.u
+
+        _lon = (lambda v: None if not v else
+                rdflib.Literal(v))
+        lon = lambda c: _lon(c.value)
+
+        _blon = lambda v: _lon(True if v == 'TRUE' else False)  # sigh sheets datatypes
+        blon = lambda c: _blon(c.value)
+
+        _oon = (lambda v: None if not v else
+                OntId(v).u)
+        oon = lambda c: _oon(c.value)
+
+        self.type().value
+        self.mistake().value
+        pos = (
+            (ns.ilxtr.curationInternal, blon(self.curation_internal())),
+            (ns.definition, lon(self.definition())),
+            (ns.editorNote, lon(self.notes())),
+            (ns.rdf.type, oon(self.rdf_type())),
+            (ns.replacedBy, oon(self.replacedby_())),
+            (ns.ilxtr.futureType, oon(self.future_type())),
+        )
+
+        for p, o in pos:
+            if o is not None:
+                yield s, p, o
+
+
 class AnnoTags(Reports):
     name = 'anno-tags'
 

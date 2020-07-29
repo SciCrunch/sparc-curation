@@ -11,12 +11,15 @@ import augpathlib as aug
 from hyputils import hypothesis as hyp
 from protcur import document as ptcdoc
 from pyontutils.core import OntGraph, OntRes, OntResIri, OntResPath
-from pyontutils.utils import UTCNOWISO, anyMembers
+from pyontutils.utils import UTCNOWISO, anyMembers, Async, deferred
 from sparcur import sheets
 from sparcur.core import (OntId,
                           OntTerm,
                           get_all_errors,
-                          adops,)
+                          adops,
+                          JApplyRecursive,
+                          get_nested_by_key,
+                          )
 from sparcur.utils import want_prefixes, log as _log
 from sparcur.paths import Path
 from sparcur.config import auth
@@ -205,7 +208,6 @@ class SparqlQueries:
         return self.sparql.prepareQuery(query, initNs=self.prefixes)
 
 
-
 class TtlFile:
 
     def __init__(self, ontres, ontres_compare_to=None):
@@ -244,23 +246,44 @@ class TtlFile:
                                  title=f'Dataset milestone completion dates')
 
     def mis(self, ext=None):
+        from pyontutils.namespaces import OntCuries
+        from pyontutils.config import auth as pauth
         rdflib = self.rdflib
         ns = self.ns
         ontres = self.ontres
 
-        counts = Counter(ontres.graph.predicates())
+        if False:
+            from ttlser import CustomTurtleSerializer
+            CustomTurtleSerializer.addTopClasses(
+                ns.ilxtr.MISType,
+                ns.ilxtr.MISPredicate,
+            )
+
+        preds = ontres.graph.predicates()
+        types = (o for s, o in ontres.graph[:ns.rdf.type:])
         g = OntGraph(namespace_manager=ontres.graph.namespace_manager)
+        OntCuries.populate(g.namespace_manager)
+        for things, type_ in ((preds, ns.ilxtr.MISPredicate), (types, ns.ilxtr.MISType)):
+            counts = Counter(things)
 
-        [(g.add((s, ns.ilxtr.numberOfOccurrences, rdflib.Literal(count))),
-          g.add((s, ns.rdf.type, ns.ilxtr.MISPredicate)))
-         for s, count in counts.items()
-         if g.namespace_manager.qname(s).split(':')[0]
-         not in ('rdf', 'rdfs', 'owl')]
-        g.debug()
+            [(g.add((s, ns.ilxtr.numberOfOccurrences, rdflib.Literal(count))),
+              g.add((s, ns.rdf.type, type_)))
+             for s, count in counts.items()
+             if g.namespace_manager.qname(s).split(':')[0]
+             not in ('rdf', 'rdfs', 'owl')]
 
-        rows = [[g.namespace_manager.qname(s), o.toPython()]
+        rows = [[g.namespace_manager.qname(s),
+                 g.namespace_manager.qname(next(g[s:ns.rdf.type:])),
+                 o.toPython()]
                 for s, o in g[:ns.ilxtr.numberOfOccurrences:]]
-        header = [['curie', 'count']]
+
+        m = sheets.Mis()
+        g.populate_from_triples(m.triples())
+        olr = pauth.get_path('ontology-local-repo')
+        if olr.exists():
+            g.write(path=olr / 'ttl/sparc-mis-helper.ttl')  # FIXME hardcoded and non-obvious
+
+        header = [['curie', 'type', 'count']]
         return header + sorted(rows, key=lambda r:-r[-1])  # FIXME only Report has access to -C :/
 
 
@@ -1064,7 +1087,7 @@ class Report:
     def changes(self):
         tout = self._ttlfile.changes()
 
-    @sheets.Reports.makeReportSheet('curies')
+    @sheets.Reports.makeReportSheet('curie')
     def mis(self, ext=None):
         tout = self._ttlfile.mis(ext=ext)
         return self._print_table(tout,
@@ -1073,10 +1096,53 @@ class Report:
 
     @sheets.AnnoTags.makeReportSheet()
     def protocols(self, ext=None):
+        def tp(i):
+            """ not pio at all """
+            try:
+                return idlib.Pio(i)
+            except idlib.exc.MalformedIdentifierError:
+                return i
+
+        def ti(i):
+            """ can't figure out the integer id """
+            try:
+                return i.uri_api_int
+            except (AttributeError, idlib.exc.MalformedIdentifierError) as e:
+                return i
+
         blob_data = self._data_ir(org_id=self.options.project_id)
+        collect = []
+        _ = JApplyRecursive(get_nested_by_key,
+                            blob_data,
+                            'protocol_url_or_doi',
+                            asExport=False,
+                            collect=collect,
+                            skip_keys=('inputs',),)
+        _ = None
+        blob_dataset = None  # no longer needed and repr issues
+        collect = sorted(set(collect), key=lambda i: str(i))
+        dois = [c for c in collect if isinstance(c, idlib.Doi)]
+        deref = Async()(deferred(d.dereference)() for d in dois)
+        dios = [ti(tp(u)) for u in deref]
+
+        pios = [c for c in collect if isinstance(c, idlib.Pio)]
+        pints = [ti(p) for p in pios]
+        pstrs = [p.asStr() for p in pints]
+        from_datasets = set(pints) | set(dios)
+
         blob_protcur = self._protcur()
-        urls_protcur = [b['uri_api_private'] if '' in b else b['id']
-                        for b in blob_protcur['@graph']]
+        protocols = [b for b in blob_protcur['@graph']
+                     if '@type' in b and 'sparc:Protocol' in b['@type']]
+        urls_protcur = [b['id'] for b in protocols]
+
+        uios = [tp(u) for u in urls_protcur]
+        from_hypothesis = set(uios)
+
+        both = from_hypothesis & from_datasets
+        only_hyp = from_hypothesis - from_datasets
+        only_dat = from_datasets - from_hypothesis
+        hrm = [(len(s), [d.identifier if hasattr(d, 'identifier') else d for d in s])
+               for s in (both, only_hyp, only_dat)]
         header = [['uri', 'uri_human', 'doi', 'access']]
         breakpoint()
         return self._print_table(header + rows,

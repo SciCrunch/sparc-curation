@@ -390,6 +390,12 @@ class NormValues(HasErrors):
 
             return out
 
+        elif isinstance(thing, numbers.Number):
+            # this way we don't have to check the schema here
+            # we avoid an AttributeError in the event we treated
+            # a number like a string, and if it is incorrect we
+            # catch it later with the schemas
+            return thing
         else:
             # TODO make use of path
             # FIXME I do NOT like this pattern :/

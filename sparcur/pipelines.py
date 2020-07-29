@@ -377,8 +377,10 @@ class ManifestFilePipeline(PathPipeline):
 
 class Merge(Pipeline):
 
-    def __init__(self, pipelines):
+    def __init__(self, pipelines, lifters=None, runtime_context=None):
         self.pipelines = pipelines
+        self.lifters = lifters
+        self.runtime_context = runtime_context
 
     @property
     def data(self):
@@ -387,7 +389,18 @@ class Merge(Pipeline):
             try:
                 data.update(pipeline.data)
             except TypeError as e:
-                raise TypeError(f'Issue in {pipeline}.data') from e
+                msg = (f'Issue in {pipeline}.data '
+                       f'{self.runtime_context.id}\n'
+                       f'{self.runtime_context.path}')
+                if hasattr(pipeline, 'path'):
+                    # FIXME this doesn't work right now
+                    # but it should be possible to pinpoint
+                    # the exact file causing errors, though
+                    # the dataset is good enough to target
+                    # the debugging
+                    msg += f'\n{pipeline.path}'
+
+                raise TypeError(msg) from e
 
         return data
 
@@ -451,7 +464,9 @@ class JSONPipeline(Pipeline):
             # obscure the do4
 
             previous_pipeline = Merge([p(previous_pipeline, lifters, runtime_context)
-                                        for p in self.previous_pipeline_classes])
+                                        for p in self.previous_pipeline_classes],
+                                      lifters,
+                                      runtime_context)
 
         if False:
             # unfortunately this breaks assumptions about the pipeline structure
@@ -459,13 +474,14 @@ class JSONPipeline(Pipeline):
             # it right now
             if len(self.previous_pipeline_classes) > 1:
                 previous_pipeline = Merge([p(previous_pipeline, lifters, runtime_context)
-                                           for p in self.previous_pipeline_classes])
+                                           for p in self.previous_pipeline_classes],
+                                          lifters,
+                                          runtime_context)
             else:
                 PPC, = self.previous_pipeline_classes
                 previous_pipeline = PPC(previous_pipeline, lifters, runtime_context)
 
         if not isinstance(previous_pipeline, Pipeline):
-            breakpoint()
             raise TypeError(f'{previous_pipeline} is not a Pipeline!')
 
         self.previous_pipeline = previous_pipeline
@@ -705,7 +721,20 @@ class PipelineStart(JSONPipeline):
 
     @property
     def pipeline_start(self):
-        data = super().pipeline_start
+        try:
+            data = super().pipeline_start
+        except self.SkipPipelineError:
+            raise
+        except Exception as e:
+            log.critical(f'Unhandled exception {e}')
+            log.exception(e)
+            # FIXME probably need more than this
+            # FIXME hard to maintain this
+            data = {'id': self.runtime_context.id,
+                    'meta': {'uri_api': self.runtime_context.uri_api,
+                             'uri_human': self.runtime_context.uri_human,}}
+            raise self.SkipPipelineError(data) from e
+
         if 'errors' in data:
             get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
             sections = set((s,) for s in data)
@@ -842,7 +871,25 @@ class SPARCBIDSPipeline(JSONPipeline):
 
     @property
     def pipeline_start(self):
-        data = super().pipeline_start
+        # XXX can't just assign property from PipelineStart
+        # because super() will break file under LOL PYTHON
+        # otherwise the methods should be identical >_<
+        # I have tried every variant, but the way super()
+        # works is completely broken code reuse
+        try:
+            data = super().pipeline_start
+        except self.SkipPipelineError:
+            raise
+        except Exception as e:
+            log.critical(f'Unhandled exception {e}')
+            log.exception(e)
+            # FIXME probably need more than this
+            # FIXME hard to maintain this
+            data = {'id': self.runtime_context.id,
+                    'meta': {'uri_api': self.runtime_context.uri_api,
+                             'uri_human': self.runtime_context.uri_human,}}
+            raise self.SkipPipelineError(data) from e
+
         if 'errors' in data:
             get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
             sections = set((s,) for s in data)
@@ -1519,7 +1566,7 @@ class ProtcurPipeline(Pipeline):
                     # TODO
                     pass
             else:
-                log.debug(f'no working sheet for {at}')
+                log.critical(f'no working sheet for {at}')
 
             return ast
 
@@ -1576,8 +1623,9 @@ class ProtcurPipeline(Pipeline):
                 ('protc:invariant',      'TEMPRAW:protocolInvolvesInvariant'),     # FIXME source from protcs
                 ('protc:executor-verb',  'TEMPRAW:protocolInvolvesAction'),        # FIXME source from protcs
 
-                ('protc:black-box',  'TEMPRAW:lol'),
+                ('protc:black-box',            'TEMPRAW:lol'),
                 ('protc:black-box-component',  'TEMPRAW:lol'),
+                ('protc:objective*',           'TEMPRAW:lol'),
 
                 # TODO aspects of subjects vs reagents, primary particiant in the
                 # core protocols vs subprotocols

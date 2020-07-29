@@ -64,7 +64,7 @@ class TriplesExport(ProtcurData):
             (owl.versionIRI, ver_ontid),
             (owl.versionInfo, rdflib.Literal(iso)),
             (isAbout, rdflib.URIRef(self.uri_api)),
-            (TEMP.hasHumanUri, rdflib.URIRef(self.uri_human)),
+            (TEMP.hasUriHuman, rdflib.URIRef(self.uri_human)),
             (rdfs.label, rdflib.Literal(f'{self.folder_name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),

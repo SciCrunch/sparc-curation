@@ -341,16 +341,16 @@ def JFixKeys(obj):
         return obj
 
 
-def get_nested_by_key(obj, key, *args, path=None, collect=tuple()):
+def get_nested_by_key(obj, key, *args, path=None, asExport=True, collect=tuple()):
     if isinstance(obj, dict) and key in obj:
         value = obj[key]
         if is_list_or_tuple(value):
             for v in value:
                 n = json_export_type_converter(v)
-                collect.append(n if n is not None else v)
+                collect.append(n if n is not None and asExport else v)
         else:
             n = json_export_type_converter(value)
-            collect.append(n if n is not None else value)
+            collect.append(n if n is not None and asExport else value)
 
     return obj  # have to return this otherwise somehow everything is turned to None?
 
@@ -1259,6 +1259,13 @@ def compact_errors(path_errors):
 
 class JPointer(str):
     """ a class to mark json pointers for resolution """
+
+    @staticmethod
+    def pathToSchema(path):
+        # search all possible valid paths for information about the
+        # current path in the schema ... useful to check just a single
+        # path in an object against a schema ... there is surely a better way
+        raise NotImplementedError("This shouldn't be implemented here.")
 
     @staticmethod
     def pathFromSchema(schema_path):

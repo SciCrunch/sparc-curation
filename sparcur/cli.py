@@ -614,7 +614,7 @@ class Main(Dispatcher):
             else:
                 latest_path = self.options.export_protcur_base / 'LATEST'
                 latest_partial_path = self.options.export_protcur_base / 'LATEST_PARTIAL'
-                path = latest_partial_path if self.options.partial else latest_path
+                path = (latest_partial_path if self.options.partial else latest_path) / 'protcur.json'
                 with open(path, 'rt') as f:
                     blob_protcur = json.load(f)
 
@@ -1531,6 +1531,7 @@ done"""
 
     def sheets(self):
         from pyontutils import sheets as ps
+        #from sparcur import sheets as ss
 
         data = self._data_ir(self.options.project_id)
 
