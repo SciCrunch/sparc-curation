@@ -228,7 +228,23 @@ def lj(j):
 def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **kwargs):
     try:
         dict_literal = _json_identifier_expansion(obj)
-    except idlib.exceptions.ResolutionError as e:
+    except idlib.exc.RemoteError as e:
+        if hasattr(obj, '_cooldown'):
+            return obj._cooldown()  # trigger cooldown to simplify issues down the line
+
+        error = dict(error=e,
+                     pipeline_stage=stage.__class__.__name__,
+                     blame='submission',
+                     path=tuple(path))
+
+        if addError:
+            if addError(**error):
+                log.exception(e)
+                #logd.error(msg)
+        else:
+            return {'errors': [error]}
+
+    except idlib.exc.ResolutionError as e:
         if hasattr(obj, '_cooldown'):
             return obj._cooldown()  # trigger cooldown to simplify issues down the line
 

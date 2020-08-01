@@ -8,7 +8,7 @@ from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import OntId, OntTerm, lj
-from sparcur.utils import log, logd, fromJson
+from sparcur.utils import log, logd, loge, fromJson
 from sparcur.protocols import ProtocolData
 
 
@@ -287,15 +287,21 @@ class MetaConverter(TripleConverter):
             else:
                 pioid = value
 
-            pioid_int = pioid.uri_api_int
-            s = self.c.l(pioid_int)
-
-            # FIXME needs to be a pipeline so that we can export errors
             try:
-                data = pioid.data()
-            except OntId.BadCurieError as e:
-                logd.error(e)  # FIXME export errors ...
+                pioid_int = pioid.uri_api_int
+                s = self.c.l(pioid_int)
+                # FIXME needs to be a pipeline so that we can export errors
+                try:
+                    data = pioid.data()
+                except OntId.BadCurieError as e:
+                    loge.error(e)  # FIXME export errors ...
+                    data = None
+            except idlib.exc.RemoteError as e:  # FIXME sandbox violation
+                loge.exception(e)
+                s = self.c.l(pioid)
                 data = None
+
+            yield s, rdf.type, sparc.Protocol
 
             if data:
                 yield s, rdfs.label, rdflib.Literal(pioid.label)
