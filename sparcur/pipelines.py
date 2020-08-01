@@ -5,6 +5,7 @@ from itertools import chain
 from collections import deque, defaultdict
 import idlib
 import rdflib
+import augpathlib as aug
 from joblib import Parallel, delayed
 from hyputils import hypothesis as hyp
 from pyontutils.core import OntRes, OntGraph
@@ -13,6 +14,7 @@ from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines 
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from protcur import document as ptcdoc
 from protcur.analysis import protc
+import sparcur
 from sparcur import apinat
 from sparcur import schemas as sc
 from sparcur import datasets as dat
@@ -89,6 +91,23 @@ class Pipeline:
 
 class DatasourcePipeline(Pipeline):
     """ pipeline that sources complex data from somewhere else """
+
+
+class BlackfynnDatasetDataPipeline(DatasourcePipeline):
+
+    def __init__(self, previous_pipeline, lifters, runtime_context):
+        self.dataset_id = previous_pipeline.data['id']
+        if not hasattr(self.__class__, 'BlackfynnDatasetData'):
+            from sparcur.backends import BlackfynnDatasetData
+            self.__class__.BlackfynnDatasetData = BlackfynnDatasetData
+
+    @property
+    def data(self):
+        bdd = self.BlackfynnDatasetData(self.dataset_id)
+        try:
+            return bdd.fromCache()
+        except FileNotFoundError as e:
+            raise exc.NetworkSandboxError from e
 
 
 class SubmissionPipeline(DatasourcePipeline):
@@ -856,18 +875,16 @@ class SPARCBIDSPipeline(JSONPipeline):
                 [['meta', 'sample_count']]],
     )
 
-    updates = [
-        # this is the stage at which normalization should actually happen I think
-        # or at least normalization that is not required to prevent pipelines from
-        # breaking themselves
-        # TODO a way to indicate any key matching ? or does that seem like a bad idea?
-        [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
-        [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
-        [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
-    ]
-
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
-    adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],]
+    adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],
+            [['prov', 'sparcur_version'], lambda _: sparcur.__version__],
+            ]
+
+    __filerp = aug.RepoPath(__file__)
+    if __filerp.working_dir is not None:
+        # TODO consider embedding a commit during release?
+        __commit = __filerp.repo.active_branch.commit.hexsha
+        adds.append([['prov', 'sparcur_commit'], lambda _, commit=__commit: commit])
 
     @property
     def pipeline_start(self):
@@ -984,13 +1001,44 @@ class PipelineExtras(JSONPipeline):
 
     previous_pipeline_classes = SPARCBIDSPipeline,
 
-    subpipelines = [
+    subpipelines = (
+        [[[['id'], ['id']]],
+         BlackfynnDatasetDataPipeline,
+         ['inputs', 'remote_dataset_metadata']],
+
         [[[['contributors'], None]],
          ContributorsPipeline,
          None],
+
         [[[['submission'], None]],
          SubmissionPipeline,
          ['submission']],
+    )
+
+    copies = (
+
+        [['inputs', 'remote_dataset_metadata', 'status-log', 'entries', 0],
+         ['status', 'status_on_platform']],
+
+        [['inputs', 'remote_dataset_metadata', 'readme', 'readme'],
+         ['rmeta', 'readme']],
+    )
+
+    derives = (
+        [[['inputs', 'remote_dataset_metadata', 'doi']],
+         DT.BOX(De.doi),
+         [['meta', 'doi']]],
+    )
+
+    updates = [
+        # this is the stage at which normalization should actually happen I think
+        # or at least normalization that is not required to prevent pipelines from
+        # breaking themselves
+        # TODO a way to indicate any key matching ? or does that seem like a bad idea?
+        # FIXME this is a nasty network step
+        [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
     ]
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
@@ -1058,22 +1106,6 @@ class PipelineExtras(JSONPipeline):
             if m:
                 data['meta']['modality'] = m
 
-        '''  # XXX delete
-        if False and 'organ' not in data['meta']:
-            # skip here, now attached directly to award
-            if 'award_number' in data['meta']:
-                an = data['meta']['award_number']
-                o = self.lifters.organ(an)
-                if o:
-                    if o != 'othertargets':
-                        o = OntId(o)
-                        if o.prefix == 'FMA':
-                            ot = OntTerm(o)
-                            o = next(OntTerm.query(label=ot.label, prefix='UBERON'))
-
-                    data['meta']['organ'] = o
-
-        '''
         if 'organ' not in data['meta'] or data['meta']['organ'] == 'othertargets':
             o = self.lifters.organ_term
             if o:
@@ -1117,20 +1149,33 @@ class PipelineExtras(JSONPipeline):
                 data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
 
 
+        return data
         # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
         # and indeed, when we added PipelineStart this shifted and broke everything
         # FIXME use the rmeta
-        local = (self
-                 .previous_pipeline.pipelines[0]
-                 .previous_pipeline.pipelines[0]
-                 .previous_pipeline.pipelines[0]
-                 .path)
-        remote = local.remote
+        #local = (self
+                 #.previous_pipeline.pipelines[0]
+                 #.previous_pipeline.pipelines[0]
+                 #.previous_pipeline.pipelines[0]
+                 #.path)
+        #rmeta = local.cache._dataset_metadata(force_cache=True)  # network sandbox
+
+        # FIXME this is STILL really bad, because rmeta is pulled in in add !!!!
+        # we could snapshot all the rmeta as another input I guess ... ?
+        # really need a way to split the input json from the summary without
+        # losing the input ... more thoughts on this once we get the per dataset flow up
+        bdd = BlackfynnDatasetData(data['id'])
+        try:
+            rmeta = bdd.fromCache()
+        except FileNotFoundError as e:
+            raise exc.NetworkSandboxError from e
+
+        #rmeta = data['id']local.cache._dataset_metadata(force_cache=True)  # network sandbox
         if 'doi' not in data['meta']:
-            doi = remote.doi
+            doi = idlib.Doi(rmeta['doi']) if 'doi' in rmeta else None
             if doi is not None:
                 try:
-                    metadata = doi.metadata()
+                    metadata = doi.metadata()  # FIXME network sandbox violation
                     if metadata is not None:
                         data['meta']['doi'] = doi
                 except idlib.exceptions.ResolutionError:
@@ -1140,12 +1185,17 @@ class PipelineExtras(JSONPipeline):
             data['status'] = {}
 
         if 'status_on_platform' not in data['status']:
-            try:
-                data['status']['status_on_platform'] = remote.bfobject.status
-            except exc.NoRemoteFileWithThatIdError as e:
-                log.exception(e)
-                if remote.cache is not None and remote.cache.exists():
-                    remote.cache.crumple()
+            sle = rmeta['status-log']['entries']
+            if sle:
+                data['status']['status_on_platform'] = sle[0]
+
+        if 'rmeta' not in data:
+            data['rmeta'] = {}
+
+        if 'readme' not in data['rmeta']:
+            data['readme'] = rmeta['readme']['readme']
+        else:
+            log.warning(f"readme unexpectedly already in rmeta for {data['id']}")
 
         return data
 

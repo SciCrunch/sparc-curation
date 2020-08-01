@@ -22,10 +22,13 @@ class ProtcurData:
         """ can't use __call__ in subclasses where it is overwritten ... """
         yield from self.protcur_nodes(protocol_uri)
 
-    def _protcur(self, protocol_uri, filter=lambda p: True):
+    def _protcur(self, protocol_uri, filter=lambda p: True):  # FIXME deprecated and replaced by spc export protcur + recombine graphs
         self.lazy_setup()
         protocol_uri = idlib.get_right_id(protocol_uri)
-        gen = (p for p in self.protc if p.uri.startswith(protocol_uri.identifier) and filter(p))
+        if isinstance(protocol_uri, idlib.Pio):
+            gen = (p for p in self.protc if p._anno.uri_api_int == protocol_uri and filter(p))
+        else:
+            gen = (p for p in self.protc if p.uri.startswith(protocol_uri.identifier) and filter(p))
 
         try:
             p = next(gen)
@@ -85,6 +88,7 @@ class ProtcurData:
 
     @staticmethod
     def populate_annos():
+        from protcur import document as ptcdoc
         from protcur.core import annoSync
         from protcur.analysis import Hybrid, protc
         from hyputils.hypothesis import HypothesisHelper, group_to_memfile
@@ -99,7 +103,7 @@ class ProtcurData:
         # FIXME hack to workaround bad api key init for hyutils until we can integrate orthauth
         get_annos.api_token = auth.get('hypothesis-api-key')
         annos.clear()
-        annos.extend(get_annos())
+        annos.extend([ptcdoc.Annotation(a) for a in get_annos()])
 
         # reset classes in case some other class has populated them
         # (e.g. during testing) FIXME this is a bad hack

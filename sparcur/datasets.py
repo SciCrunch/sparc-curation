@@ -36,6 +36,11 @@ def tos(hrm):
         return hrm
 
 
+def to_string_and_then_python_identifier(thing):
+    """ handl cases where a header value isn't a string """
+    return python_identifier(str(thing))
+
+
 hasSchema = sc.HasSchema()
 @hasSchema.mark
 class Header:
@@ -51,7 +56,7 @@ class Header:
         header = []
         for i, c in enumerate(orig_header):
             if c:
-                c = python_identifier(c)
+                c = to_string_and_then_python_identifier(c)
                 c = nml.NormHeader(c)
 
             if not c:

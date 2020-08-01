@@ -1,6 +1,7 @@
 import pprint
 from typing import Tuple
 from functools import wraps
+import idlib
 from sparcur import schemas as sc
 from sparcur import normalization as nml
 from sparcur.core import log, logd, JPointer
@@ -79,3 +80,21 @@ class Derives:
             return next(iter(out))
 
         return tuple(out)
+
+    @staticmethod
+    def doi(doi_string):  # FIXME massive network sandbox violation here
+        """ check if a doi string resolves, if it does, return it """
+        doi = idlib.Doi(doi_string)
+        try:
+            metadata = doi.metadata()  # FIXME network sandbox violation
+            if metadata is not None:
+                return doi
+        except idlib.exceptions.ResolutionError:
+            # sometimes a doi is present on the platform but does not resolve
+            # in which case we don't add it as metadata because it has not
+            # been officially published, just reserved, this check is more
+            # correct than checkin the status on the platform
+            # FIXME HOWEVER it violates the network sandbox, so we probably
+            # need an extra step during the data retrieval phase which attempts
+            # to fetch all the doi metadata
+            pass

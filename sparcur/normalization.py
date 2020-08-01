@@ -959,3 +959,15 @@ class NormSamplesFile(NormSubjectsFile):
 
         else:
             yield value.strip()
+
+    def sample_id(self, value):
+        if not isinstance(value, str):
+            msg = f'Bad type for sample_id: {type(value)}'
+            if self.addError(msg,
+                             pipeline_stage=self.__class__.__name__,
+                             blame='submission',):
+                logd.error(msg)
+
+            return str(value)
+        else:
+            return value

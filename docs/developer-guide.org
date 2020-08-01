@@ -244,6 +244,7 @@ is implemented above and tangled as =sparcur.simple=.
                                               ; meta-extra -> dataset-doi -> cache-remote-metadata -> fetch-all
                                               meta-extra -> award-organ #; lifters -> submission-normalized
                                                             award-organ -> scraped-award-organ
+                           pipeline-extras -> pipeline-extras-updates -> identifier-resolution -> network
            ??? -> overview-sheet -> sheets))
 
 ;; subgraphs

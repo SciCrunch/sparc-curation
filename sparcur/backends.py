@@ -432,6 +432,7 @@ class BlackfynnRemote(aug.RemotePath):
             if blob:
                 return idlib.Doi(blob['doi'])
         except exc.NoRemoteFileWithThatIdError as e:
+            # FIXME crumping datasets here is bad, but so is going to network for this :/
             log.exception(e)
             if self.cache is not None and self.cache.exists():
                 self.cache.crumple()

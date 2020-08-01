@@ -87,7 +87,7 @@ class Reports(Sheet):
             pass
 
         assert ReportPreviewClass.name != cls.name
-
+        assert ReportPreviewClass.name.startswith(cls.name), (ReportPreviewClass.name, cls.name)
         return ReportPreviewClass
 
     @classmethod
@@ -224,6 +224,11 @@ class Mis(Reports):
 
 class AnnoTags(Reports):
     name = 'anno-tags'
+
+    @classmethod
+    def asPreviewClass(cls):
+        """ anno tags don't need a preview class """
+        return cls
 
     def _annotation_row(self, anno):
         key = self.index_columns[0]

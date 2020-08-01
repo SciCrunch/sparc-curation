@@ -236,6 +236,10 @@ def inttype(id):
     return {'@id': id, '@type': 'xsd:integer'}
 
 
+def cont(id, type):
+    return {'type': type, 'context_value': id}
+
+
 def not_array(schema, in_all=False):
     """ hacked way to determine that the blob in question cannot be an array """
     return ('type' in schema and schema['type'] != 'array' or
@@ -1124,12 +1128,11 @@ class SubjectExportSchema(JSONSchema):
                            },
             'ear_tag_number': strcont('TEMP:localIdAlt'),
             'treatment': strcont('TEMP:hadExperimentalTreatmentApplied'),
-            'initial_weight': strcont('sparc:animalSubjectHasWeight'),
-            'height_inches': strcont('TEMP:subjectHasHeight'),
+            'initial_weight': cont('sparc:animalSubjectHasWeight', ['string', 'number']),
+            'height_inches': cont('TEMP:subjectHasHeight', ['string', 'number']),  # FIXME units
             'gender': strcont('sparc:hasGender'),
-            'body_mass_weight': strcont('TEMP:subjectHasWeight'),
-
-                        'anesthesia': strcont('TEMP:wasAdministeredAnesthesia'),
+            'body_mass_weight': cont('TEMP:subjectHasWeight', ['string', 'number']),  # FIXME units
+            'anesthesia': strcont('TEMP:wasAdministeredAnesthesia'),
             'stimulation_site': strcont('sparc:spatialLocationOfModulator'),  # TODO ontology
             'stimulator': strcont('sparc:stimulatorUtilized'),
             'stimulating_electrode_type': strcont('sparc:stimulatorUtilized'),  # FIXME instance vs type
@@ -1490,6 +1493,15 @@ class DatasetOutExportSchema(JSONSchema):
         'id': {'type': 'string',  # ye old multiple meta/bf id issue
                'pattern': '^N:dataset:'},
         'meta': MetaOutExportSchema.schema,
+        #'readme': {'type': 'string',},  # TODO ...
+        'rmeta': {'type': 'object',
+                  # FIXME TODO not entirely sure how to deal with embedding remote metadata about
+                  # datasets some of which also comes from this pipeline
+                  # heh, recursive metadata ...
+                  'properties': {'readme': {
+                      'type': 'string',
+                      'context_value': {'@id': 'TEMP:readmeText', '@type': 'ilxtr:Markdown'},
+                  },},},
         'prov': ProvSchema.schema,
         'errors': ErrorSchema.schema,
         'contributors': ContributorsOutExportSchema.schema,
@@ -1541,7 +1553,7 @@ class StatusSchema(JSONSchema):
               'required': ['submission_index', 'curation_index', 'error_index',
                            'submission_errors', 'curation_errors'],
               'properties': {
-                  'status_on_platform': {'type': 'string',
+                  'status_on_platform': {'type': 'object',  # NOTE becomes a json literal iirc
                                          'context_value': 'TEMP:blackfynnPlatformStatus',
                                          },
                   'submission_index': {'type': 'integer', 'minimum': 0,
