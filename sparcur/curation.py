@@ -591,7 +591,7 @@ class Summary(Integrator, ExporterSummarizer):
                 # the per-dataset ttl conversion as well, parsing the ttl is probably
                 # a bad call though
                 hrm = Parallel(n_jobs=self._n_jobs)(
-                    delayed(datame)(d, ca, timestamp, helpers)
+                    delayed(datame)(d, ca, timestamp, helpers, log.level)
                     for d in self.iter_datasets_safe)
                 #hrm = Async()(deferred(datame)(d) for d in self.iter_datasets)
                 self._data_cache = self.make_json(hrm)
@@ -614,16 +614,18 @@ class Summary(Integrator, ExporterSummarizer):
         return data
 
 
-def datame(d, ca, timestamp, helpers=None):
+def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO):
     """ sigh, pickles """
     log_names = 'idlib', 'protcur', 'orthauth', 'ontquery', 'augpathlib', 'pyontutils'
     for log_name in log_names:
         log = logging.getLogger(log_name)
         if not log.handlers:
             log = makeSimpleLogger(log_name)
+            log.setLevel(log_level)
             log.info(f'{log_name} had no handler')
         else:
-            #log.debug(log.handlers)
+            if log.level != log_level:
+                log.setLevel(log_level)
             pass
 
     rc = d.path._cache_class._remote_class

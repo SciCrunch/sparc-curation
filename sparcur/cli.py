@@ -246,7 +246,7 @@ from sparcur import exceptions as exc
 from sparcur.core import JT
 from sparcur.core import OntId, OntTerm, adops
 from sparcur.utils import GetTimeNow  # top level
-from sparcur.utils import log, logd, bind_file_handler
+from sparcur.utils import log, logd, loge, bind_file_handler
 from sparcur.utils import register_type, fromJson
 from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
@@ -452,6 +452,7 @@ class Main(Dispatcher):
         if not self.options.verbose:
             log.setLevel('INFO')
             logd.setLevel('INFO')
+            loge.setLevel('INFO')
 
         if self.options.project_path:
             self.cwd = Path(self.options.project_path).resolve()
