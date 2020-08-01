@@ -491,12 +491,14 @@ class Tabular(HasErrors):
     def xlsx(self):
         try:
             one = list(self.xlsx1())
+            e1 = None
         except Exception as e:
             e1 = e
             one = None
 
         try:
             two = list(self.xlsx2())
+            e2 = None
         except Exception as e:
             e2 = e
             two = None
@@ -515,12 +517,26 @@ class Tabular(HasErrors):
         #if one_test != two_test:
             #breakpoint()
 
-        if one is None and two is None:
-            raise e1 from e2  # sigh, can't raise both
-        elif two is None:
-            raise e2
+        if e1 is not None:
+            message = f'malformed xml file could not be read by xlsx2csv {self.path}'
+            if self.addError(message,
+                             blame='submission',
+                             path=self.path):
+                logd.exception(e1)
 
-        yield from two
+        if e2 is not None:
+            message = f'malformed xml file could not be read by openpyxl {self.path}'
+            if self.addError(message,
+                             blame='submission',
+                             path=self.path):
+                logd.exception(e2)
+
+        if e2 is None:
+            yield from two
+        elif e1 is None:
+            yield from one
+        else:
+            raise exc.NoDataError(f'{self.path}') from e2
 
     def xlsx2(self):
         wb = openpyxl.load_workbook(self.path)
