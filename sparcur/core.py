@@ -111,7 +111,10 @@ class OntTerm(OTB, OntId):
             'label': self.label,
         }
         if hasattr(self, 'synonyms') and self.synonyms:
-            out['synonyms'] = self.synonyms
+            if is_list_or_tuple(self.synonyms):
+                out['synonyms'] = self.synonyms
+            else:
+                out['synonyms'] = self.synonyms,
 
         return out
 
@@ -140,8 +143,13 @@ class OntTerm(OTB, OntId):
             yield s, definition, rdflib.Literal(self.definition)
         if self.deprecated:
             yield s, owl.deprecated, rdflib.Literal(True)
-        for syn in self.synonyms:
-            s, NIFRID.synonyms, rdflib.Literal(syn)
+
+        if is_list_or_tuple(self.synonyms):  # workaround for ontquery list vs string issue
+            for syn in self.synonyms:
+                yield s, NIFRID.synonyms, rdflib.Literal(syn)
+
+        elif self.synonyms:
+            yield s, NIFRID.synonyms, rdflib.Literal(self.synonyms)
 
 
 class HasErrors:
