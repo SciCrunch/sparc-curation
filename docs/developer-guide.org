@@ -121,7 +121,22 @@ function sparcur-get-all-remote-data () {
     # NOTE not quite all the remote data, the google sheets
     # don't have caching functionality yet
 
-    # TODO parse args
+    # parse args
+    local POSITIONAL=()
+    while [[ $# -gt 0 ]]
+    do
+    key="$1"
+    case $key in
+        --project-id)         local PROJECT_ID="${2}"; shift; shift ;;
+        --symlink-objects-to) local SYMLINK_OBJECTS_TO="${2}"; shift; shift ;;
+        --log-path)           local LOG_PATH="${2}"; shift; shift ;;
+        --parent-path)        local PARENT_PATH="${2}"; shift; shift ;;
+        --only-filesystem)    local ONLY_FILESYSTEM="ONLY_FS"; shift ;;
+        -h|--help)            echo "${HELP}"; return ;;
+        *)                    POSITIONAL+=("$1"); shift ;;
+    esac
+    done
+
     # gnu coreutils gdate needed for osx support/freebsd
     # gdate on darwin only has millisecond resolution?
     # this also won't work on freebsd without gnu coreutils
@@ -131,12 +146,17 @@ function sparcur-get-all-remote-data () {
     local TIME_START_FRIENDLY=$(echo ${TIME_START} | sed 's/://g')
     mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START_FRIENDLY}" || \
         { CODE=$?; echo 'mv failed'; return $CODE; }
-    local PARENT_PATH=${TIME_START_FRIENDLY}
-    local LOG_PATH="${PARENT_PATH}/logs"
+    local PARENT_PATH=${PARENT_PATH:-$TIME_START_FRIENDLY}
+    local LOG_PATH=${LOG_PATH:-"${PARENT_PATH}/logs"}
 
     #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
-    local PROJECT_ID=$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")
-    local SYMLINK_OBJECTS_TO=$()
+    local PROJECT_ID=${PROJECT_ID:-$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")}
+    local maybe_slot=()
+    if [[ -n "${SYMLINK_OBJECTS_TO}" ]]; then
+        # MUST use arrays to capture optional arguments like this otherwise
+        # arg values with spaces in them will destroy your sanity
+        maybe_slot+=(--symlink-objects-to "${SYMLINK_OBJECTS_TO}")
+    fi
 
     echo ${PARENT_PATH}  # needed to be able to follow logs
 
@@ -144,25 +164,37 @@ function sparcur-get-all-remote-data () {
         mkdir "${LOG_PATH}" || { CODE=$?; echo 'mkdir of ${LOG_PATH} failed'; return $CODE; }
     fi
 
-    # fetch annotations
-    python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
-    local pids_final[0]=$!
+    if [[ -z "${ONLY_FILESYSTEM}" ]]; then
+        # fetch annotations
+        echo "Fetching annotations metadata"
+        python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
+        local pids_final[0]=$!
 
-    # fetch remote metadata
-    python -m sparcur.simple.fetch_remote_metadata_all \
-           --project-id "${PROJECT_ID}" \
-           > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
-    local pids[0]=$!
+        # fetch remote metadata
+        echo "Fetching remote metadata"
+        python -m sparcur.simple.fetch_remote_metadata_all \
+            --project-id "${PROJECT_ID}" \
+            > "${LOG_PATH}/fetch-remote-metadata.log" 2>&1 &
+        local pids[0]=$!
+    fi
+
+    local FAIL=0
 
     # clone aka fetch top level
-    local FAIL=0
+
+    # we do not background this assignment because it runs quickly
+    # and everything that follows depends on it finishing, plus we
+    # need it to finish to set the PROJECT_PATH variable here
+    echo $maybe_slot
+    echo python -m sparcur.simple.clone --project-id "${PROJECT_ID}" --parent-path "${PARENT_PATH}" "${maybe_slot}"
     local PROJECT_PATH=$(python -m sparcur.simple.clone \
                                 --project-id "${PROJECT_ID}" \
                                 --parent-path "${PARENT_PATH}" \
-                                > "${LOG_PATH}/clone.log" 2>&1) || FAIL=$((FAIL+1))
+                                "${maybe_slot[@]}" \
+                                > "${LOG_PATH}/clone.log" 2>&1) || { FAIL=$((FAIL+1)); echo "clone failed"; }
 
     for pid in ${pids[*]}; do
-        wait $pid || FAIL=$((FAIL+1))
+        wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
     if [[ $FAIL -ne 0 ]]; then
         echo "${FAIL} commands failed. Cannot continue."
@@ -171,16 +203,18 @@ function sparcur-get-all-remote-data () {
     fi
 
     # pull aka fetch file system metadata
+    echo "Fetching file system metadata"
     python -m sparcur.simple.pull \
            --project-path "${PROJECT_PATH}" \
            > "${LOG_PATH}/pull.log" 2>&1 || {
         CODE=$?;
-        tail -n "${LOG_PATH}/pull.log";
+        tail -n 100 "${LOG_PATH}/pull.log";
         echo "Pull failed! The last 100 lines of ${LOG_PATH}/pull.log are listed above.";
         echo "${PROJECT_PATH}";
         return $CODE; }
 
     # fetch metadata files
+    echo "Fetching metadata files"
     python -m sparcur.simple.fetch_metadata_files \
            --project-path "${PROJECT_PATH}" \
            > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
@@ -188,7 +222,7 @@ function sparcur-get-all-remote-data () {
     pids_final[1]=$!
     local FAIL=0
     for pid in ${pids_final[*]}; do
-        wait $pid || FAIL=$((FAIL+1))
+        wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
     if [[ $FAIL -ne 0 ]]; then
         echo "${FAIL} commands failed. Cannot continue."
@@ -443,7 +477,7 @@ if __name__ == '__main__':
 ***** Clone
 This is an example of how to clone the top level of a project.
 See ref:simple-utils for a good way to instantiate =RemotePath=.
-#+name: simple-clone
+#+name: clone.py
 #+begin_src python :tangle ../sparcur/simple/clone.py
 from pathlib import Path
 
@@ -491,11 +525,11 @@ def main(parent_path=None,
     """ clone a project into a random subfolder of the current folder
         or specify the parent path to clone into """
 
-    import tempfile
     from sparcur.config import auth
     from sparcur.simple.utils import backend_blackfynn
 
     if parent_path is None:
+        import tempfile
         parent_path = Path(tempfile.mkdtemp(dir=parent_parent_path))
 
     project_id = auth.get(project_id_auth_var)
@@ -523,6 +557,7 @@ for all retrieval after the first pull it is usually more effective
 to retrieve it at the same time as fetching metadata files since it
 runs in parallel per dataset.
 
+#+name: fetch_remote_metadata_all.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata_all.py
 from joblib import Parallel, delayed
 from sparcur.backends import BlackfynnDatasetData
@@ -566,6 +601,7 @@ The implementation of =sparcur.backends.BlackfynnDatasetData= supports the abili
 to retrieve metadata directly from the remote without the need for an intervening
 local path. However this functionality is obscured here because we want to derive
 a consistent view of the data from the file system snapshot.
+#+name: fetch_remote_metadata.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata.py
 from joblib import Parallel, delayed
 from sparcur.paths import Path
@@ -613,6 +649,7 @@ if __name__ == '__main__':
 #+end_src
 ***** Pull
 Pull a single dataset or pull all datasets or clone and pull all datasets.
+#+name: pull.py
 #+begin_src python :tangle ../sparcur/simple/pull.py
 from joblib import Parallel, delayed
 from sparcur.paths import Path
@@ -692,14 +729,15 @@ if __name__ == '__main__':
     pipe_main(main, after=print)
 #+end_src
 ***** Fetch
-#+begin_src python :tangle ../sparcur/simple/fetch.py
+#+caption: NOTE this block is unused!
+#+begin_src python :tangle ../sparcur/simple/fetch.py :exports none
 from sparcur.simple.fetch_metadata_files import main as files
 from sparcur.simple.fetch_remote_metadata import main as rmeta
 
 
 def main(path=Path.cwd(), **kwargs):
     if path is None or not path.find_cache_root() in (path, *path.parents):
-        from sparcur.simple.pull_all import main as pull
+        from sparcur.simple.pull import main as pull
         path = pull(**kwargs)
 
     # FIXME these can be run in parallel
@@ -717,6 +755,7 @@ if __name__ == '__main__':
 # ugh I gave myself the name in a loop variable colliding with
 # name at higher level of indentation still in a loop bug, so
 # totally will overwrite the name and cause madness to ensue
+#+name: fetch_metadata_files.py
 #+begin_src python :tangle ../sparcur/simple/fetch_metadata_files.py
 from joblib import Parallel, delayed
 from sparcur import exceptions as exc
@@ -779,7 +818,7 @@ def from_path_fetch_metadata_files(path, n_jobs=12):
 
 def main(path=Path.cwd(), n_jobs=12, **kwargs):
     if path is None or path.find_cache_root() not in (path, *path.parents):
-        from sparcur.simple.pull_all import main as pull
+        from sparcur.simple.pull import main as pull
         path = pull(**kwargs)
 
     from_path_fetch_metadata_files(path, n_jobs=n_jobs)
@@ -983,10 +1022,9 @@ class Options(clif.Options):
 
     @property
     def symlink_objects_to(self):
-        paths = self.paths
-        if paths:
-            return paths[0]
-
+        slot = self._args['--symlink-objects-to']
+        if slot:
+            return Path(slot).expanduser()
 
     @property
     def sparse_limit(self):
