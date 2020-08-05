@@ -116,6 +116,7 @@ digraph G {
 [[file:./images/graph-retrieve-all.png]]
 **** Bash implementation                                             :ignore:
 # FIXME this is really an env file not a bin file ...
+#+name: pipeline-functions
 #+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
 function sparcur-get-all-remote-data () {
     # NOTE not quite all the remote data, the google sheets
@@ -133,24 +134,52 @@ function sparcur-get-all-remote-data () {
         --parent-path)        local PARENT_PATH="${2}"; shift; shift ;;
         --only-filesystem)    local ONLY_FILESYSTEM="ONLY_FS"; shift ;;
         -h|--help)            echo "${HELP}"; return ;;
-        *)                    POSITIONAL+=("$1"); shift ;;
+        ,*)                    POSITIONAL+=("$1"); shift ;;
     esac
     done
+
+    # Why, you might be asking, are we declaring a local project path here without assignment?
+    # Well. Let me tell you. Because local is a command with an exist status. So it _always_
+    # returns zero. So if you need to check the output of the command running in a subshell
+    # that you are assigning to a local variable _ALWAYS_ set local separately first.
+    # Yes, shellcheck does warn about this. See also https://superuser.com/a/1103711
+    local PROJECT_PATH
+    local UTC_OFFSET_START
+    local TIME_START_NO_OFFSET
 
     # gnu coreutils gdate needed for osx support/freebsd
     # gdate on darwin only has millisecond resolution?
     # this also won't work on freebsd without gnu coreutils
-    iso8601millis="+%FT%T,%6N%:z"  # FIXME do we _really_ need millis!? yemaybe? concurrent startups?
-    local TIME_START=$(date ${iso8601millis} || gdate ${iso8601millis})
-    local TIME_START_SAFE=$(echo ${TIME_START} | sed 's/[:-]//g')
-    local TIME_START_FRIENDLY=$(echo ${TIME_START} | sed 's/://g')
-    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START_FRIENDLY}" || \
-        { CODE=$?; echo 'mv failed'; return $CODE; }
+    iso8601millis="+%FT%T,%6N"  # FIXME do we _really_ need millis!? yemaybe? concurrent startups?
+    utcoffset="+%:z"
+    # I really hope the utc offset doesn't change between start & end
+    # but laptops and airplains do exist, so it could
+    # also how utterly annoying that the date separator and the
+    # negative utc offset share the same symbol ... talk about
+    # an annoying design flaw that is going to haunt humanity
+    # with double the number of calls to date for # ... as
+    # long as anoyone is writing code to deal with time
+    TIME_START_NO_OFFSET=$(date ${iso8601millis} || gdate ${iso8601millis})
+    UTC_OFFSET_START=$(date ${utcoffset} || gdate ${utcoffset})
+    local TIME_START="${TIME_START_NO_OFFSET}${UTC_OFFSET_START}"  # XXX unused
+
+    local TIME_START_NO_OFFSET_FS_OK=${TIME_START_NO_OFFSET//:/}
+    local UTC_OFFSET_START_FS_OK=${UTC_OFFSET_START//:/}
+    local TIME_START_FRIENDLY=${TIME_START_NO_OFFSET_FS_OK}${UTC_OFFSET_START_FS_OK}
+    # So. iso8601 guidance on what to do about subsecond time and the utc offset in the compact
+    # representation is not entirely clear, however I _think_ that %FT%T%H%M%S,%6N%z is ok but
+    # the -/+ must stay between the timezone and the rest, so we will have to grab tz by itself
+    local TIME_START_SAFE=${TIME_START_NO_OFFSET_FS_OK//-/}${UTC_OFFSET_START_FS_OK}  # XXX unused
+    if [[ -z "${PARENT_PATH}" ]]; then
+        mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START_FRIENDLY}" || \
+            { CODE=$?; echo 'mv failed'; return $CODE; }
+    fi
     local PARENT_PATH=${PARENT_PATH:-$TIME_START_FRIENDLY}
     local LOG_PATH=${LOG_PATH:-"${PARENT_PATH}/logs"}
 
     #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
     local PROJECT_ID=${PROJECT_ID:-$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")}
+
     local maybe_slot=()
     if [[ -n "${SYMLINK_OBJECTS_TO}" ]]; then
         # MUST use arrays to capture optional arguments like this otherwise
@@ -158,7 +187,7 @@ function sparcur-get-all-remote-data () {
         maybe_slot+=(--symlink-objects-to "${SYMLINK_OBJECTS_TO}")
     fi
 
-    echo ${PARENT_PATH}  # needed to be able to follow logs
+    echo "${PARENT_PATH}"  # needed to be able to follow logs
 
     if [ ! -d "${LOG_PATH}" ]; then
         mkdir "${LOG_PATH}" || { CODE=$?; echo 'mkdir of ${LOG_PATH} failed'; return $CODE; }
@@ -185,15 +214,25 @@ function sparcur-get-all-remote-data () {
     # we do not background this assignment because it runs quickly
     # and everything that follows depends on it finishing, plus we
     # need it to finish to set the PROJECT_PATH variable here
-    echo $maybe_slot
-    echo python -m sparcur.simple.clone --project-id "${PROJECT_ID}" --parent-path "${PARENT_PATH}" "${maybe_slot}"
-    local PROJECT_PATH=$(python -m sparcur.simple.clone \
-                                --project-id "${PROJECT_ID}" \
-                                --parent-path "${PARENT_PATH}" \
-                                "${maybe_slot[@]}" \
-                                > "${LOG_PATH}/clone.log" 2>&1) || { FAIL=$((FAIL+1)); echo "clone failed"; }
+    echo python -m sparcur.simple.clone --project-id "${PROJECT_ID}" --parent-path "${PARENT_PATH}" "${maybe_slot[@]}"
+    echo "Cloning top level"
+    PROJECT_PATH=$(python -m sparcur.simple.clone \
+                          --project-id "${PROJECT_ID}" \
+                          --parent-path "${PARENT_PATH}" \
+                          "${maybe_slot[@]}" \
+                          > "${LOG_PATH}/clone.log" 2>&1) || {
+        # TODO tee the output when verbose is passed
+        CODE=$?;
+        tail -n 100 "${LOG_PATH}/clone.log";
+        echo "Pull failed! The last 100 lines of ${LOG_PATH}/clone.log are listed above.";
+        apids=( "${pids[@]}" "${pids_final[@]}" );
+        for pid in "${apids[@]}"; do
+            kill $pid;
+        done;
+        return $CODE;
+    }
 
-    for pid in ${pids[*]}; do
+    for pid in "${pids[@]}"; do
         wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
     if [[ $FAIL -ne 0 ]]; then
@@ -215,13 +254,15 @@ function sparcur-get-all-remote-data () {
 
     # fetch metadata files
     echo "Fetching metadata files"
+    # have to pass project path as a position argument here so that it
+    # does not try to pull aka fetch the file system metadata again
     python -m sparcur.simple.fetch_metadata_files \
            --project-path "${PROJECT_PATH}" \
            > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
 
     pids_final[1]=$!
     local FAIL=0
-    for pid in ${pids_final[*]}; do
+    for pid in "${pids_final[@]}"; do
         wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
     if [[ $FAIL -ne 0 ]]; then
@@ -521,7 +562,7 @@ def main(parent_path=None,
          parent_parent_path=Path.cwd(),
          project_id_auth_var='blackfynn-organization',
          symlink_objects_to=None,
-         **kwargs):
+         ,**kwargs):
     """ clone a project into a random subfolder of the current folder
         or specify the parent path to clone into """
 
@@ -529,6 +570,7 @@ def main(parent_path=None,
     from sparcur.simple.utils import backend_blackfynn
 
     if parent_path is None:
+        breakpoint()  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX FIXME
         import tempfile
         parent_path = Path(tempfile.mkdtemp(dir=parent_parent_path))
 
@@ -637,7 +679,7 @@ def from_path_fetch_remote_metadata(path, n_jobs=12, cached_ok=False):
 def main(path=Path.cwd(), n_jobs=12, rmeta_cached_ok=False, **kwargs):
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.clone import main as clone
-        path = clone(**kwargs)
+        path = clone(path=path, n_jobs=n_jobs, **kwargs)
 
     from_path_fetch_remote_metadata(path, n_jobs=n_jobs, cached_ok=rmeta_cached_ok)
     return path
@@ -700,7 +742,7 @@ def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, **kwargs):
     project_path = None
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.fetch_remote_metadata import main as remote_metadata
-        project_path = remote_metadata(**kwargs)
+        project_path = remote_metadata(path=path, **kwargs)
     else:
         project_path = path.find_cache_root()
         if path != project_path:
@@ -738,7 +780,7 @@ from sparcur.simple.fetch_remote_metadata import main as rmeta
 def main(path=Path.cwd(), **kwargs):
     if path is None or not path.find_cache_root() in (path, *path.parents):
         from sparcur.simple.pull import main as pull
-        path = pull(**kwargs)
+        path = pull(path=path, n_jobs=n_jobs, **kwargs)
 
     # FIXME these can be run in parallel
     # python is not its own best glue code ...
@@ -819,7 +861,7 @@ def from_path_fetch_metadata_files(path, n_jobs=12):
 def main(path=Path.cwd(), n_jobs=12, **kwargs):
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.pull import main as pull
-        path = pull(**kwargs)
+        path = pull(path=path, n_jobs=n_jobs, **kwargs)
 
     from_path_fetch_metadata_files(path, n_jobs=n_jobs)
     return path
@@ -968,7 +1010,7 @@ Options:
     --dataset-id=ID                 one or more datset ids
     --project-id-auth-var=VAR       name of the auth variable holding the project-id
 
-    --project-path=PATH             the project path
+    --project-path=PATH             the project path, will be path if <path>... is empty
     --parent-path=PATH              the parent path of the
     --parent-parent-path=PATH       parent in which a random tempdir is generated
                                     to be the parent path, don't use this ...
@@ -1004,13 +1046,15 @@ class Options(clif.Options):
 
     @property
     def paths(self):
-        return [Path(p) for p in self._args['<path>']]
+        return [Path(p).expanduser().resolve() for p in self._args['<path>']]
 
     @property
     def path(self):
         paths = self.paths
         if paths:
             return paths[0]
+        elif self.project_path:
+            return self.project_path
         else:
             # if no paths were listed default to cwd
             # consistent with how the default kwargs
@@ -1019,6 +1063,12 @@ class Options(clif.Options):
             # to be overwritten by the conventions of
             # individual pipeline mains
             return Path.cwd()
+
+    @property
+    def project_path(self):
+        pp = self._args['--project-path']
+        if pp:
+            return Path(pp).expanduser().resolve()
 
     @property
     def symlink_objects_to(self):
