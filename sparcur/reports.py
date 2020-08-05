@@ -234,7 +234,8 @@ class TtlFile:
                 cell.toPython() for cell in row]
 
     def changes(self):
-        added, removed, changed = self.graph.subjectsChanges(self.graph_compare_to)
+        added, removed, changed = self.graph.subjectsChanged(self.graph_compare_to)
+        return added, removed, changed
 
     def milestones(self):
         query = self.queries.dataset_milestone_completion_date()
@@ -1085,7 +1086,11 @@ class Report:
         return TtlFile(ontres, ontres_compare_to)
 
     def changes(self):
-        tout = self._ttlfile.changes()
+        a, r, c = self._ttlfile.changes()
+        for n, t in zip(('Added', 'Removed', 'Changed'), (a, r, c)):
+            print(n + ' ' + ('-' * 40))
+            pprint.pprint(t)
+            print(('-' * (len(n) + 1)) + ('-' * 40))
 
     @sheets.Reports.makeReportSheet('curie')
     def mis(self, ext=None):
