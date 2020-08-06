@@ -608,7 +608,7 @@ Easier to read, harder to debug. The python paradox.
 :header-args: :shebang "#!/usr/bin/env python3"
 :END:
 Cache annotations.
-#+begin_src python :tangle ../sparcur/simple/fetch_annotations.py
+#+begin_src python :tangle ../sparcur/simple/fetch_annotations.py :mkdirp yes
 from pathlib import Path
 from hyputils import hypothesis as hyp
 from sparcur.config import auth
