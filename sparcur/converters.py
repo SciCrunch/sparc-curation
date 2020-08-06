@@ -31,12 +31,21 @@ class TripleConverter(dat.HasErrors):
             def _func(self, value, p=predicate): return p, self.l(value)
             setattr(cls, attr, _func)
 
+    _pyru_loaded = False
+
     def __init__(self, json_source, integrator=None):
         """ in case we want to do contextual things here """
         super().__init__()
         self._source = json_source
         self.integrator = integrator
         self.extra = self.Extra(self)
+
+        if not self.__class__._pyru_loaded:
+            from pysercomb.pyr import units as pyru
+            self.__class__.pyru = pyru
+            # we don't need to register with import type registry
+            # here becuase that is only needed for the json output
+            self.__class__._pyru_loaded = True
 
     def l(self, value):
         if isinstance(value, idlib.Stream) and hasattr(value, '_id_class'):
@@ -270,8 +279,14 @@ class MetaConverter(TripleConverter):
             log.debug(value)
             if not isinstance(value, idlib.Pio):
                 if isinstance(value, idlib.Doi):
-                    for t in value.triples_gen:
-                        yield t
+                    try:
+                        t = None
+                        for t in value.triples_gen:
+                            yield t
+                    except idlib.exc.ResolutionError as e:
+                        if t is None:
+                            # we already logged this error during id dereferencing
+                            return
 
                     ds, _, _ = t
                     try:
@@ -279,7 +294,7 @@ class MetaConverter(TripleConverter):
                         s = self.c.l(pioid)
                         yield ds, TEMP.dereferencesTo, s
                         yield s, TEMP.hasDoi, ds
-                    except idlib.exceptions.MalformedIdentifierError as e:
+                    except idlib.exc.MalformedIdentifierError as e:
                         log.warning(e)
                         return
                 else:

@@ -1266,6 +1266,29 @@ class ManifestRecordExportSchema(JSONSchema):
                  'data_type': {
                      'type': 'string',
                  },
+                 'additional_types': {
+                     'type': 'string',  # FIXME currently expects a single value, maybe rename?
+                     #'type': 'array',
+                     #'minItems': 1,
+                     #'items': {
+                         #'type': 'string',
+                         # FIXME need to make a note that if more than one
+                         # value is provided then the value provided first
+                         # is the one that will be lifted to mimetype for the file
+                         # TODO mimetype pattern?
+                     #},
+                 },
+                 # extras duplicated from other sheets
+                 'protocl_title': {'type': 'string',},
+                 'protocol_url_or_doi': _protocol_url_or_doi_schema,
+                 'software_version': {'type': 'string'},
+                 'software_vendor': {'type': 'string'},
+                 'software_url': {'type': 'string'},
+                 'software_rrid': EIS._allOf(RridSchema),
+                 'software': {'type': 'string'},
+                 # more extras
+                 #'organism_RRID': EIS._allOf(RridSchema),
+                 'sha1': {'type': 'string'},
              },
              },
             {'oneOf': [
@@ -1306,9 +1329,11 @@ class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
     schema = {
         'type': 'object',
         'jsonld_include': {'@type': ['sparc:File', 'owl:NamedIndividual']},
+        # FIXME handle raw json manifest file structure where contents is the json blob
+        # I think we just need to rename metadata -> manifest_records to fix that case
         'allOf': [
             PathSchema.schema,
-            {'required': ['manifest_records', 'contents'],  # TODO uri_api
+            {'required': ['contents'],  # TODO uri_api
              'properties': {
                  'errors': ErrorSchema.schema,
                  'contents':  {
@@ -1328,7 +1353,9 @@ class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
     }
 
 
-ManifestFileSchema = ManifestFileExportSchema
+class ManifestFileSchema(JSONSchema):
+    __schema = copy.deepcopy(ManifestFileExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
 
 
 class ManifestFilesExportSchema(JSONSchema):

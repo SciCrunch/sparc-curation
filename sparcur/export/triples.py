@@ -58,6 +58,8 @@ class TriplesExport(ProtcurData):
         ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
         sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
                                       'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
+        sparc_mis_helper = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
+                                         'NIF-Ontology/sparc/ttl/sparc-mis-helper.ttl')
 
         pos = (
             (rdf.type, owl.Ontology),
@@ -68,6 +70,7 @@ class TriplesExport(ProtcurData):
             (rdfs.label, rdflib.Literal(f'{self.folder_name} curation export graph')),
             (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
+            (owl.imports, sparc_mis_helper),
             (TEMP.TimestampExportStart, rdflib.Literal(self.timestamp_export_start)),
         )
         for p, o in pos:
@@ -268,7 +271,7 @@ class TriplesExportDataset(TriplesExport):
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
         if isinstance(v, int):
-            loge.critical('darn it max normlize your ids!')
+            #loge.critical('darn it max normlize your ids!')  # now caught by the schemas
             v = str(v)
 
         v = quote(v, safe=tuple())

@@ -204,8 +204,9 @@ class ExportXml(ExportBase):
                     'dataset_id': id,
                     'xml': tuple()}
             blob['xml'] = [{'path': x.relative_to(local).as_posix(),
-                            'type': e.mimetype,  # FIXME should this in the extracted ??
-                            'extracted': e.asDict() if e.mimetype else None}
+                            'type': 'path',
+                            'mimetype': e.mimetype,  # FIXME should this in the extracted ??
+                            'contents': e.asDict() if e.mimetype else None}
                            for x in local_xmls
                            for e in (exml.ExtractXml(x),)]
 
@@ -509,7 +510,7 @@ class Export(ExportBase):
 
         #breakpoint()
 
-        dump_path.mkdir(parents=True)
+        dump_path.mkdir(parents=True, exist_ok=True)
         # FIXME TODO make these latest paths accessible
         # probably by splitting protcur export out into
         # its own class
@@ -644,7 +645,7 @@ class Export(ExportBase):
         for blob_dataset in datasets:
             pipe = pipes.IrToExportJsonPipeline(blob_dataset)
             data = pipe.data
-            blob_export_json['datasets'].append(pipe.data)
+            blob_export_json['datasets'].append(data)
 
         return blob_export_json
 

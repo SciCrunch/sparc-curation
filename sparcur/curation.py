@@ -8,10 +8,10 @@ from pyontutils.utils import byCol as _byCol, Async, deferred, makeSimpleLogger
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT
-from sparcur.core import adops, OntTerm
-from sparcur.paths import Path
+from sparcur.core import adops, OntTerm, JEncode
+from sparcur.paths import Path, BlackfynnCache
 from sparcur.state import State
-from sparcur.utils import log
+from sparcur.utils import log, fromJson, register_type
 from sparcur import schemas as sc
 from sparcur.export.triples import TriplesExportDataset, TriplesExportSummary
 from sparcur.datasources import OrganData, OntologyData
@@ -614,7 +614,10 @@ class Summary(Integrator, ExporterSummarizer):
         return data
 
 
-def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO):
+_p = Path('/tmp/asdf')
+_p.mkdir(exist_ok=True)  # FIXME XXXXXXXXXXXXXXXXXXXXXXXXXX
+def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
+           evil=[False], dumb=False):
     """ sigh, pickles """
     log_names = 'idlib', 'protcur', 'orthauth', 'ontquery', 'augpathlib', 'pyontutils'
     for log_name in log_names:
@@ -633,7 +636,44 @@ def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO):
         rc._setup()
         rc.anchorTo(ca)
 
+    if not hasattr(BlackfynnCache, '_anchor'):
+        # the fact that we only needed this much later in time
+        # tells me that we had actually done an excellent job
+        # of firewalling the validation pipeline from anything
+        # related to the cache beyond the xatter data
+
+        # can't use ca.__class__ because it is the posix variant of # _cache_class
+        BlackfynnCache._anchor = ca
+
+    prp = d.path.project_relative_path
     if helpers is not None:
         d.add_helpers(helpers)
 
-    return d.data_for_export(timestamp)
+    out_path = (dp / d.id).with_suffix('.json')
+    if out_path.exists() and dumb:
+        if not evil[0]:  # FIXME this is SO DUMB to do in here, but ...
+            from pysercomb.pyr import units as pyru
+            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
+            evil[0] = True
+
+        log.warning(f'loading from path {out_path}')
+        # FIXME this is _idiotically_ slow with joblib
+        # multiple orders of magnitude faster just using listcomp
+        with open(out_path, 'rt') as f:
+            return fromJson(json.load(f))
+
+    blob_dataset = d.data_for_export(timestamp)
+    with open(out_path.with_suffix('.raw.json'), 'wt') as f:  # FIXME XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        json.dump(blob_dataset, f, sort_keys=True, indent=2, cls=JEncode)
+
+    try:
+        pipe = pipes.IrToExportJsonPipeline(blob_dataset)  # FIXME network sandbox violation
+        blob_export = pipe.data
+        with open(out_path, 'wt') as f:  # FIXME XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+            json.dump(blob_export, f, sort_keys=True, indent=2, cls=JEncode)
+    except Exception as e:
+        log.exception(e)
+        log.critical(f'error during fancy json export, see previous log entry')
+
+    return blob_dataset

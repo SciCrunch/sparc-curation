@@ -47,6 +47,26 @@ def protocol_url_or_doi(value):
     return out
 
 
+def rrid(value, self=None):
+    if value.strip().lower() in ('unknown', 'uknown'):
+        return UNKNOWN
+    else:
+        try:
+            out = idlib.Rrid(value)  # XXX possible encapsulation issue
+            return out
+        except idlib.exceptions.MalformedIdentifierError as e:
+            msg = f'malformed RRID: {value}'
+            if self is not None:
+                if self.addError(msg,
+                                pipeline_stage=self.__class__.__name__,
+                                blame='submission',
+                                path=self._path):
+                    log.error(msg)
+
+            if not value.startswith('RRID:'):
+                return rrid('RRID:' + value)
+
+
 class _Unknown(str):
     def __new__(cls, value=None):
         return str.__new__(cls, 'UNKNOWN')
@@ -302,6 +322,8 @@ class NormValues(HasErrors):
 
     def _normv(self, thing, key=None, rec=None, path=tuple()):
         cell_errors = []
+        #if 'software_rrid' in path:
+            #breakpoint()
         if isinstance(thing, dict):
             out = {}
             for i, (k, v) in enumerate(thing.items()):
@@ -579,7 +601,7 @@ class NormDatasetDescriptionFile(NormValues):
 
         try:
             #log.debug(f"{v} '{self.path}'")
-            orcid = idlib.Orcid(v)
+            orcid = idlib.Orcid(v)  # XXX possible encapsulation issue
             if not orcid.identifier.checksumValid:  # FIXME should not handle this with ifs ...
                 # FIXME json schema can't do this ...
                 msg = f'orcid failed checksum {value!r} {self._path.as_posix()!r}'
@@ -656,9 +678,9 @@ class NormDatasetDescriptionFile(NormValues):
             doi = True
 
         if doi:
-            value = idlib.Doi(value)
+            value = idlib.Doi(value)  # XXX possible encapsulation issue
         else:
-            value = idlib.Pio(value)
+            value = idlib.Pio(value)  # XXX possible encapsulation issue
 
         return value
 
@@ -698,7 +720,7 @@ class NormDatasetDescriptionFile(NormValues):
             v = val.strip()
             if v:
                 try:
-                    yield idlib.Doi(v)
+                    yield idlib.Doi(v)  # XXX possible encapsulation issue
                 except idlib.exceptions.MalformedIdentifierError as e:
                     logd.exception(e)
                 #doi = idlib.Doi(v)
@@ -731,7 +753,8 @@ class NormSubjectsFile(NormValues):
             from pysercomb.pyr import units as pyru
             self.__class__.pyru = pyru
 
-    def subject_id(self, value):
+    def __subject_id(self, value):
+        # XXX unused, ids like this need to be fixed in the source data
         if not isinstance(value, str):
             msg = f'Bad type for subject_id: {type(value)}'
             if self.addError(msg,
@@ -878,23 +901,8 @@ class NormSubjectsFile(NormValues):
         yield from self._rrid(value)
 
     def _rrid(self, value):
+        yield rrid(value, self)
         # OF COURSE RRIDS ARE SPECIAL
-        if value.strip().lower() in ('unknown', 'uknown'):
-            yield UNKNOWN
-        else:
-            try:
-                rrid = idlib.Rrid(value)
-                yield rrid
-            except idlib.exceptions.MalformedIdentifierError as e:
-                msg = f'malformed RRID: {value}'
-                if self.addError(msg,
-                                 pipeline_stage=self.__class__.__name__,
-                                 blame='submission',
-                                 path=self._path):
-                    log.error(msg)
-
-                if not value.startswith('RRID:'):
-                    yield from self.rrid_for_strain('RRID:' + value)
 
     #def protocol_io_location(self, value):  # FIXME need to normalize this with dataset_description
         #yield value
@@ -960,7 +968,8 @@ class NormSamplesFile(NormSubjectsFile):
         else:
             yield value.strip()
 
-    def sample_id(self, value):
+    def __sample_id(self, value):
+        # XXX unused, ids like this need to be fixed in the source data
         if not isinstance(value, str):
             msg = f'Bad type for sample_id: {type(value)}'
             if self.addError(msg,

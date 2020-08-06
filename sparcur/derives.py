@@ -1,10 +1,10 @@
-import pprint
+import copy
 from typing import Tuple
 from functools import wraps
 import idlib
 from sparcur import schemas as sc
 from sparcur import normalization as nml
-from sparcur.core import log, logd, JPointer
+from sparcur.core import log, logd, JPointer, HasErrors
 
 
 def collect(*oops, unpacked=True):
@@ -98,3 +98,86 @@ class Derives:
             # need an extra step during the data retrieval phase which attempts
             # to fetch all the doi metadata
             pass
+
+    @staticmethod
+    def _lift_mr(path_dataset, dataset_relative_path, record):
+        parent = dataset_relative_path.parent
+        record_drp = parent / record['filename']
+
+        # FIXME this is validate move elsewhere ??? but this is also
+        # where we want to embed data about the path ...
+        # but I supposed we could inject errors later ? this is an
+        # extremely obscure place to inject these ...
+        # and to do that we need access to the path
+        # and it is clear given that we passed in THIS_PATH
+
+        # FIXME TODO how to deal with sparse datasets
+        _record_path = path_dataset / record_drp  # do not include in export
+        _cache = _record_path.cache
+        if _cache is None:
+            lifted = _record_path._jsonMetadata()  # will produce the error for us
+        else:
+            lifted = _cache._jsonMetadata()
+
+        if 'errors' in lifted:
+            he = HasErrors(pipeline_stage='Derives._lift_mr')
+            _message = lifted['errors'].pop()['message']
+            # FIXME pretty sure that path in addError is used for both
+            # the json path and the file system path
+            message = ('Non-existent path listed in manifest '
+                       f'{dataset_relative_path}\n{_message}')
+            if he.addError(message,
+                           blame='submission',
+                           path=_record_path):
+                logd.error(message)
+
+            he.embedErrors(lifted)
+
+        lifted['prov'] = dataset_relative_path
+        lifted['dataset_relative_path'] = record_drp
+        lifted['manifest_record'] = {
+            k:v for k, v in record.items() if k != 'filetype'
+        }
+        if 'additional_types' in record:
+            # FIXME TODO make sure that the mimetypes match
+            # FIXME currently a string, either change name or make a list?
+            lifted['mimetype'] = record['additional_types']
+
+        return lifted
+
+    @staticmethod
+    def _scaffolds(lifted, scaffolds):
+        # FIXME this is burried here, should be more like how we
+        # handle the xml extraction
+
+        expected = 'organ', 'species'
+        if 'mimetype' in lifted and lifted['mimetype'] == 'inode/vnd.abi.scaffold+directory':
+            # TODO type -> scaffold
+            # TODO look for additional metadata from interior manifest
+            scaf = copy.deepcopy(lifted)
+            # FIXME should be a move step for organ and specie
+            for key in expected:
+                if key in scaf['manifest_record']:
+                    scaf[key] = scaf['manifest_record'][key]
+
+            scaffolds.append(scaf)
+
+    @classmethod
+    def path_metadata(cls, path_dataset, manifests, xmls):
+        path_metadata = []
+        scaffolds = []  # FIXME need a better abstraction for additional known types e.g. the mbf segmentations
+        for manifest in manifests:
+            if 'contents' in manifest:
+                contents = manifest['contents']
+                if 'manifest_records' in contents:
+                    drp = manifest['dataset_relative_path']
+                    for record in contents['manifest_records']:
+                        lifted = cls._lift_mr(path_dataset, drp, record)
+                        path_metadata.append(lifted)
+                        if 'errors' not in lifted:
+                            cls._scaffolds(lifted, scaffolds)
+
+        path_metadata.extend(xmls['xml'])
+        # TODO try to construct/resolve the referent paths in these datasets as well
+        # getting the path json metadata will embed errors about missing files for us
+        return path_metadata, scaffolds

@@ -27,11 +27,18 @@ from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference
 from sparcur.state import State
 from sparcur.config import auth
 from sparcur.derives import Derives
+from sparcur.extract import xml as exml
 
 DT = DictTransformer
 De = Derives
 
 a = rdf.type
+
+
+# used to pass the runtime path of the dataset since
+# we don't want to pre-extract all the fs information
+_THIS_PATH_KEY = object()
+THIS_PATH = [_THIS_PATH_KEY]
 
 
 class MapPathsCombinator:
@@ -394,6 +401,48 @@ class ManifestFilePipeline(PathPipeline):
         return super().data
 
 
+class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
+
+    def __init__(self, previous_pipeline, lifters, runtime_context):
+        self.id = previous_pipeline.data['id']
+        self.path = runtime_context.path # FIXME nasty implicit nonsense
+
+    @property  # schema is handled internally
+    def data(self):
+        return self.do_xml_metadata(self.path, self.id)
+
+    @staticmethod
+    def _path_to_json_meta(path):
+        e = exml.ExtractXml(path)
+        metadata = path._jsonMetadata(do_expensive_operations=False)
+        # XXX sideeffects to retrieve path metadata
+        # FIXME expensive operations is hardcoded & blocked
+        if e.mimetype:
+            metadata['contents'] = e.asDict()
+            # FIXME TODO probably want to check that the mimetypes are compatible when overwriting?
+            metadata['mimetype'] = e.mimetype  # overwrites the type
+
+        return metadata
+
+    @classmethod
+    def do_xml_metadata(cls, local, id):
+        # FIXME this is extremely inefficient to run on all datasets
+        # we have a find command to subset the datasets so we don't
+        # have to do an exhaustive search ... someone has to do it
+        # but it should only be done once maybe at the start?
+        local_xmls = list(local.rglob('*.xml'))
+        missing = [p.as_posix() for p in local_xmls if not p.exists()]
+        if missing:
+            oops = "\n".join(missing)
+            raise BaseException(f'unfetched children\n{oops}')
+
+        blob = {'type': 'all-xml-files',  # FIXME not quite correct use of type here
+                'dataset_id': id,
+                'xml': tuple()}
+        blob['xml'] = [cls._path_to_json_meta(path) for path in local_xmls]
+        return blob
+
+
 class Merge(Pipeline):
 
     def __init__(self, pipelines, lifters=None, runtime_context=None):
@@ -443,7 +492,7 @@ class JSONPipeline(Pipeline):
     subpipelines = []
     copies = []
     moves = []
-    cleans = []
+    cleans = []  # FIXME should really be able to do cleans after derives too
     derives = []
     updates = []
     adds = []
@@ -506,6 +555,8 @@ class JSONPipeline(Pipeline):
         self.previous_pipeline = previous_pipeline
         self.lifters = lifters
         self.runtime_context = runtime_context
+        if hasattr(runtime_context, 'path'):
+            self.path = runtime_context.path
 
     def subpipeline_errors(self, errors):
         """ override this for pipeline specific error handling rules """
@@ -561,7 +612,18 @@ class JSONPipeline(Pipeline):
     @property
     def augmented(self):
         data = self.updated
-        DictTransformer.derive(data, self.derives, source_key_optional=True)
+
+        if hasattr(self, 'path'):
+            data[_THIS_PATH_KEY] = self.path
+
+        # FIXME THIS_PATH is cool but but violates our desire to keep validating the
+        # existence of things separate from rearranging them
+        try:
+            DictTransformer.derive(data, self.derives, source_key_optional=True)
+        finally:
+            if _THIS_PATH_KEY in data:
+                data.pop(_THIS_PATH_KEY)
+
         return data
 
     @property
@@ -805,9 +867,6 @@ class SPARCBIDSPipeline(JSONPipeline):
               [['submission_file',], ['inputs', 'submission_file']],
               [['samples_file',], ['inputs', 'samples_file']],
               [['manifest_file',], ['inputs', 'manifest_file']],
-              [['dirs',], ['meta', 'dirs']],  # FIXME not quite right ...
-              [['files',], ['meta', 'files']],
-              [['size',], ['meta', 'size']],
               [['dataset_description_file', 'name'], ['meta', 'title']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'template_schema_version',
@@ -829,11 +888,16 @@ class SPARCBIDSPipeline(JSONPipeline):
                         'number_of_samples',
               ))
 
-    moves = ([['dataset_description_file',], ['inputs', 'dataset_description_file']],
-             [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
-             #[['subjects'], ['subjects_file']],  # first step in ending the confusion
-             [['subjects_file', 'subjects'], ['subjects']],
-             [['samples_file', 'samples'], ['samples']],
+    moves = (
+        [['dirs',], ['meta', 'dirs']],  # FIXME not quite right ...
+        [['files',], ['meta', 'files']],
+        [['size',], ['meta', 'size']],
+
+        [['dataset_description_file',], ['inputs', 'dataset_description_file']],
+        [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
+        #[['subjects'], ['subjects_file']],  # first step in ending the confusion
+        [['subjects_file', 'subjects'], ['subjects']],
+        [['samples_file', 'samples'], ['samples']],
     )
 
     cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
@@ -1006,6 +1070,10 @@ class PipelineExtras(JSONPipeline):
          BlackfynnDatasetDataPipeline,
          ['inputs', 'remote_dataset_metadata']],
 
+        [[[['id'], ['id']]],  # TODO need to know in which datasets to do which filetypes
+         XmlFilePipeline,  # FIXME need a way to mrege lists
+         ['inputs', 'xml']],  # FIXME need to remove this when we're done
+
         [[[['contributors'], None]],
          ContributorsPipeline,
          None],
@@ -1028,17 +1096,31 @@ class PipelineExtras(JSONPipeline):
         [[['inputs', 'remote_dataset_metadata', 'doi']],
          DT.BOX(De.doi),
          [['meta', 'doi']]],
+
+        [[THIS_PATH, ['inputs', 'manifest_file'], ['inputs', 'xml']],  # TODO
+        De.path_metadata,  # XXX WARNING this goes back and hits the file system
+         [['path_metadata'], ['scaffolds']]
+         ],
     )
 
+    __mr_path = ['metadata_file', int, 'contents', 'manifest_records', int]
     updates = [
         # this is the stage at which normalization should actually happen I think
         # or at least normalization that is not required to prevent pipelines from
         # breaking themselves
         # TODO a way to indicate any key matching ? or does that seem like a bad idea?
         # FIXME this is a nasty network step
+        # maybe move these to a PipelineNormalization class? that would simplify
+        # the madness that is the current normalization implementation ...
         [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [__mr_path + ['protocol_url_or_doi'], norm.protocol_url_or_doi],
+        #[__mr_path + ['software_rrid'], norm.rrid],  # FIXME how do we handle errors here?
+
+        # TODO ... this isn't really norm at this point, more mapping.species
+        #[['samples', int, 'species'], norm.species],
+        #[['subjects', int, 'species'], norm.species],
     ]
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
@@ -1047,6 +1129,10 @@ class PipelineExtras(JSONPipeline):
         lambda p: ('inputs' not in p and 'contributor_role' in p),
         lambda p: ('inputs' not in p and 'contributor_orcid' in p),
     )
+
+    @property
+    def updated(self):
+        return super().updated
 
     @property
     def cleaned(self):
@@ -1121,7 +1207,7 @@ class PipelineExtras(JSONPipeline):
                             if ot.curie == 'FMA:7202':
                                 label = 'gall bladder'
                             else:
-                                lable = ot.label
+                                label = ot.label
 
                             _o = next(OntTerm.query(label=label, prefix='UBERON'))
                         except BaseException as e:
@@ -1148,54 +1234,10 @@ class PipelineExtras(JSONPipeline):
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
                 data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
 
-
-        return data
-        # FIXME this is a really bad way to do this :/ maybe stick the folder in data['prov'] ?
-        # and indeed, when we added PipelineStart this shifted and broke everything
-        # FIXME use the rmeta
-        #local = (self
-                 #.previous_pipeline.pipelines[0]
-                 #.previous_pipeline.pipelines[0]
-                 #.previous_pipeline.pipelines[0]
-                 #.path)
-        #rmeta = local.cache._dataset_metadata(force_cache=True)  # network sandbox
-
-        # FIXME this is STILL really bad, because rmeta is pulled in in add !!!!
-        # we could snapshot all the rmeta as another input I guess ... ?
-        # really need a way to split the input json from the summary without
-        # losing the input ... more thoughts on this once we get the per dataset flow up
-        bdd = BlackfynnDatasetData(data['id'])
-        try:
-            rmeta = bdd.fromCache()
-        except FileNotFoundError as e:
-            raise exc.NetworkSandboxError from e
-
-        #rmeta = data['id']local.cache._dataset_metadata(force_cache=True)  # network sandbox
-        if 'doi' not in data['meta']:
-            doi = idlib.Doi(rmeta['doi']) if 'doi' in rmeta else None
-            if doi is not None:
-                try:
-                    metadata = doi.metadata()  # FIXME network sandbox violation
-                    if metadata is not None:
-                        data['meta']['doi'] = doi
-                except idlib.exceptions.ResolutionError:
-                    pass
-
-        if 'status' not in data:
-            data['status'] = {}
-
-        if 'status_on_platform' not in data['status']:
-            sle = rmeta['status-log']['entries']
-            if sle:
-                data['status']['status_on_platform'] = sle[0]
-
-        if 'rmeta' not in data:
-            data['rmeta'] = {}
-
-        if 'readme' not in data['rmeta']:
-            data['readme'] = rmeta['readme']['readme']
-        else:
-            log.warning(f"readme unexpectedly already in rmeta for {data['id']}")
+        # FIXME HACK this is a clean
+        if 'xml' in data['inputs']:
+            # FIXME should be trivial except that clean comes before derives
+            data['inputs'].pop('xml')
 
         return data
 
@@ -1446,7 +1488,7 @@ class ToJsonLdPipeline(JSONPipeline):
                     collect=__includes)
 
     adds = (
-        [['@context'], lambda l: sc.base_context],
+        [['@context'], lambda l: copy.deepcopy(sc.base_context)],  # FIXME should be a link
         [['meta', '@context'], lambda l: sc.MetaOutExportSchema.context()],
         [['contributors', '@context'], lambda l: sc.ContributorExportSchema.context()],
         [['subjects', '@context'], lambda l: sc.SubjectsExportSchema.context()],
@@ -1807,10 +1849,13 @@ class ProtcurPipeline(Pipeline):
                 'id-converted-from' in pio._progenitors):
                 orig_pio = pio._progenitors['id-converted-from']
                 if orig_pio.asStr() != pio.asStr():
-                    if hasattr(orig_pio, 'uri_human') and orig_pio.uri_human:
-                        data['uri_human'] = orig_pio.uri_human
-                    elif orig_pio.slug_tail:
-                        data['uri_human'] = orig_pio
+                    try:
+                        if hasattr(orig_pio, 'uri_human') and orig_pio.uri_human:
+                            data['uri_human'] = orig_pio.uri_human
+                        elif orig_pio.slug_tail:
+                            data['uri_human'] = orig_pio
+                    except idlib.exc.RemoteError as e:  # FIXME network sandbox violation
+                        logd.exception(e)
 
         sheets_lookup = self._sheets_lookup()
         annos, idints, pidints = self._idints()
@@ -1839,7 +1884,7 @@ class ProtcurPipeline(Pipeline):
                         #pidints = None
                         #pannos = None
                         #breakpoint()
-            except idlib.exc.RemoteError as e:
+            except idlib.exc.RemoteError as e:  # FIXME network sandbox violation
                 urih(data, pio)
                 if 'uri_human' not in data:
                     log.error(f'No uri_human for {pio.asStr()}')

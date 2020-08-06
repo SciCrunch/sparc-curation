@@ -469,6 +469,14 @@ class Tabular(HasErrors):
                                      path=self.path):
                         logd.error(message)
 
+                if len(rows[0]) == 1 and ('\t' if delimiter == ',' else ',') in rows[0][0]:
+                    message = (f'Possible wrong file extension in {self.path.id} '
+                               f'{self.path.project_relative_path}')
+                    if self.addError(message,
+                                     blame='submission',
+                                     path=self.path):
+                        logd.error(message)
+
                 if encoding != 'utf-8':
                     message = f'encoding bad {encoding!r} {self.path.as_posix()!r}'
                     if self.addError(exc.EncodingError(message),
@@ -742,7 +750,7 @@ class MetadataFile(HasErrors):
 
     def __new__(cls, path, template_schema_version=None):
         if template_schema_version is not None:  # and template_schema_version < latest  # TODO
-            logd.info(template_schema_version)  # TODO warn
+            logd.debug(f'{template_schema_version} {path}')  # TODO warn
 
         if cls.record_type_key_header is None or cls.record_type_key_alt is None:
             raise TypeError(f'record_type_key_? should not be None on {cls.__name__}')
@@ -1284,12 +1292,18 @@ class SamplesFilePath(ObjectPath):
 SamplesFilePath._bind_flavours()
 
 
+# TODO when we need them ?
+#_props = sc.ManifestFileSchema.schema['properties']['man']['items']['properties']
+#_nsman = [k for k, v in _props.items()
+          #if isinstance(v, dict) and sc.not_array(v)]
+#_nsman = sorted(set(_nsffes))
 class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
     renames_header = {'filename': 'metadata_element',}
     record_type_key_alt = 'filename'
     record_type_key_header = 'metadata_element'
     groups_alt = {'manifest_records': GROUP_ALL}
     normalize_header = False
+    #_expect_single = _nsman
 
 
 class ManifestFilePath(ObjectPath):

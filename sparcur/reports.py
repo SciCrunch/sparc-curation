@@ -757,8 +757,8 @@ class Report:
                                if dataset_xml['type'] == 'all-xml-files'  # FIXME
                                for metadata_blob in dataset_xml['xml']
                                if metadata_blob['type'] in mbf_types and
-                               'contours' in metadata_blob['extracted']
-                               for c in metadata_blob['extracted']['contours']),
+                               'contours' in metadata_blob['contents']
+                               for c in metadata_blob['contents']['contours']),
                            key=key)
         header = [['id', 'name', 'metadata source', 'dataset']]
         if self.options.unique:

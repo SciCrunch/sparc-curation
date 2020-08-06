@@ -69,18 +69,16 @@ The dependency DAG is as follows.
 #+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
 <<racket-graph-helper>>
 (define g (dag-notation
-           fetch-all -> fetch-annotations
-           fetch-all -> fetch-metadata-files
+           fetch-all -> fetch-metadata-files -> pull -> sparse-materialize -> fetch-remote-metadata
+           fetch-all ->      fetch-files     -> pull -> clone
            fetch-all -> fetch-remote-metadata
-           fetch-metadata-files -> pull
-           pull -> sparse-materialize
-           sparse-materialize -> fetch-remote-metadata
-           pull -> clone))
+           fetch-all -> fetch-annotations
+))
 
 (graphviz g)
 #+end_src
 
-#+RESULTS[e29666f9fbc8046ebab291bb30916242ab20cfeb]: graph-retrieve-all
+#+RESULTS[5b1ab6330a12cfe55439af47a6bd717498fc6c7d]: graph-retrieve-all
 #+begin_src dot :file ./images/graph-retrieve-all.png :cmdline -Kdot -Tpng :exports results :cache yes
 digraph G {
 	node0 [label="fetch-metadata-files"];
@@ -90,20 +88,29 @@ digraph G {
 	node4 [label="pull"];
 	node5 [label="fetch-annotations"];
 	node6 [label="sparse-materialize"];
+	node7 [label="fetch-files"];
+	subgraph U {
+		edge [dir=none];
+	}
+
 	subgraph cluster_F {
         color=none;
         node2;
 	}
+
 	subgraph cluster_D {
         label="Dataset";
         color=green;
 		node0 -> node4;
+		node2 -> node7;
 		node2 -> node0;
 		node2 -> node3;
 		node4 -> node1;
 		node4 -> node6;
 		node6 -> node3;
+		node7 -> node4;
 	}
+
 	subgraph cluster_P {
         label="Protcur";
         color=purple;
@@ -112,8 +119,9 @@ digraph G {
 }
 #+end_src
 
-#+RESULTS[041cb032103aa97b8bf26a7397abce2271f685b5]:
+#+RESULTS[8febbedbaf66631abc1d1c9ed53915698665c236]:
 [[file:./images/graph-retrieve-all.png]]
+
 **** Bash implementation                                             :ignore:
 # FIXME this is really an env file not a bin file ...
 #+name: pipeline-functions
@@ -216,26 +224,29 @@ function sparcur-get-all-remote-data () {
     # need it to finish to set the PROJECT_PATH variable here
     echo python -m sparcur.simple.clone --project-id "${PROJECT_ID}" --parent-path "${PARENT_PATH}" "${maybe_slot[@]}"
     echo "Cloning top level"
+    set -o pipestatus
     PROJECT_PATH=$(python -m sparcur.simple.clone \
                           --project-id "${PROJECT_ID}" \
                           --parent-path "${PARENT_PATH}" \
                           "${maybe_slot[@]}" \
-                          > "${LOG_PATH}/clone.log" 2>&1) || {
+                          2>&1 | tee "${LOG_PATH}/clone.log" | tail -n 1) || {
         # TODO tee the output when verbose is passed
         CODE=$?;
         tail -n 100 "${LOG_PATH}/clone.log";
-        echo "Pull failed! The last 100 lines of ${LOG_PATH}/clone.log are listed above.";
+        echo "Clone failed! The last 100 lines of ${LOG_PATH}/clone.log are listed above.";
         apids=( "${pids[@]}" "${pids_final[@]}" );
         for pid in "${apids[@]}"; do
             kill $pid;
         done;
+        set +o pipefail
         return $CODE;
     }
+    set +o pipefail
 
     for pid in "${pids[@]}"; do
         wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
-    if [[ $FAIL -ne 0 ]]; then
+    if [[ $FAIL -ne 0 || -z "${PROJECT_PATH}" ]]; then
         echo "${FAIL} commands failed. Cannot continue."
         echo "${PROJECT_PATH}"
         return 1
@@ -243,6 +254,7 @@ function sparcur-get-all-remote-data () {
 
     # pull aka fetch file system metadata
     echo "Fetching file system metadata"
+    echo python -m sparcur.simple.pull --project-path "${PROJECT_PATH}"
     python -m sparcur.simple.pull \
            --project-path "${PROJECT_PATH}" \
            > "${LOG_PATH}/pull.log" 2>&1 || {
@@ -256,11 +268,26 @@ function sparcur-get-all-remote-data () {
     echo "Fetching metadata files"
     # have to pass project path as a position argument here so that it
     # does not try to pull aka fetch the file system metadata again
+    echo python -m sparcur.simple.fetch_metadata_files --project-path "${PROJECT_PATH}"
     python -m sparcur.simple.fetch_metadata_files \
            --project-path "${PROJECT_PATH}" \
            > "${LOG_PATH}/fetch-metadata-files.log" 2>&1 &
 
     pids_final[1]=$!
+
+    # fetch files
+    echo "Fetching files"
+    # XXX at some point this will probably also depend on the manifests
+    # so we don't fetch everything with a matching extension
+    # TODO derive --extension from manifests or all it to be passed in
+    echo python -m sparcur.simple.fetch_metadata_files --project-path "${PROJECT_PATH}" --extension xml
+    python -m sparcur.simple.fetch_files \
+           --project-path "${PROJECT_PATH}" \
+           --extension xml \
+           > "${LOG_PATH}/fetch-files.log" 2>&1 &
+
+    pids_final[2]=$!
+
     local FAIL=0
     for pid in "${pids_final[@]}"; do
         wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
@@ -517,7 +544,7 @@ if __name__ == '__main__':
 :END:
 ***** Clone
 This is an example of how to clone the top level of a project.
-See ref:simple-utils for a good way to instantiate =RemotePath=.
+See ref:utils.py for a good way to instantiate =RemotePath=.
 #+name: clone.py
 #+begin_src python :tangle ../sparcur/simple/clone.py
 from pathlib import Path
@@ -799,11 +826,11 @@ if __name__ == '__main__':
 # totally will overwrite the name and cause madness to ensue
 #+name: fetch_metadata_files.py
 #+begin_src python :tangle ../sparcur/simple/fetch_metadata_files.py
-from joblib import Parallel, delayed
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd
 from sparcur.paths import Path
 from sparcur.datasets import DatasetStructure
+from sparcur.simple.utils import fetch_paths_parallel
 
 # fetch metadata files
 fetch_prefixes = (
@@ -830,24 +857,7 @@ def _from_path_fetch_metadata_files_parallel(path, n_jobs=12):
     if not len(paths_to_fetch):
         log.warning('No paths to fetch, did you pull the file system metadata?')
 
-    def fetch(cache):
-        # lambda functions are great right up until you have to handle an
-        # error function inside of them ... thanks python for yet another
-        # failure to be homogenous >_<
-        meta = cache.meta
-        try:
-            size_mb = meta.size.mb
-        except AttributeError as e:
-            if meta.errors:
-                logd.debug(f'remote errors {meta.errors} for {cache!r}')
-                return
-            else:
-                raise e
-
-        return cache.fetch(size_limit_mb=size_mb + 1)
-
-    fetch_path = lambda path: fetch(path.cache)
-    Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths_to_fetch)
+    fetch_paths_parallel(paths_to_fetch, n_jobs=n_jobs)
 
 
 def from_path_fetch_metadata_files(path, n_jobs=12):
@@ -864,6 +874,82 @@ def main(path=Path.cwd(), n_jobs=12, **kwargs):
         path = pull(path=path, n_jobs=n_jobs, **kwargs)
 
     from_path_fetch_metadata_files(path, n_jobs=n_jobs)
+    return path
+
+
+if __name__ == '__main__':
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main)
+#+end_src
+****** File level metadata extraction
+Fetch files by extension.
+#+name: fetch_files.py
+#+begin_src python :tangle ../sparcur/simple/fetch_files.py
+import os
+from sparcur.paths import Path
+from sparcur.simple.utils import fetch_paths_parallel
+
+
+def _datasets_with_extension(path, extension):
+    """ Hack around the absurd slowness of python's rglob """
+
+    # TODO query multiple extensions with -o at the same time
+    command = fr"""for d in */; do
+    find "$d" \( -type l -o -type f \) -name '*.{extension}' \
+    -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
+done"""
+
+    with path:
+        with os.popen(command) as p:
+            string = p.read()
+
+    has_extension = string.split('\n')
+    datasets = [p for p in path.children if p.cache_id in has_extension]
+    return datasets
+
+
+def _from_path_fetch_files_simple(path, extensions, fetch=True):
+    cache = path.cache
+    if cache.is_organization():
+        paths = set()
+        for ext in extensions:
+            ds = _datasets_with_extension(path, ext)
+            paths.update(ds)
+
+    else:  # dataset_path
+        paths = path,
+
+    files = [matching  # FIXME stream ?
+             for path in paths
+             for ext in extensions
+             for matching in path.rglob(f'*.{ext}')]
+
+    if fetch:
+        [f.fetch(size_limit_mb=None) for f in files if not f.exists()]
+        #Async(rate=5)(deferred(f.fetch)(size_limit_mb=None)
+                      #for f in files if not f.exists())
+
+    return files
+
+
+def _from_path_fetch_files_parallel(path, extensions, n_jobs=12):
+    paths_to_fetch = _from_path_fetch_files_simple(path, extensions, fetch=False)
+    fetch_paths_parallel(paths_to_fetch, n_jobs=n_jobs)
+
+
+def from_path_fetch_files(path, extensions, n_jobs=12):
+    if n_jobs <= 1:
+        _from_path_fetch_files_simple(path, extensions)
+    else:
+        _from_path_fetch_files_parallel(path, extensions, n_jobs=n_jobs)
+
+
+def main(path=Path.cwd(), n_jobs=12, extensions=('xml',), **kwargs):
+    if path is None or path.find_cache_root() not in (path, *path.parents):
+        from sparcur.simple.pull import main as pull
+        path = pull(path=path, n_jobs=n_jobs, **kwargs)
+
+    from_path_fetch_files(path, extensions, n_jobs=n_jobs)
     return path
 
 
@@ -995,7 +1081,7 @@ if __name__ == '__main__':
 #+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes :exports none
 #+end_src
 *** _*Utils*_
-#+name: simple-utils
+#+name: utils.py
 #+begin_src python :tangle ../sparcur/simple/utils.py
 """Common command line options for all sparcur.simple modules
 Usage:
@@ -1007,19 +1093,19 @@ Options:
     --hypothesis-group-name=NAME    the hypotheis group name
 
     --project-id=ID                 the project id
-    --dataset-id=ID                 one or more datset ids
+    --dataset-id=<ID>...            one or more datset ids
     --project-id-auth-var=VAR       name of the auth variable holding the project-id
 
     --project-path=PATH             the project path, will be path if <path>... is empty
-    --parent-path=PATH              the parent path of the
+    --parent-path=PATH              the parent path where the project will be cloned to
     --parent-parent-path=PATH       parent in which a random tempdir is generated
                                     to be the parent path, don't use this ...
+    --extension=<EXT>...            one or more file extensions to fetch
 
     --jobs=N                        number joblib jobs [default: 12]
     --sparse-limit=N                package count that forces a sparse pull [default: 10000]
     --symlink-objects-to=PATH       path to an existing objects directory
 """
-
 
 from pyontutils import clifun as clif
 from sparcur.paths import Path, BlackfynnCache
@@ -1038,7 +1124,11 @@ class Options(clif.Options):
 
     @property
     def id(self):
-        return self.project_id if self.project_id else self.dataset_id
+        return (self.project_id
+                if self.project_id else
+                (self.dataset_id[0]
+                 if self.dataset_id else
+                 None))
 
     @property
     def jobs(self):
@@ -1071,13 +1161,17 @@ class Options(clif.Options):
             return Path(pp).expanduser().resolve()
 
     @property
+    def extensions(self):
+        return self.extension
+
+    @property
     def symlink_objects_to(self):
         slot = self._args['--symlink-objects-to']
         if slot:
             return Path(slot).expanduser()
 
     @property
-    def sparse_limit(self):
+    def sparse_limit(self):  # FIXME not being pulled in by asKwargs ??
         return int(self._args['--sparse-limit'])
 
 
@@ -1088,6 +1182,28 @@ def pipe_main(main, after=None, argv=None):
         after(out)
 
     return out
+
+
+def fetch_paths_parallel(paths, n_jobs=12):
+    from joblib import Parallel, delayed
+    def fetch(cache):
+        # lambda functions are great right up until you have to handle an
+        # error function inside of them ... thanks python for yet another
+        # failure to be homogenous >_<
+        meta = cache.meta
+        try:
+            size_mb = meta.size.mb
+        except AttributeError as e:
+            if meta.errors:
+                logd.debug(f'remote errors {meta.errors} for {cache!r}')
+                return
+            else:
+                raise e
+
+        return cache.fetch(size_limit_mb=size_mb + 1)
+
+    fetch_path = lambda path: fetch(path.cache)
+    Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths)
 #+end_src
 *** _*Test*_
 #+begin_src python :tangle ../test/simple/test_utils.py :mkdirp yes

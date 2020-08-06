@@ -305,13 +305,17 @@ class BlackfynnCache(PrimaryCache, EatCache):
         """ path level json metadata """
         # FIXME this is going to be very slow due to the local.cache call overhead
         # it will be much better implement this from Path directly using xattrs()
-        drp = self.local.relative_to(self.dataset.local)
+        d = self.dataset
+        _, bf_ds_id = d.id.split(':', 1)  # split off the N:
+        l = self.local
+        drp = l.relative_to(d.local)
         meta = self.meta  # TODO see what we need from this
-        N, bf_id = self.id.split(':', 1)  # FIXME SODA use case
+        _, bf_id = self.id.split(':', 1)  # FIXME SODA use case
         uri_api = self.uri_api  # FIXME vs self.uri_api_package ?
         uri_human = self.uri_human
         blob = {
             'type': 'path',
+            'dataset_id': bf_ds_id,
             'dataset_relative_path': drp,
             'uri_api': uri_api,  # -> @id in the @context
             'uri_human': uri_human,
@@ -327,7 +331,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
             # they contain
         }
 
-        mimetype = self.mimetype
+        mimetype = l.mimetype
         if mimetype:
             blob['mimetype'] = mimetype
 
@@ -346,17 +350,38 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     _cache_class = BlackfynnCache
 
+    _dataset_cache = {}
+
     @classmethod
     def fromJson(cls, blob):
-        # TODO check
+        # FIXME the problem here is that we can't distingish between cases where
+        # the original path was absolute, vs cases where we are embedding this data
+        # the the path was relative to start with
+        return blob
+
+        #return Path(blob['dataset_relative_path'])  # doesn't work, want full path
         if (hasattr(cls, '_cache_class') and
             hasattr(cls._cache_class, '_anchor') and
             cls._cache_class._anchor is not None):
-            l = cls._cache_class._anchor.local
+            a = cls._cache_class._anchor
+            #l = a.local
+            did = 'N:' + blob['dataset_id']
+            if did not in cls._dataset_cache:
+                cls._dataset_cache.update({c.id:c.local for c in a.children})
+
+            dataset_local = cls._dataset_cache[did]
             path_relative_string = blob['dataset_relative_path']
-            return l / path_relative_string
+            return dataset_local / path_relative_string
         else:
             return blob  # FIXME TODO
+
+    @property
+    def project_relative_path(self):
+        return self.relative_path_from(self._cache_class._anchor.local)
+
+    @property
+    def dataset_relative_path(self):
+        return self.relative_path_from(self.cache.dataset.local)
 
     @property
     def cache_id(self):
@@ -379,8 +404,15 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             return self._jsonMetadata()
 
     def _jsonMetadata(self, do_expensive_operations=False):
-        self = self.resolve()  # safety since we have to go hunting paths
+        # FIXME WARNING resolution only works if we were relative to
+        # the current working directory
+        if self.is_broken_symlink():
+            self = self.absolute()
+        else:
+            self = self.resolve()  # safety since we have to go hunting paths
+
         project_path = self.find_cache_root()
+
         if project_path is None:
             # FIXME TODO I think we used dataset_description as a hint?
             project_path = Path('/')  # FIXME FIXME
@@ -392,6 +424,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
         blob = {
             'type': 'path',
+            'dataset_id': dataset_path.cache_id,
             'dataset_relative_path': drp,
         }
 
@@ -402,6 +435,14 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         if do_expensive_operations:
             blob['magic_mimetype'] = asdf
 
+        if not (self.is_broken_symlink() or self.exists()):
+            msg = f'Path does not exist! {self}'
+            # do not log the error here, we won't have
+            # enough context to know where we got a bad
+            # path, but the caller should, maybe a case for
+            # inversion of control here
+            blob['errors'] = [{'message': msg}]
+
         return blob
 
     def pull(self, *args,
@@ -411,7 +452,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
              cache_anchor=None,
              log_name=None,
              log_level='INFO',
-             # pass the paralle in at run time if needed
+             # pass in Parallel in at run time if needed
              Parallel=None,
              delayed=None,
              _in_parallel=False,):

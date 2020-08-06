@@ -228,9 +228,21 @@ class HasErrors:
                 data['errors'] = el
 
 
-def lj(j):
+def lj(j, limit=100):
     """ use with log to format json """
-    return '\n' + json.dumps(j, indent=2, cls=JEncode)
+    out = '\n' + json.dumps(j, indent=2, cls=JEncode)
+    if out.count('\n') > limit + 3:
+        asdf = out.split('\n')
+        ninclude = limit // 2
+        head = asdf[:ninclude]
+        tail = asdf[-ninclude:]
+        # better to calculate explicitly given potential
+        # weirdness with // 2
+        nexcluded = len(asdf) - (len(head) + len(tail))
+        lines = head + [f'\n ... Skipping {nexcluded} lines ... \n'] + tail
+        return '\n'.join(lines)
+    else:
+        return out
 
 
 def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **kwargs):
@@ -269,6 +281,19 @@ def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **k
                 logd.error(msg)
         else:
             return {'errors': [error]}
+    except Exception as e:
+        log.critical(f'Unhandled exception {e} in {path}')
+        error = dict(error=e,
+                     pipeline_stage=stage.__class__.__name__,
+                     blame='stage',
+                     path=tuple(path))
+
+        if addError:
+            if addError(**error):
+                log.exception(e)
+                #logd.error(msg)
+        else:
+            return {'errors': [error]}
 
 
 def _json_identifier_expansion(obj, *args, **kwargs):
@@ -303,6 +328,15 @@ def json_identifier_expansion(obj, *args, path=None, **kwargs):
                'type': 'identifier',
                'system': obj.__class__.__name__,
                'errors': [{'message': msg, 'path': path}]}
+        return out
+    except Exception as e:
+        oops = json_export_type_converter(obj)
+        msg = f'Unhandled exception {e} in {path}'
+        out = {'id': obj,
+               'type': 'identifier',
+               'system': obj.__class__.__name__,
+               'errors': [{'message': msg, 'path': path}]}
+        log.critical(msg)
         return out
 
 
@@ -440,13 +474,15 @@ def zipeq(*iterables):
     try:
         gen = itertools.zip_longest(*iterables, fillvalue=sentinel)
     except TypeError as e:
-        raise TypeError(f'One of these is not iterable {iterables}') from e
+        msg = str(iterables)[:2000]
+        raise TypeError(f'One of these is not iterable {msg}') from e
 
     for zipped in gen:
         if sentinel in zipped:
+            msg = str(iterables)[:2000]
             raise exc.LengthMismatchError('Lengths do not match! '
                                           'Did you remember to box your function?\n'
-                                          f'{iterables}')
+                                          f'{msg}')
 
         yield zipped
 
@@ -631,6 +667,20 @@ class AtomicDictOperations:
             msg = f'target_path is not a list or tuple! {type(target_path)}'
             raise TypeError(msg)
 
+        if False and target_path == ['@context', '@base']:
+            # use to debug TargetPathExistsError issues
+            if '@tracker' not in data:
+                data['@tracker'] = []
+            try:
+                raise BaseException('tracker')
+            except BaseException as e:
+                data['@tracker'].append(e)
+
+            if '@context' in data and '@base' in data['@context']:
+                log.critical(f'target present {data["id"]}')
+            else:
+                log.critical(f'target not present {data["id"]}')
+
         target_prefixes = target_path[:-1]
         target_key = target_path[-1]
         target = data
@@ -663,8 +713,8 @@ class AtomicDictOperations:
         if update:
             pass
         elif fail_on_exists and target_key in target:
-            raise exc.TargetPathExistsError(f'A value already exists at path {target_path}\n'
-                                            f'{lj(data)}')
+            msg = f'A value already exists at path {target_path} in\n{lj(data)}'
+            raise exc.TargetPathExistsError(msg)
 
         target[target_key] = value
 
@@ -959,9 +1009,12 @@ class _DictTransformer:
 
                 cls.add(data,
                         ((tp, v) for tp, v in
-                         adops.apply(express_zip, target_paths,
+                         adops.apply(express_zip,
+
+                                     target_paths,
                                      adops.apply(defer_get, data, source_paths,
                                                  source_key_optional=source_key_optional),
+
                                      source_key_optional=source_key_optional,
                                      extra_error_types=(TypeError,),
                                      failure_value=tuple())
