@@ -281,6 +281,12 @@ class Options(clif.Options):
         return self._args['<project-id>'] or self._args['--project-id']
 
     @property
+    def project_path(self):
+        pp = self._args['--project-path']
+        if pp:
+            return Path(pp).expanduser().resolve()
+
+    @property
     def jobs(self):
         return int(self._args['--jobs'])
 

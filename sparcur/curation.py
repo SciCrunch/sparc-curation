@@ -619,7 +619,13 @@ _p.mkdir(exist_ok=True)  # FIXME XXXXXXXXXXXXXXXXXXXXXXXXXX
 def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
            evil=[False], dumb=False):
     """ sigh, pickles """
-    log_names = 'idlib', 'protcur', 'orthauth', 'ontquery', 'augpathlib', 'pyontutils'
+    log_names = ('sparcur',
+                 'idlib',
+                 'protcur',
+                 'orthauth',
+                 'ontquery',
+                 'augpathlib',
+                 'pyontutils')
     for log_name in log_names:
         log = logging.getLogger(log_name)
         if not log.handlers:
@@ -629,7 +635,6 @@ def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
         else:
             if log.level != log_level:
                 log.setLevel(log_level)
-            pass
 
     rc = d.path._cache_class._remote_class
     if not hasattr(rc, '_cache_anchor'):

@@ -1,3 +1,4 @@
+from datetime import datetime
 from urllib.parse import quote
 import idlib
 import rdflib
@@ -270,11 +271,17 @@ class TriplesExportDataset(TriplesExport):
         yield from self.triples_samples
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
-        if isinstance(v, int):
+        if not isinstance(v, str):
             #loge.critical('darn it max normlize your ids!')  # now caught by the schemas
-            v = str(v)
+            if isinstance(v, datetime):
+                # XXX datetime is a REALLy bad case because there is not a
+                # canonical representation
+                v = isoformat(datetime)
+            else:
+                v = str(v)
 
         v = quote(v, safe=tuple())
+
         s = rdflib.URIRef(self.dsid + '/subjects/' + v)
         return s
 

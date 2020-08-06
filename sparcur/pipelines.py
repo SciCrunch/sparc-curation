@@ -1597,6 +1597,7 @@ class ProtcurPipeline(Pipeline):
 
         return annos#[:5000]  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+    _logged_nn = set()
     @staticmethod
     def _annos_to_json(data, annos, sheets_lookup, Term):
         def partition(a):
@@ -1658,7 +1659,9 @@ class ProtcurPipeline(Pipeline):
                     # TODO
                     pass
             else:
-                log.critical(f'no working sheet for {at}')
+                if at not in ProtcurPipeline._logged_nn:
+                    ProtcurPipeline._logged_nn.add(at)
+                    log.critical(f'no working sheet for {at}')
 
             return ast
 

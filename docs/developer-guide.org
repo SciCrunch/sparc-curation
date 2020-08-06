@@ -121,12 +121,11 @@ digraph G {
 
 #+RESULTS[8febbedbaf66631abc1d1c9ed53915698665c236]:
 [[file:./images/graph-retrieve-all.png]]
-
 **** Bash implementation                                             :ignore:
 # FIXME this is really an env file not a bin file ...
-#+name: pipeline-functions
+#+name: pipeline-functions-sparc-get-all-remote-data
 #+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
-function sparcur-get-all-remote-data () {
+function sparc-get-all-remote-data () {
     # NOTE not quite all the remote data, the google sheets
     # don't have caching functionality yet
 
@@ -243,6 +242,16 @@ function sparcur-get-all-remote-data () {
     }
     set +o pipefail
 
+    # explicit export of the current project path for pipelines
+    # ideally we wouldn't need this, and when this pipeline
+    # finished the export pipeline would kick off, or the export
+    # pipeline would search for ... an existing project path ...
+    # by ... oh right, looking for an environment variable or
+    # checksing some other persistent state ... so this is the one
+    # unless some controlling process sets it top down from the start
+    # but we can't assume that
+    export SPARCUR_PROJECT_PATH="${PROJECT_PATH}"
+
     for pid in "${pids[@]}"; do
         wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
@@ -300,6 +309,7 @@ function sparcur-get-all-remote-data () {
 }
 #+end_src
 *** _*Validate*_
+**** Overview                                                        :ignore:
 This is the graph of the existing approach. A slightly more sane version
 is implemented above and tangled as =sparcur.simple=.
 
@@ -332,21 +342,23 @@ is implemented above and tangled as =sparcur.simple=.
                                                           manifest -> fetch-all
 
                            pipeline-extras -> submission-normalized -> submission
+                           pipeline-extras -> pipeline-files-xml -> cache -> fetch-all ; -> fetch-files
                            pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> sheets -> network
                                               contributors -> member #;state -> blackfynn-api -> network
                                               contributors -> description
-                           pipeline-extras -> meta-extra -> organ-term #;lifters -> organs-sheet -> sheets
+                           pipeline-extras -> meta-extra -> dataset-doi -> pipeline-remote-metadata -> cache ; -> fetch-remote-metadata
+                                              meta-extra -> dataset-remote-readme -> pipeline-remote-metadata
+                                              meta-extra -> dataset-remote-status -> pipeline-remote-metadata
+
+                                              meta-extra -> organ-term #;lifters -> organs-sheet -> sheets
                                               meta-extra -> modality #;lifters -> organs-sheet
                                               meta-extra -> techniques #;lifters -> organs-sheet
                                               meta-extra -> protocol-uris #;lifters -> organs-sheet
                                               meta-extra -> award-manual #;lifters -> organs-sheet
-                                              meta-extra -> dataset-doi -> blackfynn-api ; path.cache.remote.bfobject.doi ; what a hack :x
-                                              ; FIXME TODO this is how dataset-doi _should_ work
-                                              ; uncomment when it _actually_ works like this
-                                              ; meta-extra -> dataset-doi -> cache-remote-metadata -> fetch-all
-                                              meta-extra -> award-organ #; lifters -> submission-normalized
+                                              meta-extra -> award-organ #;lifters -> submission-normalized
                                                             award-organ -> scraped-award-organ
                            pipeline-extras -> pipeline-extras-updates -> identifier-resolution -> network
+                           pipeline-extras -> pipeline-protcur -> cache ; -> fetch-annotations
            ??? -> overview-sheet -> sheets))
 
 ;; subgraphs
@@ -485,8 +497,52 @@ digraph G {
 
 #+RESULTS[20008f92af2cbbe5a5aa89221885829ea3bd0f11]: graph-validate-all-dot
 [[file:./images/graph-validate-all.png]]
-
+**** ??? implementation                                              :ignore:
 *** _*Export*_
+**** Overview                                                        :ignore:
+In the current implementation validation and export are conflated.
+This is bad, and will be changed.
+
+=spc export= must only be run after =sparc-get-all-remote-data=,
+otherwise there will be network sandbox violations.
+
+For the record there are multiple way invoke =spc export=.
+#+begin_src bash :eval never
+# pushd to the project location
+pushd "${PROJECT_PATH:-SPARCUR_PROJECT_PATH}"
+spc export
+popd
+# pass the project location as a positional argument
+spc export "${PROJECT_PATH:-SPARCUR_PROJECT_PATH}"
+# pass the project location as an option
+spc export --project-path "${PROJECT_PATH:-SPARCUR_PROJECT_PATH}"
+#+end_src
+
+At the moment =sparc-export-all= is just a wrapper around =spc export=.
+This will change as we move to a single dataset export model. There
+will then likely be a function that checks for datasets that have
+changed since last export, updates only those and then collects the
+outputs.
+**** Bash implementation                                             :ignore:
+#+name: pipeline-functions-sparc-export-all
+#+begin_src bash :tangle ../bin/pipeline-functions.sh
+function sparc-export-all () {
+    # parse args
+    local POSITIONAL=()
+    while [[ $# -gt 0 ]]
+    do
+    key="$1"
+    case $key in
+        --project-path) local PROJECT_PATH="${2}"; shift; shift ;;
+        -h|--help)      echo "${HELP}"; return ;;
+        ,*)              POSITIONAL+=("$1"); shift ;;
+    esac
+    done
+
+    local PROJECT_PATH="${PROJECT_PATH:-$SPARCUR_PROJECT_PATH}"
+    spc export --project-path "${PROJECT_PATH}"
+}
+#+end_src
 ** Single dataset
 *** _*Retrieve*_
 **** Overview                                                        :ignore:
@@ -499,6 +555,47 @@ python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
 #+end_src
 *** _*Validate*_
 *** _*Export*_
+** Protocols
+#+name: graph-protocols
+#+header: :wrap "src dot :file ./images/graph-protocols.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g (dag-notation
+           export-protcur -> pipeline-protcur -> cache-annotations -> fetch-annotations
+                             pipeline-protcur -> fetch-protocols-io -> network
+                             ; FIXME fetching the protocols.io metadata is a major network sandbox violation
+                             ; ideally we can untangle this, but it is difficult, also issues with how we
+                             ; are caching put this at risk of going stale
+))
+
+(graphviz g)
+#+end_src
+
+#+RESULTS[aaeaed353b6b51181c18cdb722696d821a27f63f]: graph-protocols
+#+begin_src dot :file ./images/graph-protocols.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="fetch-protocols-io"];
+	node1 [label="pipeline-protcur"];
+	node2 [label="network"];
+	node3 [label="cache-annotations"];
+	node4 [label="export-protcur"];
+	node5 [label="fetch-annotations"];
+	subgraph U {
+		edge [dir=none];
+	}
+	subgraph D {
+		node0 -> node2;
+		node1 -> node3;
+		node1 -> node0;
+		node3 -> node5;
+		node4 -> node1;
+	}
+}
+#+end_src
+
+#+RESULTS[e419d8438b4609bab73327984f217d394a78f995]:
+[[file:./images/graph-protocols.png]]
+
 * Internal Structure
 :PROPERTIES:
 :header-args: :comments link :exports code
@@ -945,6 +1042,7 @@ def from_path_fetch_files(path, extensions, n_jobs=12):
 
 
 def main(path=Path.cwd(), n_jobs=12, extensions=('xml',), **kwargs):
+    #breakpoint()  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.pull import main as pull
         path = pull(path=path, n_jobs=n_jobs, **kwargs)
