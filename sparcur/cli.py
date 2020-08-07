@@ -36,8 +36,8 @@ Usage:
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
-    spc show     [schemas rmeta protcur (export [json ttl])] [options] [<project-id>]
-    spc show     protcur  [json ttl]                         [options]
+    spc show     [schemas rmeta (export [json ttl])]  [options] [<project-id>]
+    spc show     protcur  [json ttl]                  [options]
     spc sheets   [update] [options] <sheet-name>
 
 Commands:

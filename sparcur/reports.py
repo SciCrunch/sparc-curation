@@ -1099,12 +1099,13 @@ class Report:
                                  title=f'MIS predicates',
                                  ext=ext)
 
-    @sheets.AnnoTags.makeReportSheet()
+    @sheets.AnnoTags.makeReportSheet('uri')
     def protocols(self, ext=None):
         def tp(i):
             """ not pio at all """
             try:
-                return idlib.Pio(i)
+                if i is not None:
+                    return idlib.Pio(i)
             except idlib.exc.MalformedIdentifierError:
                 return i
 
@@ -1112,8 +1113,27 @@ class Report:
             """ can't figure out the integer id """
             try:
                 return i.uri_api_int
-            except (AttributeError, idlib.exc.MalformedIdentifierError) as e:
+            except (AttributeError,
+                    idlib.exc.MalformedIdentifierError,
+                    idlib.exc.RemoteError) as e:
                 return i
+
+        def th(i):
+            try:
+                return i.uri_human
+            except (AttributeError,
+                    idlib.exc.MalformedIdentifierError,
+                    idlib.exc.RemoteError) as e:
+                pass
+
+        def do_deref(d):
+            r = d.dereference()
+            if r != d.asUri():
+                return r
+            #try:
+            #chain = d._resolution_chain_responses(d.identifier_actionable)
+            #except (idlib.exc.ResolutionError, idlib.exc.RemoteError) as e:
+            #log.exception(e)
 
         blob_data = self._data_ir(org_id=self.options.project_id)
         collect = []
@@ -1127,8 +1147,8 @@ class Report:
         blob_dataset = None  # no longer needed and repr issues
         collect = sorted(set(collect), key=lambda i: str(i))
         dois = [c for c in collect if isinstance(c, idlib.Doi)]
-        deref = Async()(deferred(d.dereference)() for d in dois)
-        dios = [ti(tp(u)) for u in deref]
+        deref = Async()(deferred(do_deref)(d) for d in dois)
+        dios = [ti(tp(u)) if u is not None else d for d, u in zip(dois, deref)]
 
         pios = [c for c in collect if isinstance(c, idlib.Pio)]
         pints = [ti(p) for p in pios]
@@ -1146,10 +1166,95 @@ class Report:
         both = from_hypothesis & from_datasets
         only_hyp = from_hypothesis - from_datasets
         only_dat = from_datasets - from_hypothesis
+        either = from_hypothesis | from_datasets
         hrm = [(len(s), [d.identifier if hasattr(d, 'identifier') else d for d in s])
                for s in (both, only_hyp, only_dat)]
-        header = [['uri', 'uri_human', 'doi', 'access']]
-        breakpoint()
-        return self._print_table(header + rows,
+        header = [['uri',
+                   'uri_human',
+                   'doi',
+                   'exists',
+                   'access',
+                   'count annos',
+                   'count protcur',
+                   'is protocols.io'
+                   'from datasets',
+                   'from hypothes.is',
+                   'from protocols.io']]
+        li = list(either)
+        rows = []
+        # FIXME probably better to do this by checking if we have a record of this in protocols first
+        for i in li:
+            access = False
+            exists = False
+            is_pio = False
+            if isinstance(i, idlib.Stream):
+                is_pio = isinstance(i, idlib.Pio)
+                uri = i
+                uri_human = th(i)
+                try:
+                    if isinstance(i, idlib.Doi):
+                        doi = i
+                        i.data()
+                    else:
+                        doi = i.doi
+                        exists = True
+                        access = True
+                except idlib.exc.NotAuthorizedError:
+                    exists = True
+                    doi = None
+                except idlib.exc.RemoteError:
+                    doi = None
+            else:
+                uri = idlib.Uri(i)
+                uri_human = None
+                if i in dios:
+                    exists = bool(deref[dios.index(i)])
+                    doi = dois[dios.index(i)]
+                    access = exists
+                    #if not exists:  # need the uris as a backstop for ident
+                        #uri = None
+                else:
+                    doi = None
+                    try:
+                        uri._resolution_chain_responses(uri.identifier_actionable)
+                        access = exists = True
+                    except idlib.exc.ResolutionError:
+                        pass
+
+            if i in from_hypothesis:
+                protocol = protocols[uios.index(i)]
+                n_annos = protocol['anno_count']
+                n_protcur = protocol['protcur_anno_count']
+                if uri_human is None and 'uri_human' in protocol:
+                    uri_human = protocol['uri_human']
+
+            row = [
+                uri,
+                uri_human,
+                doi,
+                exists,
+                access,
+                n_annos,
+                n_protcur,
+                is_pio,
+                i in from_datasets,
+                i in from_hypothesis,
+                False,
+            ]
+
+            rows.append(row)
+
+        def sk(r):
+            return (
+                r[3],
+                r[4],
+                r[2] is not None, r[2],
+                r[1] is not None, r[1],
+                r[0] is not None, r[0],
+            )
+
+        srows = sorted(rows, key=sk)
+
+        return self._print_table(header + srows,
                                  title=f'Protocol report',
                                  ext=ext)

@@ -1704,6 +1704,8 @@ class ProtcurPipeline(Pipeline):
 
         #data['TEMP:hasNumberOfProtcurAnnotations'] = len(anp)
         data['protcur_anno_count'] = len(anp)
+        data['other_anno_count'] = len(na)
+        data['anno_count'] = len(annos)
 
         tpn = (
                 ('ilxtr:technique', 'TEMPRAW:protocolEmploysTechnique'),
@@ -1859,6 +1861,8 @@ class ProtcurPipeline(Pipeline):
                             data['uri_human'] = orig_pio
                     except idlib.exc.RemoteError as e:  # FIXME network sandbox violation
                         logd.exception(e)
+                        if not orig_pio.identifier.is_int():
+                            data['uri_human'] = orig_pio
 
         sheets_lookup = self._sheets_lookup()
         annos, idints, pidints = self._idints()
@@ -1890,6 +1894,7 @@ class ProtcurPipeline(Pipeline):
             except idlib.exc.RemoteError as e:  # FIXME network sandbox violation
                 urih(data, pio)
                 if 'uri_human' not in data:
+                    # FIXME Pio progenitor klobbering
                     log.error(f'No uri_human for {pio.asStr()}')
                     # TODO embed error status
                     #annos = None
