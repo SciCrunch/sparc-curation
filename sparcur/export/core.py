@@ -6,7 +6,7 @@ from socket import gethostname
 from itertools import chain
 from collections import Counter
 import idlib
-import requests
+#import requests  # import time hog
 from pyontutils.core import OntGraph, populateFromJsonLd
 from pyontutils.utils import Async, deferred
 from sparcur import export as ex
@@ -536,6 +536,7 @@ class Export(ExportBase):
                 blob_id_met = json.load(f)
 
         else:
+            import requests
             def fetch(id):  # FIXME error proof version ...
                 try:
                     metadata = id.metadata()

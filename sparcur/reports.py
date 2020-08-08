@@ -879,8 +879,8 @@ class Report:
                     log.error(e)
                     continue
 
-                if isinstance(hrm.black_box, pyru.Term):
-                    autos.add(hrm.black_box)
+                if isinstance(hrm._value, pyru.Term):
+                    autos.add(hrm._value)
 
                 continue
 
@@ -922,7 +922,7 @@ class Report:
             invar = next(next(input.children).children)
             paramparser = pyru.ParamParser()
             param = invar.parameter()
-            if isinstance(param, ParameterValue):  # FIXME how the heck ...
+            if isinstance(param, ParameterValue):  # FIXME how the heck ... it was a hack in analysis iirc
                 tv = param.v
             else:
                 tv = racket.sexp(param)[1]
@@ -981,7 +981,7 @@ class Report:
                     nk = value_to_key[v]
                     hrmd[nk].extend(hrmd.pop(k))
 
-        if 'protc:input' in tags:
+        if 'protc:input' in tags or 'protc:black-box' in tags or 'protc:black-box-component':
             return self._protc_input(hrmd, tags, protc, ext)
 
         def more(k, v):
@@ -1099,7 +1099,7 @@ class Report:
                                  title=f'MIS predicates',
                                  ext=ext)
 
-    @sheets.AnnoTags.makeReportSheet('uri')
+    @sheets.Reports.makeReportSheet('uri')
     def protocols(self, ext=None):
         def tp(i):
             """ not pio at all """
@@ -1176,7 +1176,7 @@ class Report:
                    'access',
                    'count annos',
                    'count protcur',
-                   'is protocols.io'
+                   'is protocols.io',
                    'from datasets',
                    'from hypothes.is',
                    'from protocols.io']]

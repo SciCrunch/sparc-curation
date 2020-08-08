@@ -1143,8 +1143,13 @@ class _DictTransformer:
                     if isinstance(pc, object):
                         pi, pc = pc, pc.__class__
 
-                    __file = inspect.getsourcefile(pc)
-                    __line = inspect.getsourcelines(pc)[-1]
+                    try:
+                        __file = inspect.getsourcefile(pc)
+                        __line = ' line ' + inspect.getsourcelines(pc)[-1]
+                    except TypeError as e2:
+                        __file = f'<Thing that is not defined in a file: {pc}>'
+                        __line = ''
+
                     if hasattr(p, 'path'):
                         __path = f'"{p.path}"'
                     else:
@@ -1152,7 +1157,7 @@ class _DictTransformer:
 
                     raise exc.SubPipelineError(
                         f'Error while processing {p}.data for\n{__path}\n'
-                        f'{__file} line {__line}') from e
+                        f'{__file}{__line}') from e
 
             else:
                 p.data  # trigger the pipeline since it is stateful

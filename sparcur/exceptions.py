@@ -157,3 +157,7 @@ class NetworkSandboxError(SparCurError):
 class PreviewModeError(SparCurError):
     """ sparcur is running in preview mode and code
         tried to access some non-preview resource """
+
+
+class StopTheWorld(SparCurError):
+    """ stop everything we are in a state of pure madness """

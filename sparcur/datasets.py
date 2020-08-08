@@ -4,7 +4,7 @@ import copy
 from types import GeneratorType
 from itertools import chain
 from collections import Counter
-import openpyxl
+#import openpyxl  # import time hog
 import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
@@ -433,6 +433,25 @@ ObjectPath._bind_flavours()
 
 class Tabular(HasErrors):
 
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        # wouldn't it be great if you could bind tabular
+        # to _CLASS=Tabular in new and then not have to
+        # change the contents of the code and risk difficult
+        # to debug copy/paste errors ? LOL PYTHON sigh
+        Tabular._setup(*args, **kwargs)
+        Tabular.__new__ = Tabular._renew
+        return super().__new__(cls)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        import openpyxl
+        Tabular._openpyxl = openpyxl
+
     def __init__(self, path, rotate=False):
         super().__init__()
         self.path = path
@@ -547,7 +566,7 @@ class Tabular(HasErrors):
             raise exc.NoDataError(f'{self.path}') from e2
 
     def xlsx2(self):
-        wb = openpyxl.load_workbook(self.path)
+        wb = self._openpyxl.load_workbook(self.path)
         sheet = wb.get_active_sheet()
         for row in sheet.rows:
             yield [cell.value for cell in row]

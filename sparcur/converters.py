@@ -186,7 +186,9 @@ class ContributorConverter(TripleConverter):
 ContributorConverter.setup()
 
 class DatasetContributorConverter(TripleConverter):
-    known_skipped = 'id', 'contributor_name', 'first_name', 'last_name'
+    """ dataset <-> contributor mapping """
+    known_skipped = ('id', 'contributor_name', 'first_name', 'last_name',
+                     'contributor_orcid_id', 'contributor_affiliation', 'blackfynn_user_id')
 
     mapping = (
         ('is_contact_person', sparc.isContactPerson),
@@ -197,6 +199,7 @@ class DatasetContributorConverter(TripleConverter):
         return TEMP.hasRole, TEMP[value]
 
 DatasetContributorConverter.setup()
+
 
 class MetaConverter(TripleConverter):
     mapping = [
@@ -368,6 +371,16 @@ performance_related = [
     # TODO execution -> performance
     ['experiment_number', TEMP.localExecutionNumber],  # FIXME TODO
     ['session', TEMP.localExecutionNumber],
+
+    #['protocol_title']  # skip, but maybe cross reference the metadata?
+
+    # participant in performance of basically translates to
+    # there is a technique specified by this protocol and this subject
+    # was a primary participant in an instance of that technique
+    # the only question is whether we should assert that it is the
+    # primary particiant in the protocol or not, I'm guessing no?
+    ['protocol_url_or_doi', TEMP.participantInPerformanceOf],
+
 ]
 
 utility = [
@@ -375,6 +388,7 @@ utility = [
     ['note', TEMP.providerNote],
 ]
 class SubjectConverter(TripleConverter):
+    known_skipped = 'protocol_title',
     mapping = [
         ['subject_id', TEMP.localId],
         ['ear_tag_number', TEMP.localIdAlt],
@@ -392,6 +406,7 @@ class SubjectConverter(TripleConverter):
         ['initial_weight', sparc.animalSubjectHasWeight],  # TODO time
         ['mass', sparc.animalSubjectHasWeight],
         ['body_mass', sparc.animalSubjectHasWeight],  # TODO
+        ['body_weight', sparc.animalSubjectHasWeight],
         ['height_inches', TEMP.subjectHasHeight],  # FIXME converted in datasets sigh
         ['sex', TEMP.hasBiologicalSex],
         ['gender', sparc.hasGender],
@@ -424,6 +439,7 @@ SubjectConverter.setup()
 
 
 class SampleConverter(TripleConverter):
+    known_skipped = 'protocol_title',
     mapping = [
         ['sample_id', TEMP.localId],  # unmangled
         #['subject_id', TEMP.wasDerivedFromSubject],

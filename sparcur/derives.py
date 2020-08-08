@@ -100,7 +100,7 @@ class Derives:
             pass
 
     @staticmethod
-    def _lift_mr(path_dataset, dataset_relative_path, record):
+    def _lift_mr(path_dataset, dataset_relative_path, record, should_log):
         parent = dataset_relative_path.parent
         record_drp = parent / record['filename']
 
@@ -129,7 +129,9 @@ class Derives:
             if he.addError(message,
                            blame='submission',
                            path=_record_path):
-                logd.error(message)
+                if should_log:
+                    should_log = False
+                    logd.error(message)
 
             he.embedErrors(lifted)
 
@@ -143,7 +145,7 @@ class Derives:
             # FIXME currently a string, either change name or make a list?
             lifted['mimetype'] = record['additional_types']
 
-        return lifted
+        return lifted, should_log
 
     @staticmethod
     def _scaffolds(lifted, scaffolds):
@@ -171,8 +173,10 @@ class Derives:
                 contents = manifest['contents']
                 if 'manifest_records' in contents:
                     drp = manifest['dataset_relative_path']
+                    _should_log = True
                     for record in contents['manifest_records']:
-                        lifted = cls._lift_mr(path_dataset, drp, record)
+                        lifted, _should_log = cls._lift_mr(
+                            path_dataset, drp, record, _should_log)
                         path_metadata.append(lifted)
                         if 'errors' not in lifted:
                             cls._scaffolds(lifted, scaffolds)

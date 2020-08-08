@@ -3,7 +3,6 @@ import logging
 from socket import gethostname
 from functools import wraps
 import idlib
-from joblib import Parallel, delayed
 from pyontutils.utils import byCol as _byCol, Async, deferred, makeSimpleLogger
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
@@ -582,6 +581,7 @@ class Summary(Integrator, ExporterSummarizer):
             ca = self.path._cache_class._remote_class._cache_anchor
 
             if not self._debug and self._n_jobs > 1:  # yes debug masks jobs for now
+                from joblib import Parallel, delayed
                 # this flies with no_google, so something is up with
                 # the reserialization of the Sheets classes I think
                 # FIXME I suspect that the major bottleneck here is deserialization

@@ -274,9 +274,9 @@ class TriplesExportDataset(TriplesExport):
         if not isinstance(v, str):
             #loge.critical('darn it max normlize your ids!')  # now caught by the schemas
             if isinstance(v, datetime):
-                # XXX datetime is a REALLy bad case because there is not a
+                # XXX datetime is a REALLY bad case because there is not a
                 # canonical representation
-                v = isoformat(datetime)
+                v = isoformat(v)
             else:
                 v = str(v)
 

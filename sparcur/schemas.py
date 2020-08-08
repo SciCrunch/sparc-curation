@@ -76,6 +76,7 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
 
     #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
     'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
+    'hyp-protcur': {'@id': 'https://uilx.org/tgbugs/u/hypothesis/protcur/', '@prefix': True},
     #'sparcur': {'@id': 'https://uilx.org/tgbugs/u/sparcur/', '@prefix': True},
     #'aspect': {'@id': 'https://uilx.org/tgbugs/u/aspect/', '@prefix': True},
     'aspect-raw': {'@id': 'https://uilx.org/tgbugs/u/aspect-raw/', '@prefix': True},

@@ -1048,6 +1048,12 @@ class SPARCBIDSPipeline(JSONPipeline):
     def data(self):
         data = super().data
 
+        if 'folder_name' not in data['meta']:
+            # sentinel value to detect cases where the pipeline
+            # should not try to continue and should simply fail
+            log.critical(lj(data))
+            raise exc.StopTheWorld(f'Something has gone VERY wrong {data["id"]}')
+
         # dereference should happen here not at the end of PiplineStart
         # though harder to work backwards to the offending file right now
 
@@ -1099,8 +1105,11 @@ class PipelineExtras(JSONPipeline):
 
         [[THIS_PATH, ['inputs', 'manifest_file'], ['inputs', 'xml']],  # TODO
         De.path_metadata,  # XXX WARNING this goes back and hits the file system
-         [['path_metadata'], ['scaffolds']]
-         ],
+         [['path_metadata'], ['scaffolds']]],
+
+        [[['samples']],
+         De.samples_to_subjects,
+         [['subjects']]]
     )
 
     __mr_path = ['metadata_file', int, 'contents', 'manifest_records', int]
@@ -1739,6 +1748,9 @@ class ProtcurPipeline(Pipeline):
         norms = {
             'ilxtr:technique': normalize_tech,
 
+            'protc:black-box': normalize_node,
+            'protc:black-box-component': normalize_node,
+
             'protc:input': normalize_node,
             'protc:implied-input': normalize_node,
 
@@ -1802,7 +1814,7 @@ class ProtcurPipeline(Pipeline):
                     #if [v for v in vals if isinstance(v, str)]:
                         #breakpoint()
 
-                    data[pred] = ['protcur:' + v.prov.id
+                    data[pred] = ['hyp-protcur:' + v.prov.id
                                   if hasattr(v, 'prov') else
                                   v  # assume it is an id probably wrongly
                                   for v in vals]  # FIXME

@@ -1,6 +1,5 @@
 import idlib
 import rdflib
-import requests
 from idlib.cache import cache, COOLDOWN
 from orthauth.utils import QuietDict
 from pyontutils import combinators as cmb
@@ -129,6 +128,12 @@ class ProtocolData(dat.HasErrors):
         # what dataset is using it, >_<
         super().__init__(pipeline_stage=self.__class__)
 
+        # FIXME not clear we have to worry about this any more?
+        # but still annoying that there is no non-performance-destroying
+        # way to get just the exceptions and not anything else >_<
+        from requests.exceptions import MissingSchema
+        self._MissingSchema = MissingSchema
+
     def protocol(self, uri):
         return self._get_protocol_json(uri)
 
@@ -165,7 +170,7 @@ class ProtocolData(dat.HasErrors):
 
             except idlib.exceptions.ResolutionError as e:
                 pass  # FIXME I think we already log this error?
-            except requests.exceptions.MissingSchema as e:
+            except self._MissingSchema as e:
                 if self.addError(e, blame='submission'):
                     logd.error(e)
             except OntId.BadCurieError as e:

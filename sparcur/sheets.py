@@ -353,8 +353,8 @@ class WorkingAspectsImplied(AnnoTags):
             return 'asp:' + suffix.replace(' ', '-')
 
 
-class WorkingInputs(AnnoTags):
-    sheet_name = 'working-protc:input'
+class WorkingBlackBox(AnnoTags):
+    sheet_name = 'working-protc:black-box'
     index_columns = 'value',
 
     def map(self, anno):
@@ -364,6 +364,14 @@ class WorkingInputs(AnnoTags):
         bad_for_mapping = row.bad_for_mapping_().value
         if mapping_ok and not not_input:
             pass
+
+
+class WorkingBlackBoxComponent(AnnoTags):
+    sheet_name = 'working-protc:black-box-component'
+
+
+class WorkingInputs(WorkingBlackBox):
+    sheet_name = 'working-protc:input'
 
 
 class WorkingInputInstances(AnnoTags):
