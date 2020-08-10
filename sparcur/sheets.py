@@ -249,8 +249,14 @@ class AnnoTags(Reports):
             try:
                 row = getattr(index, value)().row
             except AttributeError as e:
-                # TODO
-                raise
+                try:
+                    # FIXME yes indeed the obscured rules for
+                    # when to downcase have come be to haunt us
+                    # this was filtering out countless potential matches
+                    row = getattr(index, value.lower())().row
+                except AttributeError as e:
+                    # TODO
+                    raise
 
         return row
 
@@ -293,6 +299,7 @@ class WorkingExecVerb(AnnoTags):
         bad = row.bad().value
         help__ = row.help__().value
         map_to = row.map_to().value
+        merge = row.merge().value
 
         if not (bad or help__):
             if map_to:
@@ -302,7 +309,11 @@ class WorkingExecVerb(AnnoTags):
                     suffix = map_to
             elif merge:
                 suffix = merge
+            else:
+                return  # FIXME error in this case?
 
+            #if suffix == 'anaesthetize':  # finally, was a case conversion issue
+                #breakpoint()
             return 'verb:' + suffix.replace(' ', '-')
 
 
@@ -359,14 +370,26 @@ class WorkingBlackBox(AnnoTags):
 
     def map(self, anno):
         row = self._annotation_row(anno)
-        mapping_ok = row.mapping_ok().value
+        mapping_ok = row.mapping_ok().value == 'TRUE'  # FIXME
         not_input = row.not_input_().value
         bad_for_mapping = row.bad_for_mapping_().value
+        manual_mapping = row.manual_mapping().value
         if mapping_ok and not not_input:
             pass
 
+        if manual_mapping and ' ' in manual_mapping:
+            log.error(f'Why does a manual mapping have a space in it {manual_mapping!r}')
 
-class WorkingBlackBoxComponent(AnnoTags):
+        elif manual_mapping:
+            return OntTerm(manual_mapping)
+
+        elif mapping_ok:  # FIXME anno.astValue can drift from auto_mapping
+            # this is so hilariously inefficient, we parse the same stuff
+            # 3 times or something
+            return OntTerm(anno.asPython().asPython().black_box.curie)
+
+
+class WorkingBlackBoxComponent(WorkingBlackBox):
     sheet_name = 'working-protc:black-box-component'
 
 

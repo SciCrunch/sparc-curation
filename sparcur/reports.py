@@ -1099,8 +1099,7 @@ class Report:
                                  title=f'MIS predicates',
                                  ext=ext)
 
-    @sheets.Reports.makeReportSheet('uri')
-    def protocols(self, ext=None):
+    def _get_protocol_ids(self):
         def tp(i):
             """ not pio at all """
             try:
@@ -1117,14 +1116,6 @@ class Report:
                     idlib.exc.MalformedIdentifierError,
                     idlib.exc.RemoteError) as e:
                 return i
-
-        def th(i):
-            try:
-                return i.uri_human
-            except (AttributeError,
-                    idlib.exc.MalformedIdentifierError,
-                    idlib.exc.RemoteError) as e:
-                pass
 
         def do_deref(d):
             r = d.dereference()
@@ -1152,7 +1143,7 @@ class Report:
 
         pios = [c for c in collect if isinstance(c, idlib.Pio)]
         pints = [ti(p) for p in pios]
-        pstrs = [p.asStr() for p in pints]
+        pstrs = [p.asStr() for p in pints if p is not None]
         from_datasets = set(pints) | set(dios)
 
         blob_protcur = self._protcur()
@@ -1169,6 +1160,21 @@ class Report:
         either = from_hypothesis | from_datasets
         hrm = [(len(s), [d.identifier if hasattr(d, 'identifier') else d for d in s])
                for s in (both, only_hyp, only_dat)]
+        return either, uios, dois, dios, deref, from_datasets, from_hypothesis, protocols
+
+    @sheets.Reports.makeReportSheet('uri')
+    def protocols(self, ext=None):
+        def th(i):
+            try:
+                return i.uri_human
+            except (AttributeError,
+                    idlib.exc.MalformedIdentifierError,
+                    idlib.exc.RemoteError) as e:
+                pass
+
+        (either, uios, dois, dios, deref, from_datasets,
+         from_hypothesis, protocols) = self._get_protocol_ids()
+
         header = [['uri',
                    'uri_human',
                    'doi',
@@ -1184,6 +1190,8 @@ class Report:
         rows = []
         # FIXME probably better to do this by checking if we have a record of this in protocols first
         for i in li:
+            if i is None:
+                raise TypeError('sigh')
             access = False
             exists = False
             is_pio = False
@@ -1227,6 +1235,9 @@ class Report:
                 n_protcur = protocol['protcur_anno_count']
                 if uri_human is None and 'uri_human' in protocol:
                     uri_human = protocol['uri_human']
+            else:
+                n_annos = 0
+                n_protcur = 0
 
             row = [
                 uri,

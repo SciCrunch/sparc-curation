@@ -75,11 +75,17 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'label': 'rdfs:label',
 
     #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
-    'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
-    'hyp-protcur': {'@id': 'https://uilx.org/tgbugs/u/hypothesis/protcur/', '@prefix': True},
+
+    #'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
+    #'hyp-protcur': {'@id': 'https://uilx.org/tgbugs/u/hypothesis/protcur/', '@prefix': True},
+
     #'sparcur': {'@id': 'https://uilx.org/tgbugs/u/sparcur/', '@prefix': True},
     #'aspect': {'@id': 'https://uilx.org/tgbugs/u/aspect/', '@prefix': True},
-    'aspect-raw': {'@id': 'https://uilx.org/tgbugs/u/aspect-raw/', '@prefix': True},
+
+    #'aspect-raw': {'@id': 'https://uilx.org/tgbugs/u/aspect-raw/', '@prefix': True},
+
+    #'verb': {'@id': 'https://uilx.org/tgbugs/u/executor-verb/', '@prefix': True},
+
     'fuzzy': {'@id': 'https://uilx.org/tgbugs/u/fuzzy-quantity/', '@prefix': True},
 
     'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},

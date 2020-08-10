@@ -126,7 +126,7 @@ class TripleConverter(dat.HasErrors):
                             if 'synonyms' in d:  # FIXME yield from o.synonyms(s)
                                 for syn in d['synonyms']:
                                     yield s, NIFRID.synonym, rdflib.Literal(syn)
-                        except idlib.exceptions.ResolutionError:
+                        except idlib.exc.ResolutionError:
                             pass
 
                     elif isinstance(o, ProtcurExpression) or isinstance(o, Quantity):
@@ -159,7 +159,7 @@ class TripleConverter(dat.HasErrors):
 
 
 class ContributorConverter(TripleConverter):
-    known_skipped = 'id', 'contributor_name'
+    known_skipped = 'id', 'contributor_name', 'is_contact_person', 'contributor_role'
     mapping = (
         ('first_name', sparc.firstName),
         ('middle_name', TEMP.middleName),
@@ -203,6 +203,7 @@ DatasetContributorConverter.setup()
 
 class MetaConverter(TripleConverter):
     mapping = [
+        ['template_schema_version', TEMP.hasDatasetTemplateSchemaVersion],
         ['acknowledgements', TEMP.acknowledgements],
         ['folder_name', rdfs.label],
         ['title', dc.title],
@@ -222,6 +223,8 @@ class MetaConverter(TripleConverter):
         ['subject_count', TEMP.hasNumberOfSubjects],
         ['sample_count', TEMP.hasNumberOfSamples],
         ['contributor_count', TEMP.hasNumberOfContributors],
+        ['number_of_subjects', TEMP.hasExpectedNumberOfSubjects],
+        ['number_of_samples', TEMP.hasExpectedNumberOfSamples],
 
         ['title_for_complete_data_set', TEMP.collectionTitle],
         ['prior_batch_number', TEMP.Continues],  # see datacite relationType
@@ -231,9 +234,10 @@ class MetaConverter(TripleConverter):
         ['timestamp_updated', TEMP.wasUpdatedAtTime],
         ['timestamp_updated_contents', TEMP.contentsWereUpdatedAtTime],
 
+        ['funding', TEMP.hasAdditionalFundingInformation],
+        ['completeness_of_data_set', TEMP.completenessOfDataset],
         # TODO
         #['additional_links', ],
-        #['completeness_of_data_set', ],
         #['examples'],
         #['links'],
 
@@ -347,12 +351,20 @@ class SubmissionConverter(TripleConverter):
 SubmissionConverter.setup()
 
 class StatusConverter(TripleConverter):
-    known_skipped = 'submission_errors', 'curation_errors'
+    known_skipped = 'submission_errors', 'curation_errors', 'unclassified_errors'
     mapping = [
+        #['status_on_platform', TEMP.statusOnPlatform],  # FIXME this may come out as a json blob that is a list
+        ['unclassified_stages', TEMP.unclassifiedStages],  # curation internal
+        ['unclassified_index', TEMP.unclassifiedIndex],  # curation internal
         ['submission_index', TEMP.submissionIndex],
         ['curation_index', TEMP.curationIndex],
         ['error_index', TEMP.errorIndex],
     ]
+    def status_on_platform(self, value):
+        # FIXME should probably be implemented in extras and
+        # we should yield all the records under TEMP.hasStatusHistory
+        # but at the moment it is just a single blob not the whole list
+        return TEMP.statusOnPlatform, rdflib.Literal(value['status']['name'])
 StatusConverter.setup()
 
 file_related = [
@@ -365,7 +377,9 @@ file_related = [
     ['filename', TEMP.hasDigitalArtifactThatIsAboutIt],  #
     ['upload_filename', TEMP.hasDigitalArtifactThatIsAboutIt],
     ['dataset_id', TEMP.providerDatasetIdentifier],  # FIXME need a global convention for this
+    ['experimental_log_file_name', TEMP.hasDigitalArtifactThatIsAboutIt],  # FIXME maybe more specific
     ]
+
 performance_related = [
 
     # TODO execution -> performance
@@ -379,32 +393,54 @@ performance_related = [
     # was a primary participant in an instance of that technique
     # the only question is whether we should assert that it is the
     # primary particiant in the protocol or not, I'm guessing no?
+    # also until we can resolve the subjects from samples sheets issue
+    # this is going to remain an issue
     ['protocol_url_or_doi', TEMP.participantInPerformanceOf],
-
 ]
 
 utility = [
     ['comment', TEMP.providerNote],
     ['note', TEMP.providerNote],
 ]
-class SubjectConverter(TripleConverter):
-    known_skipped = 'protocol_title',
-    mapping = [
-        ['subject_id', TEMP.localId],
-        ['ear_tag_number', TEMP.localIdAlt],
-        ['age_category', TEMP.hasAgeCategory],
+
+subject_ambiguous = [
+        # ambiguous fields that cannot be distingished between subject and sample with certainty
         ['experimental_group', TEMP.hasAssignedGroup],
         ['group', TEMP.hasAssignedGroup],
         ['treatment', TEMP.TODO],
+
+        ['genotype', TEMP.hasGenotype],  # ambiguous, cell samples can have a genotype
+        ['weight', sparc.animalSubjectHasWeight],  # ambig
+        ['initial_weight', sparc.animalSubjectHasWeight],  # TODO time  # ambig
+        ['mass', sparc.animalSubjectHasWeight],  # ambig
+
+        ['nerve', TEMPRAW.involvesAnatomicalRegion],  # FIXME we can be more specific than this probably
+        ['stimulation_site', sparc.spatialLocationOfModulator],  # TODO ontology
+        ['stimulator', sparc.stimulatorUtilized],
+        ['stimulating_electrode_type', sparc.stimulatorUtilized],  # FIXME instance vs type
+
+        #require extras
+        ['experiment_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
+        # could be the injection date for a particular sample rather than the subject
+        ['injection_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
+        ['date_of_injection', TEMP.protocolExecutionDate],
+]
+
+
+class SubjectConverter(TripleConverter):
+    known_skipped = 'protocol_title',
+    always_subject = [
+        ['subject_id', TEMP.localId],
+        ['ear_tag_number', TEMP.localIdAlt],
+        ['age_category', TEMP.hasAgeCategory],
+        ['pool_id', TEMP.hasPoolId],  # FIXME pools need to be lifted into their own thing
+
         #['rrid_for_strain', rdf.type],  # if only
         ['rrid_for_strain', sparc.specimenHasIdentifier],  # really subClassOf strain
         ['genus', sparc.animalSubjectIsOfGenus],
         ['species', sparc.animalSubjectIsOfSpecies],
         ['strain', sparc.animalSubjectIsOfStrain],
-        ['genotype', TEMP.hasGenotype],
-        ['weight', sparc.animalSubjectHasWeight],
-        ['initial_weight', sparc.animalSubjectHasWeight],  # TODO time
-        ['mass', sparc.animalSubjectHasWeight],
+
         ['body_mass', sparc.animalSubjectHasWeight],  # TODO
         ['body_weight', sparc.animalSubjectHasWeight],
         ['height_inches', TEMP.subjectHasHeight],  # FIXME converted in datasets sigh
@@ -420,26 +456,25 @@ class SubjectConverter(TripleConverter):
         # TODO experiment hasParticpant (some (subject wasAdministeredAnesthesia))
         # or something like that -> experimentHasSubjectUnder ...
 
-
-        ['stimulation_site', sparc.spatialLocationOfModulator],  # TODO ontology
-        ['stimulator', sparc.stimulatorUtilized],
-        ['stimulating_electrode_type', sparc.stimulatorUtilized],  # FIXME instance vs type
-
         ['organism_rrid', TEMP.TODO],
 
-        ['nerve', TEMPRAW.involvesAnatomicalRegion],  # FIXME we can be more specific than this probably
-
         # require extras
-        ['experiment_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
-        ['injection_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
         ['date_of_euthanasia', TEMP.protocolExecutionDate],
-        ['date_of_injection', TEMP.protocolExecutionDate],
-    ] + file_related + performance_related + utility
+
+    ]
+    mapping = always_subject + subject_ambiguous + file_related + performance_related + utility
 SubjectConverter.setup()
 
 
 class SampleConverter(TripleConverter):
-    known_skipped = 'protocol_title',
+    known_skipped = ('protocol_title',
+                     'primary_key',
+                     'species',
+                     'sex',
+                     'body_weight',
+                     'age_category',
+                     'strain',
+                     )
     mapping = [
         ['sample_id', TEMP.localId],  # unmangled
         #['subject_id', TEMP.wasDerivedFromSubject],

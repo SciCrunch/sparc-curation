@@ -41,10 +41,15 @@ OntCuries({'orcid':'https://orcid.org/',
            'user':'https://api.blackfynn.io/users/N:user:',
            'bibo': 'http://purl.org/ontology/bibo/',  # crossref
            'prism.basic': 'http://prismstandard.org/namespaces/basic/2.1/',  # crossref
+
            'unit': str(unit),
            'dim': str(dim),
            'asp': str(asp),
+           'protcur': 'https://uilx.org/tgbugs/u/protcur/',
+           'hyp-protcur': 'https://uilx.org/tgbugs/u/hypothesis/protcur/',
            'aspect-raw': 'https://uilx.org/tgbugs/u/aspect-raw/',
+           'verb': 'https://uilx.org/tgbugs/u/executor-verb/',
+           'fuzzy': 'https://uilx.org/tgbugs/u/fuzzy-quantity/',
            'tech': str(tech),
            'awards':str(TEMP['awards/']),
            'sparc':str(sparc),})

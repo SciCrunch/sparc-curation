@@ -15,7 +15,7 @@ from sparcur import curation as cur  # FIXME implicit state must be set in cli
 from sparcur import pipelines as pipes
 from sparcur.core import JEncode, JFixKeys, adops, OntTerm
 from sparcur.paths import Path
-from sparcur.utils import symlink_latest, loge, logd, register_type
+from sparcur.utils import symlink_latest, loge, logd
 from sparcur.utils import register_type, fromJson
 from sparcur.config import auth
 
@@ -431,6 +431,13 @@ class Export(ExportBase):
                     }
         for f in ('meta', 'subjects', 'samples', 'contributors'):
             context.pop(f)  # FIXME HACK meta @graph for datasets
+
+        ontology_header = {  # FIXME should probably not be added here since it is obscure ...
+            '@id': 'https://cassava.ucsd.edu/sparc/ontologies/protcur.ttl',
+            '@type': 'owl:Ontology',
+        }
+
+        protcur.append(ontology_header)
 
         blob_protcur = {  # FIXME this should not be defined here so confusing that it is not with the pipeline ...
             '@context': context,

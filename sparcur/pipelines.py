@@ -1109,7 +1109,7 @@ class PipelineExtras(JSONPipeline):
 
         [[['samples']],
          De.samples_to_subjects,
-         [['subjects']]]
+         [['subjects_from_samples']]]
     )
 
     __mr_path = ['metadata_file', int, 'contents', 'manifest_records', int]
@@ -1655,6 +1655,9 @@ class ProtcurPipeline(Pipeline):
 
             # FIXME FIXME EVIL NETWORK
             at = ast.prov.astType
+            if at is None:
+                return ast
+
             key = 'working-' + at
             if key in sheets_lookup:
                 try:
@@ -1759,6 +1762,8 @@ class ProtcurPipeline(Pipeline):
 
             'protc:parameter*': normalize_node,
             'protc:invariant': normalize_node,
+
+            'protc:executor-verb': normalize_node,
 
             'sparc:Tool': normalize_working,
             'sparc:Reagent': normalize_working,

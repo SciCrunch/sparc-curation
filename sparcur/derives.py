@@ -185,3 +185,35 @@ class Derives:
         # TODO try to construct/resolve the referent paths in these datasets as well
         # getting the path json metadata will embed errors about missing files for us
         return path_metadata, scaffolds
+
+    @staticmethod
+    def samples_to_subjects(samples, schema_version=None):
+        """ extract subject information from samples sheet """
+        # TODO only allow this for <= 1.2.3 ? or no, really
+        # only the subject id should be present in later versions
+
+        # FIXME TODO derive subject fields from schema?
+        subject_fields = (
+            'subject_id',
+            'ear_tag_number',
+            'rrid_for_strain',
+            'genus',
+            'species',
+            'strain',
+            'sex',
+            'gender',
+            'age',
+            'age_category',
+            'body_weight',
+            'body_mass',
+            'body_mass_weight',
+            'height_inches',
+            'age_years',
+            'organism_rrid',
+            'age_range_min',
+            'age_range_max',
+            'date_of_euthanasia',
+        )
+        subjects = [{k:v for k, v in blob_sample.items() if k in subject_fields}
+                    for blob_sample in samples]
+        return subjects,
