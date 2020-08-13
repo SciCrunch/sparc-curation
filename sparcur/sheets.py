@@ -192,7 +192,11 @@ class Mis(Reports):
     @staticmethod
     def _rowhack(self, ns, rdflib):
         # can't overwrite pyontutils.sheets.Row like we do in other cases sigh
-        oid = OntId(self.curie().value)
+        curie = self.curie().value
+        if not curie:
+            return
+
+        oid = OntId(curie)
         s = oid.u
 
         _lon = (lambda v: None if not v else

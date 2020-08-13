@@ -1220,6 +1220,7 @@ class PipelineExtras(JSONPipeline):
 
                             _o = next(OntTerm.query(label=label, prefix='UBERON'))
                         except BaseException as e:
+                            log.exception(e)
                             log.critical(ot)
                             continue
 

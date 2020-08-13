@@ -20,8 +20,8 @@ Usage:
     spc report   anno-tags <tag>...                 [options]
     spc report   [access filetypes pathids errors]  [options]
     spc report   [completeness keywords subjects]   [options]
-    spc report   [contributors samples mbf mis]     [options]
-    spc report   [protocols changes test]           [options]
+    spc report   [contributors samples milestones]  [options]
+    spc report   [protocols changes test mbf mis]   [options]
     spc shell    [affil integration protocols exit] [options]
     spc shell    [(dates [<path>...]) sheets]       [options]
     spc server   [options]
@@ -598,6 +598,9 @@ class Main(Dispatcher):
 
             with open(self.options.export_file, 'rt') as f:
                 data = fromJson(json.load(f))
+        elif self.options.published:
+            raise NotImplementedError('TODO')
+            data = requests.get('some cassava url')
         else:
             from sparcur import export as ex
             data = self._export(ex.Export, org_id=org_id).latest_ir

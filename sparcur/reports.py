@@ -230,21 +230,19 @@ class TtlFile:
 
     def _to_human(self, row):
         return [self.graph.namespace_manager.qname(cell)
-                if isinstance(cell, rdflib.URIRef) else
+                if isinstance(cell, self.rdflib.URIRef) else
                 cell.toPython() for cell in row]
 
     def changes(self):
         added, removed, changed = self.graph.subjectsChanged(self.graph_compare_to)
         return added, removed, changed
 
-    def milestones(self):
+    def milestones(self, ext=None):
         query = self.queries.dataset_milestone_completion_date()
         res = list(self.graph.query(query))
         rows = sorted(self._to_human(row) for row in res)
         header = [['dataset', 'milestone comp date']]
         return header + rows
-        return self._print_table(header + rows,
-                                 title=f'Dataset milestone completion dates')
 
     def mis(self, ext=None):
         from pyontutils.namespaces import OntCuries
@@ -318,6 +316,7 @@ class Report:
 
         self.terms()
         self.mis()
+        self.milestones()
         for tag in (
                 'protc:input',  # this is slower now
                 'protc:input-instance',
@@ -981,7 +980,7 @@ class Report:
                     nk = value_to_key[v]
                     hrmd[nk].extend(hrmd.pop(k))
 
-        if 'protc:input' in tags or 'protc:black-box' in tags or 'protc:black-box-component':
+        if 'protc:input' in tags or 'protc:black-box' in tags or 'protc:black-box-component' in tags:
             return self._protc_input(hrmd, tags, protc, ext)
 
         def more(k, v):
@@ -1099,7 +1098,14 @@ class Report:
                                  title=f'MIS predicates',
                                  ext=ext)
 
-    def _get_protocol_ids(self):
+    @sheets.Reports.makeReportSheet('dataset')
+    def milestones(self, ext=None):
+        tout = self._ttlfile.milestones(ext=ext)
+        return self._print_table(tout,
+                                 title=f'Dataset milestone completion dates',
+                                 ext=ext)
+
+    def _get_protocol_ids(self, blob_data, blob_protcur):
         def tp(i):
             """ not pio at all """
             try:
@@ -1126,7 +1132,7 @@ class Report:
             #except (idlib.exc.ResolutionError, idlib.exc.RemoteError) as e:
             #log.exception(e)
 
-        blob_data = self._data_ir(org_id=self.options.project_id)
+        # dataset blob
         collect = []
         _ = JApplyRecursive(get_nested_by_key,
                             blob_data,
@@ -1146,7 +1152,7 @@ class Report:
         pstrs = [p.asStr() for p in pints if p is not None]
         from_datasets = set(pints) | set(dios)
 
-        blob_protcur = self._protcur()
+        # protcur blob
         protocols = [b for b in blob_protcur['@graph']
                      if '@type' in b and 'sparc:Protocol' in b['@type']]
         urls_protcur = [b['id'] for b in protocols]
@@ -1160,7 +1166,8 @@ class Report:
         either = from_hypothesis | from_datasets
         hrm = [(len(s), [d.identifier if hasattr(d, 'identifier') else d for d in s])
                for s in (both, only_hyp, only_dat)]
-        return either, uios, dois, dios, deref, from_datasets, from_hypothesis, protocols
+        return (either, uios, dois, dios, deref,
+                from_datasets, from_hypothesis, protocols)
 
     @sheets.Reports.makeReportSheet('uri')
     def protocols(self, ext=None):
@@ -1172,8 +1179,12 @@ class Report:
                     idlib.exc.RemoteError) as e:
                 pass
 
+        blob_data = self._data_ir(org_id=self.options.project_id)
+        blob_protcur = self._protcur()
+
         (either, uios, dois, dios, deref, from_datasets,
-         from_hypothesis, protocols) = self._get_protocol_ids()
+         from_hypothesis, protocols) = self._get_protocol_ids(
+             blob_data, blob_protcur)
 
         header = [['uri',
                    'uri_human',

@@ -230,7 +230,6 @@ class TriplesExportDataset(TriplesExport):
             dsid = self.uri_api
         except BaseException as e:  # FIXME ...
             raise e
-            return
 
         if 'meta' in data:
             meta_converter = conv.MetaConverter(data['meta'], self)
@@ -308,13 +307,6 @@ class TriplesExportDataset(TriplesExport):
                 yield s, TEMP.hasDerivedInformationAsParticipant, dsid
                 yield dsid, TEMP.isAboutParticipant, s
                 yield from converter.triples_gen(s)
-                continue
-                for field, value in subject.items():
-                    convert = getattr(converter, field, None)
-                    if convert is not None:
-                        yield (s, *convert(value))
-                    elif field not in converter.known_skipped:
-                        loge.warning(f'Unhandled subject field: {field}')
 
         yield from triples_gen(self.subject_id, self.subjects)
 
@@ -358,12 +350,6 @@ class TriplesExportDataset(TriplesExport):
                 # hasInformationDerivedFromProcessWhereWasParticipant -> hasInformationDerivedFromProcessWhereWasPrimaryParticipant seems most correct, but is extremely verbose
                 # hasDerivedInformationAsParticipant -> hasDerivedInformationAsParticipantPrimary materialize the role into the predicate? seems reasonable
                 continue
-                for field, value in sample.items():
-                    convert = getattr(converter, field, None)
-                    if convert is not None:
-                        yield (s, *convert(value))
-                    elif field not in converter.known_skipped:
-                        loge.warning(f'Unhandled sample field: {field}')
 
         yield from triples_gen(self.primary_key, self.samples)
 

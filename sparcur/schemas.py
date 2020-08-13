@@ -175,7 +175,7 @@ def json_version(version):
             'NoLTWhitespace': NoLTWhitespaceSchema.schema,
             'EmbeddedIdentifier': EmbeddedIdentifierSchema.schema,
 
-        'meta': MetaOutExportSchema.schema,
+            'meta': MetaOutExportSchema.schema,
             'prov': ProvSchema.schema,
             'errors': ErrorSchema.schema,
             'contributor': ContributorOutExportSchema.schema,
@@ -330,17 +330,6 @@ class HasSchema:
 
             pipeline_start.schema = self.input_schema_class
             cls.pipeline_start = pipeline_start
-
-        return cls
-
-        # pretty sure this functionality is no longer used
-        if self.schema is not None:
-            cls._output = cls.output
-            @property
-            def output(_self):
-                return self.schema.validate(cls._output)
-
-            cls.output = output
 
         return cls
 

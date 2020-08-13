@@ -299,15 +299,6 @@ class BlackfynnRemote(aug.RemotePath):
         remote.cache_init()
         return remote
 
-        dataset = self._bfobject.dataset
-        if isinstance(dataset, str):
-            dataset = self.organization.get_child_by_id(dataset)
-            self.bfobject.dataset = dataset.bfobject
-        else:
-            dataset = self.__class__(dataset)
-
-        return dataset
-
     def get_child_by_id(self, id):
         for c in self.children:
             if c.id == id:
@@ -321,10 +312,6 @@ class BlackfynnRemote(aug.RemotePath):
     def stem(self):
         name = PurePosixPath(self._name)
         return name.stem
-        #if isinstance(self.bfobject, self._File) and not self.from_packages:
-            #return name.stem
-        #else:
-            #return name.stem
 
     @property
     def suffix(self):
