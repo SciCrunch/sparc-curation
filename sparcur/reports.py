@@ -3,7 +3,7 @@ import sys
 import json
 import types
 import pprint
-from itertools import chain
+from itertools import chain, zip_longest
 from collections import Counter, defaultdict
 import idlib
 import htmlfn as hfn
@@ -19,8 +19,9 @@ from sparcur.core import (OntId,
                           adops,
                           JApplyRecursive,
                           get_nested_by_key,
+                          get_nested_by_type,
                           )
-from sparcur.utils import want_prefixes, log as _log
+from sparcur.utils import want_prefixes, log as _log, is_list_or_tuple
 from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.curation import ExporterSummarizer
@@ -302,6 +303,8 @@ class Report:
         self.filetypes()
         self.samples()
         self.subjects()
+        self.samples_values()
+        self.subjects_values()
         self.completeness()
         self.keywords()
         #self.size(dirs=list(self.datasets_local))  # TODO needs to be reworked to use latest_ir
@@ -509,8 +512,32 @@ class Report:
                                  title='All types aligned (has duplicates)',
                                  ext=ext)
 
-    @sheets.Reports.makeReportSheet('column_name')
+    def _s(self, dict_key, ext=None):
+        data = self._data_ir()
+        datasets = data['datasets']
+        key = self._sort_key
+        # FIXME we need the blob wrapper in addition to the blob generator
+        # FIXME these are the normalized ones ...
+        s_headers = tuple(k for dataset_blob in datasets
+                          if dict_key in dataset_blob  # FIXME inputs?
+                          for s_blob in dataset_blob[dict_key]
+                          for k in s_blob)
+        counts = tuple(kv for kv in sorted(Counter(s_headers).items(),
+                                            key=key))
+
+        index_col_name = 'Column Name'
+        if ext is None:
+            index_col_name += f' unique = {len(counts)}'
+        rows = ((index_col_name, '#'), *counts)
+        return self._print_table(rows,
+                                 title=f'{dict_key.capitalize()} Report',
+                                 ext=ext)
+
+
+    @sheets.Reports.makeReportSheet('column_name', sheet_name='samples')
     def samples(self, ext=None):
+        return self._s('samples', ext=ext)
+
         data = self._data_ir()
         datasets = data['datasets']
         key = self._sort_key
@@ -531,8 +558,10 @@ class Report:
                                  title='Samples Report',
                                  ext=ext)
 
-    @sheets.Reports.makeReportSheet('column_name')
+    @sheets.Reports.makeReportSheet('column_name', sheet_name='subjects')
     def subjects(self, ext=None):
+        return self._s('subjects', ext=ext)
+
         data = self._data_ir()
         datasets = data['datasets']
         key = self._sort_key
@@ -552,6 +581,62 @@ class Report:
         return self._print_table(rows,
                                  title='Subjects Report',
                                  ext=ext)
+
+    def _s_values(self, dict_key, ext=None, skip_keys=('subject_id', 'sample_id', 'primary_key')):
+        data = self._data_ir()
+        datasets = data['datasets']
+
+        def detype(_v):
+            return ((_v.asJson(),) if hasattr(_v, 'asJson') else
+                    ((_v.identifier,) if hasattr(_v, 'identifier')
+                     else (_v if is_list_or_tuple(_v) else (_v,))))
+
+        def anydict(_v):
+            if isinstance(_v, dict):
+                return True
+            elif not is_list_or_tuple(_v):
+                return False
+
+            oops = []
+            JApplyRecursive(get_nested_by_type, _v, dict, collect=oops)
+            return oops
+
+        dd = defaultdict(set)
+        _ = [
+            dd[k].add(v) for dataset_blob in datasets
+            if dict_key in dataset_blob
+            for samples_blob in dataset_blob[dict_key]
+            for k, _v in samples_blob.items()
+            if k not in skip_keys and not anydict(_v)
+            for v in detype(_v)
+        ]
+        _ = [
+            dd[k].add(v) for dataset_blob in datasets
+            if dict_key in dataset_blob
+            for samples_blob in dataset_blob[dict_key]
+            for _k, __v in samples_blob.items()
+            if _k not in skip_keys and anydict(__v)
+            for blob in anydict(__v)
+            for k, _v in blob.items()
+            if k not in skip_keys
+            for v in detype(_v)
+        ]
+
+        vd = dict(dd)
+        header = sorted(vd, key=lambda k:len(vd[k]))
+        cols = [[k, *sorted([str(v) for v in vd[k]])] for k in header]
+        rows = list(zip_longest(*cols, fillvalue=None))
+        return self._print_table(rows,
+                                 title=f'{dict_key.capitalize()} Values Report',
+                                 ext=ext)
+
+    @sheets.Reports.makeReportSheet(sheet_name='samples-values')
+    def samples_values(self, ext=None):
+        return self._s_values('samples', ext=ext)
+
+    @sheets.Reports.makeReportSheet(sheet_name='subjects-values')
+    def subjects_values(self, ext=None):
+        return self._s_values('subjects', ext=ext)
 
     @sheets.Reports.makeReportSheet('id')  # FIXME vs path
     def completeness(self, ext=None):

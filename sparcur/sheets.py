@@ -91,12 +91,15 @@ class Reports(Sheet):
         return ReportPreviewClass
 
     @classmethod
-    def makeReportSheet(cls, *index_cols):
+    def makeReportSheet(cls, *index_cols, sheet_name=None):
         """ Decorator to build a Sheet class for a cli.Report method
 
             NOTE reports that do not have index columns will update
             the entire sheet every time, so probabaly don't edit those
         """
+        _sheet_name = sheet_name  # avoid issues with class scope
+        del sheet_name
+
         def _rowcellify(cell_value):
             if isinstance(cell_value, idlib.Stream):
                 try:
@@ -118,7 +121,7 @@ class Reports(Sheet):
 
             class ReportSheet(cls):
                 __name__ = f'Report{method.__name__.capitalize()}'
-                sheet_name = method.__name__
+                sheet_name = method.__name__ if _sheet_name is None else _sheet_name
                 index_columns = index_cols
 
             method._report_class = ReportSheet
@@ -132,6 +135,8 @@ class Reports(Sheet):
 
                 if 'ext' not in kwargs or kwargs['ext'] is None:
                     kwargs['ext'] = True
+                elif isinstance(kwargs['ext'], bool) and kwargs['ext']:
+                    pass  # already went through
                 else:
                     msg = 'Should not have extension and export to sheets.'
                     raise TypeError(msg)

@@ -18,6 +18,7 @@ Usage:
     spc report   terms   [anatomy cells subcelluar] [options]
     spc report   overview [<path>...]               [options]
     spc report   anno-tags <tag>...                 [options]
+    spc report   [samples-values subjects-values]   [options]
     spc report   [access filetypes pathids errors]  [options]
     spc report   [completeness keywords subjects]   [options]
     spc report   [contributors samples milestones]  [options]
@@ -114,6 +115,8 @@ Commands:
                 mis             list summary predicates used per dataset
                 access          report on dataset access master vs pipelines
                 overview        general dataset information
+                samples-values  report all cell values for samples sheets
+                subjects-values report all cell values for subjects sheets
 
                 options: --raw  run reports on live data without export
                        : --tab-table
