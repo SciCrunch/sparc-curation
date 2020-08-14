@@ -9,7 +9,7 @@ from collections import deque, defaultdict
 import idlib
 import rdflib
 import ontquery as oq
-from idlib.formats import rdf as _bind_rdf
+from idlib.formats import rdf as _bind_rdf  # imported for side effect
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
 from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ, Measurement

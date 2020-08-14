@@ -3,11 +3,6 @@ import hashlib
 import pathlib
 from functools import wraps
 from itertools import chain
-try:
-    import magic  # from sys-apps/file consider python-magic ?
-except ImportError:
-    pass
-
 import augpathlib as aug
 from dateutil import parser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache

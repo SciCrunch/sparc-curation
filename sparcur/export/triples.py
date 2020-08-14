@@ -10,7 +10,6 @@ from pyontutils.namespaces import (TEMP,
                                    rdf,
                                    rdfs,
                                    owl,
-                                   skos,
                                    dc,)
 from sparcur import converters as conv
 from sparcur.core import (adops,

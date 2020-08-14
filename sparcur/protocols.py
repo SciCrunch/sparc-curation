@@ -1,15 +1,11 @@
 import idlib
 import rdflib
-from idlib.cache import cache, COOLDOWN
-from orthauth.utils import QuietDict
 from pyontutils import combinators as cmb
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout, ilxtr
-from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
+from pyontutils.namespaces import TEMP, ilxtr
 from sparcur import datasets as dat
-from sparcur.core import log, logd, OntTerm, OntId, sparc
-from sparcur.paths import Path
+from sparcur.core import OntTerm, OntId
 from sparcur.utils import log, logd
-from sparcur.config import config, auth
+from sparcur.config import auth
 
 
 class ProtcurData:

@@ -8,9 +8,7 @@ from collections import Counter
 import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
 from terminaltables import AsciiTable
-from pyontutils.utils import byCol, Async, deferred, python_identifier
-from pyontutils.namespaces import OntCuries, makeNamespaces, TEMP, isAbout
-from pyontutils.namespaces import rdf, rdfs, owl, skos, dc
+from pyontutils.utils import python_identifier
 from . import schemas as sc
 from . import raw_json as rj
 from . import exceptions as exc
@@ -18,8 +16,6 @@ from . import normalization as nml
 from .core import log, logd, HasErrors
 from .paths import Path
 from .utils import is_list_or_tuple
-
-a = rdf.type
 
 
 # FIXME review this :/ it is not a good implementation at all

@@ -2,12 +2,10 @@ import io
 import os
 import json
 import types
-import asyncio
 from copy import deepcopy
 #from nibabel import nifti1
 #from pydicom import dcmread
 #from scipy.io import loadmat
-import yaml
 import boto3
 import botocore
 import requests
@@ -35,12 +33,10 @@ from blackfynn import Dataset, BaseNode
 from blackfynn import base as bfb
 from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
-from blackfynn.models import BaseCollection
-from pyontutils.utils import Async, deferred, async_getter, chunk_list
+from pyontutils.utils import Async, deferred
 from pyontutils.iterio import IterIO
 from sparcur import exceptions as exc
 from sparcur.core import lj
-from sparcur.metastore import MetaStore
 from .config import auth
 
 
