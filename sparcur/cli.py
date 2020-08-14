@@ -32,7 +32,6 @@ Usage:
     spc feedback <feedback-file> <feedback>...
     spc missing  [options]
     spc xattrs   [options]
-    spc demos    [options]
     spc goto     <remote-id>
     spc fix      [options] [duplicates mismatch] [<path>...]
     spc stash    [options --restore] <path>...
@@ -145,7 +144,6 @@ Commands:
 
     missing     find and fix missing metadata
     xattrs      populate metastore / backup xattrs
-    demos       long running example queries
     goto        given an id cd to the containing directory
                 invoke as `pushd $(spc goto <id>)`
     dedupe      find and resolve cases with multiple ids
@@ -1134,50 +1132,6 @@ done"""
                          for uri in f.protocol_uris_resolved]
             breakpoint()
         """
-
-    def demos(self):
-        # get the first dataset
-        dataset = next(iter(self.summary))
-
-        # another way to get the first dataset
-        dataset_alt = next(self.anchor.children)
-
-        # view all dataset descriptions call repr(tabular_view_demo)
-        ds = self.datasets
-        tabular_view_demo = [next(d.dataset_description).t
-                             for d in ds[:1]
-                             if 'dataset_description' in d.data]  # FIXME
-
-        # get package testing
-        bigskip = auth.get_list('datasets-sparse') + auth.get_list('datasets-no')
-        bfds = self.bfl.bf.datasets()
-        packages = [list(d.packages) for d in bfds[:3]
-                    if d.id not in bigskip]
-        n_packages = [len(ps) for ps in packages]
-
-        # bootstrap a new local mirror
-        # FIXME at the moment we can only have of these at a time
-        # sigh more factories incoming
-        #anchor = BlackfynnCache('/tmp/demo-local-storage')
-        #anchor.bootstrap()
-
-        if False:
-            ### this is the equivalent of export, quite slow to run
-            # export everything
-            dowe = self.summary.data()
-
-            # show all the errors from export everything
-            error_id_messages = [(d['id'], e['message'])
-                                 for d in dowe['datasets']
-                                 for e in d['errors']]
-            error_messages = [e['message']
-                              for d in dowe['datasets']
-                              for e in d['errors']]
-
-        #rchilds = list(datasets[0].rchildren)
-        #package, file = [a for a in rchilds if a.id == 'N:package:8303b979-290d-4e31-abe5-26a4d30734b4']
-
-        return self.shell()
 
     def tables(self):
         """ print summary view of raw metadata tables, possibly per dataset """

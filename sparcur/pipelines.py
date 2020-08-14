@@ -728,18 +728,6 @@ class RdfPipeline(ExportPipeline):
         return self.graph
 
 
-class TurtleExport:
-    """ bad way to implement helper class for export
-        the choice of serialization can be deferred
-        until much later in time, so creating a high
-        level invariant is not required """
-
-    @property
-    def data(self):
-        raise NotImplementedError("don't use this, it is here as an example only")
-        return self.graph.serialize(format='nifttl')
-
-
 hasSchema = sc.HasSchema()
 @hasSchema.mark
 class ApiNATOMY(JSONPipeline):
@@ -1254,17 +1242,6 @@ class PipelineExtras(JSONPipeline):
     @hasSchema(sc.DatasetOutSchema)
     def data(self):
         return super().data
-
-    @property
-    def data_derived_post(self):  # XXX deprecated
-        raise NotImplementedError
-        todo = [[['meta', 'modality'], 'TODO should come from sheets maybe?']]
-        derives = [[[['meta', 'award_number']],
-                    lambda an: (self.lifters.organ(an),),
-                    [['meta', 'organ']]]]
-        data = super().data_derived_post
-        DictTransformer.derive(data, derives)
-        return data
 
 
 class PipelineEnd(JSONPipeline):

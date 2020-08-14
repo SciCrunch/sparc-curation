@@ -178,7 +178,7 @@ class HasErrors:
         else:
             data[mpk] = [key]
 
-    def addError(self, error, pipeline_stage=None, logfunc=None, blame=None, path=None):
+    def addError(self, error, pipeline_stage=None, blame=None, path=None):
         do_log = error not in self._already_logged
         if do_log:
             self._already_logged.add(error)
@@ -979,7 +979,7 @@ class _DictTransformer:
                         source_key_optional=source_key_optional)
 
     @classmethod
-    def derive(cls, data, derives, source_key_optional=True, empty='CULL', cheaty_face=None):
+    def derive(cls, data, derives, source_key_optional=True, empty='CULL'):
         """ [[[source-path, ...], function, [target-path, ...]], ...] """
         # if you have source key option True and empty='OK' you will get loads of junk
         allow_empty = empty == 'OK' and not empty == 'CULL'

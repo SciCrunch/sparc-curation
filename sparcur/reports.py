@@ -538,49 +538,9 @@ class Report:
     def samples(self, ext=None):
         return self._s('samples', ext=ext)
 
-        data = self._data_ir()
-        datasets = data['datasets']
-        key = self._sort_key
-        # FIXME we need the blob wrapper in addition to the blob generator
-        # FIXME these are the normalized ones ...
-        samples_headers = tuple(k for dataset_blob in datasets
-                                 if 'samples' in dataset_blob  # FIXME inputs?
-                                 for samples_blob in dataset_blob['samples']
-                                 for k in samples_blob)
-        counts = tuple(kv for kv in sorted(Counter(samples_headers).items(),
-                                            key=key))
-
-        index_col_name = 'Column Name'
-        if ext is None:
-            index_col_name += f' unique = {len(counts)}'
-        rows = ((index_col_name, '#'), *counts)
-        return self._print_table(rows,
-                                 title='Samples Report',
-                                 ext=ext)
-
     @sheets.Reports.makeReportSheet('column_name', sheet_name='subjects')
     def subjects(self, ext=None):
         return self._s('subjects', ext=ext)
-
-        data = self._data_ir()
-        datasets = data['datasets']
-        key = self._sort_key
-        # FIXME we need the blob wrapper in addition to the blob generator
-        # FIXME these are the normalized ones ...
-        subjects_headers = tuple(k for dataset_blob in datasets
-                                 if 'subjects' in dataset_blob  # FIXME inputs?
-                                 for subject_blob in dataset_blob['subjects']
-                                 for k in subject_blob)
-        counts = tuple(kv for kv in sorted(Counter(subjects_headers).items(),
-                                            key=key))
-
-        index_col_name = 'Column Name'
-        if ext is None:
-            index_col_name += f' unique = {len(counts)}'
-        rows = ((index_col_name, '#'), *counts)
-        return self._print_table(rows,
-                                 title='Subjects Report',
-                                 ext=ext)
 
     def _s_values(self, dict_key, ext=None, skip_keys=('subject_id', 'sample_id', 'primary_key')):
         data = self._data_ir()

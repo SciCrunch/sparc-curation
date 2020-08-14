@@ -627,7 +627,6 @@ class NormDatasetDescriptionFile(NormValues):
             except exc.CouldNotNormalizeError as e:
                 #self.addError(e,
                               #pipeline_stage=f'{self.__class__.__name__}.contributor_role',
-                              #logfunc=logd.error,
                               #blame='submission',
                               #path=self._path)
                 emsg = f'Bad value: "{orig}"'

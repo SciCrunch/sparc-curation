@@ -552,12 +552,6 @@ class BlackfynnRemote(aug.RemotePath):
             if parent is None:
                 parent = self.bfobject.dataset
 
-        if False and isinstance(parent, str):
-            if parent in self.helper_index:
-                return self.helper_index[parent]
-            else:
-                raise TypeError('grrrrrrrrrrrrrrr')
-
         if parent:
             parent_cache = self.cache.parent if self.cache is not None else None
             self._c_parent = self.__class__(parent, cache=parent_cache)
@@ -886,6 +880,7 @@ class BlackfynnRemote(aug.RemotePath):
             raise NotImplementedError('TODO')
 
     def _lchildmeta(self, child):
+        raise NotImplementedError('pretty sure unused')
         # FIXME all of this should be accessible from local and/or cache directly ...
         lchild = self.cache.local / child.name  # TODO LocalPath.__truediv__ ?
         excache = None
