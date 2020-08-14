@@ -100,6 +100,13 @@ class DatasourcePipeline(Pipeline):
 class BlackfynnDatasetDataPipeline(DatasourcePipeline):
 
     def __init__(self, previous_pipeline, lifters, runtime_context):
+        # FIXME super convoluted and also just a bad way to detect if
+        # there is no remote, but probably the best we can manage in
+        # cases where we need to avoid a network sandbox violation
+        # and we don't want to create a stub for the remote data in
+        # a cache because it doesn't exist at all on the remote
+        self._no_remote = runtime_context.path.cache.meta.updated is None
+
         self.dataset_id = previous_pipeline.data['id']
         if not hasattr(self.__class__, 'BlackfynnDatasetData'):
             from sparcur.backends import BlackfynnDatasetData
@@ -107,6 +114,10 @@ class BlackfynnDatasetDataPipeline(DatasourcePipeline):
 
     @property
     def data(self):
+        if self._no_remote:
+            return {}
+            #raise exc.NotUploadedToRemoteYetError(self.dataset_id)
+
         bdd = self.BlackfynnDatasetData(self.dataset_id)
         try:
             return bdd.fromCache()

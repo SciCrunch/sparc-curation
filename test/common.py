@@ -152,8 +152,12 @@ class RealDataHelper:
         from sparcur.paths import BlackfynnCache, Path
         from sparcur.config import auth
         from sparcur.backends import BlackfynnRemote
-        from sparcur.simple import pull, fetch_metadata_files
+        from sparcur.simple import pull, fetch_metadata_files, fetch_files
         test_datasets_real = auth.get_list('datasets-test')
+        nosparse = [
+            'N:dataset:bec4d335-9377-4863-9017-ecd01170f354',  # mbf headers
+        ]
+        test_datasets_real.extend(nosparse)
         slot = auth._pathit('{:user-cache-path}/sparcur/objects-temp')
         # FIXME slot needs to be handled transparently as an LRU cache
         # that has multiple folder levels and stores only by uuid
@@ -166,11 +170,12 @@ class RealDataHelper:
         cls.anchor.local_data_dir_init(symlink_objects_to=slot)
         cls.project_path = cls.anchor.local
         list(cls.anchor.children)  # side effect to retrieve top level folders
-        cls.datasets = list(cls.project_path.children)
-        cls.test_datasets = [d for d in cls.datasets if d.cache_id in test_datasets_real]
-        [d.rmdir() for d in cls.datasets if d.cache_id not in test_datasets_real]  # for sanity
+        datasets = list(cls.project_path.children)
+        cls.test_datasets = [d for d in datasets if d.cache_id in test_datasets_real]
+        [d.rmdir() for d in datasets if d.cache_id not in test_datasets_real]  # for sanity
         if not RealDataHelper._fetched:
             RealDataHelper._fetched = True  # if we fail we aren't going to try again
-            [d._mark_sparse() for d in cls.test_datasets]  # keep pulls fastish
+            [d._mark_sparse() for d in cls.test_datasets if d.cache_id not in nosparse]  # keep pulls fastish
             pull.from_path_dataset_file_structure_all(cls.project_path, paths=cls.test_datasets)
             fetch_metadata_files.main(cls.project_path)
+            fetch_files.main(cls.project_path)

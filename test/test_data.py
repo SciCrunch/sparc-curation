@@ -6,7 +6,7 @@ import idlib
 import rdflib
 import pytest
 from pyontutils.core import OntResIri, OntGraph, OntResPath, OntId
-from pyontutils.namespaces import UBERON, NIFSTD, asp, TEMP, TEMPRAW
+from pyontutils.namespaces import UBERON, NIFSTD, asp, TEMP, TEMPRAW, tech
 from sparcur.paths import Path
 from sparcur.reports import SparqlQueries
 from .common import skipif_no_net
@@ -105,12 +105,14 @@ class TestCurationExportTtl(unittest.TestCase):
         self.pp(res, unpack=False)
         assert len(res) > 0
 
+    @pytest.mark.skip('only in preview at the moment')
     def test_protocol_techniques(self):
         query = self.spaql_templates.protocol_techniques()
         res = list(self.graph.query(query))
         print(res)
         assert len(res) > 0
 
+    @pytest.mark.skip('only in preview at the moment')
     def test_protocol_aspects(self):
         query = self.spaql_templates.protocol_aspects()
         res = list(self.graph.query(query))
@@ -122,11 +124,8 @@ class TestCurationExportTtl(unittest.TestCase):
 class TestProtcurTtl(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        #cls.orp = OntResPath()
-        #cls.graph = cls.orp.graph
-        path = Path('~/.local/share/sparcur/export/protcur/LATEST/protcur.ttl').expanduser()
-        #path = Path('/home/tom/git/NIF-Ontology/ttl/protcur.ttl')
-        cls.graph = OntGraph(path=path).parse()  # fixme the heck
+        iri = 'https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl'
+        cls.graph = OntGraph().parse(iri, format='ttl')
         cls.nsm = cls.graph.namespace_manager
         cls.spaql_templates = SparqlQueries(cls.nsm)
         cls._q_protocol_aspects =  cls.spaql_templates.protocol_aspects()
@@ -140,10 +139,9 @@ class TestProtcurTtl(unittest.TestCase):
             query,
             initBindings={
                 'technique':
-                #rdflib.Literal('confocal microscopy technique')
-                #rdflib.Literal('microscopy')
-                rdflib.Literal('Microscopy')
-                #rdflib.Literal('microscopy technique')
+                tech.histology,
+                #tech.microscopy,  # missing
+                #tech.sectioning,  # present but as an input which is a bug
             }))
         print(res)
         assert len(res) > 0
@@ -156,9 +154,9 @@ class TestProtcurTtl(unittest.TestCase):
 
     def test_protocol_aspect_terms(self):
         aspects = [
-            #'magnification',
-            #'temperature',
-            #'fold',
+            'magnification',
+            'temperature',
+            'fold',
                    ]
 
         results = []

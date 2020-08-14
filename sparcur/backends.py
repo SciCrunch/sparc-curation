@@ -1249,6 +1249,10 @@ class BlackfynnDatasetData:
         elif isinstance(remote_cache_or_id, aug.CachePath):
             self._c_cache_path = remote_cache_or_id
             self.id = self._c_cache_path.id
+        elif isinstance(remote_cache_or_id, aug.AugmentedPath):
+            # on the off chance that we are passed a local path
+            self._c_cache_path = remote_cache_or_id.cache
+            self.id = self._c_cache_path.id
         else:
             self.id = remote_cache_or_id
 
@@ -1283,6 +1287,8 @@ class BlackfynnDatasetData:
         """ retrieve cached results without hitting the network """
         # TODO FIXME error on no cache?
         if not self.cache.exists():
+            # REMINDER: self.cache is NOT a cache_path in this context
+            # super confusing I know ...
             msg = f'No cached metadata for {self.id}. Run `spc rmeta` to populate.'
             raise FileNotFoundError(msg)
 

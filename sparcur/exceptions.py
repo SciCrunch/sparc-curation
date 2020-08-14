@@ -161,3 +161,7 @@ class PreviewModeError(SparCurError):
 
 class StopTheWorld(SparCurError):
     """ stop everything we are in a state of pure madness """
+
+
+class NotUploadedToRemoteYetError(SparCurError):
+    """ signal that the file in question has not been uploaded """

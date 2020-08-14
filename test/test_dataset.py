@@ -60,7 +60,7 @@ class Helper:
             with open(tf, 'wb') as f:
                 f.write(file.show(ref))
 
-            obj = self.metadata_file_class(tf, schema_version=version)
+            obj = self.metadata_file_class(tf, template_schema_version=version)
             try:
                 obj.data
             except exc.MalformedHeaderError as e:

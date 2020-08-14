@@ -25,7 +25,7 @@ class TestExtractMetadataReal(RealDataHelper, unittest.TestCase):
 
     def test_mbf_header(self):
         test_id = 'N:dataset:bec4d335-9377-4863-9017-ecd01170f354'
-        test_dataset = [d for d in self.datasets if d.id == test_id][0]
+        test_dataset = [d.cache for d in self.test_datasets if d.cache.id == test_id][0]
         if not list(test_dataset.local.children):
             rchilds = list(test_dataset.rchildren)
             xmls = [c for c in rchilds if c.suffix == '.xml']
