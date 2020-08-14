@@ -178,34 +178,50 @@ class SparqlQueries:
 
     def protocol_inputs(self):
         query = """
-            SELECT DISTINCT ?protocol ?ast ?input
+            SELECT DISTINCT ?protocol ?ast_in ?input
             WHERE {
                 ?protocol rdf:type sparc:Protocol .
-                ?protocol TEMP:protocolInvolvesInput ?ast .
-                ?ast rdf:type protcur:input .
-                ?ast TEMP:hasValue ?input .
+                ?protocol TEMP:protocolInvolvesInput ?ast_in .
+                ?ast_in rdf:type protcur:input .
+                ?ast_in TEMP:hasValue ?input .
             }
         """
         return self.sparql.prepareQuery(query, initNs=self.prefixes)
 
-    def protocol_inputs(self):
-        # powle euth ket xyl negative
+    def protocol_species_dose(self):
         query = """
-            SELECT DISTINCT ?protocol
-            WHERE {
-                ?protocol rdf:type sparc:Protocol .
-                ?protocol TEMP:protocolInvolvesAspect asp:anaesthetized .
-                ?protocol TEMP:protocolInvolvesInput ?ast_rat .
-                ?protocol TEMP:protocolInvolvesInput ?ast_ana .
-                ?ast_rat rdf:type protcur:input .  # FIXME or black-box
-                ?ast_rat TEMP:hasValue BIRNLEX:160 . # NCBITaxon:10090 .
-                ?ast_ana rdf:type protcur:input .
-                ?ast_ana TEMP:hasValue NIFSTD:DB01221 . # CHEBI:92386 .
-                ?ast_ana TEMP:protcurChildren ?child .
-                ?child rdf:type protcur:parameter .
-                ?child ?rdf:value 10 .
-            }
-        """
+SELECT DISTINCT
+?dataset
+?protocol
+
+?label_drug
+?value_lt
+WHERE {
+    VALUES ?t {protcur:invariant protcur:parameter} .
+    ?ast_inv a ?t .
+    ?ast_inv TEMP:hasValue ?bnode .
+    ?bnode ilxtr:jsonRecordType <https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/quantity> .
+    ?bnode rdf:value ?value_lt .
+    ?bnode TEMP:hasUnit <https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/milligram%20%2F%20kilogram> .
+    FILTER (?value_lt < ?limit)
+
+    ?ast_drug a protcur:input .
+    ?ast_drug TEMP:hasValue ?drug .
+                            ?drug rdfs:label ?label_drug .
+    ?ast_drug TEMP:protcurChildren+ ?ast_child .
+    ?ast_child TEMP:hasValue ?bnode .
+
+    ?protocol a sparc:Protocol .
+    ?protocol TEMP:protocolInvolvesInput ?ast_drug .
+
+    ?protocol TEMP:protocolInvolvesInput ?ast_in_sp .
+    ?ast_in_sp rdf:type protcur:input .
+    ?ast_in_sp TEMP:hasValue ?species .
+
+    OPTIONAL { ?dataset TEMP:hasProtocol ?protocol } .
+
+} ORDER BY ?label_input ?value_lt
+"""
         return self.sparql.prepareQuery(query, initNs=self.prefixes)
 
 

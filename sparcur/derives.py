@@ -113,6 +113,7 @@ class Derives:
 
         # FIXME TODO how to deal with sparse datasets
         _record_path = path_dataset / record_drp  # do not include in export
+
         _cache = _record_path.cache
         if _cache is None:
             lifted = _record_path._jsonMetadata()  # will produce the error for us

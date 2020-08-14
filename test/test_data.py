@@ -1,10 +1,11 @@
 """ test the actual output of the curation export pipeline """
 import unittest
 from pprint import pprint
+import pytest
 import idlib
 import rdflib
 import pytest
-from pyontutils.core import OntResIri, OntGraph, OntResPath
+from pyontutils.core import OntResIri, OntGraph, OntResPath, OntId
 from pyontutils.namespaces import UBERON, NIFSTD, asp, TEMP, TEMPRAW
 from sparcur.paths import Path
 from sparcur.reports import SparqlQueries
@@ -123,13 +124,14 @@ class TestProtcurTtl(unittest.TestCase):
     def setUpClass(cls):
         #cls.orp = OntResPath()
         #cls.graph = cls.orp.graph
-        path = Path('/home/tom/.local/share/sparcur/export/protcur/LATEST/protcur.ttl')
-        path = Path('/home/tom/git/NIF-Ontology/ttl/protcur.ttl')
+        path = Path('~/.local/share/sparcur/export/protcur/LATEST/protcur.ttl').expanduser()
+        #path = Path('/home/tom/git/NIF-Ontology/ttl/protcur.ttl')
         cls.graph = OntGraph(path=path).parse()  # fixme the heck
         cls.nsm = cls.graph.namespace_manager
         cls.spaql_templates = SparqlQueries(cls.nsm)
         cls._q_protocol_aspects =  cls.spaql_templates.protocol_aspects()
         cls._q_protocol_inputs =  cls.spaql_templates.protocol_inputs()
+        cls._q_protocol_species_dose =  cls.spaql_templates.protocol_species_dose()
 
     def test_protcur_techniques(self):
         query = self.spaql_templates.protocol_techniques()
@@ -239,3 +241,19 @@ class TestProtcurTtl(unittest.TestCase):
         print(set().intersection(*pids))
         _ = [print(r) for rs in results for r in rs]
 
+    def _query_protocol_species_dose(self, species, drug, dose):
+        query = self._q_protocol_species_dose
+        res = list(self.graph.query(query,
+                                    initBindings={'species': species,
+                                                  'drug': drug,
+                                                  'dose': dose,}))
+        return res
+
+    @pytest.mark.skip('rdflib sparql impl is too slow')
+    def test_protcur_species_dose(self):
+        res = self._query_protocol_species_dose(
+            OntId("NCBITaxon:10116").u,
+            OntId("CHEBI:6121").u,
+            100)
+
+        breakpoint()

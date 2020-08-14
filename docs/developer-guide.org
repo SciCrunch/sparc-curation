@@ -834,13 +834,17 @@ def from_path_dataset_file_structure(path, time_now=None):
 
 
 # pull all in parallel
-def from_path_dataset_file_structure_all(project_path, time_now=None):
-    """ pull all of the file structure and file system metadata for a project """
+def from_path_dataset_file_structure_all(project_path, *args, paths=None, time_now=None):
+    """ pull all of the file structure and file system metadata for a project
+        paths is a keyword argument that accepts a list/tuple of the subset of
+        paths that should be pulled """
+
     if time_now is None:
         time_now = GetTimeNow()
 
     project_path.pull(
-        time_now=None,  # TODO
+        paths=paths,
+        time_now=time_now,  # TODO
         debug=False,  # TODO
         n_jobs=12,
         log_level='DEBUG' if False else 'INFO',  # TODO

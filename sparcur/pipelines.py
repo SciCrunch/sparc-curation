@@ -32,9 +32,6 @@ from sparcur.extract import xml as exml
 DT = DictTransformer
 De = Derives
 
-a = rdf.type
-
-
 # used to pass the runtime path of the dataset since
 # we don't want to pre-extract all the fs information
 _THIS_PATH_KEY = object()
@@ -614,7 +611,12 @@ class JSONPipeline(Pipeline):
         data = self.updated
 
         if hasattr(self, 'path'):
-            data[_THIS_PATH_KEY] = self.path
+            # FIXME why/how is this not the local path to start with !?
+            if isinstance(self.path, aug.CachePath):
+                log.warning('WHY IS A CACHE PATH BEING PASSED AS A PATH TO PIPELINES!')
+                data[_THIS_PATH_KEY] = self.path.local
+            else:
+                data[_THIS_PATH_KEY] = self.path
 
         # FIXME THIS_PATH is cool but but violates our desire to keep validating the
         # existence of things separate from rearranging them
@@ -1225,12 +1227,17 @@ class PipelineExtras(JSONPipeline):
                 _test_path = deque(['meta', 'protocol_url_or_doi'])
                 if not [e for e in data['errors']
                         if 'path' in e and e['path'] == _test_path]:
-                    breakpoint()
                     raise exc.ShouldNotHappenError('urg')
+                    #breakpoint()
 
             else:
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
-                data['meta']['protocol_url_or_doi'] = tuple(sorted(set(data['meta']['protocol_url_or_doi'])))  # ick
+                key = lambda i: i.asStr() if hasattr(i, 'asStr') else i
+                # FIXME sorting heterogenous types and whether the objects
+                # themselves should define that via comaprison dunders or what ...
+                _v = sorted(set(data['meta']['protocol_url_or_doi']),  # ick
+                            key=key)
+                data['meta']['protocol_url_or_doi'] = tuple(_v)
 
         # FIXME HACK this is a clean
         if 'xml' in data['inputs']:

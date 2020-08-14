@@ -441,6 +441,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         return blob
 
     def pull(self, *args,
+             paths=None,
              time_now=None,
              debug=False,
              n_jobs=12,
@@ -473,7 +474,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         if cache.is_organization():
             if debug or Parallel is None:
                 for child in self.children:
-                    child.pull()
+                    if paths is None or child in paths:
+                        child.pull()
             else:
                 Parallel(n_jobs=n_jobs)(
                     delayed(child.pull)(_in_parallel=True,
@@ -481,7 +483,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                                         cache_anchor=cache.anchor,
                                         log_name=_log.name,
                                         log_level=log_level,)
-                    for child in self.children)
+                    for child in self.children
+                    if paths is None or child in paths)
 
         elif cache.is_dataset():
             self._pull_dataset(time_now)  # XXX actual pull happens in here
