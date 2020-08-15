@@ -27,7 +27,7 @@ ontologies:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
       removeUnsatisfiableClasses: true
-  - url: https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/neuron-development.ttl
+  - url: https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
