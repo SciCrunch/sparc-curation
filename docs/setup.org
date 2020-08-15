@@ -663,6 +663,16 @@ pushd ~/git
 for d in $(ls); do if [ -d $d/.git ]; then pushd $d; git pull || break; popd; fi; done
 popd
 #+END_SRC
+
+#+name: git-pull-all-windows
+#+begin_src powershell
+function Git-Pull-All {
+    if($pwd.Path -eq $HOME) {
+        pushd ~/git }
+    foreach($p in Get-ChildItem -directory) {
+        if($p.GetDirectories(".git")) {
+            pushd $p; git pull; popd } } }
+#+end_src
 ** SPARC
 *** WARNINGS
 1. *DO NOT USE* =cp -a= copy files with xattrs! \\
