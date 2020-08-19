@@ -470,6 +470,16 @@ class Tabular(HasErrors):
                                      path=self.path):
                         logd.error(message)
 
+                if not rows:
+                    ps = self.path.size
+                    pcs = self.path.cache.size
+                    if ps != pcs:
+                        msg = ('We have a likely case of a file that '
+                               f'failed to fetch {ps} != {pcs}! {self.path}')
+                        log.critical()
+
+                    return
+
                 if len(rows[0]) == 1 and ('\t' if delimiter == ',' else ',') in rows[0][0]:
                     message = (f'Possible wrong file extension in {self.path.id} '
                                f'{self.path.project_relative_path}')
@@ -549,6 +559,10 @@ class Tabular(HasErrors):
 
     def xlsx2(self):
         wb = self._openpyxl.load_workbook(self.path)
+
+        if wb is None:
+            raise exc.NoDataError(f'{self.path}')
+
         sheet = wb.get_active_sheet()
         for row in sheet.rows:
             yield [cell.value for cell in row]

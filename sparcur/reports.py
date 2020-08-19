@@ -837,9 +837,10 @@ class Report:
         if self.options.raw:
             graph = self.summary.triples_exporter.graph
         else:
-            from sparcur import export as ex  # FIXME very slow to import
-            graph = OntGraph()
-            self._export(ex.Export).latest_export_ttl_populate(graph)
+            #from sparcur import export as ex  # FIXME very slow to import
+            #graph = OntGraph()
+            #self._export(ex.Export).latest_export_ttl_populate(graph)
+            graph = self._ttlfile.graph
 
         objects = set()
         skipped_prefixes = set()
@@ -851,7 +852,7 @@ class Report:
                     oid = OntId(e)
                     if oid.prefix in want_prefixes:
                         objects.add(oid)
-                    else:
+                    elif oid.prefix is not None:
                         skipped_prefixes.add(oid.prefix)
 
         if self.options.server and isinstance(ext, types.FunctionType):

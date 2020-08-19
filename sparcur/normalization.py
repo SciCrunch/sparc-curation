@@ -162,6 +162,12 @@ class NormSpecies(NormSimple):
         'cat':'Felis catus',
         'rat':'Rattus norvegicus',
         'mouse':'Mus musculus',
+        'sus scrofa domestica': 'Sus scrofa domesticus',
+
+        # spelling errors
+        'mus muscus': 'Mus musculus',
+        'sus scofa': 'Sus scrofa',
+        'rattus noervegicus domestica': 'Rattus norvegicus domestica',
     }
 
 class NormSex(NormSimple):

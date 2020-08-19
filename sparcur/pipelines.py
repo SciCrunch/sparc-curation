@@ -16,6 +16,7 @@ from protcur import document as ptcdoc
 from protcur.analysis import protc
 import sparcur
 from sparcur import apinat
+from sparcur import mapping
 from sparcur import schemas as sc
 from sparcur import datasets as dat
 from sparcur import converters as conv
@@ -581,10 +582,17 @@ class JSONPipeline(Pipeline):
     @property
     def subpipelined(self):
         data = self.pipeline_start
-        errors_subpipelines = list(DictTransformer.subpipeline(data,
-                                                               self.runtime_context,
-                                                               self.subpipelines,
-                                                               lifters=self.lifters))
+        try:
+            errors_subpipelines = list(DictTransformer.subpipeline(
+                data,
+                self.runtime_context,
+                self.subpipelines,
+                lifters=self.lifters))
+        except Exception as e:
+            log.exception(e)
+            log.critical('Unhandled error!')
+            raise e  # don't know the consequence of not failing hard here so continue to raise for now
+
         errors = tuple(es for es in errors_subpipelines if isinstance(es, tuple))
         self.subpipeline_errors(errors)
         self.subpipeline_instances = tuple(es for es in errors_subpipelines if isinstance(es, Pipeline))
@@ -993,7 +1001,7 @@ class SPARCBIDSPipeline(JSONPipeline):
             if path not in (saf, suf):
                 for_super.append((path, error, subpipeline_class))
 
-        if saf not in paths and suf not in paths:
+        if paths and saf not in paths and suf not in paths:
             logd.error(f'samples_file nor subjects_file')
 
         super().subpipeline_errors(for_super)
@@ -1099,20 +1107,6 @@ class PipelineExtras(JSONPipeline):
          ['rmeta', 'readme']],
     )
 
-    derives = (
-        [[['inputs', 'remote_dataset_metadata', 'doi']],
-         DT.BOX(De.doi),
-         [['meta', 'doi']]],
-
-        [[THIS_PATH, ['inputs', 'manifest_file'], ['inputs', 'xml']],  # TODO
-        De.path_metadata,  # XXX WARNING this goes back and hits the file system
-         [['path_metadata'], ['scaffolds']]],
-
-        [[['samples']],
-         De.samples_to_subjects,
-         [['subjects_from_samples']]]
-    )
-
     __mr_path = ['metadata_file', int, 'contents', 'manifest_records', int]
     updates = [
         # this is the stage at which normalization should actually happen I think
@@ -1129,9 +1123,30 @@ class PipelineExtras(JSONPipeline):
         #[__mr_path + ['software_rrid'], norm.rrid],  # FIXME how do we handle errors here?
 
         # TODO ... this isn't really norm at this point, more mapping.species
-        #[['samples', int, 'species'], norm.species],
-        #[['subjects', int, 'species'], norm.species],
+        [['meta', 'species'], mapping.species],
+        [['samples', int, 'species'], mapping.species],
+        [['samples', int, 'sex'], mapping.sex],
+        # we update here since the pipelines are inflexib about deriving
+        # after updating, but there some sense here, it prevents the samples
+        # table from getting out of sync with contents derived from it, which
+        # is a good thing
+        [['subjects', int, 'species'], mapping.species],
+        [['subjects', int, 'sex'], mapping.sex],
     ]
+
+    derives = (
+        [[['inputs', 'remote_dataset_metadata', 'doi']],
+         DT.BOX(De.doi),
+         [['meta', 'doi']]],
+
+        [[THIS_PATH, ['inputs', 'manifest_file'], ['inputs', 'xml']],  # TODO
+        De.path_metadata,  # XXX WARNING this goes back and hits the file system
+         [['path_metadata'], ['scaffolds']]],
+
+        [[['samples']],
+         De.samples_to_subjects,
+         [['subjects_from_samples']]]
+    )
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
 

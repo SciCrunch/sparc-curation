@@ -301,6 +301,11 @@ function sparc-get-all-remote-data () {
     for pid in "${pids_final[@]}"; do
         wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
     done
+
+    # FIXME HACK
+    #find -type f -size 0 -exec getfattr -d {} \;
+    #find -type f -size 0 -exec spc fetch --limit=-1 {} \;
+
     if [[ $FAIL -ne 0 ]]; then
         echo "${FAIL} commands failed. Cannot continue."
         echo "${PROJECT_PATH}"
