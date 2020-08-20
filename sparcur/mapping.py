@@ -1,7 +1,21 @@
 # term mapping
 
+from functools import wraps
 from .core import OntTerm
 from .utils import log
+
+
+def tos(f):
+    @wraps(f)
+    def inner(v):
+        if isinstance(v, str):
+            return f(v)
+        elif isinstance(v, tuple):
+            return tuple(f(_) for _ in v)
+        elif isinstance(v, list):
+            return [f(_) for _ in v]
+
+    return inner
 
 
 # TODO load from db/config ?
@@ -15,9 +29,11 @@ _species = {
     'rattus norvegicus':      OntTerm('NCBITaxon:10116', label='Rattus norvegicus'),
     'suncus murinus':         OntTerm('NCBITaxon:9378',  label='Suncus murinus'),
     'sus scrofa':             OntTerm('NCBITaxon:9823',  label='Sus scrofa'),
+    'sus scrofa domesticus':  OntTerm('NCBITaxon:9825',  label='Sus scrofa domesticus'),
 }
 
 
+@tos
 def species(string, __species=dict(_species)):
     lstr = string.lower()
     if lstr in __species:
@@ -33,6 +49,7 @@ _sex = {
 }
 
 
+@tos
 def sex(string, __sex=dict(_sex)):
     lstr = string.lower()
     if lstr in __sex:
@@ -40,4 +57,3 @@ def sex(string, __sex=dict(_sex)):
     else:
         log.warning(f'No ontology mapping found for {string}')
         return string
-
