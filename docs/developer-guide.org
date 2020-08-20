@@ -953,7 +953,7 @@ def _from_path_fetch_metadata_files_simple(path, fetch=True):
         the remote if fetch == True """
     for glob_prefix in fetch_prefixes:
         ds = DatasetStructure(path)
-        for path_to_metadata in ds._abstracted_paths(glob_prefix, fetch=fetch):
+        for path_to_metadata in ds._abstracted_paths(glob_prefix, fetch=fetch):  # FIXME fetch here is broken
             yield path_to_metadata
 
 
@@ -968,10 +968,14 @@ def _from_path_fetch_metadata_files_parallel(path, n_jobs=12):
 
 def from_path_fetch_metadata_files(path, n_jobs=12):
     """ fetch metadata files located within a path """
-    if n_jobs <= 1:
-        _from_path_fetch_metadata_files_simple(path)
-    else:
-        _from_path_fetch_metadata_files_parallel(path, n_jobs=n_jobs)
+    #if n_jobs <= 1:
+        #gen = _from_path_fetch_metadata_files_simple(path)
+        # FIXME broken ??? somehow abstracted paths doesn't fetch when
+        # we run in directly, or somehow fetch_paths_parallel does something
+        # different
+        #paths = list(gen)
+    #else:
+    _from_path_fetch_metadata_files_parallel(path, n_jobs=n_jobs)
 
 
 def main(path=Path.cwd(), n_jobs=12, **kwargs):
@@ -1209,7 +1213,7 @@ Options:
                                     to be the parent path, don't use this ...
     --extension=<EXT>...            one or more file extensions to fetch
 
-    --jobs=N                        number joblib jobs [default: 12]
+    -j --jobs=N                     number joblib jobs [default: 12]
     --sparse-limit=N                package count that forces a sparse pull [default: 10000]
     --symlink-objects-to=PATH       path to an existing objects directory
 """
@@ -1240,6 +1244,8 @@ class Options(clif.Options):
     @property
     def jobs(self):
         return int(self._args['--jobs'])
+
+    n_jobs = jobs  # match internal kwargs conventions
 
     @property
     def paths(self):
@@ -1292,7 +1298,6 @@ def pipe_main(main, after=None, argv=None):
 
 
 def fetch_paths_parallel(paths, n_jobs=12):
-    from joblib import Parallel, delayed
     def fetch(cache):
         # lambda functions are great right up until you have to handle an
         # error function inside of them ... thanks python for yet another
@@ -1310,7 +1315,11 @@ def fetch_paths_parallel(paths, n_jobs=12):
         return cache.fetch(size_limit_mb=size_mb + 1)
 
     fetch_path = lambda path: fetch(path.cache)
-    Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths)
+    if n_jobs <= 1:
+        [fetch_path(path) for path in paths]
+    else:
+        from joblib import Parallel, delayed
+        Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths)
 #+end_src
 *** _*Test*_
 #+begin_src python :tangle ../test/simple/test_utils.py :mkdirp yes
