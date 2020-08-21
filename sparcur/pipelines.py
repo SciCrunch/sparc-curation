@@ -1463,7 +1463,10 @@ class PipelineEnd(JSONPipeline):
 
     @hasSchema(sc.PostSchema, fail=True)
     def data(self):
-        return super().data
+        try:
+            return super().data
+        except Exception as e:
+            raise exc.StopTheWorld(self.path) from e
 
 
 class IrToExportJsonPipeline(JSONPipeline):

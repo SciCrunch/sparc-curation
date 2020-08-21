@@ -237,6 +237,10 @@ class BlackfynnCache(PrimaryCache, EatCache):
         # we just keep the xattrs in the object cache? how about file moves?
         # sigh git ...
         if self.local_object_cache_path.exists():
+            locsize = self.local_object_cache_path.size
+            if locsize != meta.size:
+                raise NotImplementedError('TODO yield from local then fetch the rest starting at offset')
+
             gen = chain((f'from local cache {self.local_object_cache_path}',),
                         self.local_object_cache_path.data)
         else:
@@ -259,8 +263,23 @@ class BlackfynnCache(PrimaryCache, EatCache):
         if self.local_object_cache_path.exists():
             yield from gen
         else:
+            # FIXME we MUST write the metadata first so that we know the expected size
+            # so that in the event that the generator is only partially run out we know
+            # that we can pick up where we left off with the fetch, this also explains
+            # why all the cases where the cached data size did not match were missing
+            # xattrs entirely
+
+            self.local_object_cache_path.touch()
+            self.local_object_cache_path.cache_init(meta)
+
             yield from self.local_object_cache_path._data_setter(gen)
-            self.local_object_cache_path.cache_init(self.meta)  # FIXME self.meta be stale here?!
+
+            ls = self.local_object_cache_path.size
+            if ls != meta.size:
+                self.local_object_cache_path.unlink()
+                msg = f'{ls} != {meta.size} for {self}'
+                raise ValueError(msg)  # FIXME TODO
+
 
     def _meta_is_root(self, meta):
         return meta.id.startswith('N:organization:')
