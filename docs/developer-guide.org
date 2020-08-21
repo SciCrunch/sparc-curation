@@ -932,37 +932,57 @@ if __name__ == '__main__':
 # totally will overwrite the name and cause madness to ensue
 #+name: fetch_metadata_files.py
 #+begin_src python :tangle ../sparcur/simple/fetch_metadata_files.py
+from itertools import chain
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd
 from sparcur.paths import Path
 from sparcur.datasets import DatasetStructure
-from sparcur.simple.utils import fetch_paths_parallel
+from sparcur.simple.utils import fetch_paths_parallel, rglob
 
 # fetch metadata files
 fetch_prefixes = (
-    'dataset_description',
-    'subjects',
-    'samples',
-    'submission',
-    'manifest',
+    ('dataset_description', 'glob'),
+    ('subjects',            'glob'),
+    ('samples',             'glob'),
+    ('submission',          'glob'),
+    ('manifest',           'rglob'),  # XXX NOTE the rglob here
 )
 
 
 def _from_path_fetch_metadata_files_simple(path, fetch=True):
     """ transitive yield paths to all metadata files, fetch them from
         the remote if fetch == True """
-    for glob_prefix in fetch_prefixes:
+    for glob_prefix, glob_type in fetch_prefixes:
+        if glob_type == 'rglob':
+            gp0 = glob_prefix[0]
+            pattern = f'[{gp0.upper()}{gp0}]{glob_prefix[1:]}*'
+            yield from rglob(path, pattern)
+            continue
         ds = DatasetStructure(path)
-        for path_to_metadata in ds._abstracted_paths(glob_prefix, fetch=fetch):  # FIXME fetch here is broken
+        for path_to_metadata in ds._abstracted_paths(glob_prefix,
+                                                     glob_type=glob_type,
+                                                     fetch=fetch):  # FIXME fetch here is broken
             yield path_to_metadata
 
 
 def _from_path_fetch_metadata_files_parallel(path, n_jobs=12):
     """ Fetch all metadata files within the current path in parallel. """
-    paths_to_fetch = list(_from_path_fetch_metadata_files_simple(path, fetch=False))
-    if not len(paths_to_fetch):
+    paths_to_fetch = _from_path_fetch_metadata_files_simple(path, fetch=False)
+    try:
+        first = next(paths_to_fetch)
+        paths_to_fetch = chain((first,), paths_to_fetch)
+    except StopIteration:
         log.warning('No paths to fetch, did you pull the file system metadata?')
+        return
 
+    # FIXME passing in a generator here fundamentally limits the whole fetching
+    # process to a single thread because the generator is stuck feeding from a
+    # single process, IF you materialize the paths first then the parallel fetch
+    # can actually run in parallel, but bugs/errors encountered late in collecting
+    # the paths will force all previous work to be redone
+    # XXX as a result of this we use the posix find command to implement rglob
+    # in a way that is orders of magnitude faster
+    paths_to_fetch = list(paths_to_fetch)
     fetch_paths_parallel(paths_to_fetch, n_jobs=n_jobs)
 
 
@@ -1218,7 +1238,9 @@ Options:
     --symlink-objects-to=PATH       path to an existing objects directory
 """
 
+import os
 from pyontutils import clifun as clif
+from sparcur import exceptions as exc
 from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
@@ -1297,6 +1319,24 @@ def pipe_main(main, after=None, argv=None):
     return out
 
 
+def rglob(path, pattern):
+    """ Hack around the absurd slowness of python's rglob """
+
+    doig = (hasattr(path, 'cache') and
+            path.cache and
+            path.cache.cache_ignore)
+    exclude = ' '.join([f"-not -path './{p}*'" for p in path.cache.cache_ignore]) if doig else ''
+    command = f"""find {exclude} -name {pattern!r}"""
+
+    with path:
+        with os.popen(command) as p:
+            string = p.read()
+
+    path_strings = string.split('\n')
+    paths = [path / s for s in path_strings if s]
+    return paths
+
+
 def fetch_paths_parallel(paths, n_jobs=12):
     def fetch(cache):
         # lambda functions are great right up until you have to handle an
@@ -1310,11 +1350,18 @@ def fetch_paths_parallel(paths, n_jobs=12):
                 logd.debug(f'remote errors {meta.errors} for {cache!r}')
                 return
             else:
-                raise e
+                raise exc.StopTheWorld(cache) from e
 
         return cache.fetch(size_limit_mb=size_mb + 1)
 
-    fetch_path = lambda path: fetch(path.cache)
+    def fetch_path(path):
+        cache = path.cache
+        if cache is None:
+            raise exc.NoCachedMetadataError(path)
+
+        # do not return to avoid cost of serialization back to the control process
+        fetch(cache)
+
     if n_jobs <= 1:
         [fetch_path(path) for path in paths]
     else:
