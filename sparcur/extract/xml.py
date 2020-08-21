@@ -41,9 +41,11 @@ class ExtractXml:
                     #log.debug(inst.e.getroot().tag)
 
         else:
-            path.xopen()
-            breakpoint()
-            raise TypeError(f'FIXME converter not implemented for whatever this is {path}')
+            msg = f'FIXME converter not implemented for whatever this is {path}'
+            log.critical(msg)
+            raise NotImplementedError(msg)
+            #path.xopen()
+            #breakpoint()
 
 
 class NotXml(HasErrors):
@@ -237,39 +239,40 @@ class ExtractMBF(XmlSource):
 
         return data_in
 
-    def _extract(self, *args, **kwargs):
+    def _extract(self, *args, prefix='_:', **kwargs):
+        _p = prefix
         subject = {
-            'id':      self.xpath('_:sparcdata/_:subject/@subjectid'),
-            'species': self.xpath('_:sparcdata/_:subject/@species'),
-            'sex':     self.xpath('_:sparcdata/_:subject/@sex'),
-            'age':     self.xpath('_:sparcdata/_:subject/@age'), # age at death ? (maximum age heh)
+            'id':      self.xpath(f'{_p}sparcdata/{_p}subject/@subjectid'),
+            'species': self.xpath(f'{_p}sparcdata/{_p}subject/@species'),
+            'sex':     self.xpath(f'{_p}sparcdata/{_p}subject/@sex'),
+            'age':     self.xpath(f'{_p}sparcdata/{_p}subject/@age'), # age at death ? (maximum age heh)
         }
 
         atlas = {
-            'organ':        self.xpath('_:sparcdata/_:atlas/@organ'),
-            'atlas_label':  self.xpath('_:sparcdata/_:atlas/@label'),
-            'atlas_rootid': self.xpath('_:sparcdata/_:atlas/@rootid'),
+            'organ':        self.xpath(f'{_p}sparcdata/{_p}atlas/@organ'),
+            'atlas_label':  self.xpath(f'{_p}sparcdata/{_p}atlas/@label'),
+            'atlas_rootid': self.xpath(f'{_p}sparcdata/{_p}atlas/@rootid'),
         }
 
         images = [
-            {'path_mbf': [pathlib.PureWindowsPath(p) for p in image_xpath('_:filename/text()')],
+            {'path_mbf': [pathlib.PureWindowsPath(p) for p in image_xpath(f'{_p}filename/text()')],
              'channels': [{'id':     channel_xpath('@id'),
                            'source': channel_xpath('@source'),}
-                          for channel in image_xpath('_:channels/_:channel')
+                          for channel in image_xpath(f'{_p}channels/{_p}channel')
                           for channel_xpath in (self.mkx(channel),)],
             }
-            for image in self.xpath('_:images/_:image')
+            for image in self.xpath(f'{_p}images/{_p}image')
             for image_xpath in (self.mkx(image),)
         ]
 
         # these are probably study targets ? or rois ? or what ...
         contours = [
             {'name':        xpath('@name'),
-             'guid':        xpath('_:property[@name="GUID"]/_:s/text()'),
-             'id_ontology': xpath('_:property[@name="TraceAssociation"]/_:s/text()'),
+             'guid':        xpath(f'{_p}property[@name="GUID"]/{_p}s/text()'),
+             'id_ontology': xpath(f'{_p}property[@name="TraceAssociation"]/{_p}s/text()'),
              # closed=true ??
             }
-            for contour in self.xpath('_:contour')
+            for contour in self.xpath(f'{_p}contour')
             for xpath in (self.mkx(contour),)]
 
         return {
@@ -294,6 +297,19 @@ class ExtractNeurolucida(ExtractMBF):
         data_in = self._condense(unique=unique, guid=guid)
         self.embedErrors(data_in)
         return data_in
+
+
+class ExtractVesselucida(ExtractMBF):
+
+    top_tag = 'mbf'
+    mimetype = 'application/vnd.mbfbioscience.vesselucida+xml'
+
+    def typeMatches(self):
+        return (super().typeMatches() and
+                'Vesselucida' in self.xpath('/mbf/@appname'))
+
+    def _extract(self, *args, prefix='', **kwargs):
+        return super()._extract(*args, prefix=prefix, **kwargs)
 
 
 class ExtractZen(XmlSource):
