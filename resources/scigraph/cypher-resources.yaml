@@ -374,9 +374,38 @@ cypherResources:
     query: |
       MATCH path1 = (start:Class{iri: '${start-id}'})
       -[:apinatomy:annotates]->(start_housing)
+      -[:apinatomy:subtypes*0..1]->()
+      -[:apinatomy:clones*0..1]->(layer_or_end)
+      -[:apinatomy:layers*0..1]->()
+      -[:apinatomy:bundles]->(link)
+      -[:apinatomy:source|apinatomy:prevChainEndLevels|apinatomy:prev*1..]->(nodeRoot)
+      -[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
+      -[:apinatomy:conveyingLyph]->()
+      -[:apinatomy:supertype*0..1]->(soma:NamedIndividual)
+      -[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      RETURN path1
+      UNION
+      MATCH path1 = (start:Class{iri: '${start-id}'})
+      -[:apinatomy:bundles]->(link)
+      -[:apinatomy:source|apinatomy:prevChainEndLevels|apinatomy:prev*1..]->(nodeRoot)
+      -[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
+      -[:apinatomy:conveyingLyph]->(soma:NamedIndividual)
+      -[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      RETURN path1
+
+  - path: /dynamic/demos/apinat/old-bundles/{start-id}
+    operations:
+      - summary: Return the paths to somas from an anatomical region (aka connected-somas)
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      MATCH path1 = (start:Class{iri: '${start-id}'})
+      -[:apinatomy:annotates]->(start_housing)
       -[:apinatomy:bundlesChains]->(chain)
       -[:apinatomy:root]->(root)
-      -[:apinatomy:internalIn]->(layer_or_end)
+      -[:apinatomy:internalIn]->(layer_or_end)  # this hits a cycle back to start_housing
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:external]->(layer_or_end_external)
