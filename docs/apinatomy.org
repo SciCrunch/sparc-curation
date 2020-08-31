@@ -48,12 +48,12 @@ spc apinat keast-spinal-full.jsonld keast-spinal-full.ttl
 # look backward up the folder hierarchy to find it
 ** Deploy ttl
 After running the ttl export via [[apinat-export][apinat-export]]
-scp the files to the server hosting the ttl files.
+rsync the files to the server hosting the ttl files.
 
 #+begin_src bash :results none :noweb yes
-scp ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
-scp ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
-scp ~/git/sparc-curation/keast-spinal-full.ttl cassava:/tmp/
+rsync --rsh ssh ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
+rsync --rsh ssh ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
+rsync --rsh ssh ~/git/sparc-curation/keast-spinal-full.ttl cassava:/tmp/
 #+end_src
 
 And then put move them to the right place.
@@ -75,6 +75,10 @@ unlink keast-spinal-full.ttl
 ln -s "../${ARCHIVE_PATH}/keast-spinal-full.ttl"
 popd
 #+end_src
+
+#+RESULTS:
+| /var/www/sparc/ApiNATOMY/ontologies | ~ |
+| ~                                   |   |
 
 Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success if needed.
 ** Load and deploy graph
