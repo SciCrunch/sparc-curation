@@ -471,10 +471,27 @@ class Organs(FieldAlignment):
         row = self._lookup(dataset_id, fail=True)
         return self.values.index(row)
 
-    def _update_dataset_metadata(self, id, name, award):
+    def _update_technique(self, cell):
+        # NOTE some rows won't update if the dataset no longer exists
+        value = cell.value
+        if value:
+            try:
+                term = next(OntTerm.query(label=value))
+                cell.value = term.asCellHyperlink()
+            except StopIteration:
+                log.info(f'no term for technique {value}')
+
+    def _update_dataset_metadata(self, id, name, award, update_techniques=False):
         try:
             row_index = self._dataset_row_index(id)
             row = self.row_object(row_index)
+
+            if update_techniques:
+                for i in range(1,10):
+                    h = f'technique{i}'
+                    cell_t = getattr(row, h, lambda:None)()
+                    if cell_t is not None:
+                        self._update_technique(cell_t)
 
             cell_dsn = row.dataset_name()
             if cell_dsn.value != name:
@@ -489,18 +506,25 @@ class Organs(FieldAlignment):
             self._appendRow(row)
 
     def update_from_ir(self, ir):
-        dataset_blobs = ir['datasets']
-        self._wat = self.values[8]
-        for blob in dataset_blobs:
-            meta = blob['meta']
-            self._update_dataset_metadata(
-                id=blob['id'],
-                name=adops.get(blob, ['meta', 'folder_name'], on_failure=''),
-                award=adops.get(blob, ['meta', 'award_number'], on_failure=''),
-            )
+        oi = OntTerm.query._instrumented
+        if oi is not OntTerm:
+            OntTerm.query._instrumented = OntTerm
 
+        try:
+            dataset_blobs = ir['datasets']
+            self._wat = self.values[8]
+            for blob in dataset_blobs:
+                meta = blob['meta']
+                self._update_dataset_metadata(
+                    id=blob['id'],
+                    name=adops.get(blob, ['meta', 'folder_name'], on_failure=''),
+                    award=adops.get(blob, ['meta', 'award_number'], on_failure=''),
+                )
+        finally:
+            # FIXME this is so dumb :/
+            OntTerm.query._instrumented = oi
         #log.debug(self.uncommitted())
-        self.commit()
+        #self.commit()
 
     def modality(self, dataset_id):
         """ tuple of modalities """

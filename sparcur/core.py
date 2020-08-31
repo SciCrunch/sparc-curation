@@ -134,6 +134,9 @@ class OntTerm(OTB, OntId):
 
         return self.label + sep + self.curie
 
+    def asCellHyperlink(self):
+        return f'=HYPERLINK("{self.iri}", "{self.label}")'
+
     @property
     def triples_simple(self):
         # method name matches convention from neurondm
@@ -155,6 +158,9 @@ class OntTerm(OTB, OntId):
 
         elif self.synonyms:
             yield s, NIFRID.synonyms, rdflib.Literal(self.synonyms)
+
+
+OntTerm._sinit()
 
 
 class HasErrors:
@@ -879,6 +885,8 @@ class _DictTransformer:
         """
 
         for path, function in updates:
+            if path == ['metadata_file', int, 'contents', 'manifest_records', int, 'software_rrid']:
+                breakpoint()
             if int in path:  # unlike adops.add, this has to be implemented in DT
                 pivot = path.index(int)
                 before = path[:pivot]

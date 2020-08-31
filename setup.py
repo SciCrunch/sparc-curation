@@ -14,6 +14,21 @@ def find_version(filename):
 
 __version__ = find_version('sparcur/__init__.py')
 
+
+def do_emacs_things():
+    'emacs -q -batch -L . --no-site-file --load org --load ob-shell'
+    ['emacs',
+     '--batch',
+     '--no-init-file',
+     '--no-site-file',
+     '--directory', '.',
+     '--load', 'org',
+     '--load', 'ob-shell',
+     '--load', 'ob-python',
+     '--eval', '(org-babel-tangle-file "docs/developer-guide.org")',
+     ]
+
+
 with open('README.md', 'rt') as f:
     long_description = f.read()
 
@@ -50,7 +65,7 @@ setup(name='sparcur',
           'ontquery>=0.2.6',
           'openpyxl',
           'protcur>=0.0.7',
-          'pyontutils>=0.1.25',
+          'pyontutils>=0.1.26',
           'pysercomb>=0.0.7',
           'rdflib_jsonld',
           'terminaltables',
