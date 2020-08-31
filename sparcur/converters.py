@@ -1,6 +1,7 @@
 from types import GeneratorType
 import idlib
 import rdflib
+import ontquery as oq
 from pysercomb.pyr.types import ProtcurExpression, Quantity, Range
 from pyontutils import combinators as cmb
 from pyontutils.namespaces import TEMP, TEMPRAW, isAbout, sparc, NIFRID
@@ -100,6 +101,9 @@ class TripleConverter(dat.HasErrors):
 
                 for v in values:
                     #log.debug(f'{field} {v} {convert}')
+                    if isinstance(v, oq.OntId):
+                        _old_v = v
+                        v = v.asInstrumented()
                     try:
                         p, o = convert(v)
                     except exc.NoTripleError as e:

@@ -161,6 +161,7 @@ class OntTerm(OTB, OntId):
 
 
 OntTerm._sinit()
+OntTerm.set_repr_args('curie', 'label')
 
 
 class HasErrors:
@@ -308,6 +309,9 @@ def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **k
 
 
 def _json_identifier_expansion(obj, *args, **kwargs):
+    if isinstance(obj, oq.OntId):
+        obj = obj.asInstrumented()
+
     if isinstance(obj, oq.OntTerm):
         oc = obj.__class__
         obj.__class__ = OntTerm  # that this works is amazing/terrifying
