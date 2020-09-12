@@ -39,6 +39,8 @@ def xml(dataset_blobs):
             return v.asCell()
         #elif isinstance(v, list) or isinstance(v, str):
             #return v
+        elif isinstance(v, BaseException):
+            return repr(v)
         else:
             #loge.debug(repr(v))
             return v
