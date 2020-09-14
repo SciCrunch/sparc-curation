@@ -309,8 +309,12 @@ def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **k
 
 
 def _json_identifier_expansion(obj, *args, **kwargs):
-    if isinstance(obj, oq.OntId):
-        obj = obj.asInstrumented()
+    if not isinstance(obj, oq.OntTerm):
+        if isinstance(obj, rdflib.URIRef):
+            obj = OntId(obj)
+
+        if isinstance(obj, oq.OntId):
+            obj = obj.asInstrumented()
 
     if isinstance(obj, oq.OntTerm):
         oc = obj.__class__
