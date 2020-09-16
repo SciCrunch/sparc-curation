@@ -1,5 +1,6 @@
 import json
 import logging
+import tempfile
 from socket import gethostname
 from functools import wraps
 import idlib
@@ -614,7 +615,7 @@ class Summary(Integrator, ExporterSummarizer):
         return data
 
 
-_p = Path('/tmp/asdf')
+_p = Path(tempfile.gettempdir()) / 'asdf'
 _p.mkdir(exist_ok=True)  # FIXME XXXXXXXXXXXXXXXXXXXXXXXXXX
 def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
            evil=[False], dumb=False):
