@@ -1,5 +1,9 @@
 #+title: ApiNATOMY model RDF export and deployment
 #+options: num:nil
+#+startup: showall
+
+# [[file:./apinatomy.pdf]]
+# [[file:./apinatomy.html]]
 
 * Using this file :noexport:
 You can also tangle this file to produce [[file:../export-apinatomy-tests]]
@@ -14,12 +18,18 @@ emacs --batch \
 ./export-apinatomy-tests
 #+end_src
 * ApiNATOMY to RDF/OWL2 conversion
+:PROPERTIES:
+:visibility: folded
+:END:
 ** Basic strategy
-   JSON -> RDF -> OWL2 \\
-   Conversion from json to rdf should have few if any changes in semantics. \\
-   Conversion from a direct rdf translation to OWL2 is where the semantic \\
-   translation of ApiNATOMY structures into OWL2 constructs will happen.
+JSON -> RDF -> OWL2 \\
+Conversion from json to rdf should have few if any changes in semantics. \\
+Conversion from a direct rdf translation to OWL2 is where the semantic \\
+translation of ApiNATOMY structures into OWL2 constructs will happen.
 * Server setup
+:PROPERTIES:
+:visibility: folded
+:END:
 On the ontology host (read, ttl host, not SciGraph host) you will need the following.
 #+begin_src bash :dir /ssh:host-apinat-ttl|sudo:host-apinat-ttl: :eval never
 mkdir /var/www/sparc/ApiANTOMY
@@ -50,6 +60,8 @@ spc apinat keast-spinal-full.jsonld keast-spinal-full.ttl
 After running the ttl export via [[apinat-export][apinat-export]]
 rsync the files to the server hosting the ttl files.
 
+# NOTE on windows the ~ must be exapnded for scp
+# and rsync apparently can't read .ssh/config on windows sigh
 #+begin_src bash :results none :noweb yes
 rsync --rsh ssh ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
 rsync --rsh ssh ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
@@ -76,10 +88,6 @@ ln -s "../${ARCHIVE_PATH}/keast-spinal-full.ttl"
 popd
 #+end_src
 
-#+RESULTS:
-| /var/www/sparc/ApiNATOMY/ontologies | ~ |
-| ~                                   |   |
-
 Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success if needed.
 ** Load and deploy graph
 Then run
@@ -99,6 +107,9 @@ An example run is
 [[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/soma-processes][Soma processes]]
 [[http://ontology.neuinfo.org/trees/sparc/simple/dynamic/demos/apinat/soma-processes][Soma processes simple]]
 * Dynamic cypher queries
+:PROPERTIES:
+:visibility: folded
+:END:
 NOTE: this section contains temporary instructions.
 This should really be done on a development instance of data services.
 Sometimes it is faster to edit [[tramp:/ssh:aws-scigraph-data-scigraph:services.yaml]] directly.
@@ -122,6 +133,9 @@ to match the name of the file that you scp to cassava.
       removeUnsatisfiableClasses: true
 #+end_src
 * ApiNATOMY model server specification
+:PROPERTIES:
+:visibility: folded
+:END:
 ** Intro
 While an ApiNATOMY server has been on the roadmap for some time, there have not been
 clear requirements and use cases to drive the development in a way that is productive.
@@ -150,6 +164,13 @@ models as well.
 
 A brief outline of the initial requirements needed to meet the needs of the RDF conversion pipeline
 are documented below.
+** Architecture diagram
+[[file:./images/apinatomy-server-diagram.png]]
+Legend.
+| Solid lines         | initial  |
+| Dashed lines        | soon     |
+| Dotted lines        | later    |
+| Dashed dotted lines | dataflow |
 ** https by default
 ** url structure
 *** apinatomy.org
@@ -166,3 +187,7 @@ the source model hash needs to be separat
 ** return authoring metadata
 ** store the source model
 ** have endpoint for resource-map and generated
+** overlap with loading in the client
+*** load all formats from local
+*** google sheets import
+*** load from a url
