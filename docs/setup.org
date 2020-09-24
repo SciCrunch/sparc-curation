@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.0; orgstrap-block-checksum: 429cd137fc35934c4475a1c3c382ee0116a4a42ae0d4641dd4b39bebc1b90b6a; -*-
 #+TITLE: Developer and curator setup guide
 #+AUTHOR: Tom Gillespie
 # [[./setup.pdf]]
@@ -1652,3 +1652,23 @@ rrid-metadata/rrid
 NIF-Ontology/
 '
 #+end_src
+* Bootstrap :noexport:
+#+name: orgstrap
+#+begin_src elisp :results none
+(defun orgstrap---advise-ob-scor-windows (command &rest args)
+  (let ((exec-path (cons "C:/Program Files/Git/bin/" exec-path)))
+    (when (string= (downcase (executable-find "bash"))
+                   (downcase "C:/WINDOWS/system32/bash.exe"))
+      ;; git bash (and I assume mingw bash) is ok so only fail on wsl bash
+      ;; this check needs to happen inside the advice to prevent any bash block
+      ;; from running with bad semantics since wsl bash could damage the system
+      (error "WSL bash detected! Not running bash block since WSL bash is completely broken and will skip whole commands and/or drop their output."))
+    (apply command args)))
+
+(when (eq system-type 'windows-nt)
+  (advice-add #'org-babel--shell-command-on-region :around #'orgstrap---advise-ob-scor-windows))
+#+end_src
+
+# Local Variables:
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.0 (body) (let ((print-quoted nil)) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp 'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let ((ocbe org-confirm-babel-evaluate)) (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (unwind-protect (save-excursion (org-babel-goto-named-src-block "orgstrap") (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe))))
+# End:
