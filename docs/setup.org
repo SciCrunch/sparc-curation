@@ -538,10 +538,12 @@ clisp `
 emacs `
 firefox `
 GoogleChrome `
+nodejs `
 poshgit `
 procexp `
 python `
 racket `
+rsync `
 vim
 #+end_src
 

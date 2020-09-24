@@ -1452,7 +1452,7 @@ done"""
         if path_in.suffix == '.json':
             from sparcur import apinat
             agraph = apinat.Graph(resource_map)
-            graph = agraph.graph()
+            graph = agraph.graph() # FIXME broken in some config space?
             graph.write(path=path_out)
         elif path_in.suffix == '.jsonld':
             from pyontutils.core import populateFromJsonLd, OntGraph
@@ -1785,7 +1785,7 @@ def main():
         raise e
     finally:
         if logfile.size == 0:
-            logfile.unlink()
+            logfile.unlink()  # FIXME broken on windows with spc apinat
 
     if options.profile:
         exit = time()
