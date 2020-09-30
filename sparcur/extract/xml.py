@@ -404,6 +404,19 @@ class ExtractZISRAWSUBBLOCK_METADATA(XmlSource):
         return {}
 
 
+class ExtractMSXMLExcel(XmlSource):
+    """ MS-XML for Excel.
+        https://en.wikipedia.org/wiki/Microsoft_Office_XML_formats
+    """
+
+    top_tag = '{urn:schemas-microsoft-com:office:spreadsheet}Workbook'
+    # not clear that this is really xml metadata, it might count as data
+    mimetype = 'application/vnd.ms-excel+xml'  # this isn't real, but close enough
+
+    def _extract(self):
+        return {}
+
+
 ExtractXml.classes = (*[c for c in subclasses(XmlSource)], XmlSource)
 
 # FIXME not entirely clear that I am using type correctly here
