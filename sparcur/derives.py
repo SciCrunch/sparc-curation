@@ -89,7 +89,7 @@ class Derives:
             metadata = doi.metadata()  # FIXME network sandbox violation
             if metadata is not None:
                 return doi
-        except idlib.exceptions.ResolutionError:
+        except idlib.exceptions.RemoteError:
             # sometimes a doi is present on the platform but does not resolve
             # in which case we don't add it as metadata because it has not
             # been officially published, just reserved, this check is more
