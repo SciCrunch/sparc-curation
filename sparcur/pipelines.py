@@ -422,14 +422,19 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
 
     @staticmethod
     def _path_to_json_meta(path):
-        e = exml.ExtractXml(path)
         metadata = path._jsonMetadata(do_expensive_operations=False)
-        # XXX sideeffects to retrieve path metadata
-        # FIXME expensive operations is hardcoded & blocked
-        if e.mimetype:
-            metadata['contents'] = e.asDict()
-            # FIXME TODO probably want to check that the mimetypes are compatible when overwriting?
-            metadata['mimetype'] = e.mimetype  # overwrites the type
+        try:
+            e = exml.ExtractXml(path)
+            # XXX sideeffects to retrieve path metadata
+            # FIXME expensive operations is hardcoded & blocked
+            if e.mimetype:
+                metadata['contents'] = e.asDict()
+                # FIXME TODO probably want to check that the mimetypes are compatible when overwriting?
+                metadata['mimetype'] = e.mimetype  # overwrites the type
+        except NotImplementedError as e:
+            he = dat.HasErrors(pipeline_stage='XmlFilePipeline._path_to_json_meta')
+            he.addError(e, path=path)
+            he.embedErrors(metadata)
 
         return metadata
 
