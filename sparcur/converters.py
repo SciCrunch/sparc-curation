@@ -294,7 +294,7 @@ class MetaConverter(TripleConverter):
                         t = None
                         for t in value.triples_gen:
                             yield t
-                    except idlib.exc.ResolutionError as e:
+                    except idlib.exc.RemoteError as e:
                         if t is None:
                             # we already logged this error during id dereferencing
                             return

@@ -480,9 +480,9 @@ class Export(ExportBase):
                     metadata = id.metadata()
                     metadata['id'] = id
                     return metadata
-                except (requests.exceptions.HTTPError, idlib.exceptions.ResolutionError) as e:
+                except (requests.exceptions.HTTPError, idlib.exc.RemoteError) as e:
                     logd.error(e)
-                except (requests.exceptions.ConnectionError, requests.exceptions.SSLError) as e:
+                except (requests.exceptions.ConnectionError, requests.exceptions.SSLError, idlib.exc.ResolutionError) as e:
                     log.error(e)
 
             # retrieve doi metadata and materialize it in the dataset

@@ -340,6 +340,14 @@ def json_identifier_expansion(obj, *args, path=None, **kwargs):
     """ expand identifiers to json literal form """
     try:
         return _json_identifier_expansion(obj, *args, **kwargs)
+    except idlib.exceptions.RemoteError as e:
+        oops = json_export_type_converter(obj)
+        msg = f'remote error {e} for {type(obj)}: {oops}'
+        out = {'id': obj,
+               'type': 'identifier',
+               'system': obj.__class__.__name__,
+               'errors': [{'message': msg, 'path': path}]}
+        return out
     except idlib.exceptions.ResolutionError as e:
         oops = json_export_type_converter(obj)
         msg = f'could not resolve {type(obj)}: {oops}'
