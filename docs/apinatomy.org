@@ -49,46 +49,71 @@ Run this block in emacs with =C-c C-c= or tangle and run with the block below
 #+name: apinat-export
 #+header: :shebang "#!/usr/bin/env bash" :tangle-mode (identity #o0755)
 #+begin_src bash :dir ../ :tangle ../export-apinatomy-tests :async
-spc apinat ./test/apinatomy/keast-spinal-map.json keast-spinal.ttl
-spc apinat ./test/apinatomy/bolser-lewis-map.json test-bolew.ttl
-spc apinat keast-spinal-full.jsonld keast-spinal-full.ttl
+spc apinat bolser-lewis.jsonld bolser-lewis.ttl
+spc apinat keast-bladder.jsonld keast-bladder.ttl
+spc apinat bronchomotor.jsonld bronchomotor.ttl
 #+end_src
 # note have to export to working dir not ../bin/ because
 # there is no test folder inside of bin and python can't
 # look backward up the folder hierarchy to find it
+
+# [[tramp:/ssh:cassava|sudo:cassava:/var/www/sparc/ApiNATOMY/ontologies/sparc-data.ttl]]
 ** Deploy ttl
 After running the ttl export via [[apinat-export][apinat-export]]
-rsync the files to the server hosting the ttl files.
+define the functions in ref:deploy-ontology-file and then run
+~apinat-deploy-from-ttl bronchomotor.ttl~.
 
-# NOTE on windows the ~ must be exapnded for scp
-# and rsync apparently can't read .ssh/config on windows sigh
-#+begin_src bash :results none :noweb yes
-rsync --rsh ssh ~/git/sparc-curation/test-bolew.ttl cassava:/tmp/
-rsync --rsh ssh ~/git/sparc-curation/keast-spinal.ttl cassava:/tmp/
-rsync --rsh ssh ~/git/sparc-curation/keast-spinal-full.ttl cassava:/tmp/
-#+end_src
+# FIXME it should be possible to implement this whole process
+# using OntResIriWrite or something like that
+# read the header, lookup the uri -> server file system path
+# write the version iri if it doesn exist (otherwise error)
+# and symlink it to the remote, I don't have an implementation
+# of RemoteUnixPath that could use something like sftp to
+# allow direct execution of file operations on a remote path
+# from a local python representation of that class so it is
+# too big to bite off right now
 
-And then put move them to the right place.
-#+begin_src bash :dir /ssh:cassava|sudo:cassava:
-DATE=$(date +%Y%m%dT%H%M%S)
-ARCHIVE_PATH="archive/manual/${DATE}"
-FOLDER="/var/www/sparc/ApiNATOMY/${ARCHIVE_PATH}"
-mkdir $FOLDER
-mv "/tmp/test-bolew.ttl" $FOLDER
-mv "/tmp/keast-spinal.ttl" $FOLDER
-mv "/tmp/keast-spinal-full.ttl" $FOLDER
-chown -R nginx:nginx $FOLDER
-pushd /var/www/sparc/ApiNATOMY/ontologies
-unlink test-bolew.ttl
-ln -s "../${ARCHIVE_PATH}/test-bolew.ttl"
-unlink keast-spinal.ttl
-ln -s "../${ARCHIVE_PATH}/keast-spinal.ttl"
-unlink keast-spinal-full.ttl
-ln -s "../${ARCHIVE_PATH}/keast-spinal-full.ttl"
-popd
+#+name: deploy-ontology-file
+#+begin_src bash
+function apinat-remote-operations () {
+    local PATH_SOURCE="${1}"
+    local PATH_TARGET="${2}"
+    local PATH_LINK="${3}"
+    local FILE_NAME_TTL=$(basename -- "${PATH_TTL}")
+    local DIR_LINK="$(dirname "${PATH_LINK}")"
+    local LINK_TARGET="$(realpath -m --relative-to="${DIR_LINK}" "${PATH_TARGET}")"
+    mkdir -p "$(dirname "${PATH_TARGET}")"
+    chown nginx:nginx "${PATH_SOURCE}"
+    mv "${PATH_SOURCE}" "${PATH_TARGET}"
+    unlink "${PATH_LINK}"
+    ln -s "${LINK_TARGET}" "${PATH_LINK}"
+}
+
+function apinat-deploy-from-ttl () {
+    # TODO loop over positional argument paths, but retain a single ssh command
+    local PATH_TTL="${1}"  # FIXME careful with this, never allow a user to set the source path
+    local DATE=$(date +%s)  # FIXME source from the ontology directly? better to spend time implementing OntResIriWrite
+    local HOST_APINAT_ONTOLOGY=cassava
+    local FILE_NAME_TTL=$(basename -- "${PATH_TTL}")
+    local NAME_TTL="${FILE_NAME_TTL%.*}"
+    local PATH_REMOTE_TARGET_BASE=/var/www/sparc/ApiNATOMY/ontologies/
+    local VERSION_PATH="${NAME_TTL}/${DATE}/${FILE_NAME_TTL}"
+    local PATH_REMOTE_SOURCE="/tmp/${FILE_NAME_TTL}"
+    local PATH_REMOTE_TARGET="${PATH_REMOTE_TARGET_BASE}${VERSION_PATH}"
+    local PATH_REMOTE_LINK="${PATH_REMOTE_TARGET_BASE}${FILE_NAME_TTL}"
+
+    local SUDO_OR_SU='$(command -v sudo 1>& 2 && echo sudo ${0} -c || { echo For su on ${HOSTNAME} 1>& 2; echo su -c; })'
+
+    rsync --rsh ssh "${PATH_TTL}" ${HOST_APINAT_ONTOLOGY}:"${PATH_REMOTE_SOURCE}"
+    ssh -t ${HOST_APINAT_ONTOLOGY} "${SUDO_OR_SU} '$(typeset -f apinat-remote-operations); apinat-remote-operations \
+\"${PATH_REMOTE_SOURCE}\" \
+\"${PATH_REMOTE_TARGET}\" \
+\"${PATH_REMOTE_LINK}\"'"
+}
 #+end_src
 
 Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success if needed.
+# [[tramp:/ssh:cassava|sudo:cassava:/var/www/sparc/ApiNATOMY/ontologies/sparc-data.ttl]]
 ** Load and deploy graph
 Then run
 [[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
