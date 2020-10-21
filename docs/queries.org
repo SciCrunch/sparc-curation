@@ -68,6 +68,59 @@ WHERE {
 ** Experimental Protocol
 *** Conditions studied
 *** Experimental groups
+#+name: experimental-groups
+#+begin_src sparql :var limit="10"
+SELECT DISTINCT
+?dataset
+?group
+?subj
+WHERE {
+    ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
+    ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
+    ?subj  TEMP:hasAssignedGroup ?group .
+} ORDER BY ASC(?dataset) ASC(?group) LIMIT ?limit
+#+end_src
+
+#+RESULTS: experimental-groups
+| dataset                                                                          | group | subj                                                                                               |
+|----------------------------------------------------------------------------------+-------+----------------------------------------------------------------------------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16013 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16014 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16016 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16017 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17018 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17020 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17045 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17046 |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17047 |
+
+#+call: experimental-groups(limit="20") :var dataset="dataset:01b5cc2d-b321-4fed-8767-52771c4d680f"
+
+#+RESULTS:
+| group | subj                                                                                               |
+|-------+----------------------------------------------------------------------------------------------------|
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17113 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17114 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17140 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17154 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17172 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17173 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17067 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17068 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17074 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17075 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17077 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17078 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17079 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17080 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17083 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17084 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17099 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16013 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16014 |
+|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
+
 *** Techniques
 # #+header: :var dataset=(identity nil)
 #+begin_src sparql
@@ -104,6 +157,7 @@ UNION
 | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/99  |
 
 ** Datasets following same protocol with different subjects
+*** Completeness
 #+begin_src sparql
 SELECT DISTINCT
 ?dataset
@@ -127,6 +181,30 @@ WHERE {
 | https://api.blackfynn.io/datasets/N:dataset:0c23200d-d821-4732-a467-9f73ab2862f0 | Complete     |
 | https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | complete     |
 | https://api.blackfynn.io/datasets/N:dataset:1284a4e8-21e1-4b9f-9280-6ba06f6b9a50 | Batch        |
+*** Dataset collections
+#+begin_src sparql :var limit="10"
+SELECT DISTINCT
+?title
+?dataset
+WHERE {
+  ?startdataset TEMP:collectionTitle ?title .
+  ?dataset  TEMP:collectionTitle ?title .
+} ORDER BY ASC(?title) LIMIT ?limit
+#+end_src
+
+#+RESULTS:
+| title                                                                                          | dataset                                                                          |
+|------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------|
+| A multi-scale model of cardiac electrophysiology                                               | https://api.blackfynn.io/datasets/N:dataset:c5c2f40f-76be-4979-bfc4-b9f9947231cf |
+| AAV Serotypes 6_8_9 Intrapancreatic 4 weeks                                                    | https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e |
+| AAV8 Titer and Route                                                                           | https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 |
+| AAV8 Titer and Route                                                                           | https://api.blackfynn.io/datasets/N:dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a |
+| AAVretro Serotype Intrapancreatic 4 weeks                                                      | https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f |
+| Acute effects of gastric electrical stimulation settings on gastric motility assessed with MRI | https://api.blackfynn.io/datasets/N:dataset:c2564991-28d5-42cf-bfb6-8f93b874a5af |
+| Acute effects of vagus nerve stimulation settings on gastric motility assessed with MRI        | https://api.blackfynn.io/datasets/N:dataset:76593e2b-2343-44db-9d47-f7c15f3e2afa |
+| Afferent Fiber Interactions with Renal Glomeruli                                               | https://api.blackfynn.io/datasets/N:dataset:55ceb112-2519-41c8-b808-f05dd4dd87d1 |
+| Anatomy and Histology of the Domestic Pig in the Context of Vagus Nerve Stimulation            | https://api.blackfynn.io/datasets/N:dataset:f1f7598c-ab36-4cff-95a2-85917e951407 |
+| Assessment of gastric emptying and motility with MRI under gastric electrical stimulation      | https://api.blackfynn.io/datasets/N:dataset:6f7e029d-684e-4603-9dea-ec82a53c5a75 |
 
 ** Subjects
 *** Members
