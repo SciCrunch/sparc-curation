@@ -506,6 +506,50 @@ WHERE {
 | https://api.blackfynn.io/datasets/N:dataset:fc6e3a87-1241-4f81-b284-8ebc82efc499 | Mus musculus |
 | https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | Mus musculus |
 
+**** Sample Source
+#+name: dataset-sample-source
+#+begin_src sparql :var limit="20"
+SELECT DISTINCT
+?dataset
+?ae
+# ?slid
+WHERE {
+?sample TEMP:hasDerivedInformationAsParticipant ?dataset .
+?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?ae .
+?sample a sparc:Sample .
+# ?sample TEMP:localId ?slid .
+?dataset a sparc:Dataset .
+}
+ORDER BY
+DESC(?ae)
+# ASC(?slid)
+LIMIT ?limit
+#+end_src
+
+#+RESULTS: dataset-sample-source
+| dataset                                                                          | ae                              |
+|----------------------------------------------------------------------------------+---------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:82c228a2-134a-4f6f-82f2-d89e64cb7be1 | whole stomach                   |
+| https://api.blackfynn.io/datasets/N:dataset:57466879-2cdd-4af2-8bd6-7d867423c709 | vasculature of the the pancreas |
+| https://api.blackfynn.io/datasets/N:dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | transverse colon                |
+| https://api.blackfynn.io/datasets/N:dataset:4a361ad8-d500-4f3d-81f8-c92f504946b2 | torus pyloricus                 |
+| https://api.blackfynn.io/datasets/N:dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c | superior cervical ganglia       |
+| https://api.blackfynn.io/datasets/N:dataset:bec4d335-9377-4863-9017-ecd01170f354 | subdiaphragmatic vagus nerve    |
+| https://api.blackfynn.io/datasets/N:dataset:c082215b-6765-4cc8-a965-92773b4c18c1 | subdiaphragmatic vagus nerve    |
+| https://api.blackfynn.io/datasets/N:dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 | subdiaphragmatic vagus nerve    |
+| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | stomach                         |
+| https://api.blackfynn.io/datasets/N:dataset:a244bca9-b747-4035-9bdc-ee6227a29dfd | stellate ganglion               |
+| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | spleen                          |
+| https://api.blackfynn.io/datasets/N:dataset:9d8ad16c-2ae7-414c-8573-048303039c76 | spinal cord, segments L5-S2     |
+| https://api.blackfynn.io/datasets/N:dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | sigmoid colon                   |
+| https://api.blackfynn.io/datasets/N:dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | sigma                           |
+| https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | sample middle ~2 cm             |
+| https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | sample middle ~2 cm             |
+| https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | sample middle ~2 cm             |
+| https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | right colon                     |
+| https://api.blackfynn.io/datasets/N:dataset:6d6818f2-ef75-4be5-9360-8d37661a8463 | right cervical vagus nerve      |
+| https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | right cervical vagus nerve      |
+
 *** Protocol
 **** Involves
 #+begin_src sparql
