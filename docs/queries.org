@@ -1,0 +1,555 @@
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e8883bd1429e87a80d937119139e193829dc796f38b27503982de5b90efbbd7d; -*-
+# [[orgstrap][jump to the orgstrap block for this file]]
+
+* SPARQL
+:PROPERTIES:
+:header-args:sparql: :url http://localhost:9999/blazegraph/sparql
+:header-args:sparql+: :format text/csv
+:header-args:sparql+: :results table
+:END:
+** Datasets
+*** Dataset Predicates
+#+begin_src sparql
+SELECT DISTINCT
+?p
+# ?pp
+# ?po
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset ?p ?o .
+  # ?p ?pp ?po .
+}
+#+end_src
+
+#+RESULTS:
+| p                                                                     |
+|-----------------------------------------------------------------------|
+| http://uri.interlex.org/temp/uris/contentsWereUpdatedAtTime           |
+| http://uri.interlex.org/temp/uris/curationIndex                       |
+| http://uri.interlex.org/temp/uris/errorIndex                          |
+| http://uri.interlex.org/temp/uris/hasAdditionalFundingInformation     |
+| http://uri.interlex.org/temp/uris/hasAwardNumber                      |
+| http://uri.interlex.org/temp/uris/hasContactPerson                    |
+| http://uri.interlex.org/temp/uris/hasDatasetTemplateSchemaVersion     |
+| http://uri.interlex.org/temp/uris/hasExpectedNumberOfSamples          |
+| http://uri.interlex.org/temp/uris/hasExpectedNumberOfSubjects         |
+| http://uri.interlex.org/temp/uris/hasExperimentalModality             |
+| http://uri.interlex.org/temp/uris/hasNumberOfContributors             |
+| http://uri.interlex.org/temp/uris/hasNumberOfDirectories              |
+| http://uri.interlex.org/temp/uris/hasNumberOfFiles                    |
+| http://uri.interlex.org/temp/uris/hasProtocol                         |
+| http://uri.interlex.org/temp/uris/hasResponsiblePrincipalInvestigator |
+| http://uri.interlex.org/temp/uris/hasSizeInBytes                      |
+| http://uri.interlex.org/temp/uris/hasUriApi                           |
+| http://uri.interlex.org/temp/uris/hasUriHuman                         |
+| http://uri.interlex.org/temp/uris/milestoneCompletionDate             |
+| http://uri.interlex.org/temp/uris/statusOnPlatform                    |
+| http://uri.interlex.org/temp/uris/submissionIndex                     |
+| http://uri.interlex.org/temp/uris/unclassifiedIndex                   |
+| http://uri.interlex.org/temp/uris/wasCreatedAtTime                    |
+| http://uri.interlex.org/temp/uris/wasUpdatedAtTime                    |
+| http://www.w3.org/1999/02/22-rdf-syntax-ns#type                       |
+| http://www.w3.org/2000/01/rdf-schema#label                            |
+| http://purl.org/dc/elements/1.1/title                                 |
+| http://purl.org/dc/elements/1.1/description                           |
+| http://uri.interlex.org/temp/uris/protocolEmploysTechnique            |
+| http://purl.obolibrary.org/obo/IAO_0000136                            |
+| http://uri.interlex.org/temp/uris/collectionTitle                     |
+| http://uri.interlex.org/temp/uris/hasDoi                              |
+| http://uri.interlex.org/temp/uris/hasNumberOfSubjects                 |
+| http://uri.interlex.org/temp/uris/involvesAnatomicalRegion            |
+| http://uri.interlex.org/temp/uris/isAboutParticipant                  |
+| http://uri.interlex.org/temp/uris/acknowledgements                    |
+| http://uri.interlex.org/temp/uris/completenessOfDataset               |
+| http://uri.interlex.org/temp/uris/isDescribedBy                       |
+| http://uri.interlex.org/temp/uris/hasNumberOfSamples                  |
+| http://uri.interlex.org/temp/uris/unclassifiedStages                  |
+
+** Experimental Protocol
+*** Conditions studied
+*** Experimental groups
+*** Techniques
+# #+header: :var dataset=(identity nil)
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?technique
+# ?protocol
+# ?technique_p
+WHERE {
+{ ?dataset a sparc:Dataset .
+  ?dataset TEMP:protocolEmploysTechnique ?technique .
+  # ?technique rdfs:label ?tl
+}
+UNION
+{ ?dataset TEMP:hasProtocol ?protocol .
+  ?protocol TEMP:protocolEmploysTechnique ?technique .
+  # ?technique rdfs:label ?tl
+}
+} LIMIT 10
+#+end_src
+
+#+RESULTS:
+| dataset                                                                          | technique                                                          |
+|----------------------------------------------------------------------------------+--------------------------------------------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:765abd74-2671-4dda-a249-8f31c5727ea6 | http://uri.interlex.org/tgbugs/uris/readable/technique/dissection  |
+| https://api.blackfynn.io/datasets/N:dataset:765abd74-2671-4dda-a249-8f31c5727ea6 | http://uri.interlex.org/tgbugs/uris/readable/technique/surgical    |
+| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/readable/technique/dissection  |
+| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/readable/technique/perfusion   |
+| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/readable/technique/surgical    |
+| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/150 |
+| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/157 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/readable/technique/imaging     |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/150 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/99  |
+
+** Datasets following same protocol with different subjects
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?completeness
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:completenessOfDataset ?completeness .
+} LIMIT 10
+#+end_src
+
+#+RESULTS:
+| dataset                                                                          | completeness |
+|----------------------------------------------------------------------------------+--------------|
+| https://api.blackfynn.io/datasets/N:dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | batch        |
+| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | hasNext      |
+| https://api.blackfynn.io/datasets/N:dataset:02786240-2033-4f86-808d-daf345ce3165 | complete     |
+| https://api.blackfynn.io/datasets/N:dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | complete     |
+| https://api.blackfynn.io/datasets/N:dataset:093c54b7-34c3-4204-9cea-0e2bdfd1fa93 | Complete     |
+| https://api.blackfynn.io/datasets/N:dataset:0a5a2827-2b39-4085-87ea-2b7fbbe27cc8 | batch        |
+| https://api.blackfynn.io/datasets/N:dataset:0b14782a-382d-430d-857e-acc333e3c324 | Complete     |
+| https://api.blackfynn.io/datasets/N:dataset:0c23200d-d821-4732-a467-9f73ab2862f0 | Complete     |
+| https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | complete     |
+| https://api.blackfynn.io/datasets/N:dataset:1284a4e8-21e1-4b9f-9280-6ba06f6b9a50 | Batch        |
+
+** Subjects
+*** Members
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?subject
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:isAboutParticipant ?subject .
+  ?subject a sparc:Subject .
+} LIMIT 10
+#+end_src
+
+#+RESULTS:
+| dataset                                                                          | subject                                                                                                                         |
+|----------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:d4ca262e-7893-4d72-9325-03dd08b053ce | https://api.blackfynn.io/datasets/N:dataset:d4ca262e-7893-4d72-9325-03dd08b053ce/subjects/GN060716                              |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/subjects/sub-896                               |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/subjects/sub-897                               |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/subjects/sub-898                               |
+| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_1_SPARC_10Hz_LcVNS          |
+| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_1_SPARC_10Hz_vGastricBranch |
+| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_10_SPARC_10Hz_LcVNS         |
+| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_11_SPARC_10Hz_LcVNS         |
+| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_12_SPARC_10Hz_LcVNS         |
+| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_2_SPARC_10Hz_LcVNS          |
+
+*** Total
+#+begin_src sparql
+SELECT DISTINCT
+(COUNT(DISTINCT ?subject) as ?count_subject)
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:isAboutParticipant ?subject .
+  ?subject a sparc:Subject .
+}
+#+end_src
+
+#+RESULTS:
+| count_subject |
+|---------------|
+|          1575 |
+
+*** Subject Metadata
+- Identifier
+- Group
+- Species
+- Strain
+- Sex
+- Age Category
+- Age
+- Mass
+
+# #+header: :var species="NCBITaxon:10116"
+# #+header: :var species="NCBITaxon:9685"
+#+name: subject-metadata
+#+begin_src sparql
+SELECT DISTINCT
+?local_id
+
+?assigned_group
+
+?l_species
+?strain
+?l_sex
+
+?age_category
+?age_value
+?age_unit
+
+?mass_value
+?mass_unit
+
+WHERE {
+  ?subject a sparc:Subject .
+  ?subject TEMP:localId ?local_id .
+  ?subject sparc:animalSubjectIsOfSpecies ?species . OPTIONAL { ?species rdfs:label ?l_species . }
+  OPTIONAL { ?subject sparc:animalSubjectIsOfStrain ?strain . } # ?strain rdfs:label ?l_strain .
+  OPTIONAL { ?subject TEMP:hasBiologicalSex ?sex . ?sex rdfs:label ?l_sex . }
+  OPTIONAL { ?subject TEMP:hasAgeCategory ?age_category . }
+  OPTIONAL { ?subject TEMP:hasAssignedGroup ?assigned_group . }
+  # OPTIONAL { ?subject TEMP:participantInPerformanceOf ?protocol . }
+
+  OPTIONAL {
+  # mass
+  ?subject sparc:animalSubjectHasWeight ?bn_mass .
+  ?bn_mass a sparc:Measurement .
+  ?bn_mass TEMP:hasUnit ?mass_unit .
+  ?bn_mass rdf:value ?mass_value .
+}
+  OPTIONAL {
+  # age
+  ?subject TEMP:hasAge ?bn_age .
+  ?bn_age a sparc:Measurement .
+  ?bn_age TEMP:hasUnit ?age_unit .
+  ?bn_age rdf:value ?age_value .
+}
+#  VALUES ?l_s {?species ?sex}  # doesn't work, if it did it would duplicate rows
+#  ?l_s rdfs:label ?label
+} LIMIT 10
+#+end_src
+
+#+RESULTS: subject-metadata
+| local_id       | assigned_group | l_species    | strain        | l_sex | age_category | age_value | age_unit                                                      | mass_value | mass_unit |
+|----------------+----------------+--------------+---------------+-------+--------------+-----------+---------------------------------------------------------------+------------+-----------|
+| mouse3         |                | Mus musculus | C57BL/6J      | male  |              |         7 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
+| mouse4         |                | Mus musculus | C57BL/6J      | male  |              |         7 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
+| WT28M          |                | Mus musculus | C57BL/6J      | male  |              |         8 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
+| WT29M          |                | Mus musculus | C57BL/6J      | male  |              |         8 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
+| C57BL/6J       |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
+| Gpr65-ires-Cre |                | Mus musculus | 129S6/SvEvTac |       |              |           |                                                               |            |           |
+| LoxP-ChR2      |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
+| LoxP-DTR       |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
+| Mc4r-2a-Cre    |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
+| Phox2b-Cre     |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
+
+#+call: subject-metadata() :var species="NCBITaxon:10090"
+
+#+RESULTS:
+| local_id   | assigned_group | l_species    | strain                                                                    | l_sex  | age_category | age_value | age_unit                                                      | mass_value | mass_unit |
+|------------+----------------+--------------+---------------------------------------------------------------------------+--------+--------------+-----------+---------------------------------------------------------------+------------+-----------|
+| sub-iWAT10 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg and B6.Cg-Gt(ROSA)26Sortm14(CAG-tdTomato)Hze/J | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT12 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg and B6.Cg-Gt(ROSA)26Sortm14(CAG-tdTomato)Hze/J | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT22 |                | Mus musculus | Kieg and B6.Cg-Gt(ROSA)26Sortm14(CAG-tdTomato)Hze/J                       | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT34 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT35 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | male   | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT36 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | male   | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT37 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | male   | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT40 |                | Mus musculus | C57BL/6J                                                                  | male   | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT56 |                | Mus musculus | B6.FVB(Cg)-Tg(Dbh-cre)KH212Gsat/Mmucd                                     | female | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+| sub-iWAT57 |                | Mus musculus | B6.FVB(Cg)-Tg(Dbh-cre)KH212Gsat/Mmucd                                     | female | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
+
+** Samples
+*** Members
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?sample
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:isAboutParticipant ?sample .
+  ?sample a sparc:Sample .
+} LIMIT 10
+#+end_src
+
+#+RESULTS:
+| dataset                                                                          | sample                                                                                                  |
+|----------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-1  |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-10 |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-11 |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-12 |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-13 |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-2  |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-3  |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-4  |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-5  |
+| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-6  |
+
+*** Total
+#+begin_src sparql
+SELECT DISTINCT
+(COUNT(DISTINCT ?subject) as ?count_subject)
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:isAboutParticipant ?subject .
+  ?subject a sparc:Sample .
+}
+#+end_src
+
+#+RESULTS:
+| count_subject |
+|---------------|
+|          7751 |
+
+*** Sample predicates
+#+begin_src sparql
+SELECT DISTINCT
+?p
+WHERE {
+  ?sample a sparc:Sample .
+  ?sample ?p ?o .
+}
+#+end_src
+
+#+RESULTS:
+| p                                                                         |
+|---------------------------------------------------------------------------|
+| http://uri.interlex.org/temp/uris/hasDerivedInformationAsParticipant      |
+| http://uri.interlex.org/temp/uris/localId                                 |
+| http://uri.interlex.org/temp/uris/raw/wasExtractedFromAnatomicalRegion    |
+| http://uri.interlex.org/temp/uris/wasDerivedFromSubject                   |
+| http://www.w3.org/1999/02/22-rdf-syntax-ns#type                           |
+| http://uri.interlex.org/temp/uris/participantInPerformanceOf              |
+| http://uri.interlex.org/temp/uris/hasAssignedGroup                        |
+| http://uri.interlex.org/temp/uris/hasDigitalArtifactThatIsAboutIt         |
+| http://uri.interlex.org/temp/uris/TODO                                    |
+| http://uri.interlex.org/temp/uris/providerNote                            |
+| http://uri.interlex.org/temp/uris/hasDigitalArtifactThatIsAboutItWithHash |
+| http://uri.interlex.org/temp/uris/localExecutionNumber                    |
+
+*** Sample Metadata
+
+#+name: sample-metadata
+#+begin_src sparql
+SELECT DISTINCT
+?subject_lid
+
+?local_id
+
+?assigned_group
+
+?anat_ent_src
+
+WHERE {
+  ?sample a sparc:Sample .
+  ?sample TEMP:localId ?local_id .
+
+  ?sample TEMP:wasDerivedFromSubject ?subject .
+  ?subject TEMP:localId ?subject_lid .
+  ?subject a sparc:Subject .
+
+  OPTIONAL { ?sample TEMP:hasAssignedGroup ?assigned_group . }
+  OPTIONAL { ?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?anat_ent_src . }
+  # OPTIONAL { ?sample TEMP:participantInPerformanceOf ?protocol . }
+} LIMIT 10
+#+end_src
+
+#+RESULTS: sample-metadata
+| subject_lid | local_id                                                                            | assigned_group                               | anat_ent_src |
+|-------------+-------------------------------------------------------------------------------------+----------------------------------------------+--------------|
+| sub_4585    | 121 Adult Left Colon 4585 10x stitch anti HucD 488 anti S100B 594 anti PHOX2B 647 1 | anti HuC/D, anti S100β, anti PHOX2B staining | left colon   |
+| sub_4585    | 244 Adult Left Colon 4585 20x 20x anti HucD 647 anti cKit 594 1                     | anti HuC/D, anti cKit staining               | left colon   |
+| sub_4585    | 245 Adult Left Colon 4585 20x anti HucD 647 anti cKit 594 2                         | anti HuC/D, anti cKit staining               | left colon   |
+| sub_4585    | 246 Adult Left Colon 4585  20x anti HucD 647 anti cKit 594 3                        | anti HuC/D, anti cKit staining               | left colon   |
+| sub_4585    | 260 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 1                          | anti HuC/D, anti NFM staining                | left colon   |
+| sub_4585    | 261 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 2                          | anti HuC/D, anti NFM staining                | left colon   |
+| sub_4585    | 262 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 3                          | anti HuC/D, anti NFM staining                | left colon   |
+| sub_4585    | 269 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 1                         | anti HuC/D, anti Tuj1 staining               | left colon   |
+| sub_4585    | 270 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 2                         | anti HuC/D, anti Tuj1 staining               | left colon   |
+| sub_4585    | 271 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 3                         | anti HuC/D, anti Tuj1 staining               | left colon   |
+
+** Anatomical entities
+*** Dataset
+**** Involves
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+# ?ae
+?l_ae
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:involvesAnatomicalRegion ?ae .  # TODO not 100% on the modelling here
+  ?ae rdfs:label ?l_ae .
+} ORDER BY ASC(?l_ae) LIMIT 10 
+#+end_src
+
+#+RESULTS:
+| dataset                                                                          | l_ae             |
+|----------------------------------------------------------------------------------+------------------|
+| https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:8742cd78-1ad8-4c17-aa12-42c06e898ded | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:c23e9319-fe3c-4354-aca8-259e8cff0f7a | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | abdominal cavity |
+| https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | abdominal wall   |
+| https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | abdominal wall   |
+
+**** About
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+# ?ae
+?l_ae
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset isAbout: ?ae .  # TODO not 100% on the modelling here
+  ?ae rdfs:label ?l_ae .
+  # ?ae rdfs:subClassOf* UBERON:0001062 .  # FIXME this information is not in the graph right now
+                                           # which is why we get mouse
+} ORDER BY ASC(?l_ae) LIMIT 10 
+#+end_src
+
+#+RESULTS:
+| dataset                                                                          | l_ae         |
+|----------------------------------------------------------------------------------+--------------|
+| https://api.blackfynn.io/datasets/N:dataset:02786240-2033-4f86-808d-daf345ce3165 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:3bb4788f-edab-4f04-8e96-bfc87d69e4e5 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:663d8eba-eb68-4fef-b9a0-ac51410b26d3 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:6ce2e98e-5217-4952-897d-017285d303b2 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:f267c9fd-678e-4469-beb8-327b35f1738a | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:f563672f-7d39-4e6d-b198-82960fb4a434 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:fc6e3a87-1241-4f81-b284-8ebc82efc499 | Mus musculus |
+| https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | Mus musculus |
+
+*** Protocol
+**** Involves
+#+begin_src sparql
+SELECT DISTINCT
+?protocol
+?l_bb
+WHERE {
+  ?protocol a sparc:Protocol .
+  ?protocol TEMP:protocolInvolvesBlackBox ?ast_bb .
+
+  ?ast_bb rdf:type protcur:black-box .  # TODO need to refine on organ an ingest the new alignment
+  ?ast_bb TEMP:hasValue ?bb_value .
+
+  ?bb_value rdfs:label ?l_bb .
+} LIMIT 10 
+#+end_src
+
+#+RESULTS:
+| protocol                                        | l_bb             |
+|-------------------------------------------------+------------------|
+| https://www.protocols.io/api/v3/protocols/18985 | photon           |
+| https://www.protocols.io/api/v3/protocols/19341 | Metazoa          |
+| https://www.protocols.io/api/v3/protocols/18985 | Metazoa          |
+| https://www.protocols.io/api/v3/protocols/23160 | Metazoa          |
+| https://www.protocols.io/api/v3/protocols/19269 | Metazoa          |
+| https://www.protocols.io/api/v3/protocols/20256 | Metazoa          |
+| https://www.protocols.io/api/v3/protocols/22833 | stomach          |
+| https://www.protocols.io/api/v3/protocols/25817 | heart            |
+| https://www.protocols.io/api/v3/protocols/26704 | neck             |
+| https://www.protocols.io/api/v3/protocols/19127 | abdominal cavity |
+
+** Associated scaffolds
+** Other
+NOTE These are not yet in the ttl file, the queries written here will not work yet.
+*** File types
+In all likelihood we are not going to include the names of each of the
+individual files in the standard ttl export. We may put it in a named
+graph and then update the journal, possibly only for released
+datasets. The use cases for having individual files in the graph is
+not at all clear, we might have individual folders, or run it in the
+other direction where a subject could list the folders that contain
+data about it.  Trying to keep the graph in sync with Blackfynn would
+be quite a pain, essentially we would store/append every single file
+that ever appears and then mark the deleted ones as deleted or something.
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?file_type
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:containsFileWithType ?file_type .  # TODO not 100% on the modelling here
+} LIMIT 10
+#+end_src
+*** Has Raw Data
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?raw
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:containsFolderForRawData ?raw .  # TODO not 100% on the modelling here
+} LIMIT 10
+#+end_src
+*** Has Derived Data
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?derived
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:containsFolderForDerivedData ?derived .  # TODO not 100% on the modelling here
+} LIMIT 10
+#+end_src
+*** Has Code
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?code
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:containsFolderForCode ?code .  # TODO not 100% on the modelling here
+} LIMIT 10
+#+end_src
+*** Used in simulation
+This modeling is extremely preliminary.
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?dataset_sim
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset_sim a sparc:Dataset .  # TODO not 100% on this
+  # the dataset holds the simulation, and is also what references the other datasets
+  # whether we need an explicit type for simulation datasets is not clear, I suspect
+  # that we do not, since datasets are just data, the aboutness or typeness probably
+  # should come from the fact that the dataset specifies or houses a simulation ...
+  # ?dataset_sim a sparc:SimulationDataset . # also not good
+  # ?dataset_sim TEMP:isSubstrateForSomeComputationalSimulation true .  # FIXME this is bad bad bad
+  VALUES ?p {TEMP:derivesParametersFrom TEMP:derivesValidationDataFrom ilxtr:hasInformationInput} .
+  ?dataset_sim ?p ?dataset .
+} LIMIT 10
+#+end_src
+* Bootstrap :noexport:
+:PROPERTIES:
+:visibility:  folded
+:END:
+#+name: orgstrap
+#+begin_src elisp :results none :lexical yes
+(defun orgstrap---noconfirm-eval-sparql (lang _body)
+  "Run sparql queries without confirmation dialogue."
+  (not (string= lang "sparql")))
+(setq-local ocbe org-confirm-babel-evaluate) ; hack that works due to dynamic scope
+
+;; TODO
+;;(defun orgstrap---advise-sparql-execute-query (&rest args)
+;;  (compactify-current-buffer default-curies))
+
+;;(advice-add #'sparql-execute-query :after #'orgstrap---advise-sparql-execute-query)
+#+end_src
+
+** Local Variables :ARCHIVE:
+
+# Local Variables:
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable) (let ((ocbe org-confirm-babel-evaluate)) (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (unwind-protect (save-excursion (org-babel-goto-named-src-block "orgstrap") (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility))))
+# End:
