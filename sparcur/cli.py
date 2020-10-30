@@ -16,6 +16,7 @@ Usage:
     spc report   size    [options] [<path>...]
     spc report   tofetch [options] [<directory>...]
     spc report   terms   [anatomy cells subcelluar] [options]
+    spc report   terms   [hubmap hubmap-anatomy]    [options]
     spc report   overview [<path>...]               [options]
     spc report   anno-tags <tag>...                 [options]
     spc report   [samples-values subjects-values]   [options]
@@ -102,6 +103,8 @@ Commands:
                                 anatomy
                                 cells
                                 subcelluar
+                                hubmap
+                                hubmap-anatomy
 
                 subjects        all headings from subjects files
                 samples         all headings from samples files
@@ -366,7 +369,7 @@ class Dispatcher(clif.Dispatcher):
             return [[asStr(cell) for cell in row] for row in rows]
 
         def simple_tsv(rows):
-            return '\n'.join('\t'.join(asAsciiRows(rows))) + '\n'
+            return '\n'.join('\t'.join(row) for row in asAsciiRows(rows)) + '\n'
 
         if self.options.tab_table:
             if title:

@@ -12,6 +12,7 @@ from hyputils import hypothesis as hyp
 from protcur import document as ptcdoc
 from pyontutils.core import OntGraph, OntRes, OntResIri, OntResPath
 from pyontutils.utils import UTCNOWISO, anyMembers, Async, deferred
+from pyontutils.namespaces import isAbout, ilxtr, TEMP
 from sparcur import sheets
 from sparcur.core import (OntId,
                           OntTerm,
@@ -21,7 +22,8 @@ from sparcur.core import (OntId,
                           get_nested_by_key,
                           get_nested_by_type,
                           )
-from sparcur.utils import want_prefixes, log as _log, is_list_or_tuple
+from sparcur.utils import want_prefixes, log as _log
+from sparcur.utils import expand_label_curie, is_list_or_tuple
 from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.curation import ExporterSummarizer
@@ -334,6 +336,8 @@ class Report:
             self.mbf()
 
         self.terms()
+        self.hubmap()
+        self.hubmap_anatomy()
         self.mis()
         self.milestones()
         for tag in (
@@ -828,11 +832,8 @@ class Report:
                                  title='Unique MBF contours',
                                  ext=ext)
 
-    def terms(self, ext=None):
-        # anatomy
-        # cells
-        # subcelluar
-        import rdflib
+    @property
+    def _graph(self):
         # FIXME cache these results and only recompute if latest changes?
         if self.options.raw:
             graph = self.summary.triples_exporter.graph
@@ -842,6 +843,19 @@ class Report:
             #self._export(ex.Export).latest_export_ttl_populate(graph)
             graph = self._ttlfile.graph
 
+        return graph
+
+    def terms(self, ext=None):
+        if self.options.hubmap:
+            return self.hubmap(ext=ext)
+        elif self.options.hubmap_anatomy:
+            return self.hubmap_anatomy(ext=ext)
+
+        # anatomy
+        # cells
+        # subcelluar
+        import rdflib
+        graph = self._graph
         objects = set()
         skipped_prefixes = set()
         for t in graph:
@@ -896,6 +910,131 @@ class Report:
                                                    if hasattr(ot, 'label') and ot.label else ''))]
 
             yield self._print_table(rows, title=title, ext=ext)
+
+    @idlib.utils.cache_result
+    def _hubmap(self):
+        graph = self._graph
+        ir = self._data_ir()
+        rows = self._hubmap_terms(graph, ir)
+        return rows
+
+    @sheets.Reports.makeReportSheet()
+    def hubmap(self, ext=None):
+        title = 'SPARC Terms for HuBMAP'
+        rows = self._hubmap()
+        rows = expand_label_curie(rows)
+        rows = [['Species', 'Species Id', 'Term', 'Term Id']] + rows
+        return self._print_table(rows, title=title, ext=ext)
+
+    @sheets.Reports.makeReportSheet()
+    def hubmap_anatomy(self, ext=None):
+        title = 'SPARC Anatomical Terms for HuBMAP'
+        rows = self._hubmap()
+        anat = [r for r in rows if r[1].prefix in ('UBERON', 'FMA', 'ILX')]
+        rows = expand_label_curie(anat)
+        rows = [['Species', 'Species Id', 'Anatomy', 'Anatomy Id']] + rows
+        return self._print_table(rows, title=title, ext=ext)
+
+    @staticmethod
+    def _hubmap_terms(graph, ir):
+        import rdflib
+        def collect_id_ontology(obj, key, *args, path=None, collect=tuple()):
+            lc = len(collect)
+            get_nested_by_key(obj, key, *args, path=path, collect=collect)
+            if lc + 1 == len(collect):
+                collect[-1] = (collect[-1], tuple(path[:2]))
+
+            return obj
+
+
+        def get_all_types(obj, *args, path=None, collect=tuple()):
+            collect.add(type(obj))
+            return obj
+
+
+        def collect_types(obj, type, *args, path=None, collect=tuple()):
+            lc = len(collect)
+            get_nested_by_type(obj, type, *args, path=path, collect=collect)
+            if lc + 1 == len(collect):
+                collect[-1] = (collect[-1], tuple(path[:2]))
+
+            return obj
+
+        # ttl
+        # may have to run with compute_qname once to avoid an error?
+        sigh = [(graph.namespace_manager.compute_qname(s), o.toPython())
+        for s, o in graph[:isAbout:] if isinstance(o, rdflib.URIRef)]
+
+        asdf = sorted(set([(graph.namespace_manager.qname(s), o.toPython())
+                for s, o in graph[:isAbout:] if isinstance(o, rdflib.URIRef)] + [
+                        (graph.namespace_manager.qname(s), o.toPython())
+        for s, o in graph[:TEMP.involvesAnatomicalRegion:] if isinstance(o, rdflib.URIRef)]))
+
+        qq = defaultdict(list)
+        for s, o in asdf:
+            qq[s].append(OntTerm(o))
+
+        # json
+        collect = []
+        _ = JApplyRecursive(get_nested_by_type, ir, str, collect=collect)
+        eff = sorted(set(collect), key=lambda k:len(k))
+
+        collect = []
+        _ = JApplyRecursive(get_nested_by_type, ir, OntTerm, collect=collect)
+        terms = sorted(set(collect))
+
+        collect = set()
+        _ = JApplyRecursive(get_all_types, ir, collect=collect)
+        types = collect
+
+        collect = []
+        _ = JApplyRecursive(collect_id_ontology, ir, 'id_ontology', collect=collect)
+        _from_mbf = sorted(set(collect))
+        from_mbf = [(OntTerm(t), p) for t, p in _from_mbf]
+
+        collect = []
+        _ = JApplyRecursive(collect_types, ir, OntTerm, collect=collect)
+        term_dsps = sorted(set(collect))
+
+        dids = {('datasets', i): d['id'][2:] for i, d in enumerate(ir['datasets'])}
+
+        for t, p in from_mbf + term_dsps:
+            id = dids[p]
+            qq[id].append(t)
+
+        banned = set(OntTerm(c, label=l)
+                    for c, l in (('UBERON:0000025', 'tube'),
+                                 ('UBERON:0000479', 'tissue') ,
+                                 ('UBERON:0003978', 'valve'),
+                                 ('UBERON:0000403', 'scalp'),  # guessing scalple
+                                 ('UBERON:0001021', 'nerve'),
+                                 ('UBERON:0018707', 'bladder organ'),
+                                 ('UBERON:4200215', 'suture'),
+                                 ('UBERON:0003129', 'skull'),
+                                 ('UBERON:0001753', 'cementum'),  # guessing cement
+                                 ('UBERON:0003148', 'obsolete sclerite'),  # plates apparently >_<
+                                ))
+        zz = defaultdict(set)
+        for terms in qq.values():
+            spec = None
+            anat = []
+            for term in terms:
+                if term in banned:
+                    continue
+
+                if term.prefix == 'NCBITaxon':
+                    spec = term
+                else:
+                    anat.append(term)
+
+            zz[spec].update(anat)
+
+        # structure
+        # species organ
+        # linked via dataset
+
+        rows = sorted([[s, t] for s, ts in zz.items() for t in ts])
+        return rows
 
     @idlib.utils.cache_result
     def _annos(self):
@@ -1136,7 +1275,7 @@ class Report:
             ontres = OntRes.fromStr(self.options.ttl_file)
         else:
             # FIXME make this go away and derive it from git
-            iri = 'https://cassava.ucsd.edu/sparc/exports/curation-export.ttl'
+            iri = 'https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl'
             ontres = OntResIri(iri)
 
         if self.options.ttl_compare:

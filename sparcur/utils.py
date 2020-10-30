@@ -26,10 +26,28 @@ _ilog.addHandler(log.handlers[0])
 __type_registry = {None: None}
 def register_type(cls, type_name):
     if type_name in __type_registry:
+        if __type_registry[type_name] is cls:
+            # better to do this check here than to force
+            # all callers to check for themselves which
+            # can fail if two separate systems try to
+            # register the same type
+            return
+
         raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
                          f'{type_name} -> {__type_registry[type_name]}')
 
     __type_registry[type_name] = cls
+
+
+def register_all_types():
+    # as a side effect this registers idlib streams and OntTerm
+    # sigh doing anything in the top level of python :/
+    import sparcur.core
+    import sparcur.paths  # also a top level registration
+
+    # this is not done at top level because it is quite slow
+    from pysercomb.pyr import units as pyru
+    [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
 
 
 def fromJson(blob):
@@ -61,6 +79,32 @@ def fromJson(blob):
         return [fromJson(_) for _ in blob]
     else:
         return blob
+
+
+def path_irs(*paths_or_strings):
+    """Given one or more paths pointing to sparcur export
+    json yield the python internal representation."""
+    # TODO support for urls
+    import json
+    register_all_types()
+
+    for path_or_string in paths_or_strings:
+        with open(path_or_string) as f:
+            blob = json.load(f)
+
+        yield fromJson(blob)
+
+
+def path_ir(path_or_string):
+    """Given a path or string return the sparcur python ir."""
+    return next(path_irs(path_or_string))
+
+
+def expand_label_curie(rows_of_terms):
+    return [[value for term in rot for value in
+             (term.label if term is not None else '',
+              term.curie if term is not None else '')]
+            for rot in rows_of_terms]
 
 
 class GetTimeNow:
