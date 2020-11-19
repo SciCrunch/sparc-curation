@@ -9,7 +9,7 @@ from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
-from sparcur.utils import log, GetTimeNow, register_type
+from sparcur.utils import log, GetTimeNow, register_type, transitive_dirs
 from sparcur.config import auth
 
 
@@ -408,6 +408,12 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                     self.readlink().parts[1])
         except OSError as e:
             raise exc.NoCachedMetadataError(self) from e
+
+    @property
+    def rchildren_dirs(self):
+        # FIXME windows support if find not found
+        if self.is_dir():
+            yield from transitive_dirs(self)
 
     def populateJsonMetadata(self, blob):
         """ populate a json blob with file system metadata"""

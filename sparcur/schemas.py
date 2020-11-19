@@ -609,6 +609,8 @@ ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
+award_pattern = 'OT2D|TR'
+
 
 class NoLTWhitespaceSchema(JSONSchema):
     schema = {'allOf': [{'type': 'string'},
@@ -808,6 +810,59 @@ class DatasetStructureSchema(JSONSchema):
                         {'anyOf': [
                             {'required': ['subjects_file']},
                             {'required': ['samples_file']}]}]}
+
+
+class FutureValidPaths:
+    # maybe we use these in the future?
+    ['code', '*']
+    ['docs', '*']
+    ['source', '*']  # but will check for matches and warn on extra
+    ['derivative', '*']  # but will check for matches and warn on extra
+    ['primary', '^pool-']
+    ['primary', '^pool-', '^perf-']
+    ['primary', '^subj?-']
+    ['primary', '^subj?-', '^perf-']
+    ['primary', '^subj?-', '^samp?-']
+    ['primary', '^samp?-']
+    ['primary', '^samp?-', '^perf-']
+    ['primary', '^perf-']
+    # the more likely approach is as follows
+    # all some-* indicates that the id MUST be a known
+    # identifier whose type matches the expected slot
+
+    # primary (or some-subject some-sample some-pool some-perf)
+    # this is broken unless the manifest can save us (which it must)
+    # otherwise we have to warn on all folders that do not match
+    # a known entity
+    # a perf- folder may appear once per non-perf node
+    # some-subject (or some-sample some-perf-no-subject some-manifest-folder)
+    # some-sample (or some-sample some-perf-end some-manifest-folder)
+    # some-perf-no-subject (or some-sample some-manifest-folder)
+    # some-perf (or some-subject-no-perf some-sample-no-perf)
+    # HOWEVER this is too much for right now, we may need to completely
+    # rework the requirements for the template 2.0 to avoid these tricky cases
+    # for now, we are going to find all folders that match an id below the top
+    # level and then we are going to warn about all other folder names that are
+    # not either contained in a subject where there are no samples or in a sample
+
+    # {'allOf': [
+    #     {'type': 'string',},
+    #                   {'oneOf': [
+    #                       {'pattern': subject_folder_pattern},
+    #                       {'pattern': sample_folder_pattern},
+    #                       {'pattern': performance_folder_pattern},
+    #                       {'pattern': pool_folder_pattern},
+    #                   ],},]
+    # }
+
+
+class DatasetPathSchema(JSONSchema):
+    schema = {'type': 'array',
+              'additionalItems': {'type': 'string'},
+              'items': [
+                  {'type': 'string',
+                   'enum': ['code', 'docs', 'source', 'primary', 'derivative'],
+                   },]}
 
 
 class ContributorExportSchema(JSONSchema):

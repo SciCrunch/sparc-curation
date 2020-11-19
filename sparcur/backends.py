@@ -1308,6 +1308,8 @@ class BlackfynnDatasetData:
                 # 'banner': self.bfobject.banner,  # FIXME not persistent ...
                 'status-log': self.bfobject.status_log,  # FIXME most recent only?
                 'tags': cont['tags'],
+                #'updated_at': cont['updatedAt'],  # redundant with xattr metadata
+                #'created_at': cont['createdAt'],  # redundant with xattr metadata
 
                 # FIXME strip emails before export
                 # leave teams and users out of this for now, too much noise
@@ -1315,6 +1317,12 @@ class BlackfynnDatasetData:
                 #'users': self.bfobject.users,
                 'contributors': self.bfobject.contributors,
                 'package_counts': package_counts,
+                'publication': meta['publication'],
+                'canPublish': meta['canPublish'],
+                'locked': meta['locked'],
+                # there are a number of fields that we do not currently pull in
+                # TODO consider whether to pull all the metadata so we don't have
+                # to update this here
         }
 
         if 'license' in cont:

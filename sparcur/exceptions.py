@@ -88,6 +88,10 @@ class FileTypeError(SparCurError):
     """ File type is not allowed """
 
 
+class MissingFileError(SparCurError):
+    """ A file required to proceed is missing. """
+
+
 class NoDataError(SparCurError):
     """ There was no data in the file (not verified with stat)
         FIXME HACK workaround for bad handling of empty sheets in byCol """

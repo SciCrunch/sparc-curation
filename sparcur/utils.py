@@ -1,4 +1,5 @@
 import io
+import os
 import logging
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
@@ -222,6 +223,18 @@ def symlink_latest(dump_path, path, relative=True):
         path.unlink()
 
     path.symlink_to(dump_path)
+
+
+def transitive_dirs(path):
+    """Fast list of all child directories using unix find."""
+    command = """find -type d"""
+    with path:
+        with os.popen(command) as p:
+            string = p.read()
+
+    path_strings = string.split('\n')  # XXX posix path names can contain newlines
+    paths = [path / s for s in path_strings if s][1:]  # leave out the parent folder itself
+    return paths
 
 
 class BlackfynnId(str):

@@ -55,7 +55,41 @@ print(sorted(data.keys()))
 
 #+RESULTS[cc32c2f62cd7a758207c6368bc90a6742db681e3]:
 : ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'prov', 'size']
+** Load Python IR
+#+begin_src python
+from sparcur.utils import path_ir
+ir = path_ir('curation-export.json')
+#+end_src
 
+#+begin_src python
+def main():
+    from sparcur.reports import Report
+    from sparcur.utils import path_ir
+    from pyontutils.core import OntResIri
+    ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl')
+    graph = ori.graph
+
+    ir = path_ir('/tmp/curation-export-test.json')
+
+    rows = Report._hubmap_terms(graph, ir)
+
+    anat = [r for r in rows if r[1].prefix in ('UBERON', 'FMA', 'ILX')]
+    all_r = expand_label_curie(rows)
+    ana_r = expand_label_curie(anat)
+    return all_r, ana_r
+
+
+if __name__ == '__main__':
+    return main()
+#+end_src
+* Extending implementation
+** Adding a new xml type
+#+begin_src python
+def new_xml_format(path):
+    from sparcur.extract import xml
+    ex = xml.XmlSource(path)
+    top_tag = ex.e.getroot().tag
+#+end_src
 * Workflow
 ** All datasets
 *** _*Retrieve*_
@@ -124,7 +158,7 @@ digraph G {
 **** Bash implementation                                             :ignore:
 # FIXME this is really an env file not a bin file ...
 #+name: pipeline-functions-sparc-get-all-remote-data
-#+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
+#+begin_src bash -r -l "\([[:space:]]\|#\)*(ref:%s)$" :tangle ../bin/pipeline-functions.sh :mkdirp yes
 function sparc-get-all-remote-data () {
     # NOTE not quite all the remote data, the google sheets
     # don't have caching functionality yet
@@ -134,7 +168,7 @@ function sparc-get-all-remote-data () {
     while [[ $# -gt 0 ]]
     do
     key="$1"
-    case $key in
+    case $key in #(ref:(((((((sigh)
         --project-id)         local PROJECT_ID="${2}"; shift; shift ;;
         --symlink-objects-to) local SYMLINK_OBJECTS_TO="${2}"; shift; shift ;;
         --log-path)           local LOG_PATH="${2}"; shift; shift ;;
@@ -290,6 +324,8 @@ function sparc-get-all-remote-data () {
     # so we don't fetch everything with a matching extension
     # TODO derive --extension from manifests or all it to be passed in
     echo python -m sparcur.simple.fetch_metadata_files --project-path "${PROJECT_PATH}" --extension xml
+
+    # FIXME fetch_files fails silently here :/
     python -m sparcur.simple.fetch_files \
            --project-path "${PROJECT_PATH}" \
            --extension xml \
@@ -530,14 +566,14 @@ changed since last export, updates only those and then collects the
 outputs.
 **** Bash implementation                                             :ignore:
 #+name: pipeline-functions-sparc-export-all
-#+begin_src bash :tangle ../bin/pipeline-functions.sh
+#+begin_src bash -r -l "\([[:space:]]\|#\)*(ref:%s)$" :tangle ../bin/pipeline-functions.sh
 function sparc-export-all () {
     # parse args
     local POSITIONAL=()
     while [[ $# -gt 0 ]]
     do
     key="$1"
-    case $key in
+    case $key in #(ref:(((sigh)
         --project-path) local PROJECT_PATH="${2}"; shift; shift ;;
         -h|--help)      echo "${HELP}"; return ;;
         ,*)              POSITIONAL+=("$1"); shift ;;
@@ -600,7 +636,14 @@ digraph G {
 
 #+RESULTS[e419d8438b4609bab73327984f217d394a78f995]:
 [[file:./images/graph-protocols.png]]
-
+** Release
+Since we are moving to run individual datasets the aggregate release
+process is decouple, and mediated via git:36a749b5c321cdb81ba81f9d35e050ceb8479976
+*** Testing
+**** Code
+**** Data
+*** Reporting
+After a release
 * Internal Structure
 :PROPERTIES:
 :header-args: :comments link :exports code
@@ -1098,88 +1141,222 @@ compose = lambda f, g: (lambda *x: f(g(*x)))
 *** _*Validate*_
 **** _Protocols_
 **** _Datasets_
-#+begin_src python
+:PROPERTIES:
+:header-args: :shebang "#!/usr/bin/env python3"
+:END:
+***** Extract
+#+name: dataset-extract
+#+begin_src python :tangle ../sparcur/simple/extract.py :mkdirp yes
+from types import GeneratorType
+from sparcur import datasets as dat
+from sparcur import exceptions as exc
+from sparcur.utils import log, logd
 from sparcur.paths import Path
-from sparcur.datasets import DatasetStructure
+from sparcur.backends import BlackfynnDatasetData
+from sparcur.simple.fetch_metadata_files import fetch_prefixes
 
 
 def from_path_summary(project_path):
     dataset_path_structure
     summary((
         dataset(
-            dataset_path_structure
-            dataset_description
-            subjects
-            samples
-            submission
-            manifests
-            *rest
+            dataset_path_structure,
+            dataset_description,
+            subjects,
+            samples,
+            submission,
+            manifests,
+            ,*rest
 )))
 
 
+otkm = {ThingFilePath.obj:prefix + '_file' for prefix, ThingFilePath
+        in dat.DatasetStructure.sections.items()}
+otkm[type(dat.DatasetStructure())] = 'watstruct'  # hack around Pathlib type mangling
 #def dataset(path_structure, description, subjects, samples, submission, manifests, *rest):
-def dataset(*objects):
+def dataset_raw(*objects, object_type_key_map=otkm):
     data = {}
     #path_structure, description, subjects, samples, submission, manifests, *rest = objects
     for obj in objects:
-        data.update(obj.data)  # FIXME this seems too naievely simple
+        log.debug(obj)
+        try:
+            # FIXME isinstance probably needed due to Paths ... :/
+            try:
+                key = object_type_key_map[type(obj)]
+                data.update({key: obj.data})  # FIXME this seems too naievely simple
+            except KeyError:
+                # AAAAAAAAAAAAAAAAAAAAAA this is so stupid inhomogenous and busted
+                # decide whether the objects themselves determine where they sit
+                # or whether this method does this is now WAY too complicated
+                # to be easily understood and all sorts of nonuniformity in the
+                # underlying processes is leaking through ugh 1 vs many issues :/
+                #data.update(obj.data)
+                raise
+        except Exception as e:
+            # FIXME current things that leak through
+            # MalformedHeaderError
+            # something in the objects list is a dict
+            breakpoint()
+            pass
 
     return data
 
 
-def from_path_dataset(dataset_path):
-    return dataset(*comb_dataset(dataset_path))
+def early_failure(path, error):
+    # these are the 9999 5555 and 4444 errors
+    # TODO match the minimal schema reqs as
+    # we did in pipelines
+    cache = path.cache
+    return {'id': cache.id,
+            'meta': {'uri_api': cache.uri_api,
+                     'uri_human': cache.uri_human,},
+            #'status': 'early_failure',  # XXX note that status is not requried
+            # if we cannot compute it, but if there are inputs there should be
+            # a status
+            'errors': [error],  # FIXME format errro
+    }
 
 
-def object_from_find_path(glob_prefix, object_from_path_function, glob_type='glob'):
-    if glob_prefix not in fetch_prefixes:
+def from_path_dataset_raw(dataset_path):
+    """ Main entry point for getting dataset metadata from a path. """
+    gen  = from_path_dataset_description(dataset_path)
+    try:
+        ddo = dataset_description_object = next(gen)
+    except exc.MissingFileError as e:
+        # TODO return a stub with embedded error
+        logd.critical(e)
+        return early_failure(dataset_path, e)
+
+    try:
+       next(gen)
+       # TODO return a stub with embedded error
+    except StopIteration:
+        pass
+
+    data = ddo.data
+    ddod = type('ddod', tuple(), {'data': data})
+    dtsv = data['template_schema_version']
+    return dataset_raw(ddo, *comb_dataset(dataset_path, dtsv))
+
+
+def object_from_find_path(glob_prefix, object_from_path_function, glob_type='glob', onfail=None):
+    """ Return a function that will find files that start with glob_prefix"""
+    if glob_prefix not in dict(fetch_prefixes):
         raise ValueError('glob_prefix not in fetch_prefixes! '
                          f'{glob_prefix!r} not in {fetch_prefixes}')
     def func(path, *args, **kwargs):
-        ds = DatasetStructure(path)
-        for path in ds._abstracted_paths(glob_prefix, sandbox=True):
-            yield object_from_path_function(path, *args, **kwargs)
+        ds = dat.DatasetStructure(path)
+        rpath = None
+        for rpath in ds._abstracted_paths(glob_prefix, sandbox=True):
+            yield object_from_path_function(rpath, *args, **kwargs)
+
+        if rpath is None and onfail is not None:
+            raise onfail(f'No match for {glob_prefix} in {path.name}')
 
     return func
+
+
+def multiple(func, merge=None):
+    """ combine multiple results """
+    def express(*args, **kwargs):
+        vs = tuple(func(*args, **kwargs))
+        if merge is not None:
+            yield merge(vs)
+        else:
+            yield vs
+
+    return express
 
 
 # TODO how to attach and validate schemas orthogonally in this setting?
 # e.g. so that we can write dataset_1_0_0 dataset_1_2_3 etc.
 # FIXME it is never this simple :/ have to dispatch on template version
 # which we can only know at runtime
-def description(path): return dat.DatasetDescriptionFilePath(path).object
 
-def submission(path):  return dat.SubmissionFilePath(path).object
-def subjects(path):    return dat.SubjectsFilePath(path).object
-def samples(path):     return dat.SamplesFilePath(path).object
-def manifest(path):    return dat.ManifestFilePath(path).object
+# NOTE we capture version as early as possible in the process, yes we
+# could also gather all the files and folders and then pass the version
+# in as an argument when we validate their structure, but there are
+# elements of the locations or names of those files that might depend
+# on the template version, therefore we get maximum flexibility by only
+# need to look for the dataset description file
+def description(path):          return dat.DatasetDescriptionFilePath(path).object
+
+def submission(path, version):  return dat.SubmissionFilePath(path).object_new(version)
+def subjects(path, version):    return dat.SubjectsFilePath(path).object_new(version)
+def samples(path, version):     return dat.SamplesFilePath(path).object_new(version)
+def manifest(path, version):    return dat.ManifestFilePath(path).object_new(version)
 
 
-def from_path_dataset_path_structure(path):
-    return
+class mmf:  # sigh patterns are stupid, move this to elsewhere so it doesn't taint everything
+    def __init__(self, data):
+        self.data = data
+otkm[mmf] = 'manifest_file'  # FIXME this defeats the purpose of otkm in the first place!!!!
+# it obsures what is going on and makes it harder to understand what is supposed to be documentation
 
 
-from_path_dataset_description = object_from_find_path('dataset_description', description)
+def merge_manifests(vs):
+    # FIXME massive hack :/
+    k = 'manifest_file'
+    # FIXME errors key ... ? is it allowed up there? it shouldn't be ...
+    return mmf([m for v in vs for m in v.data[k]])
+    #return type('mmmmmmm', tuple(), dict(data = {k: [m for v in vs for m in v.data[k]]}))
+
+
+def from_path_dataset_path_structure(path, version):
+    return dat.DatasetStructure(path)
+
+
+class sigh:  # the things we have to do to avoid special cases >_<
+    def __init__(self, data):
+        self.data = data
+
+
+otkm[sigh] = 'rmeta'  # FIXME this defeats the purpose of otkm in the first place!!!!
+def from_path_remote_metadata(path, _version):
+    # version is not used for this at the moment
+    return sigh(BlackfynnDatasetData(path.cache).fromCache())
+
+
+from_path_dataset_description = object_from_find_path('dataset_description', description, onfail=exc.MissingFileError)
 from_path_subjects            = object_from_find_path('subjects',            subjects)
 from_path_samples             = object_from_find_path('samples',             samples)
 from_path_submission          = object_from_find_path('submission',          submission)
-from_path_manifests           = object_from_find_path('manifest',            manifest, 'rglob')
-from_path_remote_metadata     = lambda path: ds.BlackfynnDatasetData(path.cache).fromCache()
+from_path_manifests           = multiple(object_from_find_path('manifest',   manifest, 'rglob'),
+                                         merge_manifests)
 
 
 def combinate(*functions):
     def combinator(*args, **kwargs):
         for f in functions:
-            yield f(*args, **kwargs)
+            obj = f(*args, **kwargs)
+            if isinstance(obj, GeneratorType):
+                # FIXME this is really bad because you don't know what key
+                # they are expected to show up under and you can just pair them
+                # after the fact, you have to know at the same time >_< so the
+                # objects themselves have to know where they are supposed to fit
+                # in the dict, or dataset has to keep a mapping between the object
+                # types and the key they go under ... this last option seems better
+                yield from obj
+                # FIXME last one wins, vs yield tuple vs ...?
+                # FIXME manifests are completely broken for this
+                #thing = next(obj)
+                #try:
+                    #yield thing, *obj
+                #except StopIteration:
+                    #yield thing
+            else:
+                yield obj
 
     return combinator
 
 
 # this is all well and good right up until the moment that
 # the rest of these depend on one of the others
+# FIXME this is woefully incomplete, it only gets the raw data
+# it doesn't deal with any transformations at all
 comb_dataset = combinate(
+    #from_path_dataset_description,  # must be run prior to combination to get version
     from_path_dataset_path_structure,
-    #from_path_dataset_description,  # must come first
     from_path_subjects,
     from_path_samples,
     from_path_submission,
@@ -1197,13 +1374,38 @@ def protcur_output(): pass
 def summary(datasets, protocols_io_data, protcur_output): pass
 
 
-def main(path=Path.cwd()):
-    dataset = from_path_dataset(path)
+def main(path=Path.cwd(), dataset_id=None, time_now=None, **kwargs):
+    # TODO parallelize if multiple paths
+    # This assumes that all retrieve operations have
+    # finished successfully for the current dataset
+    cache = path.cache
+    if not cache.is_dataset():
+        raise TypeError('can only run on a single dataset')
+
+    dataset_raw = from_path_dataset_raw(path)
     breakpoint()
 
 
 if __name__ == '__main__':
-    main()
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main, after=print)
+#+end_src
+***** Transform
+#+name: dataset-transform
+#+begin_src python :tangle ../sparcur/simple/transform.py :mkdirp yes
+def main(path=Path.cwd(), **kwargs):
+    # FIXME TODO need to follow the behavior of main in extract
+    cache = path.cache
+    if not cache.is_dataset():
+        raise TypeError('can only run on a single dataset')
+
+    dataset_raw = from_path_dataset_raw(path)
+    breakpoint()
+
+
+if __name__ == '__main__':
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main, after=print)
 #+end_src
 **** Network resources
 *** _*Export*_
@@ -1241,6 +1443,7 @@ Options:
 import os
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
+from sparcur.utils import log, logd
 from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
@@ -1332,7 +1535,7 @@ def rglob(path, pattern):
         with os.popen(command) as p:
             string = p.read()
 
-    path_strings = string.split('\n')
+    path_strings = string.split('\n')  # XXX posix path names can contain newlines
     paths = [path / s for s in path_strings if s]
     return paths
 

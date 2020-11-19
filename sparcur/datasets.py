@@ -3,7 +3,7 @@ import csv
 import copy
 from types import GeneratorType
 from itertools import chain
-from collections import Counter
+from collections import Counter, defaultdict
 #import openpyxl  # import time hog
 import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
@@ -14,7 +14,7 @@ from . import raw_json as rj
 from . import exceptions as exc
 from . import normalization as nml
 from .core import log, logd, HasErrors
-from .paths import Path
+from .paths import Path, BlackfynnCache
 from .utils import is_list_or_tuple
 
 
@@ -251,10 +251,11 @@ class DatasetStructure(Path):
         return self.counts['dirs'] + self.counts['files']
 
     @property
-    def bids_root(self):
+    def dataset_root(self):
         # FIXME this will find the first dataset description file at any depth!
         # this is incorrect behavior!
-        """ Sometimes there is an intervening folder. """
+        """ The folder where the dataset_description file is located.
+            Sometimes there is an intervening folder. """
         if self.cache.is_dataset:
             def check_fordd(paths, level=0, stop=3):
                 if not paths:  # apparently the empty case recurses forever
@@ -293,7 +294,7 @@ class DatasetStructure(Path):
             return dd_paths[0].parent  # FIXME choose shorter version? if there are multiple?
 
         elif self.parent:  # organization has no parent
-            return self.parent.bids_root
+            return self.parent.dataset_root
 
     def _abstracted_paths(self, name_prefix, glob_type=None, fetch=True, sandbox=False):
         """ A bottom up search for the closest file in the parent directory.
@@ -315,9 +316,9 @@ class DatasetStructure(Path):
             return
         elif (self.cache and
               self.cache.is_dataset and
-              self.bids_root is not None and
-              self.bids_root != self):
-            path = self.bids_root
+              self.dataset_root is not None and
+              self.dataset_root != self):
+            path = self.dataset_root
 
         first = name_prefix[0]
         cased_np = '[' + first.upper() + first + ']' + name_prefix[1:]  # FIXME warn and normalize
@@ -386,6 +387,7 @@ class DatasetStructure(Path):
         # python objects, but we aren't there yet
 
         out = self.counts
+        # out['paths'] = self.inverted_index()
         for section_name in self.sections:
             #section_paths_name = section_name + '_paths'
             #paths = list(getattr(self, section_paths_name))
@@ -402,12 +404,47 @@ class DatasetStructure(Path):
         self.embedErrors(out)
         return out
 
+    xattr_prefix = BlackfynnCache.xattr_prefix
+    cache_meta = aug.EatCache.meta
+
+    def data_dir_structure(self):
+        #return {d.dataset_relative_path:d.cache_meta for d in self.rchildren_dirs}
+        # TODO get all the leaves and then build an inverted index
+        return {d.dataset_relative_path:{k:v for k, v in d.cache_meta.items() if v is not None}
+                for d in self.rchildren_dirs}
+
+    def inverted_index(self):
+        # TODO there are two steps here
+        # 1. identifying invalid folder hierarchies
+        #    (e.g. materialized subjects and samples folders)
+        # 2. _after_ we have the subjects identifiers we
+        #    need to find all the matches remove all the nested
+        #    non-matching and then recheck for invalid hierarchies
+        # at the moment there seem to be lots of incorrect structures
+        # where the primary has a bunch of stuff in between
+
+        # {sourc,primary,derivative}/{subject_id,sample_id,pool_id,performance_id}/{don-t-really-care}...
+        dds = self.data_dir_structure()
+        #dd = defaultdict(lambda : defaultdict(list))
+        dd = defaultdict(list)
+        for d in dds:
+            p = d.parts
+            dd[p[-1]].append((len(p), d, p[::-1]))
+
+        return dict(dd)
+
 
 class ObjectPath(Path):
     obj = None
     @property
     def object(self):
         return self.obj(self)
+
+    def object_new(self, template_schema_version=None):
+        """ PROPERTIES ARE BAD KIDS DON'T DO IT UNLESS
+            YOU ARE REALLY SURE """  # sigh
+
+        return self.obj(self, template_schema_version)
 
 
 ObjectPath._bind_flavours()
