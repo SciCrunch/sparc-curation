@@ -844,7 +844,7 @@ class PipelineStart(JSONPipeline):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
-class SPARCBIDSPipeline(JSONPipeline):
+class SDSPipeline(JSONPipeline):
 
     previous_pipeline_classes = PipelineStart,
     #previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
@@ -1083,7 +1083,7 @@ class PipelineExtras(JSONPipeline):
     # subclassing allows us to pop additional steps
     # before or after their super()'s name
 
-    previous_pipeline_classes = SPARCBIDSPipeline,
+    previous_pipeline_classes = SDSPipeline,
 
     subpipelines = (
         [[[['id'], ['id']]],
@@ -1348,7 +1348,7 @@ class PipelineEnd(JSONPipeline):
     _curation = [
         'DatasetStructure.curation-error',
         'SubjectsFile.curation-error',
-        'SPARCBIDSPipeline.data',
+        'SDSPipeline.data',
         'PipelineExtras.data',
         'ProtocolData',  # FIXME this is here as a placeholder
     ]
@@ -2000,7 +2000,7 @@ class SummaryPipeline(JSONPipeline):
         return data
 
 
-SPARCBIDSPipeline.check()
+SDSPipeline.check()
 PipelineExtras.check()
 PipelineEnd.check()
 PipelineEnd._expand_stages()

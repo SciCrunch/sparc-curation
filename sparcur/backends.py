@@ -1295,6 +1295,11 @@ class BlackfynnDatasetData:
         with open(self.cache, 'rt') as f:
             return json.load(f)
 
+    @property
+    def data(self):
+        """ for uniformity MetadataFile type """
+        return self.fromCache()
+
     def __call__(self):
         # FIXME TODO switch to use dict transformers
         # self.bfobject.relationships()
