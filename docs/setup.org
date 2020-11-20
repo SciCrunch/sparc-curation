@@ -420,7 +420,30 @@ Other software that you will probably need at some point but that is not package
 - [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
 
 *** Windows
-**** Symlinks
+**** Config
+Group policy for file system issues.
+***** Long Paths
+Datasets in SPARC often have long names. Windows 10 default settings
+break long paths in Python. To fix this enable win32 long paths.
+
+[[https://docs.microsoft.com/en-us/archive/blogs/jeremykuhne/net-4-6-2-and-long-paths-on-windows-10#enabling-win32-long-path-support][Microsoft Documentation]]
+
+You can use =gpedit.msc= to grant these permissions by adding the user
+by navigating the menu tree below. You can run =gpedit.msc= directly
+with =Win-r= or often =Win gpedit enter=.
+
+#+begin_example
+Computer configuration
+└── Administrative Templates
+    Enable Win32 long paths
+#+end_example
+
+Double click to open the setting dialogue, select the enable radio
+button on the left and then click the ok button.
+
+Any program that is run after this is enabled will work as expected if
+it supports long paths. No restart or logout is required.
+***** Symlinks
 =augpathlib= makes extensive use of symlinks to store metadata for remote files
 that have not been downloaded. By default normal users cannot create symlinks on
 windows. The best way to fix this is by granting the user that will run sparcur

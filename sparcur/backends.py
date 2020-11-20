@@ -17,6 +17,8 @@ class BlackfynnRemote(aug.RemotePath):
     _async_rate = None
     _local_dataset_name = object()
 
+    _exclude_uploaded = True
+
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls)
 
@@ -586,16 +588,22 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def rchildren(self):
-        yield from self._rchildren()
+        # we control exclude uploaded via a class level variable so that
+        # so that the cache implementation doesn't have to know about it
+        # since cache shouldn't know anything about why the remote gives
+        # it certain files, just that it does
+        yield from self._rchildren(exclude_uploaded=self._exclude_uploaded)
 
     def _dir_or_file(self, child, deleted, exclude_uploaded):
         state = child.bfobject.state
         if state != 'READY':
             log.debug (f'{state} {child.name} {child.id}')
+            self._errors.append(f'State not READY is {state}')
             if state == 'DELETING' or state == 'PARENT-DELETING':
                 deleted.append(child)
                 return
             if exclude_uploaded and state == 'UPLOADED':
+                logd.warning(f'Bad news kids. {self!r}')  # TODO
                 return
 
         if child.is_file():

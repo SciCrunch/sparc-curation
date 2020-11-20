@@ -724,6 +724,28 @@ def _from_project_path_top_level(project_path):
     # this is a separate function in case the previous step fails
     # which is also why it is hidden, it makes too many assuptions
     # to be used by itself
+
+    #if isinstance(project_path, pathlib.PureWindowsPath):
+        # FIXME these changes need to be deeper
+        # The real solution: https://bugs.python.org/issue27731
+        # we have to set group policy on the windows computers
+        # that are going to be running this stuff leaving these
+        # comments here for now until setup.org is updated
+
+        # we resolve because when we with project_path below if the
+        # anchor path is still relative then it will be looking in
+        # the wrong place date/organization/date/organization/folder
+        # instead of in date/organization/folder
+        #ppr = project_path.resolve()
+        #r = ppr.relative_to(ppr.anchor)
+        # for some reason python is not correctly adding the //?/ part
+        # of the path which is required to get sane and modern
+        # behavior on windows https://bugs.python.org/issue18199
+        # claims this is fixed as of 4 years ago, but it seems that
+        # pathlib has no support for this sigh
+        # see also https://stackoverflow.com/questions/27680647/
+        #project_path = project_path.__class__(f'//?/{ppr.drive}/') / r
+
     anchor = project_path.cache
     list(anchor.children)  # this fetchs data from the remote path to the local path
     return project_path  # returned instead of anchor & children because it is needed by next phase

@@ -476,7 +476,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
              # pass in Parallel in at run time if needed
              Parallel=None,
              delayed=None,
-             _in_parallel=False,):
+             _in_parallel=False,
+             exclude_uploaded=True,):
         # TODO usage errors
 
         if time_now is None:
@@ -507,26 +508,32 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                                         time_now=time_now,
                                         cache_anchor=cache.anchor,
                                         log_name=_log.name,
-                                        log_level=log_level,)
+                                        log_level=log_level,
+                                        exclude_uploaded=exclude_uploaded,)
                     for child in self.children
                     if paths is None or child in paths)
 
         elif cache.is_dataset():
-            self._pull_dataset(time_now)  # XXX actual pull happens in here
+            self._pull_dataset(time_now, exclude_uploaded)  # XXX actual pull happens in here
 
         else:
             raise NotImplementedError(self)
 
-    def _pull_dataset(self, time_now):
+    def _pull_dataset(self, time_now, exclude_uploaded):
         cache = self.cache
         if cache.is_organization():
             raise TypeError('can\' use this method on organizations')
         elif not cache.is_dataset():
-            return self.dataset._pull_dataset()
+            return self.dataset._pull_dataset(time_now, exclude_uploaded)
 
         children = list(self.children)
         if not children:
-            return list(self.cache.rchildren)
+            try:
+                _old_eu = self._remote_class._exclude_uploaded
+                cache._remote_class._exclude_uploaded = exclude_uploaded
+                return list(self.cache.rchildren)
+            finally:
+                cache._remote_class._exclude_uploaded = _old_eu
 
         # instantiate a temporary staging area for pull
         ldd = cache.local_data_dir
