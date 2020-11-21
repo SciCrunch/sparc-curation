@@ -521,19 +521,23 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     def _pull_dataset(self, time_now, exclude_uploaded):
         cache = self.cache
+        try:
+            _old_eu = self._remote_class._exclude_uploaded
+            cache._remote_class._exclude_uploaded = exclude_uploaded
+            return self._pull_dataset_internal(time_now)
+        finally:
+            cache._remote_class._exclude_uploaded = _old_eu
+
+    def _pull_dataset_internal(self, time_now):
+        cache = self.cache
         if cache.is_organization():
             raise TypeError('can\' use this method on organizations')
         elif not cache.is_dataset():
-            return self.dataset._pull_dataset(time_now, exclude_uploaded)
+            return self.dataset._pull_dataset_internal(time_now)
 
         children = list(self.children)
         if not children:
-            try:
-                _old_eu = self._remote_class._exclude_uploaded
-                cache._remote_class._exclude_uploaded = exclude_uploaded
-                return list(self.cache.rchildren)
-            finally:
-                cache._remote_class._exclude_uploaded = _old_eu
+            return list(self.cache.rchildren)  # XXX actual pull happens here
 
         # instantiate a temporary staging area for pull
         ldd = cache.local_data_dir
@@ -544,16 +548,24 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         working = self
         upstream = contain_upstream / working.name
         upstream.mkdir()
-        upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
-
-        # FIXME TODO error handling
-
-        # pull and prep for comparison of relative paths
-        upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
-        upstream_children = [c.local.relative_to(upstream)
-                            for c in upstream_c_children]
-        working_children = [c.relative_to(working)
-                            for c in working.rchildren]
+        try:
+            # if mkdir succeeds then any failure that happens between
+            # then and the point where we swap needs to move the folder
+            # to a unique path marked as an error so that future calls
+            # to this function are not stopped by an existing directory
+            # that failed to be cleaned up
+            upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
+            # pull and prep for comparison of relative paths
+            upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
+            upstream_children = [c.local.relative_to(upstream)
+                                 for c in upstream_c_children]
+            working_children = [c.relative_to(working)
+                                for c in working.rchildren]
+        except BaseException as e:
+            error_suf = f'{time_now.START_TIMESTAMP_LOCAL_SAFE}-ERROR'
+            upstream.rename(upstream.parent / (upstream.name + error_suf))
+            # TODO do we need to log here or can we log up the stack?
+            raise e
 
         # FIXME TODO comparison/diff and support for non-curation workflows
 

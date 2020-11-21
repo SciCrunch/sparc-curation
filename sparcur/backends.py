@@ -7,7 +7,7 @@ import augpathlib as aug
 from augpathlib import PathMeta
 from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
-from sparcur.utils import log, BlackfynnId
+from sparcur.utils import log, logd, BlackfynnId
 from sparcur.config import auth
 
 
@@ -378,8 +378,14 @@ class BlackfynnRemote(aug.RemotePath):
         if '/' in name:
             bads = ','.join(f'{i}' for i, c in enumerate(name) if c == '/')
             self._errors.append(f'slashes {bads}')
-            log.critical(f'GO AWAY {self}')
+            logd.critical(f'Forward slash in name for {self}')
             name = name.replace('/', '_')
+            self.bfobject.name = name  # AND DON'T BOTHER US AGAIN
+
+        if name.endswith(' '):  # breaks paths on windows
+            self._errors.append(f'trailing whitespace in {name!r}')
+            log.critical(f'Trailing whitespace in name for {self}')
+            name = name.rstrip()
             self.bfobject.name = name  # AND DON'T BOTHER US AGAIN
 
         return name

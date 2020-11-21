@@ -893,18 +893,18 @@ from sparcur.utils import GetTimeNow
 
 
 # pull dataset
-def from_path_dataset_file_structure(path, time_now=None):
+def from_path_dataset_file_structure(path, time_now=None, exclude_uploaded=True):
     """ pull the file structure and file system metadata for a single dataset
         right now only works from a dataset path """
 
     if time_now is None:
         time_now = GetTimeNow()
 
-    path._pull_dataset(time_now)
+    path._pull_dataset(time_now, exclude_uploaded)
 
 
 # pull all in parallel
-def from_path_dataset_file_structure_all(project_path, *args, paths=None, time_now=None):
+def from_path_dataset_file_structure_all(project_path, *args, paths=None, time_now=None, exclude_uploaded=True):
     """ pull all of the file structure and file system metadata for a project
         paths is a keyword argument that accepts a list/tuple of the subset of
         paths that should be pulled """
@@ -919,7 +919,8 @@ def from_path_dataset_file_structure_all(project_path, *args, paths=None, time_n
         n_jobs=12,
         log_level='DEBUG' if False else 'INFO',  # TODO
         Parallel=Parallel,
-        delayed=delayed,)
+        delayed=delayed,
+        exclude_uploaded=exclude_uploaded,)
 
 
 # mark datasets as sparse 
@@ -936,8 +937,8 @@ def sparse_materialize(path, sparse_limit:int=None):
         cache._sparse_materialize(sparse_limit=sparse_limit)
 
 
-def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, **kwargs):
-    project_path = None
+def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, exclude_uploaded=True, **kwargs):
+    project_path = None  # path could be None so can't find_cache_root here
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.fetch_remote_metadata import main as remote_metadata
         project_path = remote_metadata(path=path, **kwargs)
@@ -946,7 +947,7 @@ def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, **kwargs):
         if path != project_path:
             # dataset_path case
             sparse_materialize(path, sparse_limit=sparse_limit)
-            from_path_dataset_file_structure(path)
+            from_path_dataset_file_structure(path, time_now=time_now, exclude_uploaded=exclude_uploaded)
             print('NOTE: you probably need to run `pushd ~/ && popd` '
                 'to get a sane view of the filesystem if you ran this'
                 'from within a dataset folder')
@@ -959,8 +960,11 @@ def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, **kwargs):
         from sparcur.simple.clone import _from_project_path_top_level
         _from_project_path_top_level(project_path)
 
-    sparse_materialize(project_path, sparse_limit=sparse_limit)
-    from_path_dataset_file_structure_all(project_path)
+    sparse_materialize(project_path,
+                       sparse_limit=sparse_limit)
+    from_path_dataset_file_structure_all(project_path,
+                                         time_now=time_now,
+                                         exclude_uploaded=exclude_uploaded)
     return project_path
 
 
@@ -1488,6 +1492,7 @@ Options:
     --extension=<EXT>...            one or more file extensions to fetch
 
     -j --jobs=N                     number joblib jobs [default: 12]
+    --include-uploaded              pull files from remote marked as uploaded
     --sparse-limit=N                package count that forces a sparse pull [default: 10000]
     --symlink-objects-to=PATH       path to an existing objects directory
 """
@@ -1554,6 +1559,10 @@ class Options(clif.Options):
     @property
     def extensions(self):
         return self.extension
+
+    @property
+    def exclude_uploaded(self):
+        return not self.include_uploaded
 
     @property
     def symlink_objects_to(self):

@@ -593,8 +593,9 @@ simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
 # no whitespace no colons for subject and sample identifiers
 # and no forward slashes and no pipes
-# also no leading symbols
-fs_safe_identifier_pattern = '[A-Za-z0-9][^ \n\t*|:\/]+'
+# also no leading symbols (problematic for utf-8 but deal with it)
+# see https://stackoverflow.com/questions/1976007/
+fs_safe_identifier_pattern = '[A-Za-z0-9][^ \n\t*|:\/<>"\\?]+'
 
 # NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
