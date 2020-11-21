@@ -904,7 +904,12 @@ def from_path_dataset_file_structure(path, time_now=None, exclude_uploaded=True)
 
 
 # pull all in parallel
-def from_path_dataset_file_structure_all(project_path, *args, paths=None, time_now=None, exclude_uploaded=True):
+def from_path_dataset_file_structure_all(project_path,
+                                         ,*args,
+                                         paths=None,
+                                         time_now=None,
+                                         n_jobs=12,
+                                         exclude_uploaded=True):
     """ pull all of the file structure and file system metadata for a project
         paths is a keyword argument that accepts a list/tuple of the subset of
         paths that should be pulled """
@@ -916,7 +921,7 @@ def from_path_dataset_file_structure_all(project_path, *args, paths=None, time_n
         paths=paths,
         time_now=time_now,  # TODO
         debug=False,  # TODO
-        n_jobs=12,
+        n_jobs=n_jobs,
         log_level='DEBUG' if False else 'INFO',  # TODO
         Parallel=Parallel,
         delayed=delayed,
@@ -937,7 +942,12 @@ def sparse_materialize(path, sparse_limit:int=None):
         cache._sparse_materialize(sparse_limit=sparse_limit)
 
 
-def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, exclude_uploaded=True, **kwargs):
+def main(path=Path.cwd(),
+         time_now=None,
+         sparse_limit:int=None,
+         n_jobs=12,
+         exclude_uploaded=True,
+         ,**kwargs):
     project_path = None  # path could be None so can't find_cache_root here
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.fetch_remote_metadata import main as remote_metadata
@@ -964,6 +974,7 @@ def main(path=Path.cwd(), time_now=None, sparse_limit:int=None, exclude_uploaded
                        sparse_limit=sparse_limit)
     from_path_dataset_file_structure_all(project_path,
                                          time_now=time_now,
+                                         n_jobs=n_jobs,
                                          exclude_uploaded=exclude_uploaded)
     return project_path
 
