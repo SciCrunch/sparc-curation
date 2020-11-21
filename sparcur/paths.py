@@ -498,7 +498,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         cache = self.cache
 
         if cache.is_organization():
-            if debug or Parallel is None:
+            if debug or Parallel is None or n_jobs <= 1:
                 for child in self.children:
                     if paths is None or child in paths:
                         child.pull()
@@ -547,8 +547,12 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         # create the new directory with the xattrs needed to pull
         working = self
         upstream = contain_upstream / working.name
-        upstream.mkdir()
         try:
+            upstream.mkdir()
+            # if upstream fails that means that somehow a previous
+            # cleanup did not succeed (for some reason), this time it
+            # should succeed and next time everything should work
+
             # if mkdir succeeds then any failure that happens between
             # then and the point where we swap needs to move the folder
             # to a unique path marked as an error so that future calls
