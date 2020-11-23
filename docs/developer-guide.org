@@ -589,22 +589,71 @@ function sparc-export-all () {
 **** Overview                                                        :ignore:
 **** Bash implementation                                             :ignore:
 #+begin_src bash
-DATASET_PATH=$(python -m sparcur.simple.clone --dataset-id ${DATASET_ID})
-python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
-python -m sparcur.simple.pull ${DATASET_PATH}
-python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
-#+end_src
-
-What we would like to be able to write.
-#+begin_src bash
 function sparcur-retrieve () {
     "First pass retrieve all remote data for a single dataset."
-    DATASET_ID=${1}
-    python -m sparcur.simple.retrieve --dataset-id ${DATASET_ID}
+    local DATASET_ID=$1
+    local DATASET_PATH
+    DATASET_PATH=$(python -m sparcur.simple.retrieve --dataset-id ${DATASET_ID})
+    # FIXME error handling
+    echo $DATASET_PATH
 }
 #+end_src
 *** _*Validate*_
+**** Extract
+#+begin_src bash
+python -m sparcur.simple.extract "${DATASET_PATH}"
+#+end_src
+**** Retrieve 2
 *** _*Export*_
+** Future correct single dataset workflow
+Network access should only be possible during the retrieve phase.
+
+The validate step may happen during extract and transform as well
+since structure or data content issues may be easier to detect during
+certain phases. Ideally this would not be the case, but practically it
+will take more work than necessary given our use cases.
+*** Hypothes.is
+This is pulled in bulk independently in a different workflow but it is
+probably worth checking to see if we need to run it again whenever we
+run a dataset.
+*** Structure metadata
+**** Retrieve
+This is ref:clone.py, ref:fetch_remote_metadata_all.py, and ref:pull.py.
+**** Extract
+**** Transform
+**** Validate
+We can't do this right now because the current dataset template cannot
+be statically validated. Only some of it can be validated when we have
+the data from the subjects and samples sheets. In this future pipeline
+the type prefixes will be required so that the structure can be
+statically verified.
+*** Dataset metadata
+Run this if the structure metadata is in a state where we can proceed
+(i.e. that there is a dataset_description file).
+**** Retrieve
+This is ref:fetch_metadata_files.py.
+**** Extract
+**** Transform
+**** Validate
+*** File metadata
+**** Retrieve
+This is ref:fetch_files.py.
+Depends on the manifest files and the dataset structure.
+**** Extract
+**** Transform
+**** Validate
+*** Protocols
+Checking and/or retrieving these depends on 3 things.
+The protocols.io group, the hypothesis group, and the dataset metadata.
+*** Protc
+Needs hypothesis and protocols.
+*** Export
+**** Convert
+**** Serialize
+Probably also includes load in some cases e.g. for the file level
+metadata that will be attached to package-id file-id pairs.
+# TODO issue with dumping packages into mongo is that we will
+# have to flag packages and collections as deleted
 ** Protocols
 #+name: graph-protocols
 #+header: :wrap "src dot :file ./images/graph-protocols.png :cmdline -Kdot -Tpng :exports results :cache yes"
@@ -1545,6 +1594,7 @@ def from_path_summary(project_path):
 
 
 def main(path=Path.cwd(), dataset_id=None, time_now=None, **kwargs):
+    # TODO path from dataset_id and retrieve conventions? or just pass path from retrieve final output?
     # TODO parallelize if multiple paths
     # This assumes that all retrieve operations have
     # finished successfully for the current dataset
