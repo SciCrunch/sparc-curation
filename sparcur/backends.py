@@ -609,7 +609,7 @@ class BlackfynnRemote(aug.RemotePath):
                 deleted.append(child)
                 return
             if exclude_uploaded and state == 'UPLOADED':
-                logd.warning(f'Bad news kids. {self!r}')  # TODO
+                logd.warning(f'File in {self.id} is UPLOADED not READY! {child!r}')  # TODO
                 return
 
         if child.is_file():
@@ -1293,6 +1293,8 @@ class BlackfynnDatasetData:
     @property
     def bfobject(self):
         if not hasattr(self, '_bfobject'):
+            # NOTE if self.id is a string then this will likely
+            # result in the NotImplementedError in _cache_path
             self._bfobject = self.remote.bfobject
 
         return self._bfobject

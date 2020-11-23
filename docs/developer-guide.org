@@ -10,22 +10,22 @@
 * Demos
 ** Remote only connection
 This is the simplest way to get a remote only connection to Blackfynn.
-#+BEGIN_SRC python
+#+begin_src python
 from sparcur.paths import BlackfynnCache, Path
 from sparcur.config import auth
 from sparcur.backends import BlackfynnRemote
-organization_id = auth.get('blackfynn-organization')
+project_id = auth.get('blackfynn-organization')
 BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
-BlackfynnRemote.init(organization_id)
+BlackfynnRemote.init(project_id)
 root = BlackfynnRemote(BlackfynnRemote.root)
 datasets = list(root.children)
 return datasets
-#+END_SRC
+#+end_src
 ** Validate a dataset
 You can run this example block and it will validate the DatasetTemplate. \\
 To see the full results =from pprint import pprint=
 and change the last line to =pprint(data)=.
-#+BEGIN_SRC python :results output :exports both :cache yes :tangle ./broken.py
+#+begin_src python :results output :exports both :cache yes :tangle ./broken.py
 from sparcur import pipelines as pipes
 from sparcur.paths import Path
 
@@ -51,7 +51,7 @@ path = Path('../resources/DatasetTemplate')
 pipeline = makeValidator(path)
 data = pipeline.data
 print(sorted(data.keys()))
-#+END_SRC
+#+end_src
 
 #+RESULTS[cc32c2f62cd7a758207c6368bc90a6742db681e3]:
 : ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'prov', 'size']
@@ -594,6 +594,15 @@ python -m sparcur.simple.fetch_remote_metadata ${DATASET_PATH}
 python -m sparcur.simple.pull ${DATASET_PATH}
 python -m sparcur.simple.fetch_metadata_files ${DATASET_PATH}
 #+end_src
+
+What we would like to be able to write.
+#+begin_src bash
+function sparcur-retrieve () {
+    "First pass retrieve all remote data for a single dataset."
+    DATASET_ID=${1}
+    python -m sparcur.simple.retrieve --dataset-id ${DATASET_ID}
+}
+#+end_src
 *** _*Validate*_
 *** _*Export*_
 ** Protocols
@@ -646,15 +655,13 @@ process is decouple, and mediated via git:36a749b5c321cdb81ba81f9d35e050ceb84799
 After a release
 * Internal Structure
 :PROPERTIES:
-:header-args: :comments link :exports code
+:header-args:python: :comments link :exports code :mkdirp yes
+:header-args:python+: :shebang "#!/usr/bin/env python3"
 :END:
 ** Pipelines
 Easier to read, harder to debug. The python paradox.
 *** _*Retrieve*_
 **** _Protocols_
-:PROPERTIES:
-:header-args: :shebang "#!/usr/bin/env python3"
-:END:
 Cache annotations.
 #+begin_src python :tangle ../sparcur/simple/fetch_annotations.py :mkdirp yes
 from pathlib import Path
@@ -684,9 +691,6 @@ if __name__ == '__main__':
     pipe_main(main)
 #+end_src
 **** _Datasets_
-:PROPERTIES:
-:header-args: :shebang "#!/usr/bin/env python3"
-:END:
 ***** Clone
 This is an example of how to clone the top level of a project.
 See ref:utils.py for a good way to instantiate =RemotePath=.
@@ -699,16 +703,36 @@ from pathlib import Path
 def from_path_id_and_backend_project_top_level(parent_path,
                                                project_id,
                                                RemotePath,
-                                               symlink_objects_to=None):
+                                               symlink_objects_to=None,):
     """ given the enclosing path to clone to, the project_id, and a fully
         configured (with Local and Cache) backend remote path, anchor the
         project pointed to by project_id along with the first level of children """
 
+    project_path = _from_path_id_remote_project(parent_path,
+                                                project_id,
+                                                RemotePath,
+                                                symlink_objects_to)
+    return _from_project_path_top_level(project_path)
+
+
+def from_path_project_backend_id_dataset(parent_path,
+                                         project_id,
+                                         dataset_id,
+                                         RemotePath,
+                                         symlink_objects_to=None,):
+    project_path = _from_path_id_remote_project(parent_path,
+                                                project_id,
+                                                RemotePath,
+                                                symlink_objects_to)
+    return _from_project_path_id_dataset(project_path, dataset_id)
+
+
+def _from_path_id_remote_project(parent_path, project_id, RemotePath, symlink_objects_to):
     RemotePath.init(project_id)  # calling init is required to bind RemotePath._api
     anchor = RemotePath.smartAnchor(parent_path)
     anchor.local_data_dir_init(symlink_objects_to=symlink_objects_to)
     project_path = anchor.local
-    return _from_project_path_top_level(project_path)
+    return project_path
 
 
 def _from_project_path_top_level(project_path):
@@ -725,42 +749,29 @@ def _from_project_path_top_level(project_path):
     # which is also why it is hidden, it makes too many assuptions
     # to be used by itself
 
-    #if isinstance(project_path, pathlib.PureWindowsPath):
-        # FIXME these changes need to be deeper
-        # The real solution: https://bugs.python.org/issue27731
-        # we have to set group policy on the windows computers
-        # that are going to be running this stuff leaving these
-        # comments here for now until setup.org is updated
-
-        # we resolve because when we with project_path below if the
-        # anchor path is still relative then it will be looking in
-        # the wrong place date/organization/date/organization/folder
-        # instead of in date/organization/folder
-        #ppr = project_path.resolve()
-        #r = ppr.relative_to(ppr.anchor)
-        # for some reason python is not correctly adding the //?/ part
-        # of the path which is required to get sane and modern
-        # behavior on windows https://bugs.python.org/issue18199
-        # claims this is fixed as of 4 years ago, but it seems that
-        # pathlib has no support for this sigh
-        # see also https://stackoverflow.com/questions/27680647/
-        #project_path = project_path.__class__(f'//?/{ppr.drive}/') / r
-
     anchor = project_path.cache
     list(anchor.children)  # this fetchs data from the remote path to the local path
     return project_path  # returned instead of anchor & children because it is needed by next phase
 
 
+def _from_project_path_id_dataset(project_path, dataset_id):
+    anchor = project_path.cache
+    remote = anchor._remote_class(dataset_id)
+    cache = anchor / remote
+    return cache.local
+
+
 def main(parent_path=None,
          project_id=None,
          parent_parent_path=Path.cwd(),
-         project_id_auth_var='blackfynn-organization',
+         project_id_auth_var='blackfynn-organization',  # FIXME move default to clifun
          symlink_objects_to=None,
+         id=None,
+         dataset_id=None,
          ,**kwargs):
     """ clone a project into a random subfolder of the current folder
         or specify the parent path to clone into """
 
-    from sparcur.config import auth
     from sparcur.simple.utils import backend_blackfynn
 
     if parent_path is None:
@@ -768,8 +779,22 @@ def main(parent_path=None,
         import tempfile
         parent_path = Path(tempfile.mkdtemp(dir=parent_parent_path))
 
-    project_id = auth.get(project_id_auth_var)
+    if project_id is None:
+        from sparcur.config import auth
+        project_id = auth.get(project_id_auth_var)
+
     RemotePath = backend_blackfynn()
+
+    if id and dataset_id:
+        dataset_path = from_path_project_backend_id_dataset(
+            parent_path,
+            project_id,
+            id,  # FIXME multiple datasets
+            RemotePath,
+            symlink_objects_to,)
+
+        return dataset_path
+
     project_path = from_path_id_and_backend_project_top_level(
         parent_path,
         project_id,
@@ -800,7 +825,7 @@ from sparcur.backends import BlackfynnDatasetData
 from sparcur.simple.utils import backend_blackfynn
 
 
-def from_id_fetch_remote_metadata(id, n_jobs=12):
+def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
     """ given an dataset id fetch its associated dataset metadata """
     if id.startswith('N:organization'):
         RemotePath = backend_blackfynn()
@@ -810,24 +835,36 @@ def from_id_fetch_remote_metadata(id, n_jobs=12):
             [p() for p in prepared]
         else:
             Parallel(n_jobs=12)(delayed(p)() for p in prepared)
-    elif id.startswith('N:dataset'):
-        bdd = BlackfynnDatasetData(id)
+    elif id.startswith('N:dataset:'):  # TODO support dataset: ?
+        RemotePath = backend_blackfynn(project_id)
+        dataset = RemotePath(id)
+        bdd = BlackfynnDatasetData(dataset)
         bdd()
     else:
         raise NotImplementedError(id)
 
 
-def main(id=None, n_jobs=12, **kwargs):
-    if id is None:
-        from sparcur.config import auth
-        id = auth.get('blackfynn-organization')
+def main(id=None,
+         project_id=None,
+         project_id_auth_var='blackfynn-organization',  # FIXME move to clifun
+         n_jobs=12,
+         **kwargs):
 
-    from_id_fetch_remote_metadata(id, n_jobs=n_jobs)
+    if project_id is None:
+        from sparcur.config import auth
+        project_id = auth.get(project_id_auth_var)
+
+    if id is None:
+        id = project_id
+
+    from_id_fetch_remote_metadata(id,
+                                  project_id=project_id,
+                                  n_jobs=n_jobs,)
 
 
 if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
-    pipe_main(main)
+    pipe_main(main)  # nothing to print or do after
 #+end_src
 ****** From path
 :PROPERTIES:
@@ -837,6 +874,9 @@ The implementation of =sparcur.backends.BlackfynnDatasetData= supports the abili
 to retrieve metadata directly from the remote without the need for an intervening
 local path. However this functionality is obscured here because we want to derive
 a consistent view of the data from the file system snapshot.
+# NOTE check where this is used, currently it is only used in simple.pull.main
+# which will trigger only if pull is called without any other arguments and not
+# in an existing project which is not a good way to do any of this
 #+name: fetch_remote_metadata.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata.py
 from joblib import Parallel, delayed
@@ -874,14 +914,17 @@ def main(path=Path.cwd(), n_jobs=12, rmeta_cached_ok=False, **kwargs):
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.clone import main as clone
         path = clone(path=path, n_jobs=n_jobs, **kwargs)
+        # NOTE path is passed along here, but kwargs is expected to contain
+        # parent_path or parent_parent_path and project_id note that if that
+        # happens then the path returned from clone will change accordingly
 
     from_path_fetch_remote_metadata(path, n_jobs=n_jobs, cached_ok=rmeta_cached_ok)
     return path
 
 
 if __name__ == '__main__':
-    path = main()
-    print(path)
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main)  # we probably don't print here?
 #+end_src
 ***** Pull
 Pull a single dataset or pull all datasets or clone and pull all datasets.
@@ -951,16 +994,17 @@ def main(path=Path.cwd(),
     project_path = None  # path could be None so can't find_cache_root here
     if path is None or path.find_cache_root() not in (path, *path.parents):
         from sparcur.simple.fetch_remote_metadata import main as remote_metadata
-        project_path = remote_metadata(path=path, **kwargs)
+        project_path = remote_metadata(path=path, **kwargs)  # transitively calls clone
     else:
         project_path = path.find_cache_root()
         if path != project_path:
             # dataset_path case
             sparse_materialize(path, sparse_limit=sparse_limit)
             from_path_dataset_file_structure(path, time_now=time_now, exclude_uploaded=exclude_uploaded)
-            print('NOTE: you probably need to run `pushd ~/ && popd` '
-                'to get a sane view of the filesystem if you ran this'
-                'from within a dataset folder')
+            if path == Path.cwd():
+                print('NOTE: you probably need to run `pushd ~/ && popd` '
+                      'to get a sane view of the filesystem if you ran this'
+                      'from within a dataset folder')
             return path
 
     if not list(project_path.children):
@@ -1089,7 +1133,7 @@ def main(path=Path.cwd(), n_jobs=12, **kwargs):
 
 if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
-    pipe_main(main)
+    pipe_main(main, after=print)
 #+end_src
 ****** File level metadata extraction
 Fetch files by extension.
@@ -1239,6 +1283,73 @@ compose = lambda f, g: (lambda *x: f(g(*x)))
 #from_path_remote_metadata = compose(lambda id: from_id_remote_metadata(id),
                                     #lambda path: path.cache.id)
 #+end_src
+***** Retrieve
+Putting it all together into a single command.
+
+The behavior of retrieve works exactly as it does for clone the
+difference is that it runs for just a single dataset and the
+parent_path is made to be the dataset_id uuid if you are running a
+single dataset pipeline you will still need the project folder
+structure for logs and jobs etc.  you can also still run all datasets
+together off of a single SPARC Consoritum folder, in which case all
+you need to do is pass the communal parent_path
+
+#+name: retrieve.py
+#+begin_src python :tangle ../sparcur/simple/retrieve.py
+from pathlib import Path
+from sparcur.simple.clone import main as clone
+from sparcur.simple.fetch_remote_metadata_all import main as remote_metadata
+from sparcur.simple.pull import main as pull
+from sparcur.simple.fetch_metadata_files import main as fetch_metadata_files
+
+
+def main(id=None,
+         dataset_id=tuple(),
+         parent_path=None,
+         parent_parent_path=Path.cwd(),
+         path=None,  # keep path out of kwargs
+         ,**kwargs):
+    # FIXME parent_path and project_id seem like they probably need to
+    # be passed here, it would be nice if project_path could just be
+    # the current folder and if the xattrs are missing for the
+    # project_id then ... it is somehow inject from somewhere else?
+    # this doesn't really work, because that would mean that we would
+    # have to carry the project id around in the xattr metadata for
+    # all dataset folders, which might not be the worst thing, but
+    # definitely redundant
+    if id is None:
+        raise TypeError('id is a required argument!')
+
+    if parent_path is None:
+        N, thing_type, uuid = id.split(':')
+        parent_path = parent_parent_path / uuid
+        parent_path.mkdir(exist_ok=True)
+
+    # XXX for now we do these steps in order here
+    # rather than trusting that calling simple.pull.main will do
+    # the right thing if there is no path ... it should but probably
+    # doesn't right now due to assumptions about paths existing
+
+    # remote metadata from path (could do from id too?)
+    remote_metadata(id=id, **kwargs)  # could run parallel to clone, easier in bash
+    # clone single without organization parent somehow seems likely broken?
+    path = clone(id=id,
+                 dataset_id=dataset_id,
+                 parent_path=parent_path,
+                 parent_parent_path=parent_parent_path,
+                 ,**kwargs)
+    # pull single
+    pull(path=path, **kwargs)
+    # fetch metadata files
+    fetch_metadata_files(path=path, **kwargs)
+
+    return path
+
+
+if __name__ == '__main__':
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main, after=print)
+#+end_src
 *** _*Validate*_
 **** _Protocols_
 **** _Datasets_
@@ -1247,7 +1358,7 @@ compose = lambda f, g: (lambda *x: f(g(*x)))
 :END:
 ***** Extract
 #+name: dataset-extract
-#+begin_src python :tangle ../sparcur/simple/extract.py :mkdirp yes
+#+begin_src python :tangle ../sparcur/simple/extract.py
 from sparcur import datasets as dat
 from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
@@ -1451,7 +1562,7 @@ if __name__ == '__main__':
 #+end_src
 ***** Transform
 #+name: dataset-transform
-#+begin_src python :tangle ../sparcur/simple/transform.py :mkdirp yes
+#+begin_src python :tangle ../sparcur/simple/transform.py
 from sparcur import pipelines as pipes
 
 pipes.SDSPipeline.copies
@@ -1478,7 +1589,7 @@ if __name__ == '__main__':
 *** _*Export*_
 ** Utility
 *** _*Init*_
-#+begin_src python :tangle ../sparcur/simple/__init__.py :mkdirp yes :exports none
+#+begin_src python :tangle ../sparcur/simple/__init__.py :exports none
 #+end_src
 *** _*Utils*_
 #+name: utils.py
@@ -1486,6 +1597,8 @@ if __name__ == '__main__':
 """Common command line options for all sparcur.simple modules
 Usage:
     sparcur-simple [options] [<path>...]
+    sparcur-simple [options] [--dataset-id=<ID>...]
+    sparcur-simple [options] [--extension=<EXT>...] [<path>...]
 
 Options:
     -h --help                       show this
@@ -1517,11 +1630,21 @@ from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
 
-def backend_blackfynn(Local=Path, Cache=BlackfynnCache):
-    """ return a configured blackfynn backend
-        calling this is sufficient to get everything set up correclty """
+def backend_blackfynn(project_id=None, Local=Path, Cache=BlackfynnCache):
+    """return a configured blackfynn backend
+        calling this is sufficient to get everything set up correclty
+
+        You must call RemotePath.init(project_id) before using
+        RemotePath.  Passing the project_id argument to this function
+        will do that for you. It is not required because there are
+        cases where the project_id may not be known at the time that
+        this function is called. """
 
     RemotePath = BlackfynnRemote._new(Local, Cache)
+
+    if project_id is not None:
+        RemotePath.init(project_id)
+
     return RemotePath
 
 
@@ -1529,10 +1652,14 @@ class Options(clif.Options):
 
     @property
     def id(self):
-        return (self.project_id
-                if self.project_id else
-                (self.dataset_id[0]
-                 if self.dataset_id else
+        # dataset_id has priority since project_id can occure without a
+        # dataset_id, but dataset_id may sometimes come with a project_id
+        # in which case the dataset_id needs priority for functions that
+        # branch on the most granular identifier type provided
+        return (self.dataset_id[0]
+                if self.dataset_id else
+                (self.project_id
+                 if self.project_id else
                  None))
 
     @property
@@ -1708,7 +1835,7 @@ class DataWrapper:
 
 #+end_src
 *** _*Test*_
-#+begin_src python :tangle ../test/simple/test_utils.py :mkdirp yes
+#+begin_src python :tangle ../test/simple/test_utils.py
 from sparcur.simple.utils import pipe_main
 
 def test_pipe_main():
