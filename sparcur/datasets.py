@@ -42,24 +42,26 @@ hasSchema = sc.HasSchema()
 class Header:
     """ generic header normalization for python """
     # FIXME this is a really a pipeline stage
-    def __init__(self, first_row_or_column, normalize=True):
+    def __init__(self, first_row_or_column, normalize=True, alt=False):
         self.pipeline_start = first_row_or_column
         self._normalize = normalize
+        self._alt = alt
 
     @property
     def normalized(self):
         orig_header = self.pipeline_start
         header = []
+        prefix = 'TEMPA' if self._alt else 'TEMPH' # prevent collision
         for i, c in enumerate(orig_header):
             if c:
                 c = to_string_and_then_python_identifier(c)
                 c = nml.NormHeader(c)
 
             if not c:
-                c = f'TEMP_{i}'
+                c = f'{prefix}_{i}'
 
             if c in header:
-                c = c + f'_TEMP_{i}'
+                c = c + f'_{prefix}_{i}'
 
             header.append(c)
 
@@ -1137,7 +1139,9 @@ class MetadataFile(HasErrors):
         except StopIteration as e:
             raise exc.NoDataError(f'{self.path}') from e
 
-        self._alt_header = Header(self.alt_header, normalize=self.normalize_alt)
+        self._alt_header = Header(self.alt_header,
+                                  normalize=self.normalize_alt,
+                                  alt=True)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
         self.orig_to_norm_alt = safe_invert(self.norm_to_orig_alt)
 
@@ -1153,6 +1157,14 @@ class MetadataFile(HasErrors):
         self._header = Header(self.header, normalize=self.normalize_header)
         self.norm_to_orig_header = self._header.lut(**self.renames_header)
         self.orig_to_norm_header = safe_invert(self.norm_to_orig_header)
+
+        _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)
+        if _matched:
+            # this has to be fatal because it violates assumptions made by
+            # downstream code that are useful to deal with nesting
+            # we may be able to fix this in the future but skip for now
+            msg = f'Common cells between alt header and header! {_matched}'
+            raise exc.MalformedHeaderError(msg)
 
         yield self.header
         yield from gen

@@ -80,6 +80,13 @@ class TestSubmissionFile(Helper, unittest.TestCase):
     metadata_file_class = SubmissionFile
     pipe = pipes.SubmissionFilePipeline
 
+    def test_submission_multi_column_extra_row(self):
+        tf = examples_root / 'submission-multi-column-extra-row.csv'
+        obj = self.metadata_file_class(tf)
+        value = obj.data
+        pprint.pprint(value)
+        assert not [k for k in value if not isinstance(k, str)]
+
     def test_submission_multi_row_error_no_values(self):
         tf = examples_root / 'submission-multi-row-error-no-values.csv'
         obj = self.metadata_file_class(tf)
@@ -93,6 +100,15 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         value = obj.data
         pprint.pprint(value)
         assert not [k for k in value if not isinstance(k, str)]
+
+    def test_submission_matched_at_header(self):
+        tf = examples_root / 'submission-matched-alt-header.csv'
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, "Should have failed."
+        except exc.MalformedHeaderError:
+            pass
 
     def test_sm_ot(self):
         tf = examples_root / 'sm-ot.csv'
