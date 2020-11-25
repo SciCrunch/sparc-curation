@@ -1164,7 +1164,8 @@ class MetadataFile(HasErrors):
             # downstream code that are useful to deal with nesting
             # we may be able to fix this in the future but skip for now
             msg = f'Common cells between alt header and header! {_matched}'
-            raise exc.MalformedHeaderError(msg)
+            log.warning(msg)  # can't quite error yet due to metadata_element
+            #raise exc.MalformedHeaderError(msg)
 
         yield self.header
         yield from gen
