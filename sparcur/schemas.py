@@ -353,13 +353,11 @@ class HasSchema:
                         logd.error('schema validation has failed and fail=True')
                         raise norm_or_error
 
-                    try:
-                        if 'errors' not in data:
-                            data['errors'] = []
-                    except BaseException as e:
-                        raise exc.SparCurError(
-                            f'Error from {_self.__class__.__name__}.'
-                            f'{function.__name__}') from e
+                    # I have no idea why this if statement used to be in
+                    # a try except block, it should never fail unless
+                    # the definition of __contains__ for a dict was overwritten
+                    if 'errors' not in data:
+                        data['errors'] = []
                         
                     data['errors'] += norm_or_error.json(pipeline_stage_name)
                     # TODO make sure the step is noted even if the schema is the same
@@ -797,8 +795,9 @@ class DatasetStructureSchema(JSONSchema):
                                           'type': 'string',
                                           'pattern': metadata_filename_pattern},
                                       },
-                    #'path_structure': {'type': 'array',
-                    # 'items': {'type': 'string', 'pattern': ''}}
+                    'dir_structure': {'type': 'array',  # TODO FIXME do not include in primary export
+                                      'items': {'type': 'object',}
+                                      ,},
                     'dirs': {'type': 'integer',
                              'minimum': 0},
                     'files': {'type': 'integer',

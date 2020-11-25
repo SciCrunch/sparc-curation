@@ -436,10 +436,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         if project_path is None:
             # FIXME TODO I think we used dataset_description as a hint?
             project_path = Path('/')  # FIXME FIXME
-            log.critical('No dataset path found for {self}!')
+            log.critical(f'No dataset path found for {self}!')
             #raise NotImplementedError('current implementation cant anchor with current info')
 
-        dataset_path = [p for p in self.parents if p.parent == project_path][0]
+        dataset_path = [p for p in chain((self,), self.parents) if p.parent == project_path][0]
         drp = self.relative_path_from(dataset_path)  # FIXME ...
 
         blob = {

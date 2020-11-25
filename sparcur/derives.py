@@ -1,6 +1,7 @@
 import copy
 from typing import Tuple
 from functools import wraps
+from collections import defaultdict
 import idlib
 from sparcur import schemas as sc
 from sparcur import normalization as nml
@@ -218,3 +219,52 @@ class Derives:
         subjects = [{k:v for k, v in blob_sample.items() if k in subject_fields}
                     for blob_sample in samples]
         return subjects,
+
+    @staticmethod
+    def validate_structure(path, dir_structure, subjects, samples):
+        # absolute_paths = [path / pblob['dataset_relative_path'] for pblob in dir_structure]
+        dd = defaultdict(list)
+        for pblob in dir_structure:
+            drp = pblob['dataset_relative_path']
+            p = drp.parts
+            dd[p[-1]].append((len(p), drp, p[::-1]))
+
+        dirs = dict(dd)
+        subs = {s['subject_id']:s for s in subjects}
+        dd = defaultdict(list)
+        for s in samples:
+            dd[s['sample_id']].append(s)
+        samps = dict(dd)
+
+        union_sub = set(dirs) | set(subs)
+        inter_sub = set(dirs) & set(subs)
+
+        if inter_sub == subs:
+            pass
+        else:
+            # FIXME not all subjects have folders there may be samples
+            # that have folders but not subjects ??? don't wan't to force
+            # metadata structure onto folder structure but it complicates
+            # the implementation again ... probably worth it in this case
+            logd.warning('miscount subject dirs, TODO')
+            pass
+
+        union_sam = set(dirs) | set(samps)
+        inter_sam = set(dirs) & set(samps)
+
+        # FIXME this is where non-uniqueness of sample ids becomes a giant pita
+        if inter_sam == samps:
+            pass
+        else:
+            logd.warning('miscount sample dirs, TODO')
+            template_version_less_than_2 = True  # FIXME TODO
+            if template_version_less_than_2:
+                # handle old aweful nonsense
+                # 1. construct subject sample lookups using tuple
+                # 2. try to construct subject sample id pairs
+            else:
+                pass  # TODO that's an error!
+
+
+        breakpoint()
+        return subject_folders, sample_folders

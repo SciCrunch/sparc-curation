@@ -1150,7 +1150,13 @@ class PipelineExtras(JSONPipeline):
 
         [[['samples']],
          De.samples_to_subjects,
-         [['subjects_from_samples']]]
+         [['subjects_from_samples']]],
+
+        [[THIS_PATH, ['dir_structure'], ['subjects'], ['samples']],
+         # FIXME this needs to happen fast and early
+         # FIXME structure is going to be in a separate file/blob for export
+         De.validate_structure,
+         [['subject_dirs'], ['sample_dirs']]],
     )
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]

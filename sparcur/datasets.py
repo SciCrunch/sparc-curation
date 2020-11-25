@@ -403,6 +403,8 @@ class DatasetStructure(Path):
                 else:
                     out[section_key] = paths
 
+        out['dir_structure'] = list(self.data_dir_structure().values())
+
         self.embedErrors(out)
         return out
 
@@ -412,8 +414,15 @@ class DatasetStructure(Path):
     def data_dir_structure(self):
         #return {d.dataset_relative_path:d.cache_meta for d in self.rchildren_dirs}
         # TODO get all the leaves and then build an inverted index
-        return {d.dataset_relative_path:{k:v for k, v in d.cache_meta.items() if v is not None}
-                for d in self.rchildren_dirs}
+
+        # FIXME this is just the directories so it is probably ok to
+        # resolve the cache for now so we can get the nice json
+        # metadata but ultimately we will need _caceh_jsonMetadata or similar
+        # that uses xattrs to avoid the overhead of constructing the cache class
+        return {d.dataset_relative_path:{**d.cache._jsonMetadata(),
+                                         'path_meta': {k:v for k, v in self.__class__(d).cache_meta.items()
+                                                       if v is not None}}
+                for d in (Path(d) for d in self.rchildren_dirs)}
 
     def inverted_index(self):
         # TODO there are two steps here

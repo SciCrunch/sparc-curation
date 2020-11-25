@@ -16,6 +16,7 @@ NOT_APPLICABLE = object()
 
 
 def protocol_url_or_doi(value):
+    # FIXME network sandbox violation
     # FIXME can't use idlib.get_right_id because it is
     # totally broken with regard to dereferencing
     if not is_list_or_tuple(value):
@@ -29,6 +30,15 @@ def protocol_url_or_doi(value):
             raise TypeError(f'should already be in stream form {v}')
 
         normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
+        if isinstance(normed, idlib.Pio):
+            try:
+                normed = normed.uri_api_int  # integer id preferred if available
+            except idlib.exc.IdDoesNotExistError as e:
+                logd.error(e)  # we'll catch this again later too
+            except Exception as e:
+                breakpoint()
+                log.exception(e)  # FIXME don't know what we will get here
+
         if not isinstance(normed, idlib.Pio) and isinstance(v, idlib.Doi):
             # ensure that regular dois are returned, not their referents
             # if it is a protocol id, use that as primary and reference the doi
