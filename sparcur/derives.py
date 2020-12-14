@@ -222,6 +222,19 @@ class Derives:
 
     @staticmethod
     def validate_structure(path, dir_structure, subjects, samples):
+
+        # for dataset templates of the 1.* series
+        # general approach: set of all specimen ids and set of all
+        # folder names take the ones that match ignore the known ok
+        # that do not, and warn on all the rest that do not match
+        # and that are not inside a known specimen or subject folder
+
+        valid_top_123 = ('source', 'primary', 'derivative',  # FIXME not here :/ schema somehow?
+                         'code', 'docs', 'protocol')
+
+        def top_level(drp):
+            return drp.parent.name == '' and drp.name in valid_top_123
+            
         # absolute_paths = [path / pblob['dataset_relative_path'] for pblob in dir_structure]
         dd = defaultdict(list)
         for pblob in dir_structure:
@@ -229,7 +242,11 @@ class Derives:
             p = drp.parts
             dd[p[-1]].append((len(p), drp, p[::-1]))
 
-        dirs = dict(dd)
+        dirs = {k:av for k, vs in dd.items()
+                for av in ([v for v in vs if not top_level(v[1])],)
+                # cull empty in a single step
+                if av} 
+
         subs = {s['subject_id']:s for s in subjects}
         dd = defaultdict(list)
         for s in samples:
@@ -239,8 +256,19 @@ class Derives:
         union_sub = set(dirs) | set(subs)
         inter_sub = set(dirs) & set(subs)
 
-        if inter_sub == subs:
-            pass
+        records = []
+        done_dirs = set()
+        done_specs = set()
+        if inter_sub == set(subs):
+            for subject_id, blob in subs.items():
+                done_dirs.add(subject_id)
+                done_specs.add(subject_id)
+                records.append({'type': 'SubjectDirs',
+                                # have to split the type because we can't recover
+                                # the type using just the specimen id (sigh)
+                                # and we need it to set the correct prefix (sigh)
+                                'id': subject_id,
+                                'dirs': [d[1] for d in dirs[subject_id]]})
         else:
             # FIXME not all subjects have folders there may be samples
             # that have folders but not subjects ??? don't wan't to force
@@ -262,9 +290,70 @@ class Derives:
                 # handle old aweful nonsense
                 # 1. construct subject sample lookups using tuple
                 # 2. try to construct subject sample id pairs
+                for sample_id, blobs in samps.items():
+                    for blob in blobs:
+                        if sample_id in dirs:
+                            candidates = dirs[sample_id]
+                            # TODO zero candidates error
+                            actual = []
+                            for level, drp, rparts in candidates:
+                                p_sample_id, p_subject_id, *p_rest = rparts
+                                assert sample_id == p_sample_id  # this should always be true
+                                subject_id = blob['subject_id']
+                                if subject_id == p_subject_id:
+                                    id = blob['primary_key']
+                                    done_dirs.add((subject_id, p_sample_id))
+                                    done_specs.add(id)
+                                    actual.append(drp)
+
+                            if actual:
+                                records.append(
+                                    {'type': 'SampleDirs',
+                                    # have to split the type because we can't recover
+                                    # the type using just the specimen id (sigh)
+                                    # and we need it to set the correct prefix (sigh)
+                                    'id': id,
+                                    'dirs': actual,
+                                    })
+                    else:
+                        logd.error(f'No folder for sample {sample_id}')
             else:
                 pass  # TODO that's an error!
 
+        usamps = set(v['primary_key'] for vs in samps.values() for v in vs)
+        udirs = set(nv for k, vs in dirs.items()
+                    for nv in (((v[-1][1], k) for v in vs) # -1 rpaths 1 parent
+                               if k in samps else
+                               (k,)))
+        not_done_specs = (set(subs) | usamps) - set(done_specs)
+        not_done_dirs = set(udirs) - set(done_dirs)
+        # FIXME this is not even close to granular enough
+        #if samps and not sample_folders:
+            #logd.warning('No sample folders')
 
+        #if subs and not subject_folders:
+            #logd.warning('No subject folders')
+        obj = {
+            'records': records,
+        }
+
+        he = HasErrors(pipeline_stage='Derives.validate_structure')
+        if not_done_specs:
+            msg = ('There are specimens that have no corresponding '
+                   f'directory!\n{not_done_specs}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if not_done_dirs:
+            msg = ('There are directories that have no corresponding '
+                   f'specimen!\n{not_done_dirs}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        he.embedErrors(obj)
         breakpoint()
-        return subject_folders, sample_folders
+        return obj,
