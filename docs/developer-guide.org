@@ -9,8 +9,19 @@
 
 * Demos
 ** Remote only connection
-This is the simplest way to get a remote only connection to Blackfynn.
-#+begin_src python
+If you have [[(def_babf)][~sparcur.simple~]] this is the simplest way to get a remote
+only connection to Blackfynn.
+#+begin_src python :results drawer :epilogue "import pprint; return pprint.pformat(datasets)"
+from sparcur.config import auth
+from sparcur.simple.utils import backend_blackfynn
+project_id = auth.get('blackfynn-organization')
+BlackfynnRemote = backend_blackfynn(project_id)
+root = BlackfynnRemote(project_id)
+datasets = list(root.children)
+#+end_src
+
+Otherwise you have to do what backend_blackfynn does for you
+#+begin_src python :results drawer :epilogue "import pprint; return pprint.pformat(datasets)"
 from sparcur.paths import BlackfynnCache, Path
 from sparcur.config import auth
 from sparcur.backends import BlackfynnRemote
@@ -19,18 +30,35 @@ BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
 BlackfynnRemote.init(project_id)
 root = BlackfynnRemote(BlackfynnRemote.root)
 datasets = list(root.children)
-return datasets
 #+end_src
 ** Validate a dataset
-You can run this example block and it will validate the DatasetTemplate. \\
-To see the full results =from pprint import pprint=
-and change the last line to =pprint(data)=.
-#+begin_src python :results output :exports both :cache yes :tangle ./broken.py
+You can run this example block and it will validate the [[file:../resources/DatasetTemplate][DatasetTemplate]].
+
+# #+header: :epilogue "import pprint; return pprint.pformat(data.keys())"
+#+header: :epilogue "import pprint; return pprint.pformat(data)"
+#+begin_src python :results drawer :exports both :cache yes :tangle ./broken.py
 from sparcur import pipelines as pipes
-from sparcur.paths import Path
+from sparcur.paths import Path as basePath
 
 
 def makeValidator(dataset_path):
+
+    class Path(basePath):
+        """ Workaround absense of cache. """
+
+        # TODO likely will also need to rebind the cache class as well
+
+        @property
+        def dataset_relative_path(self, __drp=dataset_path):
+            return self.relative_path_from(self.__class__(__drp))
+
+    Path._bind_flavours()
+
+    # XXX monkey patch TODO sigh FIXME DatasetStructure calls Path directly inside
+    basePath.dataset_relative_path = Path.dataset_relative_path
+
+    dataset_path = Path(dataset_path)
+
     class context:
         path = dataset_path.resolve()
         id = path.id
@@ -44,17 +72,18 @@ def makeValidator(dataset_path):
         uri_human = context.uri_human
         timestamp_export_start = None
 
-    return pipes.SPARCBIDSPipeline(dataset_path, lifters, context)
+    return pipes.SDSPipeline(dataset_path, lifters, context)
 
 
-path = Path('../resources/DatasetTemplate')
+path = basePath('../resources/DatasetTemplate')
 pipeline = makeValidator(path)
 data = pipeline.data
-print(sorted(data.keys()))
 #+end_src
 
-#+RESULTS[cc32c2f62cd7a758207c6368bc90a6742db681e3]:
-: ['dirs', 'errors', 'files', 'id', 'inputs', 'meta', 'prov', 'size']
+#+RESULTS[99f2d5eba83acdff6934d4fdfe64da4170348550]:
+:results:
+:end:
+
 ** Load Python IR
 #+begin_src python
 from sparcur.utils import path_ir
@@ -351,8 +380,11 @@ function sparc-get-all-remote-data () {
 #+end_src
 *** _*Validate*_
 **** Overview                                                        :ignore:
-This is the graph of the existing approach. A slightly more sane version
-is implemented above and tangled as =sparcur.simple=.
+This is the graph of the existing approach more or less as implemented
+by ~spc export~.
+
+A slightly more sane version is being implemented as part of
+=sparcur.simple= which will sandbox the network dependencies.
 
 # runs both but I'm fairly cerain that it fails to update the second code block
 # #+name: graph-validate-run-both
@@ -612,6 +644,14 @@ The validate step may happen during extract and transform as well
 since structure or data content issues may be easier to detect during
 certain phases. Ideally this would not be the case, but practically it
 will take more work than necessary given our use cases.
+
+We have to be careful to separate basic validation of the structure of
+the dataset data from the validation that the identifiers provided in
+that structure point to values known to their respective remotes.
+
+For example we need to be able to say =you are missing a protocol reference=
+at a separate point in time from saying =the remote(s) we asked had no record=
+=of the protocol reference you provided=.
 *** Hypothes.is
 This is pulled in bulk independently in a different workflow but it is
 probably worth checking to see if we need to run it again whenever we
@@ -845,6 +885,9 @@ def main(parent_path=None,
     RemotePath = backend_blackfynn()
 
     if id and dataset_id:
+        # FIXME doesn't check for existing so if the name changes we get duped folders
+        # this issue possibly upstream in retrieve, clone just clones whatever you tell
+        # it to clone, but maybe it should check the existing metadata and fail or warn?
         dataset_path = from_path_project_backend_id_dataset(
             parent_path,
             project_id,
@@ -1792,7 +1835,7 @@ from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
 
-def backend_blackfynn(project_id=None, Local=Path, Cache=BlackfynnCache):
+def backend_blackfynn(project_id=None, Local=Path, Cache=BlackfynnCache):  # (ref:def_babf)
     """return a configured blackfynn backend
         calling this is sufficient to get everything set up correclty
 
