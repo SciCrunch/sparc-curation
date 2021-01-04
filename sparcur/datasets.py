@@ -414,12 +414,16 @@ class DatasetStructure(Path):
     def data_dir_structure(self):
         #return {d.dataset_relative_path:d.cache_meta for d in self.rchildren_dirs}
         # TODO get all the leaves and then build an inverted index
+        def jmc(d): return d.cache._jsonMetadata()
+        def jml(d): return d._jsonMetadata()  # XXX TODO FIXME for local validation w/o cache
 
         # FIXME this is just the directories so it is probably ok to
         # resolve the cache for now so we can get the nice json
         # metadata but ultimately we will need _caceh_jsonMetadata or similar
         # that uses xattrs to avoid the overhead of constructing the cache class
-        return {d.dataset_relative_path:{**d.cache._jsonMetadata(),
+        # XXX yep, _cache_jsonMetadata is needed especially for standalone validation
+        jsonMeta = jmc if self.cache is not None else jml
+        return {d.dataset_relative_path:{**jsonMeta(d),
                                          'path_meta': {k:v for k, v in self.__class__(d).cache_meta.items()
                                                        if v is not None}}
                 for d in (Path(d) for d in self.rchildren_dirs)}
@@ -1379,6 +1383,19 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
     normalize_header = False
     #_expect_single = _nsman
 
+    @staticmethod
+    def fix_tod_123(blob):
+        if 'timestamp' in blob and 'timestamp_or_date' not in blob:
+            # XXX FIXME this destroys the original view of the data
+            blob['timestamp_or_date'] = blob.pop('timestamp')
+
+    @property
+    def data(self):
+        data = super().data
+        if self.template_schema_version <= '1.2.3': # FIXME HACK
+            [self.fix_tod_123(blob) for blob in data['manifest_records']]
+
+        return data
 
 class ManifestFilePath(ObjectPath):
     obj = ManifestFile

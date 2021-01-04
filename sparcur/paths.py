@@ -9,7 +9,8 @@ from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
-from sparcur.utils import log, GetTimeNow, register_type, transitive_dirs
+from sparcur.utils import log, GetTimeNow, register_type, unicode_truncate
+from sparcur.utils import transitive_dirs, transitive_paths
 from sparcur.config import auth
 
 
@@ -89,7 +90,13 @@ class BlackfynnCache(PrimaryCache, EatCache):
         # a more uniform distribution of deletions across folders
         # therefore if you need to find files deleted from a specific folder
         # use find -name '*collection-id-part*'
-        return self.trash  / suuid[:2] / f'{sid}-{pid}-{fid}{self.name}'
+
+        # nearly every file system we are likely to work with has 255 BYTE
+        # limit on filename length, that is NOT CHAR length, so we have to
+        # encode and then decode and truncate
+        name = unicode_truncate(f'{sid}-{pid}-{fid}{self.name}', 255)
+
+        return self.trash  / suuid[:2] / name
 
     @property
     def _trashed_path_short(self):
@@ -316,7 +323,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
         blob.update(self._jsonMetadata())
 
     def _jsonMetadata(self, do_expensive_operations=False):
-        """ path level json metadata """
+        """ path (cache) level json metadata """
         # FIXME this is going to be very slow due to the local.cache call overhead
         # it will be much better implement this from Path directly using xattrs()
         d = self.dataset
@@ -333,7 +340,10 @@ class BlackfynnCache(PrimaryCache, EatCache):
             'dataset_relative_path': drp,
             'uri_api': uri_api,  # -> @id in the @context
             'uri_human': uri_human,
-            'remote_id': bf_id,
+            'remote_id': (f'{bf_id}/files/{meta.file_id}'  # XXX a horrible hack, but it kinda works
+                          if self.is_file() or self.is_broken_symlink() else
+                          bf_id),
+            }
             # FIXME N:package:asdf is nasty for jsonld but ...
             # yes the bf_id will have to be parsed to know what
             # endpoint to send it to ... yay for scala thinking amirite !? >_<
@@ -343,7 +353,13 @@ class BlackfynnCache(PrimaryCache, EatCache):
             # and and when they happend to have only a single
             # member they are conflated with the single file
             # they contain
-        }
+
+        if meta.checksum is not None:
+            blob['checksums'] = [{'type': 'checksum',
+                                  # FIXME cypher should ALWAYS travel with checksum
+                                  # not be implicit and based on the implementation
+                                  'cypher': self.cypher.__name__.replace('openssl_', ''),
+                                  'hex': meta.checksum.hex(),}]
 
         mimetype = l.mimetype
         if mimetype:
@@ -395,6 +411,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     @property
     def dataset_relative_path(self):
+        # FIXME broken for local validation
         return self.relative_path_from(self.cache.dataset.local)
 
     @property
@@ -423,7 +440,82 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         else:
             return self._jsonMetadata()
 
-    def _jsonMetadata(self, do_expensive_operations=False):
+
+    xattr_prefix = BlackfynnCache.xattr_prefix
+    _xattr_meta = aug.EatCache.meta
+    _symlink_meta = aug.SymlinkCache.meta
+
+    @property
+    def cache_meta(self):
+        """ Access cached metadata without constructing the cache instance. """
+        if self.is_broken_symlink():
+            # NOTE check ibs first otherwise symlink meta could
+            # raise a NoCachedMetadataError, it may raise other
+            # errors if something goes wrong when reading the
+            # symlink, but not that particular error
+            return self._symlink_meta
+        else:
+            return self._xattr_meta
+
+    @staticmethod
+    def _uri_api_bf(id):  # further SIGH
+        if 'N:dataset:' in id:
+            endpoint = 'datasets/' + id
+        elif 'N:organization:' in id:
+            endpoint = 'organizations/' + id
+        elif 'N:collection:' in id:
+            endpoint = 'collections/' + id
+        else:
+            endpoint = 'packages/' + id  # XXX if you use N:package:asdf/files/file-id this works
+
+        return 'https://api.blackfynn.io/' + endpoint
+
+    @staticmethod
+    def _uri_human_bf(oid, did, id):
+        N, type, suffix = id.split(':')
+        if id.startswith('N:package:'):
+            #prefix = '/viewer/'
+            prefix = '/files/00000000-0000-0000-0000-000000000000/'  # unprocessed cases
+        elif id.startswith('N:collection:'):
+            prefix = '/files/'
+        elif id.startswith('N:dataset:'):
+            prefix = '/'  # apparently organization needs /datasets after it
+            return Path._uri_human_bf(None, None, oid) + prefix + id
+        elif id.startswith('N:organization:'):
+            return f'https://app.blackfynn.io/{id}/datasets'
+        else:
+            raise exc.UnhandledTypeError(type)
+
+        return Path._uri_human_bf(oid, None, did) + prefix + id
+
+    def _cache_jsonMetadata(self, do_expensive_operations=False):
+        blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)
+        project_meta = project_path.cache_meta
+        meta = self.cache_meta
+        _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
+        remote_id = (f'{bf_id}/files/{meta.file_id}'  # XXX a horrible hack, but it kinda works
+                     if self.is_file() or self.is_broken_symlink() else
+                     bf_id)
+        uri_api = self._uri_api_bf('N:' + remote_id)
+        uri_human = self._uri_human_bf(project_meta.id,
+                                       'N:' + blob['dataset_id'],
+                                       # XXX NOTE that we can't use remote_id because
+                                       # /viewer/ etc. doesn't work for the human uri
+                                       meta.id)
+        blob['remote_id'] = remote_id
+        blob['uri_api'] = uri_api
+        blob['uri_human'] = uri_human
+        if (self.is_file() or self.is_broken_symlink()) and meta.checksum is not None:
+            # FIXME known checksum failures !!!!!!!
+            blob['checksums'] = [{'type': 'checksum',
+                                  # FIXME cypher should ALWAYS travel with checksum
+                                  # not be implicit and based on the implementation
+                                  'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
+                                  'hex': meta.checksum.hex(),}]
+
+        return blob
+
+    def _jm_common(self, do_expensive_operations=False):
         # FIXME WARNING resolution only works if we were relative to
         # the current working directory
         if self.is_broken_symlink():
@@ -442,9 +534,13 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         dataset_path = [p for p in chain((self,), self.parents) if p.parent == project_path][0]
         drp = self.relative_path_from(dataset_path)  # FIXME ...
 
+
+        # XXX FIXME handle case where there is no cache
+        _, bf_ds_id = dataset_path.cache_id.split(':', 1)  # split off the N:
+
         blob = {
             'type': 'path',
-            'dataset_id': dataset_path.cache_id,
+            'dataset_id': bf_ds_id,
             'dataset_relative_path': drp,
         }
 
@@ -463,7 +559,34 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             # inversion of control here
             blob['errors'] = [{'message': msg}]
 
+        return blob, project_path
+
+    def _jsonMetadata(self, do_expensive_operations=False):
+        blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)
         return blob
+
+    def _transitive_metadata(self):
+        def hrm(p):
+            cjm = p._cache_jsonMetadata()
+            # this is not always needed so it is not included by default
+            # but we do need it here for when we generate the rdf export
+            p = cjm['dataset_relative_path'].parent
+            if p.name != '':  # we are at the root of the relative path aka '.'
+                cjm['parent_drp'] = p
+            return cjm
+
+        rchildren = transitive_paths(self)  # FIXME perf boost but not portable
+        metadata = [hrm(c) for c in rchildren]
+        index = {b['dataset_relative_path']:b for b in metadata}
+        pid = self._uri_api_bf(self.cache_id)
+        for m in metadata:
+            p = m.pop('parent_drp', None)
+            if p in index:
+                m['parent_id'] = index[p]['uri_api']
+            else:
+                m['parent_id'] = pid
+
+        return metadata
 
     def pull(self, *args,
              paths=None,
@@ -477,7 +600,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
              Parallel=None,
              delayed=None,
              _in_parallel=False,
-             exclude_uploaded=True,):
+             exclude_uploaded=False,):
         # TODO usage errors
 
         if time_now is None:

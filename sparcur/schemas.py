@@ -597,7 +597,8 @@ fs_safe_identifier_pattern = '[A-Za-z0-9][^ \n\t*|:\/<>"\\?]+'
 
 # NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
-iso8601datepattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]'
+iso8601bothpattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9](T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]]))*'
+iso8601datepattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]'  # XXX people are using this in the timestamp field repeatedly
 
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
 doi_pattern = idlib.Doi._id_class.canonical_regex
@@ -1308,6 +1309,14 @@ class ManifestRecordExportSchema(JSONSchema):
                      'type': 'string',
                      'pattern': iso8601pattern,
                  },
+                 'timestamp_or_date': {  # this is internal for dataset template <= 1.2.3
+                     'type': 'string',
+                     'pattern': iso8601bothpattern,
+                 },
+                 'date': {
+                     'type': 'string',
+                     'pattern': iso8601datepattern,
+                 },
                  'description': {
                      'type': 'string',
                  },
@@ -1350,6 +1359,33 @@ class ManifestRecordExportSchema(JSONSchema):
     }
 
 
+class ChecksumSchema(JSONSchema):
+    _schema_base = {
+        'type': 'object',
+        'required': ['type', 'cypher'],
+        'properties': {
+            'type': {'type': 'string',
+                     'enum': ('checksum',),},
+            'cypher': {'type': 'string',
+                       # more may be supported in the future
+                       # but supported checksums must be closed
+                       # because every single supported checksum
+                       # requires a full implementation
+                       'enum': ('sha256',),},
+            # other options might be base64 or something like that
+            'hex': {'type': 'string',},
+        }
+    }
+
+    _schema_more = {'oneOf': [
+        {'properties': {'cypher': {'type': 'string', 'enum': ('sha256',),},
+                        'hex': {'type': 'string', 'minLength': 64, 'maxLength': 64,},},},
+    ],}
+
+    schema = {'allOf': [_schema_base,
+                        _schema_more,]}
+
+
 class PathSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -1371,9 +1407,22 @@ class PathSchema(JSONSchema):
             'mimetype': {'type': 'string'},
             'magic_mimetype': {'type': 'string'},
             'contents': {'type': 'object'},  # opqaue here
+            'checksums': {'type': 'array',
+                          'minItems': 1,
+                          'items': ChecksumSchema.schema,},
             'errors': ErrorSchema.schema,
         }
     }
+
+
+class PathTransitiveMetadataSchema(JSONSchema):
+    schema = {'type': 'object',
+              'properties': {
+                  'type': {'type': 'string',
+                           'enum': ('PathTransitiveMetadata',),},
+                  'records': {'type': 'array',
+                              'items': PathSchema.schema,
+                              'minItems': 1,},},}
 
 
 class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
@@ -1591,6 +1640,20 @@ class DatasetOutExportSchema(JSONSchema):
         'resources': {'type': 'array',
                       'items': {'type': 'object'},},
         'submission': {'type': 'object',},
+        'specimen_dirs': {'type': 'object',  # FIXME unnest this
+                          'required': ['records',],
+                          'properties':
+                          {'records': {'type': 'array',  # FIXME records vs contents we use both in manifests
+                                       'items': {
+                                           'type': 'object',
+                                           'required': ['specimen_id', 'dirs'],
+                                           'properties': {
+                                               'type': {'type': 'string',  # FIXME seems wrong
+                                                        'enum': ('SampleDirs', 'SubjectDirs'),},
+                                               'specimen_id': {'type': 'string'},  # foreign key to subject or sample id
+                                               'dirs': {'type': 'array',
+                                                        'minItems': 1,},},},},
+                           'errors': ErrorSchema.schema,},},
         'inputs': {'type': 'object',
                    # TODO do we need errors at this level?
                    'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,

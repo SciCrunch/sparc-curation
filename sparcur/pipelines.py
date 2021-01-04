@@ -346,6 +346,33 @@ class DatasetStructurePipeline(PathPipeline):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
+class PathTransitiveMetadataPipeline(PathPipeline):
+
+    class data_transformer_class:
+        def __init__(self, path, template_schema_version=None):
+            self.path = path
+
+        @property
+        def data(self):
+            # TODO dataset_id probably
+            blob = {'type': 'PathTransitiveMetadata',}
+            records = self.path._transitive_metadata()
+            if records:
+                blob['records'] = records
+            else:
+                # FIXME TODO errors
+                pass
+
+            return blob
+
+    @hasSchema(sc.PathTransitiveMetadataSchema)
+    def data(self):
+        return super().data
+
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class SubmissionFilePipeline(PathPipeline):
 
     data_transformer_class = dat.SubmissionFile
@@ -880,7 +907,7 @@ class SDSPipeline(JSONPipeline):
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
               [['samples_file',], ['inputs', 'samples_file']],
-              [['manifest_file',], ['inputs', 'manifest_file']],
+              [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['dataset_description_file', 'name'], ['meta', 'title']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'template_schema_version',
@@ -913,6 +940,13 @@ class SDSPipeline(JSONPipeline):
         [['subjects_file', 'subjects'], ['subjects']],
         [['samples_file', 'samples'], ['samples']],
     )
+
+    #conditional = (  # someday ...
+        #[[['meta', 'template_schema_version']],
+         #(lambda version: version <= '1.2.3'),
+         #dict(derives=(['manifest_file'],))
+        #]
+    #)
 
     cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
 
@@ -1156,7 +1190,7 @@ class PipelineExtras(JSONPipeline):
          # FIXME this needs to happen fast and early
          # FIXME structure is going to be in a separate file/blob for export
          De.validate_structure,
-         [['subject_dirs'], ['sample_dirs']]],
+         [['specimen_dirs']]],
     )
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
@@ -1351,12 +1385,16 @@ class PipelineEnd(JSONPipeline):
         'ManifestFilePipeline.transformer',
         'ManifestFilePipeline.data',
     ]
+
     _curation = [
         'DatasetStructure.curation-error',
         'SubjectsFile.curation-error',
-        'SDSPipeline.data',
         'PipelineExtras.data',
         'ProtocolData',  # FIXME this is here as a placeholder
+    ]
+
+    _shadowed = [
+        'SDSPipeline.data',  # by PipelineExtras
     ]
 
     _blame_stage = object()
@@ -1391,7 +1429,15 @@ class PipelineEnd(JSONPipeline):
     @classmethod
     def _indexes(cls, data):
         """ compute submission and curation error indexes """
-        path_errors = get_all_errors(data)
+        _path_errors = get_all_errors(data)
+        # XXX remove duplicate and potentially resolved errors as they
+        # are confusing and not really used or useful ideally we would
+        # extract all cases where the same schema was run by multiple
+        # pipelines, unfortunately it isn't as easy as it should be to
+        # get the order of execution of pipelines that preceeded the
+        # current pipeline since they form a dag
+        path_errors = [pe for pe in _path_errors
+                       if pe[-1]['pipeline_stage'] not in cls._shadowed]
         (compacted, path_error_report, by_invariant_path,
          errors) = compact_errors(path_errors)
         unclassified_stages = []
@@ -1428,10 +1474,12 @@ class PipelineEnd(JSONPipeline):
                         curation_errors.append(error)
                         blamed = True
                     else:
-                        raise ValueError(f'Unhandled blame target {blame_target}\n{message}')
+                        msg = f'Unhandled blame target {blame_target}\n{message}'
+                        raise ValueError()
 
                 else:
-                    raise ValueError(f'Unhandled blame type {blame}\n{message}')
+                    msg = f'Unhandled blame type {blame}\n{message}'
+                    raise ValueError(msg)
 
             if stage in cls._submission:
                 if not blamed:
@@ -1890,7 +1938,7 @@ class ProtcurPipeline(Pipeline):
                          if 'working' in S.sheet_name}
         return sheets_lookup
 
-    def _hrm(self):
+    def _make_blob(self, annos=None):
         def urih(data, pio):
             if (hasattr(pio, '_progenitors') and
                 'id-converted-from' in pio._progenitors):
@@ -1907,7 +1955,7 @@ class ProtcurPipeline(Pipeline):
                             data['uri_human'] = orig_pio
 
         sheets_lookup = self._sheets_lookup()
-        annos, idints, pidints = self._idints()
+        annos, idints, pidints = self._idints(annos=annos)
         out = []
         for pio, pannos in pidints.items():
             data = {}
@@ -1918,6 +1966,10 @@ class ProtcurPipeline(Pipeline):
 
             data['id'] = pio
             data['@type'] = ['sparc:Protocol', 'owl:NamedIndividual']
+
+            #if hasattr(pio, 'progenitor'):  # don't progenitor here due to private etc.
+                #data['TEMP:alternateIdentifier'] = ['']
+
             try:
                 if hasattr(pio, 'uri_human') and pio.uri_human:
                     # calling hasattr on a property evokes sideffects !? # file under LOL PYTHON
@@ -1947,7 +1999,10 @@ class ProtcurPipeline(Pipeline):
 
             try:
                 if hasattr(pio, 'doi') and pio.doi:
-                    data['doi'] = pio.doi
+                    _doi = pio.doi
+                    if _doi:
+                        #data['TEMP:hasDoi'] = _doi
+                        data['doi'] = _doi
             except idlib.exc.RemoteError as e:
                 # TODO embed error status
                 pass
@@ -1962,7 +2017,7 @@ class ProtcurPipeline(Pipeline):
 
     @property
     def data(self):
-        return self._hrm()
+        return self._make_blob()
 
 
 class ProtocolPipeline(Pipeline):

@@ -334,10 +334,11 @@ class MetaConverter(TripleConverter):
                 nsteps = len(data['steps'])
                 yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
 
-            try:
-                yield from self.integrator.triples_protcur(s)
-            except OntId.BadCurieError as e:
-                logd.error(e)  # FIXME export errors ...
+            # XXX removed as deprecated, content now exported via protcur.ttl
+            #try:
+                #yield from self.integrator.triples_protcur(s)
+            #except OntId.BadCurieError as e:
+                #logd.error(e)  # FIXME export errors ...
 MetaConverter.setup()  # box in so we don't forget
 
 

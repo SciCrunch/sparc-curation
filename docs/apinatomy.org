@@ -40,6 +40,125 @@ chown -R nginx:nginx /var/www/sparc/ApiANTOMY
 #+end_src
 * SciGraph pipeline
 ** Export to ttl
+#+link: r-apin-mod git:79316499d7987f73a56ce2bc54d07afe91886cd1:
+
+# these link abbreviations should be in the file themselves, or materialized from a common source
+# in a way that can be synced, or actually it is probably ok to put them in a setup/startup file
+# as long as orgstrap tells you how to get that file
+# the gsl local index should not be here in the file, but the local path names can and should be
+#+git-share-local: git:79316499d7987f73a56ce2bc54d07afe91886cd1:HEAD: file:~/git/apinatomy-models/
+r-apin-mod:HEAD:{model-id}/
+#+link: gsx https://docs.google.com/spreadsheets/d/%s/export?format=xlsx
+YEAH it DOES support arbitrary locations, with the ~%s~ implicitly at the tail by default
+
+gsx:google-sheet-id
+
+#+name: flow-to-ttl
+#+begin_src elisp
+; org
+; org-set-regexps-and-options
+
+(defun-local ex-do (&rest nothing)
+  "Executor do. Eats the input since it is to be run by the executor."
+  ;; maybe use this to resolve the ex-come-from flows?
+  ;; while loop would be annoying here
+  (yes-or-no-p "Step done? "))
+
+(defun-local ex-label (label) ;; call/cc, prompt, or cl condition handling is likely the abstraction we would want
+  "Target acquired!")
+
+(defun-local ex-come-from (label)
+  ;; detangling what is going on when using this, there is an implicit assertion
+  ;; that a linear set of ex-do steps result in the same final state as a series
+  ;; of sequential calls, the reason to use come-from is that the conductor program
+  ;; can return and go on to the next step as expected (though a post condition)
+  ;; measurement ala a contract needs to be confirmed, the conductor continues
+  ;; along to the next step, and the extracted and compiled ex-do (which is really
+  ;; a macro) command uses the come-from to stich the dependency tree back together
+  ;; for the real world steps that are most efficient, the problem with this is that
+  ;; you have to prove that the ordering for both graphs is compatible, namely that
+  ;; for a particular set of sequential calls that there is only a single come-from
+  ;; per line, otherwise you have to figure out what it means to have 20 things that
+  ;; can all in princilple happen after the completion of a step, which is possible
+  ;; but would need a solution
+  "AAAAAAAAA!")
+
+(defun-local flow-to-ttl (model-id)
+  ;; probably need 1 more level of indirection to handle cases where the model-id
+  ;; will be put inside the models/ folder which should probably happen sooner rather than later
+  ;(let ((default-directory (expand-file-name model-id (git-share-local r-apin-mod:HEAD:))) ; TODO ))
+  (let ((default-directory (expand-file-name (symbol-name model-id) "~/git/apinatomy-models/"))
+        (xlsx    (format  "source/%s.xlsx"   model-id))
+        (json    (format  "source/%s.json"   model-id))
+        (jsonld  (format "derived/%s.jsonld" model-id))
+        (ttl     (format "derived/%s.ttl"    model-id)))
+    ;; TODO make sure the directories exist
+    ;; TODO resume from previous step on failure <- this is critical
+    ;; TODO push the model id further down the call chain since input
+    ;; and output paths are defined by convention
+    (-mx->  model-id   xlsx) ; source/{model-id}.xlsx
+    (-xj->  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
+    (-jl->  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
+    (-lt->  jsonld      ttl) ; derived/{model-id}.jsonld derived/{model-id}.ttl
+))
+
+(defun-local -mx-> (model-id path-xlsx)
+  ;; automated
+  (let* ((google-sheet-id (-ms-> model-id))
+         (url (format "https://docs.google.com/spreadsheets/d/%s/export?format=xlsx" google-sheet-id)))
+    ' ; it probably makes more sense to implement stuff like this using the condition system?
+    ;; in terms of flow control for a DAG you try to do the thing,
+    ;; stop at your first error and then go do the dependency? but in
+    ;; reality there is often an explicit step where all checks must
+    ;; pass before the whole process can continue because of some time
+    ;; constraint or similar
+    (ex-do (format "Make sure that the permissions are set correctly on %" url))
+
+    (url-copy-file url path-xlsx t)))
+
+(defun-local -xj-> (path-xlsx path-json)
+  "This is currently a manual step."
+  (let (;(open-physiology-viewer "https://open-physiology-viewer.surge.sh/")
+        (open-physiology-viewer "file:///home/tom/git/open-physiology-viewer/dist/test-app/index.html"))
+    ;; TODO conditional open only if not already
+    ;;(browse-url open-physiology-viewer)
+    ;;(run-command "google-chrome-unstable" open-physiology-viewer)
+    (ex-do (format "open file (left top folder) to upload to viewer from %s" path-xlsx)
+           (format "save file (left bottom floppy) to download from viewer to %s" path-json)
+           (ex-label 'viewer-after-open))))
+
+(defun-local -jl-> (path-json path-json-ld)
+  "Currently a manual step."
+  (ex-do (ex-come-from 'viewer-after-open) ; This is amazing.
+         ;; Allows decoupling of functional spec from the actual execution in the real world.
+         ;; As a bonus we get to use my all time favorite control flow structure.
+         (format "export flattened json-ld (right 2nd from bot white doc) to download from viewer to %s"
+                 path-json-ld)))
+
+(defun-local -lt-> (path-json-ld path-ttl)
+  ;; automated
+  (run-command "spc" "apinat" path-json-ld path-ttl))
+#+end_src
+
+#+begin_src elisp
+(defun-local update-models (model-ids) ; vs &rest model-ids
+  ;; FIXME mapcar is inadequate for handling parallel processes that
+  ;; might have ex-do parts
+  (mapcar #'flow-to-ttl model-ids))
+
+(defun-local all-models ()
+  ;;(let ((default-directory (git-share-local r-apin-mod:HEAD:)) ; TODO ))
+  (let ((default-directory (expand-file-name "~/git/apinatomy-models/")))
+    ;; you could use something like model-repository but then you have to make
+    ;; a bunch of concatentations, better just to switch the default directory
+    ;; so that the context deals with alignment between name and local referent
+    (cl-remove-if (lambda (p) (or (not (file-directory-p p)) (string-prefix-p "." p)))
+                  (directory-files default-directory))))
+
+(defun-local update-all-models ()
+  (update-models (all-models)))
+#+end_src
+** ttl deprecated
 Until this is fully automated you need to obtain the flattened jsonld
 export of any files to be converted to ttl.
 
@@ -61,7 +180,18 @@ spc apinat bronchomotor.jsonld bronchomotor.ttl
 ** Deploy ttl
 After running the ttl export via [[apinat-export][apinat-export]]
 define the functions in ref:deploy-ontology-file and then run
-~apinat-deploy-from-ttl bronchomotor.ttl~.
+~apinat-deploy-from-ttl bronchomotor.ttl~. NOTE Both functions need
+to be defined.
+
+The current command to deploy all is.
+#+begin_src bash
+for f in $(ls */derived/*.ttl); do apinat-deploy-from-ttl $f; done
+#+end_src
+
+If you add a new model you will need to update the imports in
+https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl.
+The update process should be automated as part of the workflows
+described here. See also [[file:./../resources/scigraph/ontologies-sparc-data.yaml]].
 
 # FIXME it should be possible to implement this whole process
 # using OntResIriWrite or something like that
@@ -102,8 +232,10 @@ function apinat-deploy-from-ttl () {
     local PATH_REMOTE_TARGET="${PATH_REMOTE_TARGET_BASE}${VERSION_PATH}"
     local PATH_REMOTE_LINK="${PATH_REMOTE_TARGET_BASE}${FILE_NAME_TTL}"
 
+    # FIXME also notify host for sudo
     local SUDO_OR_SU='$(command -v sudo 1>& 2 && echo sudo ${0} -c || { echo For su on ${HOSTNAME} 1>& 2; echo su -c; })'
 
+    # TODO ensure that apinat-remote-operations is defined
     rsync --rsh ssh "${PATH_TTL}" ${HOST_APINAT_ONTOLOGY}:"${PATH_REMOTE_SOURCE}"
     ssh -t ${HOST_APINAT_ONTOLOGY} "${SUDO_OR_SU} '$(typeset -f apinat-remote-operations); apinat-remote-operations \
 \"${PATH_REMOTE_SOURCE}\" \

@@ -659,7 +659,7 @@ def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
     if out_path.exists() and dumb:
         if not evil[0]:  # FIXME this is SO DUMB to do in here, but ...
             from pysercomb.pyr import units as pyru
-            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
             pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
             evil[0] = True
 

@@ -185,9 +185,18 @@ digraph G {
 #+RESULTS[8febbedbaf66631abc1d1c9ed53915698665c236]:
 [[file:./images/graph-retrieve-all.png]]
 **** Bash implementation                                             :ignore:
+# TODO we need some way to snapshot and deliver the contents of
+# --cache-path (usually ~/.cache/sparcur/) so that pipelines can be
+# rerun in a way that is deterministic, this is primarily an issue for
+# the blackfynn remote metadata that is updated at every run the quick
+# and dirty fix is to set SPARCUR_CACHE_PATH=${PARENT_PATH}/cache and
+# then symlink in everything except the blackfynn-meta folder but the
+# right thing to do is probably to add a configuration option for the
+# location of each cache folder
+
 # FIXME this is really an env file not a bin file ...
 #+name: pipeline-functions-sparc-get-all-remote-data
-#+begin_src bash -r -l "\([[:space:]]\|#\)*(ref:%s)$" :tangle ../bin/pipeline-functions.sh :mkdirp yes
+#+begin_src bash -r -l "\([[:space:]]*#[[:space:]]*(ref:%s)\|[[:space:]]*(ref:%s)\)$" :tangle ../bin/pipeline-functions.sh :mkdirp yes
 function sparc-get-all-remote-data () {
     # NOTE not quite all the remote data, the google sheets
     # don't have caching functionality yet
@@ -197,7 +206,7 @@ function sparc-get-all-remote-data () {
     while [[ $# -gt 0 ]]
     do
     key="$1"
-    case $key in #(ref:(((((((sigh)
+    case $key in # (ref:(((((((sigh)
         --project-id)         local PROJECT_ID="${2}"; shift; shift ;;
         --symlink-objects-to) local SYMLINK_OBJECTS_TO="${2}"; shift; shift ;;
         --log-path)           local LOG_PATH="${2}"; shift; shift ;;
@@ -264,12 +273,14 @@ function sparc-get-all-remote-data () {
     fi
 
     if [[ -z "${ONLY_FILESYSTEM}" ]]; then
-        # fetch annotations
+        # fetch annotations (ref:bash-pipeline-fetch-annotations)
         echo "Fetching annotations metadata"
         python -m sparcur.simple.fetch_annotations > "${LOG_PATH}/fetch-annotations.log" 2>&1 &
         local pids_final[0]=$!
 
-        # fetch remote metadata
+        # fetch remote metadata (ref:bash-pipeline-fetch-remote-metadata-all)
+        # if this fails with 503 errors, check the backoff_factor in
+        # sparcur.blackfynn_api.patch_session
         echo "Fetching remote metadata"
         python -m sparcur.simple.fetch_remote_metadata_all \
             --project-id "${PROJECT_ID}" \
@@ -598,14 +609,15 @@ changed since last export, updates only those and then collects the
 outputs.
 **** Bash implementation                                             :ignore:
 #+name: pipeline-functions-sparc-export-all
-#+begin_src bash -r -l "\([[:space:]]\|#\)*(ref:%s)$" :tangle ../bin/pipeline-functions.sh
+
+#+begin_src bash -r -l "\([[:space:]]*#[[:space:]]*(ref:%s)\|[[:space:]]*(ref:%s)\)$" :tangle ../bin/pipeline-functions.sh
 function sparc-export-all () {
     # parse args
     local POSITIONAL=()
     while [[ $# -gt 0 ]]
     do
     key="$1"
-    case $key in #(ref:(((sigh)
+    case $key in # (ref:(((sigh)
         --project-path) local PROJECT_PATH="${2}"; shift; shift ;;
         -h|--help)      echo "${HELP}"; return ;;
         ,*)              POSITIONAL+=("$1"); shift ;;
@@ -762,6 +774,8 @@ Easier to read, harder to debug. The python paradox.
 *** _*Retrieve*_
 **** _Protocols_
 Cache annotations.
+See [[(bash-pipeline-fetch-annotations)]] for usage.
+#+name: fetch_annotations.py
 #+begin_src python :tangle ../sparcur/simple/fetch_annotations.py :mkdirp yes
 from pathlib import Path
 from hyputils import hypothesis as hyp
@@ -920,6 +934,7 @@ for all retrieval after the first pull it is usually more effective
 to retrieve it at the same time as fetching metadata files since it
 runs in parallel per dataset.
 
+See [[(bash-pipeline-fetch-remote-metadata-all)]] for usage.
 #+name: fetch_remote_metadata_all.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata_all.py
 from joblib import Parallel, delayed
@@ -936,7 +951,7 @@ def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
         if n_jobs <= 1:
             [p() for p in prepared]
         else:
-            Parallel(n_jobs=12)(delayed(p)() for p in prepared)
+            Parallel(n_jobs=n_jobs)(delayed(p)() for p in prepared)
     elif id.startswith('N:dataset:'):  # TODO support dataset: ?
         RemotePath = backend_blackfynn(project_id)
         dataset = RemotePath(id)
@@ -1038,7 +1053,7 @@ from sparcur.utils import GetTimeNow
 
 
 # pull dataset
-def from_path_dataset_file_structure(path, time_now=None, exclude_uploaded=True):
+def from_path_dataset_file_structure(path, time_now=None, exclude_uploaded=False):
     """ pull the file structure and file system metadata for a single dataset
         right now only works from a dataset path """
 
@@ -1054,7 +1069,7 @@ def from_path_dataset_file_structure_all(project_path,
                                          paths=None,
                                          time_now=None,
                                          n_jobs=12,
-                                         exclude_uploaded=True):
+                                         exclude_uploaded=False):
     """ pull all of the file structure and file system metadata for a project
         paths is a keyword argument that accepts a list/tuple of the subset of
         paths that should be pulled """
@@ -1091,7 +1106,7 @@ def main(path=Path.cwd(),
          time_now=None,
          sparse_limit:int=None,
          n_jobs=12,
-         exclude_uploaded=True,
+         exclude_uploaded=False,
          ,**kwargs):
     project_path = None  # path could be None so can't find_cache_root here
     if path is None or path.find_cache_root() not in (path, *path.parents):
@@ -1662,6 +1677,7 @@ def main(path=Path.cwd(), dataset_id=None, time_now=None, **kwargs):
 if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main, after=print)
+
 #+end_src
 ***** Transform
 There is not a clean separation between transformation and validation
@@ -1792,6 +1808,45 @@ if __name__ == '__main__':
 #+end_src
 **** Network resources
 *** _*Export*_
+**** _Dataset Path Metadata_
+:PROPERTIES:
+:header-args: :shebang "#!/usr/bin/env python3"
+:END:
+In principle this could run as part of the dataset metadata export,
+however since it produces separate files and can run at the same time,
+it is its own module.
+#+name: dataset-path-metadata-extract
+#+begin_src python :tangle ../sparcur/simple/path_metadata.py
+from pathlib import Path
+from sparcur.utils import transitive_paths
+
+
+def from_path_transitive_metadata(path):
+    return path._transitive_metadata()
+
+
+def main(path=Path.cwd(), time_now=None, **kwargs):
+    from sparcur.paths import Path
+    # TODO path from dataset_id and retrieve conventions? or just pass path from retrieve final output?
+    # TODO parallelize if multiple paths
+    # This assumes that all retrieve operations have
+    # finished successfully for the current dataset
+    cache = path.cache
+    if not cache.is_dataset():
+        raise TypeError('can only run on a single dataset')
+
+    tm = from_path_transitive_metadata(Path(path))
+    # TODO export to some file
+    # FIXME TODO validate file formats, which means this also needs to support the remoteless case
+    return tm
+
+
+if __name__ == '__main__':
+    import pprint
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main, after=pprint.pprint)
+
+#+end_src
 ** Utility
 *** _*Init*_
 #+begin_src python :tangle ../sparcur/simple/__init__.py :exports none
@@ -1821,7 +1876,7 @@ Options:
     --extension=<EXT>...            one or more file extensions to fetch
 
     -j --jobs=N                     number joblib jobs [default: 12]
-    --include-uploaded              pull files from remote marked as uploaded
+    --exclude-uploaded              do not pull files from remote marked as uploaded
     --sparse-limit=N                package count that forces a sparse pull [default: 10000]
     --symlink-objects-to=PATH       path to an existing objects directory
 """
@@ -1902,10 +1957,6 @@ class Options(clif.Options):
     @property
     def extensions(self):
         return self.extension
-
-    @property
-    def exclude_uploaded(self):
-        return not self.include_uploaded
 
     @property
     def symlink_objects_to(self):

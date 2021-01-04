@@ -5,6 +5,7 @@ import dicttoxml
 from pysercomb.pyr.types import ProtcurExpression, Quantity
 from sparcur.core import OntTerm, get_all_errors
 from sparcur.utils import loge, is_list_or_tuple
+from sparcur import pipelines as pipes
 
 
 def xml(dataset_blobs):
@@ -65,7 +66,7 @@ def xml(dataset_blobs):
         if 'errors' in dowe:
             ers = get_all_errors(dowe)
             for path, er in ers:
-                if er['pipeline_stage'] == 'SPARCBIDSPipeline.data':
+                if er['pipeline_stage'] in pipes.PipelineEnd._shadowed:
                     continue
 
                 er['dataset_id'] = id

@@ -37,6 +37,7 @@ OntCuries({'orcid':'https://orcid.org/',
            'ror':'https://ror.org/',
            'pio.api': 'https://www.protocols.io/api/v3/protocols/',
            'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
+           'collection':'https://api.blackfynn.io/collections/N:collection:',
            'package':'https://api.blackfynn.io/packages/N:package:',
            'user':'https://api.blackfynn.io/users/N:user:',
            'bibo': 'http://purl.org/ontology/bibo/',  # crossref
@@ -505,6 +506,8 @@ def zipeq(*iterables):
         raise TypeError(f'One of these is not iterable {msg}') from e
 
     for zipped in gen:
+        # sadly we can't use len % 2 because
+        # iterables have indefinite length
         if sentinel in zipped:
             msg = str(iterables)[:2000]
             raise exc.LengthMismatchError('Lengths do not match! '
@@ -1307,7 +1310,7 @@ def condense_over_stage(errors):
     for error in errors:
         #log.critical(error)
         new_error = {k:hashable_converter(v) for k, v in error.items()}
-        copy.deepcopy(error)
+        #copy.deepcopy(error)  # FIXME why the heck was this here !?
         new_error.pop('pipeline_stage', None)
         if 'schema_path' in new_error:  # XXX non json schema errors
             sp = new_error['schema_path']

@@ -134,6 +134,22 @@ Commands:
                        : --ttl-compare=PATHoURI
                        : --published
 
+    show        show an export file
+
+                schemas         show the latest schema export folder
+                rmeta           show the rmeta cache folder
+                export          show the latest project level export
+
+                                json
+                                ttl
+
+                protcur         show the latest protcur export
+
+                                json
+                                ttl
+
+                options: --open=P   open the output file with specified command
+
     shell       drop into an ipython shell
 
                 integration     integration subshell with different defaults
@@ -354,7 +370,8 @@ class Dispatcher(clif.Dispatcher):
                               (self.options.open
                                if self.options.open else
                                self.options.show),
-                              org_id)
+                              org_id,
+                              self.options.export_protcur_base,)
         return export
 
     def _print_table(self, rows, title=None, align=None, ext=None):
@@ -597,7 +614,7 @@ class Main(Dispatcher):
             if not self.__class__._pyru_loaded:
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
-                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
                 pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
             with open(self.options.export_file, 'rt') as f:
@@ -624,7 +641,7 @@ class Main(Dispatcher):
             if False and not self.__class__._pyru_loaded:  # FIXME do we need this ?
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
-                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
                 pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
 
@@ -1005,7 +1022,10 @@ done"""
             dump_path = (self.options.export_protcur_base /
                          self._folder_timestamp)
             hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
-            blob_protcur = export.export_protcur(dump_path, hgn, no_network=self.options.no_google)
+            blob_protcur = export.export_protcur(dump_path,
+                                                 hgn,
+                                                 no_network=self.options.no_google,
+                                                 direct=True)
             # NOTE --latest will also pull from latest protcur export
             # if it exists I think, the issue is with repeated export
             # of the same content ... as usual, which will confuse
@@ -1028,6 +1048,7 @@ done"""
                 # in a way that is marginally sane
                 raise NotImplementedError('dataset blobs inclusion please')
             else:
+                log.info('export protcur completed successfully')
                 return blob_protcur
 
         elif self.options.mbf:
@@ -1052,6 +1073,7 @@ done"""
                                            exclude=noexport)
 
             sc.SummarySchema().validate_strict(export.latest_export)
+            log.info('export completed successfully')
 
         if self.options.debug:
             breakpoint()
@@ -1182,7 +1204,13 @@ done"""
                       '=================================================='
                     '\n--------------------------------------------------\n'))]
 
-        [print(t if isinstance(t, str) else repr(t)) for t in tables]  # FIXME _print_tables?
+        def safe_repr(t):
+            try:
+                return repr(t)
+            except Exception as e:
+                log.exception(e)
+
+        [print(t if isinstance(t, str) else safe_repr(t)) for t in tables]  # FIXME _print_tables?
 
     def find(self):
         paths = []

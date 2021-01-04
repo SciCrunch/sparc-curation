@@ -48,7 +48,7 @@ def register_all_types():
 
     # this is not done at top level because it is quite slow
     from pysercomb.pyr import units as pyru
-    [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+    [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
 
 
 def fromJson(blob):
@@ -225,16 +225,37 @@ def symlink_latest(dump_path, path, relative=True):
     path.symlink_to(dump_path)
 
 
-def transitive_dirs(path):
-    """Fast list of all child directories using unix find."""
-    command = """find -type d"""
+def _transitive_(path, command):
     with path:
         with os.popen(command) as p:
             string = p.read()
 
     path_strings = string.split('\n')  # XXX posix path names can contain newlines
+    # XXXXXXXXXXXXXXXXXXX REMINDER THAT THIS IS NOT SORTED
+    # https://doi.org/10.1021/acs.orglett.9b03216
     paths = [path / s for s in path_strings if s][1:]  # leave out the parent folder itself
     return paths
+
+
+def transitive_paths(path):
+    """Fast list of all child directories using unix find."""
+    command = """find -not -path '.operations*'"""
+    # TODO failover to builtin rglob
+    return _transitive_(path, command)
+
+
+def transitive_dirs(path):
+    """Fast list of all child directories using unix find."""
+    command = """find -type d"""
+    # TODO failover to builtin rglob + filter
+    return _transitive_(path, command)
+
+
+def unicode_truncate(string, length):
+    """ Truncate unicode string to at most maximum length.
+        If truncation splits a multibyte charachter then ignore
+        the final truncated bytes. """
+    return string.encode()[:length].decode(errors='ignore')
 
 
 class BlackfynnId(str):
@@ -256,10 +277,12 @@ class BlackfynnId(str):
     @property
     def uri_api(self):
         # NOTE: this cannot handle file ids
-        if self.is_dataset:
+        if self.is_dataset():
             endpoint = 'datasets/' + self.id
-        elif self.is_organization:
+        elif self.is_organization():
             endpoint = 'organizations/' + self.id
+        elif self.is_dir():
+            endpoint = 'collections/' + self.id
         else:
             endpoint = 'packages/' + self.id
 

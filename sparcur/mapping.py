@@ -1,8 +1,17 @@
 # term mapping
 
 from functools import wraps
-from .core import OntTerm
+from idlib.from_oq import OntTerm as iOT
+from .core import OntTerm as cOT
 from .utils import log
+
+
+# reminder that ontquery is irretrievably broken if used directly and
+# should never be invoked at the top level because it hits the network
+# during __init__, this is a fix that uses the neurondm simple from_oq
+# implementation that defers retrieval until fetch is called
+class OntTerm(iOT, cOT):
+    skip_for_instrumentation = False
 
 
 def tos(f):
@@ -19,6 +28,7 @@ def tos(f):
 
 
 # TODO load from db/config ?
+
 _species = {
     'canis lupus familiaris': OntTerm('NCBITaxon:9615',  label='Canis familiaris'),
     'felis catus':            OntTerm('NCBITaxon:9685',  label='Felis catus'),
@@ -34,7 +44,11 @@ _species = {
 
 
 @tos
-def species(string, __species=dict(_species)):
+def species(string, __species=dict(_species), __fetched=[False]):
+    if not __fetched[0]:  # SIGH
+        [v.fetch() for v in __species.values()]  # TODO parallel
+        __fetched[0] = True
+
     lstr = string.lower()
     if lstr in __species:
         return __species[lstr]
@@ -50,7 +64,11 @@ _sex = {
 
 
 @tos
-def sex(string, __sex=dict(_sex)):
+def sex(string, __sex=dict(_sex), __fetched=[False]):
+    if not __fetched[0]:  # SIGH
+        [v.fetch() for v in __sex.values()]  # TODO parallel
+        __fetched[0] = True
+
     lstr = string.lower()
     if lstr in __sex:
         return __sex[lstr]

@@ -267,7 +267,7 @@ class Derives:
                                 # have to split the type because we can't recover
                                 # the type using just the specimen id (sigh)
                                 # and we need it to set the correct prefix (sigh)
-                                'id': subject_id,
+                                'specimen_id': subject_id,
                                 'dirs': [d[1] for d in dirs[subject_id]]})
         else:
             # FIXME not all subjects have folders there may be samples
@@ -312,7 +312,7 @@ class Derives:
                                     # have to split the type because we can't recover
                                     # the type using just the specimen id (sigh)
                                     # and we need it to set the correct prefix (sigh)
-                                    'id': id,
+                                    'specimen_id': id,
                                     'dirs': actual,
                                     })
                     else:
@@ -327,15 +327,13 @@ class Derives:
                                (k,)))
         not_done_specs = (set(subs) | usamps) - set(done_specs)
         not_done_dirs = set(udirs) - set(done_dirs)
-        # FIXME this is not even close to granular enough
-        #if samps and not sample_folders:
-            #logd.warning('No sample folders')
 
-        #if subs and not subject_folders:
-            #logd.warning('No subject folders')
-        obj = {
-            'records': records,
-        }
+        obj = {}
+
+        if records:
+            obj['records'] = records
+        else:
+            pass # TODO embed an error
 
         he = HasErrors(pipeline_stage='Derives.validate_structure')
         if not_done_specs:
@@ -355,5 +353,4 @@ class Derives:
                 logd.error(msg)
 
         he.embedErrors(obj)
-        breakpoint()
         return obj,

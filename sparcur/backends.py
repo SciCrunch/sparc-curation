@@ -17,7 +17,7 @@ class BlackfynnRemote(aug.RemotePath):
     _async_rate = None
     _local_dataset_name = object()
 
-    _exclude_uploaded = True
+    _exclude_uploaded = False
 
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls)
@@ -68,7 +68,8 @@ class BlackfynnRemote(aug.RemotePath):
         id = self.id
         N, type, suffix = id.split(':')
         if id.startswith('N:package:'):
-            prefix = '/viewer/'
+            #prefix = '/viewer/'
+            prefix = '/files/00000000-0000-0000-0000-000000000000/'  # unprocessed cases
         elif id.startswith('N:collection:'):
             prefix = '/files/'
         elif id.startswith('N:dataset:'):
@@ -90,6 +91,8 @@ class BlackfynnRemote(aug.RemotePath):
             endpoint = 'datasets/' + self.id
         elif self.is_organization():
             endpoint = 'organizations/' + self.id
+        elif self.is_dir():
+            endpoint = 'collections/' + self.id
         elif self.file_id is not None:
             endpoint = f'packages/{self.id}/files/{self.file_id}'
         else:
@@ -603,8 +606,10 @@ class BlackfynnRemote(aug.RemotePath):
     def _dir_or_file(self, child, deleted, exclude_uploaded):
         state = child.bfobject.state
         if state != 'READY':
-            log.debug (f'{state} {child.name} {child.id}')
-            self._errors.append(f'State not READY is {state}')
+            #log.debug (f'{state} {child.name} {child.id}')
+            if state != 'UPLOADED':
+                self._errors.append(f'State not READY and not UPLOADED is {state}')
+
             if state == 'DELETING' or state == 'PARENT-DELETING':
                 deleted.append(child)
                 return

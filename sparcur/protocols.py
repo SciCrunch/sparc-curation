@@ -49,6 +49,9 @@ class ProtcurData:
             yield from self._protcur(protocol_uri)
 
     def triples_protcur(self, protocol_subject):
+        # XXX deprecated and extremely slow
+        # triples from the protcur pipeline are exported only once as part of
+        # protcur.ttl
         ps = list(self._protcur(str(protocol_subject)))
         anatomy = [(p, OntId('UBERON:' + str(p).split('UBERON:', 1)[-1].split(' ', 1)[0])) for p in ps
                    if p.astType == 'protc:input' and '(protc:input (term UBERON' in str(p)]
@@ -86,11 +89,17 @@ class ProtcurData:
         from protcur import document as ptcdoc
         from protcur.core import annoSync
         from protcur.analysis import Hybrid, protc
-        from hyputils.hypothesis import HypothesisHelper, group_to_memfile
+        from hyputils.hypothesis import HypothesisHelper, group_to_memfile, AnnoReader
         from hyputils import hypothesis as hyp
         ProtcurData.protc = protc
         group = auth.get('hypothesis-group')
-        get_annos, annos, stream_thread, exit_loop = annoSync(group_to_memfile(group + 'sparcur'),
+        memfile = group_to_memfile(group + 'sparcur')
+        #ar = AnnoReader(memfile, group)
+        #annos = ar.get_annos()
+        #ud = [a.updated for a in annos]
+        #lud_before = max(ud) if ud else None
+        #del ud
+        get_annos, annos, stream_thread, exit_loop = annoSync(memfile,
                                                               helpers=(HypothesisHelper, Hybrid, protc),
                                                               group=group,
                                                               sync=False)
@@ -99,11 +108,16 @@ class ProtcurData:
         get_annos.api_token = auth.get('hypothesis-api-key')
         annos.clear()
         annos.extend([ptcdoc.Annotation(a) for a in get_annos()])
+        #lud_after = max([a.updated for a in annos])
 
         # reset classes in case some other class has populated them
         # (e.g. during testing) FIXME this is a bad hack
         protc.reset()
         Hybrid.reset()
+
+        #if lud_before == lud_after:  # no new annos
+            # yeah we can use pickled ... but how :/
+            #return ???
 
         # FIXME this is expensive and slow to continually recompute
         [protc(a, annos) for a in annos]

@@ -76,7 +76,9 @@ class ExportBase:
                  latest=False,
                  partial=False,
                  open_when_done=False,
-                 org_id=None):
+                 org_id=None,
+                 export_protcur_base=None,
+                 export_base=None,):
         if org_id is None:
             self.export_source_path = export_source_path
             id = export_source_path.cache.anchor.id
@@ -84,12 +86,25 @@ class ExportBase:
             # do not set export_source_path, to prevent accidental export
             id = org_id
 
-        self.export_base = Path(export_path, id, self.export_type)
+        self.export_base = (export_base if export_base is not None else
+                            Path(export_path, id, self.export_type))
         self.latest = latest
         self.partial = partial
         self.folder_timestamp = folder_timestamp
         self.timestamp = timestamp
         self.open_when_done = open_when_done
+        self.export_protcur_base = export_protcur_base  # pass in as export_base
+
+        self._args = dict(export_path=export_path,
+                          export_source_path=export_source_path,
+                          folder_timestamp=folder_timestamp,
+                          timestamp=timestamp,
+                          latest=latest,
+                          partial=partial,
+                          open_when_done=open_when_done,
+                          org_id=org_id,
+                          export_protcur_base=export_protcur_base,
+                          export_base=export_base,)
 
     @staticmethod
     def make_dump_path(dump_path):
@@ -244,7 +259,7 @@ class Export(ExportBase):
         if not self.__class__._pyru_loaded:
             self.__class__._pyru_loaded = True
             from pysercomb.pyr import units as pyru
-            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range)]
+            [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
             pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
         return super().latest_ir
@@ -297,22 +312,40 @@ class Export(ExportBase):
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
 
-        functions = []
-        suffixes = []
-        modes = []
+        def jdump(blob, f):
+            json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+
+        # path metadata
+        blob_path_transitive_metadata = pipes.PathTransitiveMetadataPipeline(
+            self.export_source_path, None, None).data  # FIXME timestamp etc.
+        # FIXME need top level object not just an array
+        with open(dump_path / 'path-metadata.json', 'wt') as f:
+            # TODO mongo
+            jdump(blob_path_transitive_metadata, f)
+
+        # TODO a converter that doesn't care about higher level structure
+        #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data
+        #breakpoint()
+
+        # TODO ttl conversion
+
         blob_data = intr.data_for_export(self.timestamp)  # build and cache the data
         epipe = pipes.IrToExportJsonPipeline(blob_data)
         blob_export = epipe.data
         blob_jsonld = self._dataset_export_jsonld(blob_export)
 
+        functions = []
+        suffixes = []
+        modes = []
+
         # always dump the json
-        j = lambda f: json.dump(blob_export, f, sort_keys=True, indent=2, cls=JEncode)
+        j = lambda f: jdump(blob_export, f)#json.dump(blob_export, f, sort_keys=True, indent=2, cls=JEncode)
         functions.append(j)
         suffixes.append('.json')
         modes.append('wt')
 
         # always dump the jsonld
-        j = lambda f: json.dump(blob_jsonld, f, sort_keys=True, indent=2, cls=JEncode)
+        j = lambda f: jdump(blob_jsonld, f)#json.dump(blob_jsonld, f, sort_keys=True, indent=2, cls=JEncode)
         functions.append(j)
         suffixes.append('.jsonld')
         modes.append('wt')
@@ -416,19 +449,42 @@ class Export(ExportBase):
 
         return blob_protocols
 
-    def export_protcur(self, dump_path, *hypothesis_groups, no_network=False):
-        # FIXME no_network passed in here is dumb
-        #if (self.latest and  # FIXME NOTE this only points to the latest integrated release
-            #self.latest_protcur_path.exists()):
-            #blob_protcur = self.latest_protocols
-        #else:
+    def export_protcur(self,
+                       dump_path,
+                       *hypothesis_groups,
+                       # FIXME no_network passed in here is dumb
+                       no_network=False,
+                       # FIXME direct= is a hack
+                       direct=False):
+        if not direct and self.export_base != self.export_protcur_base:
+            # workaround to set the correct export base path
+            nargs = {**self._args}
+            nargs['export_base'] = self.export_protcur_base
+            export = ExportProtcur(**nargs)
+            return export.export_protcur(export.dump_path,
+                                         *hypothesis_groups,
+                                         no_network=no_network), export
 
-        pipeline = pipes.ProtcurPipeline(*hypothesis_groups, no_network=no_network)
+        pipeline = pipes.ProtcurPipeline(*hypothesis_groups,
+                                         no_network=no_network)
+        annos = pipeline.load()
+        if self.latest_export_path.exists():
+            # FIXME this only points to the latest integrated release
+            # which is not what we want, we need the latest protcur to be independent
+            #self.latest and
+            blob_protcur = self.latest_export
+            t_lex = blob_protcur['prov']['timestamp_export_start']
+            t_lup = max(a.updated for a in annos).replace('+00:00', 'Z')
+            new_annos_here = t_lex < t_lup  # <= is pretty much impossible
+            rerun_protcur_export = False  # TODO wire this up to cli
+            if not (new_annos_here or rerun_protcur_export):
+                return blob_protcur
+
         # FIXME NOTE this does not do the identifier expansion pass
-        protcur = pipeline.data
+        protcur = pipeline._make_blob(annos=annos)
         context = {**sc.base_context,
-                    **sc.protcur_context,
-                    }
+                   **sc.protcur_context,
+                   }
         for f in ('meta', 'subjects', 'samples', 'contributors'):
             context.pop(f)  # FIXME HACK meta @graph for datasets
 
@@ -443,8 +499,8 @@ class Export(ExportBase):
             '@context': context,
             'meta': {'count': len(protcur)},  # FIXME adjust to structure
             'prov': {'timestamp_export_start': self.timestamp,
-                        'export_system_identifier': Path.sysid,
-                        'export_hostname': gethostname(),},
+                     'export_system_identifier': Path.sysid,
+                     'export_hostname': gethostname(),},
             '@graph': protcur,  # FIXME regularize elements ?
         }
 
@@ -626,11 +682,20 @@ class Export(ExportBase):
         teds = self.export_rdf(dump_path, previous_latest_datasets, dataset_blobs)
         tes = ex.TriplesExportSummary(blob_ir, teds=teds + [teim])
 
-        # protcur  # FIXME running after because rdf export side effects anno sync
-        blob_protcur = self.export_protcur(dump_path, 'sparc-curation')  # FIXME  # handle orthogonally
+        # paths
+        #breakpoint()
+        #blob_paths = blob_ir
 
-        blob_protcur_path = dump_path / 'protcur.json'  # FIXME SIGH
-        populateFromJsonLd(tes.graph, blob_protcur_path)  # this makes me so happy
+        # protcur  # FIXME running after because rdf export side effects anno sync
+        blob_protcur, export_protcur = self.export_protcur(
+            dump_path, 'sparc-curation')  # FIXME  # handle orthogonally (nearly there)
+
+        # populateFromJsonLd should result in there being two ontology headers? (it does)
+        # embedding protcur.ttl results in a BIG file so no longer running this
+        # since the protcur.ttl files can now be produced and versioned independently
+
+        # TODO to replace this we need to add a versioned import to curation-export.ttl
+        # populateFromJsonLd(tes.graph, export_protcur.latest_export_path)  # this makes me so happy
 
         with open(filepath_json.with_suffix('.ttl'), 'wb') as f:
             f.write(tes.ttl)
@@ -643,3 +708,8 @@ class Export(ExportBase):
 
         # disco
         self.export_disco(filepath_json, dataset_blobs, teds)
+
+
+class ExportProtcur(Export):
+
+    filename_json = 'protcur.json'

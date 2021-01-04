@@ -14,6 +14,7 @@ from pyontutils.namespaces import (TEMP,
 from sparcur import converters as conv
 from sparcur.core import (adops,
                           OntCuries,
+                          OntId,
                           curies_runtime,)
 from sparcur.utils import loge, log
 from sparcur.protocols import ProtcurData
@@ -267,6 +268,42 @@ class TriplesExportDataset(TriplesExport):
         yield from self.ddt(data)
         yield from self.triples_subjects
         yield from self.triples_samples
+        yield from self.triples_specimen_dirs
+
+    def _psd(self, rec, dsi):
+        type = rec['type']
+        spec_id = rec['specimen_id']
+        if type == 'SampleDirs':
+            sid = self.primary_key(spec_id)
+        elif type == 'SubjectDirs':
+            sid = self.subject_id(spec_id)
+        else:
+            raise NotImplementedError(f'wat {type}')
+
+        for drp in rec['dirs']:
+            path_record = dsi[drp]
+            collection_id = path_record['remote_id']
+            #p = (self.data['prov']['export_project_path'] /
+                 #self.data['meta']['folder_name'] /
+                 #drp)
+            #cid = p.cache.cache.uri_api
+            cid = OntId(collection_id).u
+            yield sid, TEMP.hasFolderAboutIt, cid
+            # TEMP.isFolderAboutSpecimen
+            # NOTE the details for these do not go here
+            #yield cid, rdf.type, owl.NamedIndividual
+            #yield cid, rdf.type, sparc.Folder
+            #yield cid, TEMP.isAboutSpecimen, sid
+
+    @property
+    def triples_specimen_dirs(self):
+        ds = self.data['dir_structure']
+        sd = self.data['specimen_dirs']
+        dsi = {b['dataset_relative_path']:b for b in ds}
+        if 'records' in sd:
+            recs = sd['records']
+            for rec in recs:
+                yield from self._psd(rec, dsi)
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
         if not isinstance(v, str):
