@@ -185,6 +185,11 @@ def patch_session(self):
     if self._session is None:
         self._session = Session()
         self._set_auth(self._token)
+        try:
+            backoff_factor = auth.get('blackfynn-backoff-factor')
+        except Exception as e:
+            log.exception(e)
+            backoff_factor = 1
 
         # Enable retries via urllib
         adapter = HTTPAdapter(
@@ -192,7 +197,7 @@ def patch_session(self):
             pool_maxsize=1000,  # wheeee
             max_retries=Retry(
                 total=self.settings.max_request_timeout_retries,
-                backoff_factor=.5,
+                backoff_factor=backoff_factor,
                 status_forcelist=[502, 503, 504] # Retriable errors (but not POSTs)
             )
         )

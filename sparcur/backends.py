@@ -1324,6 +1324,9 @@ class BlackfynnDatasetData:
     def __call__(self):
         # FIXME TODO switch to use dict transformers
         # self.bfobject.relationships()
+
+        # if this fails with 503 errors, check the
+        # blackfynn-backoff-factor config variable
         meta = self.bfobject.meta  # why this is not default in the python api the world may never know
         package_counts = self.bfobject.packageTypeCounts
         cont = meta['content']

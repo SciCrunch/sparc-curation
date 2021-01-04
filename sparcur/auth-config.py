@@ -7,6 +7,8 @@
   'log-path': {'default': '{:user-log-path}/sparcur',
                'environment-variables': 'SPARCUR_LOG_PATH LOG_PATH'},
   'blackfynn-organization': {'environment-variables': 'BLACKFYNN_ORGANIZATION'},
+  'blackfynn-backoff-factor': {'default': 1,
+                               'environment-variables': 'BLACKFYNN_BACKOFF_FACTOR'},
   'hypothesis-api-key': {'environment-variables': 'HYP_API_KEY HYP_API_TOKEN'},
   'hypothesis-group': {'environment-variables': 'HYP_GROUP'},
   'hypothesis-user': {'environment-variables': 'HYP_USER'},

@@ -279,8 +279,8 @@ function sparc-get-all-remote-data () {
         local pids_final[0]=$!
 
         # fetch remote metadata (ref:bash-pipeline-fetch-remote-metadata-all)
-        # if this fails with 503 errors, check the backoff_factor in
-        # sparcur.blackfynn_api.patch_session
+        # if this fails with 503 errors, check the
+        # blackfynn-backoff-factor config variable
         echo "Fetching remote metadata"
         python -m sparcur.simple.fetch_remote_metadata_all \
             --project-id "${PROJECT_ID}" \
