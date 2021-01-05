@@ -393,10 +393,20 @@ class DatasetDescriptionFilePipeline(PathPipeline):
     def data(self):
         out = super().data
         if 'template_schema_version' not in out:  # schema version MUST be present or downstream pipelines break
-            raise ValueError('All description files should have a '
-                             'template version at this point. If they do not '
-                             'it means that the input pipeline is broken.')
-            #out['template_schema_version'] = None
+            if self.path.cache is not None:  # pre-curation use case (SODA)
+                msg = ('Missing template schema version '
+                       f'in {self.path.cache.uri_human}')
+            else:
+                msg = f'Missing template schema version in {self.path}'
+
+            logd.critical(msg)
+            # sadly we can't make this fatal because there are legit cases
+            # where people just leave the thing out and it is still present
+            # in the Description and Example columns so they think that is ok
+            #raise ValueError('All description files should have a '
+                             #'template version at this point. If they do not '
+                             #'it means that the input pipeline is broken.')
+            out['template_schema_version'] = None
         return out
 
 
