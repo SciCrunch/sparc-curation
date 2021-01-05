@@ -252,6 +252,14 @@ class PathPipeline(PrePipeline):
             path = previous_pipeline.data['path']  # we already caught the duplicate error
             try:
                 template_schema_version = previous_pipeline.data['template_schema_version']
+                if isinstance(template_schema_version, tuple):
+                    # FIXME obscurely implemented hack that condenses
+                    # the version to a single string instead of a tuple
+                    # the error will still show up in the schemas
+                    if len(set(template_schema_version)) == 1:
+                        # if someone has somehow managed to get more than
+                        # one different version keep it, it will be fun
+                        template_schema_version = template_schema_version[0]
             except KeyError:
                 # the only time this should happen is with a dataset descirption file
                 template_schema_version = None

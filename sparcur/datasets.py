@@ -1419,12 +1419,41 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
 
     @property
     def data(self):
-        data = super().data
-        if self.template_schema_version <= '1.2.3': # FIXME HACK
+        try:
+            data = super().data
+        except exc.MalformedHeaderError as e:
+            if (type(self) == ManifestFile and
+                'pattern' in self.norm_to_orig_header and
+                'filename' not in self.norm_to_orig_header):
+                log.exception(e)
+                # FIXME massive hack to work around the multiple
+                # different schemas
+                return PatternManifestFile(
+                    self.path, self.template_schema_version).data
+            else:
+                raise e
+
+        if isinstance(self.template_schema_version, tuple):
+            # error will be caught via schema and will also lead to a
+            # multiplication of errors since the elif here won't run
+            pass
+        elif self.template_schema_version <= '1.2.3': # FIXME HACK
             if 'manifest_records' in data:  # raw json manifests don't conform to this structure FIXME
                 [self.fix_tod_123(blob) for blob in data['manifest_records']]
 
         return data
+
+
+class PatternManifestFile(ManifestFile):
+    # FIXME this is an extreme hack and we need to resolve how we are
+    # going to deal with with pattern vs filename because right now
+    # you can't really have two valid schemas under a single name,
+    # though in principle there is no issue with that
+    renames_header = {'pattern': 'metadata_element',}
+    record_type_key_alt = 'pattern'
+    record_type_key_header = 'metadata_element'
+    groups_alt = {'manifest_records': GROUP_ALL}
+    normalize_header = False
 
 
 class ManifestFilePath(ObjectPath):
