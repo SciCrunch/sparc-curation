@@ -1101,7 +1101,11 @@ class MetadataFile(HasErrors):
     def _norm_alt_headers(self):
         # headers MUST be normalized as early as possible due to the fact that
         # there are very likely to be duplicate keys
-        gen = self._headers()
+        try:
+            gen = self._headers()
+        except exc.BadDataError as e:
+            msg = f'Bad data in {self.path}!'
+            raise exc.BadDataError(msg) from e
 
         indexes = {}
         def normb(k):
@@ -1351,6 +1355,10 @@ SubjectsFilePath._bind_flavours()
 def join_cast(sep):
     """ oh look, you still can't use list comprehension in class scope """
     def sigh(t, sep=sep):
+        for _ in t:
+            if _ is None:
+                raise exc.BadDataError('A primary key value was None!')
+
         return sep.join(tuple(str(_) for _ in t))
 
     return sigh
