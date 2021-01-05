@@ -1381,6 +1381,7 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
     record_type_key_header = 'metadata_element'
     groups_alt = {'manifest_records': GROUP_ALL}
     normalize_header = False
+    #raw_json_class = rj.RawJsonManifestFile  # FIXME TODO sigh
     #_expect_single = _nsman
 
     @staticmethod
@@ -1393,9 +1394,11 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
     def data(self):
         data = super().data
         if self.template_schema_version <= '1.2.3': # FIXME HACK
-            [self.fix_tod_123(blob) for blob in data['manifest_records']]
+            if 'manifest_records' in data:  # raw json manifests don't conform to this structure FIXME
+                [self.fix_tod_123(blob) for blob in data['manifest_records']]
 
         return data
+
 
 class ManifestFilePath(ObjectPath):
     obj = ManifestFile

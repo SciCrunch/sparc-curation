@@ -253,6 +253,7 @@ class PathPipeline(PrePipeline):
             try:
                 template_schema_version = previous_pipeline.data['template_schema_version']
             except KeyError:
+                # the only time this should happen is with a dataset descirption file
                 template_schema_version = None
 
         if isinstance(path, list):
@@ -392,7 +393,10 @@ class DatasetDescriptionFilePipeline(PathPipeline):
     def data(self):
         out = super().data
         if 'template_schema_version' not in out:  # schema version MUST be present or downstream pipelines break
-            out['template_schema_version'] = None
+            raise ValueError('All description files should have a '
+                             'template version at this point. If they do not '
+                             'it means that the input pipeline is broken.')
+            #out['template_schema_version'] = None
         return out
 
 
@@ -660,6 +664,11 @@ class JSONPipeline(Pipeline):
     @property
     def augmented(self):
         data = self.updated
+        return self._augmented(data)
+
+    def _augmented(self, data):
+        # sigh yeah, we're doing this for a quick hack on this until we can
+        # finish getting the proper version implemented
 
         if hasattr(self, 'path'):
             # FIXME why/how is this not the local path to start with !?
@@ -877,6 +886,7 @@ class SDSPipeline(JSONPipeline):
     #previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
 
     subpipelines = [
+        # this was moved to pipeline start so that we can get the template schema version
         #[[[['dataset_description_file'], ['path']]],
          #DatasetDescriptionFilePipeline,
          #['dataset_description_file']],
@@ -1189,6 +1199,9 @@ class PipelineExtras(JSONPipeline):
         [[THIS_PATH, ['dir_structure'], ['subjects'], ['samples']],
          # FIXME this needs to happen fast and early
          # FIXME structure is going to be in a separate file/blob for export
+         # without the hack to augmented below if there are no samples or no
+         # subjects then this will fail and won't run at all, yet another reason
+         # to move away from using derives entirely, too limited in expressivity
          De.validate_structure,
          [['specimen_dirs']]],
     )
@@ -1199,10 +1212,6 @@ class PipelineExtras(JSONPipeline):
         lambda p: ('inputs' not in p and 'contributor_role' in p),
         lambda p: ('inputs' not in p and 'contributor_orcid' in p),
     )
-
-    @property
-    def updated(self):
-        return super().updated
 
     @property
     def cleaned(self):
@@ -1244,6 +1253,40 @@ class PipelineExtras(JSONPipeline):
                 #breakpoint()
 
         return data
+
+    @property
+    def updated(self):
+        return super().updated
+
+    @property
+    def augmented(self):
+        # FIXME SIGH there isn't actually a way to do a real around
+        # here because the data is trapped in the pipeline and is
+        # never passed to the function, so you can always follow where
+        # it comes from, but never actually interpose or compose
+        # anything with it, so you can't do things like call finally
+        # without literally copying the whole contents of the code
+        # SIGH don't design data pipelines while sleepy kids
+        data = self.updated
+        # FIXME SUCH HACK MUCH WOW
+        # have to do this to get around the limitation that derives
+        # must have _all_ arguments present and multiple dispatch
+        # won't work or any of that, so hacking this until the proper
+        # functional pipeline is finished
+        add_subs = 'subjects' not in data
+        add_samps = 'samples' not in data
+        try:
+            if add_subs:
+                data['subjects'] = []
+            if add_samps:
+                data['samples'] = []
+
+            return self._augmented(data)
+        finally:
+            if add_subs:
+                data.pop('subjects')
+            if add_samps:
+                data.pop('samples')
 
     @property
     def added(self):

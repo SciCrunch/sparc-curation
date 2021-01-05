@@ -1,5 +1,6 @@
 import json
 from sparcur import schemas as sc
+from sparcur.utils import log, logd
 
 
 class RawJson:
@@ -57,7 +58,12 @@ class RawJsonDatasetDescription(RawJson):
         if not isinstance(blob['contributors'], list):
             # TODO this needs to be an error with an easy fix
             blob['contributors'] = [blob['contributors']]
-            breakpoint()
+            logd.critical(f'contributors has the wrong structure {self.path}')
+
+        if 'template_schema_version' not in blob:
+            if 'version' in blob:  # FIXME non-standard should not support
+                logd.critical(f'unsupported schema for template schema version will be removed {self.path}')
+                blob['template_schema_version'] = blob['version']
 
         return blob
 

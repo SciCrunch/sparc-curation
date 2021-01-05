@@ -1170,7 +1170,7 @@ class _DictTransformer:
             if target_path is not None:
                 try:
                     function(data, target_path, p.data)
-                except BaseException as e:
+                except Exception as e:
                     import inspect
                     if isinstance(pc, object):
                         pi, pc = pc, pc.__class__
