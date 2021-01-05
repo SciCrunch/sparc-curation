@@ -298,12 +298,17 @@ class TriplesExportDataset(TriplesExport):
     @property
     def triples_specimen_dirs(self):
         ds = self.data['dir_structure']
-        sd = self.data['specimen_dirs']
         dsi = {b['dataset_relative_path']:b for b in ds}
-        if 'records' in sd:
-            recs = sd['records']
-            for rec in recs:
-                yield from self._psd(rec, dsi)
+
+        if 'specimen_dirs' in self.data:
+            # not everyone has these, and sometimes if the metadata
+            # files are mangled enough they don't even have subjects
+            # or samples that would cause errors
+            sd = self.data['specimen_dirs']
+            if 'records' in sd:
+                recs = sd['records']
+                for rec in recs:
+                    yield from self._psd(rec, dsi)
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
         if not isinstance(v, str):
