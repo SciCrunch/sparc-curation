@@ -4,6 +4,7 @@ from functools import wraps
 from collections import defaultdict
 import idlib
 from sparcur import schemas as sc
+from sparcur import exceptions as exc
 from sparcur import normalization as nml
 from sparcur.core import log, logd, JPointer, HasErrors
 
@@ -103,6 +104,10 @@ class Derives:
     @staticmethod
     def _lift_mr(path_dataset, dataset_relative_path, record, should_log):
         parent = dataset_relative_path.parent
+        if 'filename' not in record:
+            msg = f'filename missing from record in {dataset_relative_path}'
+            raise exc.BadDataError(msg)
+
         record_drp = parent / record['filename']
 
         # FIXME this is validate move elsewhere ??? but this is also
@@ -177,8 +182,12 @@ class Derives:
                     drp = manifest['dataset_relative_path']
                     _should_log = True
                     for record in contents['manifest_records']:
-                        lifted, _should_log = cls._lift_mr(
-                            path_dataset, drp, record, _should_log)
+                        try:
+                            lifted, _should_log = cls._lift_mr(
+                                path_dataset, drp, record, _should_log)
+                        except exc.BadDataError as e:
+                            logd.error(e)
+                            continue  # FIXME need this in the errors record
                         path_metadata.append(lifted)
                         if 'errors' not in lifted:
                             cls._scaffolds(lifted, scaffolds)
