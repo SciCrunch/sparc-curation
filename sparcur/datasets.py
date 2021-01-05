@@ -595,14 +595,14 @@ class Tabular(HasErrors):
             #breakpoint()
 
         if e1 is not None:
-            message = f'malformed xml file could not be read by xlsx2csv {self.path}'
+            message = f'malformed xlsx file could not be read by xlsx2csv {self.path}'
             if self.addError(message,
                              blame='submission',
                              path=self.path):
                 logd.exception(e1)
 
         if e2 is not None:
-            message = f'malformed xml file could not be read by openpyxl {self.path}'
+            message = f'malformed xlsx file could not be read by openpyxl {self.path}'
             if self.addError(message,
                              blame='submission',
                              path=self.path):
@@ -621,7 +621,7 @@ class Tabular(HasErrors):
         if wb is None:
             raise exc.NoDataError(f'{self.path}')
 
-        sheet = wb.get_active_sheet()
+        sheet = wb.active
         for row in sheet.rows:
             yield [cell.value for cell in row]
 
@@ -656,7 +656,7 @@ class Tabular(HasErrors):
             log.warning(f'Sheet weirdness in {self.path}')
             log.warning(str(e))
         except AttributeError as e:
-            message = ('Major sheet weirdness (maybe try resaving, '
+            message = ('xlsx2csv: major sheet weirdness ('
                        'probably a bug in the xlsx2csv converter)? '
                        f'in {self.path}')
             if self.addError(exc.EncodingError(message),
@@ -1440,6 +1440,9 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
         if isinstance(self.template_schema_version, tuple):
             # error will be caught via schema and will also lead to a
             # multiplication of errors since the elif here won't run
+            pass
+        elif self.template_schema_version is None:
+            # this can happen on a NoDataError
             pass
         elif self.template_schema_version <= '1.2.3': # FIXME HACK
             if 'manifest_records' in data:  # raw json manifests don't conform to this structure FIXME
