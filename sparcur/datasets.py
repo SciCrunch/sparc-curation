@@ -1421,8 +1421,14 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
             data = super().data
         except exc.MalformedHeaderError as e:
             if (type(self) == ManifestFile and
-                'pattern' in self.norm_to_orig_header and
-                'filename' not in self.norm_to_orig_header):
+                (hasattr(self, 'norm_to_orig_header') and
+                 'pattern' in self.norm_to_orig_header and
+                 'filename' not in self.norm_to_orig_header or
+                 # try to see if pattern is there, but if we have to
+                 # run this branch then we are already in trouble
+                 'pattern' in self.header and
+                 'pattern' in self.alt_header and
+                 'filename' not in self.header)):
                 log.info(e)  # not much point in logging the full exception
                 # FIXME massive hack to work around the multiple
                 # different schemas
