@@ -1166,13 +1166,14 @@ class MetadataFile(HasErrors):
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
         self.orig_to_norm_alt = safe_invert(self.norm_to_orig_alt)
         if self.normalize_header and self.alt_header[0] != self._alt_header.data[0]:
-            msg = (f'Bad alt header value {self.alt_header[0]!r} != {self._alt_header.data[0]!r}'
+            msg = (f'Potentially bad alt header value {self.alt_header[0]!r} '
+                   f'!= {self._alt_header.data[0]!r}'
                    f' in {self.path.as_posix()!r}')
-            # FIXME path and dataset relative issues
-            if self.addError(msg,
-                             blame='submission',
-                             path=self.path):
-                logd.error(msg)
+            # this is not guranteed to be an issue but hitting
+            # Subject_id instead of subject_id will cause issues for
+            # other people who are not using this pipeline to
+            # normalize everything (for example)
+            logd.warning(msg)
 
         if self.primary_key_rule is not None:
             nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
@@ -1190,13 +1191,10 @@ class MetadataFile(HasErrors):
         self.norm_to_orig_header = self._header.lut(**self.renames_header)
         self.orig_to_norm_header = safe_invert(self.norm_to_orig_header)
         if self.normalize_alt and self.header[0] != self._header.data[0]:
-            msg = (f'Bad header value {self.header[0]!r} != {self._header.data[0]!r}'
+            msg = (f'Potentially bad header value {self.header[0]!r} '
+                   f'!= {self._header.data[0]!r}'
                    f' in {self.path.as_posix()!r}')
-            # FIXME path and dataset relative issues
-            if self.addError(msg,
-                             blame='submission',
-                             path=self.path):
-                logd.error(msg)
+            logd.warning(msg)
 
         _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)
         if _matched:
@@ -1425,7 +1423,7 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
             if (type(self) == ManifestFile and
                 'pattern' in self.norm_to_orig_header and
                 'filename' not in self.norm_to_orig_header):
-                log.exception(e)
+                log.info(e)  # not much point in logging the full exception
                 # FIXME massive hack to work around the multiple
                 # different schemas
                 return PatternManifestFile(
