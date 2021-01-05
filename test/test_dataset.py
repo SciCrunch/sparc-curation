@@ -157,6 +157,13 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         pprint.pprint(value)
         assert [s for s in value['subjects'] if 'subject_id' in s]
 
+    def test_su_cry(self):
+        tf = examples_root / 'su-cry.csv'
+        obj = self.metadata_file_class(tf)
+        value = obj.data
+        pprint.pprint(value)
+        assert [s for s in value['subjects'] if 'subject_id' in s]
+
     def test_versions(self):
         self._versions()
 

@@ -42,10 +42,11 @@ hasSchema = sc.HasSchema()
 class Header:
     """ generic header normalization for python """
     # FIXME this is a really a pipeline stage
-    def __init__(self, first_row_or_column, normalize=True, alt=False):
+    def __init__(self, first_row_or_column, normalize=True, alt=False, normalize_first_cell=False):
         self.pipeline_start = first_row_or_column
         self._normalize = normalize
         self._alt = alt
+        self._normalize_first_cell = normalize or normalize_first_cell
 
     @property
     def normalized(self):
@@ -94,8 +95,13 @@ class Header:
             msg = f'Original header is not unique.\nDuplicate entries: {dupes}'
             raise exc.MalformedHeaderError(msg)
 
-        return {renames[n] if n in renames else n:h
-                for n, h in zip(original, original)}
+        if self._normalize_first_cell:
+            norm_first = (*normalized[:1], *original[1:])
+            return {renames[n] if n in renames else n:h
+                    for n, h in zip(norm_first, original)}
+        else:
+            return {renames[n] if n in renames else n:h
+                    for n, h in zip(original, original)}
 
 
 class DatasetMetadata(Path, HasErrors):
@@ -843,6 +849,7 @@ class MetadataFile(HasErrors):
         if condition:
             breakpoint()
 
+        self.embedErrors(data)
         return data
 
     def _data(self):
@@ -1154,9 +1161,18 @@ class MetadataFile(HasErrors):
 
         self._alt_header = Header(self.alt_header,
                                   normalize=self.normalize_alt,
-                                  alt=True)
+                                  alt=True,
+                                  normalize_first_cell=self.normalize_header)
         self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
         self.orig_to_norm_alt = safe_invert(self.norm_to_orig_alt)
+        if self.normalize_header and self.alt_header[0] != self._alt_header.data[0]:
+            msg = (f'Bad alt header value {self.alt_header[0]!r} != {self._alt_header.data[0]!r}'
+                   f' in {self.path.as_posix()!r}')
+            # FIXME path and dataset relative issues
+            if self.addError(msg,
+                             blame='submission',
+                             path=self.path):
+                logd.error(msg)
 
         if self.primary_key_rule is not None:
             nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
@@ -1167,9 +1183,20 @@ class MetadataFile(HasErrors):
         # this will fail see version 1.1 subjects template for this
         # with a note that 1.1 had many issues
         self.header = next(gen)
-        self._header = Header(self.header, normalize=self.normalize_header)
+        self._header = Header(self.header,
+                              normalize=self.normalize_header,
+                              normalize_first_cell=self.normalize_alt)
+        # FIXME the case where someone has a capitalized subject_id
         self.norm_to_orig_header = self._header.lut(**self.renames_header)
         self.orig_to_norm_header = safe_invert(self.norm_to_orig_header)
+        if self.normalize_alt and self.header[0] != self._header.data[0]:
+            msg = (f'Bad header value {self.header[0]!r} != {self._header.data[0]!r}'
+                   f' in {self.path.as_posix()!r}')
+            # FIXME path and dataset relative issues
+            if self.addError(msg,
+                             blame='submission',
+                             path=self.path):
+                logd.error(msg)
 
         _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)
         if _matched:
