@@ -7,6 +7,7 @@ from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
 from sparcur.core import log, logd, JPointer, HasErrors
+from sparcur.utils import register_type
 
 
 def collect(*oops, unpacked=True):
@@ -229,6 +230,10 @@ class Derives:
                     for blob_sample in samples]
         return subjects,
 
+    # FIXME bad that we need to call these here
+    register_type(None, 'SampleDirs')
+    register_type(None, 'SubjectDirs')
+
     @staticmethod
     def validate_structure(path, dir_structure, subjects, samples):
 
@@ -256,6 +261,8 @@ class Derives:
                 # cull empty in a single step
                 if av} 
 
+        # subject_id could be missing, but we filter failures on all of
+        # those so in theory we shouldn't need to handle it as this stage
         subs = {s['subject_id']:s for s in subjects}
         dd = defaultdict(list)
         for s in samples:

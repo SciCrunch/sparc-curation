@@ -84,6 +84,20 @@ class TripleConverter(dat.HasErrors):
             else:
                 subject = rdflib.URIRef(subject)
 
+        def protocol_stuff():
+            nonlocal _v
+            nonlocal s
+            d = _v.asDict()  # FIXME this is a silly way to do this, use Stream.triples_gen
+            _o = (owl.Class
+                    if isinstance(v, OntTerm) else  # FIXME not really accurate
+                    owl.NamedIndividual)
+            yield s, rdf.type, _o
+            if 'label' in d:
+                yield s, rdfs.label, rdflib.Literal(d['label'])
+            if 'synonyms' in d:  # FIXME yield from o.synonyms(s)
+                for syn in d['synonyms']:
+                    yield s, NIFRID.synonym, rdflib.Literal(syn)
+
         #maybe_not_normalized = self.message_passing_key in self._source  # TODO maybe not here?
         for field, value in self._source.items():
             #normalized = not (maybe_not_normalized and field in self._source)  # TODO
@@ -120,16 +134,7 @@ class TripleConverter(dat.HasErrors):
                         s = _v.asUri(rdflib.URIRef)
                         yield subject, p, s
                         try:
-                            d = _v.asDict()  # FIXME this is a silly way to do this, use Stream.triples_gen
-                            _o = (owl.Class
-                                  if isinstance(v, OntTerm) else  # FIXME not really accurate
-                                  owl.NamedIndividual)
-                            yield s, rdf.type, _o
-                            if 'label' in d:
-                                yield s, rdfs.label, rdflib.Literal(d['label'])
-                            if 'synonyms' in d:  # FIXME yield from o.synonyms(s)
-                                for syn in d['synonyms']:
-                                    yield s, NIFRID.synonym, rdflib.Literal(syn)
+                            yield from protocol_stuff()
                         except idlib.exc.ResolutionError:
                             pass
 
@@ -181,11 +186,16 @@ class ContributorConverter(TripleConverter):
 
         def affiliation(self, value):
             #_, s = self.c.affiliation(value)
-            if isinstance(value, str):  # FIXME json conv
-                yield from idlib.Ror(value).triples_gen
-            else:
-                yield from value.triples_gen
-               
+            try:
+                if isinstance(value, str):  # FIXME json conv
+                    yield from idlib.Ror(value).triples_gen
+                else:
+                    yield from value.triples_gen
+            except idlib.exc.RemoteError as e:
+                # FIXME sigh, temp until we can split out the
+                # remote data resolution phase from the rest
+                loge.exception(e)
+
 
 ContributorConverter.setup()
 
@@ -309,7 +319,11 @@ class MetaConverter(TripleConverter):
                         log.warning(e)
                         return
                 else:
+                    #try:  # was related to bug where value could be None when loading back to ir
                     pioid = idlib.Pio(value)  # FIXME :/ should be handled in Pio directly probably?
+                    #except TypeError as e:
+                        #breakpoint()
+                        #raise e
             else:
                 pioid = value
 

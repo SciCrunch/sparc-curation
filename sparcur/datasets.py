@@ -354,6 +354,14 @@ class DatasetStructure(Path):
                     except self._requests.exceptions.ConnectionError as e:
                         raise exc.NetworkFailedForPathError(path) from e
 
+                name = path.name
+                if (path.is_file() and
+                    (name.startswith('.~lock.') and name.endswith('#')) and
+                    path.cache.meta.id is None):
+                    # FIXME abstract to handle arbitrary path name regex patterns
+                    log.warning(f'illegal untracked file detect {path}')
+                    continue
+
                 if path.suffix in path.stem:
                     msg = f'path has duplicate suffix {path.as_posix()!r}'
                     self.addError(msg,
@@ -361,7 +369,7 @@ class DatasetStructure(Path):
                                   path=path)
                     logd.error(msg)
 
-                if path.name[0].isupper():
+                if name[0].isupper():  # FIXME should probably be checking name.lower() != name
                     msg = f'path has bad casing {path.as_posix()!r}'
                     if self.addError(msg,
                                      blame='submission',
@@ -1177,7 +1185,7 @@ class MetadataFile(HasErrors):
             # Subject_id instead of subject_id will cause issues for
             # other people who are not using this pipeline to
             # normalize everything (for example)
-            logd.warning(msg)
+            logd.debug(msg)
 
         if self.primary_key_rule is not None:
             nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
@@ -1198,7 +1206,7 @@ class MetadataFile(HasErrors):
             msg = (f'Potentially bad header value {self.header[0]!r} '
                    f'!= {self._header.data[0]!r}'
                    f' in {self.path.as_posix()!r}')
-            logd.warning(msg)
+            logd.debug(msg)
 
         _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)
         if _matched:

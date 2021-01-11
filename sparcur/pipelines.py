@@ -541,7 +541,9 @@ hasSchema = sc.HasSchema()
 class JSONPipeline(Pipeline):
     # we can't quite do this yet, but these pipelines are best composed
     # by subclassing and then using super().previous_step to insert another
-    # step along the way
+    # step along the way XXX update: this is still true, but it can't deal
+    # with a number of different types of extension (see _augmented), is
+    # massively over engineered, and is in the process of being replaced
 
     previous_pipeline_classes = tuple()
     # If previous_pipeline_classes is set then this pipeline is run on the previous_pipeline given
@@ -552,6 +554,7 @@ class JSONPipeline(Pipeline):
     # if there is more than one class any overlapping keys will match the output
     # of the last class in the pipeline FIXME duplicate keys should probably error loudly ...
 
+    filter_failures = []
     subpipelines = []
     copies = []
     moves = []
@@ -634,8 +637,54 @@ class JSONPipeline(Pipeline):
         return self.previous_pipeline.data
 
     @property
-    def subpipelined(self):
+    def ffail(self):
+        """ filter failures
+            extra cleaning
+            to remove paths that do not pass the schema and that thus
+            have a potential to break things during export """
+        # FIXME kind of weird positioning in the flow because this
+        # can only work on the output of the previous pipeline and
+        # acts after movies copies etc. so it can't prevent ... hrm
+        # moved to the head
+
         data = self.pipeline_start
+
+        if 'errors' in data:
+            pop_paths = [tuple(p) for p, e in [(e['path'], e) for e in data['errors']
+                                            if 'path' in e]
+                         if any(ff(e, p) for ff in self.filter_failures)]
+
+            if pop_paths:
+                # need to remove from the tail of a list so that indexes don't
+                # shift until after we have already passed them
+                # some paths may have more than one error so use set to avoid double remove issues
+                safe_ordering = sorted(set(pop_paths), reverse=True)
+
+                try:
+                    garbage = [(p, tuple(DT.pop(data, [p]))) for p in safe_ordering]
+                except exc.NoSourcePathError as e:
+                    raise exc.SparCurError(f'{self.runtime_context.path}') from e
+
+                msg = '\n\t'.join(str(t) for t in garbage)
+                logd.warning(f'Garbage truck says:\n{msg}')
+
+            # get all error paths
+            # filter the paths to remove
+            # pop the values at those paths
+
+            #candidates_for_removal = [e for e in data['errors'] if 'path' in e]
+            #not_input = [e for e in candidates_for_removal if e['path'][0] != 'inputs']
+            #cand_paths = [e['path'] for e in not_input]
+            #if 'contributors' in data:
+                # FIXME will have to sort these in reverse
+                #hrm = list(DT.pop(data, [['contributors', 0, 'contributor_role', 1]]))
+                #breakpoint()
+
+        return data
+
+    @property
+    def subpipelined(self):
+        data = self.ffail
         try:
             errors_subpipelines = list(DictTransformer.subpipeline(
                 data,
@@ -1227,50 +1276,25 @@ class PipelineExtras(JSONPipeline):
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
 
     filter_failures = (  # XXX TODO implement this for other pipelines as well ?
-        lambda p: ('inputs' not in p and 'contributor_role' in p),
-        lambda p: ('inputs' not in p and 'contributor_orcid' in p),
+        # FIXME this is silly, there only needs to be a single lambda for this DUH
+        # and thus no need for a list of lambda
+        lambda e, p: ('inputs' not in p and 'contributor_role' in p or
+                      'inputs' not in p and 'contributor_orcid' in p or
+
+                      'inputs' not in p and 'samples' in p and 'message' in e
+                      and e['message'] == "'sample_id' is a required property" or
+
+                      'inputs' not in p and 'samples' in p and 'message' in e
+                      and e['message'] == "'subject_id' is a required property" or
+
+                      'inputs' not in p and 'subjects' in p and 'message' in e
+                      and e['message'] == "'subject_id' is a required property"
+                      ),
     )
 
-    @property
-    def cleaned(self):
-        """ extra cleaning (that could become standard like other stages)
-            to remove paths that do not pass the schema and that are thus
-            have a potential to break things during export """
-
-        data = super().cleaned
-
-        if 'errors' in data:
-            pop_paths = [tuple(p) for p in [e['path'] for e in data['errors']
-                                            if 'path' in e]
-                         if any(ff(p) for ff in self.filter_failures)]
-
-            if pop_paths:
-                # need to remove from the tail of a list so that indexes don't
-                # shift until after we have already passed them
-                # some paths may have more than one error so use set to avoid double remove issues
-                safe_ordering = sorted(set(pop_paths), reverse=True)
-
-                try:
-                    garbage = [(p, tuple(DT.pop(data, [p]))) for p in safe_ordering]
-                except exc.NoSourcePathError as e:
-                    raise exc.SparCurError(f'{self.runtime_context.path}') from e
-
-                msg = '\n\t'.join(str(t) for t in garbage)
-                logd.warning(f'Garbage truck says:\n{msg}')
-
-            # get all error paths
-            # filter the paths to remove
-            # pop the values at those paths
-
-            #candidates_for_removal = [e for e in data['errors'] if 'path' in e]
-            #not_input = [e for e in candidates_for_removal if e['path'][0] != 'inputs']
-            #cand_paths = [e['path'] for e in not_input]
-            #if 'contributors' in data:
-                # FIXME will have to sort these in reverse
-                #hrm = list(DT.pop(data, [['contributors', 0, 'contributor_role', 1]]))
-                #breakpoint()
-
-        return data
+    #@property
+    #def cleaned(self):
+        #data = super().cleaned
 
     @property
     def updated(self):

@@ -19,6 +19,10 @@ def protocol_url_or_doi(value):
     # FIXME network sandbox violation
     # FIXME can't use idlib.get_right_id because it is
     # totally broken with regard to dereferencing
+    # FIXME under certain circumstances this field winds
+    # up with a None in a list, that is really really bad
+    # and we need to figure out why/how, I may have fixed
+    # it with an update to idlib, but I'm not sure
     if not is_list_or_tuple(value):
         value = value,
         out = None

@@ -1331,6 +1331,7 @@ class BlackfynnDatasetData:
         package_counts = self.bfobject.packageTypeCounts
         cont = meta['content']
         blob = {'id': self.remote.id,
+                'type': 'BlackfynnRemoteMetadata',  # registered as IdentityJsonType in core
                 'name': cont['name'],  # title
                 'description': cont['description'],  # subtitle
                 'readme': self.bfobject.readme,

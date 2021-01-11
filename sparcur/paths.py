@@ -491,7 +491,14 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
     def _cache_jsonMetadata(self, do_expensive_operations=False):
         blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)
         project_meta = project_path.cache_meta
-        meta = self.cache_meta
+        meta = self.cache_meta  # FIXME this is very risky
+        # and is the reason why I made it impossible to contsturct
+        # cache classes when no cache was present, namely that if
+        # there is no cache then PathMeta will still return the
+        # correct structure, but it will be empty, which is bad
+        if meta.id is None:
+            raise exc.NoCachedMetadataError(self)
+
         _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
         remote_id = (f'{bf_id}/files/{meta.file_id}'  # XXX a horrible hack, but it kinda works
                      if self.is_file() or self.is_broken_symlink() else
@@ -567,7 +574,12 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     def _transitive_metadata(self):
         def hrm(p):
-            cjm = p._cache_jsonMetadata()
+            try:
+                cjm = p._cache_jsonMetadata()
+            except exc.NoCachedMetadataError:
+                # FIXME TODO figure out when to log this
+                # probably only log when there is a dataset id
+                return
             # this is not always needed so it is not included by default
             # but we do need it here for when we generate the rdf export
             p = cjm['dataset_relative_path'].parent
@@ -575,8 +587,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                 cjm['parent_drp'] = p
             return cjm
 
-        rchildren = transitive_paths(self)  # FIXME perf boost but not portable
-        metadata = [hrm(c) for c in rchildren]
+        exclude_patterns = '*.~lock*#', '.DS_Store'  # TODO make this configurable
+        # FIXME perf boost but not portable
+        rchildren = transitive_paths(self, exclude_patterns=exclude_patterns)
+        metadata = [_ for _ in [hrm(c) for c in rchildren] if _ is not None]
         index = {b['dataset_relative_path']:b for b in metadata}
         pid = self._uri_api_bf(self.cache_id)
         for m in metadata:

@@ -19,7 +19,7 @@ from pyontutils.namespaces import OntCuries, TEMP, sparc, NIFRID, definition
 from pyontutils.namespaces import tech, asp, dim, unit, rdf, owl, rdfs
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd  # FIXME fix other imports
-from sparcur.utils import is_list_or_tuple, register_type
+from sparcur.utils import is_list_or_tuple, register_type, IdentityJsonType
 
 xsd = rdflib.XSD
 po = CustomTurtleSerializer.predicateOrder
@@ -333,6 +333,12 @@ def _json_identifier_expansion(obj, *args, **kwargs):
                 return obj.asDict()
             except idlib.exc.RemoteError as e:
                 logd.error(e)
+                # we must return object here otherwise sanity destorying
+                # None might creep in during expansion here, this really
+                # shouldn't be able to happen i.e. it should be impossible
+                # for asDict to raise a remote error at all, but we need
+                # to catch it here as well
+                return obj
     else:
         return obj
 
@@ -1417,3 +1423,16 @@ class JPointer(str):
 # register idlib classes for fromJson
 [register_type(i, i.__name__) for i in
  (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm)]
+
+# register other types for fromJson
+register_type(IdentityJsonType, 'BlackfynnRemoteMetadata')
+
+# handle old json export that won't stop due to missing BRM
+# XXX let this be a reminder to never allow foreign json in unless it
+# comes wrapped in an outer blob that can properly type it or where we
+# can reasonably inject a type so that we can stop further recursion
+# because it is (for now) json raw json
+register_type(None, 'publication')
+register_type(None, 'revision')
+register_type(None, 'embargo')
+register_type(None, 'removal')

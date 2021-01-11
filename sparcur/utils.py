@@ -51,6 +51,16 @@ def register_all_types():
     [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
 
 
+class IdentityJsonType:
+    """ use to register types that should not be recursed upon e.g.
+        because they contain external use of type that does not align
+        with our usage """
+
+    @classmethod
+    def fromJson(cls, blob):
+        return blob
+
+
 def fromJson(blob):
     if isinstance(blob, dict):
         if 'type' in blob:
@@ -237,9 +247,12 @@ def _transitive_(path, command):
     return paths
 
 
-def transitive_paths(path):
+def transitive_paths(path, exclude_patterns=tuple()):
     """Fast list of all child directories using unix find."""
-    command = """find -not -path '.operations*'"""
+    hrm = ' '.join(['-not -path ' + repr(pat) for pat in exclude_patterns])
+    if hrm:
+        hrm = ' ' + hrm
+    command = f"""find -not -path '.operations*'{hrm}"""
     # TODO failover to builtin rglob
     return _transitive_(path, command)
 
