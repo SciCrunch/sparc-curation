@@ -395,14 +395,39 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def name(self):
-        if isinstance(self.bfobject, self._File) and self.from_packages:
-            #return self.bfobject.filename
-            # it seems that there was a change in how files were returned
-            # via the packages endpoint such that filename now duplicates
-            # extensions in nearly all cases while name is more or less
-            # correct now? where correct means that it matches the stem
-            # plus suffix approach I use below
-            return self.bfobject.name
+        bfo = self.bfobject
+        if isinstance(bfo, self._File) and self.from_packages:
+            #breakpoint()
+            # at some point in time the blackfynn process that dumps
+            # data into whatever is returned by the /packages endpoint
+            # changed without warning, so there are two different
+            # schemas implicit in the data returned by the endpoint
+            # the way we work around the issue is to compare filename
+            # and name to see if name has a suffix and whether the
+            # suffixes match, there is a performance cost due to
+            # having to repeatedly check the same files over and over
+            # again, but at least this way we can determine whether
+            # there is a fixed date that we could use as a proxy
+            f = self.bfobject.filename
+            n = self.bfobject.name
+            pf = PurePath(f)
+            pn = PurePath(n)
+            sf = pf.suffix
+            sn = pn.suffix
+            if (sf and not sn or
+                sn and sf != sn or
+                not sf and not sn):
+                #name.suffix
+                #name.suffix.suffix
+
+                #name.other          <<<   this case is annoying
+                #name.other.suffix
+                return f
+            #elif sf == sn and len(pf.suffixes) > 1:
+                #return n
+            else:
+                log.debug('New /packages schema detected')
+                return n
         else:
             return self.stem + self.suffix
 
