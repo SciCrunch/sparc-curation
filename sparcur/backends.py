@@ -396,7 +396,13 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def name(self):
         if isinstance(self.bfobject, self._File) and self.from_packages:
-            return self.bfobject.filename
+            #return self.bfobject.filename
+            # it seems that there was a change in how files were returned
+            # via the packages endpoint such that filename now duplicates
+            # extensions in nearly all cases while name is more or less
+            # correct now? where correct means that it matches the stem
+            # plus suffix approach I use below
+            return self.bfobject.name
         else:
             return self.stem + self.suffix
 
@@ -603,7 +609,9 @@ class BlackfynnRemote(aug.RemotePath):
         # it certain files, just that it does
         yield from self._rchildren(exclude_uploaded=self._exclude_uploaded)
 
-    def _dir_or_file(self, child, deleted, exclude_uploaded):
+    def _dir_or_file(self, child, deleted, exclude_uploaded, skip_existing):
+        """ skip_existing sould be set if create_cache is set to true """
+        # FIXME
         state = child.bfobject.state
         if state != 'READY':
             #log.debug (f'{state} {child.name} {child.id}')
@@ -624,16 +632,27 @@ class BlackfynnRemote(aug.RemotePath):
                         and c.cache.id == cid]
             if existing:
                 unmatched = [e for e in existing if child.name != e.name]
-                if unmatched:
+                if unmatched and skip_existing:
+                    # NOTE this should run when create_cache is True to avoid
+                    # creating files with duplicate names in the event that
+                    # somehow there was a duplicate name, this is an internal
+                    # implementation detail related to old decisions about how
+                    # to populate the local cache
                     log.debug(f'skipping {child.name} becuase a file with that '
-                                f'id already exists {unmatched}')
+                              f'id already exists {unmatched}')
                     return
 
         return True
 
     def _rchildren(self,
                    create_cache=True,
-                   exclude_uploaded=True,
+                   # FIXME I am 99% sure that create_cache should default to False
+                   # and I was also 99% sure that I HAD set it to be False by
+                   # default so that remote.rchildren would not populate cache
+                   # but that only cache.rchildren would, however neither of those
+                   # is really correct in order to fix this need to review who is
+                   # calling this for the create cache side effects and fix them
+                   exclude_uploaded=False,
                    sparse=False,):
         if isinstance(self.bfobject, self._File):
             return
@@ -655,7 +674,7 @@ class BlackfynnRemote(aug.RemotePath):
                 for bfobject in self.bfobject.packagesByName(filenames=filenames):
                     child = self.__class__(bfobject)
                     if child.is_dir() or child.is_file():
-                        if not self._dir_or_file(child, deleted, exclude_uploaded):
+                        if not self._dir_or_file(child, deleted, exclude_uploaded, create_cache):
                             continue
                     else:
                         # probably a package that has files
@@ -709,7 +728,7 @@ class BlackfynnRemote(aug.RemotePath):
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
                 if child.is_dir() or child.is_file():
-                    if not self._dir_or_file(child, deleted, exclude_uploaded):
+                    if not self._dir_or_file(child, deleted, exclude_uploaded, create_cache):
                         continue
 
                     if create_cache:
@@ -1360,7 +1379,12 @@ class BlackfynnDatasetData:
 
         doi = self.remote.doi
         if doi is not None:
-            blob['doi'] = self.remote.doi
+            # FIXME somehow this managed to not be None and then self.remote.doi
+            # was able to be None later !??!?!?!?!
+            # I think this could happen if between timepoints something was published
+            # or became resolvable or there was a network failure between the first
+            # call and the second call
+            blob['doi'] = doi
 
         with open(self.cache, 'wt') as f:
             json.dump(blob, f, indent=2, sort_keys=True, cls=self._JEncode)

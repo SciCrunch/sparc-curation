@@ -1252,6 +1252,7 @@ class PipelineExtras(JSONPipeline):
 
     derives = (
         [[['inputs', 'remote_dataset_metadata', 'doi']],
+         # FIXME doi should never be able to be None here AAAAAA
          DT.BOX(De.doi),
          [['meta', 'doi']]],
 

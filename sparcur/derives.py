@@ -87,6 +87,9 @@ class Derives:
     @staticmethod
     def doi(doi_string):  # FIXME massive network sandbox violation here
         """ check if a doi string resolves, if it does, return it """
+        if doi_string is None:
+            raise TypeError('WHAT HAVE YOU DONE!?')
+
         doi = idlib.Doi(doi_string)
         try:
             metadata = doi.metadata()  # FIXME network sandbox violation
