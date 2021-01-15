@@ -642,6 +642,16 @@ function sparcur-retrieve () {
     echo $DATASET_PATH
 }
 #+end_src
+FIXME xfil dataset_path correctly, i.e. when we export we need to be
+able to point directly to the dataset folder without having to guess
+about names so we need to have symlinked the dataset itself to a name
+that we can dereference correctly we need a layer of indirection so
+that all our stuff here can be stable even if we (for example) run all
+folders off a single sparc consortium top level folder. This is for later.
+
+This is now done via invariant path which is =${dataset_uuid}/dataset=.
+To avoid issues the symlink needs to be dereferenced so that it is possible
+to find the project (organization) level.
 *** _*Validate*_
 **** Extract
 #+begin_src bash
@@ -1411,9 +1421,17 @@ structure for logs and jobs etc.  you can also still run all datasets
 together off of a single SPARC Consoritum folder, in which case all
 you need to do is pass the communal parent_path
 
+Usage example.
+#+begin_src bash
+python -m sparcur.simple.retrieve \
+--dataset-id N:dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 \
+--symlink-objects-to /mnt/str/tom/cache/bf-object-cache
+#+end_src
+
 #+name: retrieve.py
 #+begin_src python :tangle ../sparcur/simple/retrieve.py
-from pathlib import Path
+from sparcur.paths import Path
+from sparcur.utils import symlink_latest
 from sparcur.simple.clone import main as clone
 from sparcur.simple.fetch_remote_metadata_all import main as remote_metadata
 from sparcur.simple.pull import main as pull
@@ -1442,6 +1460,8 @@ def main(id=None,
         parent_path = parent_parent_path / uuid
         parent_path.mkdir(exist_ok=True)
 
+    invariant_path = parent_path / 'dataset'  # FIXME hardcoded
+
     # XXX for now we do these steps in order here
     # rather than trusting that calling simple.pull.main will do
     # the right thing if there is no path ... it should but probably
@@ -1454,11 +1474,14 @@ def main(id=None,
                  dataset_id=dataset_id,
                  parent_path=parent_path,
                  parent_parent_path=parent_parent_path,
-                 ,**kwargs)
+                 ,**kwargs)  # XXX symlink_objects_to will just work if you pass it
+
+    symlink_latest(path, invariant_path)
+
     # pull single
     pull(path=path, **kwargs)
     # fetch metadata files
-    fetch_metadata_files(path=path, **kwargs)
+    fetch_metadata_files(path=path, **kwargs)  # FIXME symlink_to
 
     return path
 
@@ -1474,6 +1497,13 @@ if __name__ == '__main__':
 :header-args: :shebang "#!/usr/bin/env python3"
 :END:
 ***** Extract
+Usage example.
+#+begin_src bash
+python -m sparcur.simple.extract \
+--dataset-id N:dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 \
+--export-parent-path 21957eae-0824-4fb5-b18f-04d6ed12ce18/exports
+#+end_src
+
 #+name: dataset-extract
 #+begin_src python :tangle ../sparcur/simple/extract.py
 from sparcur import datasets as dat
@@ -1661,22 +1691,43 @@ def from_path_summary(project_path):
 )))
 
 
-def main(path=Path.cwd(), dataset_id=None, time_now=None, **kwargs):
+def main(path=Path.cwd(), id=None, dataset_id=tuple(), time_now=None,
+         export_path=None, export_parent_path=None, _entry_point=False, **kwargs):
     # TODO path from dataset_id and retrieve conventions? or just pass path from retrieve final output?
     # TODO parallelize if multiple paths
     # This assumes that all retrieve operations have
     # finished successfully for the current dataset
+    from sparcur.simple.export import prepare_dataset_export, export_blob
+    if id is not None:  # XXX note that id should be dataset_id # TODO parent_path ??
+        N, thing_type, uuid = id.split(':')
+        path = path / uuid / 'dataset'  # FIXME hardcoded see invariant_path
+        path = path.resolve()  # make sure that invariant_path is expanded as we expect.
+
     cache = path.cache
     if not cache.is_dataset():
         raise TypeError('can only run on a single dataset')
 
+    if _entry_point:
+        if export_parent_path is None:
+            export_parent_path = prepare_dataset_export(path, export_path)
+
+        kwargs.update({'export_path': export_path,
+                       'export_parent_path': export_parent_path,
+                       'time_now': time_now,})
+
     dataset_raw = from_path_dataset_raw(path)
-    return dataset_raw
+
+    if _entry_point:
+        export_blob_path = export_blob(dataset_raw, 'ir.json', **kwargs)
+        return export_blob_path
+    else:
+        return dataset_raw
 
 
 if __name__ == '__main__':
+    import pprint
     from sparcur.simple.utils import pipe_main
-    pipe_main(main, after=print)
+    pipe_main(main, after=pprint.pprint)
 
 #+end_src
 ***** Transform
@@ -1808,6 +1859,86 @@ if __name__ == '__main__':
 #+end_src
 **** Network resources
 *** _*Export*_
+**** _Setup for per-dataset export_
+#+name: export.py
+#+begin_src python :tangle ../sparcur/simple/export.py
+import json
+from socket import gethostname
+import augpathlib as aug
+from pyontutils.utils import timeformat_friendly
+import sparcur
+from sparcur.core import JEncode
+from sparcur.paths import Path
+from sparcur.utils import loge, symlink_latest
+from sparcur.config import auth
+
+
+def prepare_dataset_export(path, export_path=None):  # FIXME do we need export_base?
+    if export_path is None:  # FIXME confusing and breaks w/ convention -> Options maybe?
+        export_path = Path(auth.get_path('export-path'))  # FIXME allow alt?
+
+    N, thing_type, uuid = path.cache.id.split(':')
+    # we don't use cache._fs_safe_id here because we know the
+    # identifier type from the folder structure
+    # FIXME dataset metadata export setup basically needs to do all of this first
+    # set latest run and then latest complete at the end, but complete is kind of arbitrary
+    # from the atomic point of view
+    tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
+    # FIXME somehow tupdated can be None !??!?!
+    export_dataset_folder = export_path / 'datasets' / uuid
+    export_parent = export_dataset_folder / timeformat_friendly(tupdated)
+    if not export_parent.exists():
+        export_parent.mkdir(parents=True)
+
+    export_latest_run = export_dataset_folder / 'LATEST_RUN'
+    symlink_latest(export_parent, export_latest_run)
+    return export_parent
+
+
+def export_blob(blob, blob_file_name, time_now=None,
+                export_path=None, export_parent_path=None, **kwargs):
+    if export_parent_path is None:
+        # NOTE if export_parent_path is not None then it is up to the user
+        # to make sure that the contents of the dataset directory do not change
+        # resulting in confusion about mismatched transitive update dates
+        export_parent_path = prepare_dataset_export(path, export_path)
+    elif not export_parent_path.exists():
+        # safe to mkdir here since outside has a record of the path name
+        export_parent_path.mkdir(parents=True)
+
+    export_blob_path = export_parent_path / blob_file_name
+
+    add_prov(blob, time_now)
+
+    with open(export_blob_path, 'wt') as f:
+        json.dump(blob, f, indent=2, cls=JEncode)
+
+    loge.info(f'path metadata exported to {export_blob_path}')
+    return export_blob_path
+
+
+def add_prov(blob, time_now):
+    """ Mutate blob in place to add prov. """
+    blob['prov'] = {'timestamp_export_start': time_now.START_TIMESTAMP,
+                    'export_system_identifier': Path.sysid,
+                    'export_hostname': gethostname(),
+                    'sparcur_version': sparcur.__version__,
+                    }
+    rp = aug.RepoPath(sparcur.core.__file__)
+    if rp.working_dir is not None:
+        blob['prov']['sparcur_commit'] = rp.repo.active_branch.commit.hexsha
+
+
+def main(path=Path.cwd(), export_path=None, **kwargs):
+    return prepare_dataset_export(path, export_path=export_path)
+
+
+if __name__ == '__main__':
+    import pprint
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main, after=pprint.pprint)
+
+#+end_src
 **** _Dataset Path Metadata_
 :PROPERTIES:
 :header-args: :shebang "#!/usr/bin/env python3"
@@ -1821,10 +1952,15 @@ Usage example
 find  -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -exec python -m sparcur.simple.path_metadata {} \;
 #+end_src
 
+Alternate example
+#+begin_src bash
+python -m sparcur.simple.path_metadata \
+21957eae-0824-4fb5-b18f-04d6ed12ce18/dataset \
+--export-parent-path 21957eae-0824-4fb5-b18f-04d6ed12ce18/exports/
+#+end_src
 #+name: dataset-path-metadata-extract
 #+begin_src python :tangle ../sparcur/simple/path_metadata.py
 from pathlib import Path
-from sparcur.utils import transitive_paths
 
 
 def from_path_transitive_metadata(path):
@@ -1834,72 +1970,37 @@ def from_path_transitive_metadata(path):
             'data': tml,}
 
 
-def prepare_dataset_export(path, export_base=None):  # FIXME do we need export_base?
-    from pyontutils.utils import timeformat_friendly
+def main(path=Path.cwd(), time_now=None,
+         export_path=None, export_parent_path=None, _entry_point=False, **kwargs):
     from sparcur.paths import Path
-    from sparcur.utils import symlink_latest
-    from sparcur.config import auth
-    export_base = Path(auth.get_path('export-path'))  # FIXME allow alt?
-    N, thing_type, uuid = path.cache.id.split(':')
-    # we don't use cache._fs_safe_id here because we know the
-    # identifier type from the folder structure
-    # FIXME dataset metadata export setup basically needs to do all of this first
-    # set latest run and then latest complete at the end, but complete is kind of arbitrary
-    # from the atomic point of view
-    tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
-    # FIXME somehow tupdated can be None !??!?!
-    export_dataset_folder = export_base / 'datasets' / uuid
-    export_parent = export_dataset_folder / timeformat_friendly(tupdated)
-    if not export_parent.exists():
-        export_parent.mkdir(parents=True)
+    from sparcur.simple.export import prepare_dataset_export, export_blob
 
-    export_latest_run = export_dataset_folder / 'LATEST_RUN'
-    symlink_latest(export_parent, export_latest_run)
-    return export_parent
-
-
-def main(path=Path.cwd(), time_now=None, export_path=None, **kwargs):
-    import json
-    from socket import gethostname
-    import augpathlib as aug
-    import sparcur
-    from sparcur.core import JEncode
-    from sparcur.paths import Path
-    from sparcur.utils import loge, GetTimeNow
-
-    if time_now is None:
-        time_now = GetTimeNow()
     # TODO path from dataset_id and retrieve conventions? or just pass path from retrieve final output?
     # TODO parallelize if multiple paths
     # This assumes that all retrieve operations have
     # finished successfully for the current dataset
+    # FIXME Options calls resolve on all paths but not if Path.cwd slips through ...
     path = Path(path)  # FIXME even here some paths don't have caches ?!
     cache = path.cache  # XXX this should have errored when Path was applied below !?!?!??! pipe_main wat ???
     if not cache.is_dataset():
         raise TypeError('can only run on a single dataset')
 
-    export_parent = prepare_dataset_export(path)  # FIXME probably don't call this for each export main?
+    if _entry_point:
+        if export_parent_path is None:
+            export_parent_path = prepare_dataset_export(path, export_path)
+
+        kwargs.update({'export_path': export_path,
+                       'export_parent_path': export_parent_path,
+                       'time_now': time_now,})
 
     tm = from_path_transitive_metadata(path)
-
-    tm['prov'] = {'timestamp_export_start': time_now.START_TIMESTAMP,
-                  'export_system_identifier': Path.sysid,
-                  'export_hostname': gethostname(),
-                  'sparcur_version': sparcur.__version__,
-                  }
-    rp = aug.RepoPath(sparcur.core.__file__)
-    if rp.working_dir is not None:
-        tm['prov']['sparcur_commit'] = rp.repo.active_branch.commit.hexsha
-
-    export_path = export_parent / 'path-metadata.json'
-
-    with open(export_path, 'wt') as f:
-        json.dump(tm, f, indent=2, cls=JEncode)
-
-    # TODO export to some file
     # FIXME TODO validate file formats, which means this also needs to support the remoteless case
-    loge.info(f'path metadata exported to {export_path}')
-    return tm
+
+    if _entry_point:
+        export_blob_path = export_blob(tm, 'path-metadata.json', **kwargs)
+        return export_blob_path
+    else:
+        return tm
 
 
 if __name__ == '__main__':
@@ -1934,6 +2035,8 @@ Options:
     --parent-path=PATH              the parent path where the project will be cloned to
     --parent-parent-path=PATH       parent in which a random tempdir is generated
                                     to be the parent path, don't use this ...
+    --export-path=PATH              base export path containing the standard path structure
+    --export-parent-path=PATH       direct parent path into which exports will be placed
     --extension=<EXT>...            one or more file extensions to fetch
 
     -j --jobs=N                     number joblib jobs [default: 12]
@@ -1946,7 +2049,7 @@ import os
 from types import GeneratorType
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd
+from sparcur.utils import log, logd, GetTimeNow
 from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
@@ -2016,6 +2119,18 @@ class Options(clif.Options):
             return Path(pp).expanduser().resolve()
 
     @property
+    def export_path(self):
+        ep = self._args['--export-path']
+        if ep:
+            return Path(ep).expanduser().resolve()
+
+    @property
+    def export_parent_path(self):
+        epp = self._args['--export-parent-path']
+        if epp:
+            return Path(epp).expanduser().resolve()
+
+    @property
     def extensions(self):
         return self.extension
 
@@ -2029,10 +2144,19 @@ class Options(clif.Options):
     def sparse_limit(self):  # FIXME not being pulled in by asKwargs ??
         return int(self._args['--sparse-limit'])
 
+    @property
+    def time_now(self):  # FIXME make it possible to pass this in?
+        if not hasattr(self, '_time_now'):
+            self._time_now = GetTimeNow()
+
+        return self._time_now
+
 
 def pipe_main(main, after=None, argv=None):
     options, args, defaults = Options.setup(__doc__, argv=argv)
-    out = main(**options.asKwargs())
+    # _entry_point is used as a way to switch behavior when a
+    # pipeline main is run directly or actually in a pipeline
+    out = main(_entry_point=True, **options.asKwargs())
     if after:
         after(out)
 
@@ -2129,12 +2253,12 @@ def early_failure(path, error, dataset_blob=None):
         cache = path.cache
         return {'id': cache.id,
                 'meta': {'uri_api': cache.uri_api,
-                        'uri_human': cache.uri_human,},
+                         'uri_human': cache.uri_human,},
                 #'status': 'early_failure',  # XXX note that status is not requried
                 # if we cannot compute it, but if there are inputs there should be
                 # a status
                 'errors': [error],  # FIXME format errro
-        }
+                }
 
     else:
         if 'errors' not in datset_blob:
