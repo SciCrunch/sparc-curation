@@ -510,6 +510,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                                        # /viewer/ etc. doesn't work for the human uri
                                        meta.id)
         blob['remote_id'] = remote_id
+        #blob['timestamp_created'] = meta.created  # leaving this out
+        blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
         blob['uri_api'] = uri_api
         blob['uri_human'] = uri_human
         if (self.is_file() or self.is_broken_symlink()) and meta.checksum is not None:

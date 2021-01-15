@@ -20,21 +20,22 @@ def xml(dataset_blobs):
         if is_list_or_tuple(v):
             return [normv(_) for _ in v]
         if isinstance(v, dict):
-            if 'type' in v and v['type'] == 'identifier':
-                # FIXME curie
-                return f'{v["label"]}|{v["id"]}'
-            else:
-                return {k:normv(v) for k, v in v.items()}
+            return {k:normv(v) for k, v in v.items()}
         if isinstance(v, str) and v.startswith('http'):
             # needed for loading from json that has been serialized
             # rather than from our internal representation
             # probably better to centralized the reload ...
+
+            # XXX NOTE these days this will only happen if someone
+            # supplies us with a uri in a field where we aren't
+            # expecting one, in which case we should just return it
             try:
                 v = OntTerm(v)
                 return v.asCell()
             except Exception as e:
                 loge.error(f'something went wrong with {v}')
                 loge.exception(e)
+                return v
                 #raise e
         if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
@@ -75,6 +76,11 @@ def xml(dataset_blobs):
         if 'errors' in dowe:
             ers = get_all_errors(dowe)
             for path, er in ers:
+                if not isinstance(er, dict):
+                    #breakpoint()
+                    loge.critical(er)
+                    continue
+
                 if er['pipeline_stage'] in pipes.PipelineEnd._shadowed:
                     continue
 
