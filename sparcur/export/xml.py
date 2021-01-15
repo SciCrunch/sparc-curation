@@ -20,13 +20,22 @@ def xml(dataset_blobs):
         if is_list_or_tuple(v):
             return [normv(_) for _ in v]
         if isinstance(v, dict):
-            return {k:normv(v) for k, v in v.items()}
+            if 'type' in v and v['type'] == 'identifier':
+                # FIXME curie
+                return f'{v["label"]}|{v["id"]}'
+            else:
+                return {k:normv(v) for k, v in v.items()}
         if isinstance(v, str) and v.startswith('http'):
             # needed for loading from json that has been serialized
             # rather than from our internal representation
             # probably better to centralized the reload ...
-            v = OntTerm(v)
-            return v.asCell()
+            try:
+                v = OntTerm(v)
+                return v.asCell()
+            except Exception as e:
+                loge.error(f'something went wrong with {v}')
+                loge.exception(e)
+                #raise e
         if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
             return ot.asCell()

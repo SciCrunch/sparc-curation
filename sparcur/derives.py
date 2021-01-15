@@ -104,6 +104,12 @@ class Derives:
             # need an extra step during the data retrieval phase which attempts
             # to fetch all the doi metadata
             pass
+        except Exception as e:
+            # XXX random errors need to be ignored here for now
+            # since this really should not be run at this step
+            # due to the network dependency, we need a post-network
+            # step where we can strip out all the things that fail
+            log.exception(e)
 
     @staticmethod
     def _lift_mr(path_dataset, dataset_relative_path, record, should_log):
