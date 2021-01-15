@@ -1822,29 +1822,82 @@ from sparcur.utils import transitive_paths
 
 
 def from_path_transitive_metadata(path):
-    return path._transitive_metadata()
+    tml = path._transitive_metadata()
+    return {'type': 'path-metadata',
+            'data': tml,}
 
 
-def main(path=Path.cwd(), time_now=None, **kwargs):
+def prepare_dataset_export(path, export_base=None):  # FIXME do we need export_base?
+    from pyontutils.utils import timeformat_friendly
     from sparcur.paths import Path
+    from sparcur.utils import symlink_latest
+    from sparcur.config import auth
+    export_base = Path(auth.get_path('export-path'))  # FIXME allow alt?
+    N, thing_type, uuid = path.cache.id.split(':')
+    # we don't use cache._fs_safe_id here because we know the
+    # identifier type from the folder structure
+    # FIXME dataset metadata export setup basically needs to do all of this first
+    # set latest run and then latest complete at the end, but complete is kind of arbitrary
+    # from the atomic point of view
+    tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
+    export_dataset_folder = export_base / 'datasets' / uuid
+    export_parent = export_dataset_folder / timeformat_friendly(tupdated)
+    if not export_parent.exists():
+        export_parent.mkdir(parents=True)
+
+    export_latest_run = export_dataset_folder / 'LATEST_RUN'
+    symlink_latest(export_parent, export_latest_run)
+    return export_parent
+
+
+def main(path=Path.cwd(), time_now=None, export_path=None, **kwargs):
+    import json
+    from socket import gethostname
+    import augpathlib as aug
+    import sparcur
+    from sparcur.core import JEncode
+    from sparcur.paths import Path
+    from sparcur.utils import loge, GetTimeNow
+
+    if time_now is None:
+        time_now = GetTimeNow()
     # TODO path from dataset_id and retrieve conventions? or just pass path from retrieve final output?
     # TODO parallelize if multiple paths
     # This assumes that all retrieve operations have
     # finished successfully for the current dataset
-    cache = path.cache
+    path = Path(path)
+    cache = path.cache  # XXX this should have errored when Path was applied below !?!?!??! pipe_main wat ???
     if not cache.is_dataset():
         raise TypeError('can only run on a single dataset')
 
-    tm = from_path_transitive_metadata(Path(path))
+    export_parent = prepare_dataset_export(path)  # FIXME probably don't call this for each export main?
+
+    tm = from_path_transitive_metadata(path)
+
+    tm['prov'] = {'timestamp_export_start': time_now.START_TIMESTAMP,
+                  'export_system_identifier': Path.sysid,
+                  'export_hostname': gethostname(),
+                  'sparcur_version': sparcur.__version__,
+                  }
+    rp = aug.RepoPath(sparcur.core.__file__)
+    if rp.working_dir is not None:
+        tm['prov']['sparcur_commit'] = rp.repo.active_branch.commit.hexsha
+
+    export_path = export_parent / 'path-metadata.json'
+
+    with open(export_path, 'wt') as f:
+        json.dump(tm, f, indent=2, cls=JEncode)
+
     # TODO export to some file
     # FIXME TODO validate file formats, which means this also needs to support the remoteless case
+    loge.info(f'path metadata exported to {export_path}')
     return tm
 
 
 if __name__ == '__main__':
-    import pprint
+    #import pprint
     from sparcur.simple.utils import pipe_main
-    pipe_main(main, after=pprint.pprint)
+    pipe_main(main)#, after=pprint.pprint)
 
 #+end_src
 ** Utility
