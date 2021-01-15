@@ -1,6 +1,7 @@
 #+title: ApiNATOMY model RDF export and deployment
 #+options: num:nil
 #+startup: showall
+#+property: header-args:elisp :lexical yes
 
 # [[file:./apinatomy.pdf]]
 # [[file:./apinatomy.html]]
@@ -53,11 +54,11 @@ YEAH it DOES support arbitrary locations, with the ~%s~ implicitly at the tail b
 
 gsx:google-sheet-id
 
-#+name: flow-to-ttl
-#+begin_src elisp
-; org
-; org-set-regexps-and-options
+# org
+# org-set-regexps-and-options
 
+#+name: flow-to-ttl
+#+begin_src elisp :results none
 (defun-local ex-do (&rest nothing)
   "Executor do. Eats the input since it is to be run by the executor."
   ;; maybe use this to resolve the ex-come-from flows?
@@ -86,7 +87,7 @@ gsx:google-sheet-id
 (defun-local flow-to-ttl (model-id)
   ;; probably need 1 more level of indirection to handle cases where the model-id
   ;; will be put inside the models/ folder which should probably happen sooner rather than later
-  ;(let ((default-directory (expand-file-name model-id (git-share-local r-apin-mod:HEAD:))) ; TODO ))
+  ;;(let ((default-directory (expand-file-name model-id (git-share-local r-apin-mod:HEAD:))) ; TODO ))
   (let ((default-directory (expand-file-name (symbol-name model-id) "~/git/apinatomy-models/"))
         (xlsx    (format  "source/%s.xlsx"   model-id))
         (json    (format  "source/%s.json"   model-id))
@@ -94,13 +95,51 @@ gsx:google-sheet-id
         (ttl     (format "derived/%s.ttl"    model-id)))
     ;; TODO make sure the directories exist
     ;; TODO resume from previous step on failure <- this is critical
+    ;; check out `file-newer-than-file-p' as a reasonable approach ala make
+    ;; the only issue is how to prevent the xlsx retrieval from notching it up
+    ;; every single time, maybe we can compare checksums on the xlsx file?
     ;; TODO push the model id further down the call chain since input
     ;; and output paths are defined by convention
-    (-mx->  model-id   xlsx) ; source/{model-id}.xlsx
-    (-xj->  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
-    (-jl->  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
-    (-lt->  jsonld      ttl) ; derived/{model-id}.jsonld derived/{model-id}.ttl
-))
+    (funcall (checksum-or #'-mx->)  model-id   xlsx) ; source/{model-id}.xlsx
+    (funcall (out-or      #'-xj->)  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
+    (funcall (out-or      #'-jl->)  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
+    (funcall (out-or      #'-lt->)  jsonld      ttl) ; derived/{model-id}.jsonld derived/{model-id}.ttl
+    ))
+
+(defun-local checksum-or (fun)
+  (lambda (thing path-out)
+    ;;(message "dd: %s" default-directory)
+    (if (file-exists-p path-out)
+        (let ((path-temp (let ((temporary-file-directory default-directory))
+                           ;; keep the temp nearby rather than where ever the tfd is
+                           (make-temp-file (concat path-out "._maybe_new_")))))
+          (unwind-protect
+              (progn
+                (funcall fun thing path-temp)
+                (let ((checksum-new (securl-path-checksum path-temp))
+                      (checksum-old (securl-path-checksum path-out)))
+                  (unless (string= checksum-new checksum-old)
+                    (rename-file path-temp path-out t))))
+            (when (file-exists-p path-temp)
+              (delete-file path-temp))))
+      (funcall fun thing path-out))))
+
+(defun-local out-or (fun)
+  (lambda (path-in path-out)
+    (when (and (file-exists-p path-in)
+             (file-exists-p path-out)
+             (file-newer-than-file-p path-in path-out))
+        (funcall fun path-in path-out))))
+
+(defun-local -mt-> (model-id path-ttl))
+(defun-local -ml-> (model-id path-jsonld))
+(defun-local -mj-> (model-id path-json))
+
+; FIXME why the heck are these hitting stubs :/
+(defun-local -ms-> (model-id)
+  (oa-path :google :sheets (if (keywordp model-id)
+                               model-id
+                             (intern (format ":%s" model-id)))))
 
 (defun-local -mx-> (model-id path-xlsx)
   ;; automated
@@ -112,14 +151,13 @@ gsx:google-sheet-id
     ;; reality there is often an explicit step where all checks must
     ;; pass before the whole process can continue because of some time
     ;; constraint or similar
-    (ex-do (format "Make sure that the permissions are set correctly on %" url))
-
+    (ex-do (format "Make sure that the permissions are set correctly on %s" url))
     (url-copy-file url path-xlsx t)))
 
 (defun-local -xj-> (path-xlsx path-json)
   "This is currently a manual step."
-  (let (;(open-physiology-viewer "https://open-physiology-viewer.surge.sh/")
-        (open-physiology-viewer "file:///home/tom/git/open-physiology-viewer/dist/test-app/index.html"))
+  (let (;(open-physiology-viewer "file:///home/tom/git/open-physiology-viewer/dist/test-app/index.html")
+        (open-physiology-viewer "https://open-physiology-viewer.surge.sh/"))
     ;; TODO conditional open only if not already
     ;;(browse-url open-physiology-viewer)
     ;;(run-command "google-chrome-unstable" open-physiology-viewer)
@@ -140,7 +178,7 @@ gsx:google-sheet-id
   (run-command "spc" "apinat" path-json-ld path-ttl))
 #+end_src
 
-#+begin_src elisp
+#+begin_src elisp :results none
 (defun-local update-models (model-ids) ; vs &rest model-ids
   ;; FIXME mapcar is inadequate for handling parallel processes that
   ;; might have ex-do parts
@@ -156,7 +194,7 @@ gsx:google-sheet-id
                   (directory-files default-directory))))
 
 (defun-local update-all-models ()
-  (update-models (all-models)))
+  (update-models (mapcar #'intern (all-models))))
 #+end_src
 ** ttl deprecated
 Until this is fully automated you need to obtain the flattened jsonld
