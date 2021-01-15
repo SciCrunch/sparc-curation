@@ -502,7 +502,8 @@ class Organs(FieldAlignment):
                 cell_award.value = award
 
         except KeyError as e:
-            row = ['', '', name, id, award]
+            row = ['', '', name, id, award]  # XXX this was causing index errors
+            # because the columns were not being padded by appendRow
             self._appendRow(row)
 
     def update_from_ir(self, ir):
@@ -523,8 +524,8 @@ class Organs(FieldAlignment):
         finally:
             # FIXME this is so dumb :/
             OntTerm.query._instrumented = oi
-        #log.debug(self.uncommitted())
-        #self.commit()
+        log.debug(self.uncommitted())
+        self.commit()
 
     def modality(self, dataset_id):
         """ tuple of modalities """

@@ -1560,6 +1560,8 @@ done"""
 
         if sheet.sheet_name == 'Organs':
             h = sheet.row_object(0)
+            #tech_hcells = [hcell for hcell in h.cells if 'technique' in hcell.value]
+            #tech_cols = [hcell.column for hcell in tech_hcells]
             tech_cells = [
                 cell
                 for hcell in h.cells if 'technique' in hcell.value
