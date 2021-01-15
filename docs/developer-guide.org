@@ -1815,6 +1815,12 @@ if __name__ == '__main__':
 In principle this could run as part of the dataset metadata export,
 however since it produces separate files and can run at the same time,
 it is its own module.
+
+Usage example
+#+begin_src bash
+find  -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -exec python -m sparcur.simple.path_metadata {} \;
+#+end_src
+
 #+name: dataset-path-metadata-extract
 #+begin_src python :tangle ../sparcur/simple/path_metadata.py
 from pathlib import Path
@@ -1823,6 +1829,7 @@ from sparcur.utils import transitive_paths
 
 def from_path_transitive_metadata(path):
     tml = path._transitive_metadata()
+    # FIXME TODO handle sparse cases
     return {'type': 'path-metadata',
             'data': tml,}
 
@@ -1840,6 +1847,7 @@ def prepare_dataset_export(path, export_base=None):  # FIXME do we need export_b
     # set latest run and then latest complete at the end, but complete is kind of arbitrary
     # from the atomic point of view
     tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
+    # FIXME somehow tupdated can be None !??!?!
     export_dataset_folder = export_base / 'datasets' / uuid
     export_parent = export_dataset_folder / timeformat_friendly(tupdated)
     if not export_parent.exists():
@@ -1865,7 +1873,7 @@ def main(path=Path.cwd(), time_now=None, export_path=None, **kwargs):
     # TODO parallelize if multiple paths
     # This assumes that all retrieve operations have
     # finished successfully for the current dataset
-    path = Path(path)
+    path = Path(path)  # FIXME even here some paths don't have caches ?!
     cache = path.cache  # XXX this should have errored when Path was applied below !?!?!??! pipe_main wat ???
     if not cache.is_dataset():
         raise TypeError('can only run on a single dataset')
