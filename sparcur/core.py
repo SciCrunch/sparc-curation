@@ -155,10 +155,10 @@ class OntTerm(OTB, OntId):
 
         if is_list_or_tuple(self.synonyms):  # workaround for ontquery list vs string issue
             for syn in self.synonyms:
-                yield s, NIFRID.synonyms, rdflib.Literal(syn)
+                yield s, NIFRID.synonym, rdflib.Literal(syn)
 
         elif self.synonyms:
-            yield s, NIFRID.synonyms, rdflib.Literal(self.synonyms)
+            yield s, NIFRID.synonym, rdflib.Literal(self.synonyms)
 
 
 OntTerm._sinit()
