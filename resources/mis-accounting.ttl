@@ -211,6 +211,9 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+# things to map
+@prefix dandi: <http://schema.dandiarchive.org/> .
+
 # current mis namespaces 
 @prefix awards: <http://uri.interlex.org/temp/uris/awards/> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -248,7 +251,7 @@
 @prefix blackfynn: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/blackfynn/> .
 @prefix c2m2: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/c2m2/> .
 @prefix biccn: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/biccn/> .
-@prefix dandi: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/dandi/> .
+@prefix dandi-internal: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/dandi/> .
 @prefix crossref: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/crossref/> .
 @prefix datacite: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/datacite/> .
 @prefix orcid: <http://uri.interlex.org/tgbugs/uris/readable/misaccounting/orcid/> .
@@ -537,7 +540,8 @@ c2m2:sample-collection-date a owl:DatatypeProperty .
 c2m2:employed-protocol a owl:ObjectProperty .
 
 # dandi
-dandi:set a owl:Class .  # heh
+dandi-internal:set a owl:Class .  # heh
+
 
 # crossref
 crossref:doi-ttl a owl:Class ;

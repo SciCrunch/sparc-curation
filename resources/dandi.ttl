@@ -1,0 +1,656 @@
+@prefix dandi: <http://schema.dandiarchive.org/> .
+@prefix idorg: <https://registry.identifiers.org/registry/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+
+### rdf Properties
+
+dandi:access a rdf:Property ;
+    rdfs:label "Access" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:acknowledgement a rdf:Property ;
+    rdfs:label "Acknowledgement" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:age a rdf:Property ;
+    rdfs:label "Age" ;
+    rdfs:comment "A representation of age using ISO 8601 duration. This should include a valueReference if anything other than date of birth is used." ;
+    schema:domainIncludes dandi:BioSample ;
+    schema:rangeIncludes schema:Duration .
+
+dandi:anatomy a rdf:Property ;
+    rdfs:label "Anatomy" ;
+    rdfs:comment "UBERON based identifier for the location of the sample" ;
+    schema:domainIncludes dandi:BioSample .
+
+dandi:assayType a rdf:Property ;
+    rdfs:label "Assay type" ;
+    rdfs:comment "OBI based identifier for the assay used" ;
+    schema:domainIncludes dandi:BioSample .
+
+dandi:assetsSummary a rdf:Property ;
+    rdfs:label "Assets summary" ;
+    schema:domainIncludes dandi:Dandiset .
+
+dandi:awardNumber a rdf:Property ;
+    rdfs:label "Identifier for an award" ;
+    rdfs:comment "Identifier associated with a sponsored or gidt award" ;
+    schema:domainIncludes dandi:Organization,
+        dandi:Person .
+
+dandi:cryptoType a rdf:Property ;
+    rdfs:label "Cryptographic method used" ;
+    rdfs:comment "Which cryptographic checksum is used" ;
+    schema:domainIncludes dandi:Digest .
+
+dandi:dataType a rdf:Property ;
+    rdfs:label "Data type" ;
+    schema:domainIncludes dandi:Asset .
+
+dandi:digest a rdf:Property ;
+    rdfs:label "Digest" ;
+    schema:domainIncludes dandi:Asset .
+
+dandi:doi a rdf:Property ;
+    rdfs:label "Doi" ;
+    schema:domainIncludes dandi:Dandiset .
+
+dandi:embargoedUntil a rdf:Property ;
+    rdfs:label "Embargo end date" ;
+    rdfs:comment "Date on which embargo ends" ;
+    schema:domainIncludes dandi:AccessRequirements ;
+    schema:rangeIncludes schema:Date .
+
+dandi:ethicsApproval a rdf:Property ;
+    rdfs:label "Ethics approval" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:includeInCitation a rdf:Property ;
+    rdfs:label "Include contributor in citation" ;
+    rdfs:comment "A flag to indicate whether a contributor should be included when generating a citation for the item" ;
+    schema:domainIncludes dandi:Organization,
+        dandi:Person .
+
+dandi:manifestLocation a rdf:Property ;
+    rdfs:label "Manifest location" ;
+    schema:domainIncludes dandi:Dandiset .
+
+dandi:modality a rdf:Property ;
+    rdfs:label "Modality" ;
+    schema:domainIncludes dandi:Asset .
+
+dandi:path a rdf:Property ;
+    rdfs:label "Path" ;
+    schema:domainIncludes dandi:Asset .
+
+dandi:protocol a rdf:Property ;
+    rdfs:label "Protocol" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:publishedBy a rdf:Property ;
+    rdfs:label "Published by" ;
+    rdfs:comment "The URL should contain the provenance of the publishing process." ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:relatedResource a rdf:Property ;
+    rdfs:label "Related resource" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:relation a rdf:Property ;
+    rdfs:label "Relation" ;
+    rdfs:comment "Indicates how the resource is related to the dataset" ;
+    schema:domainIncludes dandi:Resource .
+
+dandi:repository a rdf:Property ;
+    rdfs:label "Repository" ;
+    rdfs:comment "An identifier of a repository in which the resource is housed",
+        "location of the item" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset,
+        dandi:Resource .
+
+dandi:sex a rdf:Property ;
+    rdfs:label "Sex" ;
+    rdfs:comment "OBI based identifier for sex of the sample if available" ;
+    schema:domainIncludes dandi:BioSample .
+
+dandi:species a rdf:Property ;
+    rdfs:label "Species" ;
+    rdfs:comment "An identifier indicating the species of the biosample" ;
+    schema:domainIncludes dandi:BioSample .
+
+dandi:status a rdf:Property ;
+    rdfs:label "Access status" ;
+    rdfs:comment "The access status of the item" ;
+    schema:domainIncludes dandi:AccessRequirements .
+
+dandi:strain a rdf:Property ;
+    rdfs:label "Strain" ;
+    rdfs:comment "Identifier for the strain of the sample" ;
+    schema:domainIncludes dandi:BioSample .
+
+dandi:studyTarget a rdf:Property ;
+    rdfs:label "What the study is " ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+dandi:vendor a rdf:Property ;
+    rdfs:label "Vendor" ;
+    schema:domainIncludes dandi:BioSample .
+
+prov:wasAssociatedWith a rdf:Property ;
+    rdfs:label "Was associated with" ;
+    schema:domainIncludes dandi:Project .
+
+prov:wasDerivedFrom a rdf:Property ;
+    rdfs:label "Was derived from" ;
+    schema:domainIncludes dandi:Asset .
+
+prov:wasGeneratedBy a rdf:Property ;
+    rdfs:label "Was generated by" ;
+    schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+### rdfs Classes
+
+dandi:AccessRequirements a rdfs:Class ;
+    rdfs:label "Access requirements" ;
+    rdfs:subClassOf prov:Entity,
+        schema:Thing ;
+    rdfs:comment "Information about access options for the dataset" .
+
+dandi:AccessType a rdfs:Class ;
+    rdfs:label "Access status type" ;
+    rdfs:subClassOf schema:Enumeration ;
+    rdfs:comment "An enumeration of access status options" .
+
+dandi:Anatomy a rdfs:Class ;
+    rdfs:label "Anatomy" ;
+    rdfs:subClassOf prov:Entity,
+        schema:Thing ;
+    rdfs:comment "UBERON or other identifier for anatomical part studied" .
+
+dandi:Asset a rdfs:Class ;
+    rdfs:label "Information about the asset" ;
+    rdfs:subClassOf prov:Entity,
+        schema:CreativeWork ;
+    rdfs:comment """Metadata used to describe an asset.
+
+    Derived from C2M2 (Level 0 and 1) and schema.org
+    """ .
+
+dandi:BioSample a rdfs:Class ;
+    rdfs:label "Information about the biosample." ;
+    rdfs:subClassOf prov:Entity,
+        schema:Thing ;
+    rdfs:comment "Description about the sample that was studied" .
+
+dandi:Dandiset a rdfs:Class ;
+    rdfs:label "Information about the dataset" ;
+    rdfs:subClassOf prov:Entity,
+        schema:Dataset ;
+    rdfs:comment "A body of structured information describing a DANDI dataset." .
+
+dandi:Digest a rdfs:Class ;
+    rdfs:label "Cryptographic checksum information" ;
+    rdfs:subClassOf prov:Entity,
+        schema:Thing ;
+    rdfs:comment "Information about the crytographic checksum of the item." .
+
+dandi:DigestType a rdfs:Class ;
+    rdfs:label "Checksum Type" ;
+    rdfs:subClassOf schema:Enumeration ;
+    rdfs:comment "An enumeration of checksum types" .
+
+dandi:Disorder a rdfs:Class ;
+    rdfs:label "Disorder" ;
+    rdfs:subClassOf prov:Entity,
+        schema:Thing ;
+    rdfs:comment "Biolink, SNOMED, or other identifier for disorder studied" .
+
+dandi:EthicsApproval a dandi:RoleType,
+        rdfs:Class ;
+    rdfs:label "Ethics approval" ;
+    rdfs:subClassOf prov:Entity,
+        schema:Thing ;
+    rdfs:comment "Approved ethics protocol",
+        "Information about ethics committee approval for project" .
+
+dandi:IdentifierType a rdfs:Class ;
+    rdfs:label "License type" ;
+    rdfs:subClassOf schema:Enumeration ;
+    rdfs:comment "An enumeration of identifiers" .
+
+dandi:LicenseType a rdfs:Class ;
+    rdfs:label "License type" ;
+    rdfs:subClassOf schema:Enumeration ;
+    rdfs:comment "An enumeration of supported licenses" .
+
+dandi:Organization a rdfs:Class ;
+    rdfs:label "Organization" ;
+    rdfs:subClassOf prov:Organization,
+        schema:Organization .
+
+dandi:Person a rdfs:Class ;
+    rdfs:label "Person" ;
+    rdfs:subClassOf prov:Person,
+        schema:Person .
+
+dandi:Project a rdfs:Class ;
+    rdfs:label "Project" ;
+    rdfs:subClassOf prov:Activity,
+        schema:Thing .
+
+dandi:RelationType a rdfs:Class ;
+    rdfs:label "Resource relation type" ;
+    rdfs:subClassOf schema:Enumeration ;
+    rdfs:comment "An enumeration of resource relations" ;
+    prov:wasDerivedFrom "https://schema.datacite.org/meta/kernel-4.2/doc/DataCite-MetadataKernel_v4.2.pdf" .
+
+dandi:Resource a rdfs:Class ;
+    rdfs:label "Resource" ;
+    rdfs:subClassOf prov:Entity,
+        schema:CreativeWork ;
+    rdfs:comment "A resource related to the project (e.g., another dataset, publication, Webpage)" .
+
+dandi:RoleType a rdfs:Class ;
+    rdfs:label "Role Type" ;
+    rdfs:subClassOf schema:Enumeration ;
+    rdfs:comment "An enumeration of rols" .
+
+schema:ContactPoint a rdfs:Class ;
+    rdfs:label "Contact point" .
+
+### Annotations
+
+dandi:Affiliation a dandi:RoleType ;
+    rdfs:label "Affiliation" ;
+    rdfs:comment "Affiliated with an entity" .
+
+dandi:Author a dandi:RoleType ;
+    rdfs:label "Author" ;
+    rdfs:comment "Author" .
+
+dandi:Cites a dandi:RelationType ;
+    rdfs:label "Cites" ;
+    rdfs:comment "Indicates that A includes B in a citation" .
+
+dandi:Compiles a dandi:RelationType ;
+    rdfs:label "Compiles" ;
+    rdfs:comment "Indicates B is the result of a compile or creation event using A" .
+
+dandi:Conceptualization a dandi:RoleType ;
+    rdfs:label "Conceptualization" ;
+    rdfs:comment "Conceptualization" .
+
+dandi:ContactPerson a dandi:RoleType ;
+    rdfs:label "Contact Person" ;
+    rdfs:comment "Contact Person" .
+
+dandi:Continues a dandi:RelationType ;
+    rdfs:label "Continues" ;
+    rdfs:comment "Indicates A is a continuation of the work B" .
+
+dandi:DataCollector a dandi:RoleType ;
+    rdfs:label "Data Collector" ;
+    rdfs:comment "Data Collector" .
+
+dandi:DataCurator a dandi:RoleType ;
+    rdfs:label "Data Curator" ;
+    rdfs:comment "Data Curator" .
+
+dandi:DataManager a dandi:RoleType ;
+    rdfs:label "Data Manager" ;
+    rdfs:comment "Data Manager" .
+
+dandi:Describes a dandi:RelationType ;
+    rdfs:label "Describes" ;
+    rdfs:comment "Indicates A describes B" .
+
+dandi:Documents a dandi:RelationType ;
+    rdfs:label "Documents" ;
+    rdfs:comment "Indicates A is documentation about B" .
+
+dandi:Embargoed a dandi:AccessType ;
+    rdfs:label "Embargoed" ;
+    rdfs:comment "The dandiset is embargoed" .
+
+dandi:FormalAnalysis a dandi:RoleType ;
+    rdfs:label "Formal Analysis" ;
+    rdfs:comment "Formal Analysis" .
+
+dandi:Funder a dandi:RoleType ;
+    rdfs:label "Funder" ;
+    rdfs:comment "Funder" .
+
+dandi:FundingAcquisition a dandi:RoleType ;
+    rdfs:label "Funding Acquisition" ;
+    rdfs:comment "Funding Acquisition" .
+
+dandi:HasMetadata a dandi:RelationType ;
+    rdfs:label "HasMetadata" ;
+    rdfs:comment "Indicates resource A has additional metadata B" .
+
+dandi:HasPart a dandi:RelationType ;
+    rdfs:label "HasPart" ;
+    rdfs:comment "Indicates A includes the part B" .
+
+dandi:HasVersion a dandi:RelationType ;
+    rdfs:label "HasVersion" ;
+    rdfs:comment "Indicates A has a version (B)" .
+
+dandi:Investigation a dandi:RoleType ;
+    rdfs:label "Investigation" ;
+    rdfs:comment "Investigation" .
+
+dandi:IsCitedBy a dandi:RelationType ;
+    rdfs:label "IsCitedBy" ;
+    rdfs:comment "Indicates that B includes A in a citation" .
+
+dandi:IsCompiledBy a dandi:RelationType ;
+    rdfs:label "IsCompiledBy" ;
+    rdfs:comment "Indicates B is used to compile or create A" .
+
+dandi:IsContinuedBy a dandi:RelationType ;
+    rdfs:label "IsContinuedBy" ;
+    rdfs:comment "Indicates A is continued by the work B" .
+
+dandi:IsDerivedFrom a dandi:RelationType ;
+    rdfs:label "IsDerivedFrom" ;
+    rdfs:comment "Indicates B is a source upon which A is based" .
+
+dandi:IsDescribedBy a dandi:RelationType ;
+    rdfs:label "IsDescribedBy" ;
+    rdfs:comment "Indicates A is described by B" .
+
+dandi:IsDocumentedBy a dandi:RelationType ;
+    rdfs:label "IsDocumentedBy" ;
+    rdfs:comment "Indicates B is documentation about/explaining A" .
+
+dandi:IsIdenticalTo a dandi:RelationType ;
+    rdfs:label "IsIdenticalTo" ;
+    rdfs:comment "Indicates that A is identical to B" .
+
+dandi:IsMetadataFor a dandi:RelationType ;
+    rdfs:label "IsMetadataFor" ;
+    rdfs:comment "Indicates additional metadata A for a resource B" .
+
+dandi:IsNewVersionOf a dandi:RelationType ;
+    rdfs:label "IsNewVersionOf" ;
+    rdfs:comment "Indicates A is a new edition of B" .
+
+dandi:IsObsoletedBy a dandi:RelationType ;
+    rdfs:label "IsObsoletedBy" ;
+    rdfs:comment "Indicates A is replaced by B" .
+
+dandi:IsOriginalFormOf a dandi:RelationType ;
+    rdfs:label "IsOriginalFormOf" ;
+    rdfs:comment "Indicates A is the original form of B" .
+
+dandi:IsPartOf a dandi:RelationType ;
+    rdfs:label "IsPartOf" ;
+    rdfs:comment "Indicates A is a portion of B" .
+
+dandi:IsPreviousVersionOf a dandi:RelationType ;
+    rdfs:label "IsPreviousVersionOf" ;
+    rdfs:comment "Indicates A is a previous edition of B" .
+
+dandi:IsReferencedBy a dandi:RelationType ;
+    rdfs:label "IsReferencedBy" ;
+    rdfs:comment "Indicates A is used as a source of information by B" .
+
+dandi:IsRequiredBy a dandi:RelationType ;
+    rdfs:label "IsRequiredBy" ;
+    rdfs:comment "Indicates A is required by B" .
+
+dandi:IsReviewedBy a dandi:RelationType ;
+    rdfs:label "IsReviewedBy" ;
+    rdfs:comment "Indicates that A is reviewed by B" .
+
+dandi:IsSourceOf a dandi:RelationType ;
+    rdfs:label "IsSourceOf" ;
+    rdfs:comment "Indicates A is a source upon which B is based" .
+
+dandi:IsSupplementedBy a dandi:RelationType ;
+    rdfs:label "IsSupplementedBy" ;
+    rdfs:comment "Indicates that B is a supplement to A" .
+
+dandi:IsSupplementTo a dandi:RelationType ;
+    rdfs:label "IsSupplementTo" ;
+    rdfs:comment "Indicates that A is a supplement to B" .
+
+dandi:IsVariantFormOf a dandi:RelationType ;
+    rdfs:label "IsVariantFormOf" ;
+    rdfs:comment "Indicates A is a variant or different form of B" .
+
+dandi:IsVersionOf a dandi:RelationType ;
+    rdfs:label "IsVersionOf" ;
+    rdfs:comment "Indicates A is a version of B" .
+
+dandi:Maintainer a dandi:RoleType ;
+    rdfs:label "Maintainer" ;
+    rdfs:comment "Maintainer" .
+
+dandi:md5 a dandi:DigestType ;
+    rdfs:label "MD5" ;
+    rdfs:comment "MD5 checksum" .
+
+dandi:Methodology a dandi:RoleType ;
+    rdfs:label "Methodology" ;
+    rdfs:comment "Methodology" .
+
+dandi:Obsoletes a dandi:RelationType ;
+    rdfs:label "Obsoletes" ;
+    rdfs:comment "Indicates A replaces B" .
+
+dandi:Open a dandi:AccessType ;
+    rdfs:label "Open access" ;
+    rdfs:comment "The dandiset is openly accessible" .
+
+dandi:Other a dandi:RoleType ;
+    rdfs:label "Other" ;
+    rdfs:comment "Other" .
+
+dandi:Producer a dandi:RoleType ;
+    rdfs:label "Producer" ;
+    rdfs:comment "Producer" .
+
+dandi:ProjectAdministration a dandi:RoleType ;
+    rdfs:label "Project Administration" ;
+    rdfs:comment "Project Administration" .
+
+dandi:ProjectLeader a dandi:RoleType ;
+    rdfs:label "Project Leader" ;
+    rdfs:comment "Project Leader" .
+
+dandi:ProjectManager a dandi:RoleType ;
+    rdfs:label "Project Manager" ;
+    rdfs:comment "Project Manager" .
+
+dandi:ProjectMember a dandi:RoleType ;
+    rdfs:label "Project Member" ;
+    rdfs:comment "Project Member" .
+
+dandi:References a dandi:RelationType ;
+    rdfs:label "References" ;
+    rdfs:comment "Indicates B is used as a source of information for A" .
+
+dandi:Requires a dandi:RelationType ;
+    rdfs:label "Requires" ;
+    rdfs:comment "Indicates A requires B" .
+
+dandi:Researcher a dandi:RoleType ;
+    rdfs:label "Researcher" ;
+    rdfs:comment "Researcher" .
+
+dandi:Resources a dandi:RoleType ;
+    rdfs:label "Resources" ;
+    rdfs:comment "Resources" .
+
+dandi:Restricted a dandi:AccessType ;
+    rdfs:label "Restricted" ;
+    rdfs:comment "The dandiset is restricted" .
+
+dandi:Reviews a dandi:RelationType ;
+    rdfs:label "Reviews" ;
+    rdfs:comment "Indicates that A is a review of B" .
+
+dandi:sha1 a dandi:DigestType ;
+    rdfs:label "SHA-1" ;
+    rdfs:comment "SHA-1 checksum" .
+
+dandi:SHA256 a dandi:DigestType ;
+    rdfs:label "SHA-256" ;
+    rdfs:comment "SHA-256 checksum" .
+
+dandi:sha512 a dandi:DigestType ;
+    rdfs:label "SHA-512" ;
+    rdfs:comment "SHA-512 checksum" .
+
+dandi:Software a dandi:RoleType ;
+    rdfs:label "Software" ;
+    rdfs:comment "Software" .
+
+dandi:Sponsor a dandi:RoleType ;
+    rdfs:label "Sponsor" ;
+    rdfs:comment "Sponsor" .
+
+dandi:StudyParticipant a dandi:RoleType ;
+    rdfs:label "Study participant" ;
+    rdfs:comment "Participant in a study" .
+
+dandi:Supervision a dandi:RoleType ;
+    rdfs:label "Supervision" ;
+    rdfs:comment "Supervision" .
+
+dandi:Validation a dandi:RoleType ;
+    rdfs:label "Validation" ;
+    rdfs:comment "Validation" .
+
+dandi:Visualization a dandi:RoleType ;
+    rdfs:label "Visualization" ;
+    rdfs:comment "Visualization" .
+
+<https://creativecommons.org/licenses/by-nc/4.0> a dandi:LicenseType ;
+    rdfs:label "Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)" .
+
+<https://creativecommons.org/licenses/by/4.0/> a dandi:LicenseType ;
+    rdfs:label "Attribution 4.0 International (CC BY 4.0)" .
+
+<https://creativecommons.org/publicdomain/zero/1.0/> a dandi:LicenseType ;
+    rdfs:label "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication" .
+
+<https://ror.org/> a dandi:IdentifierType ;
+    rdfs:label "ROR" .
+
+idorg:dandi a dandi:IdentifierType ;
+    rdfs:label "DANDI" .
+
+idorg:doi a dandi:IdentifierType ;
+    rdfs:label "DOI" .
+
+idorg:orcid a dandi:IdentifierType ;
+    rdfs:label "ORCID" .
+
+idorg:rrid a dandi:IdentifierType ;
+    rdfs:label "RRID" .
+
+schema:about schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+schema:affiliation schema:domainIncludes dandi:Person .
+
+schema:citation schema:domainIncludes dandi:Dandiset .
+
+schema:contactPoint schema:domainIncludes dandi:AccessRequirements,
+        dandi:EthicsApproval,
+        dandi:Organization .
+
+schema:contentSize schema:domainIncludes dandi:Asset .
+
+schema:contentUrl schema:domainIncludes dandi:Asset .
+
+schema:contributor schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+schema:datePublished schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+schema:description schema:domainIncludes dandi:AccessRequirements,
+        dandi:Asset,
+        dandi:Dandiset,
+        dandi:Project .
+
+schema:email schema:domainIncludes dandi:AccessRequirements,
+        dandi:Organization,
+        dandi:Person,
+        schema:ContactPoint .
+
+schema:encodingFormat schema:domainIncludes dandi:Asset .
+
+schema:endDate schema:domainIncludes dandi:Project .
+
+schema:hasPart schema:domainIncludes dandi:Project .
+
+schema:identifier schema:domainIncludes dandi:Anatomy,
+        dandi:Asset,
+        dandi:BioSample,
+        dandi:Dandiset,
+        dandi:Disorder,
+        dandi:EthicsApproval,
+        dandi:Organization,
+        dandi:Person,
+        dandi:Project,
+        dandi:Resource .
+
+schema:isPartOf schema:domainIncludes dandi:Asset,
+        dandi:Project .
+
+schema:keywords schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+schema:license schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+schema:measurementTechnique schema:domainIncludes dandi:Asset .
+
+schema:name schema:domainIncludes dandi:Asset,
+        dandi:Dandiset,
+        dandi:Organization,
+        dandi:Person,
+        dandi:Project,
+        dandi:Resource .
+
+schema:roleName schema:domainIncludes dandi:Organization,
+        dandi:Person .
+
+schema:sameAs schema:domainIncludes dandi:Asset .
+
+schema:schemaVersion schema:domainIncludes dandi:Asset,
+        dandi:Dandiset .
+
+schema:startDate schema:domainIncludes dandi:Project .
+
+schema:url schema:domainIncludes dandi:Asset,
+        dandi:Dandiset,
+        dandi:Organization,
+        dandi:Person,
+        dandi:Resource,
+        schema:ContactPoint .
+
+schema:value schema:domainIncludes dandi:Digest .
+
+schema:variableMeasured schema:domainIncludes dandi:Asset .
+
+schema:version schema:domainIncludes dandi:Dandiset .
+
+### Serialized using the ttlser deterministic serializer v1.2.0
