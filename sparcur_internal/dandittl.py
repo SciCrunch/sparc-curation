@@ -6,6 +6,11 @@ import augpathlib as aug
 from pyontutils.core import populateFromJsonLd, OntGraph
 from pyontutils.namespaces import rdfs, rdf
 
+# pushd ~/git/NOFORK/dandi-schema/context
+# python -m http.server 0 --bind 127.0.0.1
+# get the tcp port from the python server (used as ${PORT} below)
+# export PORT=
+# sed -i "s/\.\.\/context\/base\.json/http:\/\/localhost:${PORT}\/base.json/" *.yaml
 
 dandi = rdflib.Namespace('http://schema.dandiarchive.org/')
 schema = rdflib.Namespace('http://schema.org/')
