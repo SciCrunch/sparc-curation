@@ -89,8 +89,8 @@ gsx:google-sheet-id
   ;; will be put inside the models/ folder which should probably happen sooner rather than later
   ;;(let ((default-directory (expand-file-name model-id (git-share-local r-apin-mod:HEAD:))) ; TODO ))
   (let ((default-directory (expand-file-name (symbol-name model-id) "~/git/apinatomy-models/"))
-        (xlsx    (format  "source/%s.xlsx"   model-id))
-        (json    (format  "source/%s.json"   model-id))
+        (xlsx    (format "source/%s.xlsx"    model-id))
+        (json    (format "source/%s.json"    model-id))
         (jsonld  (format "derived/%s.jsonld" model-id))
         (ttl     (format "derived/%s.ttl"    model-id)))
     ;; TODO make sure the directories exist
@@ -151,7 +151,7 @@ gsx:google-sheet-id
     ;; reality there is often an explicit step where all checks must
     ;; pass before the whole process can continue because of some time
     ;; constraint or similar
-    (ex-do (format "Make sure that the permissions are set correctly on %s" url))
+    (ex-do (message "Make sure that the permissions are set correctly on %s" url))
     (url-copy-file url path-xlsx t)))
 
 (defun-local -xj-> (path-xlsx path-json)
@@ -161,8 +161,8 @@ gsx:google-sheet-id
     ;; TODO conditional open only if not already
     ;;(browse-url open-physiology-viewer)
     ;;(run-command "google-chrome-unstable" open-physiology-viewer)
-    (ex-do (format "open file (left top folder) to upload to viewer from %s" path-xlsx)
-           (format "save file (left bottom floppy) to download from viewer to %s" path-json)
+    (ex-do (message "open file (left top folder) to upload to viewer from %s" path-xlsx)
+           (message "save file (left bottom floppy) to download from viewer to %s" path-json)
            (ex-label 'viewer-after-open))))
 
 (defun-local -jl-> (path-json path-json-ld)
@@ -170,7 +170,7 @@ gsx:google-sheet-id
   (ex-do (ex-come-from 'viewer-after-open) ; This is amazing.
          ;; Allows decoupling of functional spec from the actual execution in the real world.
          ;; As a bonus we get to use my all time favorite control flow structure.
-         (format "export flattened json-ld (right 2nd from bot white doc) to download from viewer to %s"
+         (message "export flattened json-ld (right 2nd from bot white doc) to download from viewer to %s"
                  path-json-ld)))
 
 (defun-local -lt-> (path-json-ld path-ttl)
