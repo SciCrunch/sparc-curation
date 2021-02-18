@@ -1,6 +1,6 @@
 # -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 17534a2dea43a2e552b34ca9eae3b48cc39e7c7123d40cb4bf751b05b664817d; -*-
-#+titl# [[orgstrap][jump to the orgstrap block for this file]]
-e: ApiNATOMY model RDF export and deployment
+#+title: ApiNATOMY model RDF export and deployment
+# [[orgstrap][jump to the orgstrap block for this file]]
 #+options: num:nil
 #+startup: showall
 #+property: header-args:elisp :lexical yes
