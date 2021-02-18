@@ -609,7 +609,7 @@ ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
-award_pattern = 'OT2D|TR'
+award_pattern = '^(OT2OD|OT3OD|U18|TR|U01)'
 
 
 class NoLTWhitespaceSchema(JSONSchema):
@@ -1403,13 +1403,24 @@ class PathSchema(JSONSchema):
                         'pattern': simple_url_pattern},
             'uri_human': {'type': 'string',
                           'pattern': simple_url_pattern},
+            'dataset_id': {'type': 'string'},
             'remote_id': {'type': 'string'},
+            'parent_id': {'type': 'string'},
             'mimetype': {'type': 'string'},
             'magic_mimetype': {'type': 'string'},
-            'contents': {'type': 'object'},  # opqaue here
+            'contents': {'type': 'object'},  # opaque here
+            'size_bytes': {'type': 'number'},
             'checksums': {'type': 'array',
                           'minItems': 1,
                           'items': ChecksumSchema.schema,},
+            'basename': {'type': 'string',
+                         # FIXME TODO this is overly restrictive and
+                         # doesn't help in providing good feedback in
+                         # cases where people are using periods as
+                         # file name separators which messes up suffix
+                         # file type detection, it also doesn't warn
+                         # if there is no suffix
+                         'pattern': fs_safe_identifier_pattern,},
             'errors': ErrorSchema.schema,
         }
     }
@@ -1539,7 +1550,7 @@ class MetaOutExportSchema(JSONSchema):
                     'context_value': idtype('@id'),
         },
         'award_number': {'type': 'string',
-                         'pattern': '^OT|^U18',
+                         'pattern': award_pattern,
                          'context_value': idtype('TEMP:hasAwardNumber', base=TEMP['awards/']),
                          },
         'principal_investigator': {'type': 'string',
