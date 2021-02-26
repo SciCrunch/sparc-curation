@@ -421,8 +421,15 @@ Other software that you will probably need at some point but that is not package
 
 *** Windows
 **** Config
-Group policy for file system issues.
-***** Long Paths
+***** Environment variables
+In order for Emacs to work in a way that is similar to other operating
+systems the HOME environment variable needs to be set.
+#+begin_src powershell
+setx HOME %USERPROFILE%
+setx PATH "C:\Program Files\Git\bin;%PATH%"
+#+end_src
+***** Group policy for file system issues
+****** Long Paths
 Datasets in SPARC often have long names. Windows 10 default settings
 break long paths in Python. To fix this enable win32 long paths.
 
@@ -438,12 +445,16 @@ Computer configuration
     Enable Win32 long paths
 #+end_example
 
+#+begin_src powershell
+Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Policies  -Name LongPathsEnabled -Value 1
+#+end_src
+
 Double click to open the setting dialogue, select the enable radio
 button on the left and then click the ok button.
 
 Any program that is run after this is enabled will work as expected if
 it supports long paths. No restart or logout is required.
-***** Symlinks
+****** Symlinks
 =augpathlib= makes extensive use of symlinks to store metadata for remote files
 that have not been downloaded. By default normal users cannot create symlinks on
 windows. The best way to fix this is by granting the user that will run sparcur
@@ -549,6 +560,11 @@ Start-Service sshd
 # disable password login in %programdata%\ssh\sshd_config
 Restart-Service sshd
 #+end_src
+
+Set default login shell.
+#+begin_src powershell
+New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
+#+end_src
 **** Package manager
 For managing a windows development/curation environment I highly recommend using
 the [[https://chocolatey.org/][chocolatey]] package manager.
@@ -569,6 +585,10 @@ racket `
 rsync `
 vim
 #+end_src
+
+# visualstudio2019community `
+# When installing Visual Studio you will likely need to install
+# additional tools via the visual studio installer.
 
 Update system Path to include packages that don't add themselves.
 This needs to be run as administrator.
@@ -747,6 +767,11 @@ find -maxdepth 1 -type d -empty -exec spc meta -u --browser {} \+
 #+BEGIN_SRC bash :results none
 find -maxdepth 1 -type d -empty -exec rmdir {} \;
 #+END_SRC
+
+#+caption: copy sparse for full clone
+#+begin_src bash
+find -maxdepth 1 -type d -exec getfattr -n user.bf.id \;
+#+end_src
 
 Pull local copy of data to a new computer. Note the double escape needed for the space.
 #+BEGIN_SRC bash :results none :eval never
@@ -1562,14 +1587,14 @@ emacs -q -l ~/opt/scimax/init.el $@
 # implicit check for bash by being able to run this block at all
 
 # git check on the off chance that we made it here without cloning this repo
-git --version || exit 1
+git --version || { echo git is missing; exit 1; }
 
 # python version check
-python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || exit 2
-pip --version || exit 3
+python -c "print('python ok') if __import__('sys').version_info.major >= 3 else __import__('sys').exit(1)" || { echo bad python version; exit 2; }
+pip --version || { echo pip is missing; exit 3; }
 
 # git email check
-[[ -n "$(git config --list | grep user.email)" ]] || exit 4
+[[ -n "$(git config --list | grep user.email)" ]] || { echo git user.email has not been configured; exit 4; }
 #+END_SRC
 
 #+NAME: clone-repos
