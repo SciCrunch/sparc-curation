@@ -24,13 +24,14 @@ from blackfynn import log as _bflog
 # so we have to undo the damage done by basic config here
 # we add the sparcur local handlers back in later
 from sparcur.utils import log, silence_loggers
-__bflog = _bflog.get_logger()
-silence_loggers(__bflog)
-__bflog.addHandler(log.handlers[0])
+for __bflog in (_bflog.get_logger(), _bflog.get_logger("blackfynn.agent")):
+    silence_loggers(__bflog)
+    __bflog.addHandler(log.handlers[0])
 
 from blackfynn import Blackfynn, Collection, DataPackage, Organization, File
 from blackfynn import Dataset, BaseNode
 from blackfynn import base as bfb
+from blackfynn.api import agent
 from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred
@@ -171,7 +172,7 @@ def init_file(self, filename):
     """ not using any of this """
 
 
-transfers.UploadManager.init_file = init_file
+agent.UploadManager.init_file = init_file
 
 
 # monkey patches
@@ -702,6 +703,7 @@ class BFLocal:
         self.project_name = self.bf.context.name
 
     def _get_connection(self, project_id):
+        # FIXME why are we still passing project_id here when we don't use it?
         try:
             return Blackfynn(api_token=auth.user_config.secrets('blackfynn', self._project_id, 'key'),
                              api_secret=auth.user_config.secrets('blackfynn', self._project_id, 'secret'))
