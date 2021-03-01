@@ -1,677 +1,1048 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e8883bd1429e87a80d937119139e193829dc796f38b27503982de5b90efbbd7d; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: c4ba24f079c6d277c1dd543b46bd9c6ccc73f794a45ffbe859c4ae08256ce769; lexical-binding: t -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
+#+title: protcur queries
+#+startup: showall
+#+property: header-args :eval no-export
 
-* SPARQL
+Links to private groups/docs/sheets are in the =Protc paper= google doc.
+
+*[[QUIT:][Save and Quit]]*
+
+*[[KILL:][Quit Without Saving]]*
+
+* Settings
+:PROPERTIES:
+:visibility: folded
+:END:
+*[[FOLD-HEADLINE:][Hide Settings for Future Sessions]]*
+** Text size
+*[[TEXT-LARGER:][Larger  +]]*
+*[[TEXT-RESET:][Reset   0]]*
+*[[TEXT-SMALLER:][Smaller -]]*
+* Getting Started
+:PROPERTIES:
+:visibility: folded
+:END:
+** Install Emacs
+:PROPERTIES:
+:visibility: folded
+:END:
+# This section is hidden by default since if this file is open in
+# Emacs you probably don't need to see this section.
+This file needs Emacs 27 or later to run. You can [[https://www.gnu.org/software/emacs/download.html][install]] Emacs
+manually on [[https://emacsformacosx.com/][Mac]] or [[http://mirrors.ocf.berkeley.edu/gnu/emacs/windows/emacs-27/][Windows]]. If you are on Linux install Emacs using
+your system's package manager. Some distros do not package the latest
+version of Emacs in their main tree. If you find yourself in this
+situation, there might be an alternate repository (e.g. [[PPA][PPA]] for Ubuntu)
+that has newer versions.
+
+# Don't use get-emacs yet, it isn't ready.
+# You could also try the orgstrap [[https://github.com/tgbugs/orgstrap/blob/master/get-emacs.el.sh.ps1][get-emacs script]] that attempts to
+# install Emacs via your platform's package manager. If a package
+# manager is not found the script will install [[https://brew.sh/][Homebrew]] on Mac and
+# [[https://chocolatey.org/][Chocolaty]] on Windows and then use that to install Emacs. See the
+# [[https://github.com/tgbugs/orgstrap#bootstrapping-to-emacs-bootstrapping-to-org][orgstrap docs]] for details.
+** First Run
+The first time you open this file you will be prompted to accept
+Local Variables. You should type exclamation mark (=!=) to permanently
+store these values so that you are not prompted again in the future.
+
+The local variables are used by [[https://github.com/tgbugs/orgstrap][orgstrap]] to ensure that all the
+functionality needed by this file is installed and working.
+
+After accepting the local variables Emacs will download and install
+any missing packages that are needed for this file. You may see the
+compile log appear during this process.
+
+Once all packages have been successfully installed an the system is
+fully functional this heading will be collapsed by default.
+
+If you would like to inspect the file and local variables first, you
+can instead answer =n= to inspect the file (it will look a bit
+different and Emacs will behave differently because this file sets
+more user friendly defaults). Once you are satisfied that the file is
+safe you can open the file again, or you can run =M-x= =org-mode=
+which will reload the local variables and allow you to accept them.
+* Tutorial
+After you are done with this tutorial you can hide it so that it does
+not get in your way by clicking *[[FOLD-HEADLINE:][Hide Tutorial for Future Sessions]]*.
+To see it again later, you can open the *Tutorial* heading by clicking
+on it as described below.
+** Navigation
+You can open and close headings (lines that start with =*=) by
+clicking on them with the mouse or by hitting =tab= when the cursor is
+on the heading line. This also works for numbered and dotted lists
+which usually won't be needed but might happen by accident.
+
+You can also open and close source blocks by clicking on the
+=#+begin_src= line, =#+end_src= line, or any of the =#+header:=,
+=#+caption:=, or =#+name:= lines associated with the block. =tab=
+works in this case as well.
+** Running Queries
 :PROPERTIES:
 :header-args:sparql: :url http://localhost:9999/blazegraph/sparql
 :header-args:sparql+: :format text/csv
-:header-args:sparql+: :results table
 :END:
-** Datasets
-*** Dataset Predicates
+
+There are 3 ways to run query blocks.
+
+1. You can click on the *Run Query ▶* button.
+2. You can type =C-c C-c= when the cursor is on the source block.
+   Usually this is done by holding =Ctrl= (=Cmd= on a mac) and then
+   hitting the =c= key twice.
+3. You can click on =# RUN:block=. This will open the
+   results in a new Emacs buffer window.
+
+   
+*[[RUN:][Run Query ▶]]*
+#+name: my-query
 #+begin_src sparql
-SELECT DISTINCT
-?p
-# ?pp
-# ?po
+# :results table :var limit="10"
+# RUN:block
+SELECT distinct ?s1 ?s2 ?id ?dataset1 ?dataset2 ?species1 ?species2 ?award1 ?award2
 WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset ?p ?o .
-  # ?p ?pp ?po .
+
+    # Give me all subjects with duplicate IDs with unique datasets
+    { SELECT ?id
+      WHERE {
+	?s1 a owl:NamedIndividual ; 
+            TEMP:localId ?id ; 
+            TEMP:hasDerivedInformationAsParticipant ?datasetx .
+	?s2 a owl:NamedIndividual ; 
+            TEMP:localId ?id ; 
+            TEMP:hasDerivedInformationAsParticipant ?datasety .
+	filter(?datasetx != ?datasety)
+    } GROUP BY ?id having (count(?id) > 1)}
+
+    ?s1 TEMP:localId ?id ;
+        sparc:animalSubjectIsOfSpecies ?species1;
+        TEMP:hasDerivedInformationAsParticipant ?dataset1 .
+    ?s2 TEMP:localId ?id ;
+        sparc:animalSubjectIsOfSpecies ?species2;
+        TEMP:hasDerivedInformationAsParticipant ?dataset2 .
+    filter(?s1 != ?s2)
+    filter(STR(IRI(?s1)) < STR(IRI(?s2)))
+    filter(?species1 != ?species2)
+    filter(STR(IRI(?species1)) < STR(IRI(?species2)))
+
+    ?dataset1 a owl:NamedIndividual ;
+              TEMP:hasAwardNumber ?award1 .
+    ?dataset2 a owl:NamedIndividual ;
+              TEMP:hasAwardNumber ?award2 .
+    filter(?dataset1 != ?dataset2)
+    filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2)))
+    filter(?award1 != ?award2)
+    filter(STR(IRI(?award1)) < STR(IRI(?award2)))
+  
+} order by ?id limit 8 # ?limit
+#+end_src
+
+#+RESULTS: my-query
+| s1                                                                                               | s2                                                                                               | id     | dataset1                                                                         | dataset2                                                                         | species1                                       | species2                                       | award1                                               | award2                                               |
+|--------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------+--------+----------------------------------------------------------------------------------+----------------------------------------------------------------------------------+------------------------------------------------+------------------------------------------------+------------------------------------------------------+------------------------------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-1  | https://api.blackfynn.io/datasets/N:dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b/subjects/sub-1  | sub-1  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_10116 | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD024912 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-10 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-10 | sub-10 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-11 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-11 | sub-11 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-12 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-12 | sub-12 | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-4  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-4  | sub-4  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-4  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-4  | sub-4  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-4  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-4  | sub-4  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-4  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-4  | sub-4  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-4  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-4  | sub-4  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_10116 | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-5  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-5  | sub-5  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-6  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-6  | sub-6  | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024909 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-7  | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-7  | sub-7  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-7  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-7  | sub-7  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-7  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-7  | sub-7  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-7  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-7  | sub-7  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-7  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-7  | sub-7  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-7  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-7  | sub-7  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-8  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-8  | sub-8  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9606  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD024899 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-9  | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9  | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+
+*[[RUN:][Run Query ▶]]*
+#+name: my-python
+#+begin_src python :var data=my-query() :epilogue "return result"
+from collections import defaultdict, OrderedDict
+import itertools
+def func(data):
+    idmap = defaultdict(lambda: defaultdict(set))
+    for row in data:
+        subj1, subj2, local_id = row[0], row[1], row[2]
+        idmap[subj1]['cluster'].add(subj2)
+        idmap[subj1]['local_id'].add(local_id)
+        value_pairs = [(row[i], row[i+1]) for i in range(3, len(row), 2)]
+        value_pairs_len = len(value_pairs)
+        for i, value_pair in enumerate(value_pairs):
+            v1, v2 = value_pair
+            idmap[subj1][i] |= set(value_pair)
+    header = ['cluster', 'local_id'] + [i for i in range(value_pairs_len)] # todo: replace this with sparql headers if possible
+    hardcoded_header =  ['classes', 'local_id', 'datasets', 'species', 'awards']
+    columns = defaultdict(list)
+    for subj in idmap:
+        padding_max = max([len(v) for v in idmap[subj].values()])
+        for colname, values in idmap[subj].items():
+            values = list(values)
+            values = [subj] + values if colname == 'cluster' else values
+            padding = padding_max - len(values) if len(values) < padding_max else 0
+            columns[colname] += values + ['-'] * padding + ['']
+    table = [hardcoded_header] + [None] + list(itertools.izip_longest(*[columns[k] for k in header]))
+    return table
+result = func(data)
+#+end_src
+
+#+RESULTS: my-python
+| classes                                                                                          | local_id | datasets                                                                         | species                                        | awards                                               |
+|--------------------------------------------------------------------------------------------------+----------+----------------------------------------------------------------------------------+------------------------------------------------+------------------------------------------------------|
+| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-1  | sub-1    | https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | http://purl.obolibrary.org/obo/NCBITaxon_10090 | http://uri.interlex.org/temp/uris/awards/OT2OD024909 |
+| https://api.blackfynn.io/datasets/N:dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b/subjects/sub-1  | -        | https://api.blackfynn.io/datasets/N:dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | http://purl.obolibrary.org/obo/NCBITaxon_10116 | http://uri.interlex.org/temp/uris/awards/OT2OD024912 |
+|                                                                                                  |          |                                                                                  |                                                |                                                      |
+| https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-10 | sub-10   | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 |
+| https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:60739e5f-5210-4d04-935d-9f2645b3977f | -                                              | -                                                    |
+| https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | -                                              | -                                                    |
+|                                                                                                  |          |                                                                                  |                                                |                                                      |
+| https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | sub-10   | https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | http://purl.obolibrary.org/obo/NCBITaxon_9615  | http://uri.interlex.org/temp/uris/awards/OT2OD025340 |
+| https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | http://purl.obolibrary.org/obo/NCBITaxon_9825  | http://uri.interlex.org/temp/uris/awards/OT2OD025308 |
+| https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | -                                              | -                                                    |
+| https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | -                                              | -                                                    |
+| https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10 | -        | https://api.blackfynn.io/datasets/N:dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | -                                              | -                                                    |
+|                                                                                                  |          |                                                                                  |                                                |                                                      |
+
+*[[RUN:][Run Query ▶]]*
+#+name: tutorial-query
+#+begin_src sparql :results table :var limit="10"
+# RUN:block
+SELECT DISTINCT ?s ?p ?o
+WHERE {
+    ?s ?p ?o
+} LIMIT ?limit
+#+end_src
+
+In addition it is possible to run query blocks with different
+parameters and preserve the results.
+
+There are two ways to run =#+call= statements.
+1. You can click on the *Run Call ▶* button.
+2. You can type =C-c C-c= anywhere on the =#+call= line.
+
+*[[RUNC:][Run Call ▶]]*
+#+call: tutorial-query(limit="1")
+
+* Queries
+:PROPERTIES:
+:header-args:sparql: :url http://localhost:9999/blazegraph/sparql
+:header-args:sparql+: :format text/csv
+:END:
+** labels
+*** query
+See the Blazegraph wiki on [[https://github.com/blazegraph/database/wiki/FullTextSearch][full text search]].
+
+*[[RUN:][Run Query ▶]]*
+#+name: query-by-label
+#+header: :var label=(literal "[a-z0-9]*") limit="10"
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT
+# ?thing
+?l_thing
+WHERE {
+    ?thing rdfs:label ?l_thing .
+    ?l_thing bds:search ?label .
+} LIMIT ?limit  # abuse of how sparql-mode works to make it possible to change the limit in a call
+#+end_src
+*** calls
+
+*[[RUNC:][Run Call ▶]]*
+#+call: query-by-label(label=(literal "heart"), limit="20")
+
+** protocols
+*** count
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :cache no
+SELECT
+(COUNT(DISTINCT ?protocol) as ?count_protocols)
+WHERE {
+    ?protocol a sparc:Protocol .
 }
 #+end_src
 
-#+RESULTS:
-| p                                                                     |
-|-----------------------------------------------------------------------|
-| http://uri.interlex.org/temp/uris/contentsWereUpdatedAtTime           |
-| http://uri.interlex.org/temp/uris/curationIndex                       |
-| http://uri.interlex.org/temp/uris/errorIndex                          |
-| http://uri.interlex.org/temp/uris/hasAdditionalFundingInformation     |
-| http://uri.interlex.org/temp/uris/hasAwardNumber                      |
-| http://uri.interlex.org/temp/uris/hasContactPerson                    |
-| http://uri.interlex.org/temp/uris/hasDatasetTemplateSchemaVersion     |
-| http://uri.interlex.org/temp/uris/hasExpectedNumberOfSamples          |
-| http://uri.interlex.org/temp/uris/hasExpectedNumberOfSubjects         |
-| http://uri.interlex.org/temp/uris/hasExperimentalModality             |
-| http://uri.interlex.org/temp/uris/hasNumberOfContributors             |
-| http://uri.interlex.org/temp/uris/hasNumberOfDirectories              |
-| http://uri.interlex.org/temp/uris/hasNumberOfFiles                    |
-| http://uri.interlex.org/temp/uris/hasProtocol                         |
-| http://uri.interlex.org/temp/uris/hasResponsiblePrincipalInvestigator |
-| http://uri.interlex.org/temp/uris/hasSizeInBytes                      |
-| http://uri.interlex.org/temp/uris/hasUriApi                           |
-| http://uri.interlex.org/temp/uris/hasUriHuman                         |
-| http://uri.interlex.org/temp/uris/milestoneCompletionDate             |
-| http://uri.interlex.org/temp/uris/statusOnPlatform                    |
-| http://uri.interlex.org/temp/uris/submissionIndex                     |
-| http://uri.interlex.org/temp/uris/unclassifiedIndex                   |
-| http://uri.interlex.org/temp/uris/wasCreatedAtTime                    |
-| http://uri.interlex.org/temp/uris/wasUpdatedAtTime                    |
-| http://www.w3.org/1999/02/22-rdf-syntax-ns#type                       |
-| http://www.w3.org/2000/01/rdf-schema#label                            |
-| http://purl.org/dc/elements/1.1/title                                 |
-| http://purl.org/dc/elements/1.1/description                           |
-| http://uri.interlex.org/temp/uris/protocolEmploysTechnique            |
-| http://purl.obolibrary.org/obo/IAO_0000136                            |
-| http://uri.interlex.org/temp/uris/collectionTitle                     |
-| http://uri.interlex.org/temp/uris/hasDoi                              |
-| http://uri.interlex.org/temp/uris/hasNumberOfSubjects                 |
-| http://uri.interlex.org/temp/uris/involvesAnatomicalRegion            |
-| http://uri.interlex.org/temp/uris/isAboutParticipant                  |
-| http://uri.interlex.org/temp/uris/acknowledgements                    |
-| http://uri.interlex.org/temp/uris/completenessOfDataset               |
-| http://uri.interlex.org/temp/uris/isDescribedBy                       |
-| http://uri.interlex.org/temp/uris/hasNumberOfSamples                  |
-| http://uri.interlex.org/temp/uris/unclassifiedStages                  |
-
-** Experimental Protocol
-*** Conditions studied
-*** Experimental groups
-#+name: experimental-groups
-#+begin_src sparql :var limit="10"
-SELECT DISTINCT
-?dataset
-?group
-?subj
-WHERE {
-    ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
-    ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
-    ?subj  TEMP:hasAssignedGroup ?group .
-} ORDER BY ASC(?dataset) ASC(?group) LIMIT ?limit
-#+end_src
-
-#+RESULTS: experimental-groups
-| dataset                                                                          | group | subj                                                                                               |
-|----------------------------------------------------------------------------------+-------+----------------------------------------------------------------------------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16013 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16014 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16016 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16017 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17018 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17020 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17045 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17046 |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17047 |
-
-#+call: experimental-groups(limit="20") :var dataset="dataset:01b5cc2d-b321-4fed-8767-52771c4d680f"
-
-#+RESULTS:
-| group | subj                                                                                               |
-|-------+----------------------------------------------------------------------------------------------------|
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17113 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17114 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17140 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17154 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17172 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17173 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17067 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17068 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17074 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17075 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17077 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17078 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17079 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17080 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17083 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17084 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17099 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16013 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16014 |
-|     0 | https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
-
-*** Techniques
-# #+header: :var dataset=(identity nil)
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?technique
-# ?protocol
-# ?technique_p
-WHERE {
-{ ?dataset a sparc:Dataset .
-  ?dataset TEMP:protocolEmploysTechnique ?technique .
-  # ?technique rdfs:label ?tl
-}
-UNION
-{ ?dataset TEMP:hasProtocol ?protocol .
-  ?protocol TEMP:protocolEmploysTechnique ?technique .
-  # ?technique rdfs:label ?tl
-}
-} LIMIT 10
-#+end_src
-
-#+RESULTS:
-| dataset                                                                          | technique                                                          |
-|----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:765abd74-2671-4dda-a249-8f31c5727ea6 | http://uri.interlex.org/tgbugs/uris/readable/technique/dissection  |
-| https://api.blackfynn.io/datasets/N:dataset:765abd74-2671-4dda-a249-8f31c5727ea6 | http://uri.interlex.org/tgbugs/uris/readable/technique/surgical    |
-| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/readable/technique/dissection  |
-| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/readable/technique/perfusion   |
-| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/readable/technique/surgical    |
-| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/150 |
-| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/157 |
-| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/readable/technique/imaging     |
-| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/150 |
-| https://api.blackfynn.io/datasets/N:dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | http://uri.interlex.org/tgbugs/uris/indexes/ontologies/methods/99  |
-
-** Datasets following same protocol with different subjects
-*** Completeness
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?completeness
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:completenessOfDataset ?completeness .
-} LIMIT 10
-#+end_src
-
-#+RESULTS:
-| dataset                                                                          | completeness |
-|----------------------------------------------------------------------------------+--------------|
-| https://api.blackfynn.io/datasets/N:dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | batch        |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | hasNext      |
-| https://api.blackfynn.io/datasets/N:dataset:02786240-2033-4f86-808d-daf345ce3165 | complete     |
-| https://api.blackfynn.io/datasets/N:dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | complete     |
-| https://api.blackfynn.io/datasets/N:dataset:093c54b7-34c3-4204-9cea-0e2bdfd1fa93 | Complete     |
-| https://api.blackfynn.io/datasets/N:dataset:0a5a2827-2b39-4085-87ea-2b7fbbe27cc8 | batch        |
-| https://api.blackfynn.io/datasets/N:dataset:0b14782a-382d-430d-857e-acc333e3c324 | Complete     |
-| https://api.blackfynn.io/datasets/N:dataset:0c23200d-d821-4732-a467-9f73ab2862f0 | Complete     |
-| https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | complete     |
-| https://api.blackfynn.io/datasets/N:dataset:1284a4e8-21e1-4b9f-9280-6ba06f6b9a50 | Batch        |
-*** Dataset collections
-#+begin_src sparql :var limit="10"
-SELECT DISTINCT
-?title
-?dataset
-WHERE {
-  ?startdataset TEMP:collectionTitle ?title .
-  ?dataset  TEMP:collectionTitle ?title .
-} ORDER BY ASC(?title) LIMIT ?limit
-#+end_src
-
-#+RESULTS:
-| title                                                                                          | dataset                                                                          |
-|------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------|
-| A multi-scale model of cardiac electrophysiology                                               | https://api.blackfynn.io/datasets/N:dataset:c5c2f40f-76be-4979-bfc4-b9f9947231cf |
-| AAV Serotypes 6_8_9 Intrapancreatic 4 weeks                                                    | https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e |
-| AAV8 Titer and Route                                                                           | https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 |
-| AAV8 Titer and Route                                                                           | https://api.blackfynn.io/datasets/N:dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a |
-| AAVretro Serotype Intrapancreatic 4 weeks                                                      | https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f |
-| Acute effects of gastric electrical stimulation settings on gastric motility assessed with MRI | https://api.blackfynn.io/datasets/N:dataset:c2564991-28d5-42cf-bfb6-8f93b874a5af |
-| Acute effects of vagus nerve stimulation settings on gastric motility assessed with MRI        | https://api.blackfynn.io/datasets/N:dataset:76593e2b-2343-44db-9d47-f7c15f3e2afa |
-| Afferent Fiber Interactions with Renal Glomeruli                                               | https://api.blackfynn.io/datasets/N:dataset:55ceb112-2519-41c8-b808-f05dd4dd87d1 |
-| Anatomy and Histology of the Domestic Pig in the Context of Vagus Nerve Stimulation            | https://api.blackfynn.io/datasets/N:dataset:f1f7598c-ab36-4cff-95a2-85917e951407 |
-| Assessment of gastric emptying and motility with MRI under gastric electrical stimulation      | https://api.blackfynn.io/datasets/N:dataset:6f7e029d-684e-4603-9dea-ec82a53c5a75 |
-
-** Subjects
-*** Members
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?subject
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:isAboutParticipant ?subject .
-  ?subject a sparc:Subject .
-} LIMIT 10
-#+end_src
-
-#+RESULTS:
-| dataset                                                                          | subject                                                                                                                         |
-|----------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:d4ca262e-7893-4d72-9325-03dd08b053ce | https://api.blackfynn.io/datasets/N:dataset:d4ca262e-7893-4d72-9325-03dd08b053ce/subjects/GN060716                              |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/subjects/sub-896                               |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/subjects/sub-897                               |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/subjects/sub-898                               |
-| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_1_SPARC_10Hz_LcVNS          |
-| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_1_SPARC_10Hz_vGastricBranch |
-| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_10_SPARC_10Hz_LcVNS         |
-| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_11_SPARC_10Hz_LcVNS         |
-| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_12_SPARC_10Hz_LcVNS         |
-| https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075 | https://api.blackfynn.io/datasets/N:dataset:dc98984e-00b9-41c0-ace8-734d5230a075/subjects/sub-SA2p1_2_SPARC_10Hz_LcVNS          |
-
-*** Total
-#+begin_src sparql
-SELECT DISTINCT
-(COUNT(DISTINCT ?subject) as ?count_subject)
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:isAboutParticipant ?subject .
-  ?subject a sparc:Subject .
-}
-#+end_src
-
-#+RESULTS:
-| count_subject |
-|---------------|
-|          1575 |
-
-*** Subject Metadata
-- Identifier
-- Group
-- Species
-- Strain
-- Sex
-- Age Category
-- Age
-- Mass
-
-# #+header: :var species="NCBITaxon:10116"
-# #+header: :var species="NCBITaxon:9685"
-#+name: subject-metadata
-#+begin_src sparql
-SELECT DISTINCT
-?local_id
-
-?assigned_group
-
-?l_species
-?strain
-?l_sex
-
-?age_category
-?age_value
-?age_unit
-
-?mass_value
-?mass_unit
-
-WHERE {
-  ?subject a sparc:Subject .
-  ?subject TEMP:localId ?local_id .
-  ?subject sparc:animalSubjectIsOfSpecies ?species . OPTIONAL { ?species rdfs:label ?l_species . }
-  OPTIONAL { ?subject sparc:animalSubjectIsOfStrain ?strain . } # ?strain rdfs:label ?l_strain .
-  OPTIONAL { ?subject TEMP:hasBiologicalSex ?sex . ?sex rdfs:label ?l_sex . }
-  OPTIONAL { ?subject TEMP:hasAgeCategory ?age_category . }
-  OPTIONAL { ?subject TEMP:hasAssignedGroup ?assigned_group . }
-  # OPTIONAL { ?subject TEMP:participantInPerformanceOf ?protocol . }
-
-  OPTIONAL {
-  # mass
-  ?subject sparc:animalSubjectHasWeight ?bn_mass .
-  ?bn_mass a sparc:Measurement .
-  ?bn_mass TEMP:hasUnit ?mass_unit .
-  ?bn_mass rdf:value ?mass_value .
-}
-  OPTIONAL {
-  # age
-  ?subject TEMP:hasAge ?bn_age .
-  ?bn_age a sparc:Measurement .
-  ?bn_age TEMP:hasUnit ?age_unit .
-  ?bn_age rdf:value ?age_value .
-}
-#  VALUES ?l_s {?species ?sex}  # doesn't work, if it did it would duplicate rows
-#  ?l_s rdfs:label ?label
-} LIMIT 10
-#+end_src
-
-#+RESULTS: subject-metadata
-| local_id       | assigned_group | l_species    | strain        | l_sex | age_category | age_value | age_unit                                                      | mass_value | mass_unit |
-|----------------+----------------+--------------+---------------+-------+--------------+-----------+---------------------------------------------------------------+------------+-----------|
-| mouse3         |                | Mus musculus | C57BL/6J      | male  |              |         7 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
-| mouse4         |                | Mus musculus | C57BL/6J      | male  |              |         7 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
-| WT28M          |                | Mus musculus | C57BL/6J      | male  |              |         8 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
-| WT29M          |                | Mus musculus | C57BL/6J      | male  |              |         8 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/week |            |           |
-| C57BL/6J       |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
-| Gpr65-ires-Cre |                | Mus musculus | 129S6/SvEvTac |       |              |           |                                                               |            |           |
-| LoxP-ChR2      |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
-| LoxP-DTR       |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
-| Mc4r-2a-Cre    |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
-| Phox2b-Cre     |                | Mus musculus | C57BL/6J      |       |              |           |                                                               |            |           |
-
-#+call: subject-metadata() :var species="NCBITaxon:10090"
-
-#+RESULTS:
-| local_id   | assigned_group | l_species    | strain                                                                    | l_sex  | age_category | age_value | age_unit                                                      | mass_value | mass_unit |
-|------------+----------------+--------------+---------------------------------------------------------------------------+--------+--------------+-----------+---------------------------------------------------------------+------------+-----------|
-| sub-iWAT10 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg and B6.Cg-Gt(ROSA)26Sortm14(CAG-tdTomato)Hze/J | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT12 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg and B6.Cg-Gt(ROSA)26Sortm14(CAG-tdTomato)Hze/J | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT22 |                | Mus musculus | Kieg and B6.Cg-Gt(ROSA)26Sortm14(CAG-tdTomato)Hze/J                       | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT34 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | female | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT35 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | male   | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT36 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | male   | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT37 |                | Mus musculus | B6.129X1-Thtm1(cre)Te/Kieg                                                | male   | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT40 |                | Mus musculus | C57BL/6J                                                                  | male   | Mature adult |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT56 |                | Mus musculus | B6.FVB(Cg)-Tg(Dbh-cre)KH212Gsat/Mmucd                                     | female | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-| sub-iWAT57 |                | Mus musculus | B6.FVB(Cg)-Tg(Dbh-cre)KH212Gsat/Mmucd                                     | female | Adolescent   |         1 | http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/year |            |           |
-
-** Samples
-*** Members
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?sample
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:isAboutParticipant ?sample .
-  ?sample a sparc:Sample .
-} LIMIT 10
-#+end_src
-
-#+RESULTS:
-| dataset                                                                          | sample                                                                                                  |
-|----------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-1  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-10 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-11 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-12 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-13 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-2  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-3  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-4  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-5  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-6  |
-
-*** Total
-#+begin_src sparql
-SELECT DISTINCT
-(COUNT(DISTINCT ?subject) as ?count_subject)
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:isAboutParticipant ?subject .
-  ?subject a sparc:Sample .
-}
-#+end_src
-
-#+RESULTS:
-| count_subject |
-|---------------|
-|          7751 |
-
-*** Sample predicates
-#+begin_src sparql
-SELECT DISTINCT
-?p
-WHERE {
-  ?sample a sparc:Sample .
-  ?sample ?p ?o .
-}
-#+end_src
-
-#+RESULTS:
-| p                                                                         |
-|---------------------------------------------------------------------------|
-| http://uri.interlex.org/temp/uris/hasDerivedInformationAsParticipant      |
-| http://uri.interlex.org/temp/uris/localId                                 |
-| http://uri.interlex.org/temp/uris/raw/wasExtractedFromAnatomicalRegion    |
-| http://uri.interlex.org/temp/uris/wasDerivedFromSubject                   |
-| http://www.w3.org/1999/02/22-rdf-syntax-ns#type                           |
-| http://uri.interlex.org/temp/uris/participantInPerformanceOf              |
-| http://uri.interlex.org/temp/uris/hasAssignedGroup                        |
-| http://uri.interlex.org/temp/uris/hasDigitalArtifactThatIsAboutIt         |
-| http://uri.interlex.org/temp/uris/TODO                                    |
-| http://uri.interlex.org/temp/uris/providerNote                            |
-| http://uri.interlex.org/temp/uris/hasDigitalArtifactThatIsAboutItWithHash |
-| http://uri.interlex.org/temp/uris/localExecutionNumber                    |
-
-*** Sample Metadata
-
-#+name: sample-metadata
-#+begin_src sparql
-SELECT DISTINCT
-?subject_lid
-
-?local_id
-
-?assigned_group
-
-?anat_ent_src
-
-WHERE {
-  ?sample a sparc:Sample .
-  ?sample TEMP:localId ?local_id .
-
-  ?sample TEMP:wasDerivedFromSubject ?subject .
-  ?subject TEMP:localId ?subject_lid .
-  ?subject a sparc:Subject .
-
-  OPTIONAL { ?sample TEMP:hasAssignedGroup ?assigned_group . }
-  OPTIONAL { ?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?anat_ent_src . }
-  # OPTIONAL { ?sample TEMP:participantInPerformanceOf ?protocol . }
-} LIMIT 10
-#+end_src
-
-#+RESULTS: sample-metadata
-| subject_lid | local_id                                                                            | assigned_group                               | anat_ent_src |
-|-------------+-------------------------------------------------------------------------------------+----------------------------------------------+--------------|
-| sub_4585    | 121 Adult Left Colon 4585 10x stitch anti HucD 488 anti S100B 594 anti PHOX2B 647 1 | anti HuC/D, anti S100β, anti PHOX2B staining | left colon   |
-| sub_4585    | 244 Adult Left Colon 4585 20x 20x anti HucD 647 anti cKit 594 1                     | anti HuC/D, anti cKit staining               | left colon   |
-| sub_4585    | 245 Adult Left Colon 4585 20x anti HucD 647 anti cKit 594 2                         | anti HuC/D, anti cKit staining               | left colon   |
-| sub_4585    | 246 Adult Left Colon 4585  20x anti HucD 647 anti cKit 594 3                        | anti HuC/D, anti cKit staining               | left colon   |
-| sub_4585    | 260 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 1                          | anti HuC/D, anti NFM staining                | left colon   |
-| sub_4585    | 261 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 2                          | anti HuC/D, anti NFM staining                | left colon   |
-| sub_4585    | 262 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 3                          | anti HuC/D, anti NFM staining                | left colon   |
-| sub_4585    | 269 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 1                         | anti HuC/D, anti Tuj1 staining               | left colon   |
-| sub_4585    | 270 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 2                         | anti HuC/D, anti Tuj1 staining               | left colon   |
-| sub_4585    | 271 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 3                         | anti HuC/D, anti Tuj1 staining               | left colon   |
-
-** Anatomical entities
-*** Dataset
-**** Involves
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-# ?ae
-?l_ae
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:involvesAnatomicalRegion ?ae .  # TODO not 100% on the modelling here
-  ?ae rdfs:label ?l_ae .
-} ORDER BY ASC(?l_ae) LIMIT 10 
-#+end_src
-
-#+RESULTS:
-| dataset                                                                          | l_ae             |
-|----------------------------------------------------------------------------------+------------------|
-| https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:78e5602a-98a8-4323-8efd-db77466030c3 | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:8742cd78-1ad8-4c17-aa12-42c06e898ded | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:c23e9319-fe3c-4354-aca8-259e8cff0f7a | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | abdominal cavity |
-| https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | abdominal wall   |
-| https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | abdominal wall   |
-
-**** About
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-# ?ae
-?l_ae
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset isAbout: ?ae .  # TODO not 100% on the modelling here
-  ?ae rdfs:label ?l_ae .
-  # ?ae rdfs:subClassOf* UBERON:0001062 .  # FIXME this information is not in the graph right now
-                                           # which is why we get mouse
-} ORDER BY ASC(?l_ae) LIMIT 10 
-#+end_src
-
-#+RESULTS:
-| dataset                                                                          | l_ae         |
-|----------------------------------------------------------------------------------+--------------|
-| https://api.blackfynn.io/datasets/N:dataset:02786240-2033-4f86-808d-daf345ce3165 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:3bb4788f-edab-4f04-8e96-bfc87d69e4e5 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:663d8eba-eb68-4fef-b9a0-ac51410b26d3 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:6ce2e98e-5217-4952-897d-017285d303b2 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:f267c9fd-678e-4469-beb8-327b35f1738a | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:f563672f-7d39-4e6d-b198-82960fb4a434 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:fc6e3a87-1241-4f81-b284-8ebc82efc499 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | Mus musculus |
-
-**** Sample Source
-#+name: dataset-sample-source
-#+begin_src sparql :var limit="20"
-SELECT DISTINCT
-?dataset
-?ae
-# ?slid
-WHERE {
-?sample TEMP:hasDerivedInformationAsParticipant ?dataset .
-?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?ae .
-?sample a sparc:Sample .
-# ?sample TEMP:localId ?slid .
-?dataset a sparc:Dataset .
-}
-ORDER BY
-DESC(?ae)
-# ASC(?slid)
-LIMIT ?limit
-#+end_src
-
-#+RESULTS: dataset-sample-source
-| dataset                                                                          | ae                              |
-|----------------------------------------------------------------------------------+---------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:82c228a2-134a-4f6f-82f2-d89e64cb7be1 | whole stomach                   |
-| https://api.blackfynn.io/datasets/N:dataset:57466879-2cdd-4af2-8bd6-7d867423c709 | vasculature of the the pancreas |
-| https://api.blackfynn.io/datasets/N:dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | transverse colon                |
-| https://api.blackfynn.io/datasets/N:dataset:4a361ad8-d500-4f3d-81f8-c92f504946b2 | torus pyloricus                 |
-| https://api.blackfynn.io/datasets/N:dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c | superior cervical ganglia       |
-| https://api.blackfynn.io/datasets/N:dataset:bec4d335-9377-4863-9017-ecd01170f354 | subdiaphragmatic vagus nerve    |
-| https://api.blackfynn.io/datasets/N:dataset:c082215b-6765-4cc8-a965-92773b4c18c1 | subdiaphragmatic vagus nerve    |
-| https://api.blackfynn.io/datasets/N:dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 | subdiaphragmatic vagus nerve    |
-| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | stomach                         |
-| https://api.blackfynn.io/datasets/N:dataset:a244bca9-b747-4035-9bdc-ee6227a29dfd | stellate ganglion               |
-| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | spleen                          |
-| https://api.blackfynn.io/datasets/N:dataset:9d8ad16c-2ae7-414c-8573-048303039c76 | spinal cord, segments L5-S2     |
-| https://api.blackfynn.io/datasets/N:dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | sigmoid colon                   |
-| https://api.blackfynn.io/datasets/N:dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | sigma                           |
-| https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | sample middle ~2 cm             |
-| https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | sample middle ~2 cm             |
-| https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | sample middle ~2 cm             |
-| https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | right colon                     |
-| https://api.blackfynn.io/datasets/N:dataset:6d6818f2-ef75-4be5-9360-8d37661a8463 | right cervical vagus nerve      |
-| https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | right cervical vagus nerve      |
-
-*** Protocol
-**** Involves
-#+begin_src sparql
+*** individuals
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :cache no
 SELECT DISTINCT
 ?protocol
-?l_bb
 WHERE {
-  ?protocol a sparc:Protocol .
-  ?protocol TEMP:protocolInvolvesBlackBox ?ast_bb .
+    ?protocol a sparc:Protocol .
+}
+#+end_src
+** techniques
+*[[RUN:][Run Query ▶]]*
+# #+header: :var technique="tech:histology"
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT
+?protocol
+?technique
+# ?l_tech
+WHERE {
+    ?protocol rdf:type sparc:Protocol .
+    ?protocol TEMP:protocolEmploysTechnique ?technique .
+    # ?technique rdfs:label ?l_tech .
+} ORDER BY ASC(?protocol) ASC(?technique)
+#+end_src
 
-  ?ast_bb rdf:type protcur:black-box .  # TODO need to refine on organ an ingest the new alignment
-  ?ast_bb TEMP:hasValue ?bb_value .
+** basic aspects
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT ?protocol ?aspect
+WHERE {
+    ?protocol rdf:type sparc:Protocol .
+    ?protocol TEMP:protocolInvolvesAspect ?ast .
+    ?ast rdf:type protcur:aspect .
+    ?ast TEMP:hasValue ?aspect .
+} LIMIT 10
+#+end_src
 
-  ?bb_value rdfs:label ?l_bb .
-} LIMIT 10 
+** dose aspects
+*** species dose results
+
+*[[RUNC:][Run Call ▶]]*
+#+call: species-mg/kg("NCBITaxon:10116", "CHEBI:6121", "100")
+
+*[[RUNC:][Run Call ▶]]*
+#+call: species-mg/kg("NCBITaxon:10116", "CHEBI:6121", "1000")
+
+*** species dose query
+:PROPERTIES:
+:visibility: folded
+:END:
+This query cannot be run by itself. It should be run buy using the
+=#+call:= definitions above in [[*species does results][species dose results]].
+#+name: species-mg/kg
+#+begin_src sparql :var species=(identity nil) drug=(identity nil) limit=(identity nil)
+SELECT DISTINCT
+?dataset
+?protocol
+
+?label_drug
+?value_lt
+
+WHERE {
+    VALUES ?t {protcur:invariant protcur:parameter} .
+    ?ast_inv a ?t .
+    ?ast_inv TEMP:hasValue ?bnode .
+    ?bnode ilxtr:jsonRecordType <https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/quantity> .
+    ?bnode rdf:value ?value_lt .
+    ?bnode TEMP:hasUnit <https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/milligram%20%2F%20kilogram> .
+    FILTER (?value_lt < ?limit)
+    # OPTIONAL { ?bnode TEMP:hasUnit ?unit } .
+
+    ?ast_drug a protcur:input .
+    ?ast_drug TEMP:hasValue ?drug .
+                            ?drug rdfs:label ?label_drug .
+    ?ast_drug TEMP:protcurChildren+ ?ast_child .
+    ?ast_child TEMP:hasValue ?bnode .
+
+    ?protocol a sparc:Protocol .
+    ?protocol TEMP:protocolInvolvesInput ?ast_drug .
+
+    ?protocol TEMP:protocolInvolvesInput ?ast_in_sp .
+    ?ast_in_sp rdf:type protcur:input .
+    ?ast_in_sp TEMP:hasValue ?species .
+
+    OPTIONAL { ?dataset TEMP:hasProtocol ?protocol } .
+
+} ORDER BY ?label_input ?value_lt
+#+end_src
+
+** anaesthesia
+*** Protocol Aspect
+*[[RUN:][Run Query ▶]]*
+#+name: query-str-asp-an
+#+begin_src sparql :cache no
+SELECT DISTINCT
+?protocol
+?action
+WHERE {
+    ?protocol a sparc:Protocol .
+    ?protocol TEMPRAW:protocolInvolvesAspect ?action .
+    FILTER regex(str(?action), "[Aa]na?es?the") .
+}
+#+end_src
+
+*** Protocol Action
+*[[RUN:][Run Query ▶]]*
+#+name: query-str-verb-an
+#+begin_src sparql :cache no
+SELECT DISTINCT
+?protocol
+?action
+WHERE {
+    ?protocol a sparc:Protocol .
+    ?protocol TEMPRAW:protocolInvolvesAction ?action .
+    FILTER regex(str(?action), "[Aa]na?es?the") .
+}
+#+end_src
+
+** inputs
+*** query execution
+**** ketamine
+
+*[[RUNC:][Run Call ▶]]*
+#+call: query-input-count("CHEBI:6121")
+
+**** xylazine
+
+*[[RUNC:][Run Call ▶]]*
+#+call: query-input-count("CHEBI:92386")
+
+**** KX
+
+*[[RUNC:][Run Call ▶]]*
+#+call: query-input-intersection("CHEBI:6121", "CHEBI:92386")
+
+*** query definitions
+:PROPERTIES:
+:visibility: folded
+:END:
+**** single input
+#+name: query-input-count
+#+begin_src sparql :cache no :var input=(identity nil)
+SELECT DISTINCT
+#?protocol
+(COUNT(DISTINCT ?protocol) as ?count_protocols)
+WHERE {
+    ?protocol rdf:type sparc:Protocol .
+    ?protocol TEMP:protocolInvolvesInput ?ast_in .
+    ?ast_in rdf:type protcur:input .
+    ?ast_in TEMP:hasValue ?input .
+}
+#+end_src
+
+#+name: query-input
+#+begin_src sparql :cache no :var input=(identity nil)
+SELECT DISTINCT
+?protocol
+#(COUNT(DISTINCT ?protocol) as ?count_protocols)
+WHERE {
+    ?protocol rdf:type sparc:Protocol .
+    ?protocol TEMP:protocolInvolvesInput ?ast_in .
+    ?ast_in rdf:type protcur:input .
+    ?ast_in TEMP:hasValue ?input .
+}
+#+end_src
+**** dual input
+# TODO input output steps
+#+name: query-input-intersection
+#+begin_src sparql :cache no :var input_a=(identity nil) input_b=(identity nil)
+SELECT DISTINCT
+# ?protocol ?ast_in_a ?ast_in_b
+(COUNT(DISTINCT ?protocol) as ?count_protocols)
+WHERE {
+    ?protocol rdf:type sparc:Protocol .
+    ?protocol TEMP:protocolInvolvesInput ?ast_in_a .
+    ?ast_in_a rdf:type protcur:input .
+    ?ast_in_a TEMP:hasValue ?input_a .
+    ?protocol TEMP:protocolInvolvesInput ?ast_in_b .
+    ?ast_in_b rdf:type protcur:input .
+    ?ast_in_b TEMP:hasValue ?input_b .
+}
+#+end_src
+** datasets
+*** instances
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT
+?dataset
+?l_dataset
+WHERE {
+    ?dataset a sparc:Dataset .
+    ?dataset rdfs:label ?l_dataset .
+} LIMIT 10
+#+end_src
+
+*** with protocols
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT
+?dataset
+?protocol
+WHERE {
+    ?dataset a sparc:Dataset .
+    ?dataset rdfs:label ?l_dataset .
+    ?dataset TEMP:hasProtocol ?protocol .
+    ?protocol a sparc:Protocol .
+} LIMIT 10
+#+end_src
+
+*** anatomy
+**** datasets about heart
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT
+?dataset
+?region
+WHERE {
+    ?dataset isAbout: ?region .
+    ?region rdfs:label ?l_region .
+    ?l_region bds:search "heart" .
+}
+#+end_src
+
+**** datasets involving heart
+*[[RUN:][Run Query ▶]]*
+#+begin_src sparql :results table :cache no
+SELECT DISTINCT
+?dataset
+?region
+?l_region
+WHERE {
+    ?dataset a sparc:Dataset .
+    ?dataset TEMP:involvesAnatomicalRegion ?region .
+    ?region rdfs:label ?l_region .
+    ?l_region bds:search "heart" .
+}
+#+end_src
+
+* Usability testing :noexport:
+:PROPERTIES:
+:visibility: folded
+:END:
+** Examples
+# TODO make it possible to update link target and description on click
+Behavioral settings.
+*[[OB-NOASK:][Run Queries Without Confirmation]]*
+
+[[RUN:][RUN]]
+
+#+begin_src elisp
+(message "Yay I'm running!")
 #+end_src
 
 #+RESULTS:
-| protocol                                        | l_bb             |
-|-------------------------------------------------+------------------|
-| https://www.protocols.io/api/v3/protocols/18985 | photon           |
-| https://www.protocols.io/api/v3/protocols/19341 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/18985 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/23160 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/19269 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/20256 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/22833 | stomach          |
-| https://www.protocols.io/api/v3/protocols/25817 | heart            |
-| https://www.protocols.io/api/v3/protocols/26704 | neck             |
-| https://www.protocols.io/api/v3/protocols/19127 | abdominal cavity |
+: Yay I’m running!
 
-** Associated scaffolds
-** Other
-NOTE These are not yet in the ttl file, the queries written here will not work yet.
-*** File types
-In all likelihood we are not going to include the names of each of the
-individual files in the standard ttl export. We may put it in a named
-graph and then update the journal, possibly only for released
-datasets. The use cases for having individual files in the graph is
-not at all clear, we might have individual folders, or run it in the
-other direction where a subject could list the folders that contain
-data about it.  Trying to keep the graph in sync with Blackfynn would
-be quite a pain, essentially we would store/append every single file
-that ever appears and then mark the deleted ones as deleted or something.
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?file_type
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:containsFileWithType ?file_type .  # TODO not 100% on the modelling here
-} LIMIT 10
+*asdf*
+
+/asdf/
+
+*[[RUN:][Run Query ▶]]*
+#+name: test-call
+#+begin_src elisp
+; RUN:Query
+(message "Yay I'm running!")
 #+end_src
-*** Has Raw Data
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?raw
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:containsFolderForRawData ?raw .  # TODO not 100% on the modelling here
-} LIMIT 10
+
+#+RESULTS: test-call
+: Yay I’m running!
+
+*[[RUNP:][Run Query ▶]]*
+
+#+RESULTS:
+: Yay I’m running!
+
+Unfortunately ~RUNP:~ doesn't quite work because it gets moved after the results block.
+
+
+*[[RUNC:][Run Call ▶]]*
+#+call: test-call()
+
+#+RESULTS:
+: Yay I’m running!
+
+** Testing
+Note that if you want to test gui applications with an alternate home directly
+you need to symlink the [[file:~/.Xauthority]] file for the current session,
+otherwise you will get a cryptic =No protocol specified= error followed by
+some message that the display could not be opened, or is unavailable etc.
+#+begin_src bash
+mkdir /tmp/test/
+ln -s ~/.Xauthority /tmp/test/
+HOME=/tmp/test
 #+end_src
-*** Has Derived Data
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?derived
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:containsFolderForDerivedData ?derived .  # TODO not 100% on the modelling here
-} LIMIT 10
-#+end_src
-*** Has Code
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?code
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset TEMP:containsFolderForCode ?code .  # TODO not 100% on the modelling here
-} LIMIT 10
-#+end_src
-*** Used in simulation
-This modeling is extremely preliminary.
-#+begin_src sparql
-SELECT DISTINCT
-?dataset
-?dataset_sim
-WHERE {
-  ?dataset a sparc:Dataset .
-  ?dataset_sim a sparc:Dataset .  # TODO not 100% on this
-  # the dataset holds the simulation, and is also what references the other datasets
-  # whether we need an explicit type for simulation datasets is not clear, I suspect
-  # that we do not, since datasets are just data, the aboutness or typeness probably
-  # should come from the fact that the dataset specifies or houses a simulation ...
-  # ?dataset_sim a sparc:SimulationDataset . # also not good
-  # ?dataset_sim TEMP:isSubstrateForSomeComputationalSimulation true .  # FIXME this is bad bad bad
-  VALUES ?p {TEMP:derivesParametersFrom TEMP:derivesValidationDataFrom ilxtr:hasInformationInput} .
-  ?dataset_sim ?p ?dataset .
-} LIMIT 10
-#+end_src
+** DONE hide property drawers completely for the user
+https://stackoverflow.com/a/17492723 implements
+=org-cycle-hide-drawers= which can make the property drawers
+completely invisible. Once header args set in property drawers
+can contain closures, this will be even more powerful.
+
+Ultimately decided not to use this because it is simpler to
+use =org-entry-put= to programmatically add property drawers
+if/when they are needed for things like the tutorial.
+** TODO version control
+One of the trickier issues with this is how to make it possible to safely
+play with the queries and explore without risk of damaging or destroying
+them. Making it easy to move the query file to a new release is also
+important. Alternately, having an upgrade mechanism built in so that
+the new releases just replace the data without replacing this file.
+
+The other possibility is that we use this file to download the release
+and have it live outside/alongside the release. The problem with this is
+that you really do need something that acts like a project folder unless
+you are willing to take on the complexity of working with temp or cache
+folders on a variety of operating systems. The project folder approach is
+attractive because it puts hard boundaries on requirements, and it provides
+a space for arbitrary conventions.
+
+While and Org file can create its own environment, the only safe way to do
+so is to have it create a containing folder and then move itself into it.
+
+Otherwise collisions, klobbering, etc. will all show up at some
+point. Having a file and a folder sit next to each other can lead to
+all sorts of problems.
 * Bootstrap :noexport:
 :PROPERTIES:
-:visibility:  folded
+:visibility: folded
 :END:
+=*-packages= vars need to be defvars, possibly local, so that they can
+be superseeded using command line arguments or file local variables if
+they are header arguments then they cannot be shadowed because the are
+bound in a let form. On the other hand, disabling header arguments can
+be done without having to have orgstrap installed or fighting with
+Emacs' command line arguments --- something of a strange trade-off.
+We might need both global variable and a header variable where both
+have to be non-nil for the block to fire.
+
+To disable vars set in the header here use =(identity nil)=.
+
+# probably an implementation detail, but if multiple values are provided
+# the first one appearing on the page wins, handy for this use case
+
+# #+header: :var   test-dir="/tmp/build/release-2020-10-12T193129Z/"
+#+header: :var   test-dir=(identity nil)
+#+header: :var   orgstrap-emacs-packages="yes"
+#+header: :var   enable-cua="yes"               enable-mouse-cycle="yes"
+#+header: :var   enable-whiteboard="yes"        enable-faces="yes"
+#+header: :var   enable-tab-bar="yes"
 #+name: orgstrap
-#+begin_src elisp :results none :lexical yes
+#+begin_src elisp :results none :lexical yes :noweb yes
+;; (defvar orgstrap-emacs-packages t
+;;   "Install Emacs packages needed to run this file.")
+
+;; inhibit the splash
+
+(setq inhibit-startup-screen t) ; amazingly orgstrap runs early enough that this works
+
+;; common
+
+<<common-defuns>>
+
+;; install packages
+
+(when orgstrap-emacs-packages
+  "Install Emacs packages needed to run this file."
+  <<orgstrap-packages>>)
+
+;; usability defuns (needed by some options)
+
+<<usability>>
+
+;; local config options
+
+(setq-local org-support-shift-select t) ; Org shift functionality is not really needed in this file
+
 (defun orgstrap---noconfirm-eval-sparql (lang _body)
   "Run sparql queries without confirmation dialogue."
+  ;; not much risk here, so better to just set it by default than to
+  ;; force users to deal with the needless complexity
   (not (string= lang "sparql")))
-(setq-local ocbe org-confirm-babel-evaluate) ; hack that works due to dynamic scope
 
-;; TODO
-;;(defun orgstrap---advise-sparql-execute-query (&rest args)
-;;  (compactify-current-buffer default-curies))
+(setq-local org-confirm-babel-evaluate #'orgstrap---noconfirm-eval-sparql)
+(setq org-confirm-babel-evaluate nil)
+(setq org-table-convert-region-max-lines 20000)
 
-;;(advice-add #'sparql-execute-query :after #'orgstrap---advise-sparql-execute-query)
+;; FIXME this is a hack to work around the fact that orgstrap restores
+;; `org-confirm-babel-evaluate' from `ocbe' ... the fact that it is possible
+;; to override `ocbe' from an another scope is ... worrying on the one hand
+;; and potentially advantagous on the other
+(setq-local ocbe org-confirm-babel-evaluate)
+
+;; options (controlled via #+header:)
+
+(when (and enable-cua (not cua-mode))
+  "Enable familiar copy/paste keybindings."
+  (cua-mode)
+  ;; enable Cmd Shift Z for apple users Ctrl y for windows
+  (when (fboundp #'undo-redo)
+    (if (eq system-type 'darwin)
+        (local-set-key "C-Z" #'undo-redo)
+      (local-set-key "C-y" #'undo-redo))))
+
+(when enable-tab-bar
+  "Enable tab-bar-mode"
+  (unless tab-bar-mode
+    (tab-bar-mode)))
+
+(when enable-whiteboard
+  "Use the whiteboard theme."
+  (load-theme 'whiteboard))
+
+(when enable-mouse-cycle
+  "Use left mouse to cycle"
+  (orgstrap---mouse-cycle))
+
+(when enable-faces
+  (orgstrap---headline-faces)
+  (set-face-attribute 'org-block-begin-line nil :extend t :foreground "black" :background "silver")
+  (set-face-attribute 'org-block-end-line nil :extend t :foreground "black" :background "silver")
+  (set-face-attribute 'org-block nil :extend t :background "white"))
+
+;; local utility function (buffer local functions would be great ... don't even need namespaces)
+
+(defun literal (string)
+  "Utility function for sparql :vars that need to be escaped."
+  (prin1-to-string string))
+
+;; server defuns
+
+<<blazegraph-server>>
+
+;; start blazegraph
+
+(unless (blazegraph-server-running-p)
+  (let ((process (if test-dir
+                     (let ((default-directory test-dir))
+                       (blazegraph-server-process))
+                   (blazegraph-server-process))))
+    (message "Starting Blazegraph ...")
+    (while (let ((status (process-status (process-name process))))
+             (and (eq status 'run) (not (blazegraph-server-http-ok-p))))
+      (sleep-for 0 100)))
+  (blazegraph-create-tab-with-buffer))
+
+;; check that server is up
+
+(if (blazegraph-server-http-ok-p)
+    ;; Once packages have been successfully installed hide the First Run heading.
+    (orgstrap---fold-heading "Getting Started")
+  (message "orgstrap failed see *Messages* tab for details."))
 #+end_src
+** Common
+#+name: common-defuns
+#+begin_src elisp
+(defun orgstrap---fold-heading (&optional name)
+  ;; https://orgmode.org/manual/Using-the-Property-API.html
+  (save-excursion
+    (if name
+        (goto-char (org-find-exact-headline-in-buffer name))
+      (org-previous-visible-heading 0))
+    (org-entry-put nil "visibility" "folded")
+    (save-buffer)))
+#+end_src
+** Packages
+FIXME need a way to allow users to confirm/enable this.
+#+name: orgstrap-packages
+#+begin_src elisp
+(require 'package)
 
-** Local Variables :ARCHIVE:
+(add-to-list
+ 'package-archives
+ '("melpa" . "https://melpa.org/packages/")
+ t)
 
+(add-to-list
+ 'package-archives
+ '("org" . "https://orgmode.org/elpa/")
+ t)
+
+(unless package--initialized
+  (package-initialize))
+
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+
+(eval-when-compile
+  (require 'use-package))
+
+(setq use-package-always-ensure t)
+
+(when (not (fboundp #'undo-redo))
+  ;; Emacs' `undo-redo' is only available in Emacs >= 28
+  ;; `undo-fu' has a backport that we can use
+  (use-package undo-fu
+    :init
+    (defalias 'undo-redo #'undo-fu-only-undo "Backport `undo-redo'")))
+
+(use-package sparql-mode)
+
+(use-package org-plus-contrib
+  :mode ("\\.org\\'" . org-mode)
+  :init
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((sparql . t)
+     (python . t))))
+#+end_src
+** Blazegraph Server
+#+name: blazegraph-server
+#+begin_src elisp
+(defvar blazegraph-process-name "*blazegraph-server process*"
+  "Name of the process and buffer for blazegraph.")
+
+(defvar blazegraph-port 9999
+  "Default port for blazegraph sparql endpoint.")
+
+(defun blazegraph-options (&optional port prefixes journal)
+  (let ((port (or port blazegraph-port))
+        (prefixes (or prefixes "data/prefixes.conf"))
+        (journal (or journal "data/blazegraph.jnl")))
+    `((jetty.port . ,port)
+      ;; (log4j.logger.com.bigdata . INFO)
+      (com.bigdata.journal.AbstractJournal.file . ,journal)
+      (com.bigdata.rdf.sail.sparql.PrefixDeclProcessor.additionalDeclsFile . ,prefixes))))
+
+(defun blazegraph-server-process (&optional port prefixes journal)
+  "Start blazegraph server at port PORT."
+  (let* ((process-name blazegraph-process-name)
+         (buffer (generate-new-buffer process-name))
+         (options (blazegraph-options port prefixes journal))
+         (options-cli (mapcar (lambda (pair)
+                                (format "-D%s=%s" (car pair) (cdr pair)))
+                              options)))
+    (with-current-buffer buffer
+      (let ((argv `(,process-name
+                    ,(current-buffer)
+                    "java"
+                    "-server"
+                    "-Xmx4g"
+                    ,@options-cli
+                    "-jar"
+                    "opt/blazegraph.jar")))
+        ;;(message "%s" argv)
+        (apply #'start-process argv)))))
+
+;;(defvar url-http-end-of-headers)
+
+(defun url-head-ok (url)
+  "Check if URL is up and OK using HTTP HEAD.
+All errors are silenced."
+  (let ((url-request-method "HEAD"))
+    (condition-case nil
+        (with-current-buffer (url-retrieve-synchronously url)
+          ;;(buffer-substring (point-min) url-http-end-of-headers)
+          (goto-char 0)
+          (re-search-forward "^HTTP.+OK$"))
+      (error nil))))
+
+(defun blazegraph-server-http-ok-p (&optional port)
+  "Returns t if if sparql endpoint is up on PORT."
+  (let ((port (or port blazegraph-port)))
+    (url-head-ok (format "http://localhost:%s/blazegraph/sparql" port))))
+
+(defun blazegraph-server-running-p (&optional port)
+  "Returns t if server is running otherwise nil.
+Checks for child process, if no process checks sparql endpoint."
+  (let ((process (get-process blazegraph-process-name))
+        (port (or port blazegraph-port)))
+    (or (and process (process-live-p process))
+        (blazegraph-server-http-ok-p port))))
+
+(defun blazegraph-server-stop ()
+  "Stop the blazegraph server."
+  (let ((process (get-process blazegraph-process-name)))
+    (when process
+      (prog1
+          (interrupt-process process))
+      ;; spin block until the process is dead so that
+      ;; Emacs won't prompt when we try to exit
+      (while (process-live-p process)
+        (sleep-for 0 100)))))
+
+(defun blazegraph-create-tab-with-buffer ()
+  (when tab-bar-mode
+    (tab-bar-new-tab 1)
+    (switch-to-buffer blazegraph-process-name)
+    (tab-bar-switch-to-prev-tab)))
+#+end_src
+** Usability
+The default for =org-cycle-hook= is what causes the position of headings
+to change when they are opened/closed. This is extremely undesirable when
+using a mouse to toggle headings. https://emacs.stackexchange.com/a/31277
+
+#+name: usability
+#+begin_src elisp
+;; mouse behavior
+
+(defun orgstrap---safe-cycle (event &optional promote-to-region)
+  "Bind this to mouse-1 for sane clickable cycling behavior."
+  (interactive "e\np")
+  (let ((face (get-char-property (point) 'face)))
+    (unless (and face (listp face) (memq 'org-block face))
+      (unwind-protect
+          (progn
+            (remove-hook 'org-cycle-hook #'org-optimize-window-after-visibility-change t)
+            (org-cycle))
+        (add-hook 'org-cycle-hook #'org-optimize-window-after-visibility-change nil t))))
+  ;; have to chain `mouse-set-point' otherwise double click to highlight words etc. fails
+  (mouse-set-point event promote-to-region))
+
+(defun orgstrap---mouse-cycle ()
+  "Allow left mouse to cycle org headings."
+  (interactive)
+  ;; reset `org-cycle-hook' as a local variable so that
+  ;; we can add/remove individual hooks without messing
+  ;; with the global behavior which might some day not
+  ;; be purely single threaded (heh)
+  (setq-local org-cycle-hook org-cycle-hook)
+  (local-unset-key [mouse-1])
+  (local-set-key [mouse-1] #'orgstrap---safe-cycle))
+
+;; don't export buttons
+
+(defun orgstrap---nox (path desc format)
+  "Return nothing for export"
+  "")
+
+;; bold headlines
+
+(defun orgstrap---headline-faces ()
+  (mapcar (lambda (n) (set-face-attribute (intern (format "org-level-%s" n)) nil :bold t))
+          (number-sequence 1 8)))
+
+;; quit buttons
+
+(org-link-set-parameters "QUIT" :export #'orgstrap---nox :follow
+                         (lambda (&optional nothing)
+                           (blazegraph-server-stop)
+                           (save-buffers-kill-terminal 16)))
+
+(org-link-set-parameters "KILL" :export #'orgstrap---nox :follow
+                         (lambda (&optional nothing)
+                           (blazegraph-server-stop)
+                           (save-buffers-kill-terminal 0)))
+
+;; hide tutorial
+
+(org-link-set-parameters "FOLD-HEADLINE" :export #'orgstrap---nox :follow
+                         (lambda (&optional nothing)
+                           (orgstrap---fold-heading)))
+
+;; use clickable links to run the next block
+
+;;(org-link-set-parameters "run" :follow #'org-babel-ref-resolve)
+;; Simple way to make a button that will run the next block.
+(org-link-set-parameters "RUN" :export #'orgstrap---nox :follow
+                         (lambda (&optional nothing)
+                           (org-next-block nil)
+                           (org-babel-execute-src-block)))
+
+(org-link-set-parameters "RUNP" :export #'orgstrap---nox :follow
+                         (lambda (&optional nothing)
+                           (org-previous-block nil)
+                           (org-babel-execute-src-block)))
+
+;; link button to run the next #+call: TODO we should be able to do this with mouse-1?
+
+(org-link-set-parameters "RUNC" :export #'orgstrap---nox :follow
+                         (lambda (&optional nothing)
+                           (save-excursion
+                             (re-search-forward "#\\+call:")
+                             (org-ctrl-c-ctrl-c))))
+
+;; link buttons change the size of the text in the file
+
+(defun recenter-on-mouse ()
+  "Recenter the cursor so that it is under the mouse."
+  ;; after much digging using `mouse-pixel-position' together
+  ;; with `pos-at-x-y' seems to be what we want, `mouse-position'
+  ;; and `window-edges' are decidedly NOT the right solution
+  ;; `pos-at-x-y' is able to call into the C code to get something
+  ;; much closer to what is produced by an actual mouse event
+  ;; https://emacs.stackexchange.com/questions/30852 has the wrong solution
+  (interactive)
+  (let* ((mpp (mouse-pixel-position))
+         (position-list (posn-at-x-y (cadr mpp)
+                                     (cddr mpp)
+                                     (selected-frame)
+                                     nil))
+         ;;(asdf (message "%s" hrm))
+         (mouse-line (cdr (posn-actual-col-row position-list)))
+         (cursor-line (- (line-number-at-pos)
+                         (line-number-at-pos (window-start))))
+         (offset (- mouse-line cursor-line)))
+    ;;(message "ml: %s cl: %s offset: %s" mouse-line cursor-line offset)
+    (scroll-down offset)))
+
+(org-link-set-parameters "TEXT-LARGER" :export #'orsgrap--nox :follow
+                         (lambda (&optional nothing)
+                           (text-scale-adjust 1)
+                           (recenter-on-mouse)))
+
+(org-link-set-parameters "TEXT-SMALLER" :export #'orsgrap---nox :follow
+                         (lambda (&optional nothing)
+                           (text-scale-adjust -1)
+                           (recenter-on-mouse)))
+
+(org-link-set-parameters "TEXT-RESET" :export #'orsgrap---nox :follow
+                         (lambda (&optional nothing)
+                           (text-scale-adjust 0)
+                           (recenter-on-mouse)))
+
+;; link button to disable ob eval checks for sparql blocks in the current buffer
+
+(org-link-set-parameters "OB-NOASK" :export #'orsgrap---nox :follow
+                         (lambda (&optional nothing)
+                           (setq-local org-confirm-babel-evaluate #'orgstrap---noconfirm-eval-sparql)
+                           (message "SPARQL queries will now run without confirmation.")))
+#+end_src
+** Local variables :ARCHIVE:
 # Local Variables:
+# org-adapt-indentation: nil
+# org-edit-src-content-indentation: 0
+# org-hide-emphasis-markers: t
+# mouse-wheel-progressive-speed: nil
+# mouse-wheel-scroll-amount: (3 ((shift) . 3))
 # eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable) (let ((ocbe org-confirm-babel-evaluate)) (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (unwind-protect (save-excursion (org-babel-goto-named-src-block "orgstrap") (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility))))
 # End:
+* Run Query ▶
