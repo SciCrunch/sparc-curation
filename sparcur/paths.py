@@ -9,9 +9,48 @@ from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
-from sparcur.utils import log, GetTimeNow, register_type, unicode_truncate
-from sparcur.utils import transitive_dirs, transitive_paths
+from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
+from sparcur.utils import transitive_dirs, transitive_paths, is_list_or_tuple
 from sparcur.config import auth
+
+
+# http://fileformats.archiveteam.org/wiki/Main_Page
+# https://www.nationalarchives.gov.uk/PRONOM/Format/proFormatSearch.aspx?status=new
+# FIXME case senstivity
+suffix_mimetypes = {
+    ('.jpx',): 'image/jpx',
+    ('.jp2',): 'image/jp2',
+
+    # sequencing
+    ('.fq',):          'application/fastq',  # wolfram lists chemical/seq-na-fastq which is overly semantic
+    ('.fq', '.gz'):    'application/x-gz-compressed-fastq',
+    ('.fastq',):       'application/fastq',
+    ('.fastq', '.gz'): 'application/x-gz-compressed-fastq',
+    ('.bam',):         'application/vnd.hts.bam',
+
+    ('.mat',):         'application/x-matlab-data',  # XXX ambiguous, depending on the matlab version
+    ('.m',):           'application/x-matlab',
+
+    ('.nii',):       'image/nii',
+    ('.nii', '.gz'): 'image/gznii',  # I'm not sure that I believe this
+
+    # http://ced.co.uk/img/TrainDay.pdf page 7
+    ('.smr',):       'application/vnd.cambridge-electronic-designced.spike2.32.data',
+    ('.smrx',):      'application/vnd.cambridge-electronic-designced.spike2.64.data',
+
+    ('.s2r',):       'application/vnd.cambridge-electronic-designced.spike2.resource',
+    ('.s2rx',):      'application/vnd.cambridge-electronic-designced.spike2.resource+xml',
+
+    ('.abf',):       'application/vnd.axon-instruments.abf',
+
+    ('.nd2',):       'image/vnd.nikon.nd2',
+    ('.czi',):       'image/vnd.zeiss.czi',
+}
+
+banned_basenames = (
+    '.DS_Store',
+    'Thumbs.db',
+)
 
 
 def cleanup(func):
@@ -43,6 +82,8 @@ class BlackfynnCache(PrimaryCache, EatCache):
 
     uri_human = backends.BlackfynnRemote.uri_human
     uri_api = backends.BlackfynnRemote.uri_api
+
+    _suffix_mimetypes = suffix_mimetypes
 
     @classmethod
     def decode_value(cls, field, value):
@@ -169,6 +210,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
 
     @property
     def cache_key(self):
+        # FIXME file system safe
         return f'{self.id}-{self.file_id}'
 
     def _dataset_metadata(self, force_cache=False):
@@ -382,6 +424,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
     _dataset_cache = {}
 
+    _suffix_mimetypes = suffix_mimetypes
+
     @classmethod
     def fromJson(cls, blob):
         # FIXME the problem here is that we can't distingish between cases where
@@ -514,6 +558,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
         blob['uri_api'] = uri_api
         blob['uri_human'] = uri_human
+
+        if meta.size is not None:
+            blob['size_bytes'] = meta.size
+
         if (self.is_file() or self.is_broken_symlink()) and meta.checksum is not None:
             # FIXME known checksum failures !!!!!!!
             blob['checksums'] = [{'type': 'checksum',
@@ -551,6 +599,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             'type': 'path',
             'dataset_id': bf_ds_id,
             'dataset_relative_path': drp,
+            'basename': self.name,  # for sanity's sake
         }
 
         mimetype = self.mimetype
@@ -589,20 +638,119 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                 cjm['parent_drp'] = p
             return cjm
 
+        def sort_dirs_first(d):
+            # NOTE THAT mimetype IS NOT A REQUIRED FIELD
+            return ((not ('mimetype' in d and
+                          d['mimetype'] == 'inode/directory')),
+                    'mimetype' in d)
+
         exclude_patterns = '*.~lock*#', '.DS_Store'  # TODO make this configurable
+        _tm = hrm(self)
+        _tm['dataset_relative_path'] = ''  # don't want . since it is ambiguous?
+        this_metadata = [_tm]  # close the transitive metadata under parent_id
         # FIXME perf boost but not portable
         rchildren = transitive_paths(self, exclude_patterns=exclude_patterns)
-        metadata = [_ for _ in [hrm(c) for c in rchildren] if _ is not None]
+        _rcm = [_ for _ in [hrm(c) for c in rchildren] if _ is not None]
+        rc_metadata = sorted(_rcm, key=sort_dirs_first)
+        metadata = this_metadata + rc_metadata
         index = {b['dataset_relative_path']:b for b in metadata}
-        pid = self._uri_api_bf(self.cache_id)
+        #pid = self._uri_api_bf(self.cache_id)
+        pid = this_metadata[0]['remote_id']
         for m in metadata:
             p = m.pop('parent_drp', None)
             if p in index:
-                m['parent_id'] = index[p]['uri_api']
+                m['parent_id'] = index[p]['remote_id']
             else:
                 m['parent_id'] = pid
 
         return metadata
+
+    @classmethod
+    def _file_type_status_lookup(cls):
+        import json  # FIXME
+        if not hasattr(cls, '_sigh_ftslu'):
+            resources = auth.get_path('resources')
+            with open(resources / 'mimetypes.json', 'rt') as f:
+                classification = json.load(f)
+
+            mimetypes = {mimetype:status for status,objs in
+                         classification.items() for obj in objs
+                         for mimetype in (obj['mimetype']
+                                          if is_list_or_tuple(obj['mimetype']) else
+                                          (obj['mimetype'],))}
+            suffixes = {obj['suffix']:status for status,objs in
+                        classification.items() for obj in objs}
+            cls._mimetypes_lu, cls._suffixes_lu = mimetypes, suffixes
+            cls._sigh_ftslu = True
+
+
+        return cls._mimetypes_lu, cls._suffixes_lu
+
+    _banned_basenames = banned_basenames
+    _unknown_suffixes = set()
+    _unclassified_mimes = set()
+    @classmethod
+    def validate_path_json_metadata(cls, path_meta_blob):
+        from sparcur.core import HasErrors  # FIXME
+        he = HasErrors(pipeline_stage=cls.__name__ + '.validate_path_json_metadata')
+        mimetypes, suffixes = cls._file_type_status_lookup()  # SIGH this overhead is 2 function calls and a branch
+        for i, path_meta in enumerate(path_meta_blob['data']):
+            if path_meta['basename'] in cls._banned_basenames:
+                msg = f'illegal file detect {path_meta["basename"]}'
+                dsrp = path_meta['dataset_relative_path']
+                if he.addError(msg, path=dsrp, json_path=('data', i)):
+                    logd.error(msg)
+                status = 'banned'
+                path_meta['status'] = status
+                continue
+
+            if 'magic_mimetype' in path_meta and 'mimetype' in path_meta:
+                # FIXME NOT clear whether magic_mimetype should be used by itself
+                # usually magic and file extension together work, magic by itself
+                # can give some completely bonkers results
+                source = 'magic_mimetype'
+                mimetype = path_meta['magic_mimetype']
+                muggle_mimetype = path_meta['mimetype']
+                if mimetype != muggle_mimetype:
+                    msg = f'mime types do not match {mimetype} != {muggle_mimetype}'
+                    dsrp = path_meta['dataset_relative_path']
+                    if he.addError(msg, path=dsrp, json_path=('data', i)):
+                        log.error(msg)
+            elif 'magic_mimetype' in path_meta:
+                source = 'magic_mimetype'
+                mimetype = path_meta['magic_mimetype']
+            elif 'mimetype' in path_meta:
+                source = 'mimetype'
+                mimetype = path_meta['mimetype']
+            else:
+                mimetype = None
+
+            if mimetype is not None:
+                try:
+                    status = mimetypes[mimetype]
+                    if status == 'banned':
+                        msg = f'banned mimetype detected {mimetype}'
+                        dsrp = path_meta['dataset_relative_path']
+                        if he.addError(msg, path=dsrp,
+                                       json_path=('data', i, source)):
+                            logd.error(msg)
+                except KeyError as e:
+                    status = 'known'
+                    if mimetype not in cls._unclassified_mimes:
+                        cls._unclassified_mimes.add(mimetype)
+                        log.info(f'unclassified mimetype {mimetype}')
+            else:
+                status = 'unknown'
+                msg = f'unknown mimetype {path_meta["basename"]}'
+                dsrp = path_meta['dataset_relative_path']
+                cls._unknown_suffixes.add(tuple(dsrp.suffixes))
+                if he.addError(msg, path=dsrp, json_path=('data', i)):
+                    logd.warning(msg)
+
+            path_meta['status'] = status
+
+        if he._errors_set:
+            he.embedErrors(path_meta_blob)
 
     def pull(self, *args,
              paths=None,

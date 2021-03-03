@@ -1318,6 +1318,9 @@ done"""
                 cmeta = path.cache.meta
                 if cmeta is not None:
                     if self.options.diff:
+                        if path.is_dir():
+                            print('It is not meaningful to diff directory metadata.')
+                            return
                         if cmeta.checksum is None:
                             if not path.cache.local_object_cache_path.exists():
                                 # we are going to have to go to network

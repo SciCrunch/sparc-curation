@@ -1443,6 +1443,7 @@ def main(id=None,
          parent_path=None,
          parent_parent_path=Path.cwd(),
          path=None,  # keep path out of kwargs
+         invariant_local_path='dataset',
          ,**kwargs):
     # FIXME parent_path and project_id seem like they probably need to
     # be passed here, it would be nice if project_path could just be
@@ -1460,7 +1461,7 @@ def main(id=None,
         parent_path = parent_parent_path / uuid
         parent_path.mkdir(exist_ok=True)
 
-    invariant_path = parent_path / 'dataset'  # FIXME hardcoded
+    invariant_path = parent_path / invariant_local_path
 
     # XXX for now we do these steps in order here
     # rather than trusting that calling simple.pull.main will do
@@ -1857,7 +1858,49 @@ if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main, after=print)
 #+end_src
+
 **** Network resources
+**** _Dataset Path Metadata_
+This is a bit out of order since validation is run after an initial export.
+#+name: dataset-path-metadata-validate
+#+begin_src python :tangle ../sparcur/simple/path_metadata_validate.py
+# FIXME this is not really doing what we want yet
+from sparcur.paths import Path
+from sparcur.simple import path_metadata
+
+
+def from_path_validated_json_metadata(path):
+    tm = path_metadata.from_path_transitive_metadata(path)
+    from_blob_validated_json_metadata(tm)
+    return tm
+
+
+def from_blob_validated_json_metadata(blob):
+    """ Mutates in place. """
+    Path.validate_path_json_metadata(blob)
+    # perferred
+    # accepted
+    # banned
+    # known
+    # unknown
+
+
+def main(_entry_point=False, **kwargs):
+    # FIXME we want to be able to accept
+    # --dataset-id, <json-file-to-validate>, and some other things probably?
+    return path_metadata.main(validate=True, _entry_point=_entry_point, **kwargs)
+    if export_path:
+        from_blob_validate_path_json_metadata
+    else:
+        from_path_validate_path_json_metadata(path)
+
+
+if __name__ == '__main__':
+    #import pprint
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main)#, after=pprint.pprint)
+
+#+end_src
 *** _*Export*_
 **** _Setup for per-dataset export_
 #+name: export.py
@@ -1952,12 +1995,19 @@ Usage example
 find  -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -exec python -m sparcur.simple.path_metadata {} \;
 #+end_src
 
+=xargs= variant.
+#+begin_src bash
+find  -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -print0 | \
+xargs -0 -I{} -P8 -r -n 1 python -m sparcur.simple.path_metadata {}
+#+end_src
+
 Alternate example
 #+begin_src bash
 python -m sparcur.simple.path_metadata \
 21957eae-0824-4fb5-b18f-04d6ed12ce18/dataset \
 --export-parent-path 21957eae-0824-4fb5-b18f-04d6ed12ce18/exports/
 #+end_src
+
 #+name: dataset-path-metadata-extract
 #+begin_src python :tangle ../sparcur/simple/path_metadata.py
 from pathlib import Path
@@ -1970,10 +2020,23 @@ def from_path_transitive_metadata(path):
             'data': tml,}
 
 
-def main(path=Path.cwd(), time_now=None,
-         export_path=None, export_parent_path=None, _entry_point=False, **kwargs):
+def main(path=Path.cwd(), id=None, time_now=None,
+         parent_path=None, invariant_local_path='dataset',
+         parent_parent_path=Path.cwd(),
+         export_local=False, export_path=None, export_parent_path=None,
+         _entry_point=False, validate=False, **kwargs):
     from sparcur.paths import Path
     from sparcur.simple.export import prepare_dataset_export, export_blob
+
+    if path == Path.cwd() and (id is not None or parent_path is not None):
+        if parent_path is None:
+            N, thing_type, uuid = id.split(':')
+            parent_path = parent_parent_path / uuid
+
+        invariant_path = parent_path / invariant_local_path
+        path = invariant_path.expanduser().resolve()
+    else:
+        parent_parent_path = None
 
     # TODO path from dataset_id and retrieve conventions? or just pass path from retrieve final output?
     # TODO parallelize if multiple paths
@@ -1995,6 +2058,8 @@ def main(path=Path.cwd(), time_now=None,
 
     tm = from_path_transitive_metadata(path)
     # FIXME TODO validate file formats, which means this also needs to support the remoteless case
+    if validate:  # FIXME raw vs validated and FIXME pipeline
+        Path.validate_path_json_metadata(tm)
 
     if _entry_point:
         export_blob_path = export_blob(tm, 'path-metadata.json', **kwargs)
@@ -2035,6 +2100,8 @@ Options:
     --parent-path=PATH              the parent path where the project will be cloned to
     --parent-parent-path=PATH       parent in which a random tempdir is generated
                                     to be the parent path, don't use this ...
+    --invariant-local-path=PATH     path relative to parent path for dataset [default: dataset]
+    --export-local                  set export-parent-path to {:parent-path}/exports/
     --export-path=PATH              base export path containing the standard path structure
     --export-parent-path=PATH       direct parent path into which exports will be placed
     --extension=<EXT>...            one or more file extensions to fetch
@@ -2043,13 +2110,14 @@ Options:
     --exclude-uploaded              do not pull files from remote marked as uploaded
     --sparse-limit=N                package count that forces a sparse pull [default: 10000]
     --symlink-objects-to=PATH       path to an existing objects directory
+    --log-level=LEVEL               log level info [default: INFO]
 """
 
 import os
 from types import GeneratorType
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, GetTimeNow
+from sparcur.utils import log, logd, loge, GetTimeNow
 from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
@@ -2119,16 +2187,48 @@ class Options(clif.Options):
             return Path(pp).expanduser().resolve()
 
     @property
+    def parent_parent_path(self):
+        ppp = self._args['--parent-parent-path']
+        if ppp:
+            return Path(ppp).expanduser().resolve()
+        else:
+            return Path.cwd()
+
+    @property
+    def parent_path(self):
+        pap = self._args['--parent-path']
+        did = self.dataset_id
+        if pap:
+            return Path(pap).expanduser().resolve()
+        elif did:
+            id = self.id  # dataset_id is a list so use id which handles that
+            N, thing_type, uuid = id.split(':')  # FIXME N:dataset: vs dataset: vs uuid alone
+            return (self.parent_parent_path / uuid).expanduser().resolve()
+
+    @property
     def export_path(self):
         ep = self._args['--export-path']
-        if ep:
+        epp = self.export_parent_path
+        if ep and epp:
+            raise TypeError('Only one of --export-path and --export-parent-path may be set.')
+        elif ep:
             return Path(ep).expanduser().resolve()
 
     @property
     def export_parent_path(self):
         epp = self._args['--export-parent-path']
-        if epp:
+        el = self.export_local
+        pap = self.parent_path
+        if epp and el:
+            raise TypeError('Only one of --export-local and --export-parent-path may be set.')
+        elif epp:
             return Path(epp).expanduser().resolve()
+        elif el and pap:
+            # it is ok to do this here becuase the TypeError above prevents
+            # the case where both epp and el are set, so even though epp
+            # is no longer always what was set on the command line, it is
+            # it is the case that there won't be conflicting sources
+            return pap / 'exports'
 
     @property
     def extensions(self):
@@ -2156,7 +2256,16 @@ def pipe_main(main, after=None, argv=None):
     options, args, defaults = Options.setup(__doc__, argv=argv)
     # _entry_point is used as a way to switch behavior when a
     # pipeline main is run directly or actually in a pipeline
-    out = main(_entry_point=True, **options.asKwargs())
+    try:
+        log.setLevel(options.log_level)
+        logd.setLevel(options.log_level)
+        loge.setLevel(options.log_level)
+        out = main(_entry_point=True, **options.asKwargs())
+    except Exception as e:
+        log.exception(e)
+        log.error(options.path)
+        raise e
+
     if after:
         after(out)
 

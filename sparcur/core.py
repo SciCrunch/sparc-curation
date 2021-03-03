@@ -186,7 +186,7 @@ class HasErrors:
         else:
             data[mpk] = [key]
 
-    def addError(self, error, pipeline_stage=None, blame=None, path=None):
+    def addError(self, error, pipeline_stage=None, blame=None, path=None, json_path=None):
         do_log = error not in self._already_logged
         if do_log:
             self._already_logged.add(error)
@@ -195,18 +195,21 @@ class HasErrors:
                  else (self._pipeline_stage if self._pipeline_stage
                        else self.__class__.__name__))
         b = len(self._errors_set)
-        et = (error, stage, blame, path)
+        et = (error, stage, blame, path, json_path)
         self._last_error = et
         self._errors_set.add(et)
         a = len(self._errors_set)
         return a != b and do_log
 
-    def _render(self, e, stage, blame, path):
+    def _render(self, e, stage, blame, path, json_path):
         o = {'pipeline_stage': stage,
-                'blame': blame,}  # FIXME
+             'blame': blame,}  # FIXME
 
         if path is not None:
             o['file_path'] = path
+
+        if json_path is not None:
+            o['path'] = json_path
 
         if isinstance(e, str):
             o['message'] = e

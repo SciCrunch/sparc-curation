@@ -1,0 +1,90 @@
+{
+    "banned": [
+        {"suffix": ".doc",
+         "mimetype": "application/msword"},
+        {"suffix": ".pages",
+         "mimetype": ["application/x-iwork-pages-sffpages",
+                      "application/vnd.apple.pages"]},
+        {"suffix": ".rtf",
+         "mimetype": "application/rtf"},
+
+        {"suffix": ".cdr",
+         "mimetype": "application/vnd.corel-draw"},
+
+        {"suffix": ".sws",
+         "mimetype": "application/vnd.objective-imaging-ltd.surveyor-workspace"},
+
+        {"suffix": ".ppt",
+         "mimetype": "application/vnd.ms-powerpoint"},
+        {"suffix": ".key",
+         "mimetype": ["application/x-iwork-keynote-sffkey",
+                      "application/vnd.apple.keynote"]},
+
+        {"suffix": ".xls",
+         "mimetype": "application/vnd.ms-excel"},
+        {"suffix": ".numbers",
+         "mimetype": ["application/x-iwork-numbers-sffnumbers",
+                      "application/vnd.apple.numbers"]}
+    ],
+    "preferred": [
+        {"suffix": ".fcs",
+         "mimetype": "application/vnd.isac.fcs"},
+
+        {"suffix": ".md",
+         "mimetype": "text/markdown"},
+        {"suffix": ".txt",
+         "mimetype": "text/plain"},
+
+        {"suffix": ".csv",
+         "mimetype": "text/csv"},
+        {"suffix": ".tsv",
+         "mimetype": "text/tab-separated-values"},
+
+        {"suffix": ".jp2",
+         "mimetype": "image/jp2"},
+        {"suffix": ".jpx",
+         "mimetype": "image/jpx"}
+
+    ],
+    "accepted": [
+        {"suffix": ".xlsx",
+         "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+        {"suffix": ".ods",
+         "mimetype": "application/vnd.oasis.opendocument.spreadsheet"},
+
+        {"suffix": ".pptx",
+         "mimetype": "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+        {"suffix": ".odp",
+         "mimetype": "application/vnd.oasis.opendocument.presentation"},
+
+        {"suffix": ".docx",
+         "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+        {"suffix": ".odt",
+         "mimetype": "application/vnd.oasis.opendocument.text"},
+        {"suffix": ".pdf",
+         "mimetype": "application/pdf"},
+        {"suffix": ".org",
+         "mimetype": "text/org"},
+        {"suffix": ".tex",
+         "mimetype": "text/x-tex"},
+        {"suffix": ".rst",
+         "mimetype": "text/x-rst"},
+
+        {"suffix": ".json",
+         "mimetype": "application/json"},
+        {"suffix": ".xml",
+         "mimetype": "application/xml"}
+
+    ],
+    "undecided": [
+        {"suffix":".nd2",
+         "mimetype": "image/vnd.nikon.nd2",
+         "comment": "many incompatible internal formats https://rbnvrw.github.io/nd2reader/"},
+        {"suffix":".s2rx",
+         "mimetype": "application/vnd.cambridge-electronic-designced.spike2.resource+xml"}
+    ],
+    "utility": [
+        {"suffix": null,
+         "mimetype": "inode/directory"}
+    ]
+}

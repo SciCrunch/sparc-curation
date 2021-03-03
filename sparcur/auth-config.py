@@ -6,6 +6,7 @@
                  'environment-variables': 'SPARCUR_CACHE_PATH CACHE_PATH'},
   'log-path': {'default': '{:user-log-path}/sparcur',
                'environment-variables': 'SPARCUR_LOG_PATH LOG_PATH'},
+  'resources': ['../resources/',],
   'blackfynn-organization': {'environment-variables': 'BLACKFYNN_ORGANIZATION'},
   'blackfynn-backoff-factor': {'default': 1,
                                'environment-variables': 'BLACKFYNN_BACKOFF_FACTOR'},
