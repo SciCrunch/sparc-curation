@@ -1821,7 +1821,9 @@ def main():
         raise e
     finally:
         if logfile.size == 0:
-            logfile.unlink()  # FIXME broken on windows with spc apinat
+            # close log handlers to safely unlink on windows
+            [h.close() for h in log.handlers]
+            logfile.unlink()
 
     if options.profile:
         exit = time()
