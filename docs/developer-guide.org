@@ -1,6 +1,6 @@
 #+TITLE: sparcur developer guide
 #+AUTHOR: Tom Gillespie
-#+OPTIONS: num:nil ^:nil h:7
+#+OPTIONS: num:nil ^:nil h:7 broken-links:t
 #+LATEX_HEADER: \usepackage[margin=0.8in]{geometry}
 #+STARTUP: showall
 
@@ -631,6 +631,91 @@ function sparc-export-all () {
 ** Single dataset
 *** _*Retrieve*_
 **** Overview                                                        :ignore:
+#+name: graph-retrieve-single
+#+header: :wrap "src dot :file ./images/graph-retrieve-single.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g
+  (dag-notation
+   :                                                                            pull -> clone
+   digest-2 -> file-contents -> fetch-files -> filter-files -> path-metadata -> pull -> sparse-materialize -> fetch-remote-metadata
+   :                 fetch-2 -> fetch-files
+   :                                 path-metadata-validate -> path-metadata
+   :                      digest-1                          -> path-metadata
+   :                      digest-1 -> pipeline-start -> fetch-metadata-files -> pull
+   :                                         fetch-1 -> fetch-metadata-files
+   :                                         fetch-1 -> fetch-annotations
+   ))
+
+(graphviz-2 g #:clusters
+            (list
+             (cluster "retrieve.py" 'green '(fetch-remote-metadata clone
+                                             sparse-materialize pull
+                                             fetch-metadata-files))
+             (cluster "path_metadata_validate.py" 'purple '(path-metadata-validate path-metadata))))
+#+end_src
+
+#+RESULTS[0a6edf0f4a2695740e58f78d9a31e1c88fb4ba3e]: graph-retrieve-single
+#+begin_src dot :file ./images/graph-retrieve-single.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="path-metadata-validate"];
+	node1 [label="fetch-2"];
+	node2 [label="digest-2"];
+	node3 [label="fetch-metadata-files"];
+	node4 [label="filter-files"];
+	node5 [label="file-contents"];
+	node6 [label="sparse-materialize"];
+	node7 [label="fetch-annotations"];
+	node8 [label="fetch-files"];
+	node9 [label="clone"];
+	node10 [label="fetch-remote-metadata"];
+	node11 [label="fetch-1"];
+	node12 [label="digest-1"];
+	node13 [label="path-metadata"];
+	node14 [label="pull"];
+	node15 [label="pipeline-start"];
+	subgraph U {
+		edge [dir=none];
+	}
+	subgraph cluster_0 {
+		label="retrieve.py";
+		color=green;
+		node10;
+		node9;
+		node6;
+		node14;
+		node3;
+	}
+	subgraph cluster_1 {
+		label="path_metadata_validate.py";
+		color=purple;
+		node0;
+		node13;
+	}
+	subgraph D {
+		node0 -> node13;
+		node1 -> node8;
+		node2 -> node5;
+		node3 -> node14;
+		node4 -> node13;
+		node5 -> node8;
+		node6 -> node10;
+		node8 -> node4;
+		node11 -> node7;
+		node11 -> node3;
+		node12 -> node15;
+		node12 -> node13;
+		node13 -> node14;
+		node14 -> node9;
+		node14 -> node6;
+		node15 -> node3;
+	}
+}
+#+end_src
+
+#+RESULTS[e1bd20c4ba0201415ec2998cd18e8226bc9f801f]:
+[[file:./images/graph-retrieve-single.png]]
+
 **** Bash implementation                                             :ignore:
 #+begin_src bash
 function sparcur-retrieve () {
@@ -682,6 +767,8 @@ run a dataset.
 **** Retrieve
 This is ref:clone.py, ref:fetch_remote_metadata_all.py, and ref:pull.py.
 **** Extract
+This is now called ref:path_metadata, but it is also dealt with as
+part of specimen_dirs.
 **** Transform
 **** Validate
 We can't do this right now because the current dataset template cannot
@@ -1901,6 +1988,10 @@ if __name__ == '__main__':
     pipe_main(main)#, after=pprint.pprint)
 
 #+end_src
+
+#+name: dataset-path-data
+#+begin_src python :tangle ../sparcur/simple/path_data.py
+#+end_src
 *** _*Export*_
 **** _Setup for per-dataset export_
 #+name: export.py
@@ -2397,10 +2488,17 @@ def test_pipe_main():
 * Code :noexport:
 See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
 for more direct mapping of graphviz functionality but one that is also way more verbose.
+# #+header: :tangle no
 #+name: racket-graph-helper
-#+header: :prologue "#lang racket/base"
-#+begin_src racket :lang racket/base :exports none :tangle ./y-u-no-compile-from-buffer.rkt :tangle no
-(require graph ; rack pkg install graph
+#+header: :prologue "#lang racket/base" :comments link
+#+begin_src racket :lang racket/base :exports none :tangle ./y-u-no-compile-from-buffer.rkt
+(require graph ; raco pkg install graph
+         racket/pretty
+         racket/set
+         racket/list
+         (only-in racket/format ~a)
+         (only-in racket/port
+                  with-output-to-string)
          (only-in racket/string
                   string-trim
                   string-replace)
@@ -2411,10 +2509,16 @@ for more direct mapping of graphviz functionality but one that is also way more 
   (for/list ([a l] [b (cdr l)]) (list a b)))
 
 (define-syntax (dag-notation stx)
+  "Write out directed graphs using a -> b -> c syntax.
+You can use a colon : at the start of a line to preserve spacing."
   (syntax-parse stx
-    #:datum-literals (->)
-    [(_ (~seq left (~seq -> right) ...) ...)
-     #:with (pairs ...) (datum->syntax this-syntax (apply append (map list-to-pairs (syntax->datum #'((left right ...) ...)))))
+    #:datum-literals (-> :)
+    [(_ (~seq (~optional :) left (~seq -> right) ...) ...)
+     #:with (pairs ...)
+     (datum->syntax this-syntax
+                    (apply append
+                           (map list-to-pairs
+                                (syntax->datum #'((left right ...) ...)))))
      #'(unweighted-graph/directed (quote (pairs ...)))]))
 
 (define (subgraph->graphviz subgraph->hash)
@@ -2438,22 +2542,142 @@ subgraphs should be specified using vertext properties or edge properties"
          [start (substring s 0 split-at)]
          [end (substring s split-at sl)]
          [extra (map subgraph->graphviz subgraph->hash-functions)])
-         (apply string-append `(,start ,@extra ,end))))
+    (apply string-append `(,start ,@extra ,end))))
+
+(struct cluster (label color members))
+
+; it is extremely annoying that you have to locally redefine a
+; function just because someone upstream forgot to provide it >_<
+(define (sanatize-name name)
+  (cond
+    [(string? name) (with-output-to-string
+                      (λ () (write name)))]
+    [(symbol? name) (sanatize-name (symbol->string name))]
+    [(number? name) (sanatize-name (number->string name))]
+    [else (sanatize-name
+           (with-output-to-string
+             (λ () (pretty-print name))))]))
+
+(define (graphviz-2 g
+                    #:clusters [clusters '()]
+                    #:colors [colors #f]
+                    #:output [port #f])
+  (define (generate-graph)
+    (parameterize ([current-output-port (or port (current-output-port))])
+      (define weighted? (weighted-graph? g))
+      (define cluster-count 0)
+      (define (new-cluster)
+        (begin0 (format "cluster_~a" cluster-count)
+          (set! cluster-count (add1 cluster-count))))
+      (define node-count 0)
+      (define node-id-table (make-hash))
+      (define (node-id-table-ref! node)
+        (hash-ref! node-id-table node
+                   (λ ()
+                     (begin0 (format "node~a" node-count)
+                       (set! node-count (add1 node-count))))))
+      (printf "digraph G {\n")
+      ; Add vertices, color them using evenly spaced HSV colors if given colors
+      (define color-count (and colors (add1 (apply max (hash-values colors)))))
+      (for ([v (in-vertices g)])
+        (cond
+          [(and color-count (hash-ref colors v #f))
+           (printf "\t~a [label=~a,color=\"~a 1.0 1.0\"];\n" (node-id-table-ref! v)
+                   (sanatize-name v)
+                   (~a #:max-width 5
+                       (exact->inexact (/ (hash-ref colors v #f) color-count))))]
+          [else
+           (printf "\t~a [label=~a];\n"
+                   (node-id-table-ref! v)
+                   (sanatize-name v))]))
+
+      ; Write undirected edges as one subgraph
+      (printf "\tsubgraph U {\n")
+      (printf "\t\tedge [dir=none];\n")
+      (define undirected-edges
+        (for/fold ([added (set)]) 
+                  ([e (in-edges g)]
+                   #:when (and (not (set-member? added e))
+                               (has-edge? g (second e) (first e))
+                               (equal? (edge-weight g (first e) (second e))
+                                       (edge-weight g (second e) (first e)))))
+          (printf "\t\t~a -> ~a~a;\n" 
+                  (node-id-table-ref! (first e))
+                  (node-id-table-ref! (second e))
+                  (if weighted? (format " [label=\"~a\"]" (edge-weight g (first e) (second e))) ""))
+          (set-add (set-add added e) (list (second e) (first e)))))
+      (printf "\t}\n")
+
+      ; write defined clusters
+      (define defined-edges
+        (for/fold ([added (set)])
+                  ([cluster clusters])
+          (printf "\tsubgraph ~a {\n\t\tlabel=\"~a\";\n"
+                  (new-cluster)
+                  (cluster-label cluster))
+          (when (cluster-color cluster)
+            (printf "\t\tcolor=~a;\n" (cluster-color cluster)))
+          (begin0
+              (for*/fold ([added added])
+                         ([vertex-start (cluster-members cluster)]
+                          #;
+                          [vertex-end (in-neighbors g vertex-start)])
+                ; FIXME node vs edge clusterings
+                ; node clustering is what we have right now and it works
+                ; as expected for layout, but at some point we may want
+                ; to enable explicit edge clustering as well, in the current
+                ; impl clusters should be non-overlapping
+                (let ([e '(1 2) #;(if (has-edge? g vertex-start vertex-end)
+                                      (list vertex-start vertex-end)
+                                      (list vertex-end vertex-start))])
+                  (printf "\t\t~a;\n" (node-id-table-ref! vertex-start))
+                  #;
+                  (printf "\t\t~a -> ~a~a;\n" 
+                          (node-id-table-ref! (first e))
+                          (node-id-table-ref! (second e))
+                          (if weighted? (format " [label=\"~a\"]" (edge-weight g (first e) (second e))) ""))
+                  (set-add (set-add added e) (list (second e) (first e)))))
+            (printf "\t}\n"))))
+
+      ; Write directed edges as another subgraph
+      (printf "\tsubgraph D {\n")
+      (for ([e (in-edges g)] #:unless (or (set-member? undirected-edges e) #;(set-member? defined-edges e)))
+        (printf "\t\t~a -> ~a~a;\n" 
+                (node-id-table-ref! (first e))
+                (node-id-table-ref! (second e))
+                (if weighted? (format " [label=\"~a\"]" (edge-weight g (first e) (second e))) "")))
+      (printf "\t}\n")
+      (printf "}\n")))
+  (if port
+      (generate-graph)
+      (with-output-to-string generate-graph)))
 
 (module+ test
-  (require racket/pretty)
   (define g (dag-notation a -> b -> c
                           b -> d -> e -> f))
+  #;
   (pretty-print g)
-  (graphviz g)
+  (define gg (graphviz-2 g #:clusters (list (cluster "test" #f '(b c d)))))
+  (display gg)
 
+  )
+
+#;
+(module+ test-sigh
+  ;; unfortunately the implementation of vertex and edge properties
+  ;; is written as a macro so they are not composable and you cannot
+  ;; iterate over multiple runtime specified properties so we have
+  ;; to use something else
   (define-vertex-property g my-subgraph)
   (for-each (λ (v) (my-subgraph-set! v #t)) '(b c d))
 
   (define sgh (list my-subgraph->hash))
-  (graphviz-subgraphs g #:subgraphs sgh)
-)
+  (define ggs (graphviz-subgraphs g #:subgraphs sgh))
+  (display ggs)
 
+  )
+
+#;
 (module+ test
   ; TODO explor possibility of using -^ or -> ^ or | syntax
   ; to point up to the most recent definition chain containing
