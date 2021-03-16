@@ -841,10 +841,44 @@ sparc-export-to-server
 #+begin_src bash :eval never
 function fetch-and-run-reports () {
     local FN="/tmp/curation-export-$(date -Is).json"
-    curl https://cassava.ucsd.edu/sparc/exports/curation-export.json -o "${FN}"
+    curl https://cassava.ucsd.edu/sparc/preview/exports/curation-export.json -o "${FN}"
     spc report all --sort-count-desc --to-sheets --export-file "${FN}"
 }
 fetch-and-run-reports
+#+end_src
+*** Export v3
+#+begin_src bash
+function preview-sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/integrated/
+    FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
+    FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
+    pushd /var/www/sparc/sparc/preview
+    cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
+    popd
+    echo Export complete. Check results at:
+    echo https://cassava.ucsd.edu/sparc/preview/archive/exports/${FOLDERNAME}
+}
+#+end_src
+
+The shared information on the file system is evil because there may be multiple processes.
+The way to mitigate the issue is to run everything locally with a read only local cache for certain files.
+#+begin_src bash :eval never
+function preview-export-rest () {
+    local DATE1=${1} # 2021-03-09T17\:26\:54\,980772-08\:00  # from spc export
+    local DATE2=${2} # 2021-03-09T164046,487692-0800  # from the path created by sparc-get-all-remote-data
+    cp -a /var/lib/sparc/.local/share/sparcur/export/protcur/LATEST/protcur.ttl /var/www/sparc/sparc/preview/archive/exports/${DATE1}/  # this may not update and should be versioned independently
+    cp -a /var/lib/sparc/files/${DATE2}/exports/datasets /var/www/sparc/sparc/preview/archive/exports/${DATE1}/path-metadata  # NOTE these will not change unless the files or the code/format change
+    chown -R nginx:nginx /var/www/sparc/sparc/preview/archive/exports/${DATE1}/
+}
+#+end_src
+
+An example. Get =DATE1= from =spc export= or from the output of
+=preview-sparc-export-to-server=. Get =DATE2= from the file system
+path created by the initial call to =sparc-get-all-remote-data=.
+#+begin_src bash :eval never
+preview-sparc-export-to-server
+preview-export-rest 2021-03-15T12:35:57,792099-07:00 2021-03-15T121043,216667-0700
 #+end_src
 *** Reporting
 :PROPERTIES:
@@ -1431,7 +1465,7 @@ auth-variables:
 #+header: :tangle-mode (identity #o600)
 #+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
 blackfynn:
-  sparc:
+  N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
     key: *replace-me-with:your-blackfynn-api-key*
     secret: *replace-me-with:your-blackfynn-api-secret*
 google:
@@ -1613,7 +1647,7 @@ popd
 #+BEGIN_SRC bash :results output :eval no-export
 [ -z $VIRTUAL_ENV ] || pip install --user wheel  # if in a venv wheel will be missing
 pushd ~/git
-for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable . 2>&1 || break; popd; done
+for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable .[dev,test] 2>&1 || break; popd; done
 popd
 #+END_SRC
 
