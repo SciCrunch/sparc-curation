@@ -713,14 +713,36 @@ digraph G {
 [[file:./images/graph-retrieve-single.png]]
 
 **** Bash implementation                                             :ignore:
+Desired invocation.
 #+begin_src bash
-function sparcur-retrieve () {
+sparcur-do-dataset ${UUID}
+sparcur-do-dataset dataset:${UUID}
+sparcur-do-dataset N:dataset:${UUID}
+sparcur-do-dataset https://api.blackfynn.io/datasets/N:dataset:${UUID}
+sparcur-do-dataset https://app.blackfynn.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/datasets/N:dataset:${UUID}
+#+end_src
+Desired behavior.
+| dataset state | objects state     | action            | outcome                   |
+|---------------+-------------------+-------------------+---------------------------|
+| not-existing  | do symlink to     | retrieve          | spc export; path-metadata |
+| existing      | either don't fail | retrieve or equiv | spc export; path-metadata |
+Desired output.
+Dataset to =exports/datasets/${UUID}/${TIMESTAMP_FRIENDLY}/= and is
+symlinked to =exports/${UUID}/LATEST=. The last run dataset itself
+goes to =exports/datasets/LATEST=. We don't have to care about the
+project identifier because each UUID is unique.
+TODO Logging goes ????
+#+begin_src bash
+function sparcur-do-dataset () {
     "First pass retrieve all remote data for a single dataset."
     local DATASET_ID=$1
     local DATASET_PATH
-    DATASET_PATH=$(python -m sparcur.simple.retrieve --dataset-id ${DATASET_ID})
+    DATASET_PATH=$(python -m sparcur.simple.retrieve \
+                          --symlink-objects-to "TODO" \
+                          --dataset-id ${DATASET_ID})
     # FIXME error handling
     echo $DATASET_PATH
+    pushd "${DATASET_PATH}"
 }
 #+end_src
 FIXME xfil dataset_path correctly, i.e. when we export we need to be
