@@ -1094,8 +1094,7 @@ class _DictTransformer:
                     ((s_piv, s_bef, s_aft, source),
                      (t_piv, t_bef, t_aft, target)) = pbac
                     assert len(source) == len(target)
-                    #s_key, t_key = object(), object()
-                    s_key, t_key = 'fuck', 'you'
+                    s_key, t_key = object(), object()
                     # transform two lists from paired holes into a single
                     # list of dicts with a source and target key and
                     # rewrite the move rule to move the after from source
@@ -1105,7 +1104,8 @@ class _DictTransformer:
                         {s_key: s,
                         t_key: t},
                         [[[s_key, *s_aft],
-                        [t_key, *t_aft]]])
+                          [t_key, *t_aft]]],
+                        source_key_optional=source_key_optional)
                     for s, t in zip(source, target)]
 
                 # NOTE we can't continue here, because there may be a
