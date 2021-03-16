@@ -80,10 +80,6 @@ pipeline = makeValidator(path)
 data = pipeline.data
 #+end_src
 
-#+RESULTS[99f2d5eba83acdff6934d4fdfe64da4170348550]:
-:results:
-:end:
-
 ** Load Python IR
 #+begin_src python
 from sparcur.utils import path_ir
@@ -1547,6 +1543,8 @@ def main(id=None,
         N, thing_type, uuid = id.split(':')
         parent_path = parent_parent_path / uuid
         parent_path.mkdir(exist_ok=True)
+    elif not parent_path.exists():
+        parent_path.mkdir()
 
     invariant_path = parent_path / invariant_local_path
 
@@ -2149,6 +2147,10 @@ def main(path=Path.cwd(), id=None, time_now=None,
 
     tm = from_path_transitive_metadata(path)
     # FIXME TODO validate file formats, which means this also needs to support the remoteless case
+    # FIXME TODO process metadata for each timepoint when things enter should go in prov I think
+    #    or we need to be collecting prov along the way, we don't have an overseer or conductor
+    #    so we can't keep everything embedded
+    # FIXME TODO embed the transitive cache updated value that is used in prepare_dataset_export
     if validate:  # FIXME raw vs validated and FIXME pipeline
         Path.validate_path_json_metadata(tm)
 

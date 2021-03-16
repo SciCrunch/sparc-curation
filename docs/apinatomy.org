@@ -108,6 +108,7 @@ gsx:google-sheet-id
     ;; TODO push the model id further down the call chain since input
     ;; and output paths are defined by convention
     (funcall (checksum-or #'-mx->)  model-id   xlsx) ; source/{model-id}.xlsx
+    ;;; FIXME TODO message about opening the open physiology viewer
     (funcall (out-or      #'-xj->)  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
     (funcall (out-or      #'-jl->)  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
     (funcall (out-or      #'-lt->)  jsonld      ttl) ; derived/{model-id}.jsonld derived/{model-id}.ttl
@@ -193,6 +194,7 @@ gsx:google-sheet-id
   (run-command "spc" "apinat" path-json-ld path-ttl))
 #+end_src
 
+#+name: all-ttl-models
 #+begin_src elisp :results none
 (defun-local update-models (model-ids) ; vs &rest model-ids
   ;; FIXME mapcar is inadequate for handling parallel processes that
@@ -210,6 +212,29 @@ gsx:google-sheet-id
 
 (defun-local update-all-models ()
   (update-models (mapcar #'intern (all-models))))
+#+end_src
+
+#+begin_src elisp
+(update-all-models)
+#+end_src
+if error clone the repo
+#+begin_src sh
+pushd ~/git
+git clone https://github.com/open-physiology/apinatomy-models.git
+#+end_src
+if model-id error then we need to set the model ids in secrets but in
+reality need to overwrite the defniition of ~-ms->~ is easier right
+now
+
+missing derived folders
+#+begin_src powershell
+pushd ~/git/apinatomy-models/
+New-Item -Path * -Name derived -ItemType "directory"
+#+end_src
+
+#+begin_src bash
+pushd ~/git/apinatomy-models/
+mkdir */derived
 #+end_src
 ** ttl deprecated
 Until this is fully automated you need to obtain the flattened jsonld
@@ -346,6 +371,7 @@ to match the name of the file that you scp to cassava.
 :PROPERTIES:
 :visibility: folded
 :END:
+# file is in pyontutils/nifstd/resolver
 ** Intro
 While an ApiNATOMY server has been on the roadmap for some time, there have not been
 clear requirements and use cases to drive the development in a way that is productive.
@@ -406,6 +432,8 @@ the source model hash needs to be separat
 #+begin_src elisp :results none :lexical yes
 ;; minimal reval
 
+;; TODO suppress the welcome screen
+;; TODO automatically run flow-to-ttl probably
 (unless (featurep 'reval)
   (defun reval-minimal (cypher checksum path-or-url &rest _alts)
     (let ((o url-handler-mode))
