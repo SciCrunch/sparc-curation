@@ -825,7 +825,7 @@ class AtomicDictOperations:
                 raise TypeError(f'Unsupported type {type(source)} for {lj(source)}')
 
         # for move
-        yield (node_key if source_prefixes else
+        yield (node_key if source_prefixes else  # FIXME {'type': {'type': {'type': sigh}}}
                AtomicDictOperations.__empty_node_key)
 
         if isinstance(source, dict):
@@ -871,11 +871,17 @@ class AtomicDictOperations:
         try:
             cls.add(data, target_path, source)
         finally:
+            # FIXME I have no idea why this was running here but it causes some
+            # weird bugs
+
             # this will change key ordering but
             # that is expected, and if you were relying
             # on dict key ordering HAH
-            if move and  node_key is not AtomicDictOperations.__empty_node_key:
-                _parent[node_key] = source
+            #if move:
+                #breakpoint()
+            #if move and  node_key is not AtomicDictOperations.__empty_node_key:
+                #_parent[node_key] = source
+            pass
 
 
 adops = AtomicDictOperations()
@@ -1011,6 +1017,108 @@ class _DictTransformer:
             [[source-path, target-path] ...]
         """
         for source_path, target_path in moves:
+            if int in source_path and int in target_path:
+                if source_path[-1] is int:
+                    msg = ('It is not meaningful to move each element of a '
+                           'source path individually.')
+                    # FIXME we may not need to error here we may just
+                    # be able to drop the int at the end and ignore it
+                    raise TypeError(msg)
+
+                # one way to implement this is to walk to the first
+                # pivot in the source and get that list, then to walk
+                # to the first pivot in the target and get that list
+                # and then do pairwise moves between the lists, noting
+                # that the lengths must match, which we will check
+                # beforehand because we know we aren't dealing with an
+                # arbitrary length stream
+                pbac = []
+                for i, path in enumerate((source_path, target_path)):
+                    pivot = path.index(int)
+                    before = path[:pivot]
+                    after = path[pivot + 1:]
+                    try:
+                        collection = adops.get(data, before)
+                        # FIXME behavior on missing keys in the target
+                        # there isn't an obviously correct solution
+                        # here but partial mutation is pretty much the
+                        # only thing we can do and have to deal with
+                        # fact that sometimes an error will leave the
+                        # transformation in a partially transformed
+                        # state
+                    except exc.NoSourcePathError as e:
+                        if i:  # target_path case
+                            msg = ('TODO right now we only vary 1 element at '
+                                   'a time but can eventually vary more')
+                            raise NotImplementedError(msg)
+                            # a this point we know we have to add all
+                            # the target structure
+                            if not after:
+                                msg = ('How to move into a non-existent list? '
+                                       'Have you considered using derive?')
+                                # closer to derive I would think
+                                raise NotImplementedError(msg)
+                                #s_piv, s_bef, s_aft, source = pbac[0]
+                                #collection = [
+                                    #_DictTransformer.pop(d, s_aft)
+                                #]
+
+                            # construct empty types matching the
+                            # source collection types FIXME this is
+                            # wrong, it should be the type of the
+                            # first element of after
+                            # FIXME pretty sure this is incorrect
+                            _len_s = len(pbac[0][-1])
+                            _nt = after[0]
+                            if _nt is int:  # list in list case
+                                raise NotImplementedError('please no')
+                            elif isinstance(_nt, str):
+                                collection = [{} for _ in range(_len_s)]
+                            elif isinstance(_nt, int):
+                                # I'm pretty sure indexed target lists
+                                # are just bad all around in this case
+                                # because it would overwrite a value
+                                msg = 'indexed target lists must already exist!'
+                                raise TypeError(msg)
+
+                            adops.add(data, before, collection)
+                        elif source_key_optional:
+                            break  # break out of inner loop we are done here
+                        else:
+                            raise e
+
+                    assert is_list_or_tuple(collection)
+                    pbac.append((pivot, before, after, collection))
+                else:
+                    # only run if we don't break
+                    ((s_piv, s_bef, s_aft, source),
+                     (t_piv, t_bef, t_aft, target)) = pbac
+                    assert len(source) == len(target)
+                    #s_key, t_key = object(), object()
+                    s_key, t_key = 'fuck', 'you'
+                    # transform two lists from paired holes into a single
+                    # list of dicts with a source and target key and
+                    # rewrite the move rule to move the after from source
+                    # key to target key, this of course mutates in place
+                    log.debug(pbac)
+                    _sigh = [_DictTransformer.move(
+                        {s_key: s,
+                        t_key: t},
+                        [[[s_key, *s_aft],
+                        [t_key, *t_aft]]])
+                    for s, t in zip(source, target)]
+
+                # NOTE we can't continue here, because there may be a
+                # move at this point of the path as well XXX TODO
+                # determing the semantics for multi-level moves in the
+                # presences of a pivot is more than I'm up for right
+                # now, so just move keys inside the same object and
+                # let's not teleport them between lists of objects for
+                continue
+            elif int in source_path or int in target_path:
+                msg = ('source_path and target_path must have the same holes')
+                raise TypeError(msg)
+
             adops.apply(adops.move, data, source_path, target_path,
                         source_key_optional=source_key_optional)
 

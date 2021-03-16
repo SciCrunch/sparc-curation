@@ -56,11 +56,14 @@ class Examples:
     @property
     def move(self):
         yield {'another':'world'}, {'hello': 'world'}, (['hello'], ['another'])
+        yield {'source': {},
+               'target': {'b': 1}}, {'source': {'a': 1},
+                                     'target': {}}, (['source', 'a'], ['target', 'b'])
 
     @property
     def move_error(self):
         yield {'another':'1'}, {}, (['hello'], ['another'])
-        yield {'another':'2'}, {'another':0, 'hello':'world'}, (['hello'], ['another'])
+        yield {'another':'2'}, {'another': 0, 'hello':'world'}, (['hello'], ['another'])
 
     @property
     def update(self):
@@ -83,6 +86,8 @@ class ExamplesDT:
     def move(self):
         # after before command
         sko = dict(source_key_optional=True)
+
+        # simple moves
         yield ({'other-key': 'something'},
                {'other-key': 'something'},
                [[['not-here'], ['not-here', 'over-there']]],
@@ -102,6 +107,62 @@ class ExamplesDT:
                {'not-here': None},
                [[['not-here'], ['not-here', 'over-there']]],
                sko)
+
+        # pattern matching with holes
+        yield ({'a': [{'c': 1}, {'c': 2}]},
+
+               {'a': [{'b': 1}, {'b': 2}]},
+
+               [[['a', int, 'b'],
+                 ['a', int, 'c']]],
+               sko)
+
+        yield ({'a': {'x': [{'c': 1}, {'c': 2}]}},
+
+               {'a': {'x': [{'b': 1}, {'b': 2}]}},
+
+               [[['a', 'x', int, 'b'],
+                 ['a', 'x', int, 'c']]],
+               sko)
+
+        return  # things not implemented yet
+        yield (
+            {'d': [{'g': [{'h': 1}, {'h': 2}]},
+                   {'g': [{'h': 3}, {'h': 4}]}]},
+
+            {'d': [{'e': [{'f': 1}, {'f': 2}]},
+                   {'e': [{'f': 3}, {'f': 4}]}]},
+
+            [[['d', int, 'e', int, 'f'],
+              ['d', int, 'g', int, 'h']]],
+
+            sko)
+
+        # TODO it is not clear whether the examples below are moves
+
+        yield ({'d': [{'e': [{}, {}],
+                       'k': [1, 2]},
+                      {'e': [{}, {}],
+                       'k': [3, 4]}]},
+               {'d': [{'e': [{'f': 1}, {'f': 2}]},
+                      {'e': [{'f': 3}, {'f': 4}]}]},
+               [[['d', int, 'e', int, 'f'],
+                 ['d', int, 'k', int]]],
+               sko)
+
+        yield ({'z': [{'e': [{}, {}],
+                       'g': [1, 2]},
+                      {'e': [{}, {}],
+                       'g': [3, 4]}]},
+               {'d': [{'e': [{'f': 1}, {'f': 2}]},
+                      {'e': [{'f': 3}, {'f': 4}]}]},
+               [[['d', int, 'e', int, 'f'],
+                 ['z', int, 'g', int]]],
+               sko)
+
+        # note that moving individual elements of a list i.e. ending
+        # the source-path with int does not make sense because that
+        # would change the structure of the source along the way
 
     @property
     def derive(self):

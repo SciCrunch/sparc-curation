@@ -1563,7 +1563,12 @@ class MetaOutExportSchema(JSONSchema):
                                 },
         'additional_links': {'type': 'array',
                              'minItems': 1,
-                             'items': {'type': 'string'},
+                             'items': {
+                                 'type': 'object',
+                                 'properties': {
+                                     'link': {'type': 'string'},
+                                     'link_description': {'type': 'string'},
+                                     },},
                              'context_value': idtype('TEMP:hasAdditionalLinks'),  # TODO
                              },
         'species': {'type': 'string',

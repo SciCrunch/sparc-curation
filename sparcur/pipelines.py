@@ -986,6 +986,7 @@ class SDSPipeline(JSONPipeline):
               [['samples_file',], ['inputs', 'samples_file']],
               [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['dataset_description_file', 'name'], ['meta', 'title']],
+              [['dataset_description_file', 'links'], ['meta', 'additional_links']],
               *copy_all(['dataset_description_file'], ['meta'],
                         'template_schema_version',
                         'species',  # TODO validate all source paths against schema
@@ -996,7 +997,7 @@ class SDSPipeline(JSONPipeline):
                         'completeness_of_data_set',
                         'funding',
                         'description',
-                        'additional_links',
+                        #'additional_links',  # FIXME internal rename
                         'keywords',
                         'acknowledgements',
                         'originating_article_doi',
@@ -1010,6 +1011,9 @@ class SDSPipeline(JSONPipeline):
         [['dirs',], ['meta', 'dirs']],  # FIXME not quite right ...
         [['files',], ['meta', 'files']],
         [['size',], ['meta', 'size']],
+
+        [['meta', 'additional_links', int, 'additional_links'],
+         ['meta', 'additional_links', int, 'link']],
 
         [['dataset_description_file',], ['inputs', 'dataset_description_file']],
         [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
