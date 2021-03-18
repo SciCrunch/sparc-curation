@@ -7,6 +7,86 @@
 :header-args:sparql+: :format text/csv
 :header-args:sparql+: :results table
 :END:
+
+*[[RUN:][Run Query ▶]]*
+#+name: my-query
+#+begin_src sparql
+# :results table :var limit="10"
+# RUN:block
+SELECT distinct ?s1 ?s2 ?id ?dataset1 ?dataset2 ?species1 ?species2 ?award1 ?award2
+WHERE {
+
+    # Give me all subjects with duplicate IDs with unique datasets
+    { SELECT ?id
+      WHERE {
+	?s1 a owl:NamedIndividual ; 
+            TEMP:localId ?id ; 
+            TEMP:hasDerivedInformationAsParticipant ?datasetx .
+	?s2 a owl:NamedIndividual ; 
+            TEMP:localId ?id ; 
+            TEMP:hasDerivedInformationAsParticipant ?datasety .
+	filter(?datasetx != ?datasety)
+    } GROUP BY ?id having (count(?id) > 1)}
+
+    ?s1 TEMP:localId ?id ;
+        sparc:animalSubjectIsOfSpecies ?species1;
+        TEMP:hasDerivedInformationAsParticipant ?dataset1 .
+    ?s2 TEMP:localId ?id ;
+        sparc:animalSubjectIsOfSpecies ?species2;
+        TEMP:hasDerivedInformationAsParticipant ?dataset2 .
+    filter(?s1 != ?s2)
+    filter(STR(IRI(?s1)) < STR(IRI(?s2)))
+    filter(?species1 != ?species2)
+    filter(STR(IRI(?species1)) < STR(IRI(?species2)))
+
+    ?dataset1 a owl:NamedIndividual ;
+              TEMP:hasAwardNumber ?award1 .
+    ?dataset2 a owl:NamedIndividual ;
+              TEMP:hasAwardNumber ?award2 .
+    filter(?dataset1 != ?dataset2)
+    filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2)))
+    filter(?award1 != ?award2)
+    filter(STR(IRI(?award1)) < STR(IRI(?award2)))
+  
+} order by ?id limit 1000 # ?limit
+#+end_src
+
+*[[RUN:][Run Query ▶]]*
+#+name: my-python
+#+begin_src python :var data=my-query() :epilogue "return result"
+from collections import defaultdict, OrderedDict
+import itertools
+def func(data):
+    idmap = defaultdict(lambda: defaultdict(list)) # change to list; order for local_id
+    for row in data:
+        subj1, subj2, local_id = row[0], row[1], row[2]
+        if not idmap[subj1]['local_id']:
+            idmap[subj1]['local_id'].append(local_id)
+        idmap[subj1]['cluster'].append(subj2)
+        idmap[subj1]['local_id'].append(local_id)
+        value_pairs = [(row[i], row[i+1]) for i in range(3, len(row), 2)]
+        value_pairs_len = len(value_pairs)          
+        for i, value_pair in enumerate(value_pairs):
+            v1, v2 = value_pair
+            if v1 not in idmap[subj1][i]:
+                idmap[subj1][i].append(v1)
+            idmap[subj1][i].append(v2)
+    header = ['cluster', 'local_id'] + [i for i in range(value_pairs_len)] # todo: replace this with sparql headers if possible
+    hardcoded_header =  ['individuals', 'local_id', 'datasets', 'species', 'awards']
+    columns = defaultdict(list)
+    subjs = sorted([(v, v.split('/')[-1]) for v in idmap], key=lambda x: x[1])
+    for subj, _ in subjs:
+        padding_max = max([len(v) for v in idmap[subj].values()])
+        for colname, values in idmap[subj].items():
+            values = list(values)
+            values = [subj] + values if colname == 'cluster' else values
+            padding = padding_max - len(values) if len(values) < padding_max else 0
+            columns[colname] += values + ['-'] * padding + ['']
+    table = [hardcoded_header] + [None] + list(itertools.izip_longest(*[columns[k] for k in header]))  # .zip_longest depending on python version
+    return table
+result = func(data)
+#+end_src
+
 ** Datasets
 *** Dataset Predicates
 #+begin_src sparql
