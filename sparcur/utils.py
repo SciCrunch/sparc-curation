@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import logging
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
@@ -271,11 +272,79 @@ def unicode_truncate(string, length):
     return string.encode()[:length].decode(errors='ignore')
 
 
-class BlackfynnId(str):
+class BlackfynnId(str):  # FIXME -> idlib.Identifier probably
     """ put all static information derivable from a blackfynn id here """
-    def __new__(cls, id):
+    uuid4_regex = ('([0-9a-f]{8}-'
+                   '[0-9a-f]{4}-'
+                   '4[0-9a-f]{3}-'
+                   '[89ab][0-9a-f]{3}-'
+                   '[0-9a-f]{12})')
+    canonical_regex = (
+        # XXX this is not implemented right now but could be
+        'https://api.blackfynn.io/id/N:([a-z]):' + uuid4_regex
+    )
+    curie_regex = '([a-z]+):' + uuid4_regex
+    id_regex = 'N:' + curie_regex
+    types = ('package', 'collection', 'dataset', 'organization', 'user', 'team')
+    paths = 'viewer', 'files', *[t + 's' for t in types]  # WHO LOVES CLASS SCOPE WHEEEE LOL PYTHON
+    path_elem_regex = '([a-z]+)'
+
+    uri_api_regex = ('https://api.blackfynn.io/' + path_elem_regex + '/' + id_regex + '(?:/' + path_elem_regex + '/([^/]+))?/?')
+    org_pref = 'https://app.blackfynn.io/N:([a-z]+):'
+    uri_human_regex = (org_pref + uuid4_regex + '/' + path_elem_regex +
+                       '(?:/' + id_regex +
+                       '(?:/' + path_elem_regex +
+                       '(?:/(?:' + id_regex + '|' +
+                       '([^/]+)' +
+                       '(?:/' + id_regex + ')?))?' +
+                       ')?)?/?'
+                       )
+    compiled = [
+        (re.compile('^' + rx + '$'), rx_type) for rx, rx_type in
+        # FIXME curie_regex likely needs to support /files/123 suffix as well?
+        zip((curie_regex, id_regex, uuid4_regex, uri_api_regex, uri_human_regex),
+            ('curie', 'id', 'uuid', 'uri_api', 'uri_human'),)]
+
+    def __new__(cls, id_uri_curie_uuid, type=None, file_id=None):
         # TODO validate structure
+        # TODO binary uuid
+        for rx, match_type in cls.compiled:
+            match = rx.match(id_uri_curie_uuid)
+            if match is not None:
+                break
+        else:
+            # FIXME malformed id error from idlib
+            raise TypeError(f'{id_uri_curie_uuid} did not match any known id pattern')
+
+        groups = [g for g in match.groups() if g is not None]
+
+        if match_type == 'uuid':
+            if type is None:
+                raise TypeError('A raw uuid must be acompanied by a type.')
+
+            id_type = type
+            uuid, = groups
+            # FIXME this one probably should be resolved since it is composed
+
+        elif match_type == 'uri_api' and 'files' in groups:
+            *_, id_type, uuid, _, file_id_string = groups
+            file_id = int(file_id_string)
+        else:
+            # there is a bunch of garbage up front
+            *_, id_type, uuid = groups
+
+        if type is not None and type != id_type:
+            raise TypeError(f'type mismatch! {type} != {id_type}')
+
+        id = f'N:{id_type}:{uuid}'
+
         self = super().__new__(cls, id)
+        self.id = id
+        self.type = id_type
+        self.uuid = uuid
+        self.file_id = file_id  # XXX NOTE yes, we are putting a
+        # file_id on everything because it simplifies all the checking
+
         gotem = False
         for type_ in ('package', 'collection', 'dataset', 'organization'):
             name = 'is_' + type_
@@ -286,6 +355,22 @@ class BlackfynnId(str):
                 setattr(self, name, False)
 
         return self
+
+    def __repr__(self):
+        file_id = '' if self.file_id is None else f', file_id={self.file_id}'
+        return f'{self.__class__.__name__}({self.id}{file_id})'
+
+    def __hash__(self):
+        return hash((self.__class__, self.id, self.file_id))
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.id == other.id and
+                self.file_id == other.file_id)  # works because None == None
+
+    @property
+    def curie(self):
+        return self.type + ':' + self.uuid
 
     @property
     def uri_api(self):
@@ -301,7 +386,7 @@ class BlackfynnId(str):
 
         return 'https://api.blackfynn.io/' + endpoint
 
-    def uri_human(self, prefix):
+    def uri_human(self, organization=None, dataset=None):
         # a prefix is required to construct these
         return self  # TODO
 

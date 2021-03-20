@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 from sparcur.config import auth
 __doc__ = f"""
 SPARC curation cli for fetching, validating datasets, and reporting.
@@ -1308,7 +1308,11 @@ done"""
             log.setLevel('ERROR')
         def inner(path):
             if self.options.uri or self.options.browser:
-                uri = path.cache.uri_human
+                if self.options.human or self.options.browser:
+                    uri = path.cache.uri_human
+                else:
+                    uri = path.cache.uri_api
+
                 print('+' + '-' * (len(uri) + 2) + '+')
                 print(f'| {uri} |')
                 if self.options.browser:

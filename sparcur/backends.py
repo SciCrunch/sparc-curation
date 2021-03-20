@@ -66,7 +66,7 @@ class BlackfynnRemote(aug.RemotePath):
             self = self.resolve()  # relative paths should not have to fail here
 
         id = self.id
-        N, type, suffix = id.split(':')
+        N, type, uuid = id.split(':')  # XXX DANGERZONE with leading junk on the uuid
         if id.startswith('N:package:'):
             #prefix = '/viewer/'
             prefix = '/files/00000000-0000-0000-0000-000000000000/'  # unprocessed cases
