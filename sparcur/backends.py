@@ -204,6 +204,8 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self._seed, str) or isinstance(self._seed, BlackfynnId):
             if isinstance(self._seed, BlackfynnId):
                 _seed = self._seed.id  # FIXME sadly this is the least bad place to do this :/
+            else:
+                _seed = self._seed
 
             try:
                 bfobject = self._api.get(_seed)
