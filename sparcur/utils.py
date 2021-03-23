@@ -2,6 +2,7 @@ import io
 import os
 import re
 import logging
+import idlib
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
 from pyontutils.utils import (makeSimpleLogger,
@@ -272,7 +273,7 @@ def unicode_truncate(string, length):
     return string.encode()[:length].decode(errors='ignore')
 
 
-class BlackfynnId(str):  # FIXME -> idlib.Identifier probably
+class BlackfynnId(idlib.Identifier):
     """ put all static information derivable from a blackfynn id here """
     uuid4_regex = ('([0-9a-f]{8}-'
                    '[0-9a-f]{4}-'
@@ -281,7 +282,7 @@ class BlackfynnId(str):  # FIXME -> idlib.Identifier probably
                    '[0-9a-f]{12})')
     canonical_regex = (
         # XXX this is not implemented right now but could be
-        'https://api.blackfynn.io/id/N:([a-z]):' + uuid4_regex
+        '^https://api.blackfynn.io/id/N:([a-z]):' + uuid4_regex + '$'
     )
     curie_regex = '([a-z]+):' + uuid4_regex
     id_regex = 'N:' + curie_regex
@@ -308,13 +309,16 @@ class BlackfynnId(str):  # FIXME -> idlib.Identifier probably
     def __new__(cls, id_uri_curie_uuid, type=None, file_id=None):
         # TODO validate structure
         # TODO binary uuid
+        if isinstance(id_uri_curie_uuid, cls):
+            return id_uri_curie_uuid
+
         for rx, match_type in cls.compiled:
             match = rx.match(id_uri_curie_uuid)
             if match is not None:
                 break
         else:
-            # FIXME malformed id error from idlib
-            raise TypeError(f'{id_uri_curie_uuid} did not match any known id pattern')
+            msg = f'{id_uri_curie_uuid.encode()!r} matched no known pattern'
+            raise idlib.exc.MalformedIdentifierError(msg)
 
         groups = [g for g in match.groups() if g is not None]
 
@@ -344,16 +348,8 @@ class BlackfynnId(str):  # FIXME -> idlib.Identifier probably
         self.uuid = uuid
         self.file_id = file_id  # XXX NOTE yes, we are putting a
         # file_id on everything because it simplifies all the checking
-
-        gotem = False
-        for type_ in ('package', 'collection', 'dataset', 'organization'):
-            name = 'is_' + type_
-            if not gotem:
-                gotem = self.startswith(f'N:{type_}:')
-                setattr(self, name, gotem)
-            else:
-                setattr(self, name, False)
-
+        # FIXME this conflicts with aug.PathMeta api where we will need
+        # to unpack file_id because id and file_id are dissociated
         return self
 
     def __repr__(self):
@@ -375,20 +371,31 @@ class BlackfynnId(str):  # FIXME -> idlib.Identifier probably
     @property
     def uri_api(self):
         # NOTE: this cannot handle file ids
-        if self.is_dataset():
+        if self.type == 'dataset':
             endpoint = 'datasets/' + self.id
-        elif self.is_organization():
+        elif self.type == 'organization':
             endpoint = 'organizations/' + self.id
-        elif self.is_dir():
+        elif self.type == 'collection':
             endpoint = 'collections/' + self.id
+        elif self.type == 'package':
+            if self.file_id is None:
+                endpoint = 'packages/' + self.id
+            else:
+                endpoint = f'packages/{self.id}/files/{self.file_id}'
         else:
-            endpoint = 'packages/' + self.id
+            raise NotImplementedError(f'{self.type} TODO need api endpoint')
 
         return 'https://api.blackfynn.io/' + endpoint
 
     def uri_human(self, organization=None, dataset=None):
         # a prefix is required to construct these
         return self  # TODO
+
+    def asStr(self):
+        # FIXME conflict with the fact that these ids are default
+        # local and unqualified, but use uuids which are unique
+        #return self.uri_api
+        return self.id
 
 
 class BlackfynnInst(BlackfynnId):

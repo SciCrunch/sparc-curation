@@ -9,7 +9,7 @@
 
 * Demos
 ** Remote only connection
-If you have [[(def_babf)][~sparcur.simple~]] this is the simplest way to get a remote
+If you have [[(def_babf)][~sparcur.simple~​]] this is the simplest way to get a remote
 only connection to Blackfynn.
 #+begin_src python :results drawer :epilogue "import pprint; return pprint.pformat(datasets)"
 from sparcur.config import auth
@@ -744,6 +744,21 @@ function sparcur-do-dataset () {
     echo $DATASET_PATH
     pushd "${DATASET_PATH}"
 }
+function sparcurl-do-already-fetched () {
+    local DATASET_DIR=$(basename .)
+    pushd ..
+    spc pull "${DATASET_DIR}"
+    popd
+    spc find --name '*.xlsx' \
+             --name '*.xml' \
+             --name 'submission*' \
+             --name 'dataset_description*' \
+             --name 'subjects*' \
+             --name 'samples*' \
+             --name 'manifest*' \
+             --limit -1 \
+             --fetch
+}
 #+end_src
 FIXME xfil dataset_path correctly, i.e. when we export we need to be
 able to point directly to the dataset folder without having to guess
@@ -1009,7 +1024,9 @@ def main(parent_path=None,
 
     if project_id is None:
         from sparcur.config import auth
+        from sparcur.utils import BlackfynnId
         project_id = auth.get(project_id_auth_var)
+        project_id = BlackfynnId(project_id)  # FIXME abstract the hardcoded backend
 
     RemotePath = backend_blackfynn()
 
@@ -1059,7 +1076,7 @@ from sparcur.simple.utils import backend_blackfynn
 
 def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
     """ given an dataset id fetch its associated dataset metadata """
-    if id.startswith('N:organization'):
+    if id.type == 'organization':
         RemotePath = backend_blackfynn()
         project = RemotePath(id)
         prepared = [BlackfynnDatasetData(r) for r in project.children]
@@ -1067,7 +1084,7 @@ def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
             [p() for p in prepared]
         else:
             Parallel(n_jobs=n_jobs)(delayed(p)() for p in prepared)
-    elif id.startswith('N:dataset:'):  # TODO support dataset: ?
+    elif id.type == 'dataset':
         RemotePath = backend_blackfynn(project_id)
         dataset = RemotePath(id)
         bdd = BlackfynnDatasetData(dataset)
@@ -1080,11 +1097,13 @@ def main(id=None,
          project_id=None,
          project_id_auth_var='blackfynn-organization',  # FIXME move to clifun
          n_jobs=12,
-         **kwargs):
+         ,**kwargs):
 
     if project_id is None:
+        from sparcur.utils import BlackfynnId
         from sparcur.config import auth
         project_id = auth.get(project_id_auth_var)
+        project_id = BlackfynnId(project_id)  # FIXME abstract the hardcoded backend
 
     if id is None:
         id = project_id
@@ -1562,7 +1581,7 @@ def main(id=None,
         raise TypeError('id is a required argument!')
 
     if parent_path is None:
-        N, thing_type, uuid = id.split(':')
+        uuid = id.uuid  # FIXME hardcoded backend assumption
         parent_path = parent_parent_path / uuid
         parent_path.mkdir(exist_ok=True)
     elif not parent_path.exists():
@@ -1807,7 +1826,7 @@ def main(path=Path.cwd(), id=None, dataset_id=tuple(), time_now=None,
     # finished successfully for the current dataset
     from sparcur.simple.export import prepare_dataset_export, export_blob
     if id is not None:  # XXX note that id should be dataset_id # TODO parent_path ??
-        N, thing_type, uuid = id.split(':')
+        uuid = id.uuid  # FIXME hardcoded backend assumption
         path = path / uuid / 'dataset'  # FIXME hardcoded see invariant_path
         path = path.resolve()  # make sure that invariant_path is expanded as we expect.
 
@@ -2031,14 +2050,16 @@ def prepare_dataset_export(path, export_path=None):  # FIXME do we need export_b
     if export_path is None:  # FIXME confusing and breaks w/ convention -> Options maybe?
         export_path = Path(auth.get_path('export-path'))  # FIXME allow alt?
 
-    N, thing_type, uuid = path.cache.id.split(':')
+    from sparcur.utils import BlackfynnId
+    identifier = BlackfynnId(path.cache.id)
+    uuid = identifier.uuid
     # we don't use cache._fs_safe_id here because we know the
     # identifier type from the folder structure
     # FIXME dataset metadata export setup basically needs to do all of this first
     # set latest run and then latest complete at the end, but complete is kind of arbitrary
     # from the atomic point of view
     tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
-    # FIXME somehow tupdated can be None !??!?!
+    # FIXME somehow tupdated can be None !??!?! XXX yes, it happens on empty sparse datasets
     export_dataset_folder = export_path / 'datasets' / uuid
     export_parent = export_dataset_folder / timeformat_friendly(tupdated)
     if not export_parent.exists():
@@ -2141,7 +2162,7 @@ def main(path=Path.cwd(), id=None, time_now=None,
 
     if path == Path.cwd() and (id is not None or parent_path is not None):
         if parent_path is None:
-            N, thing_type, uuid = id.split(':')
+            uuid = id.uuid
             parent_path = parent_parent_path / uuid
 
         invariant_path = parent_path / invariant_local_path
@@ -2232,7 +2253,7 @@ import os
 from types import GeneratorType
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, loge, GetTimeNow
+from sparcur.utils import log, logd, loge, GetTimeNow, BlackfynnId
 from sparcur.paths import Path, BlackfynnCache
 from sparcur.backends import BlackfynnRemote
 
@@ -2268,6 +2289,30 @@ class Options(clif.Options):
                 (self.project_id
                  if self.project_id else
                  None))
+
+    @property
+    def project_id(self):
+        if not hasattr(self, '_cache_project_id'):
+            id = self._args['--project-id']
+            if id is not None:
+                identifier = BlackfynnId(id, type='organization')
+                self._cache_project_id = identifier
+            else:
+                return
+
+        return self._cache_project_id
+
+    @property
+    def dataset_id(self):
+        if not hasattr(self, '_cache_dataset_id'):
+            ids = self._args['--dataset-id']
+            if ids:
+                identifiers = [BlackfynnId(id, type='dataset') for id in ids]
+                self._cache_dataset_id = identifiers
+            else:
+                return ids
+
+        return self._cache_dataset_id
 
     @property
     def jobs(self):
@@ -2317,7 +2362,7 @@ class Options(clif.Options):
             return Path(pap).expanduser().resolve()
         elif did:
             id = self.id  # dataset_id is a list so use id which handles that
-            N, thing_type, uuid = id.split(':')  # FIXME N:dataset: vs dataset: vs uuid alone
+            uuid = id.uuid
             return (self.parent_parent_path / uuid).expanduser().resolve()
 
     @property
@@ -2568,7 +2613,10 @@ subgraphs should be specified using vertext properties or edge properties"
          [extra (map subgraph->graphviz subgraph->hash-functions)])
     (apply string-append `(,start ,@extra ,end))))
 
-(struct cluster (label color members))
+(struct cluster (label color members labeljust))
+
+(define (new-cluster label color members [labeljust "c"])
+    (cluster label color members labeljust))
 
 ; it is extremely annoying that you have to locally redefine a
 ; function just because someone upstream forgot to provide it >_<
@@ -2636,9 +2684,10 @@ subgraphs should be specified using vertext properties or edge properties"
       (define defined-edges
         (for/fold ([added (set)])
                   ([cluster clusters])
-          (printf "\tsubgraph ~a {\n\t\tlabel=\"~a\";\n"
+          (printf "\tsubgraph ~a {\n\t\tlabel=\"~a\";\n\t\tlabeljust=\"~a\";\n"
                   (new-cluster)
-                  (cluster-label cluster))
+                  (cluster-label cluster)
+                  (cluster-labeljust cluster))
           (when (cluster-color cluster)
             (printf "\t\tcolor=~a;\n" (cluster-color cluster)))
           (begin0

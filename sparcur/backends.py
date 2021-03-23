@@ -152,11 +152,21 @@ class BlackfynnRemote(aug.RemotePath):
 
     def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None, local_only=False):
         self._seed = id_bfo_or_bfr
+        if isinstance(self._seed, BlackfynnId):
+            if self._seed.file_id is not None:
+                if file_id is not None:
+                    if self._seed.file_id != file_id:
+                        msg = f'file_id mismatch! {self._seed.file_id} != {file_id}'
+                        raise ValueError(msg)
+
+                file_id = self._seed.file_id
+
         self._file_id = file_id
         if not [type_ for type_ in (self.__class__,
                                     self._BaseNode,
                                     str,
-                                    PathMeta)
+                                    PathMeta,
+                                    BlackfynnId,)
                 if isinstance(self._seed, type_)]:
             raise TypeError(self._seed)
 
@@ -191,20 +201,23 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self._seed, self._BaseNode):
             bfobject = self._seed
 
-        elif isinstance(self._seed, str):
+        elif isinstance(self._seed, str) or isinstance(self._seed, BlackfynnId):
+            if isinstance(self._seed, BlackfynnId):
+                _seed = self._seed.id  # FIXME sadly this is the least bad place to do this :/
+
             try:
-                bfobject = self._api.get(self._seed)
+                bfobject = self._api.get(_seed)
             except Exception as e:  # sigh
                 if self._local_only:
-                    _class = self._id_to_type(self._seed)
+                    _class = self._id_to_type(_seed)
                     if issubclass(_class, self._Dataset):
                         bfobject = _class(self._local_dataset_name)
-                        bfobject.id = self._seed
+                        bfobject.id = _seed
                     else:
                         raise NotImplementedError(f'{_class}') from e
                 elif (not hasattr(self, '_api') and
-                      self._seed.startswith('N:organization:')):
-                    self.__class__.init(self._seed)
+                      _seed.startswith('N:organization:')):
+                    self.__class__.init(_seed)
                     return self.bfobject
                 else:
                     raise e
@@ -320,7 +333,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def suffix(self):
-        # fixme loads of shoddy logic in here
+        # FIXME loads of shoddy logic in here
         name = PurePosixPath(self._name)
         if isinstance(self.bfobject, self._File) and not self.from_packages:
             return name.suffix
@@ -448,10 +461,19 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self._seed, PathMeta):
             id = self._seed.id
 
+        elif isinstance(self._seed, BlackfynnId):
+            id = self._seed.id
+
         else:
             raise TypeError(self._seed)
 
-        return BlackfynnId(id)
+        # FIXME we can't return BlackfynnId here due to the fact that
+        # augpathlib assumes that RemotePath.id is a string
+        return str(id)
+
+    @property
+    def identifier(self):
+        return BlackfynnId(self.id)
 
     @property
     def doi(self):

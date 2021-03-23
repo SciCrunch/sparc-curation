@@ -38,6 +38,7 @@ from pyontutils.utils import Async, deferred
 from pyontutils.iterio import IterIO
 from sparcur import exceptions as exc
 from sparcur.core import lj
+from sparcur.utils import BlackfynnId
 from .config import auth
 
 
@@ -247,6 +248,12 @@ File.download = download
 
 # package meta
 def id_to_type(id):
+    #if isinstance(id, BlackfynnId):  # FIXME this is a bad place to do this (sigh)
+        #return {'package': DataPackage,
+                #'collection':Collection,
+                #'dataset': Dataset,
+                #'organization': Organization,}[id.type]
+
     if id.startswith('N:package:'):
         return DataPackage
     elif id.startswith('N:collection:'):
@@ -696,6 +703,10 @@ class BFLocal:
         # no changing local storage prefix in the middle of things
         # if you want to do that create a new class
 
+        if isinstance(project_id, BlackfynnId):
+            # FIXME make the BlackfynnId version the internal default
+            project_id = project_id.id
+
         self._project_id = project_id
         self.bf = self._get_connection(self._project_id)
 
@@ -739,6 +750,11 @@ class BFLocal:
 
     def get(self, id, attempt=1, retry_limit=3):
         log.debug('We have gone to the network!')
+        if isinstance(id, BlackfynnId):
+            # FIXME inver this so the id form is internal or implement
+            # __str__ differently from __repr__
+            id = BlackfynnId.id
+
         if id.startswith('N:dataset:'):
             try:
                 thing = self.bf.get_dataset(id)  # heterogenity is fun!
