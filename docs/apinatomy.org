@@ -86,9 +86,11 @@ gsx:google-sheet-id
   ;; but would need a solution
   "AAAAAAAAA!")
 
+(defvar *apinatomy-model-repository* "~/git/apinatomy-models/")
+
 (defmacro apinat--with-model (model-id &rest body)
   (declare (indent defun))
-  `(let ((default-directory (expand-file-name (symbol-name ,model-id) "~/git/apinatomy-models/"))
+  `(let ((default-directory (expand-file-name (symbol-name ,model-id) *apinatomy-model-repository*))
          (xlsx    (format "source/%s.xlsx"    model-id))
          (json    (format "source/%s.json"    model-id))
          (jsonld  (format "derived/%s.jsonld" model-id))
@@ -152,6 +154,10 @@ gsx:google-sheet-id
   (apinat--with-model model-id
     (funcall (out-or #'-lt->) jsonld ttl)))
 
+(defun-local -m-x-> (model-id)
+  (apinat--with-model model-id
+    (-mx-> model-id xlsx)))
+
 (defun-local -ms-> (model-id)
   (oa-path :google :sheets (if (keywordp model-id)
                                model-id
@@ -168,6 +174,11 @@ gsx:google-sheet-id
     ;; pass before the whole process can continue because of some time
     ;; constraint or similar
     (ex-do (message "Make sure that the permissions are set correctly on %s" url))
+    ;; NOTE `url-copy-file' cannot detect login redirects correclty
+    ;; google sends a 307 for the download if everything is going to work
+    ;; in curl it sends a 302 but never something in the 400 range
+    ;; ideally we would be able to (run-command "mimetype" path-xlsx)
+    ;; but that requires that users have the mimetype command avaiable
     (url-copy-file url path-xlsx t)))
 
 (defun-local -xj-> (path-xlsx path-json)
@@ -203,20 +214,40 @@ gsx:google-sheet-id
 
 (defun-local all-models ()
   ;;(let ((default-directory (git-share-local r-apin-mod:HEAD:)) ; TODO ))
-  (let ((default-directory (expand-file-name "~/git/apinatomy-models/")))
+  (let ((default-directory (expand-file-name *apinatomy-model-repository*)))
     ;; you could use something like model-repository but then you have to make
     ;; a bunch of concatentations, better just to switch the default directory
     ;; so that the context deals with alignment between name and local referent
     (cl-remove-if (lambda (p) (or (not (file-directory-p p)) (string-prefix-p "." p)))
                   (directory-files default-directory))))
 
-(defun-local update-all-models ()
-  (update-models (mapcar #'intern (all-models))))
+(defun apinat--ttl-newer (model-id)
+  (apinat--with-model model-id
+    (let ((mtimes
+           (mapcar (lambda (p)
+                     (string-to-number
+                      (format-time-string "%s"
+                                          (file-attribute-modification-time (file-attributes p)))))
+                   (list ttl xlsx))))
+      (message "%S" mtimes)
+      (and (file-exists-p ttl)
+           (apply #'> mtimes)))))
+
+(defun-local filter-recent-models (model-ids)
+  (cl-remove-if #'apinat--ttl-newer model-ids))
+
+(defun-local update-all-models (&optional skip-recent)
+  (update-models (if skip-recent
+                     (filter-recent-models (mapcar #'intern (all-models)))
+                   (mapcar #'intern (all-models)))))
 #+end_src
 
 #+begin_src elisp
-(update-all-models)
+;; FIXME do fetch all in one batch so we don't have
+;; to wait for the ttl export between each model
+(update-all-models t)
 #+end_src
+
 if error clone the repo
 #+begin_src sh
 pushd ~/git
@@ -234,9 +265,9 @@ New-Item -Path * -Name derived -ItemType "directory"
 
 #+begin_src bash
 pushd ~/git/apinatomy-models/
-mkdir */derived
+find -maxdepth 1 -type d -not -path '*.git*' -not -path '.' -exec mkdir {}/derived \;
 #+end_src
-** ttl deprecated
+** ttl deprecated :noexport:
 Until this is fully automated you need to obtain the flattened jsonld
 export of any files to be converted to ttl.
 
@@ -254,12 +285,10 @@ spc apinat bronchomotor.jsonld bronchomotor.ttl
 # there is no test folder inside of bin and python can't
 # look backward up the folder hierarchy to find it
 
-# [[tramp:/ssh:cassava|sudo:cassava:/var/www/sparc/ApiNATOMY/ontologies/sparc-data.ttl]]
 ** Deploy ttl
-After running the ttl export via [[apinat-export][apinat-export]]
-define the functions in ref:deploy-ontology-file and then run
-~apinat-deploy-from-ttl bronchomotor.ttl~. NOTE Both functions need
-to be defined.
+After running the ttl export define the functions in
+ref:deploy-ontology-file and then run ~apinat-deploy-from-ttl
+bronchomotor.ttl~. NOTE Both functions need to be defined.
 
 The current command to deploy all is.
 #+begin_src bash
@@ -270,6 +299,8 @@ If you add a new model you will need to update the imports in
 https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl.
 The update process should be automated as part of the workflows
 described here. See also [[file:./../resources/scigraph/ontologies-sparc-data.yaml]].
+
+# [[tramp:/ssh:cassava|sudo:cassava:/var/www/sparc/ApiNATOMY/ontologies/sparc-data.ttl]]
 
 # FIXME it should be possible to implement this whole process
 # using OntResIriWrite or something like that
