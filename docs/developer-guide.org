@@ -2557,10 +2557,12 @@ def test_pipe_main():
 * Code :noexport:
 See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
 for more direct mapping of graphviz functionality but one that is also way more verbose.
-# #+header: :tangle no
+# XXX NOTE make sure that this block is never tangled, it complicates setup
+# #+header: :tangle ./y-u-no-compile-from-buffer.rkt
+#+header: :tangle no
 #+name: racket-graph-helper
 #+header: :prologue "#lang racket/base" :comments link
-#+begin_src racket :lang racket/base :exports none :tangle ./y-u-no-compile-from-buffer.rkt
+#+begin_src racket :lang racket/base :exports none
 (require graph ; raco pkg install graph
          racket/pretty
          racket/set
