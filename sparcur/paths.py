@@ -11,6 +11,7 @@ from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_paths, is_list_or_tuple
+from sparcur.utils import BlackfynnId
 from sparcur.config import auth
 
 
@@ -98,28 +99,18 @@ class BlackfynnCache(PrimaryCache, EatCache):
         return self.organization
 
     @property
-    def _id_parts(self):
+    def identifier(self):
         ntid = self.id
         if ntid is None:
             raise exc.NoCachedMetadataError(self)
 
-        N, thing, id = ntid.split(':')
-        return N, thing, id
-
-    @property
-    def _id_uuid(self):
-        N, thing, id = self._id_parts
-        return id  # TODO inverse function
-
-    @property
-    def _fs_safe_id(self):
-        N, thing, id = self._id_parts
-        return thing[0] + '-' + id
+        return BlackfynnId(ntid, file_id=self.file_id)
 
     @property
     def _trashed_path(self):
-        sid = self._fs_safe_id
-        suuid = self._id_uuid
+        id = self.identifier
+        suuid = id.uuid
+        sid = id.type[0] + '-' + suuid
         try:
             pid = self.parent._fs_safe_id
         except exc.NoCachedMetadataError as e:
@@ -211,7 +202,9 @@ class BlackfynnCache(PrimaryCache, EatCache):
     @property
     def cache_key(self):
         # FIXME file system safe
-        return f'{self.id}-{self.file_id}'
+        id = self.identifier
+        uuid = id.uuid
+        return f'{uuid[:2]}/{uuid}-{self.file_id}'
 
     def _dataset_metadata(self, force_cache=False):
         """ get metadata about a dataset from the remote metadata store """

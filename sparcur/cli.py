@@ -34,7 +34,7 @@ Usage:
     spc missing  [options]
     spc xattrs   [options]
     spc goto     <remote-id>
-    spc fix      [options] [duplicates mismatch] [<path>...]
+    spc fix      [options] [duplicates mismatch cache] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
     spc show     [schemas rmeta (export [json ttl])]  [options] [<project-id>]
@@ -267,7 +267,7 @@ from sparcur.core import JT
 from sparcur.core import OntId, OntTerm, adops
 from sparcur.utils import GetTimeNow  # top level
 from sparcur.utils import log, logd, loge, bind_file_handler
-from sparcur.utils import register_type, fromJson
+from sparcur.utils import register_type, fromJson, BlackfynnId
 from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
 from sparcur.backends import BlackfynnRemote
@@ -509,6 +509,7 @@ class Main(Dispatcher):
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
             self.options.annos or
+            (self.options.fix and self.options.cache) or
             (self.options.report and not self.options.raw) or
             (self.options.report and self.options.export_file) or
             (self.options.report and self.options.protocols) or
@@ -1742,6 +1743,28 @@ class Fix(Shell):
 
     def default(self):
         pass
+
+    def cache(self):
+        new_dirs = set()
+        def make_target(path):
+            pm = path._xattr_meta
+            id = BlackfynnId(pm.id, file_id=pm.file_id)
+            uuid = id.uuid
+            # XXX see BlackfynnCache.cache_key for the pattern
+            new_dir = uuid[:2]
+            new_dirs.add(lod / new_dir)
+            target_suffix = f'{new_dir}/{uuid}-{id.file_id}'
+            target = lod / target_suffix
+            return target
+
+        lod = self.cwd.cache.local_objects_dir
+        to_move = [c for c in lod.children if c.is_file()]
+        types = set(p.name.split(':')[1] for p in to_move)
+        assert types == {'package'}  # there should only be packages in here
+        st = [(source, make_target(source)) for source in to_move]
+        to_mkdir = [d for d in new_dirs if not d.exists()]
+        _ = [d.mkdir() for d in to_mkdir]
+        _ = [s.rename(t) for s, t in st]
 
     def mismatch(self):
         """ once upon a time it was (still at the time of writing) possible
