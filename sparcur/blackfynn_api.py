@@ -397,7 +397,7 @@ def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_on
     out_of_order = []
     while True:
         try:
-            resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packages?'
+            resp = session.get(f'{self._api._host}/datasets/{self.id}/packages?'
                             f'pageSize={pageSize}&'
                             f'includeSourceFiles={str(includeSourceFiles).lower()}'
                             f'{filename_args}'
@@ -531,7 +531,7 @@ def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_on
 @property
 def packageTypeCounts(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/packageTypeCounts')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/packageTypeCounts')
     if resp.ok:
         j = resp.json()
         return j
@@ -549,7 +549,7 @@ Dataset.packageTypeCounts = packageTypeCounts
 @property
 def users(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/collaborators/users')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/collaborators/users')
     return resp.json()
 
 
@@ -560,7 +560,7 @@ Dataset.users = users
 @property
 def teams(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/collaborators/teams')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/collaborators/teams')
     return resp.json()
 
 
@@ -571,7 +571,7 @@ Dataset.teams = teams
 @property
 def doi(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/doi')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/doi')
     if resp.ok:
         return resp.json()
     else:
@@ -586,7 +586,7 @@ Dataset.doi = doi
 def delete(self):
     """ actually delete """
     session = self._api.session
-    resp = session.delete(f'https://api.blackfynn.io/datasets/{self.id}')
+    resp = session.delete(f'{self._api._host}/datasets/{self.id}')
     if resp.ok:
         return resp.json()
     else:
@@ -601,7 +601,7 @@ Dataset.delete = delete
 @property
 def contributors(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/contributors')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/contributors')
     return resp.json()
 
 
@@ -612,7 +612,7 @@ Dataset.contributors = contributors
 @property
 def banner(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/banner')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/banner')
     return resp.json()
 
 
@@ -623,7 +623,7 @@ Dataset.banner = banner
 @property
 def readme(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/readme')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/readme')
     return resp.json()
 
 
@@ -634,7 +634,7 @@ Dataset.readme = readme
 @property
 def status_log(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}/status-log')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}/status-log')
     return resp.json()
 
 
@@ -645,7 +645,7 @@ Dataset.status_log = status_log
 @property
 def meta(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/datasets/{self.id}')
+    resp = session.get(f'{self._api._host}/datasets/{self.id}')
     return resp.json()
 
 
@@ -656,7 +656,7 @@ Dataset.meta = meta
 @property
 def teams(self):
     session = self._api.session
-    resp = session.get(f'https://api.blackfynn.io/organizations/{self.id}/teams')
+    resp = session.get(f'{self._api._host}/organizations/{self.id}/teams')
     return resp.json()
 
 
@@ -796,7 +796,7 @@ class BFLocal:
         return thing
 
     def get_file_url(self, id, file_id):
-        resp = self.bf._api.session.get(f'https://api.blackfynn.io/packages/{id}/files/{file_id}')
+        resp = self.bf._api.session.get(f'{self.bf._api._host}/packages/{id}/files/{file_id}')
         if resp.ok:
             resp_json = resp.json()
         elif resp.status_code == 404:

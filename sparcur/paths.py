@@ -107,10 +107,15 @@ class BlackfynnCache(PrimaryCache, EatCache):
         return BlackfynnId(ntid, file_id=self.file_id)
 
     @property
+    def _fs_safe_id(self):
+        id = self.identifier
+        return id.type[0] + '-' + id.uuid
+
+    @property
     def _trashed_path(self):
         id = self.identifier
         suuid = id.uuid
-        sid = id.type[0] + '-' + suuid
+        sid = id.type[0] + '-' + suuid  # must match _fs_safe_id
         try:
             pid = self.parent._fs_safe_id
         except exc.NoCachedMetadataError as e:
@@ -310,6 +315,11 @@ class BlackfynnCache(PrimaryCache, EatCache):
             # that we can pick up where we left off with the fetch, this also explains
             # why all the cases where the cached data size did not match were missing
             # xattrs entirely
+            if not self.local_object_cache_path.parent.exists():
+                # FIXME sigh, no obvious way around having to check
+                # every time other than creating all the cache
+                # subfolders in advance
+                self.local_object_cache_path.parent.mkdir()
 
             self.local_object_cache_path.touch()
             self.local_object_cache_path.cache_init(meta)
@@ -505,7 +515,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         else:
             endpoint = 'packages/' + id  # XXX if you use N:package:asdf/files/file-id this works
 
-        return 'https://api.blackfynn.io/' + endpoint
+        return backends.BlackfynnRemote._base_uri_api + '/' + endpoint  # XXX FIXME SIGH
 
     @staticmethod
     def _uri_human_bf(oid, did, id):
@@ -519,7 +529,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             prefix = '/'  # apparently organization needs /datasets after it
             return Path._uri_human_bf(None, None, oid) + prefix + id
         elif id.startswith('N:organization:'):
-            return f'https://app.blackfynn.io/{id}/datasets'
+            return f'{backends.BlackfynnRemote._base_uri_human}/{id}/datasets'  # XXX FIXME SIGH
         else:
             raise exc.UnhandledTypeError(type)
 

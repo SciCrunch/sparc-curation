@@ -27,8 +27,8 @@ prefix_endswith = ['/', '#', '_', '-', ':', '=',
 base_context = {
     '@version': 1.1,
     'id': '@id',
-    'dataset': {'@id': 'https://api.blackfynn.io/datasets/N:dataset:', '@prefix': True},
-    'package': {'@id': 'https://api.blackfynn.io/packages/N:package:', '@prefix': True},
+    'dataset': {'@id': 'https://api.blackfynn.io/datasets/N:dataset:', '@prefix': True},  # FIXME -> pennsieve
+    'package': {'@id': 'https://api.blackfynn.io/packages/N:package:', '@prefix': True},  # FIXME -> pennsieve
     # @base and _bfc are added at runtime and are dataset:{dataset-id-suffix}
     'meta': '@graph',
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
@@ -882,6 +882,7 @@ class ContributorExportSchema(JSONSchema):
             'last_name': {'type': 'string',
                           'context_value': 'sparc:lastName',},
             'contributor_orcid_id': EIS._allOf(OrcidSchema, context_value=idtype('sparc:hasORCIDId')),
+            'data_remote_user_id': strcont(idtype('TEMP:hasDataRemoteUserId')),
             'blackfynn_user_id': strcont(idtype('TEMP:hasBlackfynnUserId')),
             'contributor_affiliation': {'anyOf': [EIS._allOf(RorSchema),
                                                   {'type': 'string'}],

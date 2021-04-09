@@ -273,8 +273,10 @@ def unicode_truncate(string, length):
     return string.encode()[:length].decode(errors='ignore')
 
 
-class BlackfynnId(idlib.Identifier):
-    """ put all static information derivable from a blackfynn id here """
+def make_bf_id_regex(top_level_domain):
+    """ Generate the abstracted regex for a given
+    blackfynn/pennsieve identifier scheme """
+
     uuid4_regex = ('([0-9a-f]{8}-'
                    '[0-9a-f]{4}-'
                    '4[0-9a-f]{3}-'
@@ -282,7 +284,7 @@ class BlackfynnId(idlib.Identifier):
                    '[0-9a-f]{12})')
     canonical_regex = (
         # XXX this is not implemented right now but could be
-        '^https://api.blackfynn.io/id/N:([a-z]):' + uuid4_regex + '$'
+        f'^https://api.{top_level_domain}/id/N:([a-z]):' + uuid4_regex + '$'
     )
     curie_regex = '([a-z]+):' + uuid4_regex
     id_regex = 'N:' + curie_regex
@@ -290,8 +292,8 @@ class BlackfynnId(idlib.Identifier):
     paths = 'viewer', 'files', *[t + 's' for t in types]  # WHO LOVES CLASS SCOPE WHEEEE LOL PYTHON
     path_elem_regex = '([a-z]+)'
 
-    uri_api_regex = ('https://api.blackfynn.io/' + path_elem_regex + '/' + id_regex + '(?:/' + path_elem_regex + '/([^/]+))?/?')
-    org_pref = 'https://app.blackfynn.io/N:([a-z]+):'
+    uri_api_regex = (f'https://api.{top_level_domain}/' + path_elem_regex + '/' + id_regex + '(?:/' + path_elem_regex + '/([^/]+))?/?')
+    org_pref = f'https://app.{top_level_domain}/N:([a-z]+):'
     uri_human_regex = (org_pref + uuid4_regex + '/' + path_elem_regex +
                        '(?:/' + id_regex +
                        '(?:/' + path_elem_regex +
@@ -305,6 +307,19 @@ class BlackfynnId(idlib.Identifier):
         # FIXME curie_regex likely needs to support /files/123 suffix as well?
         zip((curie_regex, id_regex, uuid4_regex, uri_api_regex, uri_human_regex),
             ('curie', 'id', 'uuid', 'uri_api', 'uri_human'),)]
+
+    return (uuid4_regex, canonical_regex, curie_regex, id_regex,
+            types, paths, path_elem_regex, uri_api_regex, org_pref,
+            uri_human_regex, compiled)
+
+
+class BlackfynnId(idlib.Identifier):
+    """ put all static information derivable from a blackfynn id here """
+
+    top_level_domain = 'blackfynn.io'
+    (uuid4_regex, canonical_regex, curie_regex, id_regex,
+     types, paths, path_elem_regex, uri_api_regex, org_pref,
+     uri_human_regex, compiled) = make_bf_id_regex(top_level_domain)
 
     def __new__(cls, id_uri_curie_uuid, type=None, file_id=None):
         # TODO validate structure
@@ -333,6 +348,13 @@ class BlackfynnId(idlib.Identifier):
         elif match_type == 'uri_api' and 'files' in groups:
             *_, id_type, uuid, _, file_id_string = groups
             file_id = int(file_id_string)
+        elif match_type == 'uri_human':
+            # strip trailing garbage that is not a uuid
+            _mgs = groups
+            while _mgs and not cls.compiled[2][0].match(_mgs[-1]):
+                _mgs = _mgs[:-1]
+
+            *_, id_type, uuid = _mgs
         else:
             # there is a bunch of garbage up front
             *_, id_type, uuid = groups
@@ -385,7 +407,7 @@ class BlackfynnId(idlib.Identifier):
         else:
             raise NotImplementedError(f'{self.type} TODO need api endpoint')
 
-        return 'https://api.blackfynn.io/' + endpoint
+        return f'https://api.{self.top_level_domain}/' + endpoint
 
     def uri_human(self, organization=None, dataset=None):
         # a prefix is required to construct these
@@ -405,3 +427,12 @@ class BlackfynnInst(BlackfynnId):
     @property
     def uri_human(self):
         pass
+
+class PennsieveId(BlackfynnId):
+    # FIXME this isn't really a subclass but you know how bad oo
+    # implementations tend to conflate type with functionality ...
+
+    top_level_domain = 'pennsieve.io'
+    (uuid4_regex, canonical_regex, curie_regex, id_regex,
+     types, paths, path_elem_regex, uri_api_regex, org_pref,
+     uri_human_regex, compiled) = make_bf_id_regex(top_level_domain)

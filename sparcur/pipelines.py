@@ -199,8 +199,10 @@ class ContributorsPipeline(DatasourcePipeline):
             member = self.member(fn, ln)
 
             if member is not None:
-                userid = OntId('https://api.blackfynn.io/users/' + member.id)
+                _base_uri = State.blackfynn_local_instance.bf._api._host  # FIXME XXX
+                userid = OntId(_base_uri + '/users/' + member.id)
                 contributor['blackfynn_user_id'] = userid
+                contributor['data_remote_user_id'] = userid
 
         else:
             member = None
@@ -416,6 +418,17 @@ class DatasetDescriptionFilePipeline(PathPipeline):
                              #'it means that the input pipeline is broken.')
             out['template_schema_version'] = None
         return out
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
+class CodeDescriptionFilePipeline(PathPipeline):
+    data_transformer_class = dat.CodeDescriptionFile
+
+    #@hasSchema(sc.CodeDescriptionSchema)  # TODO
+    @property
+    def data(self):
+        return super().data
 
 
 hasSchema = sc.HasSchema()
@@ -958,6 +971,11 @@ class SDSPipeline(JSONPipeline):
          #DatasetDescriptionFilePipeline,
          #['dataset_description_file']],
 
+        [[[['code_description_file'], ['path']],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
+         CodeDescriptionFilePipeline,
+         ['code_description_file']],
+
         [[[['submission_file'], ['path']],
           [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          SubmissionFilePipeline,
@@ -980,6 +998,7 @@ class SDSPipeline(JSONPipeline):
     ]
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
+              [['code_description_file',], ['inputs', 'code_description_file']],
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
@@ -1076,7 +1095,7 @@ class SDSPipeline(JSONPipeline):
     __filerp = aug.RepoPath(__file__)
     if __filerp.working_dir is not None:
         # TODO consider embedding a commit during release?
-        __commit = __filerp.repo.active_branch.commit.hexsha
+        __commit = __filerp.repo.active_branch.commit.hexsha  # FIXME detached head issues
         adds.append([['prov', 'sparcur_commit'], lambda _, commit=__commit: commit])
 
     @property

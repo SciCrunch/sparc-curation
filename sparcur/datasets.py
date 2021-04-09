@@ -1269,6 +1269,21 @@ class SubmissionFilePath(ObjectPath):
 SubmissionFilePath._bind_flavours()
 
 
+class CodeDescriptionFile(MetadataFile):
+    default_record_type = COLUMN_TYPE
+    renames_header = {'description': 'description_header'}
+    record_type_key_alt = 'metadata_element'
+    record_type_key_header = record_type_key_alt
+    ignore_header = 'metadata_element', 'description_header', 'example'
+
+
+class CodeDescriptionFilePath(ObjectPath):
+    obj = CodeDescriptionFile
+
+
+CodeDescriptionFilePath._bind_flavours()
+
+
 _props = sc.DatasetDescriptionSchema.schema['properties']
 _props2 = sc.ContributorSchema.schema['properties']  # FIXME recurse ...
 _nddfes = [k for k, v in chain(_props.items(), _props2.items())
@@ -1488,6 +1503,7 @@ ManifestFilePath._bind_flavours()
 
 # XXX NOTE *_file is added to all of these keys in DatasetStructure.data
 DatasetStructure.sections = {'submission': SubmissionFilePath,
+                             'code_description': CodeDescriptionFilePath,
                              'dataset_description': DatasetDescriptionFilePath,
                              'subjects': SubjectsFilePath,
                              'samples': SamplesFilePath,
