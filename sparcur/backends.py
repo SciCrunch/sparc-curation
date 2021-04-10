@@ -19,6 +19,10 @@ class BlackfynnRemote(aug.RemotePath):
 
     _exclude_uploaded = False
 
+    _base_uri_human = 'https://app.blackfynn.io'  # FIXME hardcoded
+    _base_uri_api = 'https://api.blackfynn.io'  # FIXME hardcoded
+    #_base_uri  # FIXME TODO
+
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls)
 
@@ -56,9 +60,6 @@ class BlackfynnRemote(aug.RemotePath):
         BlackfynnRemote._File = File
         BlackfynnRemote._Dataset = Dataset
         BlackfynnRemote._BaseNode = BaseNode
-        BlackfynnRemote._base_uri_human = 'https://app.blackfynn.io'  # FIXME hardcoded
-        BlackfynnRemote._base_uri_api = 'https://api.blackfynn.io'  # FIXME hardcoded
-        #BlackfynnRemote._base_uri  # FIXME TODO
 
     @property
     def uri_human(self):

@@ -360,7 +360,7 @@ class Dispatcher(clif.Dispatcher):
         if export_source_path is None:
             export_source_path = self.cwd
 
-        export_source_path = self.cwd
+        export_source_path = self.cwd  # XXX note the override
         export = export_class(self.options.export_path,
                               export_source_path,
                               self._folder_timestamp,
@@ -1063,6 +1063,10 @@ done"""
 
             return blob_ir
 
+        elif self.cwd.cache.is_dataset():
+            export = self._export(ex.Export)
+            blob_ir, intr = export.export_single_dataset()
+
         else:
             export = self._export(ex.Export)
             dataset_paths = tuple(self.paths)
@@ -1074,7 +1078,8 @@ done"""
                                            exclude=noexport)
 
             sc.SummarySchema().validate_strict(export.latest_export)
-            log.info('export completed successfully')
+
+        log.info('export completed successfully')
 
         if self.options.debug:
             breakpoint()

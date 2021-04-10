@@ -15,7 +15,7 @@ from sparcur import curation as cur  # FIXME implicit state must be set in cli
 from sparcur import pipelines as pipes
 from sparcur.core import JEncode, JFixKeys, adops, OntTerm
 from sparcur.paths import Path
-from sparcur.utils import symlink_latest, loge, logd
+from sparcur.utils import symlink_latest, loge, logd, BlackfynnId
 from sparcur.utils import register_type, fromJson
 from sparcur.config import auth
 
@@ -81,11 +81,12 @@ class ExportBase:
                  export_base=None,):
         if org_id is None:
             self.export_source_path = export_source_path
-            id = export_source_path.cache.anchor.id
+            id = export_source_path.cache.anchor.identifier.uuid
         else:
             # do not set export_source_path, to prevent accidental export
-            id = org_id
+            id = BlackfynnId(org_id).uuid
 
+        self.export_path = Path(export_path)
         self.export_base = (export_base if export_base is not None else
                             Path(export_path, id, self.export_type))
         self.latest = latest
@@ -306,9 +307,10 @@ class Export(ExportBase):
 
     def export_single_dataset(self):
         intr = cur.Integrator(self.export_source_path)  # FIXME implicit state set by cli
-        dump_path = self.export_base / 'datasets' / intr.id / self.folder_timestamp
-        latest_path = self.export_base / 'datasets' / intr.id / 'LATEST'
-        latest_partial_path = self.export_base / 'datasets' / intr.id / 'LATEST_PARTIAL'
+        id = intr.path.cache.identifier.uuid
+        dump_path = self.export_path / 'datasets' / id / self.folder_timestamp
+        latest_path = self.export_path / 'datasets' / id / 'LATEST'
+        latest_partial_path = self.export_path / 'datasets' / id / 'LATEST_PARTIAL'
         if not dump_path.exists():
             dump_path.mkdir(parents=True)
 
@@ -601,7 +603,7 @@ class Export(ExportBase):
                 print(f'{export_source_path.cache} is not at dataset level!')
                 sys.exit(123)
 
-            return self.export_single_dataset()  # FIXME unused except for `spc export .` from inside a dataset folder
+            return self.export_single_dataset()  # used from spc export inside a dataset folder
 
         else:
             return super().export(dataset_paths=dataset_paths, exclude=exclude)
