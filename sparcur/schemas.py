@@ -596,9 +596,9 @@ simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 fs_safe_identifier_pattern = '[A-Za-z0-9][^ \n\t*|:\/<>"\\?]+'
 
 # NOTE don't use builtin date-time format due to , vs . issue
-iso8601pattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]])'
-iso8601bothpattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9](T[0-2][0-9]:[0-6][0-9]:[0-6][0-9](,[0-9]{6})*(Z|[-\+[0-2][0-9]:[0-6][0-9]]))*'
-iso8601datepattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]'  # XXX people are using this in the timestamp field repeatedly
+iso8601pattern =     '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9](:[0-6][0-9](,[0-9]{1,9})?)?(Z|[+-][0-2][0-9]:[0-6][0-9])$'
+iso8601bothpattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9](T[0-2][0-9]:[0-6][0-9](:[0-6][0-9](,[0-9]{1,9})?)?(Z|[+-][0-2][0-9]:[0-6][0-9]))?$'
+iso8601datepattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$'  # XXX people are using this in the timestamp field repeatedly
 
 # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
 doi_pattern = idlib.Doi._id_class.canonical_regex
@@ -1179,7 +1179,7 @@ class SubjectExportSchema(JSONSchema):
                                          #'@type': '@id',
                                          #'@context': {'@base': f'{base}subjects/'}}
                            },
-            'ear_tag_number': strcont('TEMP:localIdAlt'),
+            'ear_tag_number': strcont('TEMP:localIdAlt'),  # FIXME also int? or int ids don't support mathematical operations
             'treatment': strcont('TEMP:hadExperimentalTreatmentApplied'),
             'initial_weight': cont('sparc:animalSubjectHasWeight', ['string', 'number']),
             'height_inches': cont('TEMP:subjectHasHeight', ['string', 'number']),  # FIXME units

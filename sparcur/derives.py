@@ -34,8 +34,12 @@ class Derives:
 
     @staticmethod
     def contributor_name(name) -> Tuple[str, str]: 
-        if ',' in name:
+        if ', ' in name:
             last, first = name.split(', ', 1)
+        elif ',' in name:
+            #last, first = name.split(',', 1)
+            msg = 'Contributor name is missing a space after the comma.'
+            raise exc.BadDataError(msg)
         elif ' ' in name:
             first, last = name.split(' ', 1)
         else:

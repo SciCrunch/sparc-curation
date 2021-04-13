@@ -752,6 +752,7 @@ function sparcurl-do-already-fetched () {
     spc find --name '*.xlsx' \
              --name '*.xml' \
              --name 'submission*' \
+             --name 'code_description*' \
              --name 'dataset_description*' \
              --name 'subjects*' \
              --name 'samples*' \
@@ -770,6 +771,54 @@ folders off a single sparc consortium top level folder. This is for later.
 This is now done via invariant path which is =${dataset_uuid}/dataset=.
 To avoid issues the symlink needs to be dereferenced so that it is possible
 to find the project (organization) level.
+
+*** _*Fetch and export*_
+This is a quick and dirty version that should just do the right thing
+given only the dataset id as an input.
+
+Usage =sparcur-fexport N:dataset:totally-not-a-uuid=. The id provided
+may be any of the variants, url, curie, api, human, uuid, etc.
+#+begin_src bash
+# DSID="set it yourself"
+function sparcur-fexport () {
+    local ID=${1:-${DSID}}
+    local UUID
+    UUID=$(python -m sparcur.simple.utils --dataset-id "${ID}")
+    python -m sparcur.simple.retrieve --dataset-id "${ID}" &&  # TODO --symlink-objects-to
+    pushd "$(realpath "${UUID}/dataset")" &&
+    # FIXME we shouldn't need this refetch so I think that retrieve is
+    # broken if files/folders already exist
+    spc find --name '*.xlsx' \
+             --name '*.xml' \
+             --name 'submission*' \
+             --name 'code_description*' \
+             --name 'dataset_description*' \
+             --name 'subjects*' \
+             --name 'samples*' \
+             --name 'manifest*' \
+             --limit -1 \
+             --fetch &&
+    spc export
+    popd # do it yourself because we might need to explore?
+}
+#+end_src
+
+# FIXME TODO can we wrap this in a really light racket gui or something?
+# so that they can just click on buttons to run stuff and see the output?
+# it would be a lot easier than trying to route it through a python gui
+# or deal with the cli
+# https://github.com/telephil/racket-json-view
+# the thing is that we can't do this all remotely because they need to
+# be able to move the files
+
+# FIXME TODO
+#+begin_src bash
+for d in $(ls *-* -d); do refetch ${d}; done
+
+for d in $(ls *-* -d); do
+    find ~/".local/share/sparcur/export/datasets/${d}/LATEST/curation-export.json" -name 'curation-export.json';
+done
+#+end_src
 *** _*Validate*_
 **** Extract
 #+begin_src bash
@@ -1552,6 +1601,7 @@ python -m sparcur.simple.retrieve \
 --symlink-objects-to /mnt/str/tom/cache/bf-object-cache
 #+end_src
 
+# FIXME xml fetching still broken sporadically
 #+name: retrieve.py
 #+begin_src python :tangle ../sparcur/simple/retrieve.py
 from sparcur.paths import Path
@@ -2059,6 +2109,8 @@ def prepare_dataset_export(path, export_path=None):  # FIXME do we need export_b
     # set latest run and then latest complete at the end, but complete is kind of arbitrary
     # from the atomic point of view
     tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
+    # XXX TODO I think that the dataset updated date is now transitive as well? though the dataset
+    # updated timestamp seems to happen a bit before the created/updated date on the file itself?
     # FIXME somehow tupdated can be None !??!?! XXX yes, it happens on empty sparse datasets
     export_dataset_folder = export_path / 'datasets' / uuid
     export_parent = export_dataset_folder / timeformat_friendly(tupdated)
@@ -2543,6 +2595,13 @@ class DataWrapper:
         self.data = data
 
 
+def main(id=None, **kwargs):
+    if id is not None:
+        print(id.uuid)
+
+
+if __name__ == '__main__':
+    pipe_main(main)
 #+end_src
 *** _*Test*_
 #+begin_src python :tangle ../test/simple/test_utils.py

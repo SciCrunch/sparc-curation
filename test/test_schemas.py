@@ -35,14 +35,17 @@ class TestContext(unittest.TestCase):
         self._doit(j)
 
 
+def make_pattern_schema(key, pattern):
+    return {'type': 'object',
+            'required': [key],
+            'properties': {
+                key: {
+                    'type': 'string',
+                    'pattern': pattern}}}
+
+
 class OrcidSchema(sc.JSONSchema):
-    orcid_pattern = sc.orcid_pattern
-    schema = {'type': 'object',
-              'required': ['orcid'],
-              'properties': {
-                  'orcid': {
-                      'type': 'string',
-                      'pattern': orcid_pattern}}}
+    schema = make_pattern_schema('orcid', sc.orcid_pattern)
 
 
 class TestOrcidRegex(unittest.TestCase):
@@ -96,3 +99,36 @@ class TestNoLTWhitespaceRegex(unittest.TestCase):
         for s in strings:
             ok, data_or_error, _  = schema.validate(s)
             assert not ok and s != data_or_error
+
+
+class Iso8601Schema(sc.JSONSchema):
+    schema = make_pattern_schema('iso8601', sc.iso8601bothpattern)
+
+
+class TestIso8601(unittest.TestCase):
+    def test_positive(self):
+        strings = (
+            '1000-01-01',
+            '1000-01-01T00:00:00,000000001Z',
+            '1000-01-01T00:00:00,000000001-00:00',
+            '1000-01-01T00:00:00,000000001+00:00',
+        )
+        schema = Iso8601Schema()
+        for s in strings:
+            j = {'iso8601': s}
+            ok, data_or_error, _  = schema.validate(j)
+            assert j == data_or_error, s
+
+
+    def test_negative(self):
+        schema = Iso8601Schema()
+        strings = (
+            '01/01/01',
+            '1000-01-01T00:00:00,000000001',
+            '1000-01-01T00:00:00,000000001Z-00:00',
+            '1000-01-01T00:00:00,000000001Z+00:00',
+        )
+        for s in strings:
+            j = {'iso8601': s}
+            ok, data_or_error, _  = schema.validate(j)
+            assert not ok and j != data_or_error, s

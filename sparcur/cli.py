@@ -474,7 +474,7 @@ class Main(Dispatcher):
     def __init__(self, options, time_now=GetTimeNow()):
         self._time_now = time_now
         self._timestamp = self._time_now.START_TIMESTAMP
-        self._folder_timestamp = self._time_now.START_TIMESTAMP_LOCAL
+        self._folder_timestamp = self._time_now.START_TIMESTAMP_LOCAL_FRIENDLY
         super().__init__(options)
         if not self.options.verbose:
             log.setLevel('INFO')

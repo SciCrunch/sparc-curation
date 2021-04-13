@@ -93,6 +93,8 @@ class Header:
         if len(set(original)) != len(original):
             dupes = [v for v, c in Counter(original).most_common() if c > 1]
             msg = f'Original header is not unique.\nDuplicate entries: {dupes}'
+            if None in dupes:
+                msg += '\nThere may be multiple records without a primary key.'
             raise exc.MalformedHeaderError(msg)
 
         if self._normalize_first_cell:

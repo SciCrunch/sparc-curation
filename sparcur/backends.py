@@ -386,7 +386,7 @@ class BlackfynnRemote(aug.RemotePath):
                     realpath = PurePath(realname)
                     namepath = PurePath(name)
                     if namepath.suffixes:
-                        log.critical('sigh {namepath!r} -?-> {realpath!r}')
+                        log.critical(f'sigh {namepath!r} -?-> {realpath!r}')
 
                     else:
                         path = namepath
