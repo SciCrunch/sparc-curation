@@ -35,6 +35,7 @@ Usage:
     spc xattrs   [options]
     spc goto     <remote-id>
     spc fix      [options] [duplicates mismatch cache] [<path>...]
+    spc fix      [options] [bf-to-pn] [<path>...]
     spc stash    [options --restore] <path>...
     spc make-url [options] [<id-or-path>...]
     spc show     [schemas rmeta (export [json ttl])]  [options] [<project-id>]
@@ -1778,6 +1779,10 @@ class Fab(Dispatcher):
 class Fix(Shell):
 
     def default(self):
+        pass
+
+    def bf_to_pn(self):
+        # TODO placeholder for fixes needed for backend transition
         pass
 
     def cache(self):

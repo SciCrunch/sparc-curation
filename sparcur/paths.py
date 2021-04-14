@@ -75,16 +75,17 @@ def cleanup(func):
 
 
 class BlackfynnCache(PrimaryCache, EatCache):
+
     xattr_prefix = 'bf'
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
 
     cypher = hashlib.sha256  # set the remote hash cypher on the cache class
 
+    _suffix_mimetypes = suffix_mimetypes
+
     uri_human = backends.BlackfynnRemote.uri_human
     uri_api = backends.BlackfynnRemote.uri_api
-
-    _suffix_mimetypes = suffix_mimetypes
 
     _id_class = BlackfynnId
 
@@ -419,6 +420,19 @@ class BlackfynnCache(PrimaryCache, EatCache):
 
 
 BlackfynnCache._bind_flavours()
+
+
+class PennsieveCache(BlackfynnCache):
+
+    xattr_prefix = 'pn'  # FIXME TODO we will likely need an xattr conversion fix
+
+    uri_human = backends.PennsieveRemote.uri_human
+    uri_api = backends.PennsieveRemote.uri_api
+
+    _id_class = PennsieveId
+
+
+PennsieveCache._bind_flavours()
 
 
 class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack to keep everything consistent
