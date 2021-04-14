@@ -460,7 +460,7 @@ the source model hash needs to be separat
 *** google sheets import
 *** load from a url
 * Reporting
-#+begin_src python :results output :epilogue "main()" :exports both :wrap example
+#+begin_src python :epilogue "return main()" :exports both
 import json
 import augpathlib as aug
 from pyontutils.core import OntGraph
@@ -497,19 +497,18 @@ ind:   {n_ind}
 json
 obj:   {n_obj}
 obj:   {n_pair}''')
+    return [['Type', 'Authored', 'Expanded'],
+            ['Individual', n_obj, n_ind],
+            ['Statement', n_pair, n_trip],
+            ['owl:Class', 'n/a', n_class],]
 #+end_src
 
 #+RESULTS:
-#+begin_example
-rdf
-trip:  318378
-class: 395
-ind:   25940
-
-json
-obj:   1714
-obj:   8274
-#+end_example
+| Type       | Authored | Expanded |
+|------------+----------+----------|
+| Individual |     1714 |    25940 |
+| Statement  |     8274 |   318378 |
+| owl:Class  |      n/a |      395 |
 * Bootstrap :noexport:
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes
