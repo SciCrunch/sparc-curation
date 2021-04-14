@@ -13,6 +13,7 @@ from sparcur.config import auth
 
 class BlackfynnRemote(aug.RemotePath):
 
+    _id_class = BlackfynnId
     _api_class = None  # set in _setup
     _async_rate = None
     _local_dataset_name = object()
@@ -69,25 +70,12 @@ class BlackfynnRemote(aug.RemotePath):
         if not self.is_absolute():
             self = self.resolve()  # relative paths should not have to fail here
 
-        id = self.id
-        N, type, uuid = id.split(':')  # XXX DANGERZONE with leading junk on the uuid
-        if id.startswith('N:package:'):
-            #prefix = '/viewer/'
-            prefix = '/files/00000000-0000-0000-0000-000000000000/'  # unprocessed cases
-        elif id.startswith('N:collection:'):
-            prefix = '/files/'
-        elif id.startswith('N:dataset:'):
-            prefix = '/'  # apparently organization needs /datasets after it
-            return self.parent.uri_human + prefix + id
-        elif id.startswith('N:organization:'):
-            return f'{BlackfynnRemote._base_uri_human}/{id}/datasets'  # XXX FIXME SIGH
-        else:
-            raise exc.UnhandledTypeError(type)
+        oid = self.organization.identifier
+        did = self._id_class(self.dataset_id)
+        return self.identifier.uri_human(organization=oid,
+                                         dataset=did)
 
-        if self.dataset_id is None:
-            raise exc.NotInProjectError(f'{self}')
-
-        return self.dataset.uri_human + prefix + id
+        #return self.dataset.uri_human + prefix + id
 
     @property
     def uri_api(self):
@@ -156,7 +144,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None, local_only=False):
         self._seed = id_bfo_or_bfr
-        if isinstance(self._seed, BlackfynnId):
+        if isinstance(self._seed, self._id_class):
             if self._seed.file_id is not None:
                 if file_id is not None:
                     if self._seed.file_id != file_id:
@@ -170,7 +158,7 @@ class BlackfynnRemote(aug.RemotePath):
                                     self._BaseNode,
                                     str,
                                     PathMeta,
-                                    BlackfynnId,)
+                                    self._id_class,)
                 if isinstance(self._seed, type_)]:
             raise TypeError(self._seed)
 
@@ -205,8 +193,8 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self._seed, self._BaseNode):
             bfobject = self._seed
 
-        elif isinstance(self._seed, str) or isinstance(self._seed, BlackfynnId):
-            if isinstance(self._seed, BlackfynnId):
+        elif isinstance(self._seed, str) or isinstance(self._seed, self._id_class):
+            if isinstance(self._seed, self._id_class):
                 _seed = self._seed.id  # FIXME sadly this is the least bad place to do this :/
             else:
                 _seed = self._seed
@@ -467,7 +455,7 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self._seed, PathMeta):
             id = self._seed.id
 
-        elif isinstance(self._seed, BlackfynnId):
+        elif isinstance(self._seed, self._id_class):
             id = self._seed.id
 
         else:
@@ -1075,7 +1063,7 @@ class BlackfynnRemote(aug.RemotePath):
             exists = False
 
         if self != self.organization:
-            if self.id.startswith('N:dataset:'):  # FIXME sigh
+            if self.identifier.type == 'dataset':  # XXX FIXME enum these ?
                 TempBFObject.dataset = self.id
             else:
                 TempBFObject.dataset = self._bfobject.dataset

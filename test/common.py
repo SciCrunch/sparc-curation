@@ -9,7 +9,7 @@ from augpathlib import PathMeta
 from augpathlib.utils import onerror_windows_readwrite_remove
 from sparcur import config
 from sparcur import exceptions as exc
-from sparcur.paths import Path
+from sparcur.paths import Path, PathL
 from sparcur.paths import LocalPath, PrimaryCache
 from sparcur.paths import SymlinkCache
 from sparcur.state import State
@@ -22,8 +22,9 @@ template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 print(template_root)
 _pid = os.getpid()
 path_project_container = this_file.parent / f'test_local-{_pid}'
-project_path = path_project_container / 'test_project'
-fake_organization = 'N:organization:fake-organization-id'
+project_path = PathL(path_project_container) / 'test_project'
+fake_org_uuid4 = 'bbad875b-9290-405a-9b5c-4c6ea1bc7a70'
+fake_organization = f'L:organization:{fake_org_uuid4}'
 project_path_real = path_project_container / 'UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
@@ -51,13 +52,16 @@ ds_roots = (
 )
 ds_folders = set(Path(d).parts[0] for d in ds_roots)
 
-DIVISION_SLASH = '\u2215'  # what have we done
+DIVISION_SLASH = '\u2215'  # what have we done XXX evil
 
 
 def mk_fldr_meta(fldr_path, ftype='collection', id=None):
-    altid = f'N:{ftype}:' + fldr_path.as_posix()
+    #import uuid
+    #altid = f'N:{ftype}:{uuid.uuid4()}'  # sigh  # XXX don't do this, because we need to be able to validate without that
+    #altid = f'N:{ftype}:' + fldr_path.as_posix()  # use L: to mark local instead of N: as the platform does
+    altid = f'L:{ftype}:' + fldr_path.as_posix()  # use L: to mark local instead of N: as the platform does
     _id = id if id is not None else altid
-    _id = _id.replace('/', DIVISION_SLASH)  # ARGH there must be a way to ensure file system safe ids :/
+    _id = _id.replace('/', DIVISION_SLASH)  # ARGH there must be a way to ensure file system safe ids :/ XXX evil
     _meta = fldr_path.meta
     kwargs = {**_meta}
     kwargs['id'] = _id
@@ -113,6 +117,7 @@ project_path.setxattrs(attrs)
 # because it should be possible to call lddi without forcing the cache to exist
 # file under CachPath and RemotePath implementations are broken because instances
 # can only exist if the underlying thing exists, which defeats the point of paths
+project_path._cache_class._asserted_anchor = project_path.cache  # XXX sigh, here we are again
 project_path.cache.local_data_dir_init()
 
 for ds in ds_folders:

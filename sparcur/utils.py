@@ -393,25 +393,36 @@ class BlackfynnId(idlib.Identifier):
     @property
     def uri_api(self):
         # NOTE: this cannot handle file ids
-        if self.type == 'dataset':
-            endpoint = 'datasets/' + self.id
-        elif self.type == 'organization':
-            endpoint = 'organizations/' + self.id
-        elif self.type == 'collection':
-            endpoint = 'collections/' + self.id
-        elif self.type == 'package':
+        if self.type == 'package':
             if self.file_id is None:
                 endpoint = 'packages/' + self.id
             else:
                 endpoint = f'packages/{self.id}/files/{self.file_id}'
+        elif self.type == 'collection':
+            endpoint = 'collections/' + self.id
+        if self.type == 'dataset':
+            endpoint = 'datasets/' + self.id
+        elif self.type == 'organization':
+            endpoint = 'organizations/' + self.id
         else:
             raise NotImplementedError(f'{self.type} TODO need api endpoint')
 
         return f'https://api.{self.top_level_domain}/' + endpoint
 
     def uri_human(self, organization=None, dataset=None):
-        # a prefix is required to construct these
-        return self  # TODO
+        if self.type == 'package':
+            # FIXME file_id?
+            endpoint = f'/{organization.id}/datasets/{dataset.id}/files/v/{self.id}'
+        elif self.type == 'collection':
+            endpoint = f'/{organization.id}/datasets/{dataset.id}/files/{self.id}'
+        elif self.type == 'dataset':
+            endpoint = f'/{organization.id}/datasets/{self.id}'
+        elif self.type == 'organization':
+            endpoint =         f'/{self.id}/datasets'
+        else:
+            raise NotImplementedError(f'{self.type} TODO need app endpoint')
+
+        return f'https://app.{self.top_level_domain}' + endpoint
 
     def asStr(self):
         # FIXME conflict with the fact that these ids are default
@@ -428,6 +439,7 @@ class BlackfynnInst(BlackfynnId):
     def uri_human(self):
         pass
 
+
 class PennsieveId(BlackfynnId):
     # FIXME this isn't really a subclass but you know how bad oo
     # implementations tend to conflate type with functionality ...
@@ -436,3 +448,10 @@ class PennsieveId(BlackfynnId):
     (uuid4_regex, canonical_regex, curie_regex, id_regex,
      types, paths, path_elem_regex, uri_api_regex, org_pref,
      uri_human_regex, compiled) = make_bf_id_regex(top_level_domain)
+
+
+class LocId:
+
+    def __init__(self, id, type):
+        self.id = id
+        self.type = type

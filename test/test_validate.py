@@ -1,15 +1,14 @@
 import unittest
 import pytest
 from .common import project_path
-
 from sparcur import schemas as sc
 from sparcur import datasets as dat
-from sparcur.paths import Path
 
 
 class TestHierarchy(unittest.TestCase):
+
     def setUp(self):
-        self.ds =  [dat.DatasetStructure(p) for p in Path(project_path).children]
+        self.ds =  [dat.DatasetStructure(p) for p in project_path.children]
 
     def tearDown(self):
         pass

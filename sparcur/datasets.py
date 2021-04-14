@@ -439,10 +439,11 @@ class DatasetStructure(Path):
         # that uses xattrs to avoid the overhead of constructing the cache class
         # XXX yep, _cache_jsonMetadata is needed especially for standalone validation
         jsonMeta = jmc if self.cache is not None else jml
+        instpath = self._cache_class._local_class  # XXXXXXXXXXX FIXME oof inheritance :/
         return {d.dataset_relative_path:{**jsonMeta(d),
                                          'path_meta': {k:v for k, v in self.__class__(d).cache_meta.items()
                                                        if v is not None}}
-                for d in (Path(d) for d in self.rchildren_dirs)}
+                for d in (instpath(d) for d in self.rchildren_dirs)}
 
     def inverted_index(self):
         # TODO there are two steps here

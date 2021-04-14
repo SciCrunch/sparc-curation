@@ -40,6 +40,7 @@ Usage:
     spc show     [schemas rmeta (export [json ttl])]  [options] [<project-id>]
     spc show     protcur  [json ttl]                  [options]
     spc sheets   [update] [options] <sheet-name>
+    spc fab      [meta] [options]
 
 Commands:
     clone       clone a remote project (creates a new folder in the current directory)
@@ -172,6 +173,9 @@ Commands:
                 duplicates
     stash       stash a copy of the specific files and their parents
     make-url    return urls for blackfynn dataset ids, or paths
+    fab         fabricate something
+
+                meta        make fake metadata for a locally updated file
 
 Options:
     -f --fetch              fetch matching files
@@ -509,6 +513,7 @@ class Main(Dispatcher):
             self.options.status or  # eventually this should be able to query whether there is new data since the last check
             self.options.pretend or
             self.options.annos or
+            self.options.fab or
             (self.options.fix and self.options.cache) or
             (self.options.report and not self.options.raw) or
             (self.options.report and self.options.export_file) or
@@ -615,7 +620,11 @@ class Main(Dispatcher):
             if not self.__class__._pyru_loaded:
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
-                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
+                iso8601s = (pyru.Iso8601DurationTime,
+                            pyru.Iso8601DurationDatetime,
+                            pyru.Iso8601DurationDate,)
+                [register_type(c, c.tag) for c in
+                (pyru._Quant, pyru.Range, pyru.Approximately, *iso8601s)]
                 pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
             with open(self.options.export_file, 'rt') as f:
@@ -642,7 +651,11 @@ class Main(Dispatcher):
             if False and not self.__class__._pyru_loaded:  # FIXME do we need this ?
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
-                [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
+                iso8601s = (pyru.Iso8601DurationTime,
+                            pyru.Iso8601DurationDatetime,
+                            pyru.Iso8601DurationDate,)
+                [register_type(c, c.tag) for c in
+                (pyru._Quant, pyru.Range, pyru.Approximately, *iso8601s)]
                 pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
 
@@ -1602,6 +1615,10 @@ done"""
         fix = Fix(self)
         return fix('fix')
 
+    def fab(self):
+        fix = Fab(self)
+        return fix('fix')
+
 
 class Report(reports.Report, Dispatcher):
 
@@ -1742,6 +1759,20 @@ class Shell(Dispatcher):
         pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         breakpoint()
+
+
+class Fab(Dispatcher):
+
+    paths = Main.paths
+    _paths = Main._paths
+
+    _print_table = Main._print_table
+
+    def meta(self):
+        """ """
+        # XXX FIXME this is a temporary hack until we fix the ability
+        # to run export
+        pass
 
 
 class Fix(Shell):

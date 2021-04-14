@@ -11,7 +11,7 @@ from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_paths, is_list_or_tuple
-from sparcur.utils import BlackfynnId
+from sparcur.utils import BlackfynnId, LocId
 from sparcur.config import auth
 
 
@@ -86,6 +86,8 @@ class BlackfynnCache(PrimaryCache, EatCache):
 
     _suffix_mimetypes = suffix_mimetypes
 
+    _id_class = BlackfynnId
+
     @classmethod
     def decode_value(cls, field, value):
         if field in ('created', 'updated'):
@@ -104,7 +106,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
         if ntid is None:
             raise exc.NoCachedMetadataError(self)
 
-        return BlackfynnId(ntid, file_id=self.file_id)
+        return self._id_class(ntid, file_id=self.file_id)
 
     @property
     def _fs_safe_id(self):
@@ -158,8 +160,8 @@ class BlackfynnCache(PrimaryCache, EatCache):
 
         # FIXME in reality files can have more than one org ...
         if self.meta is not None:
-            id = self.id
-            if id is None:
+            identifier = self.identifier
+            if identifier is None:
                 parent = self.parent
                 if parent == self:  # we have hit a root
                     return None
@@ -172,7 +174,7 @@ class BlackfynnCache(PrimaryCache, EatCache):
                 else:
                     raise exc.NotInProjectError
 
-            elif id.startswith('N:organization:'):
+            elif identifier.type == 'organization':
                 return self
 
         if self.parent and self.parent != self:
@@ -180,10 +182,10 @@ class BlackfynnCache(PrimaryCache, EatCache):
             return self.parent.organization
 
     def is_organization(self):  # FIXME ?
-        return self.id and self.id.startswith('N:organization:')
+        return self.id and self.identifier.type == 'organization'
 
     def is_dataset(self):
-        return self.id and self.id.startswith('N:dataset:')
+        return self.id and self.identifier.type == 'dataset'
 
     @property
     def dataset(self):
@@ -944,6 +946,76 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
 Path._bind_flavours()
 register_type(Path, 'path')
+
+
+class CacheL(aug.caches.ReflectiveCache):
+
+    _id_class = LocId
+
+    _asserted_anchor = None
+    _dataset_dirs = []
+
+    def _type(self):
+        if self.is_file():
+            return 'package'
+        elif self.is_dir():
+            if 'organization' in self.id:
+                # have to do this to prevent recursion
+                return 'organization'
+            elif self == self._asserted_anchor:
+                return 'organization'
+            elif self in self._dataset_dirs or self.parent.is_organization():
+                return 'dataset'
+            else:
+                return 'collection'
+        else:
+            raise TypeError('unsupported inode type')
+
+    @property
+    def identifier(self):
+        return self._id_class(self.id, self._type())
+
+    @property
+    def anchor(self):
+        if self._asserted_anchor is not None:
+            return self._asserted_anchor
+        elif self.identifier.type == 'organization':
+            return self
+        elif self.parent != self:
+            return self.parent.anchor
+        else:
+            raise exc.NotInProjectError(f'{self} is not in a project!')
+
+    dataset = BlackfynnCache.dataset
+
+    dataset_id = BlackfynnCache.dataset_id
+
+    def is_organization(self):
+        return self._type() == 'organization'
+
+    def is_dataset(self):
+        return self._type() == 'dataset'
+
+
+CacheL._bind_flavours()
+
+
+class PathL(Path):
+
+    # FIXME this seems like a good idea until you realize some of the
+    # other classes that we built inherit from Path, because it
+    # simplifies the implementation, but we actually want the type
+    # specialization to depend on the type that we passed to it, which
+    # requires modifying new to match the constructed class, sigh XXX
+    # the solution is to overwrite the cache class on instances that
+    # are subclasses of Path during construction, I think that is the
+    # only way to be sure, clunky and aweful, but unavoidable
+
+    _cache_class = CacheL
+
+
+PathL._bind_flavours()
+CacheL._local_class = PathL
 
 
 class StashCache(BlackfynnCache):
