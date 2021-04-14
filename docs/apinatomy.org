@@ -4,6 +4,7 @@
 #+options: num:nil
 #+startup: showall
 #+property: header-args:elisp :lexical yes
+#+property: header-args :eval no-export
 
 # [[file:./apinatomy.pdf]]
 # [[file:./apinatomy.html]]
@@ -458,6 +459,58 @@ the source model hash needs to be separat
 *** load all formats from local
 *** google sheets import
 *** load from a url
+* Reporting
+#+begin_src python :results output drawer :epilogue "main()" :exports both
+import json
+import augpathlib as aug
+from pyontutils.core import OntGraph
+from pyontutils.namespaces import rdf, owl
+
+
+def path_json(string):
+    with open(string, 'rt') as f:
+        return json.load(f)
+
+
+def main():
+    graph = OntGraph()
+    apinat_models = aug.RepoPath('~/git/apinatomy-models').expanduser()
+    [graph.parse(f) for f in apinat_models.rglob('*.ttl')]
+    # rdf
+    n_trip = len(graph)
+    n_class = len(set(graph[:rdf.type:owl.Class]))
+    n_ind = len(set(graph[:rdf.type:owl.NamedIndividual]))
+    # json
+    js = [path_json(p) for p in apinat_models.rglob('*.json')]
+    keys = ('publications', 'nodes', 'links', 'lyphs', 'materials', 'chains', 'groups')
+    n_obj = sum([sum([len(j[k])
+                      if k in j else 0 for k in keys])
+                 for j in js])
+    n_pair = sum([sum([sum([len(o) for o in j[k]])
+                       if k in j else 0 for k in keys])
+                  for j in js])
+    print(f'''    rdf
+    trip:  {n_trip}
+    class: {n_class}
+    ind:   {n_ind}
+
+    json
+    obj:   {n_obj}
+    obj:   {n_pair}''')
+#+end_src
+
+#+RESULTS:
+:results:
+    rdf
+    trip:  318378
+    class: 395
+    ind:   25940
+
+    json
+    obj:   1714
+    obj:   8274
+:end:
+
 * Bootstrap :noexport:
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes
