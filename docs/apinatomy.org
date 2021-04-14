@@ -460,7 +460,7 @@ the source model hash needs to be separat
 *** google sheets import
 *** load from a url
 * Reporting
-#+begin_src python :results output drawer :epilogue "main()" :exports both
+#+begin_src python :results output :epilogue "main()" :exports both :wrap example
 import json
 import augpathlib as aug
 from pyontutils.core import OntGraph
@@ -489,28 +489,27 @@ def main():
     n_pair = sum([sum([sum([len(o) for o in j[k]])
                        if k in j else 0 for k in keys])
                   for j in js])
-    print(f'''    rdf
-    trip:  {n_trip}
-    class: {n_class}
-    ind:   {n_ind}
+    print(f'''rdf
+trip:  {n_trip}
+class: {n_class}
+ind:   {n_ind}
 
-    json
-    obj:   {n_obj}
-    obj:   {n_pair}''')
+json
+obj:   {n_obj}
+obj:   {n_pair}''')
 #+end_src
 
 #+RESULTS:
-:results:
-    rdf
-    trip:  318378
-    class: 395
-    ind:   25940
+#+begin_example
+rdf
+trip:  318378
+class: 395
+ind:   25940
 
-    json
-    obj:   1714
-    obj:   8274
-:end:
-
+json
+obj:   1714
+obj:   8274
+#+end_example
 * Bootstrap :noexport:
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes
