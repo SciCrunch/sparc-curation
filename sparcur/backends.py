@@ -7,7 +7,7 @@ import augpathlib as aug
 from augpathlib import PathMeta
 from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, BlackfynnId
+from sparcur.utils import log, logd, BlackfynnId, PennsieveId
 from sparcur.config import auth
 
 
@@ -1431,3 +1431,10 @@ class BlackfynnDatasetData:
             json.dump(blob, f, indent=2, sort_keys=True, cls=self._JEncode)
 
         return blob
+
+
+class PennsieveRemote(BlackfynnRemote):
+    _id_class = PennsieveId
+    _base_uri_human = 'https://app.pennsieve.net'  # FIXME hardcoded
+    _base_uri_api = 'https://api.pennsieve.net'  # FIXME hardcoded
+    # TODO duplicate the one shot setup

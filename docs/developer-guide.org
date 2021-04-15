@@ -11,6 +11,7 @@
 ** Remote only connection
 If you have [[(def_babf)][~sparcur.simple~​]] this is the simplest way to get a remote
 only connection to Blackfynn.
+#+name: demo-remote-only
 #+begin_src python :results drawer :epilogue "import pprint; return pprint.pformat(datasets)"
 from sparcur.config import auth
 from sparcur.simple.utils import backend_blackfynn
@@ -2268,7 +2269,7 @@ if __name__ == '__main__':
 #+end_src
 *** _*Utils*_
 #+name: utils.py
-#+begin_src python :tangle ../sparcur/simple/utils.py
+#+begin_src python :tangle ../sparcur/simple/utils.py :noweb yes
 """Common command line options for all sparcur.simple modules
 Usage:
     sparcur-simple [options] [<path>...]
@@ -2299,6 +2300,8 @@ Options:
     --sparse-limit=N                package count that forces a sparse pull [default: 10000]
     --symlink-objects-to=PATH       path to an existing objects directory
     --log-level=LEVEL               log level info [default: INFO]
+
+    --for-racket                    print data for reading into Racket
 """
 
 import os
@@ -2598,6 +2601,16 @@ class DataWrapper:
 def main(id=None, **kwargs):
     if id is not None:
         print(id.uuid)
+
+    if 'for_racket' in kwargs and kwargs['for_racket']:
+        log.setLevel(60)  # logging.CRITICAL = 50
+        import json
+        <<demo-remote-only>>
+        _dsmeta = '\n'.join([f"({json.dumps(d.id)} {json.dumps(d.name)})"
+                             for d in datasets])
+        dsmeta = f"({_dsmeta})"
+        # lab pi last name should be cached in some other way
+        print(dsmeta)
 
 
 if __name__ == '__main__':

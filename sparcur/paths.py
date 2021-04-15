@@ -11,7 +11,7 @@ from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_paths, is_list_or_tuple
-from sparcur.utils import BlackfynnId, LocId
+from sparcur.utils import BlackfynnId, LocId, PennsieveId
 from sparcur.config import auth
 
 
