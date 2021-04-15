@@ -109,6 +109,7 @@
      (let* ([uuid (id-uuid ds)]
             [lp (build-path (path-export-datasets)
                             uuid "LATEST" "curation-export.json")]
+            #;
             [asdf (println lp)]
             [qq (and (file-exists? lp) (resolve-path lp))])
        ; FIXME not quite right?
@@ -166,7 +167,9 @@
            (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
          (parameterize ([current-directory (resolve-relative-path cwd-2)])
            (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
-           (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t))))))))
+           (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))))
+     (set-single-dataset! ds jview) ; FIXME jview free variable
+     (println (format "dataset export completed for ~a" (dataset-id ds))))
    (define (id-short ds)
      (let-values ([(N type uuid)
                    (apply values (string-split (dataset-id ds) ":"))])
@@ -257,8 +260,7 @@
   (define jhl (get-field json-hierlist jview))
   (define old-root (get-field root jhl))
   (when old-root
-    (println (send old-root user-data))
-    (send jhl delete-item old-root))
+    (send jhl delete-item old-root)) ; this is safe because we force selection at startup
   (send jview set-json! json)
   (define root (get-field root jhl))
   (send jhl sort json-list-item< #t)
@@ -273,6 +275,7 @@
 ;; callbacks
 
 (define (cb-dataset-selection obj event)
+  #;
   (displayln (list obj event (send event get-event-type)))
   (for ([index (send obj get-selections)])
     (let ([dataset (send obj get-data index)])
@@ -309,8 +312,8 @@
   ; TODO recursively open/close and possibly restore default view
   )
 (define (cb-export-dataset obj event)
+  #;
   (displayln (list obj event (send event get-event-type)))
-  ""
   (export-current-dataset))
 
 (define (xopen-path path)
@@ -531,19 +534,27 @@ switch to that"
   
   (define result (populate-datasets))
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
+  (cb-dataset-selection lview #f) ; FIXME why is this not tirgger by set-selection ?
 
+  #;
   (set-jview! jview hrm)
 
+  #;
   (define jhl (get-field json-hierlist jview))
+  #;
   (define root (get-field root jhl))
 
+  #;
   (object->methods jhl)
+  #;
   (object->methods root)
+  #;
   (object->methods lview)
 
   #; ; lol careful this broke everything
   (send jhl delete-item root)
 
+  #;
   (send root is-selected?)
   #; ; and THIS is why you make your fields public ffs
   (send root open)
