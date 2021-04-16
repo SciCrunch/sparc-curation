@@ -1674,8 +1674,8 @@ popd
 pushd ~/git
 raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
 # XXX note the special cases
-raco pkg install --name breadcrumbs racket-breadcrumbs
-raco pkg install --name json-view racket-json-view
+raco pkg install --name breadcrumbs racket-breadcrumbs/
+raco pkg install --name json-view racket-json-view/
 popd
 #+END_SRC
 *** Remote exports
