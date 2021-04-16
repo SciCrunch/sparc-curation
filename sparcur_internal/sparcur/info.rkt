@@ -4,7 +4,7 @@
 
 (define deps '("base"
                "gui-lib"
-               "gui-widgit-mixins"
+               "gui-widget-mixins"
                "json-view"))
 
 (define build-deps '())
