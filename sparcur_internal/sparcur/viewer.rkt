@@ -3,17 +3,10 @@
 (require racket/gui
          racket/generic
          racket/pretty
-         #;
-         racket/format
-         #;
-         (for-syntax racket/base syntax/parse)
-         #; ; not needed, found a better solution
-         describe
          gui-widget-mixins
-         racket-json-view/json-view ; this is a horribly written and unperformant library
-         ; check nofork for its dependencies
          json
-         )
+         ; XXX json-view has lurking quadratic behavior
+         json-view)
 
 ;; parameters (yay dynamic variables)
 (define path-cache-dir (make-parameter #f))
@@ -21,12 +14,14 @@
 (define path-export-dir (make-parameter #f))
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
+(define current-dataset (make-parameter #f))
 
 ;; other variables
 
 (define include-keys
     ; have to filter down due to bad performance in the viewer
     '(id meta rmeta status prov submission))
+
 ;; temporary orthauth extract
 
 (define (config-paths [os #f])
@@ -65,10 +60,54 @@
     (send jview set-json! (with-input-from-file path
                             (λ () (read-json))))))
 
+;; utility functions
+
 (define (path->json path)
   (let ([path (expand-user-path (if (path? path) path (string->path path)))])
     (with-input-from-file path
       (λ () (read-json)))))
+
+(define (resolve-relative-path path)
+  ; FIXME for some reason resolve-path returns only the relative
+  ; portion of the path !? not helpful ...
+  ; FIXME this can fail with a weird error message
+  ; if the symlink does not exist
+  (simple-form-path (build-path path ".." ".." (resolve-path path))))
+
+(define (object->methods obj)
+  (interface->method-names (object-interface obj)))
+
+(define (populate-datasets)
+  (let* ([pcd (path-cache-datasets)]
+         [result (if (file-exists? pcd)
+                     (with-input-from-file pcd
+                       (λ () (read)))
+                     (begin
+                       (let ([pc-dir (path-cache-dir)])
+                         (unless (directory-exists? pc-dir)
+                           (make-directory* pc-dir)))
+                       (let ([result (get-dataset-list)])
+                         (with-output-to-file pcd
+                           #:exists 'replace ; yes if you run multiple of these you could have a data race
+                           (λ () (pretty-write result)))
+                         ; just to confuse everyone
+                         result))
+                     )]
+         [datasets (result->dataset-list result)])
+    (set-datasets! lview datasets)
+    result))
+
+(define (init-paths!)
+  "initialize or reset the file system paths to cache, export, and source directories"
+  ;; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
+  (path-source-dir (expand-user-path "~/files/sparc-datasets")) ; TODO standardize/configure
+
+  (path-cache-dir (expand-user-path (user-cache-path "sparcur/racket")))
+  (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
+  (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
+  (path-export-datasets (build-path (path-export-dir) "datasets")))
+
+;; dataset struct and generic functions
 
 (define-generics ds
   (populate-list ds list-box)
@@ -78,15 +117,7 @@
   (id-uuid ds)
   (dataset-src-path ds)
   (dataset-export-latest-path ds)
-  (export-dataset ds)
-  )
-
-(define (resolve-relative-path path)
-  ; FIXME for some reason resolve-path returns only the relative
-  ; portion of the path !? not helpful ...
-  ; FIXME this can fail with a weird error message
-  ; if the symlink does not exist
-  (simple-form-path (build-path path ".." ".." (resolve-path path))))
+  (export-dataset ds))
 
 (struct dataset (id title pi-last-name)
   #:methods gen:ds
@@ -155,21 +186,41 @@
                          "sparcur.cli"
 
                          "export")])
-       (let ([status-1 #f]
-             [status-2 #f]
-             [status-3 #f])
-         ; FIXME on the one hand this is amazing because I am getting
-         ; logging output into the racket comint window in emacs on
-         ; the other hand it is not amazing because system* is
-         ; blocking, so probably switch to user subprocess?
-         
-         (parameterize ([current-directory cwd-1])
-           (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
-         (parameterize ([current-directory (resolve-relative-path cwd-2)])
-           (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
-           (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))))
-     (set-single-dataset! ds jview) ; FIXME jview free variable
-     (println (format "dataset export completed for ~a" (dataset-id ds))))
+       (thread ; LOL this would have been SO hard in python
+        (thunk
+         (let ([status-1 #f]
+               [status-2 #f]
+               [status-3 #f])
+           ; FIXME on the one hand this is amazing because I am getting
+           ; logging output into the racket comint window in emacs on
+           ; the other hand it is not amazing because system* is
+           ; blocking, so probably switch to user subprocess?
+           (parameterize ([current-directory cwd-1])
+             #;
+             (println (string-join argv-1 " "))
+             (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
+           (parameterize ([current-directory (resolve-relative-path cwd-2)])
+             (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
+             (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
+           #;
+           (values status-1 status-2 status-3)
+           #; ; we can't do this, even though it is cool because the ui will get out of sync
+           ; instead we need a notification area for these messages or background color?
+           ; FIXME in a threaded context we probably don't want to do this
+           ; instead we probably want to call back an change the color of the list item
+           ; or something else
+           (set-single-dataset! ds jview) ; FIXME jview free variable
+           #; ; this doesn't work because list items cannot be customized independently SIGH
+           ; I can see why people use the web for stuff like this, if you want to be able to
+           ; customize some particular entry why fight with the canned private opaque things
+           ; that don't actually meet your use cases?
+           (set-lview-item-color lview ds) ; FIXME lview free variable
+           ; TODO gui indication
+           (println (format "dataset export completed for ~a" (dataset-id ds))))))))
+   (define (set-lview-item-color lview ds)
+     ; find the current row based on data ??? and then change color ?
+     (println "TODO set color")
+     )
    (define (id-short ds)
      (let-values ([(N type uuid)
                    (apply values (string-split (dataset-id ds) ":"))])
@@ -192,11 +243,13 @@
   (send/apply list-box set (apply map list (map lb-cols datasets)))
   (for ([ds datasets]
         [n (in-naturals)])
-    (send list-box set-data n (lb-data ds))))
+    (send list-box set-data n (lb-data ds)))
+  (send button-refresh-datasets set-label
+        (format lbt-refresh-datasets (length datasets))) ; XXX free variable on the button in question
+  )
 
 (define (set-datasets*! list-box . datasets)
   (set-datasets! list-box datasets))
-
 
 (define (set-single-dataset! ds jview)
   #;
@@ -205,10 +258,10 @@
          [json (if lp [path->json lp] (hash 'id (dataset-id ds)))]
          [hrm (for/hash ([(k v) (in-hash json)]
                          #:when (member k include-keys))
-            (values k v))])
+                (values k v))])
     (set-jview! jview hrm)))
 
-(define (current-dataset)
+(define (get-current-dataset)
   ; FIXME lview free variable
   (car (for/list ([index (send lview get-selections)])
          (let ([dataset (send lview get-data index)])
@@ -225,35 +278,35 @@
       )))
 
 (define (json-list-item< a b)
-    (let ([uda (send a user-data)]
-          [udb (send b user-data)])
+  (let ([uda (send a user-data)]
+        [udb (send b user-data)])
+    #;
+    (pretty-print (list uda udb))
+    (let ([tda (node-data-type uda)]
+          [tdb (node-data-type udb)]
+          [nda (node-data-name uda)]
+          [ndb (node-data-name udb)])
       #;
-      (pretty-print (list uda udb))
-      (let ([tda (node-data-type uda)]
-            [tdb (node-data-type udb)]
-            [nda (node-data-name uda)]
-            [ndb (node-data-name udb)])
-        #;
-        (or (println (list tda tdb nda ndb)) #t)
-        (or (not (or (symbol<? tda tdb) (symbol=? tda tdb)))
-            (and (eq? tda tdb)
-                 (or (and (eq? tda 'value)
-                          ; really not sure how these can possibly show up at the same level but whatever
-                          (or (and (symbol? nda)
-                                   (symbol? ndb)
-                                   #;
-                                   (apply string<? (map symbol->string (list nda ndb)))
-                                   (symbol<? nda ndb))
-                              (and (integer? nda)
-                                   (integer? ndb)
-                                   (< nda ndb)))))
-                 ; value hash list
-                 #; ; can't have duplicate keys so this shouldn't ever happen
-                 (let ([va (node-data-value uda)]
-                       [vb (node-data-value udb)])
-                   ; the lack of type-of in racket is really annoying :/
-                   ; especially given that it is dynamically typed :/
-                   #f))))))
+      (or (println (list tda tdb nda ndb)) #t)
+      (or (not (or (symbol<? tda tdb) (symbol=? tda tdb)))
+          (and (eq? tda tdb)
+               (or (and (eq? tda 'value)
+                        ; really not sure how these can possibly show up at the same level but whatever
+                        (or (and (symbol? nda)
+                                 (symbol? ndb)
+                                 #;
+                                 (apply string<? (map symbol->string (list nda ndb)))
+                                 (symbol<? nda ndb))
+                            (and (integer? nda)
+                                 (integer? ndb)
+                                 (< nda ndb)))))
+               ; value hash list
+               #; ; can't have duplicate keys so this shouldn't ever happen
+               (let ([va (node-data-value uda)]
+                     [vb (node-data-value udb)])
+                 ; the lack of type-of in racket is really annoying :/
+                 ; especially given that it is dynamically typed :/
+                 #f))))))
 
 (define (set-jview! jview json)
   "set the default state for jview"
@@ -261,9 +314,9 @@
   (define old-root (get-field root jhl))
   (when old-root
     (send jhl delete-item old-root)) ; this is safe because we force selection at startup
-  (send jview set-json! json)
+  (send jview set-json! json) ; FIXME this is where the slowdown is even with reduced data size
   (define root (get-field root jhl))
-  (send jhl sort json-list-item< #t)
+  (send jhl sort json-list-item< #t) ; XXX this is also slow
   (send root open)
   (let ([ritems (send root get-items)])
     (when (> (length ritems) 1) ; id alone is length 1
@@ -278,8 +331,12 @@
   #;
   (displayln (list obj event (send event get-event-type)))
   (for ([index (send obj get-selections)])
-    (let ([dataset (send obj get-data index)])
-      (set-single-dataset! dataset jview)))) ; FIXME jview free here
+    (let ([dataset (send obj get-data index)]
+          [cd (current-dataset)])
+      ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
+      (when (not (equal? dataset cd))
+        (current-dataset dataset) ; FIXME multiple selection case
+        (set-single-dataset! dataset jview))))) ; FIXME jview free here
 
 (define (result->dataset-list result)
   (map (λ (ti)
@@ -410,10 +467,12 @@ switch to that"
        [callback cb-search-dataset]
        [parent panel-left]))
 
-(define button-org-sync (new button%
-                             [label "Refresh Dataset Metadata"]
-                             [callback cb-refresh-dataset-metadata]
-                             [parent panel-org-actions]))
+; lbt- label template
+(define lbt-refresh-datasets "Refresh Datasets (~a)")
+(define button-refresh-datasets (new button%
+                                     [label lbt-refresh-datasets]
+                                     [callback cb-refresh-dataset-metadata]
+                                     [parent panel-org-actions]))
 
 (define lview (new list-box%
                    [label ""]
@@ -428,17 +487,10 @@ switch to that"
 
 ; FIXME TODO scale these based on window size
 ; and remove the upper limit when if/when someone is dragging
-(send lview set-column-width 0 50 50 100)
-(send lview set-column-width 1 60 50 300)
-(send lview set-column-width 2 60 50 9999)
-
-(define (get-display-info)
-  (for/list ([monitor (in-range (get-display-count))])
-    (let-values ([(x y) (get-display-size #:monitor monitor)]
-                 [(dx dy) (get-display-left-top-inset #:monitor monitor)])
-      (list
-       monitor
-       x y dx dy))))
+(send* lview
+  (set-column-width 0 50 50 100)
+  (set-column-width 1 60 50 300)
+  (set-column-width 2 60 50 9999))
 
 (define panel-ds-actions (new horizontal-panel%
                               [stretchable-height #f]
@@ -467,107 +519,9 @@ switch to that"
                    ;;[font (make-object font% 10 'modern)]
                    [parent panel-right]])
 
-(define (object->methods obj)
-    (interface->method-names (object-interface obj)))
-
-(define (populate-datasets)
-  (let* ([pcd (path-cache-datasets)]
-         [result (if (file-exists? pcd)
-                     (with-input-from-file pcd
-                       (λ () (read)))
-                     (begin
-                       (let ([pc-dir (path-cache-dir)])
-                         (unless (directory-exists? pc-dir)
-                           (make-directory* pc-dir)))
-                       (let ([result (get-dataset-list)])
-                         (with-output-to-file pcd 
-                           #:exists 'replace ; yes if you run multiple of these you could have a data race
-                           (λ () (pretty-write result)))
-                         ; just to confuse everyone
-                         result))
-                     )]
-         [datasets (result->dataset-list result)])
-    (set-datasets! lview datasets)
-    result))
-
-[module+ main
-  ;;(send lview append "dataset:df346163-87d1-4b33-b831-eda6f0a1435c" )
-  ;;(send lview append "dataset:df34 ... 435c" )
-  (define ds-1 (dataset "N:dataset:df346163-87d1-4b33-b831-eda6f0a1435c"
-                        "Spatially Tracked Single-Neuron Transcriptomics of a ..."
-                        "Schwaber"))
-  (define ds-2 (dataset "N:dataset:1e7738b9-e908-4293-83dc-ebe78f3b4158"
-                        "Functional neuronal nodose recording from pig ..."
-                        "Ardell"))
-  ;;(send/apply lview set (apply map list (map lb-cols (list ds-1 ds-2))))
-  ;; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
-  (path-cache-dir (expand-user-path (user-cache-path "sparcur/racket")))
-  (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
-  (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
-  (path-export-datasets (build-path (path-export-dir) "datasets"))
-  (path-source-dir (expand-user-path "~/files/sparc-datasets")) ; TODO standardize
-
-
-  ;(set-datasets*! lview ds-1 ds-2)
-  ;(populate-list ds-1 lview)
-  ;(populate-list ds-2 lview)
-
-  (define org "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0")
-  (define ds "N:dataset:df346163-87d1-4b33-b831-eda6f0a1435c")
-  (define path (string-append "~/.local/share/sparcur/export/"
-                              org
-                              "/integrated/datasets/"
-                              ds
-                              "/2021-04-09T17:22:09,572702-07:00/curation-export.json"))
-  (define json (path->json path))
-  (hash-ref json 'id)
-  #; ; oh boy 
-  (pretty-print json)
-  
-  (define hrm
-    (for/hash ([(k v) (in-hash json)]
-               #:when (member k include-keys))
-      (values k v)))
-
-  #;
-  (send jview set-json! hrm)
-  
+(module+ main
+  (init-paths!)
   (define result (populate-datasets))
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
   (cb-dataset-selection lview #f) ; FIXME why is this not tirgger by set-selection ?
-
-  #;
-  (set-jview! jview hrm)
-
-  #;
-  (define jhl (get-field json-hierlist jview))
-  #;
-  (define root (get-field root jhl))
-
-  #;
-  (object->methods jhl)
-  #;
-  (object->methods root)
-  #;
-  (object->methods lview)
-
-  #; ; lol careful this broke everything
-  (send jhl delete-item root)
-
-  #;
-  (send root is-selected?)
-  #; ; and THIS is why you make your fields public ffs
-  (send root open)
-  #;
-  (send root toggle-open/closed)
-  #; ; doesn't do anything?
-  (send jhl toggle-open/closed)
-
-  #;
-  (pretty-print path)
-  #;
-  (wat path)
-  #;
-  (path->set-jview path)
-  (send frame-main show #t)
-  ]
+  (send frame-main show #t))
