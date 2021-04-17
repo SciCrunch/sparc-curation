@@ -44,8 +44,8 @@
                 "~/Library/Application Support"
                 "~/Library/Caches"
                 "~/Library/Logs"))
-    ((windows) (let ((ucp "~/AppData/Local"))
-                 (list ucp ucp ucp (string-append ucp "/Logs"))))
+    ((windows) (let ((ucp (build-path (find-system-path 'home-dir) "AppData" "Local")))
+                 (list ucp ucp ucp (build-path ucp "Logs"))))
     (else (error (format "Unknown OS ~a" (or os (system-type)))))))
 
 (define *config-paths* (config-paths))
@@ -140,14 +140,13 @@
                          result))
                      )]
          [datasets (result->dataset-list result)])
-    (set-datasets! lview datasets)
+    (set-datasets! lview datasets) ; FIXME TODO have to store elsewhere for search so we
     result))
 
 (define (init-paths!)
   "initialize or reset the file system paths to cache, export, and source directories"
   ;; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
-  (path-source-dir (expand-user-path "~/files/sparc-datasets")) ; TODO standardize/configure
-
+  (path-source-dir (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))
   (path-cache-dir (expand-user-path (user-cache-path "sparcur/racket")))
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
   (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
@@ -365,7 +364,11 @@
   (define old-root (get-field root jhl))
   (when old-root
     (send jhl delete-item old-root)) ; this is safe because we force selection at startup
-  (send jview set-json! json) ; FIXME this is where the slowdown is even with reduced data size
+  (send jview set-json! json) ; FIXME this is where the slowdown is
+  ; even with reduced data size XXX consider having two jviews, one
+  ; visible and one in the background, and render the invisible one in
+  ; the background and then swap when visible, it won't always be
+  ; fast, but at least it will be faster
   (define root (get-field root jhl))
   (send jhl sort json-list-item< #t) ; XXX this is also slow
   (send root open)
