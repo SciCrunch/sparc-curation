@@ -454,7 +454,7 @@
     (if (directory-exists? symlink)
         (let ([path (resolve-relative-path symlink)])
           (case (system-type)
-            ((windows) (subprocess #f #f #f (find-system-path "explorer.exe") path))
+            ((windows) (subprocess #f #f #f (find-executable-path "explorer.exe") path))
             (else (xopen-path path))))
         ; TODO gui visible logging
         (println "Dataset has not been fetched yet!"))))
