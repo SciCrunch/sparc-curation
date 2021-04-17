@@ -276,7 +276,6 @@ from sparcur.utils import register_type, fromJson, BlackfynnId
 from sparcur.paths import Path, BlackfynnCache, StashPath
 from sparcur.state import State
 from sparcur.backends import BlackfynnRemote
-from sparcur.curation import Summary, Integrator
 from sparcur.protocols import ProtocolData
 
 try:
@@ -491,10 +490,12 @@ class Main(Dispatcher):
         else:
             self.cwd = Path.cwd()
 
-        Integrator.rate = self.options.rate
-        Integrator.no_google = self.options.no_google
+        from sparcur.curation import Integrator
+        self.Integrator = Integrator
+        self.Integrator.rate = self.options.rate
+        self.Integrator.no_google = self.options.no_google
 
-        self.cwdintr = Integrator(self.cwd)
+        self.cwdintr = self.Integrator(self.cwd)
 
         # pass debug along (sigh)
         from augpathlib import RemotePath, AugmentedPath  # for debug
@@ -523,7 +524,7 @@ class Main(Dispatcher):
             (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
             (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
-            Integrator.no_google = True
+            self.Integrator.no_google = True
             return
 
         elif (self.options.pull or
@@ -532,14 +533,14 @@ class Main(Dispatcher):
               self.options.contributors or
               self.options.make_url or
               self.options.missing):
-            Integrator.no_google = True
+            self.Integrator.no_google = True
 
         self._setup_local()  # if this isn't run up here the internal state of the program get's wonky
 
         if (self.options.report and
             not self.options.raw and
             not self.options.access):
-            Integrator.setup(local_only=True)  # FIXME sigh
+            self.Integrator.setup(local_only=True)  # FIXME sigh
         else:
             try:
                 self._setup_bfl()
@@ -587,6 +588,7 @@ class Main(Dispatcher):
         self.anchor.anchorClassHere(remote_init=False)
 
         self.project_path = self.anchor.local
+        from sparcur.curation import Summary
         self.summary = Summary(self.project_path)
         Summary._n_jobs = self.options.jobs
         if self.options.debug:
@@ -600,7 +602,7 @@ class Main(Dispatcher):
         State.bind_blackfynn(self.bfl)
 
     def _setup_export(self):
-        Integrator.setup()
+        self.Integrator.setup()
 
     def _setup_ontquery(self):
         # FIXME this should be in its own setup method
@@ -1172,7 +1174,7 @@ done"""
         all_hypothesis_uris = set(a.uri for a in protc)
         if self.options.shell or self.options.debug:
             p, *rest = self._paths
-            f = Integrator(p)
+            f = self.Integrator(p)
             all_annos = [list(protc.byIri(uri))
                          for uri in f.protocol_uris_resolved]
             breakpoint()
@@ -1295,7 +1297,7 @@ done"""
         file = self.options.feedback_file
         feedback = ' '.join(self.options.feedback)
         path = Path(file).resolve()
-        eff = Integrator(path)
+        eff = self.Integrator(path)
         # TODO pagenote and/or database
         print(eff, feedback)
 
@@ -1431,7 +1433,7 @@ done"""
         from sparcur.server import make_app
         if self.options.raw:
             # FIXME ...
-            self.dataset_index = {d.meta.id:Integrator(d)
+            self.dataset_index = {d.meta.id:self.Integrator(d)
                                   for d in self.datasets}
         else:
             from sparcur import export as ex
@@ -1653,12 +1655,12 @@ class Shell(Dispatcher):
 
     def default(self):
         datasets = list(self.datasets)
-        datas = [Integrator(d).datasetdata for d in datasets]
+        datas = [self.Integrator(d).datasetdata for d in datasets]
         datasets_local = list(self.datasets_local)
         dsd = {d.meta.id:d for d in datasets}
         ds = datasets
         summary = self.summary
-        org = Integrator(self.project_path)
+        org = self.Integrator(self.project_path)
 
         #asdf = []
         #for d in datasets:
@@ -1678,7 +1680,7 @@ class Shell(Dispatcher):
     def more(self):
         p, *rest = self._paths
         if p.cache.is_dataset():
-            intr = Integrator(p)
+            intr = self.Integrator(p)
             j = JT(intr.data())
             iddf = intr.datasetdata.dataset_description.object  # finally
             #triples = list(f.triples)
@@ -1689,7 +1691,7 @@ class Shell(Dispatcher):
             pass
 
         datasets = self.datasets
-        datas = [Integrator(d).datasetdata for d in datasets]
+        datas = [self.Integrator(d).datasetdata for d in datasets]
         dsd = {d.meta.id:d for d in datasets}
 
         rcs = list(datasets[-1].rchildren)
@@ -1735,7 +1737,7 @@ class Shell(Dispatcher):
 
     def protocols(self):
         """ test protocol identifier functionality """
-        org = Integrator(self.project_path)
+        org = self.Integrator(self.project_path)
         from pyontutils.utils import Async, deferred
         skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, ', 'na'
         asdf = [us for us in sorted(org.organs_sheet.byCol.protocol_url_1)
@@ -1754,7 +1756,7 @@ class Shell(Dispatcher):
         #from sparcur.sheets import Organs, Progress, Grants, ISAN, Participants, Protocols as ProtocolsSheet
         from sparcur.protocols import ProtcurData
         p, *rest = self._paths
-        intr = Integrator(p)
+        intr = self.Integrator(p)
         j = JT(intr.data)
         pj = list(intr.protocol_jsons)
         pc = list(intr.triples_exporter.protcur)

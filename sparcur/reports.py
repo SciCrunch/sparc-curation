@@ -26,8 +26,6 @@ from sparcur.utils import want_prefixes, log as _log
 from sparcur.utils import expand_label_curie, is_list_or_tuple
 from sparcur.paths import Path
 from sparcur.config import auth
-from sparcur.curation import ExporterSummarizer
-from sparcur.curation import Integrator, DatasetObject  # FIXME
 
 log = _log.getChild('reports')
 
@@ -62,7 +60,6 @@ class SparqlQueries:
     def __init__(self, nsm=None):
         from rdflib.plugins import sparql
         self.sparql = sparql
-
         self.nsm = nsm if nsm else OntGraph().namespace_manager
         self.prefixes = dict(self.nsm)
         self.prefixes.update(
@@ -313,6 +310,15 @@ class Report:
             return lambda kv: -kv[-1]
         else:
             return lambda kv: kv
+
+    def __init__(self, *args, **kwargs):
+        from sparcur.curation import ExporterSummarizer
+        self.ExporterSummarizer = ExporterSummarizer
+        from sparcur.curation import Integrator, DatasetObject  # FIXME
+        self.Integrator = Integrator
+        self.DatasetObject = DatasetObject
+
+        super().__init__(*args, **kwargs)
 
     def all(self):
         #self.access()  # must be on live data
@@ -625,7 +631,7 @@ class Report:
         else:
             from sparcur import export as ex
             datasets = self._data_ir()['datasets']
-            raw = [ExporterSummarizer._completeness(data) for data in datasets]
+            raw = [self.ExporterSummarizer._completeness(data) for data in datasets]
 
         def rformat(i, si, ci, ei, name, id, award, organ):
             if self.options.server and isinstance(ext, types.FunctionType):
@@ -684,7 +690,7 @@ class Report:
     def size(self, dirs=None, ext=None):
         if dirs is None:
             dirs = self.paths
-        intrs = [Integrator(p) for p in dirs]
+        intrs = [self.Integrator(p) for p in dirs]
         if not intrs:
             intrs = self.cwdintr,
 
@@ -760,7 +766,7 @@ class Report:
             import htmlfn as hfn
             for dataset_blob in datasets:
                 if dataset_blob['id'] == id:
-                    dso = DatasetObject.from_json(dataset_blob)
+                    dso = self.DatasetObject.from_json(dataset_blob)
                     title = f'Errors for {id}'
                     urih = dataset_blob['meta']['uri_human']
                     formatted_title = (
