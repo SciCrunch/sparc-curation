@@ -15,6 +15,15 @@
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
 (define current-dataset (make-parameter #f))
+(define python-interpreter (make-parameter
+                            (find-executable-path
+                             (case (system-type)
+                               ((windows) "python.exe")
+                               ; osx is still stuck on 2.7 by default so need brew
+                               ; but for whatever reason find-executable-path is not brew aware
+                               ((macosx) "/usr/local/bin/python3")
+                               ((unix) "python") ; all of these should be >= 3.7 by this point
+                               (else (error "uhhhhh? beos is this you?"))))))
 
 ;; other variables
 
@@ -60,7 +69,44 @@
     (send jview set-json! (with-input-from-file path
                             (λ () (read-json))))))
 
+;; python argvs
+
+(define (python-mod-args module-name . args)
+  (cons (python-interpreter) (cons "-m" (cons module-name args))))
+
+(define argv-spc-export (python-mod-args "sparcur.cli" "export"))
+(define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--dataset-id" (dataset-id ds)))
+(define argv-spc-find-meta
+  (python-mod-args
+   "sparcur.cli"
+   "find"
+   "--name" "*.xlsx"
+   "--name" "*.xml"
+   "--name" "submission*"
+   "--name" "code_description*"
+   "--name" "dataset_description*"
+   "--name" "subjects*"
+   "--name" "samples*"
+   "--name" "manifest*"
+   "--name" "resources*"
+   "--name" "README*"
+   "--limit" "-1"
+   "--fetch"))
+
 ;; utility functions
+
+#; ; sigh
+(define (in-cwd-thread argv cwd)
+  ; FIXME not quite right because we need to be able to run multiple things in a row
+  ; it would have to be a list of argv cwd pairs or we just use this for the oneoffs
+  (thread
+   (thunk
+    (let ([status #f])
+      (parameterize ([current-directory cwd])
+        (values
+         (with-output-to-string
+           (thunk (set! status (apply system* argv #:set-pwd? #t))))
+         status))))))
 
 (define (path->json path)
   (let ([path (expand-user-path (if (path? path) path (string->path path)))])
@@ -117,6 +163,8 @@
   (id-uuid ds)
   (dataset-src-path ds)
   (dataset-export-latest-path ds)
+  (fetch-export-dataset ds)
+  (fetch-dataset ds)
   (export-dataset ds))
 
 (struct dataset (id title pi-last-name)
@@ -148,45 +196,47 @@
    (define (dataset-src-path ds)
      (let ([uuid (id-uuid ds)])
        (build-path (path-source-dir) uuid)))
+   (define (fetch-dataset ds)
+     (println (format "dataset fetch starting for ~a" (dataset-id ds))) ; TODO gui and/or log
+     (let ([cwd-1 (path-source-dir)]
+           [cwd-2 (build-path (dataset-src-path ds)
+                              ; FIXME dataset here is hardcoded
+                              "dataset")]
+           [argv-1 (argv-simple-retrieve ds)]
+           [argv-2 argv-spc-find-meta])
+       (thread
+        (thunk
+         (let ([status-1 #f]
+               [status-2 #f])
+           (parameterize ([current-directory cwd-1])
+             (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
+           (parameterize ([current-directory (resolve-relative-path cwd-2)])
+             (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t)))))
+           (println (format "dataset fetch completed for ~a" (dataset-id ds))))))))
    (define (export-dataset ds)
+     (println (format "dataset export starting for ~a" (dataset-id ds))) ; TODO gui and/or log
+     (let ([cwd-2 (build-path (dataset-src-path ds)
+                              ; FIXME dataset here is hardcoded
+                              "dataset")]
+           [argv-3 argv-spc-export])
+       (thread
+        (thunk
+         (let ([status-3 #f])
+           (parameterize ([current-directory (resolve-relative-path cwd-2)])
+             (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
+           (println (format "dataset export completed for ~a" (dataset-id ds))))))))
+   (define (fetch-export-dataset ds)
+     (println (format "dataset fetch and export starting for ~a" (dataset-id ds))) ; TODO gui and/or log
      (let ([cwd-1 (path-source-dir)]
            ; we can't resolve-path on cwd-2 here because it
            ; may not exist or it may point to a previous release
            [cwd-2 (build-path (dataset-src-path ds)
                               ; FIXME dataset here is hardcoded
                               "dataset")]
-           ; FIXME windows
-           [argv-1 (list "/usr/bin/env"
-                         "python3"
-                         "-m"
-                         "sparcur.simple.retrieve"
-                         "--dataset-id"
-                         (dataset-id ds))]
-           [argv-2 (list "/usr/bin/env"
-                         "python3"
-                         "-m"
-                         "sparcur.cli"
-
-                         "find"
-                         "--name" "*.xlsx"
-                         "--name" "*.xml"
-                         "--name" "submission*"
-                         "--name" "code_description*"
-                         "--name" "dataset_description*"
-                         "--name" "subjects*"
-                         "--name" "samples*"
-                         "--name" "manifest*"
-                         "--name" "resources*"
-                         "--name" "README*"
-                         "--limit" "-1"
-                         "--fetch")]
-           [argv-3 (list "/usr/bin/env"
-                         "python3"
-                         "-m"
-                         "sparcur.cli"
-
-                         "export")])
-       (thread ; LOL this would have been SO hard in python
+           [argv-1 (argv-simple-retrieve ds)]
+           [argv-2 argv-spc-find-meta]
+           [argv-3 argv-spc-export])
+       (thread
         (thunk
          (let ([status-1 #f]
                [status-2 #f]
@@ -216,10 +266,10 @@
            ; that don't actually meet your use cases?
            (set-lview-item-color lview ds) ; FIXME lview free variable
            ; TODO gui indication
-           (println (format "dataset export completed for ~a" (dataset-id ds))))))))
+           (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))))))
    (define (set-lview-item-color lview ds)
      ; find the current row based on data ??? and then change color ?
-     (println "TODO set color")
+     (println "TODO set color") ; pretty sure this cannot be done with this gui widgit
      )
    (define (id-short ds)
      (let-values ([(N type uuid)
@@ -267,15 +317,16 @@
          (let ([dataset (send lview get-data index)])
            dataset))))
 
+(define (fetch-current-dataset)
+  (fetch-dataset (current-dataset)))
+
 (define (export-current-dataset)
+  (export-dataset (current-dataset)))
+
+(define (fetch-export-current-dataset)
   ; FIXME one vs many export
   ; TODO highlight changed since last time
-  (export-dataset (current-dataset))
-  #;
-  (for ([index (send obj get-selections)])
-    (let ([dataset (send obj get-data index)])
-      (export-dataset dataset)
-      )))
+  (fetch-export-dataset (current-dataset)))
 
 (define (json-list-item< a b)
   (let ([uda (send a user-data)]
@@ -368,10 +419,15 @@
   (displayln (list obj event (send event get-event-type)))
   ; TODO recursively open/close and possibly restore default view
   )
+
+(define (cb-fetch-dataset obj event)
+  (fetch-current-dataset))
+
 (define (cb-export-dataset obj event)
-  #;
-  (displayln (list obj event (send event get-event-type)))
   (export-current-dataset))
+
+(define (cb-fetch-export-dataset obj event)
+  (fetch-export-current-dataset))
 
 (define (xopen-path path)
   (let ([command (find-executable-path
@@ -412,22 +468,28 @@ switch to that"
     (send frame-main on-close)
     (send frame-main show #f)))
 
+(define (k-fetch-export-dataset receiver event)
+  (fetch-export-current-dataset))
+
 (define (k-export-dataset receiver event)
-  (export-current-dataset)
-  )
+  (export-current-dataset))
+
 ; add functions
 (send* keymap
   (add-function "test" k-test)
+  (add-function "fetch-export-dataset" k-fetch-export-dataset)
   (add-function "export-dataset" k-export-dataset)
   (add-function "quit" k-quit))
 
 ; map functions
 (send* keymap
-  (map-function "c:t" "test")
-  (map-function "f5" "export-dataset")
-  (map-function "c:c;c:e" "export-dataset")
-  (map-function "c:q" "quit")
-  (map-function "c:w" "quit"))
+  (map-function "c:t"     "test")
+  (map-function "f5"      "fetch-export-dataset")
+  (map-function "c:f"     "fetch-export-dataset")
+  (map-function "c:c;c:e" "fetch-export-dataset")
+  (map-function "c:x"     "export-dataset")
+  (map-function "c:q"     "quit")
+  (map-function "c:w"     "quit"))
 
 #;
 (send keymap call-function "test" 1 (new event%))
@@ -497,11 +559,25 @@ switch to that"
                               [parent panel-right]))
 
 (define button-fexport (new (tooltip-mixin button%)
-                            [label "Export Dataset"] ; FIXME will need to decouple the rerun use case here
-                            [tooltip "Shortcut C-c C-e"]
+                            [label "Fetch+Export"]
+                            [tooltip "Shortcut C-f"] ; FIXME this should populate dynamically
                             [tooltip-delay 100]
-                            [callback cb-export-dataset]
+                            [callback cb-fetch-export-dataset]
                             [parent panel-ds-actions]))
+
+(define button-fetch (new (tooltip-mixin button%)
+                            [label "Fetch"]
+                            [tooltip "Shortcut <not-set>"]
+                            [tooltip-delay 100]
+                            [callback cb-fetch-dataset]
+                            [parent panel-ds-actions]))
+
+(define button-export-dataset (new (tooltip-mixin button%)
+                                   [label "Export"]
+                                   [tooltip "Shortcut C-x"]
+                                   [tooltip-delay 100]
+                                   [callback cb-export-dataset]
+                                   [parent panel-ds-actions]))
 
 ; FXIME probably goes in the bottom row of a vertical panel
 (define button-toggle-expand (new button%
