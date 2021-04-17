@@ -74,6 +74,7 @@
 (define (python-mod-args module-name . args)
   (cons (python-interpreter) (cons "-m" (cons module-name args))))
 
+(define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "--for-racket"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
 (define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--dataset-id" (dataset-id ds)))
 (define argv-spc-find-meta
@@ -400,10 +401,12 @@
        result))
 
 (define (get-dataset-list)
-  ;; TODO os specific argv
-  (let* ([argv '("/usr/bin/env" "python3" "-m" "sparcur.simple.utils" "--for-racket")]
-         [result-string (with-output-to-string (λ () (apply system* argv)))]
+  (let* ([argv argv-simple-for-racket]
+         [status #f]
+         [result-string (with-output-to-string (λ () (set! status (apply system* argv))))]
          [result (read (open-input-string result-string))])
+    (unless status
+      (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
     result))
 
 (define (cb-refresh-dataset-metadata obj event)
@@ -437,7 +440,7 @@
                   (case (system-type 'os*)
                     ((linux) "xdg-open")
                     ((macosx) "open")
-                    ((windows) "start")
+                    ;((windows) "start") ; XXX only works from powerhsell it seems
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
@@ -449,7 +452,10 @@
     (println (list "should be opening something here ...." ds resolved))
 
     (if (directory-exists? symlink)
-        (xopen-path (resolve-relative-path symlink))
+        (let ([path (resolve-relative-path symlink)])
+          (case (system-type)
+            ((windows) (subprocess #f #f #f (find-system-path "explorer.exe") path))
+            (else (xopen-path path))))
         ; TODO gui visible logging
         (println "Dataset has not been fetched yet!"))))
 
@@ -491,6 +497,7 @@ switch to that"
   (map-function "c:f"     "fetch-export-dataset")
   (map-function "c:c;c:e" "fetch-export-dataset")
   (map-function "c:x"     "export-dataset")
+  #; ; defined as the key for the menu item so avoid double calls
   (map-function "c:q"     "quit")
   (map-function "c:w"     "quit"))
 
@@ -510,6 +517,26 @@ switch to that"
        [label "sparcur control panel"]
        [width 1280]
        [height 1024]))
+
+(define menu-bar-main (new menu-bar%
+                       [parent frame-main]))
+(define menu-file (new menu% [label "File"] [parent menu-bar-main]))
+    (define menu-item-quit (new menu-item%
+                                [label "Quit"]
+                                [shortcut #\Q]
+                                [shortcut-prefix '(ctl)]
+                                [callback k-quit]
+                                [parent menu-file]))
+(define menu-edit (new menu% [label "Edit"] [parent menu-bar-main]))
+    (define menu-item-preferences (new menu-item%
+                                       [label "Preferences..."]
+                                       [shortcut #\;]
+                                       [shortcut-prefix '(ctl)]
+                                       [callback (λ (a b) (println "cb-menu-item-preferences"))]
+                                       [parent menu-edit]))
+;; TODO preferences
+; api keys
+; paths
 
 (define panel-holder (new horizontal-panel%
                           [parent frame-main]))
