@@ -1,18 +1,12 @@
-import io
 import os
-import json
-import types
-from copy import deepcopy
+#import types
 #from nibabel import nifti1
 #from pydicom import dcmread
 #from scipy.io import loadmat
 import boto3
 import botocore
 import requests
-from requests import Session
-from requests.exceptions import HTTPError, ConnectionError
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+#from requests.exceptions import HTTPError, ConnectionError
 from joblib import Parallel, delayed
 if 'BLACKFYNN_LOG_LEVEL' not in os.environ:
     # silence agent import warning
@@ -36,10 +30,29 @@ from blackfynn.api import transfers
 from blackfynn.api.data import PackagesAPI
 from pyontutils.utils import Async, deferred
 from pyontutils.iterio import IterIO
+from sparcur import monkey
 from sparcur import exceptions as exc
-from sparcur.core import lj
-from sparcur.utils import BlackfynnId
-from .config import auth
+from sparcur.utils import BlackfynnId, ApiWrapper
+
+
+def id_to_type(id):
+    #if isinstance(id, BlackfynnId):  # FIXME this is a bad place to do this (sigh)
+        #return {'package': DataPackage,
+                #'collection':Collection,
+                #'dataset': Dataset,
+                #'organization': Organization,}[id.type]
+
+    if id.startswith('N:package:'):
+        return DataPackage
+    elif id.startswith('N:collection:'):
+        return Collection
+    elif id.startswith('N:dataset:'):
+        return Dataset
+    elif id.startswith('N:organization:'):
+        return Organization
+
+
+PackagesAPI._id_to_type = id_to_type
 
 
 def upload_fileobj(
@@ -178,490 +191,68 @@ agent.UploadManager.init_file = init_file
 
 # monkey patches
 
-
-@property
-def patch_session(self):
-    """
-    Make requests-futures work within threaded/distributed environment.
-    """
-    if self._session is None:
-        self._session = Session()
-        self._set_auth(self._token)
-        try:
-            backoff_factor = auth.get('blackfynn-backoff-factor')
-        except Exception as e:
-            log.exception(e)
-            backoff_factor = 1
-
-        # Enable retries via urllib
-        adapter = HTTPAdapter(
-            pool_connections=1000,  # wheeee
-            pool_maxsize=1000,  # wheeee
-            max_retries=Retry(
-                total=self.settings.max_request_timeout_retries,
-                backoff_factor=backoff_factor,
-                status_forcelist=[502, 503, 504] # Retriable errors (but not POSTs)
-            )
-        )
-        self._session.mount('http://', adapter)
-        self._session.mount('https://', adapter)
-
-    return self._session
-
 # monkey patch to avoid session overflow during async
-bfb.ClientSession.session = patch_session
-
-
-def get(self, id, update=True):
-    return self._api.core.get(id, update=update)
+bfb.ClientSession.session = monkey.patch_session
 
 
 # monkey patch Blackfynn so that it doesn't eat errors and hide their type
-Blackfynn.get = get
+Blackfynn.get = monkey.Blackfynn_get
 
-
-def download(self, destination):
-    """ remove prefix functionality since there are filenames without extensions ... """
-    if self.type=="DirectoryViewerData":
-        raise NotImplementedError("Downloading S3 directories is currently not supported")
-
-    if os.path.isdir(destination):
-        # destination dir
-        f_local = os.path.join(destination, os.path.basename(self.s3_key))
-    else:
-        # exact location
-        f_local = destination
-
-    r = requests.get(self.url, stream=True)
-    with io.open(f_local, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk: f.write(chunk)
-
-    # set local path
-    self.local_path = f_local
-
-    return f_local
 
 # monkey patch File.download to
-File.download = download
+File.download = monkey.File_download
 
 
-# package meta
-def id_to_type(id):
-    #if isinstance(id, BlackfynnId):  # FIXME this is a bad place to do this (sigh)
-        #return {'package': DataPackage,
-                #'collection':Collection,
-                #'dataset': Dataset,
-                #'organization': Organization,}[id.type]
-
-    if id.startswith('N:package:'):
-        return DataPackage
-    elif id.startswith('N:collection:'):
-        return Collection
-    elif id.startswith('N:dataset:'):
-        return Dataset
-    elif id.startswith('N:organization:'):
-        return Organization
-
-
-class FakeBFile(File):
-    """ Fake file to simplify working with package metadata """
-
-    id = None  # unforunately these don't seem to have made it through
-
-    def __init__(self, package, **kwargs):
-        self.package = package
-        self._json = kwargs
-        def move(*tuples):
-            for f, t in tuples:
-                kwargs[t] = kwargs.pop(f)
-
-        move(('createdAt', 'created_at'),
-             ('updatedAt', 'updated_at'),
-             ('fileType', 'type'),
-             ('packageId', 'pkg_id'),
-        )
-
-        if 'size' not in kwargs:
-            kwargs['size'] = None  # if we have None on a package we know it is not zero
-
-        if 'checksum' in kwargs:
-            cs = kwargs['checksum']
-            kwargs['chunksize'] = cs['chunkSize']
-            kwargs['checksum'] = cs['checksum']  # overwrites but ok
-        else:
-            kwargs['checksum'] = None
-
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-    @property
-    def state(self):
-        return self.package.state
-
-    @property
-    def owner_id(self):
-        return self.package.owner_id
-
-    @property
-    def dataset(self):
-        return self.package.dataset
-
-    @property
-    def parent(self):
-        # cut out the middle man (hopefully)
-        return self.package.parent
-
-    def __repr__(self):
-        return ('<' +
-                self.__class__.__name__ +
-                ' '.join(f'{k}={v}' for k, v in self._json.items()) +
-                '>')
-
-
-    
 # monkey patch for PackagesAPI.get
-from future.utils import string_types
-def get(self, pkg, include='files,source'):
-    """
-    Get package object
-
-    pkg:     can be DataPackage ID or DataPackage object.
-    include: list of fields to force-include in response (if available)
-    """
-    pkg_id = self._get_id(pkg)
-
-    params = {'includeAncestors': 'true'}
-    if include is not None:
-        if isinstance(include, string_types):
-            params.update({'include': include})
-        elif hasattr(include, '__iter__'):
-            params.update({'include': ','.join(include)})
-
-    resp = self._get(self._uri('/{id}', id=pkg_id), params=params)
-
-    # TODO: cast to specific DataPackages based on `type`
-    pkg = self._get_package_from_data(resp)
-    pkg._resp = resp
-    #log.debug(lj(resp.json()))
-    return pkg
-
-PackagesAPI.get = get
-
-
-@property
-def packages(self, pageSize=1000, includeSourceFiles=True):
-    yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles)
-
-
-def packagesByName(self, pageSize=1000, includeSourceFiles=True, filenames=tuple()):
-    if filenames:
-        for filename in filenames:
-            yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles, filename=filename)
-    else:
-        yield from self._packages(pageSize=pageSize, includeSourceFiles=includeSourceFiles)
-
-
-def _packages(self, pageSize=1000, includeSourceFiles=True, raw=False, latest_only=False, filename=None):
-    """ python implementation to make use of /dataset/{id}/packages """
-    remapids = {}
-    def restructure(j):
-        """ restructure package json to match what api needs? """
-        # FIXME something's still wonky here
-        c = j['content']
-        c['int_id'] = c['id']
-        c['id'] = c['nodeId']  # FIXME indeed packages do seem to be missing ids!?
-        remapids[c['int_id']] = c['id']
-        c['int_datasetId'] = c['datasetId']
-        c['datasetId'] = c['datasetNodeId']
-        if 'parentId' in c:
-            pid = c['parentId']
-            c['parent'] = remapids[pid]  # key error to signal out of order
-            #if pid in remapids:
-            #else:
-                #c['parent'] = f'WTF ERROR: {pid}'
-                #print('wtf', pid, c['id'], c['datasetId'])
-            #else:
-                #c['parent'] = remapids['latest']
-        return j
-
-    index = {self.id:self}  # make sure that dataset is in the index
-    session = self._api.session
-    #cursor
-    #pageSize
-    #includeSourceFiles
-    #types
-    #filename
-    filename_args = f'&filename={filename}' if filename is not None else ''
-    cursor_args = ''
-    out_of_order = []
-    while True:
-        try:
-            resp = session.get(f'{self._api._host}/datasets/{self.id}/packages?'
-                            f'pageSize={pageSize}&'
-                            f'includeSourceFiles={str(includeSourceFiles).lower()}'
-                            f'{filename_args}'
-                            f'{cursor_args}')
-        except requests.exceptions.RetryError as e:
-            log.exception(e)
-            # sporadic 504 errors that we probably need to sleep on
-            breakpoint()
-            raise e
-
-        #print(resp.url)
-        if resp.ok:
-            j = resp.json()
-            packages = j['packages']
-            if raw:
-                yield from packages
-                if latest_only:
-                    break
-                else:
-                    continue
-
-            if out_of_order:
-                packages += out_of_order
-                # if a parent is on the other side of a
-                # pagination boundary put the children
-                # at the end and move on
-            out_of_order = [None]
-            while out_of_order:
-                #log.debug(f'{out_of_order}')
-                if out_of_order[0] is None:
-                    out_of_order.remove(None)
-                elif packages == out_of_order:
-                    if filename is not None:
-                        out_of_order = None
-                    elif 'cursor' not in j:
-                        raise RuntimeError('We are going nowhere!')
-                    else:
-                        # the missing parent is in another castle!
-                        break
-                else:
-                    packages = out_of_order
-                    out_of_order = []
-                for count, package in enumerate(packages):
-                    if isinstance(package, dict):
-                        id = package['content']['nodeId']
-                        name = package['content']['name']
-                        bftype = id_to_type(id)
-                        dcp = deepcopy(package)
-                        try:
-                            #if id.startswith('N:package:'):
-                                #log.debug(lj(package))
-                            rdp = restructure(dcp)
-                        except KeyError as e:
-                            if out_of_order is None:  # filename case
-                                # parents will simply not be listed
-                                # if you are using filename then beware
-                                if 'parentId' in dcp['content']:
-                                    dcp['content'].pop('parentId')
-                                rdp = restructure(dcp)
-                            else:
-                                out_of_order.append(package)
-                                continue
-
-                        bfobject = bftype.from_dict(rdp, api=self._api)
-                        if name != bfobject.name:
-                            log.critical(f'{name} != {bfobject.name}')
-                        bfobject._json = package
-                        bfobject.dataset = index[bfobject.dataset]
-                    else:
-                        bfobject = package
-
-                    if isinstance(bfobject.parent, str) and bfobject.parent in index:
-                        parent = index[bfobject.parent]
-                        if parent._items is None:
-                            parent._items = []
-                        parent.items.append(bfobject)
-                        bfobject.parent = parent
-                        # only put objects in the index when they have a parent
-                        # that is a bfobject, this ensures that you can always
-                        # recurse to base once you get an object from this function
-                        index[bfobject.id] = bfobject
-                        if parent.state == 'DELETING':
-                            if not bfobject.state == 'DELETING':
-                                bfobject.state = 'PARENT-DELETING'
-                        elif parent.state == 'PARENT-DELETING':
-                            if not bfobject.state == 'DELETING':
-                                bfobject.state = 'PARENT-DELETING'
-
-                        yield bfobject  # only yield if we can get a parent
-                    elif out_of_order is None:  # filename case
-                        yield bfobject
-                    elif bfobject.parent is None:
-                        # both collections and packages can be at the top level
-                        # dataset was set to its bfobject repr above so safe to yield
-                        if bfobject.dataset is None:
-                            log.debug('No parent no dataset\n'
-                                      + json.dumps(bfobject._json, indent=2))
-                        index[bfobject.id] = bfobject
-                        yield bfobject
-                    else:
-                        out_of_order.append(bfobject)
-                        continue
-
-                    if isinstance(bfobject, DataPackage):
-                        bfobject.fake_files = []
-                        if 'objects' not in bfobject._json:
-                            log.error(f'{bfobject} has no files!??!')
-                        else:
-                            for i, source in enumerate(bfobject._json['objects']['source']):
-                                # TODO package id?
-                                if len(source) > 1:
-                                    log.info(f'more than one key in source {sorted(source)}')
-
-                                ff = FakeBFile(bfobject, **source['content'])
-                                bfobject.fake_files.append(ff)
-                                yield ff
-
-                                if i == 1:  # only log once
-                                    log.critical(f'MORE THAN ONE FILE IN PACKAGE {bfobject.id}')
-
-            if 'cursor' in j:
-                cursor = j['cursor']
-                cursor_args = f'&cursor={cursor}'
-            else:
-                break
-
-        else:
-            break
-
-
-@property
-def packageTypeCounts(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/packageTypeCounts')
-    if resp.ok:
-        j = resp.json()
-        return j
-    else:
-        resp.raise_for_status()
+PackagesAPI.get = monkey.PackagesAPI_get
 
 
 # monkey patch Dataset to implement packages endpoint
-Dataset._packages = _packages
-Dataset.packages = packages
-Dataset.packagesByName = packagesByName
-Dataset.packageTypeCounts = packageTypeCounts
+Dataset._dp_class = DataPackage
+Dataset._packages = monkey._packages
+Dataset.packages = monkey.packages
+Dataset.packagesByName = monkey.packagesByName
+Dataset.packageTypeCounts = monkey.packageTypeCounts
 
 
-@property
-def users(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/collaborators/users')
-    return resp.json()
-
-
-# monkey patch Dataset to implement teams endpoint
-Dataset.users = users
-
-
-@property
-def teams(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/collaborators/teams')
-    return resp.json()
+# monkey patch Dataset to implement dataset users endpoint
+Dataset.users = monkey.Dataset_users
 
 
 # monkey patch Dataset to implement teams endpoint
-Dataset.teams = teams
-
-
-@property
-def doi(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/doi')
-    if resp.ok:
-        return resp.json()
-    else:
-        if resp.status_code != 404:
-            log.warning(f'{self} doi {resp.status_code}')
+Dataset.teams = monkey.Dataset_teams
 
 
 # monkey patch Dataset to implement doi endpoint
-Dataset.doi = doi
-
-
-def delete(self):
-    """ actually delete """
-    session = self._api.session
-    resp = session.delete(f'{self._api._host}/datasets/{self.id}')
-    if resp.ok:
-        return resp.json()
-    else:
-        if resp.status_code != 404:
-            log.warning(f'{self} issue deleting {resp.status_code}')
+Dataset.doi = monkey.Dataset_doi
 
 
 # monkey patch Dataset to implement delete
-Dataset.delete = delete
-
-
-@property
-def contributors(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/contributors')
-    return resp.json()
+Dataset.delete = monkey.Dataset_delete
 
 
 # monkey patch Dataset to implement contributors endpoint
-Dataset.contributors = contributors
-
-
-@property
-def banner(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/banner')
-    return resp.json()
+Dataset.contributors = monkey.Dataset_contributors
 
 
 # monkey patch Dataset to implement banner endpoint
-Dataset.banner = banner
-
-
-@property
-def readme(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/readme')
-    return resp.json()
+Dataset.banner = monkey.Dataset_banner
 
 
 # monkey patch Dataset to implement readme endpoint
-Dataset.readme = readme
-
-
-@property
-def status_log(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/status-log')
-    return resp.json()
+Dataset.readme = monkey.Dataset_readme
 
 
 # monkey patch Dataset to implement status_log endpoint
-Dataset.status_log = status_log
-
-
-@property
-def meta(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}')
-    return resp.json()
+Dataset.status_log = monkey.Dataset_status_log
 
 
 # monkey patch Dataset to implement just the dataset metadata endpoint
-Dataset.meta = meta
-
-
-@property
-def teams(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/organizations/{self.id}/teams')
-    return resp.json()
+Dataset.meta = monkey.Dataset_meta
 
 
 # monkey patch Organization to implement teams endpoint
-Organization.teams = teams
+Organization.teams = monkey.Organization_teams
 
 
 class PackageMeta:
@@ -694,122 +285,12 @@ class PackageMeta:
         self.json['objects']['source']
 
 
-class BFLocal:
+class BFLocal(ApiWrapper):
 
-    class NoBfMeta(Exception):
-        """ There is no bf id for this file. """
-
-    def __init__(self, project_id, anchor=None):
-        # no changing local storage prefix in the middle of things
-        # if you want to do that create a new class
-
-        if isinstance(project_id, BlackfynnId):
-            # FIXME make the BlackfynnId version the internal default
-            project_id = project_id.id
-
-        self._project_id = project_id
-        self.bf = self._get_connection(self._project_id)
-
-        self.organization = self.bf.context
-        self.project_name = self.bf.context.name
-
-    def _get_connection(self, project_id):
-        # FIXME why are we still passing project_id here when we don't use it?
-        try:
-            return Blackfynn(api_token=auth.user_config.secrets('blackfynn', self._project_id, 'key'),
-                             api_secret=auth.user_config.secrets('blackfynn', self._project_id, 'secret'))
-        except KeyError as e:
-            msg = f'need record in secrets for blackfynn organization {self._project_id}'
-            raise exc.MissingSecretError(msg) from e
-
-    def __getstate__(self):
-        state = self.__dict__
-        if 'bf' in state:
-            state.pop('bf')  # does not picle well due to connection
-
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.bf = self._get_connection(self._project_id)
-
-    @property
-    def root(self):
-        return self.organization.id
-
-    def create_package(self, local_path):
-        pkg = DataPackage(local_path.name, package_type='Generic')  # TODO mimetype -> package_type ...
-        pcache = local_path.parent.cache
-        pkg.dataset = pcache.dataset.id
-        if pcache.id != pkg.dataset:
-            pkg.parent = pcache.id
-
-        # FIXME this seems to create an empty package with no files?
-        # have to do aws upload first or something?
-        return self.bf._api.packages.create(pkg)
-
-    def get(self, id, attempt=1, retry_limit=3):
-        log.debug('We have gone to the network!')
-        if isinstance(id, BlackfynnId):
-            # FIXME inver this so the id form is internal or implement
-            # __str__ differently from __repr__
-            id = BlackfynnId.id
-
-        if id.startswith('N:dataset:'):
-            try:
-                thing = self.bf.get_dataset(id)  # heterogenity is fun!
-            except Exception as e:
-                if 'No dataset matching name or ID' in str(e):
-                    # sigh no error types
-                    raise exc.NoRemoteFileWithThatIdError(id) from e
-                else:
-                    raise e
-
-        elif id.startswith('N:organization:'):
-            if id == self.organization.id:
-                return self.organization  # FIXME staleness?
-            else:
-                # if we start form local storage prefix for everything then
-                # this would work
-                raise BaseException('TODO org does not match need other api keys.')
-        else:
-            try:
-                thing = self.bf.get(id)
-            except requests.exceptions.HTTPError as e:
-                resp = e.response
-                if resp.status_code == 404:
-                    msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
-                    raise exc.NoRemoteFileWithThatIdError(msg) from e
-
-                log.exception(e)
-                thing = None
-            except bfb.UnauthorizedException as e:
-                log.error(f'Unauthorized to access {id}')
-                thing = None
-
-        if thing is None:
-            if attempt > retry_limit:
-                raise exc.NoMetadataRetrievedError(f'No blackfynn object retrieved for {id}')
-            else:
-                thing = self.get(id, attempt + 1)
-
-        return thing
-
-    def get_file_url(self, id, file_id):
-        resp = self.bf._api.session.get(f'{self.bf._api._host}/packages/{id}/files/{file_id}')
-        if resp.ok:
-            resp_json = resp.json()
-        elif resp.status_code == 404:
-            msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
-            raise exc.NoRemoteFileWithThatIdError(msg)
-        else:
-            resp.raise_for_status()
-
-        try:
-            return resp_json['url']
-        except KeyError as e:
-            log.debug(lj(resp_json))
-            raise e
+    _id_class = BlackfynnId
+    _api_class = Blackfynn
+    _sec_remote = 'blackfynn'
+    _dp_class = DataPackage
 
 
 class FakeBFLocal(BFLocal):

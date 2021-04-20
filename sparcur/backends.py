@@ -1435,6 +1435,38 @@ class BlackfynnDatasetData:
 
 class PennsieveRemote(BlackfynnRemote):
     _id_class = PennsieveId
-    _base_uri_human = 'https://app.pennsieve.net'  # FIXME hardcoded
-    _base_uri_api = 'https://api.pennsieve.net'  # FIXME hardcoded
-    # TODO duplicate the one shot setup
+    _base_uri_human = 'https://app.pennsieve.io'  # FIXME hardcoded
+    _base_uri_api = 'https://api.pennsieve.io'  # FIXME hardcoded
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        PennsieveRemote._setup(*args, **kwargs)
+        return super().__new__(cls)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        if PennsieveRemote.__new__ == BlackfynnRemote._renew:
+            return  # we already ran the imports here
+
+        import requests
+        PennsieveRemote._requests = requests
+
+        # FIXME there should be a better way ...
+        from sparcur.pennsieve_api import PNLocal, id_to_type
+        PennsieveRemote._api_class = BFLocal
+        PennsieveRemote._id_to_type = staticmethod(id_to_type)
+        PennsieveRemote.__new__ = PennsieveRemote._renew
+
+        from pennsieve import Collection, DataPackage, Organization, File
+        from pennsieve import Dataset
+        from pennsieve.models import BaseNode
+        PennsieveRemote._Collection = Collection
+        PennsieveRemote._DataPackage = DataPackage
+        PennsieveRemote._Organization = Organization
+        PennsieveRemote._File = File
+        PennsieveRemote._Dataset = Dataset
+        PennsieveRemote._BaseNode = BaseNode

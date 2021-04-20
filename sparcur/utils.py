@@ -273,6 +273,128 @@ def unicode_truncate(string, length):
     return string.encode()[:length].decode(errors='ignore')
 
 
+class ApiWrapper:
+    """ Sometimes you just need one more level of indirection!
+    Abstract base class to wrap Blackfynn and Pennsieve apis.
+    """
+
+    _id_class = None
+    _api_class = None
+    _sec_remote = None
+    _dp_class = None
+
+    @classmethod
+    def _get_connection(cls, project_id):
+        try:
+            return cls._api_class(
+                api_token=auth.user_config.secrets(
+                    cls._sec_remote, project_id, 'key'),
+                api_secret=auth.user_config.secrets(
+                    cls._sec_remote, _project_id, 'secret'))
+        except KeyError as e:
+            msg = f'need record in secrets for {cls._sec_remote} organization {project_id}'
+            raise exc.MissingSecretError(msg) from e
+
+    def __init__(self, project_id, anchor=None):
+        # no changing local storage prefix in the middle of things
+        # if you want to do that create a new class
+
+        if isinstance(project_id, self._id_class):
+            # FIXME make the _id_class version the internal default
+            project_id = project_id.id
+
+        self.bf = self._get_connection(project_id)
+        self.organization = self.bf.context
+        self.project_name = self.bf.context.name
+        self.root = self.organization.id
+        self._project_id = project_id  # keep it around for set_state
+
+    def __getstate__(self):
+        state = self.__dict__
+        if 'bf' in state:
+            state.pop('bf')  # does not pickle well due to connection
+
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.bf = self._get_connection(self._project_id)
+
+    def create_package(self, local_path):
+        pkg = self._dp_class(local_path.name, package_type='Generic')  # TODO mimetype -> package_type ...
+        pcache = local_path.parent.cache
+        pkg.dataset = pcache.dataset.id
+        if pcache.id != pkg.dataset:
+            pkg.parent = pcache.id
+
+        # FIXME this seems to create an empty package with no files?
+        # have to do aws upload first or something?
+        return self.bf._api.packages.create(pkg)
+
+    def get(self, id, attempt=1, retry_limit=3):
+        log.debug('We have gone to the network!')
+        if isinstance(id, self._id_class):
+            # FIXME inver this so the id form is internal or implement
+            # __str__ differently from __repr__
+            id = id.id
+
+        if id.startswith('N:dataset:'):
+            try:
+                thing = self.bf.get_dataset(id)  # heterogenity is fun!
+            except Exception as e:
+                if 'No dataset matching name or ID' in str(e):
+                    # sigh no error types
+                    raise exc.NoRemoteFileWithThatIdError(id) from e
+                else:
+                    raise e
+
+        elif id.startswith('N:organization:'):
+            if id == self.root:
+                return self.organization  # FIXME staleness?
+            else:
+                # if we start form local storage prefix for everything then
+                # this would work
+                raise BaseException('TODO org does not match need other api keys.')
+        else:
+            try:
+                thing = self.bf.get(id)
+            except requests.exceptions.HTTPError as e:
+                resp = e.response
+                if resp.status_code == 404:
+                    msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
+                    raise exc.NoRemoteFileWithThatIdError(msg) from e
+
+                log.exception(e)
+                thing = None
+            except bfb.UnauthorizedException as e:
+                log.error(f'Unauthorized to access {id}')
+                thing = None
+
+        if thing is None:
+            if attempt > retry_limit:
+                raise exc.NoMetadataRetrievedError(f'No remote object retrieved for {id}')
+            else:
+                thing = self.get(id, attempt + 1)
+
+        return thing
+
+    def get_file_url(self, id, file_id):
+        resp = self.bf._api.session.get(f'{self.bf._api._host}/packages/{id}/files/{file_id}')
+        if resp.ok:
+            resp_json = resp.json()
+        elif resp.status_code == 404:
+            msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
+            raise exc.NoRemoteFileWithThatIdError(msg)
+        else:
+            resp.raise_for_status()
+
+        try:
+            return resp_json['url']
+        except KeyError as e:
+            log.debug(lj(resp_json))
+            raise e
+
+
 def make_bf_id_regex(top_level_domain):
     """ Generate the abstracted regex for a given
     blackfynn/pennsieve identifier scheme """
