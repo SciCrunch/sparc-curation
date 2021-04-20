@@ -1297,16 +1297,28 @@ _nddfes = sorted(set(_nddfes))
 class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     renames_alt = {'contributors': 'contributor_name',  # watch out for name collisions (heu heu heu)
-                   'metadata_version_do_not_change': 'template_schema_version'}
+                   'metadata_version_do_not_change': 'template_schema_version',
+                   'contributor_orcid_id': 'contributor_orcid',  # <= 1.2.3
+                   'metadata_version': 'template_schema_version',  # 2.0
+                   'acknowledgements': 'acknowledgments',  # <= 1.2.3
+                   'relation_to_related_identifier': 'relation_type', # 2.0
+                   }
     renames_header = {'description': 'description_header'}
     missing_add = {'template_schema_version': ('1.0', 1)}
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
     groups_alt = {'contributors': ('contributor_name',
-                                   'contributor_orcid_id',
+                                   'contributor_orcid',
                                    'contributor_affiliation',
                                    'contributor_role',
                                    'is_contact_person',),
+                  'related_identifiers': ('related_identifier',
+                                          'related_identifier_type',
+                                          'relation_type',
+                                          'related_identifier_description',),
+                  'study': ('study_purpose',
+                            'study_data_collection',
+                            'study_primary_conclusion',),
                   'links': ('additional_links', 'link_description'),
                   'examples': ('example_image_filename',
                                'example_image_locator',

@@ -204,7 +204,8 @@ class NormHeader(NormSimple):
 
 
 class NormContributorRole(str):
-    values = ('ContactPerson',
+    values = ('CorrespondingAuthor',
+              'ContactPerson',  # XXX need to
               'DataCollector',
               'DataCurator',
               'DataManager',

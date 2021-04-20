@@ -881,7 +881,7 @@ class ContributorExportSchema(JSONSchema):
             'middle_name': strcont('TEMP:middleName'),
             'last_name': {'type': 'string',
                           'context_value': 'sparc:lastName',},
-            'contributor_orcid_id': EIS._allOf(OrcidSchema, context_value=idtype('sparc:hasORCIDId')),
+            'contributor_orcid': EIS._allOf(OrcidSchema, context_value=idtype('sparc:hasORCIDId')),
             'data_remote_user_id': strcont(idtype('TEMP:hasDataRemoteUserId')),
             'blackfynn_user_id': strcont(idtype('TEMP:hasBlackfynnUserId')),
             'contributor_affiliation': {'anyOf': [EIS._allOf(RorSchema),
@@ -894,11 +894,12 @@ class ContributorExportSchema(JSONSchema):
                 'minItems': 1,
                 'items': {
                     'type': 'string',
-                    'enum': ['ContactPerson',
+                    'enum': ['CorrespondingAuthor',  # FIXME max card 1
+                             'ContactPerson',  # FIXME need version dependence here
                              'Creator',  # allowed here, moved later
                              'DataCollector',
                              'DataCurator',
-                             'DataManager',
+                             'DataManager', # this is DatasetMaintainer
                              'Distributor',
                              'Editor',
                              'HostingInstitution',
@@ -919,7 +920,7 @@ class ContributorExportSchema(JSONSchema):
                              'WorkPackageLeader',
                              'Other',]}
             },
-            'is_contact_person': {'type': 'boolean'},
+            'is_contact_person': {'type': 'boolean'},  # XXX deprecated
             'errors': ErrorSchema.schema,
         }}
 
@@ -1011,7 +1012,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
             'name': string_noltws,
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
-            'acknowledgements': {'type': 'string'},
+            'acknowledgments': {'type': 'string'},
             'funding': {'type': 'array',
                         'minItems': 1,
                         'items': {'type': 'string'}},
@@ -1040,6 +1041,66 @@ class DatasetDescriptionExportSchema(JSONSchema):
                         'link_description': {'type': 'string'},  # FIXME only if there is an additional link? some using for protocol desc
                     }
                 }
+            },
+            'related_identifiers' : {
+                'type': 'list',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'related_identifier': {'type': 'string'},
+                        'related_identifier_type': {'type': 'string'},
+                        'relation_type': {
+                            'type': 'string',
+                            'enum':
+                            [
+                                # additional relations that are needed for sparc, specifically for code and protocols
+                                'IsProtocolFor',  # like is metadata for
+                                'HasProtocol', # hopefully entails WasGeneratedByFollowing
+                                'IsSoftwareFor', # includes source code
+                                'HasSoftware',
+                                # DataCite conflates source and compiled, consider Requires?
+                                # Dataset -> Software -> SourceCode
+
+                                # datacite relations as of schema 4.4
+                                'IsCitedBy',
+                                'Cites',
+                                'IsSupplementTo',
+                                'IsSupplementedBy',
+                                'IsContinuedByContinues',
+                                'IsDescribedBy',
+                                'Describes',
+                                'HasMetadata',
+                                'IsMetadataFor',
+                                'HasVersion',
+                                'IsVersionOf',
+                                'IsNewVersionOf',
+                                'IsPreviousVersionOf',
+                                'IsPartOf',
+                                'HasPart',
+                                'IsPublishedIn',
+                                'IsReferencedBy',
+                                'References',
+                                'IsDocumentedBy',
+                                'Documents',
+                                'IsCompiledBy',
+                                'Compiles',
+                                'IsVariantFormOf',
+                                'IsOriginalFormOf',
+                                'IsIdenticalTo',
+                                'IsReviewedBy',
+                                'Reviews',
+                                'IsDerivedFrom',
+                                'IsSourceOf',
+                                'IsRequiredBy',
+                                'Requires',
+                                'IsObsoletedBy',
+                                'Obsoletes',
+                            ],
+                        },
+                        'related_identifier_description': {'type': 'string'},
+                        'resource_type_general': {'type': 'string'},  # TODO this isn't in the template to keep the template simple
+                    },
+                },
             },
             'examples': {
                 'type': 'array',

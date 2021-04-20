@@ -1018,7 +1018,7 @@ class SDSPipeline(JSONPipeline):
                         'description',
                         #'additional_links',  # FIXME internal rename
                         'keywords',
-                        'acknowledgements',
+                        'acknowledgments',
                         'originating_article_doi',
                         'title_for_complete_data_set',
 

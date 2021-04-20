@@ -1,3 +1,4 @@
+import csv
 import pprint
 import unittest
 import pytest
@@ -21,12 +22,15 @@ class TestTabular(unittest.TestCase):
 
 
 class Helper:
+    use_examples = False
+
     refs = ('d8a6aa5f83021b3b9ea208c295a19051ffe83cd9',  # located in working dir not resources
             'dataset-template-1.1',
             'dataset-template-1.2',
             'dataset-template-1.2.1',
             'dataset-template-1.2.2',
-            'dataset-template-1.2.3',) 
+            'dataset-template-1.2.3',
+            'HEAD',)
 
     def setUp(self):
         if temp_path.exists():
@@ -44,6 +48,7 @@ class Helper:
 
     def _versions(self):
         tf = temp_path / 'test-file.xlsx'
+        tfc = temp_path / 'test-file.csv'
         bads = []
         for ref in self.refs:
             if ref.startswith('d8a'):
@@ -61,8 +66,21 @@ class Helper:
                 f.write(file.show(ref))
 
             obj = self.metadata_file_class(tf, template_schema_version=version)
+            if self.use_examples:
+                recs = list(obj._t())
+                test_values = ['test value'] + [r[self.use_examples] for r in recs[1:]]
+                rows = [r + [tv] for r, tv in zip(recs, test_values)]
+                with open(tfc, 'wt') as f:
+                    writer = csv.writer(f)
+                    writer.writerows(rows)
+
+                obj = self.metadata_file_class(tfc, template_schema_version=version)
+
             try:
-                obj.data
+                data = obj.data
+                if ref == 'HEAD':
+                    # breakpoint()  # XXX testing here
+                    'sigh'
             except exc.MalformedHeaderError as e:
                 if version == '1.1':
                     # known bad
@@ -125,6 +143,7 @@ class TestDatasetDescription(Helper, unittest.TestCase):
     template = 'dataset_description.xlsx'
     metadata_file_class = DatasetDescriptionFile
     pipe = pipes.DatasetDescriptionFilePipeline
+    use_examples = 2
     
     def test_dataset_description(self):
         pass
