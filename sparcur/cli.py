@@ -239,7 +239,7 @@ Options:
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
     --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
 
-    --project-id=PID        alternate way to pass project id  [default: {auth.get('blackfynn-organization')}]
+    --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
 
     --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: sparc-curation]
 """

@@ -136,7 +136,7 @@ def check_files(files):
 transfers.check_files = check_files
 
 
-#_orgid = auth.get('blackfynn-organization')  # HACK
+#_orgid = auth.get('remote-organization')  # HACK
 # this works, but then we have to do the multipart upload dance
 # which the bf client does not implement at the moment
 def get_preview(self, files, append):
@@ -208,8 +208,9 @@ PackagesAPI.get = monkey.PackagesAPI_get
 
 
 # monkey patch Dataset to implement packages endpoint
+FakeBFile, _packages = monkey.bind_packages_File(File)
 Dataset._dp_class = DataPackage
-Dataset._packages = monkey._packages
+Dataset._packages = _packages
 Dataset.packages = monkey.packages
 Dataset.packagesByName = monkey.packagesByName
 Dataset.packageTypeCounts = monkey.packageTypeCounts

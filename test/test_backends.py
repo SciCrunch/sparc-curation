@@ -1,28 +1,30 @@
 import os
 import unittest
 import pytest
-from sparcur.paths import Path, BlackfynnCache as BFC
-from sparcur.blackfynn_api import BFLocal
-from sparcur.backends import BlackfynnRemote
+from sparcur.paths import Path, BlackfynnCache as BFC, PennsieveCache as PFC
+from sparcur.backends import BlackfynnRemote, PennsieveRemote
 from .common import test_organization, project_path_real
 
 
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
-class TestBlackfynnRemote(unittest.TestCase):
+class RemoteHelper:
+
+    _remote_class = None
+    _cache_class = None
+
     # FIXME skip in CI?
     def setUp(self):
-        class BlackfynnCache(BFC):
+        class Cache(self._cache_class):
             pass
 
-        BlackfynnCache._bind_flavours()
+        Cache._bind_flavours()
 
-        self.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
-        self.BlackfynnRemote.init(test_organization)
+        self.Remote = self._remote_class._new(Path, Cache)
+        self.Remote.init(test_organization)
         if not project_path_real.exists():
-            self.anchor = self.BlackfynnRemote.dropAnchor(project_path_real.parent)
+            self.anchor = self.Remote.dropAnchor(project_path_real.parent)
         else:
             self.anchor = project_path_real.cache
-            self.BlackfynnRemote.anchorTo(self.anchor)
+            self.Remote.anchorTo(self.anchor)
 
         self.project_path = self.anchor.local
 
@@ -45,5 +47,19 @@ class TestBlackfynnRemote(unittest.TestCase):
         b.name
 
     def test_parts_relative_to(self):
-        root = self.BlackfynnRemote(self.BlackfynnRemote.root)
-        assert root.id == self.BlackfynnRemote.root
+        root = self.Remote(self.Remote.root)
+        assert root.id == self.Remote.root
+
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class TestBlackfynnRemote(RemoteHelper, unittest.TestCase):
+
+    _remote_class = BlackfynnRemote
+    _cache_class = BFC
+
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class TestPennsieveRemote(RemoteHelper, unittest.TestCase):
+
+    _remote_class = PennsieveRemote
+    _cache_class = PFC

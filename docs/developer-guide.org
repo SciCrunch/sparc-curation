@@ -10,26 +10,26 @@
 * Demos
 ** Remote only connection
 If you have [[(def_babf)][~sparcur.simple~​]] this is the simplest way to get a remote
-only connection to Blackfynn.
+only connection to Pennsieve.
 #+name: demo-remote-only
 #+begin_src python :results drawer :epilogue "import pprint; return pprint.pformat(datasets)"
 from sparcur.config import auth
-from sparcur.simple.utils import backend_blackfynn
-project_id = auth.get('blackfynn-organization')
-BlackfynnRemote = backend_blackfynn(project_id)
-root = BlackfynnRemote(project_id)
+from sparcur.simple.utils import backend_pennsieve
+project_id = auth.get('remote-organization')
+PennsieveRemote = backend_pennsieve(project_id)
+root = PennsieveRemote(project_id)
 datasets = list(root.children)
 #+end_src
 
-Otherwise you have to do what backend_blackfynn does for you
+Otherwise you have to do what backend_pennsieve does for you
 #+begin_src python :results drawer :epilogue "import pprint; return pprint.pformat(datasets)"
-from sparcur.paths import BlackfynnCache, Path
+from sparcur.paths import PennsieveCache, Path
 from sparcur.config import auth
-from sparcur.backends import BlackfynnRemote
-project_id = auth.get('blackfynn-organization')
-BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
-BlackfynnRemote.init(project_id)
-root = BlackfynnRemote(BlackfynnRemote.root)
+from sparcur.backends import PennsieveRemote
+project_id = auth.get('remote-organization')
+PennsieveRemote = PennsieveRemote._new(Path, PennsieveCache)
+PennsieveRemote.init(project_id)
+root = PennsieveRemote(PennsieveRemote.root)
 datasets = list(root.children)
 #+end_src
 ** Validate a dataset
@@ -185,7 +185,7 @@ digraph G {
 # TODO we need some way to snapshot and deliver the contents of
 # --cache-path (usually ~/.cache/sparcur/) so that pipelines can be
 # rerun in a way that is deterministic, this is primarily an issue for
-# the blackfynn remote metadata that is updated at every run the quick
+# the pennsieve remote metadata that is updated at every run the quick
 # and dirty fix is to set SPARCUR_CACHE_PATH=${PARENT_PATH}/cache and
 # then symlink in everything except the blackfynn-meta folder but the
 # right thing to do is probably to add a configuration option for the
@@ -254,7 +254,7 @@ function sparc-get-all-remote-data () {
     local LOG_PATH=${LOG_PATH:-"${PARENT_PATH}/logs"}
 
     #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
-    local PROJECT_ID=${PROJECT_ID:-$(python -c "from sparcur.config import auth; print(auth.get('blackfynn-organization'))")}
+    local PROJECT_ID=${PROJECT_ID:-$(python -c "from sparcur.config import auth; print(auth.get('remote-organization'))")}
 
     local maybe_slot=()
     if [[ -n "${SYMLINK_OBJECTS_TO}" ]]; then
@@ -277,7 +277,7 @@ function sparc-get-all-remote-data () {
 
         # fetch remote metadata (ref:bash-pipeline-fetch-remote-metadata-all)
         # if this fails with 503 errors, check the
-        # blackfynn-backoff-factor config variable
+        # remote-backoff-factor config variable
         echo "Fetching remote metadata"
         python -m sparcur.simple.fetch_remote_metadata_all \
             --project-id "${PROJECT_ID}" \
@@ -425,7 +425,7 @@ A slightly more sane version is being implemented as part of
                            pipeline-extras -> submission-normalized -> submission
                            pipeline-extras -> pipeline-files-xml -> cache -> fetch-all ; -> fetch-files
                            pipeline-extras -> contributors -> affiliations #;lifters -> affiliations-sheet -> sheets -> network
-                                              contributors -> member #;state -> blackfynn-api -> network
+                                              contributors -> member #;state -> pennsieve-api -> network
                                               contributors -> description
                            pipeline-extras -> meta-extra -> dataset-doi -> pipeline-remote-metadata -> cache ; -> fetch-remote-metadata
                                               meta-extra -> dataset-remote-readme -> pipeline-remote-metadata
@@ -445,7 +445,7 @@ A slightly more sane version is being implemented as part of
 ;; subgraphs
 (define lifters '(affiliations organ-term modality techniques protocol-uris award-manual award-organ))
 (define state '(member))
-(define network '(network blackfynn-api sheets affiliation-sheet organs-sheet overview-sheet))
+(define network '(network pennsieve-api sheets affiliation-sheet organs-sheet overview-sheet))
 
 (define-vertex-property g vertex-id #:init $id)  ; doesn't work to get the graphviz node numbering
 
@@ -468,7 +468,7 @@ digraph G {
 	node0 [label="description"];
 	node1 [label="modality"];
 	node2 [label="dataset-doi"];
-	node3 [label="blackfynn-api"];
+	node3 [label="pennsieve-api"];
 	node4 [label="dataset-metadata"];
 	node5 [label="samples"];
 	node6 [label="subjects"];
@@ -719,8 +719,8 @@ Desired invocation.
 sparcur-do-dataset ${UUID}
 sparcur-do-dataset dataset:${UUID}
 sparcur-do-dataset N:dataset:${UUID}
-sparcur-do-dataset https://api.blackfynn.io/datasets/N:dataset:${UUID}
-sparcur-do-dataset https://app.blackfynn.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/datasets/N:dataset:${UUID}
+sparcur-do-dataset https://api.pennsieve.io/datasets/N:dataset:${UUID}
+sparcur-do-dataset https://app.pennsieve.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/datasets/N:dataset:${UUID}
 #+end_src
 Desired behavior.
 | dataset state | objects state     | action            | outcome                   |
@@ -1057,7 +1057,7 @@ def _from_project_path_id_dataset(project_path, dataset_id):
 def main(parent_path=None,
          project_id=None,
          parent_parent_path=Path.cwd(),
-         project_id_auth_var='blackfynn-organization',  # FIXME move default to clifun
+         project_id_auth_var='pennsieve-organization',  # FIXME move default to clifun
          symlink_objects_to=None,
          id=None,
          dataset_id=None,
@@ -1065,7 +1065,7 @@ def main(parent_path=None,
     """ clone a project into a random subfolder of the current folder
         or specify the parent path to clone into """
 
-    from sparcur.simple.utils import backend_blackfynn
+    from sparcur.simple.utils import backend_pennsieve
 
     if parent_path is None:
         breakpoint()  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX FIXME
@@ -1074,11 +1074,11 @@ def main(parent_path=None,
 
     if project_id is None:
         from sparcur.config import auth
-        from sparcur.utils import BlackfynnId
+        from sparcur.utils import PennsieveId
         project_id = auth.get(project_id_auth_var)
-        project_id = BlackfynnId(project_id)  # FIXME abstract the hardcoded backend
+        project_id = PennsieveId(project_id)  # FIXME abstract the hardcoded backend
 
-    RemotePath = backend_blackfynn()
+    RemotePath = backend_pennsieve()
 
     if id and dataset_id:
         # FIXME doesn't check for existing so if the name changes we get duped folders
@@ -1120,24 +1120,24 @@ See [[(bash-pipeline-fetch-remote-metadata-all)]] for usage.
 #+name: fetch_remote_metadata_all.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata_all.py
 from joblib import Parallel, delayed
-from sparcur.backends import BlackfynnDatasetData
-from sparcur.simple.utils import backend_blackfynn
+from sparcur.backends import PennsieveDatasetData
+from sparcur.simple.utils import backend_pennsieve
 
 
 def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
     """ given an dataset id fetch its associated dataset metadata """
     if id.type == 'organization':
-        RemotePath = backend_blackfynn()
+        RemotePath = backend_pennsieve()
         project = RemotePath(id)
-        prepared = [BlackfynnDatasetData(r) for r in project.children]
+        prepared = [PennsieveDatasetData(r) for r in project.children]
         if n_jobs <= 1:
             [p() for p in prepared]
         else:
             Parallel(n_jobs=n_jobs)(delayed(p)() for p in prepared)
     elif id.type == 'dataset':
-        RemotePath = backend_blackfynn(project_id)
+        RemotePath = backend_pennsieve(project_id)
         dataset = RemotePath(id)
-        bdd = BlackfynnDatasetData(dataset)
+        bdd = PennsieveDatasetData(dataset)
         bdd()
     else:
         raise NotImplementedError(id)
@@ -1145,15 +1145,15 @@ def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
 
 def main(id=None,
          project_id=None,
-         project_id_auth_var='blackfynn-organization',  # FIXME move to clifun
+         project_id_auth_var='remote-organization',  # FIXME move to clifun
          n_jobs=12,
          ,**kwargs):
 
     if project_id is None:
-        from sparcur.utils import BlackfynnId
+        from sparcur.utils import PennsieveId
         from sparcur.config import auth
         project_id = auth.get(project_id_auth_var)
-        project_id = BlackfynnId(project_id)  # FIXME abstract the hardcoded backend
+        project_id = PennsieveId(project_id)  # FIXME abstract the hardcoded backend
 
     if id is None:
         id = project_id
@@ -1171,7 +1171,7 @@ if __name__ == '__main__':
 :PROPERTIES:
 :CUSTOM_ID: fetch-remote-metadata
 :END:
-The implementation of =sparcur.backends.BlackfynnDatasetData= supports the ability
+The implementation of =sparcur.backends.PennsieveDatasetData= supports the ability
 to retrieve metadata directly from the remote without the need for an intervening
 local path. However this functionality is obscured here because we want to derive
 a consistent view of the data from the file system snapshot.
@@ -1182,17 +1182,17 @@ a consistent view of the data from the file system snapshot.
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata.py
 from joblib import Parallel, delayed
 from sparcur.paths import Path
-from sparcur.backends import BlackfynnDatasetData
+from sparcur.backends import PennsieveDatasetData
 
 
 def _from_project_path_fetch_remote_metadata(project_path, n_jobs=12, cached_ok=False):
     if n_jobs <= 1:
-        prepared = [BlackfynnDatasetData(dataset_path.cache)
+        prepared = [PennsieveDatasetData(dataset_path.cache)
                     for dataset_path in project_path.children]
         [bdd() for bdd in prepared if not (cached_ok and bdd.cache_path.exists())]
     else:
         fetch = lambda bdd: bdd() if not (cached_ok and bdd.cache_path.exists()) else None
-        fetch_path = (lambda path: fetch(BlackfynnDatasetData(path.cache)))
+        fetch_path = (lambda path: fetch(PennsieveDatasetData(path.cache)))
         Parallel(n_jobs=n_jobs)(delayed(fetch_path)(dataset_path)
                  for dataset_path in project_path.children)
 
@@ -1206,7 +1206,7 @@ def from_path_fetch_remote_metadata(path, n_jobs=12, cached_ok=False):
         _from_project_path_fetch_remote_metadata(path, n_jobs=n_jobs, cached_ok=cached_ok)
     else:  # dataset_path
         # TODO more granular rather than roll up to dataset if inside?
-        bdd = BlackfynnDatasetData(cache)
+        bdd = PennsieveDatasetData(cache)
         if not (cached_ok and bdd.cache_path.exists()):
             bdd()
 
@@ -1579,7 +1579,7 @@ if __name__ == '__main__':
 #+end_src
 ****** unused :noexport:
 #+begin_src python
-from_id_remote_metadata = lambda id: ds.BlackfynnDatasetData(id)()
+from_id_remote_metadata = lambda id: ds.PennsieveDatasetData(id)()
 compose = lambda f, g: (lambda *x: f(g(*x)))
 #from_path_remote_metadata = compose(lambda id: from_id_remote_metadata(id),
                                     #lambda path: path.cache.id)
@@ -1689,7 +1689,7 @@ from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd
 from sparcur.paths import Path
-from sparcur.backends import BlackfynnDatasetData
+from sparcur.backends import PennsieveDatasetData
 from sparcur.simple.utils import combinate, multiple, early_failure, DataWrapper
 from sparcur.simple.fetch_metadata_files import fetch_prefixes
 
@@ -1731,7 +1731,7 @@ _TOP = object()  # SIGH SIGH SIGH always need a escape hatch
 otkm = {ThingFilePath.obj:prefix + '_file' for prefix, ThingFilePath
         in dat.DatasetStructure.sections.items()}
 otkm[ManifestFiles] = 'manifest_file'
-otkm[BlackfynnDatasetData] = 'remote_dataset_metadata'
+otkm[PennsieveDatasetData] = 'remote_dataset_metadata'
 otkm[type(dat.DatasetStructure())] = 'structure'  # hack around Pathlib type mangling
 otkm[type(dat.DatasetMetadata())] = _TOP
 
@@ -1778,7 +1778,7 @@ def manifest(path, version):    return dat.ManifestFilePath(path).object_new(ver
 
 # dataset path -> python object
 
-def from_path_remote_metadata(path): return BlackfynnDatasetData(path.cache)
+def from_path_remote_metadata(path): return PennsieveDatasetData(path.cache)
 def from_path_local_metadata(path): return dat.DatasetMetadata(path)
 from_path_dataset_description = object_from_find_path('dataset_description', description,
                                                       onfail=exc.MissingFileError)
@@ -2101,8 +2101,8 @@ def prepare_dataset_export(path, export_path=None):  # FIXME do we need export_b
     if export_path is None:  # FIXME confusing and breaks w/ convention -> Options maybe?
         export_path = Path(auth.get_path('export-path'))  # FIXME allow alt?
 
-    from sparcur.utils import BlackfynnId
-    identifier = BlackfynnId(path.cache.id)
+    from sparcur.utils import PennsieveId
+    identifier = PennsieveId(path.cache.id)
     uuid = identifier.uuid
     # we don't use cache._fs_safe_id here because we know the
     # identifier type from the folder structure
@@ -2308,13 +2308,13 @@ import os
 from types import GeneratorType
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
-from sparcur.utils import log, logd, loge, GetTimeNow, BlackfynnId
-from sparcur.paths import Path, BlackfynnCache
-from sparcur.backends import BlackfynnRemote
+from sparcur.utils import log, logd, loge, GetTimeNow, PennsieveId
+from sparcur.paths import Path, PennsieveCache
+from sparcur.backends import PennsieveRemote
 
 
-def backend_blackfynn(project_id=None, Local=Path, Cache=BlackfynnCache):  # (ref:def_babf)
-    """return a configured blackfynn backend
+def backend_pennsieve(project_id=None, Local=Path, Cache=PennsieveCache):  # (ref:def_babf)
+    """return a configured pennsieve backend
         calling this is sufficient to get everything set up correclty
 
         You must call RemotePath.init(project_id) before using
@@ -2323,7 +2323,7 @@ def backend_blackfynn(project_id=None, Local=Path, Cache=BlackfynnCache):  # (re
         cases where the project_id may not be known at the time that
         this function is called. """
 
-    RemotePath = BlackfynnRemote._new(Local, Cache)
+    RemotePath = PennsieveRemote._new(Local, Cache)
 
     if project_id is not None:
         RemotePath.init(project_id)
@@ -2350,7 +2350,7 @@ class Options(clif.Options):
         if not hasattr(self, '_cache_project_id'):
             id = self._args['--project-id']
             if id is not None:
-                identifier = BlackfynnId(id, type='organization')
+                identifier = PennsieveId(id, type='organization')
                 self._cache_project_id = identifier
             else:
                 return
@@ -2362,7 +2362,7 @@ class Options(clif.Options):
         if not hasattr(self, '_cache_dataset_id'):
             ids = self._args['--dataset-id']
             if ids:
-                identifiers = [BlackfynnId(id, type='dataset') for id in ids]
+                identifiers = [PennsieveId(id, type='dataset') for id in ids]
                 self._cache_dataset_id = identifiers
             else:
                 return ids

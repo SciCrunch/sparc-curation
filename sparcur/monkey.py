@@ -99,60 +99,240 @@ def PackagesAPI_get(self, pkg, include='files,source'):
 # package meta
 
 
-class FakeBFile(File):
-    """ Fake file to simplify working with package metadata """
+def bind_packages_File(File):
+    class FakeBFile(File):
+        """ Fake file to simplify working with package metadata """
 
-    id = None  # unforunately these don't seem to have made it through
+        id = None  # unforunately these don't seem to have made it through
 
-    def __init__(self, package, **kwargs):
-        self.package = package
-        self._json = kwargs
-        def move(*tuples):
-            for f, t in tuples:
-                kwargs[t] = kwargs.pop(f)
+        def __init__(self, package, **kwargs):
+            self.package = package
+            self._json = kwargs
+            def move(*tuples):
+                for f, t in tuples:
+                    kwargs[t] = kwargs.pop(f)
 
-        move(('createdAt', 'created_at'),
-             ('updatedAt', 'updated_at'),
-             ('fileType', 'type'),
-             ('packageId', 'pkg_id'),
-        )
+            move(('createdAt', 'created_at'),
+                ('updatedAt', 'updated_at'),
+                ('fileType', 'type'),
+                ('packageId', 'pkg_id'),
+            )
 
-        if 'size' not in kwargs:
-            kwargs['size'] = None  # if we have None on a package we know it is not zero
+            if 'size' not in kwargs:
+                kwargs['size'] = None  # if we have None on a package we know it is not zero
 
-        if 'checksum' in kwargs:
-            cs = kwargs['checksum']
-            kwargs['chunksize'] = cs['chunkSize']
-            kwargs['checksum'] = cs['checksum']  # overwrites but ok
-        else:
-            kwargs['checksum'] = None
+            if 'checksum' in kwargs:
+                cs = kwargs['checksum']
+                kwargs['chunksize'] = cs['chunkSize']
+                kwargs['checksum'] = cs['checksum']  # overwrites but ok
+            else:
+                kwargs['checksum'] = None
 
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+            for k, v in kwargs.items():
+                setattr(self, k, v)
 
-    @property
-    def state(self):
-        return self.package.state
+        @property
+        def state(self):
+            return self.package.state
 
-    @property
-    def owner_id(self):
-        return self.package.owner_id
+        @property
+        def owner_id(self):
+            return self.package.owner_id
 
-    @property
-    def dataset(self):
-        return self.package.dataset
+        @property
+        def dataset(self):
+            return self.package.dataset
 
-    @property
-    def parent(self):
-        # cut out the middle man (hopefully)
-        return self.package.parent
+        @property
+        def parent(self):
+            # cut out the middle man (hopefully)
+            return self.package.parent
 
-    def __repr__(self):
-        return ('<' +
-                self.__class__.__name__ +
-                ' '.join(f'{k}={v}' for k, v in self._json.items()) +
-                '>')
+        def __repr__(self):
+            return ('<' +
+                    self.__class__.__name__ +
+                    ' '.join(f'{k}={v}' for k, v in self._json.items()) +
+                    '>')
 
+
+    def _packages(self,
+                pageSize=1000,
+                includeSourceFiles=True,
+                raw=False,
+                latest_only=False,
+                filename=None):
+        """ python implementation to make use of /dataset/{id}/packages """
+        remapids = {}
+
+        def restructure(j):
+            """ restructure package json to match what api needs? """
+            # FIXME something's still wonky here
+            c = j['content']
+            c['int_id'] = c['id']
+            c['id'] = c['nodeId']  # FIXME packages seem to be missing ids!?
+            remapids[c['int_id']] = c['id']
+            c['int_datasetId'] = c['datasetId']
+            c['datasetId'] = c['datasetNodeId']
+            if 'parentId' in c:
+                pid = c['parentId']
+                c['parent'] = remapids[pid]  # key error to signal out of order
+                #if pid in remapids:
+                #else:
+                    #c['parent'] = f'WTF ERROR: {pid}'
+                    #print('wtf', pid, c['id'], c['datasetId'])
+                #else:
+                    #c['parent'] = remapids['latest']
+            return j
+
+        index = {self.id: self}  # make sure that dataset is in the index
+        session = self._api.session
+        # cursor
+        # pageSize
+        # includeSourceFiles
+        # types
+        # filename
+        filename_args = f'&filename={filename}' if filename is not None else ''
+        cursor_args = ''
+        out_of_order = []
+        while True:
+            try:
+                resp = session.get(
+                    f'{self._api._host}/datasets/{self.id}/packages?'
+                    f'pageSize={pageSize}&'
+                    f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                    f'{filename_args}'
+                    f'{cursor_args}')
+            except requests.exceptions.RetryError as e:
+                log.exception(e)
+                # sporadic 504 errors that we probably need to sleep on
+                breakpoint()
+                raise e
+
+            #print(resp.url)
+            if resp.ok:
+                j = resp.json()
+                packages = j['packages']
+                if raw:
+                    yield from packages
+                    if latest_only:
+                        break
+                    else:
+                        continue
+
+                if out_of_order:
+                    packages += out_of_order
+                    # if a parent is on the other side of a pagination boundary put
+                    # the children at the end and move on
+                out_of_order = [None]
+                while out_of_order:
+                    #log.debug(f'{out_of_order}')
+                    if out_of_order[0] is None:
+                        out_of_order.remove(None)
+                    elif packages == out_of_order:
+                        if filename is not None:
+                            out_of_order = None
+                        elif 'cursor' not in j:
+                            raise RuntimeError('We are going nowhere!')
+                        else:
+                            # the missing parent is in another castle!
+                            break
+                    else:
+                        packages = out_of_order
+                        out_of_order = []
+                    for count, package in enumerate(packages):
+                        if isinstance(package, dict):
+                            id = package['content']['nodeId']
+                            name = package['content']['name']
+                            bftype = self._id_to_type(id)
+                            dcp = deepcopy(package)
+                            try:
+                                rdp = restructure(dcp)
+                            except KeyError as e:
+                                if out_of_order is None:  # filename case
+                                    # parents will simply not be listed
+                                    # if you are using filename then beware
+                                    if 'parentId' in dcp['content']:
+                                        dcp['content'].pop('parentId')
+                                    rdp = restructure(dcp)
+                                else:
+                                    out_of_order.append(package)
+                                    continue
+
+                            bfobject = bftype.from_dict(rdp, api=self._api)
+                            if name != bfobject.name:
+                                log.critical(f'{name} != {bfobject.name}')
+                            bfobject._json = package
+                            bfobject.dataset = index[bfobject.dataset]
+                        else:
+                            bfobject = package
+
+                        if (
+                                isinstance(bfobject.parent, str)
+                                and bfobject.parent in index):
+                            parent = index[bfobject.parent]
+                            if parent._items is None:
+                                parent._items = []
+                            parent.items.append(bfobject)
+                            bfobject.parent = parent
+                            # only put objects in the index when they have a parent
+                            # that is a bfobject, this ensures that you can always
+                            # recurse to base once you get an object from this
+                            # function
+                            index[bfobject.id] = bfobject
+                            if parent.state == 'DELETING':
+                                if not bfobject.state == 'DELETING':
+                                    bfobject.state = 'PARENT-DELETING'
+                            elif parent.state == 'PARENT-DELETING':
+                                if not bfobject.state == 'DELETING':
+                                    bfobject.state = 'PARENT-DELETING'
+
+                            yield bfobject  # only yield if we can get a parent
+                        elif out_of_order is None:  # filename case
+                            yield bfobject
+                        elif bfobject.parent is None:
+                            # both collections and packages can be at the top level
+                            # dataset was set to its bfobject repr above so safe to
+                            # yield
+                            if bfobject.dataset is None:
+                                log.debug('No parent no dataset\n'
+                                        + json.dumps(bfobject._json, indent=2))
+                            index[bfobject.id] = bfobject
+                            yield bfobject
+                        else:
+                            out_of_order.append(bfobject)
+                            continue
+
+                        if isinstance(bfobject, self._dp_class):
+                            bfobject.fake_files = []
+                            if 'objects' not in bfobject._json:
+                                log.error(f'{bfobject} has no files!??!')
+                            else:
+                                for i, source in enumerate(
+                                        bfobject._json['objects']['source']):
+                                    # TODO package id?
+                                    if len(source) > 1:
+                                        log.info('more than one key in source '
+                                                f'{sorted(source)}')
+
+                                    ff = FakeBFile(bfobject, **source['content'])
+                                    bfobject.fake_files.append(ff)
+                                    yield ff
+
+                                    if i == 1:  # only log once
+                                        msg = ('MORE THAN ONE FILE IN PACKAGE '
+                                            f'{bfobject.id}')
+                                        log.critical(msg)
+
+                if 'cursor' in j:
+                    cursor = j['cursor']
+                    cursor_args = f'&cursor={cursor}'
+                else:
+                    break
+
+            else:
+                break
+
+    return FakeBFile, packages
 
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):
@@ -175,184 +355,6 @@ def packagesByName(self,
         yield from self._packages(
             pageSize=pageSize,
             includeSourceFiles=includeSourceFiles)
-
-
-def _packages(self,
-              pageSize=1000,
-              includeSourceFiles=True,
-              raw=False,
-              latest_only=False,
-              filename=None):
-    """ python implementation to make use of /dataset/{id}/packages """
-    remapids = {}
-
-    def restructure(j):
-        """ restructure package json to match what api needs? """
-        # FIXME something's still wonky here
-        c = j['content']
-        c['int_id'] = c['id']
-        c['id'] = c['nodeId']  # FIXME packages seem to be missing ids!?
-        remapids[c['int_id']] = c['id']
-        c['int_datasetId'] = c['datasetId']
-        c['datasetId'] = c['datasetNodeId']
-        if 'parentId' in c:
-            pid = c['parentId']
-            c['parent'] = remapids[pid]  # key error to signal out of order
-            #if pid in remapids:
-            #else:
-                #c['parent'] = f'WTF ERROR: {pid}'
-                #print('wtf', pid, c['id'], c['datasetId'])
-            #else:
-                #c['parent'] = remapids['latest']
-        return j
-
-    index = {self.id: self}  # make sure that dataset is in the index
-    session = self._api.session
-    # cursor
-    # pageSize
-    # includeSourceFiles
-    # types
-    # filename
-    filename_args = f'&filename={filename}' if filename is not None else ''
-    cursor_args = ''
-    out_of_order = []
-    while True:
-        try:
-            resp = session.get(
-                f'{self._api._host}/datasets/{self.id}/packages?'
-                f'pageSize={pageSize}&'
-                f'includeSourceFiles={str(includeSourceFiles).lower()}'
-                f'{filename_args}'
-                f'{cursor_args}')
-        except requests.exceptions.RetryError as e:
-            log.exception(e)
-            # sporadic 504 errors that we probably need to sleep on
-            breakpoint()
-            raise e
-
-        #print(resp.url)
-        if resp.ok:
-            j = resp.json()
-            packages = j['packages']
-            if raw:
-                yield from packages
-                if latest_only:
-                    break
-                else:
-                    continue
-
-            if out_of_order:
-                packages += out_of_order
-                # if a parent is on the other side of a pagination boundary put
-                # the children at the end and move on
-            out_of_order = [None]
-            while out_of_order:
-                #log.debug(f'{out_of_order}')
-                if out_of_order[0] is None:
-                    out_of_order.remove(None)
-                elif packages == out_of_order:
-                    if filename is not None:
-                        out_of_order = None
-                    elif 'cursor' not in j:
-                        raise RuntimeError('We are going nowhere!')
-                    else:
-                        # the missing parent is in another castle!
-                        break
-                else:
-                    packages = out_of_order
-                    out_of_order = []
-                for count, package in enumerate(packages):
-                    if isinstance(package, dict):
-                        id = package['content']['nodeId']
-                        name = package['content']['name']
-                        bftype = self._id_to_type(id)
-                        dcp = deepcopy(package)
-                        try:
-                            rdp = restructure(dcp)
-                        except KeyError as e:
-                            if out_of_order is None:  # filename case
-                                # parents will simply not be listed
-                                # if you are using filename then beware
-                                if 'parentId' in dcp['content']:
-                                    dcp['content'].pop('parentId')
-                                rdp = restructure(dcp)
-                            else:
-                                out_of_order.append(package)
-                                continue
-
-                        bfobject = bftype.from_dict(rdp, api=self._api)
-                        if name != bfobject.name:
-                            log.critical(f'{name} != {bfobject.name}')
-                        bfobject._json = package
-                        bfobject.dataset = index[bfobject.dataset]
-                    else:
-                        bfobject = package
-
-                    if (
-                            isinstance(bfobject.parent, str)
-                            and bfobject.parent in index):
-                        parent = index[bfobject.parent]
-                        if parent._items is None:
-                            parent._items = []
-                        parent.items.append(bfobject)
-                        bfobject.parent = parent
-                        # only put objects in the index when they have a parent
-                        # that is a bfobject, this ensures that you can always
-                        # recurse to base once you get an object from this
-                        # function
-                        index[bfobject.id] = bfobject
-                        if parent.state == 'DELETING':
-                            if not bfobject.state == 'DELETING':
-                                bfobject.state = 'PARENT-DELETING'
-                        elif parent.state == 'PARENT-DELETING':
-                            if not bfobject.state == 'DELETING':
-                                bfobject.state = 'PARENT-DELETING'
-
-                        yield bfobject  # only yield if we can get a parent
-                    elif out_of_order is None:  # filename case
-                        yield bfobject
-                    elif bfobject.parent is None:
-                        # both collections and packages can be at the top level
-                        # dataset was set to its bfobject repr above so safe to
-                        # yield
-                        if bfobject.dataset is None:
-                            log.debug('No parent no dataset\n'
-                                      + json.dumps(bfobject._json, indent=2))
-                        index[bfobject.id] = bfobject
-                        yield bfobject
-                    else:
-                        out_of_order.append(bfobject)
-                        continue
-
-                    if isinstance(bfobject, self._dp_class):
-                        bfobject.fake_files = []
-                        if 'objects' not in bfobject._json:
-                            log.error(f'{bfobject} has no files!??!')
-                        else:
-                            for i, source in enumerate(
-                                    bfobject._json['objects']['source']):
-                                # TODO package id?
-                                if len(source) > 1:
-                                    log.info('more than one key in source '
-                                             f'{sorted(source)}')
-
-                                ff = FakeBFile(bfobject, **source['content'])
-                                bfobject.fake_files.append(ff)
-                                yield ff
-
-                                if i == 1:  # only log once
-                                    msg = ('MORE THAN ONE FILE IN PACKAGE '
-                                           f'{bfobject.id}')
-                                    log.critical(msg)
-
-            if 'cursor' in j:
-                cursor = j['cursor']
-                cursor_args = f'&cursor={cursor}'
-            else:
-                break
-
-        else:
-            break
 
 
 @property

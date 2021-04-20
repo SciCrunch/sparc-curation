@@ -1052,8 +1052,14 @@ class StashPath(Path):
 
 # assign defaults
 
-BlackfynnCache._local_class = Path
-backends.BlackfynnRemote._new(Path, BlackfynnCache)
-backends.BlackfynnRemote.cache_key = BlackfynnCache.cache_key
-backends.BlackfynnRemote._sparse_stems = BlackfynnCache._sparse_stems
-backends.BlackfynnRemote._sparse_include = BlackfynnCache._sparse_include
+def bind_defaults(Remote, Cache):
+    Cache._local_class = Path
+    Remote._new(Path, Cache)
+    Remote.cache_key = Cache.cache_key
+    Remote._sparse_stems = Cache._sparse_stems
+    Remote._sparse_include = Cache._sparse_include
+
+
+bind_defaults(backends.BlackfynnRemote, BlackfynnCache)
+# XXX supersedes the binding on BlackfynnRemote
+bind_defaults(backends.PennsieveRemote, BlackfynnCache)

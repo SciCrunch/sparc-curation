@@ -1,7 +1,6 @@
 import os
 import json
 from pathlib import PurePosixPath, PurePath
-from datetime import datetime
 import idlib
 import augpathlib as aug
 from augpathlib import PathMeta
@@ -119,7 +118,8 @@ class BlackfynnRemote(aug.RemotePath):
                 return file
 
         else:
-            raise FileNotFoundError(f'{package} has no file with id {file_id} but has:\n{files}')
+            msg = f'{package} has no file with id {file_id} but has:\n{files}'
+            raise FileNotFoundError(msg)
 
     @classmethod
     def get_file_url(cls, id, file_id):
@@ -193,7 +193,8 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self._seed, self._BaseNode):
             bfobject = self._seed
 
-        elif isinstance(self._seed, str) or isinstance(self._seed, self._id_class):
+        elif (isinstance(self._seed, str) or
+              isinstance(self._seed, self._id_class)):
             if isinstance(self._seed, self._id_class):
                 _seed = self._seed.id  # FIXME sadly this is the least bad place to do this :/
             else:
@@ -252,7 +253,8 @@ class BlackfynnRemote(aug.RemotePath):
                         file = files[0]
                         bfobject = transfer(file, bfobject)
                     else:
-                        log.critical(f'There are actually multiple files ...\n{files}')
+                        msg = f'There are actually multiple files ...\n{files}'
+                        log.critical(msg)
 
                 else:
                     file = files[0]
@@ -286,7 +288,8 @@ class BlackfynnRemote(aug.RemotePath):
         # can be reused (as in something like dat)
 
         if not hasattr(self.__class__, '_organization'):
-            self.__class__._organization = self.__class__(self._api.organization)
+            self.__class__._organization = self.__class__(
+                self._api.organization)
 
         return self._organization
 
@@ -350,7 +353,8 @@ class BlackfynnRemote(aug.RemotePath):
             else:
                 type = None
 
-            if type not in ('unknown', 'unsupported', 'generic', 'genericdata'):
+            not_ok_types = ('unknown', 'unsupported', 'generic', 'genericdata')
+            if type not in not_ok_types:
                 pass
 
             elif hasattr(self.bfobject, 'properties'):
@@ -1300,20 +1304,10 @@ class BlackfynnRemote(aug.RemotePath):
         return f'{self.__class__.__name__}({self.id!r}{file_id})'
 
 
-class BlackfynnDatasetData:
+class RemoteDatasetData:
 
     cache_path = auth.get_path('cache-path')
-    cache_base = cache_path / 'blackfynn-meta'
-
-    def __new__(cls, *args, **kwargs):
-        return super().__new__(cls)
-
-    _renew = __new__
-
-    def __new__(cls, *args, **kwargs):
-        BlackfynnDatasetData._setup(*args, **kwargs)
-        BlackfynnDatasetData.__new__ = BlackfynnDatasetData._renew
-        return super().__new__(cls)
+    cache_base = cache_path / 'remote-meta'
 
     @classmethod
     def _setup(cls, *args, **kwargs):
@@ -1391,7 +1385,7 @@ class BlackfynnDatasetData:
         package_counts = self.bfobject.packageTypeCounts
         cont = meta['content']
         blob = {'id': self.remote.id,
-                'type': 'BlackfynnRemoteMetadata',  # registered as IdentityJsonType in core
+                'type': self.__class__.__name__,  # registered as IdentityJsonType in core
                 'name': cont['name'],  # title
                 'description': cont['description'],  # subtitle
                 'readme': self.bfobject.readme,
@@ -1433,7 +1427,23 @@ class BlackfynnDatasetData:
         return blob
 
 
+class BlackfynnDatasetData(RemoteDatasetData):
+
+    cache_base = RemoteDatasetData.cache_path / 'blackfynn-meta'
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        BlackfynnDatasetData._setup(*args, **kwargs)
+        BlackfynnDatasetData.__new__ = BlackfynnDatasetData._renew
+        return super().__new__(cls)
+
+
 class PennsieveRemote(BlackfynnRemote):
+
     _id_class = PennsieveId
     _base_uri_human = 'https://app.pennsieve.io'  # FIXME hardcoded
     _base_uri_api = 'https://api.pennsieve.io'  # FIXME hardcoded
@@ -1449,7 +1459,7 @@ class PennsieveRemote(BlackfynnRemote):
 
     @staticmethod
     def _setup(*args, **kwargs):
-        if PennsieveRemote.__new__ == BlackfynnRemote._renew:
+        if PennsieveRemote.__new__ == PennsieveRemote._renew:
             return  # we already ran the imports here
 
         import requests
@@ -1457,7 +1467,7 @@ class PennsieveRemote(BlackfynnRemote):
 
         # FIXME there should be a better way ...
         from sparcur.pennsieve_api import PNLocal, id_to_type
-        PennsieveRemote._api_class = BFLocal
+        PennsieveRemote._api_class = PNLocal
         PennsieveRemote._id_to_type = staticmethod(id_to_type)
         PennsieveRemote.__new__ = PennsieveRemote._renew
 
@@ -1470,3 +1480,16 @@ class PennsieveRemote(BlackfynnRemote):
         PennsieveRemote._File = File
         PennsieveRemote._Dataset = Dataset
         PennsieveRemote._BaseNode = BaseNode
+
+
+class PennsieveDatasetData(BlackfynnDatasetData):
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        PennsieveDatasetData._setup(*args, **kwargs)
+        PennsieveDatasetData.__new__ = PennsieveDatasetData._renew
+        return super().__new__(cls)
