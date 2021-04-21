@@ -52,9 +52,6 @@ def id_to_type(id):
         return Organization
 
 
-PackagesAPI._id_to_type = id_to_type
-
-
 def upload_fileobj(
         file,  # aka Path
         s3_host,
@@ -292,6 +289,7 @@ class BFLocal(ApiWrapper):
     _api_class = Blackfynn
     _sec_remote = 'blackfynn'
     _dp_class = DataPackage
+    _remotebase = bfb
 
 
 class FakeBFLocal(BFLocal):

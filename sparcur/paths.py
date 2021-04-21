@@ -424,7 +424,7 @@ BlackfynnCache._bind_flavours()
 
 class PennsieveCache(BlackfynnCache):
 
-    xattr_prefix = 'pn'  # FIXME TODO we will likely need an xattr conversion fix
+    #xattr_prefix = 'pn'  # FIXME TODO we will likely need an xattr conversion fix
 
     uri_human = backends.PennsieveRemote.uri_human
     uri_api = backends.PennsieveRemote.uri_api
@@ -925,13 +925,17 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             ._cache_class
             ._remote_class
             ._stream_from_local(self,
-                                replace=True,
-                                local_backup=False))
+                                replace=replace,
+                                local_backup=local_backup))
 
         if True:  # local_backup = True:  # force True until we can get remote checksums
             # FIXME there must be a better way to do this ...
             object_path = self._cache_class._anchor.local_objects_dir / remote.cache_key
             # TODO possibly use _data_setter to calculate the hash at the same time?
+            if not object_path.parent.exists():
+                # XXX FIXME multi-level cache keys are a ticking timebomb
+                object_path.parent.mkdir(parents=True)
+
             object_path.copy_from(self)
             object_path.cache_init(remote.meta)
 

@@ -27,7 +27,7 @@ fake_org_uuid4 = 'bbad875b-9290-405a-9b5c-4c6ea1bc7a70'
 fake_organization = f'L:organization:{fake_org_uuid4}'
 project_path_real = path_project_container / 'UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
-test_dataset = 'N:dataset:5d167ba6-b918-4f21-b23d-cdb124780da1'
+test_dataset = 'N:dataset:aa859fe9-02d0-4518-981b-012ef8f35c34'
 temp_path = Path(gettempdir(), f'.sparcur-testing-base-{_pid}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
@@ -151,12 +151,14 @@ State.bind_blackfynn(fbfl)
 class RealDataHelper:
 
     _fetched = False
+    _cache_class = None
+    _remote_class = None
 
     @classmethod
     def setUpClass(cls):
-        from sparcur.paths import BlackfynnCache, Path
+        # child classes need to set _cache_class and _remote_class and then super
+        from sparcur.paths import Path
         from sparcur.config import auth
-        from sparcur.backends import BlackfynnRemote
         from sparcur.simple import pull, fetch_metadata_files, fetch_files
         test_datasets_real = auth.get_list('datasets-test')
         nosparse = [
@@ -168,10 +170,10 @@ class RealDataHelper:
         # that has multiple folder levels and stores only by uuid
         # and probably lives in '{:user-cache-path}/sparcur/objects'
         slot = slot if slot.exists() else None
-        cls.organization_id = auth.get('blackfynn-organization')
-        cls.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
-        cls.BlackfynnRemote.init(cls.organization_id)
-        cls.anchor = cls.BlackfynnRemote.smartAnchor(path_project_container)
+        cls.organization_id = auth.get('remote-organization')
+        cls.Remote = cls._remote_class._new(Path, cls._cache_class)
+        cls.Remote.init(cls.organization_id)
+        cls.anchor = cls.Remote.smartAnchor(path_project_container)
         cls.anchor.local_data_dir_init(symlink_objects_to=slot)
         cls.project_path = cls.anchor.local
         list(cls.anchor.children)  # side effect to retrieve top level folders
@@ -184,3 +186,25 @@ class RealDataHelper:
             pull.from_path_dataset_file_structure_all(cls.project_path, paths=cls.test_datasets)
             fetch_metadata_files.main(cls.project_path)
             fetch_files.main(cls.project_path)
+
+
+class RDHBF(RealDataHelper):
+
+    @classmethod
+    def setUpClass(cls):
+        from sparcur.paths import BlackfynnCache
+        from sparcur.backends import BlackfynnRemote
+        cls._cache_class = BlackfynnCache
+        cls._remote_class = BlackfynnRemote
+        super().setUpClass()
+
+
+class RDHPN(RealDataHelper):
+
+    @classmethod
+    def setUpClass(cls):
+        from sparcur.paths import PennsieveCache
+        from sparcur.backends import PennsieveRemote
+        cls._cache_class = PennsieveCache
+        cls._remote_class = PennsieveRemote
+        super().setUpClass()

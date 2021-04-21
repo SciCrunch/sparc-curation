@@ -5,7 +5,8 @@ from sparcur import apinat
 from sparcur import pipelines as pipes
 from .common import (examples_root,
                      project_path,
-                     RealDataHelper,
+                     RDHBF,
+                     RDHPN,
                      )
 
 
@@ -108,6 +109,11 @@ class TestPipelines(unittest.TestCase):
     pass
 
 
-class TestPipelinesReal(RealDataHelper, PipelineHelper, unittest.TestCase):
+class TestPipelinesRealBF(RDHBF, PipelineHelper, unittest.TestCase):
+    # RealDataHelper needs to resolve first to get correct setUpClass
+    pass
+
+
+class TestPipelinesRealPN(RDHPN, PipelineHelper, unittest.TestCase):
     # RealDataHelper needs to resolve first to get correct setUpClass
     pass

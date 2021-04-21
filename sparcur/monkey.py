@@ -11,6 +11,19 @@ from .config import auth
 from sparcur.utils import log
 
 
+def bind_agent_command(agent_module):
+    # FIXME this is a nearly perfect use case for orthauth wrapping
+    default_agent_cmd = agent_module.agent_cmd
+    def agent_cmd():
+        rcp = auth.get_path('remote-cli-path')
+        if rcp is None:
+            return default_agent_cmd()
+        else:
+            return rcp.as_posix()
+
+    agent_module.agent_cmd = agent_cmd
+
+
 @property
 def patch_session(self):
     """
@@ -20,7 +33,7 @@ def patch_session(self):
         self._session = Session()
         self._set_auth(self._token)
         try:
-            backoff_factor = auth.get('blackfynn-backoff-factor')
+            backoff_factor = auth.get('remote-backoff-factor')
         except Exception as e:
             log.exception(e)
             backoff_factor = 1
@@ -156,11 +169,11 @@ def bind_packages_File(File):
 
 
     def _packages(self,
-                pageSize=1000,
-                includeSourceFiles=True,
-                raw=False,
-                latest_only=False,
-                filename=None):
+                  pageSize=1000,
+                  includeSourceFiles=True,
+                  raw=False,
+                  latest_only=False,
+                  filename=None):
         """ python implementation to make use of /dataset/{id}/packages """
         remapids = {}
 
@@ -274,10 +287,10 @@ def bind_packages_File(File):
                                 parent._items = []
                             parent.items.append(bfobject)
                             bfobject.parent = parent
-                            # only put objects in the index when they have a parent
-                            # that is a bfobject, this ensures that you can always
-                            # recurse to base once you get an object from this
-                            # function
+                            # only put objects in the index when they have a
+                            # parent that is a bfobject, this ensures that you
+                            # can always recurse to base once you get an object
+                            # from this function
                             index[bfobject.id] = bfobject
                             if parent.state == 'DELETING':
                                 if not bfobject.state == 'DELETING':
@@ -290,12 +303,12 @@ def bind_packages_File(File):
                         elif out_of_order is None:  # filename case
                             yield bfobject
                         elif bfobject.parent is None:
-                            # both collections and packages can be at the top level
-                            # dataset was set to its bfobject repr above so safe to
-                            # yield
+                            # both collections and packages can be at the top
+                            # level dataset was set to its bfobject repr above
+                            # so safe to yield
                             if bfobject.dataset is None:
-                                log.debug('No parent no dataset\n'
-                                        + json.dumps(bfobject._json, indent=2))
+                                log.debug('No parent no dataset\n' +
+                                          json.dumps(bfobject._json, indent=2))
                             index[bfobject.id] = bfobject
                             yield bfobject
                         else:
@@ -312,15 +325,16 @@ def bind_packages_File(File):
                                     # TODO package id?
                                     if len(source) > 1:
                                         log.info('more than one key in source '
-                                                f'{sorted(source)}')
+                                                 f'{sorted(source)}')
 
-                                    ff = FakeBFile(bfobject, **source['content'])
+                                    ff = FakeBFile(
+                                        bfobject, **source['content'])
                                     bfobject.fake_files.append(ff)
                                     yield ff
 
                                     if i == 1:  # only log once
                                         msg = ('MORE THAN ONE FILE IN PACKAGE '
-                                            f'{bfobject.id}')
+                                               f'{bfobject.id}')
                                         log.critical(msg)
 
                 if 'cursor' in j:
@@ -332,7 +346,8 @@ def bind_packages_File(File):
             else:
                 break
 
-    return FakeBFile, packages
+    return FakeBFile, _packages
+
 
 @property
 def packages(self, pageSize=1000, includeSourceFiles=True):

@@ -4,14 +4,17 @@ import unittest
 import augpathlib as aug
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow
-from sparcur.paths import BlackfynnCache as BFC, LocalPath, Path
-from sparcur.backends import BlackfynnRemote
-from sparcur.blackfynn_api import BFLocal
+from sparcur.paths import PennsieveCache, LocalPath, Path
+from sparcur.backends import PennsieveRemote
 from .common import test_organization, test_dataset, _pid
 import pytest
 
 
 class _TestOperation:
+
+    _cache_class = PennsieveCache
+    _remote_class = PennsieveRemote
+
     @classmethod
     def tearDownClass(cls):
         base = aug.AugmentedPath(__file__).parent / f'test-operation-{_pid}'
@@ -20,10 +23,10 @@ class _TestOperation:
             base.rmtree()
 
     def setUp(self):
-        class BlackfynnCache(BFC):
+        class Cache(self._cache_class):
             pass
 
-        BlackfynnCache._bind_flavours()
+        Cache._bind_flavours()
 
         base = aug.AugmentedPath(__file__).parent / f'test-operation-{_pid}'
 
@@ -34,14 +37,16 @@ class _TestOperation:
         base.mkdir()
         base.pushd()
 
-        self.BlackfynnRemote = BlackfynnRemote._new(LocalPath, BlackfynnCache)
-        self.BlackfynnRemote.init(test_organization)
-        self.anchor = self.BlackfynnRemote.dropAnchor(base)
+        self.Remote = self._remote_class._new(LocalPath, Cache)
+        self.Remote.init(test_organization)
+        self.anchor = self.Remote.dropAnchor(base)
 
         self.root = self.anchor.remote
         self.project_path = self.anchor.local
         list(self.root.children)  # populate datasets
-        self.test_base = [p for p in self.project_path.children if p.cache.id == test_dataset][0]
+        self.test_base = [
+            p for p in self.project_path.children
+            if p.cache.id == test_dataset][0]
         list(self.test_base.rchildren)  # populate test dataset
 
         asdf = self.root / 'lol' / 'lol' / 'lol (1)'
@@ -167,12 +172,12 @@ class TestClone(_TestOperation, unittest.TestCase):
         self.alt_project_path.mkdir(parents=True)
 
     def _do_target(self, target, expect_error_type=None):
-        class BlackfynnCache(BFC):
+        class Cache(self._cache_class):
             pass
 
-        BlackfynnCache._bind_flavours()
+        Cache._bind_flavours()
 
-        BFR = BlackfynnRemote._new(LocalPath, BlackfynnCache)
+        BFR = self._remote_class._new(LocalPath, Cache)
         BFR.init(test_organization)
 
         if expect_error_type:

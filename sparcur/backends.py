@@ -54,6 +54,7 @@ class BlackfynnRemote(aug.RemotePath):
         from blackfynn import Collection, DataPackage, Organization, File
         from blackfynn import Dataset
         from blackfynn.models import BaseNode
+        Dataset._id_to_type = staticmethod(id_to_type)
         BlackfynnRemote._Collection = Collection
         BlackfynnRemote._DataPackage = DataPackage
         BlackfynnRemote._Organization = Organization
@@ -615,7 +616,8 @@ class BlackfynnRemote(aug.RemotePath):
                 parent = self.bfobject.dataset
 
         if parent:
-            parent_cache = self.cache.parent if self.cache is not None else None
+            parent_cache = (
+                self.cache.parent if self.cache is not None else None)
             self._c_parent = self.__class__(parent, cache=parent_cache)
             return self._c_parent
 
@@ -899,7 +901,13 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             pid = getattr(self._bfobject, 'parent')
             if pid is None:
-                return self._bfobject.dataset
+                ds = self._bfobject.dataset
+                if isinstance(ds, str):
+                    return ds
+                else:
+                    # we embed the object instead of just the id now
+                    # so we have to handle that case
+                    return ds.id
 
     def _on_cache_move_error(self, error, cache):
         if self.bfobject.package.name != self.bfobject.name:
@@ -1126,18 +1134,9 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise exc.NotADirectoryError(f'{self}')
 
-    @classmethod
-    def _prepare_package_for(cls, local_file, mkdir=False):
-        # TODO maybe ???
-        raise NotImplementedError('I think doing it this way requires uploading to s3 first ...')
-        if not isinstance(local_file, cls._local_class):
-            raise TypeError(f'{local_file} {type(local_file)} is not a {cls._local_class}')
-
-        local_file.name
-        local_file.parent.remote  # FIXME recursively mkdir ???
-        bfobject = cls._api.create_package(local_file)
-        remote = cls(bfobject)
-        return remote.cache
+    @staticmethod
+    def _upload(local, remote):
+        return remote.bfobject.upload(local, use_agent=False)
 
     @classmethod
     def _stream_from_local(cls, local_path, replace=True, local_backup=False):
@@ -1170,9 +1169,95 @@ class BlackfynnRemote(aug.RemotePath):
         if checksum == rchecksum:
             # TODO check to make sure nothing else has changed ???
             # also how does this interact with replace = true?
-            raise exc.FileHasNotChangedError('no changes have been made, not uploading')
+            raise exc.FileHasNotChangedError(
+                'no changes have been made, not uploading')
 
-        manifests = self.bfobject.upload(local_path, use_agent=False)
+        _ = cls._upload(local_path.as_posix(), self)
+        # the agent now returns nothing, we use display progres in
+        # order to force the program to block until the upload has
+        # completed, this means we should be able to get the checksum
+        # from the packages endpoint in fairly short order
+        if self.is_dataset():
+            d = self
+        else:
+            d = local_path.cache.dataset.remote
+
+        # can't filter by filename because it misses on silent rename
+        cands = [f for f in d.bfobject._packages(latest_only=True)
+                 if hasattr(f, 'filename') and
+                 f.filename == local_path.name and
+                 f.checksum == checksum.hex()]
+
+        # and f.filename == local_path.name and f.checksum == checksum
+        remotes = [cls(c) for c in cands]
+        matches = [r for r in remotes if r.parent and r.parent == self]
+
+        if not matches:
+            raise Exception(
+                f'No matching remote found for {local_path}!')
+        elif len(matches) > 1:
+            raise Exception(
+                f'Too many remotes found for {local_path}!')
+        else:
+            remote = matches[0]
+
+        try:
+            # do a little dance to update the name back to what it is supposed to be
+            stem_diff = local_path.stem != remote.bfobject.package.name
+            if replace and stem_diff:
+                if old_remote.exists():  # FIXME nasty performance cost here ...
+                    # oh man the concurrency story for multiple people adding files with the same name
+                    # wow ... in restrospect this comment was not nearly cynical enough
+
+                    # FIXME if checksum does not exist compute it before delete
+                    # this is an issue because you usually can only get the checksum
+                    # from the packages endpoint not for an individual file (sigh)
+                    old_remote.bfobject.package.delete()  # FIXME this is terrifying ...
+                    # though not as terrifying as running it before the upload
+                    # of course now there is the renaming issue I'm sure ...
+
+                    # LOL OH NO its a post https://developer.blackfynn.io/api/#/Data/deleteItems
+                    assert not old_remote.bfobject.package.exists, 'delete failed?'
+                    # FIXME issue with multiple packages with the same name
+
+                    # FIXME OH NO concurrent package.delete is non-blocking !
+
+                    # the fact that this can fail tells me that there is no
+                    # synchronization on the blackfynn backend AT ALL
+                    # operations seem to be executed as they arrive without
+                    # any notion of consistency or ordering WAT
+                    rbp = remote.bfobject.package
+                    rbp.name = remote.bfobject.name
+                    _odict = rbp.__dict__
+                    rbp.__dict__ = {
+                        k: (v.id if not isinstance(v, str) and
+                            # HACK to do object -> id
+                            hasattr(v, 'id') else v)
+                        for k, v in rbp.__dict__.items()}
+                    try:
+                        for i in range(100):
+                            # I love spinlocks for concurency don't you?
+                            try:
+                                rbp.update()
+                                break
+                            except self._requests.exceptions.HTTPError as e:
+                                if e.response.text != 'package name is already taken':  # ugh
+                                    raise e
+                                elif i == 99:
+                                    raise Exception('LOL') from e
+
+                    finally:
+                        rbp.__dict__ = _odict
+
+            elif not stem_diff and old_remote.exists():
+                log.critical(f'YOU MAY HAVE FUNKY DATA IN {local_path.cache.parent.uri_human}')
+
+        except Exception as e:
+            log.exception(e)
+
+        return remote, old_remote
+
+    def ___old():
         blob = manifests[0][0]  # there is other stuff in here but ignore for now
         id = blob['package']['content']['nodeId']
         remote = cls(id)
@@ -1266,12 +1351,12 @@ class BlackfynnRemote(aug.RemotePath):
                             if e.response.text != 'package name is already taken':  # ugh
                                 raise e
                             elif i == 99:
-                                raise BaseException('LOL') from e
+                                raise Exception('LOL') from e
 
             elif not stem_diff and old_remote.exists():
                 log.critical(f'YOU MAY HAVE FUNKY DATA IN {local_path.cache.parent.uri_human}')
 
-        except BaseException as e:
+        except Exception as e:
             log.exception(e)
 
         return remote, old_remote
@@ -1474,12 +1559,24 @@ class PennsieveRemote(BlackfynnRemote):
         from pennsieve import Collection, DataPackage, Organization, File
         from pennsieve import Dataset
         from pennsieve.models import BaseNode
+        Dataset._id_to_type = staticmethod(id_to_type)
         PennsieveRemote._Collection = Collection
         PennsieveRemote._DataPackage = DataPackage
         PennsieveRemote._Organization = Organization
         PennsieveRemote._File = File
         PennsieveRemote._Dataset = Dataset
         PennsieveRemote._BaseNode = BaseNode
+
+    @staticmethod
+    def _upload(local, remote):
+        # XXX the agent upload is entirely asynchronous and there
+        # doesn't seem to be an easy way, without monkey patching
+        # to get a synchronous version that would idk, return the
+        # new package id of the uploaded file ...
+
+        # display progress at least blocks, even if it doesn't
+        # return the package id
+        return remote.bfobject.upload(local, display_progress=True)
 
 
 class PennsieveDatasetData(BlackfynnDatasetData):

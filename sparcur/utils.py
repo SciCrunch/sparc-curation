@@ -1,4 +1,3 @@
-import io
 import os
 import re
 import logging
@@ -12,7 +11,8 @@ from pyontutils.utils import (makeSimpleLogger,
                               isoformat,
                               isoformat_safe,
                               timeformat_friendly)
-from sparcur.config import config
+from . import exceptions as exc
+from .config import auth
 
 log = makeSimpleLogger('sparcur')
 logd = log.getChild('data')
@@ -36,7 +36,8 @@ def register_type(cls, type_name):
             # register the same type
             return
 
-        raise ValueError(f'Cannot map {cls} to {type_name}. Type already present! '
+        raise ValueError(f'Cannot map {cls} to {type_name}. '
+                         'Type already present! '
                          f'{type_name} -> {__type_registry[type_name]}')
 
     __type_registry[type_name] = cls
@@ -50,7 +51,8 @@ def register_all_types():
 
     # this is not done at top level because it is quite slow
     from pysercomb.pyr import units as pyru
-    [register_type(c, c.tag) for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
+    [register_type(c, c.tag)
+     for c in (pyru._Quant, pyru.Range, pyru.Approximately)]
 
 
 class IdentityJsonType:
@@ -83,7 +85,7 @@ def fromJson(blob):
             if cls is not None:
                 return cls.fromJson(blob)
 
-        return {k:v
+        return {k: v
                 if k == 'errors' or k.endswith('_errors') else
                 fromJson(v)
                 for k, v in blob.items()}
@@ -155,7 +157,9 @@ class GetTimeNow:
 
 
 class SimpleFileHandler:
+
     _FIRST = object()
+
     def __init__(self, log_file_path, *logs, mimic=_FIRST):
         self.log_file_handler = logging.FileHandler(log_file_path.as_posix())
         if mimic is self._FIRST and logs:
@@ -190,11 +194,9 @@ def bind_file_handler(log_file):
     from ontquery.utils import log as oqlog
     from augpathlib.utils import log as alog
     from pyontutils.utils import log as pylog
-    #from blackfynn.log import get_logger; bflog = get_logger()
-    #silence_loggers(bflog.parent)  # let's not
 
     sfh = SimpleFileHandler(log_file, log)
-    sfh(alog, idlog, oalog, oqlog, prlog, pylog)#, bflog)
+    sfh(alog, idlog, oalog, oqlog, prlog, pylog)
 
 
 class _log:
@@ -212,8 +214,8 @@ class _log:
     def critical(nothing): pass
 
 
-want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr', 'sparc',
-                 'BIRNLEX', 'tech', 'unit', 'ILX', 'lex',)
+want_prefixes = ('TEMP', 'FMA', 'UBERON', 'PATO', 'NCBITaxon', 'ilxtr',
+                 'sparc', 'BIRNLEX', 'tech', 'unit', 'ILX', 'lex',)
 
 
 def is_list_or_tuple(obj):
@@ -290,9 +292,10 @@ class ApiWrapper:
                 api_token=auth.user_config.secrets(
                     cls._sec_remote, project_id, 'key'),
                 api_secret=auth.user_config.secrets(
-                    cls._sec_remote, _project_id, 'secret'))
+                    cls._sec_remote, project_id, 'secret'))
         except KeyError as e:
-            msg = f'need record in secrets for {cls._sec_remote} organization {project_id}'
+            msg = (f'need record in secrets for {cls._sec_remote} '
+                   f'organization {project_id}')
             raise exc.MissingSecretError(msg) from e
 
     def __init__(self, project_id, anchor=None):
@@ -303,6 +306,8 @@ class ApiWrapper:
             # FIXME make the _id_class version the internal default
             project_id = project_id.id
 
+        import requests  # SIGH
+        self._requests = requests
         self.bf = self._get_connection(project_id)
         self.organization = self.bf.context
         self.project_name = self.bf.context.name
@@ -354,36 +359,41 @@ class ApiWrapper:
             else:
                 # if we start form local storage prefix for everything then
                 # this would work
-                raise BaseException('TODO org does not match need other api keys.')
+                msg = 'TODO org does not match need other api keys.'
+                raise Exception(msg)
         else:
             try:
                 thing = self.bf.get(id)
-            except requests.exceptions.HTTPError as e:
+            except self._requests.exceptions.HTTPError as e:
                 resp = e.response
                 if resp.status_code == 404:
-                    msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
+                    msg = (f'{resp.status_code} {resp.reason!r} '
+                           f'when fetching {resp.url}')
                     raise exc.NoRemoteFileWithThatIdError(msg) from e
 
                 log.exception(e)
                 thing = None
-            except bfb.UnauthorizedException as e:
+            except self._remotebase.UnauthorizedException as e:
                 log.error(f'Unauthorized to access {id}')
                 thing = None
 
         if thing is None:
             if attempt > retry_limit:
-                raise exc.NoMetadataRetrievedError(f'No remote object retrieved for {id}')
+                msg = f'No remote object retrieved for {id}'
+                raise exc.NoMetadataRetrievedError(msg)
             else:
                 thing = self.get(id, attempt + 1)
 
         return thing
 
     def get_file_url(self, id, file_id):
-        resp = self.bf._api.session.get(f'{self.bf._api._host}/packages/{id}/files/{file_id}')
+        resp = self.bf._api.session.get(
+            f'{self.bf._api._host}/packages/{id}/files/{file_id}')
         if resp.ok:
             resp_json = resp.json()
         elif resp.status_code == 404:
-            msg = f'{resp.status_code} {resp.reason!r} when fetching {resp.url}'
+            msg = (f'{resp.status_code} {resp.reason!r} '
+                   f'when fetching {resp.url}')
             raise exc.NoRemoteFileWithThatIdError(msg)
         else:
             resp.raise_for_status()
@@ -391,7 +401,6 @@ class ApiWrapper:
         try:
             return resp_json['url']
         except KeyError as e:
-            log.debug(lj(resp_json))
             raise e
 
 

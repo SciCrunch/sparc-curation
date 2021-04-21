@@ -1,10 +1,10 @@
 from pennsieve import Pennsieve, DataPackage
 from pennsieve import Organization, Dataset, Collection, File
+from pennsieve import base as pnb
+from pennsieve.api import agent
 from pennsieve.api.data import PackagesAPI
+from sparcur import monkey
 from sparcur.utils import ApiWrapper, PennsieveId
-
-
-Dataset._dp_class = DataPackage
 
 
 def id_to_type(id):
@@ -24,12 +24,29 @@ def id_to_type(id):
         return Organization
 
 
-PackagesAPI._id_to_type = id_to_type
-
-
 class PNLocal(ApiWrapper):
 
     _id_class = PennsieveId
     _api_class = Pennsieve
     _sec_remote = 'pennsieve'
     _dp_class = DataPackage
+    _remotebase = pnb
+
+
+monkey.bind_agent_command(agent)
+
+FakeBFile, _packages = monkey.bind_packages_File(File)
+
+# monkey patches
+
+Dataset._dp_class = DataPackage
+Dataset.meta = monkey.Dataset_meta
+Dataset.packageTypeCounts = monkey.packageTypeCounts
+Dataset.readme = monkey.Dataset_readme
+Dataset.contributors = monkey.Dataset_contributors
+Dataset.doi = monkey.Dataset_doi
+Dataset.status_log = monkey.Dataset_status_log  # XXX NOTE this overwrites a method
+Dataset.packages = monkey.packages
+Dataset._packages = _packages
+Pennsieve.get = monkey.Blackfynn_get
+#PackagesAPI.get = monkey.PackagesAPI_get

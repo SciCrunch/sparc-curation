@@ -1057,7 +1057,7 @@ def _from_project_path_id_dataset(project_path, dataset_id):
 def main(parent_path=None,
          project_id=None,
          parent_parent_path=Path.cwd(),
-         project_id_auth_var='pennsieve-organization',  # FIXME move default to clifun
+         project_id_auth_var='remote-organization',  # FIXME move default to clifun
          symlink_objects_to=None,
          id=None,
          dataset_id=None,

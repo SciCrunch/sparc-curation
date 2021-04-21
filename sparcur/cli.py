@@ -456,7 +456,10 @@ class Main(Dispatcher):
                         'project_path',
                         'project_id',
                         'bfl',
-                        'BlackfynnRemote',
+                        'Remote',
+                        '_remote_class',
+                        '_cache_class',
+                        'Integrator',
                         'summary',
                         'cwd',
                         'cwdintr',
@@ -490,6 +493,13 @@ class Main(Dispatcher):
         else:
             self.cwd = Path.cwd()
 
+        # bind paths
+        from sparcur.backends import PennsieveRemote
+        from sparcur.paths import PennsieveCache
+        self._cache_class = PennsieveCache
+        self._remote_class = PennsieveRemote
+
+        # setup integrator
         from sparcur.curation import Integrator
         self.Integrator = Integrator
         self.Integrator.rate = self.options.rate
@@ -548,8 +558,8 @@ class Main(Dispatcher):
                 if self.options.local:
                     from sparcur.blackfynn_api import FakeBFLocal
                     log.exception(e)
-                    self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
-                    self.BlackfynnRemote.anchorTo(self.anchor)
+                    self.Remote._api = FakeBFLocal(self.anchor.id, self.anchor)
+                    self.Remote.anchorTo(self.anchor)
                 else:
                     raise e
 
@@ -558,8 +568,8 @@ class Main(Dispatcher):
             self._setup_ontquery()
 
     def _setup_local(self):
-        self.BlackfynnRemote = BlackfynnCache._remote_class
-        self.BlackfynnRemote._async_rate = self.options.rate
+        self.Remote = self._cache_class._remote_class
+        self.Remote._async_rate = self.options.rate
 
         local = self.cwd
 
@@ -595,10 +605,10 @@ class Main(Dispatcher):
             Summary._debug = True
 
     def _setup_bfl(self):
-        self.BlackfynnRemote._setup()
-        self.BlackfynnRemote.init(self.anchor.id)
+        self.Remote._setup()
+        self.Remote.init(self.anchor.id)
 
-        self.bfl = self.BlackfynnRemote._api
+        self.bfl = self.Remote._api
         State.bind_blackfynn(self.bfl)
 
     def _setup_export(self):
@@ -802,9 +812,9 @@ class Main(Dispatcher):
             print('no remote project id listed')
             sys.exit(4)
         # given that we are cloning it makes sense to _not_ catch a connection error here
-        self.BlackfynnRemote = BlackfynnRemote._new(Path, BlackfynnCache)
+        self.Remote = self._remote_class._new(Path, self._cache_class)
         try:
-            self.BlackfynnRemote.init(project_id)
+            self.Remote.init(project_id)
         except exc.MissingSecretError:
             print(f'missing api secret entry for {project_id}')
             sys.exit(11)
@@ -818,9 +828,9 @@ class Main(Dispatcher):
 
         try:
             if self.options.project_path:
-                anchor = self.BlackfynnRemote.anchorTo(self.cwd, create=True)
+                anchor = self.Remote.anchorTo(self.cwd, create=True)
             else:
-                anchor = self.BlackfynnRemote.dropAnchor(self.cwd)
+                anchor = self.Remote.dropAnchor(self.cwd)
         except exc.DirectoryNotEmptyError:
             message = (f'fatal: destination path already '
                        'exists and is not an empty directory.')
@@ -1319,8 +1329,8 @@ done"""
         if self.options.browser:
             import webbrowser
 
-        BlackfynnCache._local_class = Path  # since we skipped _setup
-        Path._cache_class = BlackfynnCache
+        self._cache_class._local_class = Path  # since we skipped _setup
+        Path._cache_class = self._cache_class
         paths = self.paths
         if not paths:
             paths = self.cwd,
@@ -1520,9 +1530,9 @@ done"""
 
     def rmeta(self, use_cache_path=False, exist_ok=False):
         from pyontutils.utils import Async, deferred
-        from sparcur.backends import BlackfynnDatasetData
+        from sparcur.backends import PennsieveDatasetData as RemoteDatasetData
         dsr = self.datasets if use_cache_path else self.datasets_remote
-        all_ = [BlackfynnDatasetData(r) for r in dsr]
+        all_ = [RemoteDatasetData(r) for r in dsr]
         prepared = [bdd for bdd in all_ if not (exist_ok and bdd.cache_path.exists())]
         hz = self.options.rate
         if not self.options.debug:
@@ -1555,7 +1565,7 @@ done"""
 
         elif self.options.rmeta:
             from sparcur import datasources as ds
-            Path(ds.BlackfynnDatasetData.cache_base).xopen(self.options.open)
+            Path(ds.PennsieveDatasetData.cache_base).xopen(self.options.open)
 
         elif self.options.protcur:
             latest_path = self.options.export_protcur_base / 'LATEST'
