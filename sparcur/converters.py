@@ -330,6 +330,7 @@ class MetaConverter(TripleConverter):
             try:
                 pioid_int = pioid.uri_api_int
                 s = self.c.l(pioid_int)
+                yield from pioid_int.triples_gen
                 # FIXME needs to be a pipeline so that we can export errors
                 try:
                     data = pioid.data()
