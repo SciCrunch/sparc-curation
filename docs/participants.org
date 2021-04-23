@@ -93,9 +93,8 @@ statistical sense.
 Each =specimen= type has a corresponding =population= type. For many
 use cases population types should be materialized. While it is
 tempting to treat population as a modifier on a specimen type, there
-are significant difference in the schema for collective vs atomic
+are significant differences in the schema for collective vs atomic
 participants.
-
 ** Examples
 *** Derivation chains
 Consider the case where I have 10 identified cells patched from a
