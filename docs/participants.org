@@ -1,0 +1,308 @@
+#+title: Dealing with participants: population, specimen, subject, sample
+# RE: https://github.com/INCF/neuroscience-data-structure/issues/9
+# RE: https://github.com/bids-standard/bids-specification/issues/779
+* An articulation of the problem
+** Basic elements
+- =participant=
+  - Anything (continuant) on which _direct_ measurements are made or
+    from which parts were derived where those parts eventually had
+    measurements made on them. Note that for its ontological usage
+    being a participant is an incidental, not and intentional or
+    active role, though in some cases it may still be an active role.
+    Participants are always identified and identifiable. They can be
+    though of as the minimum identifiable thing from which data was
+    generated, or from which another identifiable thing was generated.
+  - =specimen=
+    - A non-collective (atomic) =participant=. Covers both samples and
+      subjects.
+  - =population=
+    - Populations are collective participants that are opaque to their
+      individual members but still have relations to generated data
+      and sample/specimen derivation chains. [fn:nomen]
+    - Members of a =population= should have the same =specimen type=,
+      though this is somewhat dependent on what aspects were being
+      measured. For example if the only aspect of interest is the mass
+      of the specimen then the common type would only need to be
+      =thing with mass=, so everything from electrons to zebras.
+    - There are many cases in data systems where the data or derived
+      parts cannot be associated to an individual parent but only to a
+      population of parents of the same type.
+- =participant set=
+  - Distinct from population in that all the members of the set must
+    be individually identified. Set membership is metadata about an
+    individual participant, and is _not_ a fundamental unit of data
+    organization because members of a group are known individuals. As
+    with populations sets should usually be composed of members with
+    the same type.
+  - =group=
+    - Groups are specialized sets the correspond explicitly to
+      experimental groups that were subjected to different
+      experimental conditions such as treatment or control. The fully
+      qualified name would be =experimental group=.
+    - It is also possible to have groups of populations. So for example
+      it is possible to have treatment and control groups each have
+      single members that are populations that are opaque. This is
+      important for blinding, anonymization, and the like.
+  - =pool=
+    - A pool is distinct from a population and is a specialization of
+      a set in that a pool is specifically about data organization at
+      the file level. It is for providing a unit of organization that
+      makes it possible to assert that a single file contains internal
+      structure that is about multiple identified participants.
+    - A pool may correspond to a collection of _identified_ samples
+      that have been mixed up, e.g.  during the creation of sequencing
+      library. It may also correspond to a collection of subjects
+      where all of the data was collected at the same time, and has
+      not been demultiplexed. For example you could have treatment and
+      control animals that were all run at the same time on a
+      recording device that produced a single file, or multiple files
+      but all of which contain data about all members of the pool.
+
+
+[fn:nomen] When choosing which names to apply to these concepts there
+isn't a version that works for all communities. For example in
+statistics population and sample have a different meaning than
+presented here, and also have a different meaning that sample has in
+life science generally. There is one issue with using population in
+this context is that it will collide with the need to be able to talk
+about the indefinite populations that we are sampling from in the
+statistical sense.
+** Participant types
+:PROPERTIES:
+:CUSTOM_ID: participant-types
+:END:
+
+- =participant type=
+  - =specimen type=
+    - =subject=
+      - =organism=
+    - =sample=
+      - =whole organ=
+      - =tissue=
+      - =cell=
+      - =nucleus=
+      - =cell bits=
+      - ...
+ - =population type=
+   - =subject population=
+   - =sample population=
+     - =cell population=
+   - ...
+
+
+Each =specimen= type has a corresponding =population= type. For many
+use cases population types should be materialized. While it is
+tempting to treat population as a modifier on a specimen type, there
+are significant difference in the schema for collective vs atomic
+participants.
+
+** Examples
+*** Derivation chains
+Consider the case where I have 10 identified cells patched from a
+population of ~40 brain slices, that were derived from ~10 mice.  The
+population characteristics of the slices and the mice may be all that
+I care about, so I did not record the exact individuals from which the
+slices and cells were derived. So in the data we have a sample derived
+from a sample population derived from a subject population, which
+technically could itself be derived from a participant set where each
+individual is fully identified. Being able to "not know" the exact
+members of an experimental population drawn from an identified set of
+participants is critical for building data systems that can handling
+blinding.
+*** Population mass
+To give an example of the problem. I want to determine the mass of a
+population of 1000 people. There are at least four ways that I could
+do this. [fn:aside] [fn:cases]
+
+1. Use a single bathroom scale, increment the total number of
+   individuals that have stood on the scale and increment the sum of
+   the recorded masses.
+2. Use a single bathroom scale, record the mass of each of 1000
+   subjects and then sum all 1000 at the end.
+3. Use one giant scale (truck weigh station?) and a hand clicker to
+   allow exactly 1000 people onto the scale and record the mass, and
+   then count the 1000 people again as they leave.
+4. Same as case 3 but there is a metal beam which prevents the scale
+   from taking a measurement until all 1000 people are in place.
+
+For our data systems the key question that drives the data model is
+whether we can individual identify (e.g. by the numbers 1 to 1000)
+participants, or whether we can only identify the population of people
+that were standing on the scale at that time, or the people who stood
+on the individual scale and whose weight is part of the sum. If we are
+bad at counting we might not even know the size of the population,
+just that there was one, and that e.g. all members of it were human,
+and possibly a stray squirrel.
+
+In SPARC we have examples where there are identified brain slices that
+we can only map back to an unknown member of a population of mice.
+
+[fn:aside] An aside. While this may seem to be a trivial example,
+consider the general feasibility and the difficulty of verifying the
+results when extending these methods to handle populations of
+increasing size, say up to a million individuals. At a certain point
+case 2 is likely to be the preferred method due to the ability to
+standardize scales, parallelize measurement, validate results, provide
+reusability etc.
+
+[fn:cases] Cases 1 and 3 seem similar, but only because we have
+computers that can give us the illusion that we have really
+overwritten the previous value in case 1. If case 1 were to be
+implemented without a computer it would require that we burn each
+piece of paper with the previous number of participants and the
+previous collective mass each time we complete a step so that the
+history is erased.
+
+The key point however is that case 1 is similar to case 3 only by
+construction. Case 1 and case 2 are similar because the mass of each
+individual participant has been symbolized, in case 2 the individual
+masses are recoverable after the fact, in case 1 they are not but only
+because we are effectively burning the paper, in case 3 they are in
+principle recoverable if the scale was spring based and recording
+continuously, in case 4 it is not recoverable.
+* In the context of BIDS, and future SDS versions
+
+There are two ways that BIDS can proceed.
+
+1. Extend the concept of subject so that it covers all the types of
+   participant enumerated above.
+2. Keep the concept of subject equivalent to organismal subject as it
+   is right now and add additional type prefixes such as =sam-=.
+
+Having implemented option 2 for the SDS as part of SPARC, I strongly
+suggest that BIDS follow option 1.
+** File system
+I think that the right solution is to _NOT_ put the derivation chain
+in the file system. Effectively this means that you roll all the
+differentiated types of participant up, and only use participant in
+the file system.
+
+In BIDS this would be equivalent to extending the semantics of =sub-=
+to that of =participant= as describe above. The alternative is to have
+=sub-= retain its semantics, referring only to the organismal subject
+(as defined above), which is what we did in SPARC. In retrospect I
+think that this was a mistake.
+
+There are a couple of reasons for this. It multiplies work on the part
+of the user because they have to specify the derivation chain in the
+metadata and on the file system (see next paragraph). It leads to
+cases where identifier collisions can happen much more easily, because
+if you allow sub-1 and sam-1 and you drop the prefixes then suddenly
+things are ambiguous. Better to have a single identifier space that
+guarantees unique prefixes by construction rather than having to do a
+stupid dance carrying around the type of the participant forever, drop
+the type, identify each participant that has data about it
+individually, and avoid nesting folders for participants altogether.
+If one is not created, there will be some equivalent created
+internally, and it would be better to just use those identifiers in
+the file system so that the convention is baked into the dataset
+rather than different consumers coming up with potentially different
+ways to uniquely identify participants.
+
+There is a trade-off here, which is that if you take option 1 then you
+can't use the derivation chain and the type prefixes as an internal
+consistency check to make sure that the derivation chain in the
+metadata matches the folder hierarchy. However, having worked with
+such a setup, I can say that the ability to conduct an internal
+consistency check is in no way worth the massive amount of added
+complexity that nesting participant folders creates. Such a nested
+folder structure also leaves pitfalls and edge cases when a user
+rearranges the structure, e.g. to create and/or move sample folders so
+that they are inside a subject folder for a subject that has no actual
+data.
+
+In summary on folders, I suggest that only the nodes of the derivation
+chain that contain data about the exact participant should have
+folders. If a node e.g. a population only has metadata that can be
+captured in top level files, then it should not have nor need a
+folder. Derived participants, such as samples, that do have data,
+should have folders.
+** Metadata files
+The situation for metadata files is similar. I suggest taking the
+first approach of expanding the notion of subject rather than adding
+addition metadata files to deal with each and every new type of
+subject, sample, population, etc. that BIDS will eventually encounter.
+
+We did this in SPARC and while it seems like doing a conceptual =JOIN=
+between two separate tabular files wouldn't be a big deal, there is a
+mountain of complexity that it adds, along with additional confusion
+for the users.
+
+The trade-off is that if BIDS keeps a single participants file, then
+the tabular version of it e.g. =participants.tsv= would have to be a
+sparse table where the allowed columns would be determined by
+participant type. This is because each [[#participant-types][participant type]] tends to have
+a distinct set of fields. While such sparseness is straight forward in
+json, it is not for users if the interface is tabular.
+
+On the other hand, maintaining referential integrity for the
+derivation chain is also critical if there is no way to check the
+internal integrity against the file system (which as mentioned above,
+is not worth the trade-off), it is easier to check and validate this
+if it is in a single participants file rather than a merged nightmare
+of subjects, samples, populations, etc. The number of such "tables"
+that are individual files will multiply, determining which ones are
+required for any given dataset is difficult, and I am fairly certain
+that splitting participants.tsv also requires one to follow option 2
+and multiply the =sub-= prefix to include =sam-= etc.
+
+No matter which approach you take, the users are going to require a
+software interface that is not Excel or LOCalc to get it right.
+
+Therefore, since the metadata files will ultimately (eventually?) not
+be user facing, I strongly recommend the trade-off in favor of a
+single sparse table, or list of json objects whose schema is
+determined by the type of the participant.
+
+It is much easier to validate and verify. Individual type-specific
+views can be constructed on top of it (equivalent to a user opening a
+tabular file for each type of participant metadata). This is better
+than trying to assemble the joined sparse table after the fact,
+because the specification for that sparse table is now potentially in
+as many files as there are participant types, and adding a single json
+schema entry (or similar) to handle a new participant type is much
+easier than adding a whole new tabular file that every BIDS parser
+must now be update to be aware of.
+
+In essence, if you start adding files, you are going to have a long
+standing maintenance problem. If you stick to a single participants
+file, then you only have to update the schema for the participant
+types allowed in that file.
+* Extras :noexport:
+From population mass.
+#+begin_comment
+In the context of specimen vs population, the key distinction here
+is whether there is a data artifact that exists after the experiment
+is completed that refers only to the population as a whole, or whether
+there are individual numbers that can be associated with individual
+members of that population.
+
+What happens if we also want to record the age range? In the
+historyless case we only track the minimum and maximum age and only
+update them if we encounter someone whose age falls beyond one of the
+existing bounds.
+
+Why does this matter? This matters because we need to determine
+whether populations are subClassOf participants, i.e. are collective
+entities themselves entities? I'm going to proceed under the
+assumption that they are. We have examples in SPARC where we only have
+information that a brain slice came from the brain of one of a
+population of different animals. We have metadata about the population
+of animals, but not about any identifiable individual.
+
+We also need to materialize the population into the types because
+there are fundamentally different types of data that can be associated
+with populations vs individuals. But do we need to differentiate at
+the type level between a population of subjects vs a population of
+samples?  I think the answer is yes because the structure of the
+associated metadata the required fields in particular is dependent on
+whether it is a subject population vs a sample population, in
+particular because we want to be able to statically verify that sam-1
+can actually be derived from pop-1, without the knowledge that it is
+pop-sub-1 vs pop-sam-1, because if we have pop-1 and pop-2 then we
+can't verify that pop-1 cannot be derived from pop-2 because pop-2 is
+a sample population and pop-1 is a subject population.
+# This is a pain in the butt.
+We could choose not to create the duplicate population hierarchy.
+The cases where we will encounter issues is
+#+end_comment
