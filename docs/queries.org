@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e8883bd1429e87a80d937119139e193829dc796f38b27503982de5b90efbbd7d; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e8883bd1429e87a80d937119139e193829dc796f38b27503982de5b90efbbd7d; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 
 * SPARQL
@@ -7,55 +7,62 @@
 :header-args:sparql+: :format text/csv
 :header-args:sparql+: :results table
 :END:
-
-*[[RUN:][Run Query ▶]]*
-#+name: my-query
+** Subject reconciliation
+# #+header: :cache yes
+#+name: potential-duplicate-subjects
 #+begin_src sparql
-# :results table :var limit="10"
+# :results table
 # RUN:block
 SELECT distinct ?s1 ?s2 ?id ?dataset1 ?dataset2 ?species1 ?species2 ?award1 ?award2
 WHERE {
 
-    # Give me all subjects with duplicate IDs with unique datasets
-    { SELECT ?id
-      WHERE {
-	?s1 a owl:NamedIndividual ; 
-            TEMP:localId ?id ; 
-            TEMP:hasDerivedInformationAsParticipant ?datasetx .
-	?s2 a owl:NamedIndividual ; 
-            TEMP:localId ?id ; 
-            TEMP:hasDerivedInformationAsParticipant ?datasety .
-	filter(?datasetx != ?datasety)
+  # Give me all subjects with duplicate IDs with unique datasets
+  { SELECT ?id
+    WHERE {
+	  ?s1 a owl:NamedIndividual ;
+	  TEMP:localId ?id ;
+	  TEMP:hasDerivedInformationAsParticipant ?datasetx .
+	  ?s2 a owl:NamedIndividual ;
+	  TEMP:localId ?id ;
+	  TEMP:hasDerivedInformationAsParticipant ?datasety .
+	  filter(?datasetx != ?datasety)
     } GROUP BY ?id having (count(?id) > 1)}
 
-    ?s1 TEMP:localId ?id ;
-        sparc:animalSubjectIsOfSpecies ?species1;
-        TEMP:hasDerivedInformationAsParticipant ?dataset1 .
-    ?s2 TEMP:localId ?id ;
-        sparc:animalSubjectIsOfSpecies ?species2;
-        TEMP:hasDerivedInformationAsParticipant ?dataset2 .
-    filter(?s1 != ?s2)
-    filter(STR(IRI(?s1)) < STR(IRI(?s2)))
-    filter(?species1 != ?species2)
-    filter(STR(IRI(?species1)) < STR(IRI(?species2)))
+  # filter out the cases where there can't be a match because species doesn't match
+  ?s1 TEMP:localId ?id ;
+  sparc:animalSubjectIsOfSpecies ?species1;
+  TEMP:hasDerivedInformationAsParticipant ?dataset1 .
+  ?s2 TEMP:localId ?id ;
+  sparc:animalSubjectIsOfSpecies ?species2;
+  TEMP:hasDerivedInformationAsParticipant ?dataset2 .
+  filter(?s1 != ?s2)
+  filter(STR(IRI(?s1)) < STR(IRI(?s2))) # this is a hack to filter out duplicate triples
+  filter(?species1 != ?species2)
+  filter(STR(IRI(?species1)) < STR(IRI(?species2))) # hack to filter dupe triples
 
-    ?dataset1 a owl:NamedIndividual ;
-              TEMP:hasAwardNumber ?award1 .
-    ?dataset2 a owl:NamedIndividual ;
-              TEMP:hasAwardNumber ?award2 .
-    filter(?dataset1 != ?dataset2)
-    filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2)))
-    filter(?award1 != ?award2)
-    filter(STR(IRI(?award1)) < STR(IRI(?award2)))
-  
-} order by ?id limit 1000 # ?limit
+  # filter to find non-matching awards
+  # using contact person doesn't make sense as they are 1:1 with award right now
+  ?dataset1 a owl:NamedIndividual ;
+  TEMP:hasAwardNumber ?award1 .
+  ?dataset2 a owl:NamedIndividual ;
+  TEMP:hasAwardNumber ?award2 .
+  filter(?dataset1 != ?dataset2)
+  filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2))) # hack to filter dupe triples
+  filter(?award1 != ?award2)
+  filter(STR(IRI(?award1)) < STR(IRI(?award2))) # hack to filter dupe triples
+
+} order by ?id limit 1000
 #+end_src
 
 *[[RUN:][Run Query ▶]]*
-#+name: my-python
-#+begin_src python :var data=my-query() :epilogue "return result"
+# #+header: :results drawer output
+#+header: :epilogue "return result"
+#+name: process-duplicate-subjects
+#+begin_src python :var data=potential-duplicate-subjects()
 from collections import defaultdict, OrderedDict
 import itertools
+from sparcur.core import OntId
+
 def func(data):
     idmap = defaultdict(lambda: defaultdict(list)) # change to list; order for local_id
     for row in data:
@@ -65,14 +72,13 @@ def func(data):
         idmap[subj1]['cluster'].append(subj2)
         idmap[subj1]['local_id'].append(local_id)
         value_pairs = [(row[i], row[i+1]) for i in range(3, len(row), 2)]
-        value_pairs_len = len(value_pairs)          
+        value_pairs_len = len(value_pairs)
         for i, value_pair in enumerate(value_pairs):
             v1, v2 = value_pair
             if v1 not in idmap[subj1][i]:
                 idmap[subj1][i].append(v1)
             idmap[subj1][i].append(v2)
     header = ['cluster', 'local_id'] + [i for i in range(value_pairs_len)] # todo: replace this with sparql headers if possible
-    hardcoded_header =  ['individuals', 'local_id', 'datasets', 'species', 'awards']
     columns = defaultdict(list)
     subjs = sorted([(v, v.split('/')[-1]) for v in idmap], key=lambda x: x[1])
     for subj, _ in subjs:
@@ -81,9 +87,18 @@ def func(data):
             values = list(values)
             values = [subj] + values if colname == 'cluster' else values
             padding = padding_max - len(values) if len(values) < padding_max else 0
-            columns[colname] += values + ['-'] * padding + ['']
-    table = [hardcoded_header] + [None] + list(itertools.izip_longest(*[columns[k] for k in header]))  # .zip_longest depending on python version
+            columns[colname] += values # + ['-'] * padding + ['']
+    thing = [list(_) for _ in itertools.zip_longest(*[columns[k] for k in header])]
+    for index in (0, 2, 3, 4):
+        for row in thing:
+            row[index] = OntId(row[index]).curie  # shorten iris
+    hardcoded_header =  [f'individuals (n={len(thing)})',
+                         f'id (n={len(set([r[1] for r in thing]))})',
+                         'datasets', 'species', 'awards']
+    table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in thing), key=lambda row:(row[1], row[3], row[4], row[2]))
     return table
+
+
 result = func(data)
 #+end_src
 
