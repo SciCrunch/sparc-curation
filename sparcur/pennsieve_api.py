@@ -41,6 +41,7 @@ FakeBFile, _packages = monkey.bind_packages_File(File)
 
 Dataset._dp_class = DataPackage
 Dataset.meta = monkey.Dataset_meta
+Dataset.packagesByName = monkey.packagesByName
 Dataset.packageTypeCounts = monkey.packageTypeCounts
 Dataset.readme = monkey.Dataset_readme
 Dataset.contributors = monkey.Dataset_contributors

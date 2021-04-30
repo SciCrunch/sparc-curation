@@ -2270,7 +2270,8 @@ if __name__ == '__main__':
 *** _*Utils*_
 #+name: utils.py
 #+begin_src python :tangle ../sparcur/simple/utils.py :noweb yes
-"""Common command line options for all sparcur.simple modules
+from sparcur.config import auth
+__doc__ = f"""Common command line options for all sparcur.simple modules
 Usage:
     sparcur-simple [options] [<path>...]
     sparcur-simple [options] [--dataset-id=<ID>...]
@@ -2290,14 +2291,14 @@ Options:
     --parent-parent-path=PATH       parent in which a random tempdir is generated
                                     to be the parent path, don't use this ...
     --invariant-local-path=PATH     path relative to parent path for dataset [default: dataset]
-    --export-local                  set export-parent-path to {:parent-path}/exports/
+    --export-local                  set export-parent-path to {{:parent-path}}/exports/
     --export-path=PATH              base export path containing the standard path structure
     --export-parent-path=PATH       direct parent path into which exports will be placed
     --extension=<EXT>...            one or more file extensions to fetch
 
     -j --jobs=N                     number joblib jobs [default: 12]
     --exclude-uploaded              do not pull files from remote marked as uploaded
-    --sparse-limit=N                package count that forces a sparse pull [default: 10000]
+    --sparse-limit=N                package count that forces a sparse pull [default: {auth.get('sparse-limit')}]
     --symlink-objects-to=PATH       path to an existing objects directory
     --log-level=LEVEL               log level info [default: INFO]
 
