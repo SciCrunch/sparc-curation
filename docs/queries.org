@@ -1,12 +1,25 @@
 # -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e8883bd1429e87a80d937119139e193829dc796f38b27503982de5b90efbbd7d; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 
+# TODO consider a setup file for these maybe?
+# or populate additional local curies via orgstrap
+#+link: dataset https://api.blackfynn.io/datasets/N:dataset:
+#+link: TEMP http://uri.interlex.org/temp/uris/
+#+link: rdf http://www.w3.org/1999/02/22-rdf-syntax-ns#
+#+link: UBERON http://purl.obolibrary.org/obo/UBERON_
+#+link: pio.api https://www.protocols.io/api/v3/protocols/
+#+link: oboInOwl http://www.geneontology.org/formats/oboInOwl#
+#+link: BIRNLEX http://uri.neuinfo.org/nif/nifstd/birnlex_
+#+link: owl http://www.w3.org/2002/07/owl#
+#+link: definition http://purl.obolibrary.org/obo/IAO_0000115
+#+link: rdfs http://www.w3.org/2000/01/rdf-schema#
 * SPARQL
 :PROPERTIES:
 :header-args:sparql: :url http://localhost:9999/blazegraph/sparql
 :header-args:sparql+: :format text/csv
 :header-args:sparql+: :results table
 :END:
+# :header-args:sparql: :url http://localhost:10035/repositories/test
 ** Subject reconciliation
 # #+header: :cache yes
 #+name: potential-duplicate-subjects
@@ -225,15 +238,15 @@ SELECT DISTINCT
 # ?protocol
 # ?technique_p
 WHERE {
-{ ?dataset a sparc:Dataset .
-  ?dataset TEMP:protocolEmploysTechnique ?technique .
-  # ?technique rdfs:label ?tl
-}
-UNION
-{ ?dataset TEMP:hasProtocol ?protocol .
-  ?protocol TEMP:protocolEmploysTechnique ?technique .
-  # ?technique rdfs:label ?tl
-}
+  { ?dataset a sparc:Dataset .
+    ?dataset TEMP:protocolEmploysTechnique ?technique .
+    # ?technique rdfs:label ?tl
+  }
+  UNION
+  { ?dataset TEMP:hasProtocol ?protocol .
+    ?protocol TEMP:protocolEmploysTechnique ?technique .
+    # ?technique rdfs:label ?tl
+  }
 } LIMIT 10
 #+end_src
 
@@ -447,18 +460,18 @@ WHERE {
 #+end_src
 
 #+RESULTS:
-| dataset                                                                          | sample                                                                                                  |
-|----------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-1  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-10 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-11 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-12 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-13 |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-2  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-3  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-4  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-5  |
-| https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340 | https://api.blackfynn.io/datasets/N:dataset:dae2fef9-05e6-418f-8374-3af267643340/samples/sub-896_sam-6  |
+| dataset                                      | sample                                                                          |
+|----------------------------------------------+---------------------------------------------------------------------------------|
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_399-L1-1 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_399-L1-2 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_399-L2-1 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_399-L2-2 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_431-L1-1 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_431-L1-2 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_431-L1-3 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_431-L1-4 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_431-L1-5 |
+| dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b | dataset:699edce7-3e9f-4357-a2ce-efef5fa4799b/samples/sub-PR1705_PR1705_431-L1-6 |
 
 *** Total
 #+begin_src sparql
@@ -474,7 +487,7 @@ WHERE {
 #+RESULTS:
 | count_subject |
 |---------------|
-|          7751 |
+|          6718 |
 
 *** Sample predicates
 #+begin_src sparql
@@ -487,20 +500,20 @@ WHERE {
 #+end_src
 
 #+RESULTS:
-| p                                                                         |
-|---------------------------------------------------------------------------|
-| http://uri.interlex.org/temp/uris/hasDerivedInformationAsParticipant      |
-| http://uri.interlex.org/temp/uris/localId                                 |
-| http://uri.interlex.org/temp/uris/raw/wasExtractedFromAnatomicalRegion    |
-| http://uri.interlex.org/temp/uris/wasDerivedFromSubject                   |
-| http://www.w3.org/1999/02/22-rdf-syntax-ns#type                           |
-| http://uri.interlex.org/temp/uris/participantInPerformanceOf              |
-| http://uri.interlex.org/temp/uris/hasAssignedGroup                        |
-| http://uri.interlex.org/temp/uris/hasDigitalArtifactThatIsAboutIt         |
-| http://uri.interlex.org/temp/uris/TODO                                    |
-| http://uri.interlex.org/temp/uris/providerNote                            |
-| http://uri.interlex.org/temp/uris/hasDigitalArtifactThatIsAboutItWithHash |
-| http://uri.interlex.org/temp/uris/localExecutionNumber                    |
+| p                                         |
+|-------------------------------------------|
+| TEMP:wasDerivedFromSubject                |
+| TEMP:hasDerivedInformationAsParticipant   |
+| TEMP:localId                              |
+| rdf:type                                  |
+| TEMP:raw/wasExtractedFromAnatomicalRegion |
+| TEMP:hasAssignedGroup                     |
+| TEMP:participantInPerformanceOf           |
+| TEMP:hasFolderAboutIt                     |
+| TEMP:hasDigitalArtifactThatIsAboutIt      |
+| TEMP:TODO                                 |
+| TEMP:localExecutionNumber                 |
+| TEMP:providerNote                         |
 
 *** Sample Metadata
 
@@ -513,7 +526,7 @@ SELECT DISTINCT
 
 ?assigned_group
 
-?anat_ent_src
+(str(?anat_ent_src) as ?aess)
 
 WHERE {
   ?sample a sparc:Sample .
@@ -530,27 +543,28 @@ WHERE {
 #+end_src
 
 #+RESULTS: sample-metadata
-| subject_lid | local_id                                                                            | assigned_group                               | anat_ent_src |
-|-------------+-------------------------------------------------------------------------------------+----------------------------------------------+--------------|
-| sub_4585    | 121 Adult Left Colon 4585 10x stitch anti HucD 488 anti S100B 594 anti PHOX2B 647 1 | anti HuC/D, anti S100β, anti PHOX2B staining | left colon   |
-| sub_4585    | 244 Adult Left Colon 4585 20x 20x anti HucD 647 anti cKit 594 1                     | anti HuC/D, anti cKit staining               | left colon   |
-| sub_4585    | 245 Adult Left Colon 4585 20x anti HucD 647 anti cKit 594 2                         | anti HuC/D, anti cKit staining               | left colon   |
-| sub_4585    | 246 Adult Left Colon 4585  20x anti HucD 647 anti cKit 594 3                        | anti HuC/D, anti cKit staining               | left colon   |
-| sub_4585    | 260 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 1                          | anti HuC/D, anti NFM staining                | left colon   |
-| sub_4585    | 261 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 2                          | anti HuC/D, anti NFM staining                | left colon   |
-| sub_4585    | 262 Adult Left Colon 4585 20x anti HucD 647 anti NFM 594 3                          | anti HuC/D, anti NFM staining                | left colon   |
-| sub_4585    | 269 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 1                         | anti HuC/D, anti Tuj1 staining               | left colon   |
-| sub_4585    | 270 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 2                         | anti HuC/D, anti Tuj1 staining               | left colon   |
-| sub_4585    | 271 Adult Left Colon 4585 20x anti HucD 647 anti Tuj1 594 3                         | anti HuC/D, anti Tuj1 staining               | left colon   |
+| subject_lid   | local_id                                                                         | assigned_group                            | aess                                                                  |
+|---------------+----------------------------------------------------------------------------------+-------------------------------------------+-----------------------------------------------------------------------|
+| sub-PR1643    | PR1643_618-G-1                                                                   |                                           | right atrial ganglionic plexus (RAGP) of pig heart                    |
+| sub-72        | sam-2                                                                            |                                           | 10 mm from esophageal hiatus and 10 mm from gastroesophageal junction |
+| sub-72        | sam-1                                                                            |                                           | 10 mm from esophageal hiatus and 10 mm from gastroesophageal junction |
+| sub-PR1534    | PR1534_53-L1-3                                                                   |                                           | RAGP and SAN of pig heart                                             |
+| 56_M_03081929 | 56_M_03081929                                                                    |                                           | descending colon                                                      |
+| sub-PR1729    | PR1729_378-L1-1                                                                  |                                           | RAGP of pig heart                                                     |
+| sub-PR1729    | PR1729_378-L1-3                                                                  |                                           | RAGP of pig heart                                                     |
+| sub-PR1729    | PR1729_378-L1-2                                                                  |                                           | RAGP of pig heart                                                     |
+| sub-PR1729    | PR1729_378-L1-4                                                                  |                                           | RAGP of pig heart                                                     |
+| sub_4504      | 60 Adult Right Colon 4504 10x stitch anti HucD 594 anti nNOS 488 anti CHAT 647 1 | anti HuC/D, anti nNOS, anti ChAT staining | right colon                                                           |
 
 ** Anatomical entities
 *** Dataset
 **** Involves
+# FIXME unused at the moment
 #+begin_src sparql
 SELECT DISTINCT
 ?dataset
 # ?ae
-?l_ae
+(str(?l_ae) as ?entity)
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:involvesAnatomicalRegion ?ae .  # TODO not 100% on the modelling here
@@ -577,43 +591,42 @@ WHERE {
 SELECT DISTINCT
 ?dataset
 # ?ae
-?l_ae
+(str(?l_ae) as ?entity)
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset isAbout: ?ae .  # TODO not 100% on the modelling here
   ?ae rdfs:label ?l_ae .
-  # ?ae rdfs:subClassOf* UBERON:0001062 .  # FIXME this information is not in the graph right now
-                                           # which is why we get mouse
+  ?ae rdfs:subClassOf* UBERON:0001062 .  # have to load uberon for this
 } ORDER BY ASC(?l_ae) LIMIT 10 
 #+end_src
 
 #+RESULTS:
-| dataset                                                                          | l_ae         |
-|----------------------------------------------------------------------------------+--------------|
-| https://api.blackfynn.io/datasets/N:dataset:02786240-2033-4f86-808d-daf345ce3165 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:3bb4788f-edab-4f04-8e96-bfc87d69e4e5 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:663d8eba-eb68-4fef-b9a0-ac51410b26d3 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:6ce2e98e-5217-4952-897d-017285d303b2 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:f267c9fd-678e-4469-beb8-327b35f1738a | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:f563672f-7d39-4e6d-b198-82960fb4a434 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:fc6e3a87-1241-4f81-b284-8ebc82efc499 | Mus musculus |
-| https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | Mus musculus |
+| dataset                                      | entity                   |
+|----------------------------------------------+--------------------------|
+| dataset:1284a4e8-21e1-4b9f-9280-6ba06f6b9a50 | adipose tissue           |
+| dataset:1b137c7e-2f07-4a78-8079-828b37743306 | autonomic nervous system |
+| dataset:1873396f-8d82-4d6c-93f7-52117470e4a1 | autonomic nervous system |
+| dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 | autonomic nervous system |
+| dataset:29df9b97-a20b-469c-bf48-9389f1e31a11 | axon tract               |
+| dataset:7067a6f5-8df2-4ef8-953a-4d0bfafe6555 | bladder organ            |
+| dataset:b2a88634-e2b0-49dc-9fe3-f61f784459f2 | bladder organ            |
+| dataset:11d3dbdf-d90c-4e42-8341-cc4a956f5c9c | bladder organ            |
+| dataset:b0c104b4-f448-4a33-9adb-33704a1890f8 | body of stomach          |
+| dataset:61be84f1-e010-43aa-8095-df791b887984 | body proper              |
 
 **** Sample Source
 #+name: dataset-sample-source
 #+begin_src sparql :var limit="20"
 SELECT DISTINCT
 ?dataset
-?ae
+(str(?ae) as ?aes)
 # ?slid
 WHERE {
-?sample TEMP:hasDerivedInformationAsParticipant ?dataset .
-?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?ae .
-?sample a sparc:Sample .
-# ?sample TEMP:localId ?slid .
-?dataset a sparc:Dataset .
+  ?sample TEMP:hasDerivedInformationAsParticipant ?dataset .
+  ?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?ae .
+  ?sample a sparc:Sample .
+  # ?sample TEMP:localId ?slid .
+  ?dataset a sparc:Dataset .
 }
 ORDER BY
 DESC(?ae)
@@ -622,35 +635,36 @@ LIMIT ?limit
 #+end_src
 
 #+RESULTS: dataset-sample-source
-| dataset                                                                          | ae                              |
-|----------------------------------------------------------------------------------+---------------------------------|
-| https://api.blackfynn.io/datasets/N:dataset:82c228a2-134a-4f6f-82f2-d89e64cb7be1 | whole stomach                   |
-| https://api.blackfynn.io/datasets/N:dataset:57466879-2cdd-4af2-8bd6-7d867423c709 | vasculature of the the pancreas |
-| https://api.blackfynn.io/datasets/N:dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | transverse colon                |
-| https://api.blackfynn.io/datasets/N:dataset:4a361ad8-d500-4f3d-81f8-c92f504946b2 | torus pyloricus                 |
-| https://api.blackfynn.io/datasets/N:dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c | superior cervical ganglia       |
-| https://api.blackfynn.io/datasets/N:dataset:bec4d335-9377-4863-9017-ecd01170f354 | subdiaphragmatic vagus nerve    |
-| https://api.blackfynn.io/datasets/N:dataset:c082215b-6765-4cc8-a965-92773b4c18c1 | subdiaphragmatic vagus nerve    |
-| https://api.blackfynn.io/datasets/N:dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 | subdiaphragmatic vagus nerve    |
-| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | stomach                         |
-| https://api.blackfynn.io/datasets/N:dataset:a244bca9-b747-4035-9bdc-ee6227a29dfd | stellate ganglion               |
-| https://api.blackfynn.io/datasets/N:dataset:e8816bce-809a-4c78-8950-6f61911b6eac | spleen                          |
-| https://api.blackfynn.io/datasets/N:dataset:9d8ad16c-2ae7-414c-8573-048303039c76 | spinal cord, segments L5-S2     |
-| https://api.blackfynn.io/datasets/N:dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | sigmoid colon                   |
-| https://api.blackfynn.io/datasets/N:dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | sigma                           |
-| https://api.blackfynn.io/datasets/N:dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | sample middle ~2 cm             |
-| https://api.blackfynn.io/datasets/N:dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | sample middle ~2 cm             |
-| https://api.blackfynn.io/datasets/N:dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | sample middle ~2 cm             |
-| https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | right colon                     |
-| https://api.blackfynn.io/datasets/N:dataset:6d6818f2-ef75-4be5-9360-8d37661a8463 | right cervical vagus nerve      |
-| https://api.blackfynn.io/datasets/N:dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | right cervical vagus nerve      |
+| dataset                                      | aes                             |
+|----------------------------------------------+---------------------------------|
+| dataset:b225fa8a-9eb5-4716-8399-0f7fac9c2b64 | whole stomach                   |
+| dataset:82c228a2-134a-4f6f-82f2-d89e64cb7be1 | whole stomach                   |
+| dataset:57466879-2cdd-4af2-8bd6-7d867423c709 | vasculature of the the pancreas |
+| dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | transverse colon                |
+| dataset:4a361ad8-d500-4f3d-81f8-c92f504946b2 | torus pyloricus                 |
+| dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 | systemic                        |
+| dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c | superior cervical ganglia       |
+| dataset:bec4d335-9377-4863-9017-ecd01170f354 | subdiaphragmatic vagus nerve    |
+| dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 | subdiaphragmatic vagus nerve    |
+| dataset:c082215b-6765-4cc8-a965-92773b4c18c1 | subdiaphragmatic vagus nerve    |
+| dataset:e8816bce-809a-4c78-8950-6f61911b6eac | stomach                         |
+| dataset:d1f386c0-1715-49ce-be14-890a4ede011d | stellate ganglion               |
+| dataset:e8816bce-809a-4c78-8950-6f61911b6eac | spleen                          |
+| dataset:9d8ad16c-2ae7-414c-8573-048303039c76 | spinal cord, segments L5-S2     |
+| dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | sigmoid colon                   |
+| dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | sigma                           |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | sample middle ~2 cm             |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | sample middle ~2 cm             |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | sample middle ~2 cm             |
+| dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | right colon                     |
 
 *** Protocol
 **** Involves
 #+begin_src sparql
 SELECT DISTINCT
 ?protocol
-?l_bb
+?bb_value
+(str(?l_bb) as ?ls)
 WHERE {
   ?protocol a sparc:Protocol .
   ?protocol TEMP:protocolInvolvesBlackBox ?ast_bb .
@@ -658,25 +672,132 @@ WHERE {
   ?ast_bb rdf:type protcur:black-box .  # TODO need to refine on organ an ingest the new alignment
   ?ast_bb TEMP:hasValue ?bb_value .
 
+  ?bb_value rdfs:subClassOf+ UBERON:0001062 .
   ?bb_value rdfs:label ?l_bb .
-} LIMIT 10 
+} LIMIT 100
 #+end_src
 
 #+RESULTS:
-| protocol                                        | l_bb             |
-|-------------------------------------------------+------------------|
-| https://www.protocols.io/api/v3/protocols/18985 | photon           |
-| https://www.protocols.io/api/v3/protocols/19341 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/18985 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/23160 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/19269 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/20256 | Metazoa          |
-| https://www.protocols.io/api/v3/protocols/22833 | stomach          |
-| https://www.protocols.io/api/v3/protocols/25817 | heart            |
-| https://www.protocols.io/api/v3/protocols/26704 | neck             |
-| https://www.protocols.io/api/v3/protocols/19127 | abdominal cavity |
+| protocol      | bb_value       | ls                        |
+|---------------+----------------+---------------------------|
+| pio.api:23160 | UBERON:0014398 | respiratory muscle        |
+| pio.api:25817 | UBERON:0000948 | heart                     |
+| pio.api:19127 | UBERON:0003684 | abdominal cavity          |
+| pio.api:19341 | UBERON:0005363 | inferior vagus X ganglion |
+| pio.api:18947 | UBERON:0003684 | abdominal cavity          |
+| pio.api:22833 | UBERON:0000945 | stomach                   |
+| pio.api:20025 | UBERON:0006082 | fundus of urinary bladder |
+| pio.api:26704 | UBERON:0000974 | neck                      |
+
+# seems like there are some issues with labels https://jira.blazegraph.com/browse/BLZG-4476
+# :format application/sparql-results+xml
+#+begin_src sparql
+SELECT DISTINCT
+?protocol
+?bbc_value
+(str(?l_bbc) as ?bbl)
+WHERE {
+  ?protocol a sparc:Protocol .
+  ?protocol TEMP:protocolInvolvesBlackBoxComponent ?ast_bbc .
+
+  ?ast_bbc rdf:type protcur:black-box-component .  # TODO need to refine on organ an ingest the new alignment
+  ?ast_bbc TEMP:hasValue ?bbc_value .
+
+  ?bbc_value rdfs:subClassOf+ UBERON:0001062 .
+  ?bbc_value rdfs:label ?l_bbc .
+} ORDER BY ?l_bbc LIMIT 10
+#+end_src
+
+#+RESULTS:
+| protocol      | bbc_value      | bbl                                |
+|---------------+----------------+------------------------------------|
+| pio.api:22894 | UBERON:0006489 | C2 segment of cervical spinal cord |
+| pio.api:19299 | UBERON:0000916 | abdomen                            |
+| pio.api:22833 | UBERON:0000916 | abdomen                            |
+| pio.api:26737 | UBERON:0000916 | abdomen                            |
+| pio.api:36552 | UBERON:0000916 | abdomen                            |
+| pio.api:36617 | UBERON:0000916 | abdomen                            |
+| pio.api:22832 | UBERON:0000916 | abdomen                            |
+| pio.api:31143 | UBERON:0000916 | abdomen                            |
+| pio.api:36547 | UBERON:0000916 | abdomen                            |
+| pio.api:30926 | UBERON:0000916 | abdomen                            |
+
+** Uberon tests
+In order to use these you need to load the latest version of uberon into blazegraph.
+#+begin_src sparql
+SELECT DISTINCT ?sc (str(?l) as ?label) WHERE {
+  # BIND("brain" AS ?label) # Well would you look at that!
+  VALUES (?root) { ( UBERON:0001062 ) }
+  ?sc rdfs:subClassOf+ ?root .
+  ?sc rdfs:label ?l .
+  } limit 10
+#+end_src
+
+#+RESULTS:
+| sc             | label                            |
+|----------------+----------------------------------|
+| UBERON:0002712 | premammillary nucleus            |
+| UBERON:0009076 | membrana tympaniformis lateralis |
+| UBERON:0015103 | distal tarsal bone 1 cartilage   |
+| UBERON:4300126 | tectorial restraint system       |
+| UBERON:0001249 | spleen lymphoid follicle         |
+| UBERON:0009988 | condyle of humerus               |
+| UBERON:0004059 | spinal cord medial motor column  |
+| UBERON:0011938 | vibrissa inner root sheath       |
+| UBERON:0001543 | popliteal lymph node             |
+| UBERON:0006006 | metoptic pillar                  |
+
+#+begin_src sparql
+select ?p ?o where {
+    VALUES (?s) { ( UBERON:0001062 ) }
+    ?s ?p ?o .
+}
+#+end_src
+
+#+RESULTS:
+| p                        | o                                                                                                                                                                         |
+|--------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| oboInOwl:hasDbXref       | BIRNLEX:6                                                                                                                                                                 |
+| oboInOwl:hasDbXref       | http://linkedlifedata.com/resource/umls/id/C1515976                                                                                                                       |
+| oboInOwl:hasDbXref       | TGMA:0001822                                                                                                                                                              |
+| oboInOwl:hasDbXref       | CARO:0000000                                                                                                                                                              |
+| oboInOwl:hasDbXref       | MA:0000001                                                                                                                                                                |
+| oboInOwl:hasDbXref       | HAO:0000000                                                                                                                                                               |
+| oboInOwl:hasDbXref       | XAO:0000000                                                                                                                                                               |
+| oboInOwl:hasDbXref       | BILA:0000000                                                                                                                                                              |
+| oboInOwl:hasDbXref       | FBbt:10000000                                                                                                                                                             |
+| oboInOwl:hasDbXref       | AAO:0010841                                                                                                                                                               |
+| oboInOwl:hasDbXref       | FMA:62955                                                                                                                                                                 |
+| oboInOwl:hasDbXref       | AEO:0000000                                                                                                                                                               |
+| oboInOwl:hasDbXref       | NCIT:C12219                                                                                                                                                               |
+| oboInOwl:hasDbXref       | FBbt_root:00000000                                                                                                                                                        |
+| oboInOwl:hasDbXref       | TAO:0100000                                                                                                                                                               |
+| oboInOwl:hasDbXref       | ZFA:0100000                                                                                                                                                               |
+| oboInOwl:hasDbXref       | WBbt:0000100                                                                                                                                                              |
+| oboInOwl:hasDbXref       | EHDAA2:0002229                                                                                                                                                            |
+| oboInOwl:hasDbXref       | UMLS:C1515976                                                                                                                                                             |
+| oboInOwl:inSubset        | http://purl.obolibrary.org/obo/uberon/core#upper_level                                                                                                                    |
+| oboInOwl:id              | UBERON:0001062                                                                                                                                                            |
+| oboInOwl:hasOBONamespace | uberon                                                                                                                                                                    |
+| definition:              | Biological entity that is either an individual member of a biological species or constitutes the structural organization of an individual member of a biological species. |
+| rdfs:label               | anatomical entity                                                                                                                                                         |
+| rdf:type                 | owl:Class                                                                                                                                                                 |
 
 ** Associated scaffolds
+** Manifest files
+A SODA development use case. Find me datasets that have top level manifests with no errors.
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:hasPart+ ?file .
+  ?file a sparc:File .
+  ?file a sparc:Manifest .
+  ?file TEMP:hasParent ?dataset . # this is the tricky bit, because we conflate the identifier for dataset and the folder
+  ?file TEMP:hasErrors 0 .
+} LIMIT 10
+#+end_src
 ** Other
 NOTE These are not yet in the ttl file, the queries written here will not work yet.
 *** File types
