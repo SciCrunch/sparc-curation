@@ -8,7 +8,7 @@ import sparcur
 import sparcur.cli
 import sparcur.paths
 import sparcur.backends
-from sparcur.blackfynn_api import FakeBFLocal
+from sparcur.pennsieve_api import FakeBFLocal
 
 
 def fake_setup(self, *args, **kwargs):

@@ -1,10 +1,10 @@
-from pennsieve import Pennsieve, DataPackage
+from pennsieve import Pennsieve, DataPackage, BaseNode
 from pennsieve import Organization, Dataset, Collection, File
 from pennsieve import base as pnb
 from pennsieve.api import agent
 from pennsieve.api.data import PackagesAPI
 from sparcur import monkey
-from sparcur.utils import ApiWrapper, PennsieveId
+from sparcur.utils import ApiWrapper, PennsieveId, make_bf_cache_as_classes
 
 
 def id_to_type(id):
@@ -51,3 +51,8 @@ Dataset.packages = monkey.packages
 Dataset._packages = _packages
 Pennsieve.get = monkey.Blackfynn_get
 #PackagesAPI.get = monkey.PackagesAPI_get
+
+
+(FakeBFLocal, CacheAsBFObject, CacheAsFile,
+ CacheAsCollection, CacheAsDataset, CacheAsOrganization
+ ) = make_bf_cache_as_classes(BaseNode, File, Collection, Dataset, Organization)

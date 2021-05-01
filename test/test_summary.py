@@ -1,7 +1,7 @@
 import unittest
 from .common import template_root, project_path
 from sparcur.curation import Summary
-from sparcur.blackfynn_api import FakeBFLocal
+from sparcur.pennsieve_api import FakeBFLocal
 
 
 class TestSummary(unittest.TestCase):

@@ -15,7 +15,7 @@ from sparcur.paths import SymlinkCache
 from sparcur.state import State
 from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
-from sparcur.blackfynn_api import FakeBFLocal
+from sparcur.pennsieve_api import FakeBFLocal
 this_file = Path(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'

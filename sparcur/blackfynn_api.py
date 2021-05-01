@@ -32,7 +32,7 @@ from pyontutils.utils import Async, deferred
 from pyontutils.iterio import IterIO
 from sparcur import monkey
 from sparcur import exceptions as exc
-from sparcur.utils import BlackfynnId, ApiWrapper
+from sparcur.utils import BlackfynnId, ApiWrapper, make_bf_cache_as_classes
 
 
 def id_to_type(id):
@@ -292,81 +292,6 @@ class BFLocal(ApiWrapper):
     _remotebase = bfb
 
 
-class FakeBFLocal(BFLocal):
-    class bf:
-        """ tricksy hobbitses """
-        @classmethod
-        def get_dataset(cls, id):
-            #import inspect
-            #stack = inspect.stack(0)
-            #breakpoint()
-            #return CacheAsDataset(id)
-            class derp:
-                """ yep, this is getting called way down inside added
-                    in the extras pipeline :/ """
-                doi = None
-                status = 'FAKE STATUS ;_;'
-            return derp
-
-    def __init__(self, project_id, anchor):
-        self.organization = CacheAsBFObject(anchor)  # heh
-        self.project_name = anchor.name
-        self.project_path = anchor.local
-
-
-class CacheAsBFObject(BaseNode):
-    def __init__(self, cache):
-        self.cache = cache
-        self.id = cache.id
-        self.cache.meta
-
-    @property
-    def name(self):
-        return self.cache.name
-
-    @property
-    def parent(self):
-        parent_cache = self.cache.parent #.local.parent.cache
-        if parent_cache is not None:
-            return self.__class__(parent_cache)
-
-    @property
-    def parents(self):
-        parent = self.parent
-        while parent:
-            yield parent
-            parent = parent.parent
-
-    def __iter__(self):
-        for c in self.cache.local.children:
-            cache = c.cache
-            if cache.is_dataset():
-                child = CacheAsDataset(cache)
-            elif cache.is_organization():
-                child = CacheAsOrganization(cache)
-            elif cache.is_dir():
-                child = CacheAsCollection(cache)
-            elif cache.is_broken_symlink():
-                child = CacheAsFile(cache)
-
-            yield child
-
-    @property
-    def members(self):
-        return []
-
-
-class CacheAsFile(CacheAsBFObject, File): pass
-class CacheAsCollection(CacheAsBFObject, Collection): pass
-class CacheAsDataset(CacheAsBFObject, Dataset):
-    """ yep, this is getting called way down inside added
-        in the extras pipeline :/ """
-    doi = None
-    status = 'FAKE STATUS ;_;'
-    @property
-    def created_at(self): return self.cache.meta.created
-    @property
-    def updated_at(self): return self.cache.meta.updated
-    @property
-    def owner_id(self): return self.cache.meta.user_id
-class CacheAsOrganization(CacheAsBFObject, Organization): pass
+(FakeBFLocal, CacheAsBFObject, CacheAsFile,
+ CacheAsCollection, CacheAsDataset, CacheAsOrganization
+ ) = make_bf_cache_as_classes(BaseNode, File, Collection, Dataset, Organization)

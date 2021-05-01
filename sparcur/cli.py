@@ -556,7 +556,7 @@ class Main(Dispatcher):
                 self._setup_bfl()
             except BaseException as e:
                 if self.options.local:
-                    from sparcur.blackfynn_api import FakeBFLocal
+                    from sparcur.pennsieve_api import FakeBFLocal
                     log.exception(e)
                     self.Remote._api = FakeBFLocal(self.anchor.id, self.anchor)
                     self.Remote.anchorTo(self.anchor)
