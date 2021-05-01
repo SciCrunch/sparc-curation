@@ -1,11 +1,12 @@
 import unittest
 import pytest
 import idlib
-from sparcur.utils import BlackfynnId
+from sparcur.utils import BlackfynnId, PennsieveId
 
 
 class TestBlackfynnId(unittest.TestCase):
 
+    _id_class = BlackfynnId
     uuids = (('e4d16d59-c963-4d9c-af2f-2e40853881c3', 'package'),)
     cases = (
                      'package:e4d16d59-c963-4d9c-af2f-2e40853881c3',
@@ -23,7 +24,7 @@ class TestBlackfynnId(unittest.TestCase):
     )
 
     def test_regex(self):
-        compiled = BlackfynnId.compiled
+        compiled = self._id_class.compiled
         [x.match(u).groups()
            for x, u in ((compiled[x][0], i)
                         for x, i in zip((0,1,3,3,3,3,4,4,4,4,4,4,),
@@ -33,24 +34,34 @@ class TestBlackfynnId(unittest.TestCase):
     def test_uuid(self):
         ids = []
         for uuid, type in self.uuids:
-            id = BlackfynnId(uuid, type=type)
+            id = self._id_class(uuid, type=type)
             ids.append(id)
 
     def test_id(self):
         ids = []
         for string in self.cases:
-            id = BlackfynnId(string)
+            id = self._id_class(string)
             ids.append(id)
 
     @pytest.mark.skip('TODO')
     def test_roundtrip(self):
-        pass
+        # TODO need some way to get/store other component identifiers
+        # but tricky when there are 3 identifiers in a single uri
+        humans = [case for case in self.cases if 'app.' in case]
+        for id_str in humans:
+            id = self._id_class(id_str)
+            assert id.id in id.uri_human()
 
     def test_fail_rx(self):
         # TODO bads with edge cases
         try:
-            BlackfynnId('lol not an bfid')
+            self._id_class('lol not an bfid')
             assert False, 'should have failed'
         except idlib.exc.MalformedIdentifierError as e:  # FIXME malformed id error?
             pass
 
+
+class TestPennsieveId(TestBlackfynnId):
+
+    _id_class = PennsieveId
+    cases = tuple([c.replace('blackfynn', 'pennsieve') for c in TestBlackfynnId.cases])
