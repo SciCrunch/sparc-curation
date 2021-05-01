@@ -1,3 +1,17 @@
+import os
+if 'PENNSIEVE_LOG_LEVEL' not in os.environ:
+    # silence agent import warning
+    os.environ['PENNSIEVE_LOG_LEVEL'] = 'CRITICAL'
+from pennsieve import log as _pnlog
+# blackfynn.log sets logging.basicConfig which pollutes logs from
+# other programs that are sane and do not use the root logger
+# so we have to undo the damage done by basic config here
+# we add the sparcur local handlers back in later
+from sparcur.utils import log, silence_loggers
+for __pnlog in (_pnlog.get_logger(), _pnlog.get_logger("pennsieve.agent")):
+    silence_loggers(__pnlog)
+    __pnlog.addHandler(log.handlers[0])
+
 from pennsieve import Pennsieve, DataPackage, BaseNode
 from pennsieve import Organization, Dataset, Collection, File
 from pennsieve import base as pnb
