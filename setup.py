@@ -1,11 +1,12 @@
 import re
 import os
+import sys
 from pathlib import Path
 from setuptools import setup
 
 
 def find_version(filename):
-    _version_re = re.compile(r"__version__ = '(.*)'")
+    _version_re = re.compile(r"__version__ = ['\"](.*)['\"]")
     for line in open(filename):
         version_match = _version_re.match(line)
         if version_match:
@@ -15,22 +16,32 @@ def find_version(filename):
 __version__ = find_version('sparcur/__init__.py')
 
 
-def do_emacs_things():
-    'emacs -q -batch -L . --no-site-file --load org --load ob-shell'
-    ['emacs',
-     '--batch',
-     '--no-init-file',
-     '--no-site-file',
-     '--directory', '.',
-     '--load', 'org',
-     '--load', 'ob-shell',
-     '--load', 'ob-python',
-     '--eval', '(org-babel-tangle-file "docs/developer-guide.org")',
-     ]
+def tangle_files(*files):
+    """ emacs org babel tangle blocks to files for release """
 
+    argv = [
+        'emacs',
+        '--batch',
+        '--quick',
+        '--directory', '.',
+        '--load', 'org',
+        '--load', 'ob-shell',
+        '--load', 'ob-python',
+     ] + [arg
+          for f in files
+          for arg in ['--eval', f'"(org-babel-tangle-file \\"{f}\\")"']]
+
+    os.system(' '.join(argv))
 
 with open('README.md', 'rt') as f:
     long_description = f.read()
+
+RELEASE = '--release' in sys.argv
+if RELEASE:
+    sys.argv.remove('--release')
+
+    tangle_files(
+        './docs/developer-guide.org',)
 
 tests_require = ['pytest', 'pytest-runner']
 setup(name='sparcur',
@@ -51,13 +62,14 @@ setup(name='sparcur',
           'Programming Language :: Python :: 3.9',
       ],
       keywords='SPARC curation biocuration ontology blackfynn protc protocols hypothesis',
-      packages=['sparcur', 'sparcur.export'],
+      packages=['sparcur', 'sparcur.export', 'sparcur.simple'],
       python_requires='>=3.6',
       tests_require=tests_require,
       install_requires=[
           'augpathlib>=0.0.21',
           'beautifulsoup4',
-          'blackfynn>=3.0.0',
+          #'blackfynn>=3.0.0',
+          'pennsieve',
           'dicttoxml',
           'idlib>=0.0.1.dev8',
           "ipython; python_version < '3.7'",
