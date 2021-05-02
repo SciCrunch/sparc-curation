@@ -51,13 +51,6 @@ class RemoteHelper:
         assert root.id == self.Remote.root
 
 
-@pytest.mark.skip('Deprecated and no longer needed.')
-class TestBlackfynnRemote(RemoteHelper, unittest.TestCase):
-
-    _remote_class = BlackfynnRemote
-    _cache_class = BFC
-
-
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestPennsieveRemote(RemoteHelper, unittest.TestCase):
 
