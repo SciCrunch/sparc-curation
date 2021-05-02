@@ -1,12 +1,33 @@
-from collections import defaultdict
 from functools import wraps
+from collections import defaultdict
+from urllib.parse import quote
 import idlib
-from pyontutils.sheets import Sheet
+from pyontutils.sheets import Sheet as SheetBase
 from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
-from urllib.parse import quote
+from sparcur.config import auth
 
 # google sheets
+
+class Sheet(SheetBase):
+
+    def __init__(self, *args, **kwargs):
+        try:
+            if 'readonly' not in kwargs or kwargs['readonly']:
+                # readonly=True is default so we take this branch if not set
+                self._saf = auth.get_path(
+                    'google-api-service-account-file-readonly')
+            else:
+                self._saf = auth.get_path(
+                    'google-api-service-account-file-rw')
+        except Exception as e:
+            log.exception(e)
+
+        try:
+            super().__init__(*args, **kwargs)
+        finally:
+            self._saf = None
+
 
 # master
 class Master(Sheet):
@@ -645,3 +666,13 @@ def mkval_pu(cell):
     else:
         logd.warning(f'unhandled value {cell.value}')
         return cell.value
+
+
+def main():
+    # simple testing
+    o = Organs()
+    print(o.values[0])
+
+
+if __name__ == '__main__':
+    main()
