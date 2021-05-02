@@ -124,13 +124,13 @@ class Integrator(PathData, OntologyData):
             log.critical('no google no organ data')
             cls.organs_sheet = FakeOrganSheet
             cls.affiliations = FakeAffilSheet()
-            cls.overview_sheet = FakeOverviewSheet()
+            #cls.overview_sheet = FakeOverviewSheet()
         else:
             # ipv6 resolution issues :/ also issues with pickling
             #cls.organs_sheet = sheets.Organs(fetch_grid=True)  # this kills parallelism
             cls.organs_sheet = sheets.Organs()  # if fetch_grid = False @ class level ok
             cls.affiliations = sheets.Affiliations()
-            cls.overview_sheet = sheets.Overview()
+            #cls.overview_sheet = sheets.Overview()
 
             # zap all the services (apparently doesn't help)
             # yep, its just the organ sheet, these go in and out just fine

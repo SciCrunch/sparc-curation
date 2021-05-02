@@ -670,3 +670,7 @@ class LocId:
     def __init__(self, id, type):
         self.id = id
         self.type = type
+        self.curie = id  # FIXME depends on how id was generated
+        sysid, path = id.split(':', 1)
+        self.uri_api = 'file://' + path
+        self.uri_human = self.uri_api

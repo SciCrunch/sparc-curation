@@ -226,7 +226,7 @@ class TestMkdirRemote(_TestOperation, unittest.TestCase):
 
     def test_mkdir_remote_parents_false(self):
         now = GetTimeNow()
-        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP}' / 'some-folder'
+        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP_LOCAL_FRIENDLY}' / 'some-folder'
         try:
             remote = local.mkdir_remote()
             raise AssertionError('Should have failed since parents=False')
@@ -235,7 +235,7 @@ class TestMkdirRemote(_TestOperation, unittest.TestCase):
 
     def test_0_mkdir_remote_will_be_dataset(self):
         now = GetTimeNow()
-        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP}'
+        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP_LOCAL_FRIENDLY}'
         remote = local.mkdir_remote()
         remote.rmdir()
         remote.cache.refresh()  # reminder that remotes are a snapshot in time, NOT dynamic
@@ -243,7 +243,7 @@ class TestMkdirRemote(_TestOperation, unittest.TestCase):
 
     def test_1_mkdir_remote_will_be_collection(self):
         now = GetTimeNow()
-        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP}' / 'some-folder'
+        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP_LOCAL_FRIENDLY}' / 'some-folder'
         remote = local.mkdir_remote(parents=True)
         parent = remote.parent
         try:

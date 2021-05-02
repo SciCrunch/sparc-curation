@@ -106,7 +106,15 @@ class Header:
                     for n, h in zip(original, original)}
 
 
-class DatasetMetadata(Path, HasErrors):
+class DatasetMetadata(HasErrors):
+
+    def __init__(self, path):
+        self._path = path
+        self.cache = path.cache
+        self.name = path.name
+        # XXX transitive updated is not entirely necessary anymore since the
+        # dataset updated date is bumped on any transitive modification
+        self.updated_cache_transitive = path.updated_cache_transitive
 
     @property
     def data(self):
@@ -132,29 +140,45 @@ class DatasetMetadata(Path, HasErrors):
                         ))
 
 
-DatasetMetadata._bind_flavours()
-
-
-class DatasetStructure(Path):
+class DatasetStructure:
     sections = None  # NOTE assigned in at end of file
     rglobs = 'manifest',
     default_glob = 'glob'
     max_childs = None  # 40 was used when we didn't have sparse pulls
     rate = 8  # set by Integrator from cli
     _refresh_on_missing = True
+    _classes = {}
 
-    def __new__(cls, *args, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
+    def _newimpl(cls, path):
+        apc = path.__class__._AugmentedPath__abstractpath
+        if apc not in cls._classes:
+            # keep classes 1:1 with the types of paths so that equality works correctly
+            # mro issues with specialized paths instead of the base
+            newcls = type(cls.__name__ + apc.__name__, (cls, apc),
+                          #cls.__dict__,
+                          dict(__new__=apc.__new__,
+                               __repr__=apc.__repr__,
+                               )
+                          )
+            newcls._bind_flavours(pos_helpers=(HasErrors,), win_helpers=(HasErrors,))
+            cls._classes[apc] = newcls
+
+        nc = cls._classes[apc]
+        return nc(path)
+
+    def __new__(cls, path):
+        return cls._newimpl(cls, path)
 
     _renew = __new__
 
-    def __new__(cls, *args, **kwargs):
-        DatasetStructure._setup(*args, **kwargs)
+    def __new__(cls, path):
+        DatasetStructure._setup()
         DatasetStructure.__new__ = DatasetStructure._renew
-        return super().__new__(cls, *args, **kwargs)
+
+        return cls._newimpl(cls, path)
 
     @staticmethod
-    def _setup(*args, **kwargs):
+    def _setup():
         import requests
         DatasetStructure._requests = requests
 
@@ -466,8 +490,16 @@ class DatasetStructure(Path):
         return dict(dd)
 
 
-class ObjectPath(Path):
+class ObjectPath:
+
     obj = None
+    _classes = {}
+
+    _newimpl = DatasetStructure._newimpl
+
+    def __new__(cls, path):
+        return cls._newimpl(cls, path)
+
     @property
     def object(self):
         return self.obj(self)
@@ -477,9 +509,6 @@ class ObjectPath(Path):
             YOU ARE REALLY SURE """  # sigh
 
         return self.obj(self, template_schema_version)
-
-
-ObjectPath._bind_flavours()
 
 
 class Tabular(HasErrors):
@@ -743,6 +772,12 @@ class Tabular(HasErrors):
             out += ' ' + path.cache.dataset.name[:30] + ' ...'
 
         return out
+
+    def __write(self, path, format='csv'):
+        # FIXME this isn't actually useful because we already have the file in question
+        with open(path, 'wt') as f:
+            writer = csv.writer(f)
+            writer.writerows(self)
 
     def __repr__(self):
         limit = 30
@@ -1269,9 +1304,6 @@ class SubmissionFilePath(ObjectPath):
     obj = SubmissionFile
 
 
-SubmissionFilePath._bind_flavours()
-
-
 class CodeDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     renames_header = {'description': 'description_header'}
@@ -1282,9 +1314,6 @@ class CodeDescriptionFile(MetadataFile):
 
 class CodeDescriptionFilePath(ObjectPath):
     obj = CodeDescriptionFile
-
-
-CodeDescriptionFilePath._bind_flavours()
 
 
 _props = sc.DatasetDescriptionSchema.schema['properties']
@@ -1340,9 +1369,6 @@ class DatasetDescriptionFilePath(ObjectPath):
     obj = DatasetDescriptionFile
 
 
-DatasetDescriptionFilePath._bind_flavours()
-
-
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
 _props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
 _props3 = sc._software_schema['items']['properties']
@@ -1385,9 +1411,6 @@ class SubjectsFile(MetadataFile):
 
 class SubjectsFilePath(ObjectPath):
     obj = SubjectsFile
-
-
-SubjectsFilePath._bind_flavours()
 
 
 def join_cast(sep):
@@ -1436,9 +1459,6 @@ class SamplesFile(SubjectsFile):
 
 class SamplesFilePath(ObjectPath):
     obj = SamplesFile
-
-
-SamplesFilePath._bind_flavours()
 
 
 # TODO when we need them ?
@@ -1513,9 +1533,6 @@ class ManifestFilePath(ObjectPath):
     obj = ManifestFile
 
 
-ManifestFilePath._bind_flavours()
-
-
 # XXX NOTE *_file is added to all of these keys in DatasetStructure.data
 DatasetStructure.sections = {'submission': SubmissionFilePath,
                              'code_description': CodeDescriptionFilePath,
@@ -1526,4 +1543,3 @@ DatasetStructure.sections = {'submission': SubmissionFilePath,
 
 DatasetStructure._bind_sections()
 DatasetStructure._pipeline_stage = DatasetStructure.__name__
-DatasetStructure._bind_flavours(pos_helpers=(HasErrors,), win_helpers=(HasErrors,))

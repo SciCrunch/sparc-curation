@@ -14,6 +14,8 @@
       'BLACKFYNN_ORGANIZATION PENNSIEVE_ORGANIZATION REMOTE_ORGANIZATION'},
   'remote-backoff-factor': {'default': 1,
                             'environment-variables': 'BLACKFYNN_BACKOFF_FACTOR'},
+  'google-api-service-account-file-readonly': None,
+  'google-api-service-account-file-rw': None,
   'hypothesis-api-key': {'environment-variables': 'HYP_API_KEY HYP_API_TOKEN'},
   'hypothesis-group': {'environment-variables': 'HYP_GROUP'},
   'hypothesis-user': {'environment-variables': 'HYP_USER'},

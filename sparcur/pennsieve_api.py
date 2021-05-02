@@ -54,6 +54,7 @@ FakeBFile, _packages = monkey.bind_packages_File(File)
 # monkey patches
 
 Dataset._dp_class = DataPackage
+Dataset.delete = monkey.Dataset_delete
 Dataset.meta = monkey.Dataset_meta
 Dataset.packagesByName = monkey.packagesByName
 Dataset.packageTypeCounts = monkey.packageTypeCounts

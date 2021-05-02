@@ -619,7 +619,7 @@ class Main(Dispatcher):
         # pull in additional graphs for query that aren't loaded properly
         RDFL = oq.plugin.get('rdflib')
         olr = Path(pauth.get_path('ontology-local-repo'))
-        branch = 'methods'
+        branch = 'origin/methods'
         for fn in ('methods', 'methods-helper', 'methods-core'):
             org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
             OntTerm.query.ladd(RDFL(org.graph, OntId))
@@ -1295,7 +1295,19 @@ done"""
                         update_cache=True, update_data=fetch, size_limit_mb=limit)
                                    for path in paths)
                 elif fetch:
-                    Async(rate=hz)(deferred(path.cache.fetch)(
+                    def wrap(path):
+                        def inner(*args, **kwargs):
+                            try:
+                                return path.cache.fetch(*args, **kwargs)
+                            except Exception as e:
+                                log.exception(e)
+                                msg = f'Problem with path!\n{path}'
+                                log.critical(msg)
+                                raise e
+
+                        return inner
+
+                    Async(rate=hz)(deferred(wrap(path))(
                         size_limit_mb=limit)
                                    for path in paths)
 

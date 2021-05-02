@@ -3,7 +3,6 @@ import atexit
 import shutil
 from tempfile import gettempdir
 from pathlib import PurePosixPath
-from datetime import datetime
 import pytest
 from augpathlib import PathMeta
 from augpathlib.utils import onerror_windows_readwrite_remove

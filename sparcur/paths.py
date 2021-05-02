@@ -375,32 +375,32 @@ class BlackfynnCache(PrimaryCache, EatCache):
         # FIXME this is going to be very slow due to the local.cache call overhead
         # it will be much better implement this from Path directly using xattrs()
         d = self.dataset
-        _, bf_ds_id = d.id.split(':', 1)  # split off the N:
         l = self.local
         drp = l.relative_to(d.local)
         meta = self.meta  # TODO see what we need from this
-        _, bf_id = self.id.split(':', 1)  # FIXME SODA use case
-        uri_api = self.uri_api  # FIXME vs self.uri_api_package ?
-        uri_human = self.uri_human
         blob = {
             'type': 'path',
-            'dataset_id': bf_ds_id,
+            'dataset_id': d.identifier.curie,
             'dataset_relative_path': drp,
-            'uri_api': uri_api,  # -> @id in the @context
-            'uri_human': uri_human,
-            'remote_id': (f'{bf_id}/files/{meta.file_id}'  # XXX a horrible hack, but it kinda works
-                          if self.is_file() or self.is_broken_symlink() else
-                          bf_id),
+            'uri_api': self.uri_api,  # -> @id in the @context
+            'uri_human': self.uri_human,
             }
-            # FIXME N:package:asdf is nasty for jsonld but ...
-            # yes the bf_id will have to be parsed to know what
-            # endpoint to send it to ... yay for scala thinking amirite !? >_<
-            # but at least for this particular structure it
+        if hasattr(self, '_remote_class'):  # FIXME hack to detect CacheL cases
+            blob['remote_id'] = (
+                # XXX a horrible hack, but it kinda works
+                f'{self.identifier.curie}/files/{meta.file_id}'
+                if self.is_file() or self.is_broken_symlink() else
+                self.identifier.curie)
 
-            # NOTE packages are collections of size 1 > more
-            # and and when they happend to have only a single
-            # member they are conflated with the single file
-            # they contain
+        # FIXME N:package:asdf is nasty for jsonld but ...
+        # yes the bf_id will have to be parsed to know what
+        # endpoint to send it to ... yay for scala thinking amirite !? >_<
+        # but at least for this particular structure it
+
+        # NOTE packages are collections of size 1 > more
+        # and and when they happend to have only a single
+        # member they are conflated with the single file
+        # they contain
 
         if meta.checksum is not None:
             blob['checksums'] = [{'type': 'checksum',
@@ -488,6 +488,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                     self.readlink().parts[1])
         except OSError as e:
             raise exc.NoCachedMetadataError(self) from e
+
+    @property
+    def cache_identifier(self):
+        return self._cache_class._id_class(self.cache_id)
 
     @property
     def rchildren_dirs(self):
@@ -611,12 +615,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         drp = self.relative_path_from(dataset_path)  # FIXME ...
 
 
-        # XXX FIXME handle case where there is no cache
-        _, bf_ds_id = dataset_path.cache_id.split(':', 1)  # split off the N:
+        dsid = dataset_path.cache_identifier
 
         blob = {
             'type': 'path',
-            'dataset_id': bf_ds_id,
+            'dataset_id': dsid.curie,
             'dataset_relative_path': drp,
             'basename': self.name,  # for sanity's sake
         }
@@ -966,12 +969,14 @@ Path._bind_flavours()
 register_type(Path, 'path')
 
 
-class CacheL(aug.caches.ReflectiveCache):
+class CacheL(aug.caches.ReflectiveCache, EatCache):
 
     _id_class = LocId
 
     _asserted_anchor = None
     _dataset_dirs = []
+
+    _jsonMetadata = BlackfynnCache._jsonMetadata
 
     def _type(self):
         if self.is_file():
@@ -992,6 +997,14 @@ class CacheL(aug.caches.ReflectiveCache):
     @property
     def identifier(self):
         return self._id_class(self.id, self._type())
+
+    @property
+    def uri_api(self):
+        return self.identifier.uri_api
+
+    @property
+    def uri_human(self):
+        return self.identifier.uri_human
 
     @property
     def anchor(self):
