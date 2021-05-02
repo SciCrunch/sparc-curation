@@ -1526,19 +1526,10 @@ done"""
             return nall
 
     def apinat(self):
+        from pyontutils.core import populateFromJsonLd, OntGraph
         path_in = Path(self.options.path_in)
         path_out = Path(self.options.path_out)
-        with open(path_in) as f:
-            resource_map = json.load(f)
-
-        if path_in.suffix == '.json':
-            from sparcur import apinat
-            agraph = apinat.Graph(resource_map)
-            graph = agraph.graph() # FIXME broken in some config space?
-            graph.write(path=path_out)
-        elif path_in.suffix == '.jsonld':
-            from pyontutils.core import populateFromJsonLd, OntGraph
-            g = populateFromJsonLd(OntGraph(), path_in).write(path=path_out)
+        g = populateFromJsonLd(OntGraph(), path_in).write(path=path_out)
 
     def rmeta(self, use_cache_path=False, exist_ok=False):
         from pyontutils.utils import Async, deferred

@@ -15,7 +15,6 @@ from pyontutils.closed_namespaces import rdf, rdfs, owl
 from protcur import document as ptcdoc
 from protcur.analysis import protc
 import sparcur
-from sparcur import apinat
 from sparcur import mapping
 from sparcur import schemas as sc
 from sparcur import datasets as dat
@@ -878,37 +877,6 @@ class RdfPipeline(ExportPipeline):
     @property
     def data(self):
         return self.graph
-
-
-hasSchema = sc.HasSchema()
-@hasSchema.mark
-class ApiNATOMY(JSONPipeline):
-
-    previous_pipeline_classes = LoadJSON,
-
-    #@hasSchema(sc.ApiNATOMYSchema, fail=True)  # resourceMap fails
-    @hasSchema(sc.ApiNATOMYSchema)
-    def data(self):
-        return self.pipeline_start
-
-
-# TODO register export pipelines with the json endpoint pipeline?
-# is one way to solve this problem
-class ApiNATOMY_rdf(RdfPipeline):
-
-    converter_class = lambda self, a, b: apinat.Graph(a)
-
-    @property
-    def id(self):
-        mid = self.pipeline_start['id'].replace(' ', '-')
-        return mid
-        # FIXME this seems wrong ...
-        # the pipelines are separate from the objects they manipulate or output
-        return self._pipeline_start.object.id
-
-    @property
-    def triples_header(self):
-        yield from tuple()
 
 
 class LoadIR(JSONPipeline):
