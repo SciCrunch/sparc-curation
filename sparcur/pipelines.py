@@ -98,7 +98,7 @@ class DatasourcePipeline(Pipeline):
     """ pipeline that sources complex data from somewhere else """
 
 
-class BlackfynnDatasetDataPipeline(DatasourcePipeline):
+class RemoteDatasetDataPipeline(DatasourcePipeline):
 
     def __init__(self, previous_pipeline, lifters, runtime_context):
         # FIXME super convoluted and also just a bad way to detect if
@@ -109,9 +109,19 @@ class BlackfynnDatasetDataPipeline(DatasourcePipeline):
         self._no_remote = runtime_context.path.cache.meta.updated is None
 
         self.dataset_id = previous_pipeline.data['id']
-        if not hasattr(self.__class__, 'BlackfynnDatasetData'):
-            from sparcur.backends import BlackfynnDatasetData
-            self.__class__.BlackfynnDatasetData = BlackfynnDatasetData
+        if not hasattr(self.__class__, 'RemoteDatasetData'):
+            if lifters.remote == 'pennsieve':
+                from sparcur.backends import PennsieveDatasetData as RDD
+
+            elif lifters.remote == 'local':
+                from sparcur.backends import LocalDatasetData as RDD
+
+            elif lifters.remote == 'blackfynn':  # deprecated but kept just in case
+                from sparcur.backends import BlackfynnDatasetData as RDD
+            else:
+                raise ValueError(f'unknown remote type {lifters.remote}')
+
+            self.__class__.RemoteDatasetData = RDD
 
     @property
     def data(self):
@@ -119,7 +129,7 @@ class BlackfynnDatasetDataPipeline(DatasourcePipeline):
             return {}
             #raise exc.NotUploadedToRemoteYetError(self.dataset_id)
 
-        bdd = self.BlackfynnDatasetData(self.dataset_id)
+        bdd = self.RemoteDatasetData(self.dataset_id)
         try:
             return bdd.fromCache()
         except FileNotFoundError as e:
@@ -1090,6 +1100,7 @@ class SDSPipeline(JSONPipeline):
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
     adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],
             [['prov', 'sparcur_version'], lambda _: sparcur.__version__],
+            [['prov', 'remote'], lambda lifters: lifters.remote],
             ]
 
     __filerp = aug.RepoPath(__file__)
@@ -1220,8 +1231,8 @@ class PipelineExtras(JSONPipeline):
     previous_pipeline_classes = SDSPipeline,
 
     subpipelines = (
-        [[[['id'], ['id']]],
-         BlackfynnDatasetDataPipeline,
+        [[[['id'], ['id']]],  # TODO feed in meta so we can populate LocalDatasetData
+         RemoteDatasetDataPipeline,
          ['inputs', 'remote_dataset_metadata']],
 
         [[[['id'], ['id']]],  # TODO need to know in which datasets to do which filetypes

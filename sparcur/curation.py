@@ -9,7 +9,7 @@ from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT
 from sparcur.core import adops, OntTerm, JEncode
-from sparcur.paths import Path, BlackfynnCache
+from sparcur.paths import Path, BlackfynnCache, CacheL
 from sparcur.state import State
 from sparcur.utils import log, fromJson, register_type
 from sparcur import schemas as sc
@@ -213,6 +213,7 @@ class Integrator(PathData, OntologyData):
         class Lifters:  # do this to prevent accidental data leaks
             # context
             id = dsc.id  # in case we are somewhere else
+            remote = self.path._cache_class._remote_class._remote_type
             timestamp_export_start = timestamp
             #folder_name = dsc.name
             #uri_api = dsc.uri_api
@@ -568,7 +569,7 @@ class Summary(Integrator, ExporterSummarizer):
             helpers.update({
                 'organs_sheet': self.organs_sheet,
                 'affiliations': self.affiliations,
-                'overview_sheet': self.overview_sheet,
+                #'overview_sheet': self.overview_sheet,
             })
 
             #self.organs_sheet.fetch_grid = False  # does not solve the issue by itself
@@ -655,7 +656,8 @@ def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
     if helpers is not None:
         d.add_helpers(helpers)
 
-    out_path = (dp / d.id).with_suffix('.json')
+    did = d.id if '/' not in d.id else d.id.replace('/', '-')  # XXXXXXXXXXXXX FIXME local remote case
+    out_path = (dp / did).with_suffix('.json')
     if out_path.exists() and dumb:
         if not evil[0]:  # FIXME this is SO DUMB to do in here, but ...
             from pysercomb.pyr import units as pyru

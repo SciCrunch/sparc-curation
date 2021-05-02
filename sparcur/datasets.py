@@ -108,13 +108,14 @@ class Header:
 
 class DatasetMetadata(HasErrors):
 
-    def __init__(self, path):
+    def __init__(self, path, template_schema_version=None):
         self._path = path
         self.cache = path.cache
         self.name = path.name
         # XXX transitive updated is not entirely necessary anymore since the
         # dataset updated date is bumped on any transitive modification
         self.updated_cache_transitive = path.updated_cache_transitive
+        self.template_schema_version = template_schema_version
 
     @property
     def data(self):
@@ -149,7 +150,7 @@ class DatasetStructure:
     _refresh_on_missing = True
     _classes = {}
 
-    def _newimpl(cls, path):
+    def _newimpl(cls, path, *args, **kwargs):
         apc = path.__class__._AugmentedPath__abstractpath
         if apc not in cls._classes:
             # keep classes 1:1 with the types of paths so that equality works correctly
@@ -166,12 +167,12 @@ class DatasetStructure:
         nc = cls._classes[apc]
         return nc(path)
 
-    def __new__(cls, path):
+    def __new__(cls, path, *args, **kwargs):
         return cls._newimpl(cls, path)
 
     _renew = __new__
 
-    def __new__(cls, path):
+    def __new__(cls, path, *args, **kwargs):
         DatasetStructure._setup()
         DatasetStructure.__new__ = DatasetStructure._renew
 

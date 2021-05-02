@@ -12,6 +12,7 @@ from sparcur.config import auth
 
 class BlackfynnRemote(aug.RemotePath):
 
+    _remote_type = 'blackfynn'
     _id_class = BlackfynnId
     _api_class = None  # set in _setup
     _async_rate = None
@@ -1512,6 +1513,24 @@ class RemoteDatasetData:
         return blob
 
 
+class LocalDatasetData(RemoteDatasetData):
+    """ confusingly ... """
+
+    data = None
+
+    def __init__(self, *args, **kwargs):
+        # TODO source self.data from the metadata sheets and then all
+        # we have to do is invert the function to post the data back
+        # to the api endpoints
+        self.data = {}
+
+    def fromCache(self):
+        return self.data
+
+    def __call__(self):
+        return self.data
+
+
 class BlackfynnDatasetData(RemoteDatasetData):
 
     cache_base = RemoteDatasetData.cache_path / 'blackfynn-meta'
@@ -1529,6 +1548,7 @@ class BlackfynnDatasetData(RemoteDatasetData):
 
 class PennsieveRemote(BlackfynnRemote):
 
+    _remote_type = 'pennsieve'
     _id_class = PennsieveId
     _base_uri_human = 'https://app.pennsieve.io'  # FIXME hardcoded
     _base_uri_api = 'https://api.pennsieve.io'  # FIXME hardcoded

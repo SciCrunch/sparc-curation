@@ -27,8 +27,8 @@ prefix_endswith = ['/', '#', '_', '-', ':', '=',
 base_context = {
     '@version': 1.1,
     'id': '@id',
-    'dataset': {'@id': 'https://api.blackfynn.io/datasets/N:dataset:', '@prefix': True},  # FIXME -> pennsieve
-    'package': {'@id': 'https://api.blackfynn.io/packages/N:package:', '@prefix': True},  # FIXME -> pennsieve
+    'dataset': {'@id': 'https://api.pennsieve.io/datasets/N:dataset:', '@prefix': True},  # FIXME -> pennsieve
+    'package': {'@id': 'https://api.pennsieve.io/packages/N:package:', '@prefix': True},  # FIXME -> pennsieve
     # @base and _bfc are added at runtime and are dataset:{dataset-id-suffix}
     'meta': '@graph',
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
@@ -36,7 +36,7 @@ base_context = {
     'samples': 'TEMP:hasSubGraph',  #'_bfc:#samples-graph',
     #'contributors': '_bfc:#contributors-graph',  # FIXME broken I think
     'contributors': 'TEMP:hasSubGraph',  # FIXME broken I think
-    #'N:dataset': {'@id': 'https://api.blackfynn.io/datasets/'},  # darn it multiprefix issues
+    #'N:dataset': {'@id': 'https://api.pennsieve.io/datasets/'},  # darn it multiprefix issues
     **{p: {'@id': n, '@prefix': True}
        if [c for c in prefix_endswith if n.endswith(c)]
        else n for p, n in {**uPREFIXES, **OntCuries._dict}.items()
@@ -1043,7 +1043,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
                 }
             },
             'related_identifiers' : {
-                'type': 'list',
+                'type': 'array',
                 'items': {
                     'type': 'object',
                     'properties': {
@@ -1603,11 +1603,11 @@ class MetaOutExportSchema(JSONSchema):
                                        'context_value': 'TEMP:contentsWereUpdatedAtTime',
                                        },
         'uri_human': {'type': 'string',
-                      'pattern': r'^https://app\.blackfynn\.io/N:organization:',  # FIXME proper regex
+                      'pattern': r'^https://app\.pennsieve\.io/N:organization:',  # FIXME proper regex
                       'context_value': idtype('TEMP:hasUriHuman'),
         },
         'uri_api': {'type': 'string',
-                    'pattern': r'^https://api\.blackfynn\.io/(datasets|packages)/',  # FIXME proper regex
+                    'pattern': r'^https://api\.pennsieve\.io/(datasets|packages)/',  # FIXME proper regex
                     #'context_value': idtype('TEMP:hasUriApi'),
                     'context_value': idtype('@id'),
         },
@@ -1773,7 +1773,7 @@ class StatusSchema(JSONSchema):
                            'submission_errors', 'curation_errors'],
               'properties': {
                   'status_on_platform': {'type': 'object',  # NOTE becomes a json literal iirc
-                                         'context_value': 'TEMP:blackfynnPlatformStatus',
+                                         'context_value': 'TEMP:remotePlatformStatus',
                                          },
                   'submission_index': {'type': 'integer', 'minimum': 0,
                                        'context_value': inttype('TEMP:submissionIndex'),
@@ -1813,10 +1813,10 @@ class SummarySchema(JSONSchema):
                                       'properties': {'folder_name': {'type': 'string'},
                                                      # FIXME common source for these with MetaOutSchema
                                                      'uri_human': {'type': 'string',
-                                                                   'pattern': r'^https://app\.blackfynn\.io/N:organization:',
+                                                                   'pattern': r'^https://app\.pennsieve\.io/N:organization:',
         },
                                                      'uri_api': {'type': 'string',
-                                                                 'pattern': r'^https://api\.blackfynn\.io/organizations/N:organization:',
+                                                                 'pattern': r'^https://api\.pennsieve\.io/organizations/N:organization:',
                                                      },
                                                      'count': {'type': 'integer'},},},
                              'prov': {'type': 'object'},

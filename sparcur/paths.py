@@ -969,10 +969,24 @@ Path._bind_flavours()
 register_type(Path, 'path')
 
 
+class RemoteL:
+
+    _remote_type = 'local'
+    _cache_anchor = None
+
+    def __new__(cls, id, *args, **kwargs):
+        return PathL(id.split(':', 1)[1])
+
+    @classmethod
+    def anchorToCache(cls, cache, *args, **kwargs):
+        cls._cache_anchor = cache
+
+
 class CacheL(aug.caches.ReflectiveCache, EatCache):
 
     _id_class = LocId
 
+    _remote_class = RemoteL
     _asserted_anchor = None
     _dataset_dirs = []
 
