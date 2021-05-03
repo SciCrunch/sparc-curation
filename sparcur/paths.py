@@ -74,20 +74,14 @@ def cleanup(func):
     return inner
 
 
-class BlackfynnCache(PrimaryCache, EatCache):
+class BFPNCacheBase(PrimaryCache, EatCache):
 
-    xattr_prefix = 'bf'
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
 
     cypher = hashlib.sha256  # set the remote hash cypher on the cache class
 
     _suffix_mimetypes = suffix_mimetypes
-
-    uri_human = backends.BlackfynnRemote.uri_human
-    uri_api = backends.BlackfynnRemote.uri_api
-
-    _id_class = BlackfynnId
 
     @classmethod
     def decode_value(cls, field, value):
@@ -419,12 +413,23 @@ class BlackfynnCache(PrimaryCache, EatCache):
         return blob
 
 
+class BlackfynnCache(BFPNCacheBase, PrimaryCache, EatCache):
+
+    xattr_prefix = 'bf'
+
+    uri_human = backends.BlackfynnRemote.uri_human
+    uri_api = backends.BlackfynnRemote.uri_api
+
+    _id_class = BlackfynnId
+
+
 BlackfynnCache._bind_flavours()
 
 
-class PennsieveCache(BlackfynnCache):
+class PennsieveCache(BFPNCacheBase, PrimaryCache, EatCache):
 
     #xattr_prefix = 'pn'  # FIXME TODO we will likely need an xattr conversion fix
+    xattr_prefix = 'bf'
 
     uri_human = backends.PennsieveRemote.uri_human
     uri_api = backends.PennsieveRemote.uri_api
@@ -1093,4 +1098,4 @@ def bind_defaults(Remote, Cache):
 
 bind_defaults(backends.BlackfynnRemote, BlackfynnCache)
 # XXX supersedes the binding on BlackfynnRemote
-bind_defaults(backends.PennsieveRemote, BlackfynnCache)
+bind_defaults(backends.PennsieveRemote, PennsieveCache)
