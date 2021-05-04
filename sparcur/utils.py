@@ -115,6 +115,60 @@ def path_ir(path_or_string):
     return next(path_irs(path_or_string))
 
 
+def render_manifest(rows):
+    # FIXME checksum cypher
+    return [[filename.as_posix(),
+             isoformat(timestamp),
+             desc,
+             ft,
+             at,
+             checksum.hex() if checksum else checksum,]
+            for filename, timestamp, desc, ft, at, checksum in rows]
+
+
+def write_manifests(*args, parents=None, parents_rows=None, suffix='.csv',
+                    include_directories=False,):
+    header = ('filename', 'timestamp', 'description',  # FIXME no hardcode
+              'file type', 'additional types', 'checksum')
+    if parents is None and parents_rows is None:
+        raise TypeError('one of parents or parents_rows is required')
+    elif parents and parents_rows:
+        raise TypeError('at most one of parents or parents_rows is allowed')
+
+    if parents_rows:
+        parents = [p for p, r in parents_rows]
+
+    existing = []
+    for parent in parents:
+        manifest = parent / f'manifest{suffix}'
+        if manifest.exists():
+            existing.append(manifest)
+
+    if existing:  # TODO overwrite etc.
+        # FIXME TODO relative to some reference point
+        msg = f'Existing manifest files detected not writing!\n{existing}'
+        raise ValueError(msg)
+
+    if parents_rows is None:
+        parents_rows = [(path, path.generate_manifest())
+                        for path in parents]
+
+    manifests_rendered = []
+    if suffix == '.csv':  # FIXME deal with different suffixes
+        import csv
+        paths_rendered = [(path, render_manifest(manifest))
+                          for path, manifest in parents_rows]
+        for path, rendered in paths_rendered:
+            manifest = parent / f'manifest{suffix}'
+            manifests_rendered.append((manifest, rendered))
+            with open(manifest, 'wt') as f:
+                csv.writer(f).writerows([header] + rendered)
+    else:
+        raise NotImplementedError(f"Don't know how to export {suffix}")
+
+    return manifests_rendered
+
+
 def expand_label_curie(rows_of_terms):
     return [[value for term in rot for value in
              (term.label if term is not None else '',

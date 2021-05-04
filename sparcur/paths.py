@@ -23,14 +23,15 @@ suffix_mimetypes = {
     ('.jp2',): 'image/jp2',
 
     # sequencing
-    ('.fq',):          'application/fastq',  # wolfram lists chemical/seq-na-fastq which is overly semantic
-    ('.fq', '.gz'):    'application/x-gz-compressed-fastq',
-    ('.fastq',):       'application/fastq',
-    ('.fastq', '.gz'): 'application/x-gz-compressed-fastq',
-    ('.bam',):         'application/vnd.hts.bam',
+    ('.fq',):           'application/fastq',  # wolfram lists chemical/seq-na-fastq which is overly semantic
+    ('.fq', '.gz'):     'application/x-gz-compressed-fastq',
+    ('.fastq',):        'application/fastq',
+    ('.fastq', '.gz'):  'application/x-gz-compressed-fastq',
+    ('.fastq', '.bz2'): 'application/x-bzip-compressed-fastq',
+    ('.bam',):          'application/vnd.hts.bam',
 
-    ('.mat',):         'application/x-matlab-data',  # XXX ambiguous, depending on the matlab version
-    ('.m',):           'application/x-matlab',
+    ('.mat',):          'application/x-matlab-data',  # XXX ambiguous, depending on the matlab version
+    ('.m',):            'application/x-matlab',
 
     ('.nii',):       'image/nii',
     ('.nii', '.gz'): 'image/gznii',  # I'm not sure that I believe this
@@ -408,7 +409,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             blob['mimetype'] = mimetype
 
         if do_expensive_operations:
-            blob['magic_mimetype'] = asdf
+            blob['magic_mimetype'] = asdf  # FIXME NameError
 
         return blob
 
@@ -560,6 +561,45 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
         return Path._uri_human_bf(oid, None, did) + prefix + id
 
+    def manifest_record(self, manifest_parent_path):
+        filename = self.relative_path_from(manifest_parent_path)
+        description = None
+        filetype = self.mimetype  # TODO failover
+        additional_type = None  # TODO
+        if self.is_file():
+            meta = self.meta
+            # use updated because most file systems don't have a
+            # meaningful created time aka birthdate
+            timestamp = meta.updated
+            checksum = meta.checksum
+        else:
+            meta = self.cache.meta
+            timestamp = meta.created  # XXX created on remote platform time
+            checksum = None  # XXX avoid promulgating unchecked values
+
+        return (
+            filename,
+            timestamp,
+            description,
+            filetype,
+            additional_type,
+            checksum,
+        )
+
+    def generate_manifest(self, include_directories=False):
+        """ generate a tabular manifest of all contents of a directory
+            serialization is handled by the caller if it is required """
+
+        if not self.is_dir():
+            log.error('Can only generate manifests for directories!')
+            raise NotADirectoryError(self)
+
+        if include_directories:
+            return [c.manifest_record(self) for c in self.rchildren]
+        else:
+            return [c.manifest_record(self) for c in self.rchildren
+                    if not c.is_dir()]
+
     def _cache_jsonMetadata(self, do_expensive_operations=False):
         blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)
         project_meta = project_path.cache_meta
@@ -634,7 +674,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             blob['mimetype'] = mimetype
 
         if do_expensive_operations:
-            blob['magic_mimetype'] = asdf
+            blob['magic_mimetype'] = self._magic_mimetype
 
         if not (self.is_broken_symlink() or self.exists()):
             msg = f'Path does not exist! {self}'

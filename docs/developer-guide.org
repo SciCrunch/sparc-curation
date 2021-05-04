@@ -2273,9 +2273,15 @@ if __name__ == '__main__':
 from sparcur.config import auth
 __doc__ = f"""Common command line options for all sparcur.simple modules
 Usage:
+    sparcur-simple manifest  [options]  [<path>...]
+    sparcur-simple for-racket
     sparcur-simple [options] [<path>...]
     sparcur-simple [options] [--dataset-id=<ID>...]
     sparcur-simple [options] [--extension=<EXT>...] [<path>...]
+
+Commands:
+    manifest                        generate manifest files for path
+    for-racket                      print data for reading into Racket
 
 Options:
     -h --help                       show this
@@ -2301,8 +2307,8 @@ Options:
     --sparse-limit=N                package count that forces a sparse pull [default: {auth.get('sparse-limit')}]
     --symlink-objects-to=PATH       path to an existing objects directory
     --log-level=LEVEL               log level info [default: INFO]
-
-    --for-racket                    print data for reading into Racket
+    --open=PROGRAM                  show file with PROGRAM
+    --show                          show file with xopen
 """
 
 import os
@@ -2612,6 +2618,22 @@ def main(id=None, **kwargs):
         dsmeta = f"({_dsmeta})"
         # lab pi last name should be cached in some other way
         print(dsmeta)
+
+    if 'manifest' in kwargs and kwargs['manifest']:
+        from sparcur.utils import write_manifests
+        paths = kwargs['paths']
+        if not paths:
+            paths = [Path.cwd()]
+
+        manifests_rendered = write_manifests(parents=paths)
+        manifests, rendered = zip(*manifests_rendered)
+        nl = '\n'
+        print(f'generated manifests at:\n{nl.join([m.as_posix() for m in manifests])}')
+        if 'open' in kwargs and kwargs['open']:
+            cmd = kwargs['open']
+            [m.xopen(cmd) for m in manifests]
+        elif 'show' in kwargs and kwargs['show']:
+            [m.xopen() for m in manifests]
 
 
 if __name__ == '__main__':

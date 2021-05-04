@@ -253,6 +253,7 @@ class NormContributorRole(str):
     def normalize(cls, value):
         # a hilariously slow way to do this
         # also not really normalization ... more, best guess for what people were shooting for
+        # FIXME warn on this if it does not match so curators can see the value
         if value:
             best = sorted((cls.levenshteinDistance(value, v), v) for v in cls.values)[0]
             distance = best[0]
