@@ -38,10 +38,10 @@ OntCuries({'orcid':'https://orcid.org/',
            'pio.api': 'https://www.protocols.io/api/v3/protocols/',
 
            # FIXME -> pennsieve.io XXX and that is why you always embed the expansion rule
-           'dataset':'https://api.blackfynn.io/datasets/N:dataset:',
-           'collection':'https://api.blackfynn.io/collections/N:collection:',
-           'package':'https://api.blackfynn.io/packages/N:package:',
-           'user':'https://api.blackfynn.io/users/N:user:',
+           'dataset':'https://api.pennsieve.io/datasets/N:dataset:',
+           'collection':'https://api.pennsieve.io/collections/N:collection:',
+           'package':'https://api.pennsieve.io/packages/N:package:',
+           'user':'https://api.pennsieve.io/users/N:user:',
 
            'bibo': 'http://purl.org/ontology/bibo/',  # crossref
            'prism.basic': 'http://prismstandard.org/namespaces/basic/2.1/',  # crossref
