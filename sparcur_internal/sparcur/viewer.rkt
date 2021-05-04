@@ -15,6 +15,9 @@
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
 (define current-dataset (make-parameter #f))
+(define current-datasets (make-parameter #f))
+(define current-datasets-view (make-parameter #f))
+(define overmatch (make-parameter #f))
 (define python-interpreter (make-parameter
                             (find-executable-path
                              (case (system-type)
@@ -74,7 +77,7 @@
 (define (python-mod-args module-name . args)
   (cons (python-interpreter) (cons "-m" (cons module-name args))))
 
-(define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "--for-racket"))
+(define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "for-racket"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
 (define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--dataset-id" (dataset-id ds)))
 (define argv-spc-find-meta
@@ -115,6 +118,7 @@
       (λ () (read-json)))))
 
 (define (resolve-relative-path path)
+  ; FIXME path->complete-path I think
   ; FIXME for some reason resolve-path returns only the relative
   ; portion of the path !? not helpful ...
   ; FIXME this can fail with a weird error message
@@ -141,7 +145,8 @@
                          result))
                      )]
          [datasets (result->dataset-list result)])
-    (set-datasets! lview datasets) ; FIXME TODO have to store elsewhere for search so we
+    (current-datasets datasets)
+    (set-datasets-view! lview (current-datasets)) ; FIXME TODO have to store elsewhere for search so we
     result))
 
 (define (init-paths!)
@@ -289,7 +294,7 @@
        ; values if you want like in elisp or common lisp
        uuid))])
 
-(define (set-datasets! list-box datasets)
+(define (set-datasets-view! list-box datasets)
   (send/apply list-box set (apply map list (map lb-cols datasets)))
   (for ([ds datasets]
         [n (in-naturals)])
@@ -298,8 +303,8 @@
         (format lbt-refresh-datasets (length datasets))) ; XXX free variable on the button in question
   )
 
-(define (set-datasets*! list-box . datasets)
-  (set-datasets! list-box datasets))
+(define (set-datasets-view*! list-box . datasets)
+  (set-datasets-view! list-box datasets))
 
 (define (set-single-dataset! ds jview)
   #;
@@ -359,6 +364,8 @@
                  ; especially given that it is dynamically typed :/
                  #f))))))
 
+(define-syntax when-not (make-rename-transformer #'unless))
+
 (define (set-jview! jview json)
   "set the default state for jview"
   (define jhl (get-field json-hierlist jview))
@@ -373,12 +380,29 @@
   (define root (get-field root jhl))
   (send jhl sort json-list-item< #t) ; XXX this is also slow
   (send root open)
+  (define (by-name name items)
+    (let ([v (for/list ([i items]
+                        #:when (let ([ud (send i user-data)])
+                                 (and (eq? (node-data-type ud) 'hash)
+                                      (eq? (node-data-name ud) name))))
+               i)])
+      (and (not (null? v)) (car v))))
   (let ([ritems (send root get-items)])
+    (displayln (cons 'ritems ritems))
     (when (> (length ritems) 1) ; id alone is length 1
-      (define meta (cadr ritems)) ; usually works
-      (define submission (caddr (send root get-items))) ; usually works
-      (send meta open)
-      (send submission open))))
+      (map (λ (x)
+             (let ([ud (send x user-data)])
+               (when (and (eq? (node-data-type ud) 'hash)
+                          (memq (node-data-name ud) '(meta submission status)))
+                 (when-not (null? (send x get-items)) ; compound item
+                   (send x open))
+                 (when (eq? (node-data-name ud) 'status)
+                   (displayln (format "what the fuck ~s" (map (λ (i) (send i user-data)) (send x get-items))))
+                   (let ([per (by-name 'path_error_report (send x get-items))])
+                     (when per
+                       (send per open)
+                       ))))))
+           ritems))))
 
 ;; callbacks
 
@@ -414,8 +438,8 @@
   (displayln (list obj event (send event get-event-type)))
   (let* ([result (get-dataset-list)]
          [datasets (result->dataset-list result)])
-    ; FIXME lview is a free variable here
-    (set-datasets! lview datasets)
+    (current-datasets datasets)
+    (set-datasets-view! lview (current-datasets)) ; FIXME lview is a free variable here
     (println "dataset metadata has been refreshed") ; TODO gui viz on this
     (with-output-to-file (path-cache-datasets)
       #:exists 'replace ; yes if you run multiple of these you could have a data race
@@ -454,16 +478,44 @@
     (if (directory-exists? symlink)
         (let ([path (resolve-relative-path symlink)])
           (case (system-type)
-            ((windows) (subprocess #f #f #f (find-executable-path "explorer.exe") path))
+            ((windows)
+             ; FIXME this crashes/closes the gui (on windows obviously) !??!?
+             (subprocess #f #f #f (find-executable-path "explorer.exe") path))
             (else (xopen-path path))))
         ; TODO gui visible logging
         (println "Dataset has not been fetched yet!"))))
+
+(define (match-datasets text datasets)
+  (if text
+      (if (string-contains? text "dataset:")
+          (let* ([m (last (string-split text "dataset:"))]
+                 [uuid (if (string-contains? m "/")
+                           (car (string-split m "/"))
+                           m)]
+                 [matches (for/list ([d datasets]
+                                     #:when (string=? (id-uuid d) uuid))
+                            d)])
+            (if (null? matches)
+                datasets
+                matches))
+          (let ([matches (for/list ([d datasets]
+                                    #:when (or (string-contains? (id-uuid d) text)
+                                               (string-contains? (string-downcase (dataset-title d)) text)))
+                           d)])
+            (if (null? matches)
+                datasets
+                matches)))
+      datasets))
 
 (define (cb-search-dataset obj event)
   "callback for text field that should highlight filter sort matches in
 the list to the top and if there is only a single match select and
 switch to that"
-  (displayln (list obj event (send event get-event-type))))
+  (let* ([text (send obj get-value)]
+         [matching (match-datasets text (current-datasets))])
+    (unless (or (null? matching) (eq? matching (or (current-datasets-view) (current-datasets))))
+      (current-datasets-view matching)
+      (set-datasets-view! lview matching))))
 
 ;; keymap
 
@@ -483,19 +535,42 @@ switch to that"
 (define (k-export-dataset receiver event)
   (export-current-dataset))
 
+(define (backward-kill-word receiver event)
+  (when (eq? receiver text-search-box)
+    (let* ([ed (send receiver get-editor)]
+           [spos (send ed get-start-position)]
+           [epos (send ed get-end-position)]
+           [sbox (box spos)]
+           [s-delete (begin (send ed find-wordbreak sbox #f 'caret)
+                            (unbox sbox))])
+      (send ed delete s-delete epos)
+      ; delete from epos to the backward word break
+      )))
+
 ; add functions
 (send* keymap
   (add-function "test" k-test)
   (add-function "fetch-export-dataset" k-fetch-export-dataset)
   (add-function "export-dataset" k-export-dataset)
-  (add-function "quit" k-quit))
+  (add-function "quit" k-quit)
+  (add-function "test-backspace" (λ (a b) (displayln (format "delete all the things! ~a ~a" a b))))
+  (add-function "test-copy" (λ (a b) (displayln (format "copy thing ~a ~a" a b))))
+  (add-function "backward-kill-word" backward-kill-word)
+  (add-function "focus-search-box" (λ (a b) (send text-search-box focus)))
+  )
 
 ; map functions
 (send* keymap
+  (map-function "m:backspace" "backward-kill-word")
+  #;
+  (map-function "c:r"     "refresh-datasets")
+  (map-function "c:c"     "test-copy")
   (map-function "c:t"     "test")
   (map-function "f5"      "fetch-export-dataset")
-  (map-function "c:f"     "fetch-export-dataset")
-  (map-function "c:c;c:e" "fetch-export-dataset")
+  (map-function "c:t"     "fetch-export-dataset") ; XXX bad overlap with find
+  (map-function "c:f"     "focus-search-box") ; XXX bad overlap with find
+  #;
+  (map-function "c:c;c:e" "fetch-export-dataset") ; XXX cua intersection
   (map-function "c:x"     "export-dataset")
   #; ; defined as the key for the menu item so avoid double calls
   (map-function "c:q"     "quit")
@@ -551,7 +626,7 @@ switch to that"
                                [stretchable-height #f]
                                [parent panel-left]))
 
-(define text-org-match
+(define text-search-box
   ; text box to make it easier to paste in identifiers or titles and
   ; find a match and view it
   (new text-field%
@@ -581,8 +656,8 @@ switch to that"
 ; and remove the upper limit when if/when someone is dragging
 (send* lview
   (set-column-width 0 50 50 100)
-  (set-column-width 1 60 50 300)
-  (set-column-width 2 60 50 9999))
+  (set-column-width 1 120 60 300)
+  (set-column-width 2 120 60 9999))
 
 (define panel-ds-actions (new horizontal-panel%
                               [stretchable-height #f]
@@ -628,6 +703,9 @@ switch to that"
 (module+ main
   (init-paths!)
   (define result (populate-datasets))
+  (send frame-main show #t) ; show this first so that users know something is happening
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
+  (send text-search-box focus)
+  ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (cb-dataset-selection lview #f) ; FIXME why is this not tirgger by set-selection ?
-  (send frame-main show #t))
+)
