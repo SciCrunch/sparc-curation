@@ -118,7 +118,9 @@
   ; portion of the path !? not helpful ...
   ; FIXME this can fail with a weird error message
   ; if the symlink does not exist
-  (simple-form-path (build-path path ".." ".." (resolve-path path))))
+  (if (or (directory-exists? path) (file-exists? path))
+      (simple-form-path (build-path path ".." ".." (resolve-path path)))
+      (error 'non-existent-path "cannot resolve a non-existent path ~a" path)))
 
 (define (object->methods obj)
   (interface->method-names (object-interface obj)))
@@ -194,25 +196,29 @@
 
 (define jviews (make-hash))
 
-(define (get-jview! dataset)
+(define (dataset-jview! dataset #:update [update #f])
   (let* ([uuid (id-uuid dataset)]
-         [hr (hash-ref jviews uuid #f)]
-         [jview (if hr
-                    hr
-                    (let ([jview (new json-view%
-                                      ;;[font (make-object font% 10 'modern)]
-                                      [parent frame-helper]
-                                      #; ; hrm
-                                      [parent panel-right])])
+         [hr-jview (hash-ref jviews uuid #f)]
+         [jview (if (and hr-jview (not update))
+                    hr-jview
+                    (let ([jview (or (and update hr-jview)
+                                     (new json-view%
+                                       ;;[font (make-object font% 10 'modern)]
+                                       [parent frame-helper]))])
                       (let* ([lp (dataset-export-latest-path dataset)]
                              [json (if lp (path->json lp) (hash 'id (dataset-id dataset)))]
                              [jhash (for/hash ([(k v) (in-hash json)]
                                                ; FIXME I think we don't need include keys anymore
+                                               ; XXX false, there are still performance issues
                                                #:when (member k include-keys))
                                       (values k v))])
                         (set-jview! jview jhash)
                         (hash-set! jviews uuid jview)
                         jview)))])
+    jview))
+
+(define (get-jview! dataset)
+  (let ([jview (dataset-jview! dataset)])
     ; FIXME deal with parents and visibility
     ; FIXME unparent the current jview
     (let ([old-jview (current-jview)])
@@ -292,8 +298,13 @@
         (thunk
          (let ([status-3 #f])
            (parameterize ([current-directory (resolve-relative-path cwd-2)])
-             (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
-           (println (format "dataset export completed for ~a" (dataset-id ds))))))))
+             (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))
+               ))
+           (if status-3
+               (begin
+                 (dataset-jview! ds #:update #t)
+                 (println (format "dataset export completed for ~a" (dataset-id ds))))
+               (println (format "dataset export FAILED for ~a" (dataset-id ds)))))))))
    (define (fetch-export-dataset ds)
      (println (format "dataset fetch and export starting for ~a" (dataset-id ds))) ; TODO gui and/or log
      (let ([cwd-1 (path-source-dir)]
@@ -318,9 +329,25 @@
              #;
              (println (string-join argv-1 " "))
              (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
-           (parameterize ([current-directory (resolve-relative-path cwd-2)])
-             (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
-             (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
+           (if status-1
+               (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
+                 (parameterize ([current-directory cwd-2-resolved])
+                   (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
+                   ; TODO figure out if we need to condition this run on status-2 #t
+                   (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
+                 ; TODO gui indication
+                 (if (and status-2 status-3)
+                     (begin
+                       ; now that we have 1:1 jview:json we can automatically update the jview for
+                       ; this dataset in the background thread and it shouldn't block the ui
+                       (dataset-jview! ds #:update #t)
+                       (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
+                     (format "dataset ~a FAILED for ~a"
+                             (cond ((nor status-2 status-3) "fetch and export")
+                                   (status-2 "export")
+                                   (status-3 "fetch"))
+                             (dataset-id ds))))
+               (println (format "dataset retrieve FAILED for ~a" (dataset-id ds))))
            #;
            (values status-1 status-2 status-3)
            #; ; this doesn't work because list items cannot be customized independently SIGH
@@ -328,8 +355,7 @@
            ; customize some particular entry why fight with the canned private opaque things
            ; that don't actually meet your use cases?
            (set-lview-item-color lview ds) ; FIXME lview free variable
-           ; TODO gui indication
-           (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))))))
+           )))))
    (define (set-lview-item-color lview ds)
      ; find the current row based on data ??? and then change color ?
      (println "TODO set color") ; pretty sure this cannot be done with this gui widgit
@@ -520,7 +546,10 @@ switch to that"
          [matching (match-datasets text (current-datasets))])
     (unless (or (null? matching) (eq? matching (or (current-datasets-view) (current-datasets))))
       (current-datasets-view matching)
-      (set-datasets-view! lview matching))))
+      (set-datasets-view! lview matching) ; FIXME lview free variable
+      (when (= (length matching) 1)
+        (send lview set-selection 0)
+        (cb-dataset-selection lview #f)))))
 
 ;; keymap
 
