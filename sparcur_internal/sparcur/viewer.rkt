@@ -17,6 +17,7 @@
 (define current-dataset (make-parameter #f))
 (define current-datasets (make-parameter #f))
 (define current-datasets-view (make-parameter #f))
+(define current-jview (make-parameter #f))
 (define overmatch (make-parameter #f))
 (define python-interpreter (make-parameter
                             (find-executable-path
@@ -31,8 +32,9 @@
 ;; other variables
 
 (define include-keys
-    ; have to filter down due to bad performance in the viewer
-    '(id meta rmeta status prov submission))
+  ; have to filter down due to bad performance in the viewer
+  ; this is true even after other performance improvements
+  '(id meta rmeta status prov submission))
 
 ;; temporary orthauth extract
 
@@ -64,13 +66,6 @@
 (define (user-data-path   [suffix #f]) (fcp second suffix))
 (define (user-cache-path  [suffix #f]) (fcp third  suffix))
 (define (user-log-path    [suffix #f]) (fcp fourth suffix))
-
-#; ; don't use this
-(define (path->set-jview path)
-  ;; sadly json view is performant enough to do this
-  (let ([path (expand-user-path (if (path? path) path (string->path path)))])
-    (send jview set-json! (with-input-from-file path
-                            (λ () (read-json))))))
 
 ;; python argvs
 
@@ -157,6 +152,75 @@
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
   (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
   (path-export-datasets (build-path (path-export-dir) "datasets")))
+
+;; json view
+
+(define-syntax when-not (make-rename-transformer #'unless))
+
+(define (set-jview! jview json)
+  "set the default state for jview"
+  (define jhl (get-field json-hierlist jview))
+  (define old-root (get-field root jhl))
+  (when old-root
+    (send jhl delete-item old-root)) ; this is safe because we force selection at startup
+  (send jview set-json! json) ; FIXME this is where the slowdown is
+  ; even with reduced data size XXX consider having two jviews, one
+  ; visible and one in the background, and render the invisible one in
+  ; the background and then swap when visible, it won't always be
+  ; fast, but at least it will be faster
+  (define root (get-field root jhl))
+  (send jhl sort json-list-item< #t) ; XXX this is also slow
+  (send root open)
+  (define (by-name name items)
+    (let ([v (for/list ([i items]
+                        #:when (let ([ud (send i user-data)])
+                                 (and (eq? (node-data-type ud) 'hash)
+                                      (eq? (node-data-name ud) name))))
+               i)])
+      (and (not (null? v)) (car v))))
+  (let ([ritems (send root get-items)])
+    (when (> (length ritems) 1) ; id alone is length 1
+      (map (λ (x)
+             (let ([ud (send x user-data)])
+               (when (and (eq? (node-data-type ud) 'hash)
+                          (memq (node-data-name ud) '(meta submission status)))
+                 (when-not (null? (send x get-items)) ; compound item
+                           (send x open))
+                 (when (eq? (node-data-name ud) 'status)
+                   (let ([per (by-name 'path_error_report (send x get-items))])
+                     (when per
+                       (send per open)))))))
+           ritems))))
+
+(define jviews (make-hash))
+
+(define (get-jview! dataset)
+  (let* ([uuid (id-uuid dataset)]
+         [hr (hash-ref jviews uuid #f)]
+         [jview (if hr
+                    hr
+                    (let ([jview (new json-view%
+                                      ;;[font (make-object font% 10 'modern)]
+                                      [parent frame-helper]
+                                      #; ; hrm
+                                      [parent panel-right])])
+                      (let* ([lp (dataset-export-latest-path dataset)]
+                             [json (if lp (path->json lp) (hash 'id (dataset-id dataset)))]
+                             [jhash (for/hash ([(k v) (in-hash json)]
+                                               ; FIXME I think we don't need include keys anymore
+                                               #:when (member k include-keys))
+                                      (values k v))])
+                        (set-jview! jview jhash)
+                        (hash-set! jviews uuid jview)
+                        jview)))])
+    ; FIXME deal with parents and visibility
+    ; FIXME unparent the current jview
+    (let ([old-jview (current-jview)])
+      (when old-jview
+          (send old-jview reparent frame-helper)))
+    (send jview reparent panel-right)
+    (current-jview jview)
+    jview))
 
 ;; dataset struct and generic functions
 
@@ -259,12 +323,6 @@
              (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
            #;
            (values status-1 status-2 status-3)
-           #; ; we can't do this, even though it is cool because the ui will get out of sync
-           ; instead we need a notification area for these messages or background color?
-           ; FIXME in a threaded context we probably don't want to do this
-           ; instead we probably want to call back an change the color of the list item
-           ; or something else
-           (set-single-dataset! ds jview) ; FIXME jview free variable
            #; ; this doesn't work because list items cannot be customized independently SIGH
            ; I can see why people use the web for stuff like this, if you want to be able to
            ; customize some particular entry why fight with the canned private opaque things
@@ -305,16 +363,6 @@
 
 (define (set-datasets-view*! list-box . datasets)
   (set-datasets-view! list-box datasets))
-
-(define (set-single-dataset! ds jview)
-  #;
-  (pretty-print (cons (dataset-path ds) (lb-cols ds)))
-  (let* ([lp (dataset-export-latest-path ds)]
-         [json (if lp [path->json lp] (hash 'id (dataset-id ds)))]
-         [hrm (for/hash ([(k v) (in-hash json)]
-                         #:when (member k include-keys))
-                (values k v))])
-    (set-jview! jview hrm)))
 
 (define (get-current-dataset)
   ; FIXME lview free variable
@@ -364,58 +412,16 @@
                  ; especially given that it is dynamically typed :/
                  #f))))))
 
-(define-syntax when-not (make-rename-transformer #'unless))
-
-(define (set-jview! jview json)
-  "set the default state for jview"
-  (define jhl (get-field json-hierlist jview))
-  (define old-root (get-field root jhl))
-  (when old-root
-    (send jhl delete-item old-root)) ; this is safe because we force selection at startup
-  (send jview set-json! json) ; FIXME this is where the slowdown is
-  ; even with reduced data size XXX consider having two jviews, one
-  ; visible and one in the background, and render the invisible one in
-  ; the background and then swap when visible, it won't always be
-  ; fast, but at least it will be faster
-  (define root (get-field root jhl))
-  (send jhl sort json-list-item< #t) ; XXX this is also slow
-  (send root open)
-  (define (by-name name items)
-    (let ([v (for/list ([i items]
-                        #:when (let ([ud (send i user-data)])
-                                 (and (eq? (node-data-type ud) 'hash)
-                                      (eq? (node-data-name ud) name))))
-               i)])
-      (and (not (null? v)) (car v))))
-  (let ([ritems (send root get-items)])
-    (displayln (cons 'ritems ritems))
-    (when (> (length ritems) 1) ; id alone is length 1
-      (map (λ (x)
-             (let ([ud (send x user-data)])
-               (when (and (eq? (node-data-type ud) 'hash)
-                          (memq (node-data-name ud) '(meta submission status)))
-                 (when-not (null? (send x get-items)) ; compound item
-                   (send x open))
-                 (when (eq? (node-data-name ud) 'status)
-                   (displayln (format "what the fuck ~s" (map (λ (i) (send i user-data)) (send x get-items))))
-                   (let ([per (by-name 'path_error_report (send x get-items))])
-                     (when per
-                       (send per open)
-                       ))))))
-           ritems))))
-
 ;; callbacks
 
 (define (cb-dataset-selection obj event)
-  #;
-  (displayln (list obj event (send event get-event-type)))
   (for ([index (send obj get-selections)])
     (let ([dataset (send obj get-data index)]
           [cd (current-dataset)])
       ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
       (when (not (equal? dataset cd))
         (current-dataset dataset) ; FIXME multiple selection case
-        (set-single-dataset! dataset jview))))) ; FIXME jview free here
+        (get-jview! dataset)))))
 
 (define (result->dataset-list result)
   (map (λ (ti)
@@ -435,7 +441,6 @@
 
 (define (cb-refresh-dataset-metadata obj event)
   ; XXX requries python sparcur to be installed
-  (displayln (list obj event (send event get-event-type)))
   (let* ([result (get-dataset-list)]
          [datasets (result->dataset-list result)])
     (current-datasets datasets)
@@ -593,22 +598,26 @@ switch to that"
        [width 1280]
        [height 1024]))
 
+(define frame-helper
+  (new frame%
+       [label "invisible helper frame"]))
+
 (define menu-bar-main (new menu-bar%
-                       [parent frame-main]))
+                           [parent frame-main]))
 (define menu-file (new menu% [label "File"] [parent menu-bar-main]))
-    (define menu-item-quit (new menu-item%
-                                [label "Quit"]
-                                [shortcut #\Q]
-                                [shortcut-prefix '(ctl)]
-                                [callback k-quit]
-                                [parent menu-file]))
+(define menu-item-quit (new menu-item%
+                            [label "Quit"]
+                            [shortcut #\Q]
+                            [shortcut-prefix '(ctl)]
+                            [callback k-quit]
+                            [parent menu-file]))
 (define menu-edit (new menu% [label "Edit"] [parent menu-bar-main]))
-    (define menu-item-preferences (new menu-item%
-                                       [label "Preferences..."]
-                                       [shortcut #\;]
-                                       [shortcut-prefix '(ctl)]
-                                       [callback (λ (a b) (println "cb-menu-item-preferences"))]
-                                       [parent menu-edit]))
+(define menu-item-preferences (new menu-item%
+                                   [label "Preferences..."]
+                                   [shortcut #\;]
+                                   [shortcut-prefix '(ctl)]
+                                   [callback (λ (a b) (println "cb-menu-item-preferences"))]
+                                   [parent menu-edit]))
 ;; TODO preferences
 ; api keys
 ; paths
@@ -671,11 +680,11 @@ switch to that"
                             [parent panel-ds-actions]))
 
 (define button-fetch (new (tooltip-mixin button%)
-                            [label "Fetch"]
-                            [tooltip "Shortcut <not-set>"]
-                            [tooltip-delay 100]
-                            [callback cb-fetch-dataset]
-                            [parent panel-ds-actions]))
+                          [label "Fetch"]
+                          [tooltip "Shortcut <not-set>"]
+                          [tooltip-delay 100]
+                          [callback cb-fetch-dataset]
+                          [parent panel-ds-actions]))
 
 (define button-export-dataset (new (tooltip-mixin button%)
                                    [label "Export"]
@@ -695,11 +704,6 @@ switch to that"
                                         [callback cb-open-dataset-folder]
                                         [parent panel-ds-actions]))
 
-
-(define jview [new json-view%
-                   ;;[font (make-object font% 10 'modern)]
-                   [parent panel-right]])
-
 (module+ main
   (init-paths!)
   (define result (populate-datasets))
@@ -707,5 +711,4 @@ switch to that"
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
-  (cb-dataset-selection lview #f) ; FIXME why is this not tirgger by set-selection ?
-)
+  (cb-dataset-selection lview #f))
