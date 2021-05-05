@@ -616,11 +616,8 @@ switch to that"
                                    [label "Preferences..."]
                                    [shortcut #\;]
                                    [shortcut-prefix '(ctl)]
-                                   [callback (λ (a b) (println "cb-menu-item-preferences"))]
+                                   [callback (λ (a b) (send frame-preferences show #t))]
                                    [parent menu-edit]))
-;; TODO preferences
-; api keys
-; paths
 
 (define panel-holder (new horizontal-panel%
                           [parent frame-main]))
@@ -703,6 +700,62 @@ switch to that"
                                         [label "Open Folder"]
                                         [callback cb-open-dataset-folder]
                                         [parent panel-ds-actions]))
+
+;; TODO preferences
+(define frame-preferences
+  (new (class frame% (super-new)
+         (rename-super [super-on-subwindow-char on-subwindow-char])
+         (define/override (on-subwindow-char receiver event)
+           (super-on-subwindow-char receiver event)
+           (send keymap handle-key-event receiver event))
+         #; ; show hide basically
+         (define/augment (on-close)
+           (displayln "prefs closed")))
+       [label "sparcur preferences"]
+       [width 640]
+       [height 480]))
+
+; api keys
+; paths
+(define panel-prefs-holder (new vertical-panel%
+                                [parent frame-preferences]))
+
+#;
+(define panel-prefs-left (new vertical-panel%
+                        [parent panel-prefs-holder]))
+
+#;
+(define panel-prefs-right (new vertical-panel%
+                         [parent panel-prefs-holder]))
+
+(define text-prefs-api-key (new text-field%
+                                [font (make-object font% 10 'modern)]
+                                [label "API Key   "]
+                                [init-value "fake-api-key-value"]
+                                [parent panel-prefs-holder]))
+
+(define text-prefs-api-sec (new text-field%
+                                [font (make-object font% 10 'modern)]
+                                [label "API Secret"]
+                                [init-value "fake-api-sec-value"]
+                                [parent panel-prefs-holder]))
+
+(define panel-prefs-paths (new horizontal-panel%
+                               [parent panel-prefs-holder]
+                               ))
+(define text-prefs-path-? (new text-field%
+                                [font (make-object font% 10 'modern)]
+                                [label "Path ???"]
+                                [enabled #f]
+                                [init-value "/fake/path/to/thing/for/reference"]
+                                ; TODO need a way to click button to open
+                                [parent panel-prefs-paths]))
+(define button-prefs-path
+  (new button%
+       [label "Open Path"]
+       ;[callback cb-toggle-expand]
+       [parent panel-prefs-paths]))
+
 
 (module+ main
   (init-paths!)
