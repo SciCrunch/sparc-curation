@@ -11,6 +11,7 @@ from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_paths, is_list_or_tuple
+from sparcur.utils import levenshteinDistance
 from sparcur.utils import BlackfynnId, LocId, PennsieveId
 from sparcur.config import auth
 
@@ -677,14 +678,34 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             blob['magic_mimetype'] = self._magic_mimetype
 
         if not (self.is_broken_symlink() or self.exists()):
-            msg = f'Path does not exist! {self}'
+            # TODO search for closest match
+            cands = self._closest_existing_matches()
+            msg = f'Path does not exist!\n{self}'
+            if cands:
+                _fcands = [(r, n) for r, n in cands if r < 10]
+                fcands = _fcands if _fcands else cands
+                msg += f'\n{0: <4} {self.name}\n'
+                msg += '\n'.join([f'{r: <4} {n}' for r, n in fcands])
             # do not log the error here, we won't have
             # enough context to know where we got a bad
             # path, but the caller should, maybe a case for
             # inversion of control here
-            blob['errors'] = [{'message': msg}]
+            blob['errors'] = [{'message': msg,
+                               'candidates': cands,}]
 
         return blob, project_path
+
+    def _closest_existing_matches(self):
+        if self.parent.exists():
+            # we probably don't need this, the numbers
+            # should usually be small enough
+            #childs = [c for c in self.parent.children
+                      #if c.is_file() or c.is_broken_symlink()]
+            name = self.name
+            cands = sorted(
+                [(levenshteinDistance(c.name, name), c.name)
+                 for c in self.parent.children])
+            return cands
 
     def _jsonMetadata(self, do_expensive_operations=False):
         blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)

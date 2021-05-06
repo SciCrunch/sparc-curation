@@ -1498,7 +1498,12 @@ class RemoteDatasetData:
         if 'license' in cont:
             blob['license'] = cont['license']
 
-        doi = self.remote.doi
+        try:
+            doi = self.remote.doi
+        except Exception as e: # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX FIXME
+            log.exception(e)  # TODO HasErrors
+            doi = None
+
         if doi is not None:
             # FIXME somehow this managed to not be None and then self.remote.doi
             # was able to be None later !??!?!?!?!

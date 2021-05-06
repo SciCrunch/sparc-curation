@@ -8,7 +8,7 @@ from pysercomb.pyr.types import Quantity
 from . import exceptions as exc
 from .core import log, logd, HasErrors
 from .core import OntId
-from .utils import is_list_or_tuple
+from .utils import is_list_or_tuple, levenshteinDistance
 
 
 BLANK_VALUE = object()
@@ -233,29 +233,13 @@ class NormContributorRole(str):
     def __new__(cls, value):
         return str.__new__(cls, cls.normalize(value))
 
-    @staticmethod
-    def levenshteinDistance(s1, s2):
-        if len(s1) > len(s2):
-            s1, s2 = s2, s1
-
-        distances = range(len(s1) + 1)
-        for i2, c2 in enumerate(s2):
-            distances_ = [i2+1]
-            for i1, c1 in enumerate(s1):
-                if c1 == c2:
-                    distances_.append(distances[i1])
-                else:
-                    distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
-            distances = distances_
-        return distances[-1]
-
     @classmethod
     def normalize(cls, value):
         # a hilariously slow way to do this
         # also not really normalization ... more, best guess for what people were shooting for
         # FIXME warn on this if it does not match so curators can see the value
         if value:
-            best = sorted((cls.levenshteinDistance(value, v), v) for v in cls.values)[0]
+            best = sorted((levenshteinDistance(value, v), v) for v in cls.values)[0]
             distance = best[0]
             normalized = best[1]
             cutoff = len(value) / 2
