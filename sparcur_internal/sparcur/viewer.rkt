@@ -14,6 +14,7 @@
 (define path-export-dir (make-parameter #f))
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
+(define current-blob (make-parameter #f))
 (define current-dataset (make-parameter #f))
 (define current-datasets (make-parameter #f))
 (define current-datasets-view (make-parameter #f))
@@ -92,6 +93,20 @@
    "--limit" "-1"
    "--fetch"))
 
+(define (argv-open-ipython ds)
+  (let*-values ([(path) (dataset-export-latest-path (current-dataset))]
+                [(parent name dir?) (split-path path)]
+                [(path-meta-path) (build-path parent "path-metadata.json")])
+    (cons "/usr/bin/urxvt" ; FIXME find the right terminal emulator
+          (cons "-e" ; FIXME running without bash loses readline somehow
+                (cons "rlwrap"
+                      (python-mod-args
+                       "IPython"
+                       "-i" "-c"
+                       ; LOL PYTHON can't use with in the special import line syntax SIGH
+                       (format "import json;print('~a');f = open('~a', 'rt');blob = json.load(f);f.close();f = open('~a', 'rt');path_meta = json.load(f);f.close()"
+                               parent path path-meta-path)))))))
+
 ;; utility functions
 
 #; ; sigh
@@ -133,6 +148,7 @@
                      (begin
                        (let ([pc-dir (path-cache-dir)])
                          (unless (directory-exists? pc-dir)
+                           ; TODO make-parent-directory* ?
                            (make-directory* pc-dir)))
                        (let ([result (get-dataset-list)])
                          (with-output-to-file pcd
@@ -154,6 +170,18 @@
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
   (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
   (path-export-datasets (build-path (path-export-dir) "datasets")))
+
+(define (manifest-report)
+  ; FIXME this will fail if one of the keys isn't quite right
+  ; TODO displayln this into a text% I think?
+  (for-each (λ (m) (displayln m) (newline))
+            ; FIXME use my hr function from elsewhere
+            (hash-ref (hash-ref (hash-ref (hash-ref
+                                           (current-blob)
+                                           'status)
+                                          'path_error_report)
+                                '|#/path_metadata/-1|)
+                      'messages)))
 
 ;; json view
 
@@ -212,6 +240,7 @@
                                                ; XXX false, there are still performance issues
                                                #:when (member k include-keys))
                                       (values k v))])
+                        (current-blob json) ; FIXME this will go stale
                         (set-jview! jview jhash)
                         (hash-set! jviews uuid jview)
                         jview)))])
@@ -499,6 +528,14 @@
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
+(define (cb-open-dataset-ipython obj event)
+  (let ([argv (argv-open-ipython (current-dataset))])
+    ; FIXME bad use of thread
+    (thread (thunk (apply system* argv)))))
+
+(define (cb-open-dataset-remote obj event)
+  (println "TODO open uri_human in browser"))
+
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
          [path (dataset-src-path ds)]
@@ -729,6 +766,16 @@ switch to that"
                                         [label "Open Folder"]
                                         [callback cb-open-dataset-folder]
                                         [parent panel-ds-actions]))
+
+(define button-open-dataset-remote (new button%
+                                        [label "Open Remote"]
+                                        [callback cb-open-dataset-remote]
+                                        [parent panel-ds-actions]))
+
+(define button-open-dataset-ipython (new button%
+                                         [label "Open IPython"]
+                                         [callback cb-open-dataset-ipython]
+                                         [parent panel-ds-actions]))
 
 ;; TODO preferences
 (define frame-preferences
