@@ -39,7 +39,12 @@ class PathData:
 
     @property
     def uri_human(self):
-        return self.path.cache.uri_human
+        cache = self.path.cache
+        if cache.is_organization():
+            return cache.identifier.uri_human()
+
+        return cache.uri_human(cache.organization.identifier,
+                               cache.dataset.identifier)
 
     @property
     def uri_api(self):
