@@ -531,37 +531,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         else:
             return self._xattr_meta
 
-    @staticmethod
-    def _uri_api_bf(id):  # further SIGH
-        if 'N:dataset:' in id:
-            endpoint = 'datasets/' + id
-        elif 'N:organization:' in id:
-            endpoint = 'organizations/' + id
-        elif 'N:collection:' in id:
-            endpoint = 'collections/' + id
-        else:
-            endpoint = 'packages/' + id  # XXX if you use N:package:asdf/files/file-id this works
-
-        return backends.BlackfynnRemote._base_uri_api + '/' + endpoint  # XXX FIXME SIGH
-
-    @staticmethod
-    def _uri_human_bf(oid, did, id):
-        N, type, suffix = id.split(':')
-        if id.startswith('N:package:'):
-            #prefix = '/viewer/'
-            prefix = '/files/00000000-0000-0000-0000-000000000000/'  # unprocessed cases
-        elif id.startswith('N:collection:'):
-            prefix = '/files/'
-        elif id.startswith('N:dataset:'):
-            prefix = '/'  # apparently organization needs /datasets after it
-            return Path._uri_human_bf(None, None, oid) + prefix + id
-        elif id.startswith('N:organization:'):
-            return f'{backends.BlackfynnRemote._base_uri_human}/{id}/datasets'  # XXX FIXME SIGH
-        else:
-            raise exc.UnhandledTypeError(type)
-
-        return Path._uri_human_bf(oid, None, did) + prefix + id
-
     def manifest_record(self, manifest_parent_path):
         filename = self.relative_path_from(manifest_parent_path)
         description = None
@@ -602,7 +571,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                     if not c.is_dir()]
 
     def _cache_jsonMetadata(self, do_expensive_operations=False):
-        blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)
+        blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
         project_meta = project_path.cache_meta
         meta = self.cache_meta  # FIXME this is very risky
         # and is the reason why I made it impossible to contsturct
@@ -613,15 +582,15 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             raise exc.NoCachedMetadataError(self)
 
         _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
-        remote_id = (f'{bf_id}/files/{meta.file_id}'  # XXX a horrible hack, but it kinda works
+        idc = self._cache_class._id_class
+        remote_id = (idc(bf_id, file_id=meta.file_id)
                      if self.is_file() or self.is_broken_symlink() else
-                     bf_id)
-        uri_api = self._uri_api_bf('N:' + remote_id)
-        uri_human = self._uri_human_bf(project_meta.id,
-                                       'N:' + blob['dataset_id'],
-                                       # XXX NOTE that we can't use remote_id because
-                                       # /viewer/ etc. doesn't work for the human uri
-                                       meta.id)
+                     idc(bf_id))
+        #identifier = self._cache_class._id_class('N:' + remote_id)
+        uri_api = remote_id.uri_api
+        uri_human = remote_id.uri_human(
+            organization=project_path.cache_identifier,
+            dataset=dsid)
         blob['remote_id'] = remote_id
         #blob['timestamp_created'] = meta.created  # leaving this out
         blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
@@ -693,7 +662,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             blob['errors'] = [{'message': msg,
                                'candidates': cands,}]
 
-        return blob, project_path
+        return blob, project_path, dsid
 
     def _closest_existing_matches(self):
         if self.parent.exists():
@@ -708,7 +677,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             return cands
 
     def _jsonMetadata(self, do_expensive_operations=False):
-        blob, project_path = self._jm_common(do_expensive_operations=do_expensive_operations)
+        blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
         return blob
 
     def _transitive_metadata(self):
@@ -742,7 +711,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         rc_metadata = sorted(_rcm, key=sort_dirs_first)
         metadata = this_metadata + rc_metadata
         index = {b['dataset_relative_path']:b for b in metadata}
-        #pid = self._uri_api_bf(self.cache_id)
         pid = this_metadata[0]['remote_id']
         for m in metadata:
             p = m.pop('parent_drp', None)

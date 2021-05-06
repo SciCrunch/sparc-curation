@@ -687,7 +687,7 @@ class BlackfynnId(idlib.Identifier):
                 endpoint = f'packages/{self.id}/files/{self.file_id}'
         elif self.type == 'collection':
             endpoint = 'collections/' + self.id
-        if self.type == 'dataset':
+        elif self.type == 'dataset':
             endpoint = 'datasets/' + self.id
         elif self.type == 'organization':
             endpoint = 'organizations/' + self.id

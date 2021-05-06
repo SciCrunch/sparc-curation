@@ -80,18 +80,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def uri_api(self):
-        if self.is_dataset():  # functions being true by default is an antipattern for stuff like this >_<
-            endpoint = 'datasets/' + self.id
-        elif self.is_organization():
-            endpoint = 'organizations/' + self.id
-        elif self.is_dir():
-            endpoint = 'collections/' + self.id
-        elif self.file_id is not None:
-            endpoint = f'packages/{self.id}/files/{self.file_id}'
-        else:
-            endpoint = 'packages/' + self.id
-
-        return BlackfynnRemote._base_uri_api + '/' + endpoint
+        return self.identifier.uri_api
 
     @property
     def errors(self):
