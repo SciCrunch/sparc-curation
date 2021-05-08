@@ -3,6 +3,7 @@
 (require racket/gui
          racket/generic
          racket/pretty
+         framework
          gui-widget-mixins
          json
          ; XXX json-view has lurking quadratic behavior
@@ -20,6 +21,7 @@
 (define current-datasets-view (make-parameter #f))
 (define current-jview (make-parameter #f))
 (define overmatch (make-parameter #f))
+(define power-user? (make-parameter #f))
 (define python-interpreter (make-parameter
                             (find-executable-path
                              (case (system-type)
@@ -519,6 +521,15 @@
 (define (cb-fetch-export-dataset obj event)
   (fetch-export-current-dataset))
 
+(define (cb-open-export-folder obj event)
+  (let*-values ([(path) (dataset-export-latest-path (current-dataset))]
+                [(parent name dir?) (split-path path)])
+    (xopen-path parent)))
+
+(define (cb-open-export-json obj event)
+  (let*-values ([(path) (dataset-export-latest-path (current-dataset))])
+    (xopen-path path)))
+
 (define (xopen-path path)
   (let ([command (find-executable-path
                   (case (system-type 'os*)
@@ -528,13 +539,23 @@
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
-(define (cb-open-dataset-ipython obj event)
+(define (cb-open-export-ipython obj event)
   (let ([argv (argv-open-ipython (current-dataset))])
     ; FIXME bad use of thread
     (thread (thunk (apply system* argv)))))
 
 (define (cb-open-dataset-remote obj event)
   (println "TODO open uri_human in browser"))
+
+(define (cb-manifest-report obj event)
+  ; TODO populate the editor
+  ; TODO implement this as a method on edcanv-man-rep ?
+  (let ((ed (send edcanv-man-rep get-editor)))
+    (send ed select-all)
+    (send ed clear)
+    (send ed insert (with-output-to-string (λ () (manifest-report))))
+    (send ed scroll-to-position 0))
+  (send frame-manifest-report show #t))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
@@ -588,7 +609,7 @@ switch to that"
         (send lview set-selection 0)
         (cb-dataset-selection lview #f)))))
 
-;; keymap
+;; keymap keybind
 
 (define keymap (new keymap%))
 
@@ -628,7 +649,10 @@ switch to that"
   (add-function "test-copy" (λ (a b) (displayln (format "copy thing ~a ~a" a b))))
   (add-function "backward-kill-word" backward-kill-word)
   (add-function "focus-search-box" (λ (a b) (send text-search-box focus)))
-  )
+  (add-function "open-dataset-folder" cb-open-dataset-folder)
+  (add-function "open-export-folder" cb-open-export-folder)
+  (add-function "open-export-json" cb-open-export-json)
+  (add-function "open-export-ipython" cb-open-export-ipython))
 
 ; map functions
 (send* keymap
@@ -645,7 +669,11 @@ switch to that"
   (map-function "c:x"     "export-dataset")
   #; ; defined as the key for the menu item so avoid double calls
   (map-function "c:q"     "quit")
-  (map-function "c:w"     "quit"))
+  (map-function "c:w"     "quit")
+  (map-function "c:o" "open-dataset-folder")
+  (map-function "c:p" "open-export-folder") ; FIXME these are bad bindings
+  (map-function "c:j" "open-export-json")
+  (map-function "c:i" "open-export-ipython"))
 
 #;
 (send keymap call-function "test" 1 (new event%))
@@ -659,6 +687,7 @@ switch to that"
            (super-on-subwindow-char receiver event)
            (send keymap handle-key-event receiver event))
          (define/augment (on-close)
+           (send frame-preferences show #f)
            (displayln "see ya later")))
        [label "sparcur control panel"]
        [width 1280]
@@ -685,7 +714,7 @@ switch to that"
                                    [callback (λ (a b) (send frame-preferences show #t))]
                                    [parent menu-edit]))
 
-(define panel-holder (new horizontal-panel%
+(define panel-holder (new panel:horizontal-dragable%
                           [parent frame-main]))
 
 (define panel-left (new vertical-panel%
@@ -772,10 +801,48 @@ switch to that"
                                         [callback cb-open-dataset-remote]
                                         [parent panel-ds-actions]))
 
-(define button-open-dataset-ipython (new button%
-                                         [label "Open IPython"]
-                                         [callback cb-open-dataset-ipython]
+(define button-manifest-report (new button%
+                                    [label "Manifest Report"]
+                                    [callback cb-manifest-report]
+                                    [parent panel-ds-actions]))
+#; ; too esoteric
+(define button-open-export-folder (new button%
+                                       [label "Open Export"]
+                                       [callback cb-open-export-folder]
+                                       [parent panel-ds-actions]))
+
+(define button-open-export-json (new button%
+                                         [label "Open JSON"]
+                                         [callback cb-open-export-json]
                                          [parent panel-ds-actions]))
+
+(define button-open-export-ipython (new button%
+                                         [label "Open IPython"]
+                                         [callback cb-open-export-ipython]
+                                         [parent panel-ds-actions]))
+
+(send button-open-export-json show (power-user?))
+(send button-open-export-ipython show (power-user?))
+
+;; manifest report
+
+(define frame-manifest-report
+  (new (class frame% (super-new)
+         (rename-super [super-on-subwindow-char on-subwindow-char])
+         (define/override (on-subwindow-char receiver event)
+           (super-on-subwindow-char receiver event)
+           (send keymap handle-key-event receiver event))
+         #; ; show hide basically
+         (define/augment (on-close)
+           (displayln "prefs closed")))
+       [label "sparcur manifest report"]
+       [width 640]
+       [height 480]))
+
+(define edcanv-man-rep
+  (new editor-canvas%
+       [editor (new text%)]
+       [parent frame-manifest-report]))
 
 ;; TODO preferences
 (define frame-preferences
@@ -826,6 +893,19 @@ switch to that"
                                 [init-value "/fake/path/to/thing/for/reference"]
                                 ; TODO need a way to click button to open
                                 [parent panel-prefs-paths]))
+
+(define (toggle-show obj)
+  (send obj show (not (send obj is-shown?))))
+
+(define check-box-power-user (new check-box%
+                                  [label "Power user?"]
+                                  [callback (λ (o e)
+                                              (power-user? (not (power-user?)))
+                                              ; XXX these can get out of sync
+                                              (toggle-show button-open-export-json)
+                                              (toggle-show button-open-export-ipython))]
+                                  [parent panel-prefs-holder]))
+
 (define button-prefs-path
   (new button%
        [label "Open Path"]
