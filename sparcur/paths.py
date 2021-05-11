@@ -493,6 +493,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             return (self.getxattr('bf.id').decode()
                     if self.is_dir() or self.is_file() else
                     self.readlink().parts[1])
+        except FileNotFoundError as e:
+            # in the event we try to blindly get cached metadata for a
+            # path in a manifest that does not exist
+            raise e
         except OSError as e:
             raise exc.NoCachedMetadataError(self) from e
 

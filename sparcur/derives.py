@@ -199,6 +199,9 @@ class Derives:
                         try:
                             lifted, _should_log = cls._lift_mr(
                                 path_dataset, drp, record, _should_log)
+                        except FileNotFoundError as e:
+                            logd.error(e)
+                            continue  # FIXME need this in the errors record
                         except exc.BadDataError as e:
                             logd.error(e)
                             continue  # FIXME need this in the errors record
