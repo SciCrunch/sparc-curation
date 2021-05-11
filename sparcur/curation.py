@@ -9,7 +9,7 @@ from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT
 from sparcur.core import adops, OntTerm, JEncode
-from sparcur.paths import Path, BlackfynnCache, CacheL
+from sparcur.paths import Path, CacheL, PennsieveCache as RemoteCache
 from sparcur.state import State
 from sparcur.utils import log, fromJson, register_type
 from sparcur import schemas as sc
@@ -648,14 +648,14 @@ def datame(d, ca, timestamp, helpers=None, log_level=logging.INFO, dp=_p,
         rc._setup()
         rc.anchorTo(ca)
 
-    if not hasattr(BlackfynnCache, '_anchor'):
+    if not hasattr(RemoteCache, '_anchor'):
         # the fact that we only needed this much later in time
         # tells me that we had actually done an excellent job
         # of firewalling the validation pipeline from anything
         # related to the cache beyond the xatter data
 
         # can't use ca.__class__ because it is the posix variant of # _cache_class
-        BlackfynnCache._anchor = ca
+        RemoteCache._anchor = ca
 
     prp = d.path.project_relative_path
     if helpers is not None:
