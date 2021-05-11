@@ -585,7 +585,7 @@ class ToExport(RuntimeSchema):
         cls.schema = json_version(version)
 
 
-metadata_filename_pattern = r'^.+\/[a-z_\/]+\.(xlsx|csv|tsv|json)$'
+metadata_filename_pattern = r'^.+\/[a-z-_\/]+\.(xlsx|csv|tsv|json)$'
 
 simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
 
