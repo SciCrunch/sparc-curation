@@ -605,9 +605,11 @@ doi_pattern = idlib.Doi._id_class.canonical_regex
 
 orcid_pattern = idlib.Orcid._id_class.canonical_regex
 
+contributor_name_pattern = r'^[^, ]+,\ [^,]+$'
+
 ror_pattern = idlib.Ror._id_class.canonical_regex
 
-pattern_whitespace_lead_trail = '(^[\s]+[^\s].*|.*[^\s][\s]+$)'
+pattern_whitespace_lead_trail = r'(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
 award_pattern = '^(OT2OD|OT3OD|U18|TR|U01)'
 
@@ -875,7 +877,8 @@ class ContributorExportSchema(JSONSchema):
                    },
             'affiliation': EIS._allOf(RorSchema,
                                       context_value=idtype('TEMP:hasAffiliation')),
-            'contributor_name': {'type': 'string'},
+            'contributor_name': {'type': 'string',
+                                 'pattern': contributor_name_pattern,},
             'first_name': {'type': 'string',
                            'context_value': 'sparc:firstName',},
             'middle_name': strcont('TEMP:middleName'),

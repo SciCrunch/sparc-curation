@@ -37,9 +37,7 @@ class Derives:
         if ', ' in name:
             last, first = name.split(', ', 1)
         elif ',' in name:
-            #last, first = name.split(',', 1)
-            msg = 'Contributor name is missing a space after the comma.'
-            raise exc.BadDataError(msg)
+            last, first = name.split(',', 1)  # the error will be recorded by the json schema
         elif ' ' in name:
             first, last = name.split(' ', 1)
         else:

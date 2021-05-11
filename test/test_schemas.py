@@ -101,6 +101,36 @@ class TestNoLTWhitespaceRegex(unittest.TestCase):
             assert not ok and s != data_or_error
 
 
+class CNPSchema(sc.JSONSchema):
+    schema = make_pattern_schema('cname', sc.contributor_name_pattern)
+
+
+class TestContributorNamePatternRegex(unittest.TestCase):
+    schema = CNPSchema
+
+    def test_positive(self):
+        strings = (
+            'Last, First Middle',
+        )
+        schema = self.schema()
+        for s in strings:
+            j = {'cname': s}
+            ok, data_or_error, _  = schema.validate(j)
+            assert j == data_or_error, s
+
+    def test_negative(self):
+        strings = (
+            'Space,Missing',
+            'Commas, Too, Many',
+        )
+
+        schema = self.schema()
+        for s in strings:
+            j = {'cname': s}
+            ok, data_or_error, _  = schema.validate(j)
+            assert not ok and j != data_or_error, s
+
+
 class Iso8601Schema(sc.JSONSchema):
     schema = make_pattern_schema('iso8601', sc.iso8601bothpattern)
 
