@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import logging
 import idlib
 from idlib.utils import log as _ilog
@@ -13,6 +14,10 @@ from pyontutils.utils import (makeSimpleLogger,
                               timeformat_friendly)
 from . import exceptions as exc
 from .config import auth
+
+
+_find_command = 'gfind' if sys.platform == 'darwin' else 'find'
+
 
 log = makeSimpleLogger('sparcur')
 logd = log.getChild('data')
@@ -328,14 +333,14 @@ def transitive_paths(path, exclude_patterns=tuple()):
     hrm = ' '.join(['-not -path ' + repr(pat) for pat in exclude_patterns])
     if hrm:
         hrm = ' ' + hrm
-    command = f"""find -not -path '.operations*'{hrm}"""
+    command = f"""{_find_command} -not -path '.operations*'{hrm}"""
     # TODO failover to builtin rglob
     return _transitive_(path, command)
 
 
 def transitive_dirs(path):
     """Fast list of all child directories using unix find."""
-    command = """find -type d"""
+    command = f"""{_find_command} -type d"""
     # TODO failover to builtin rglob + filter
     return _transitive_(path, command)
 

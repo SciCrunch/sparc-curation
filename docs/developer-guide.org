@@ -1442,6 +1442,7 @@ Fetch files by extension.
 #+begin_src python :tangle ../sparcur/simple/fetch_files.py
 import os
 from sparcur.paths import Path
+from sparcur.utils import _find_command
 from sparcur.simple.utils import fetch_paths_parallel
 
 
@@ -1450,7 +1451,7 @@ def _datasets_with_extension(path, extension):
 
     # TODO query multiple extensions with -o at the same time
     command = fr"""for d in */; do
-    find "$d" \( -type l -o -type f \) -name '*.{extension}' \
+    {_find_command} "$d" \( -type l -o -type f \) -name '*.{extension}' \
     -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
 done"""
 
@@ -2315,6 +2316,7 @@ import os
 from types import GeneratorType
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
+from sparcur.utils import _find_command
 from sparcur.utils import log, logd, loge, GetTimeNow, PennsieveId
 from sparcur.paths import Path, PennsieveCache
 from sparcur.backends import PennsieveRemote
@@ -2501,7 +2503,7 @@ def rglob(path, pattern):
             path.cache and
             path.cache.cache_ignore)
     exclude = ' '.join([f"-not -path './{p}*'" for p in path.cache.cache_ignore]) if doig else ''
-    command = f"""find {exclude} -name {pattern!r}"""
+    command = f"""{_find_command} {exclude} -name {pattern!r}"""
 
     with path:
         with os.popen(command) as p:
