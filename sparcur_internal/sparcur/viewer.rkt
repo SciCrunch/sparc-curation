@@ -6,7 +6,6 @@
          framework
          gui-widget-mixins
          json
-         ; XXX json-view has lurking quadratic behavior
          json-view)
 
 ;; parameters (yay dynamic variables)
@@ -194,14 +193,12 @@
   (define jhl (get-field json-hierlist jview))
   (define old-root (get-field root jhl))
   (when old-root
-    (send jhl delete-item old-root)) ; this is safe because we force selection at startup
-  (send jview set-json! json) ; FIXME this is where the slowdown is
-  ; even with reduced data size XXX consider having two jviews, one
-  ; visible and one in the background, and render the invisible one in
-  ; the background and then swap when visible, it won't always be
-  ; fast, but at least it will be faster
+    ; this is safe because we force selection at startup
+    ; strangely this code this makes the interface less jerky when scrolling quickly
+    (send jhl delete-item old-root))
+  (send jview set-json! json)
   (define root (get-field root jhl))
-  (send jhl sort json-list-item< #t) ; XXX this is also slow
+  (send jhl sort json-list-item< #t)
   (send root open)
   (define (by-name name items)
     (let ([v (for/list ([i items]
@@ -229,23 +226,46 @@
 (define (dataset-jview! dataset #:update [update #f])
   (let* ([uuid (id-uuid dataset)]
          [hr-jview (hash-ref jviews uuid #f)]
-         [jview (if (and hr-jview (not update))
-                    hr-jview
-                    (let ([jview (or (and update hr-jview)
-                                     (new json-view%
-                                       ;;[font (make-object font% 10 'modern)]
-                                       [parent frame-helper]))])
-                      (let* ([lp (dataset-export-latest-path dataset)]
-                             [json (if lp (path->json lp) (hash 'id (dataset-id dataset)))]
-                             [jhash (for/hash ([(k v) (in-hash json)]
-                                               ; FIXME I think we don't need include keys anymore
-                                               ; XXX false, there are still performance issues
-                                               #:when (member k include-keys))
-                                      (values k v))])
-                        (current-blob json) ; FIXME this will go stale
-                        (set-jview! jview jhash)
-                        (hash-set! jviews uuid jview)
-                        jview)))])
+         [jview
+          (if (and hr-jview (not update))
+              hr-jview
+              (letrec ([hier-class
+                        (class json-hierlist% (super-new)
+                          (rename-super [super-on-item-opened on-item-opened])
+                          (define/override (on-item-opened item)
+                            (define root (get-field json-hierlist jview-inner))
+                            #;
+                            (define-values (x y w h)
+                              (values
+                                 (send root get-x)
+                                 (send root get-y)
+                                 (send root get-width)
+                                 (send root get-height)))
+                            (super-on-item-opened item)
+                            (send root sort json-list-item< #t)
+                            #; ; this isn't working as a way to stabilize the position of the buffer
+                            ; when we get to the end of its content, which is the classic and
+                            ; monumentally stupid behavior of most gui toolkits, not clear what can
+                            ; be done about this
+                            ; XXX the behavior is worse on-item-close so maybe a solution there
+                            (send root scroll-to x y w h #t)))]
+                       [jview-inner
+                        (or (and update hr-jview)
+                            (new json-view%
+                                 [hier-class% hier-class]
+                                 ;;[font (make-object font% 10 'modern)]
+                                 [parent frame-helper]))])
+                (let* ([lp (dataset-export-latest-path dataset)]
+                       [json (if lp (path->json lp) (hash 'id (dataset-id dataset)))]
+                       [jhash (for/hash ([(k v) (in-hash json)]
+                                         ; FIXME I think we don't need include keys anymore
+                                         ; XXX false, there are still performance issues
+                                         #:when (member k include-keys))
+                                (values k v))])
+                  (current-blob json) ; FIXME this will go stale
+                  (set-jview! jview-inner jhash)
+                  (hash-set! jviews uuid jview-inner)
+                  jview-inner)))])
     jview))
 
 (define (get-jview! dataset)
@@ -434,11 +454,14 @@
   (export-dataset (current-dataset)))
 
 (define (fetch-export-current-dataset)
+  ; FIXME TODO check to make sure that the dataset has changed since the last time we retrieved it
+  ; so that we can safely click the button over and over without firing off a download process
   ; FIXME one vs many export
   ; TODO highlight changed since last time
   (fetch-export-dataset (current-dataset)))
 
 (define (json-list-item< a b)
+  "sort json hierlist items"
   (let ([uda (send a user-data)]
         [udb (send b user-data)])
     #;
@@ -575,6 +598,7 @@
         (println "Dataset has not been fetched yet!"))))
 
 (define (match-datasets text datasets)
+  "given text return datasets whose title or identifier matches"
   (if text
       (if (string-contains? text "dataset:")
           (let* ([m (last (string-split text "dataset:"))]
@@ -582,14 +606,17 @@
                            (car (string-split m "/"))
                            m)]
                  [matches (for/list ([d datasets]
-                                     #:when (string=? (id-uuid d) uuid))
+                                     ; use string-contains? instead of string=?
+                                     ; so that incomplete copies still match
+                                     #:when (string-contains? (id-uuid d) uuid))
                             d)])
             (if (null? matches)
                 datasets
                 matches))
           (let ([matches (for/list ([d datasets]
                                     #:when (or (string-contains? (id-uuid d) text)
-                                               (string-contains? (string-downcase (dataset-title d)) text)))
+                                               (string-contains? (string-downcase (dataset-title d))
+                                                                 (string-downcase text))))
                            d)])
             (if (null? matches)
                 datasets
@@ -646,7 +673,11 @@ switch to that"
   (add-function "export-dataset" k-export-dataset)
   (add-function "quit" k-quit)
   (add-function "test-backspace" (λ (a b) (displayln (format "delete all the things! ~a ~a" a b))))
-  (add-function "test-copy" (λ (a b) (displayln (format "copy thing ~a ~a" a b))))
+  (add-function "copy-value" (λ (obj event)
+                               ; TODO proper chaining
+                               (when (is-a? obj json-hierlist%)
+                                 (let ([value (node-data-value (send (send obj get-selected) user-data))])
+                                   (send the-clipboard set-clipboard-string value (current-milliseconds))))))
   (add-function "backward-kill-word" backward-kill-word)
   (add-function "focus-search-box" (λ (a b) (send text-search-box focus)))
   (add-function "open-dataset-folder" cb-open-dataset-folder)
@@ -659,7 +690,7 @@ switch to that"
   (map-function "m:backspace" "backward-kill-word")
   #;
   (map-function "c:r"     "refresh-datasets")
-  (map-function "c:c"     "test-copy")
+  (map-function "c:c"     "copy-value")
   (map-function "c:t"     "test")
   (map-function "f5"      "fetch-export-dataset")
   (map-function "c:t"     "fetch-export-dataset") ; XXX bad overlap with find
