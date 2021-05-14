@@ -122,6 +122,9 @@ class NormAward(NormSimple):
             log.warning(value)
             value = value.replace('-', '-OD')  # hack
 
+        if not value:  # should be caught and reported by the schemas
+            return value
+
         n = (value
              .strip()
              .replace('-', '-')  # can you spot the difference?
