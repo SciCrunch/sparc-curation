@@ -30,7 +30,7 @@ class BlackfynnRemote(aug.RemotePath):
     _renew = __new__
 
     def __new__(cls, *args, **kwargs):
-        BlackfynnRemote._setup(*args, **kwargs)
+        cls._setup(*args, **kwargs)
         return super().__new__(cls)
 
     @classmethod
@@ -1553,7 +1553,7 @@ class PennsieveRemote(BlackfynnRemote):
     _renew = __new__
 
     def __new__(cls, *args, **kwargs):
-        PennsieveRemote._setup(*args, **kwargs)
+        cls._setup(*args, **kwargs)
         return super().__new__(cls)
 
     @staticmethod
@@ -1593,7 +1593,9 @@ class PennsieveRemote(BlackfynnRemote):
         return remote.bfobject.upload(local, display_progress=True)
 
 
-class PennsieveDatasetData(BlackfynnDatasetData):
+class PennsieveDatasetData(RemoteDatasetData):
+
+    cache_base = RemoteDatasetData.cache_path / 'pennsieve-meta'
 
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls)
