@@ -167,13 +167,16 @@ class OrganData:
         soup = BeautifulSoup(resp.content, 'lxml')
         #id = soup.find_all('span', {'id': 'spnPNUMB'})
         table = soup.find_all('table', {'summary': 'Details'})
-        text = table[0].find_all('td')[1].text.strip()
-        if 'Former' in text:
-            award, rest = text.split(' ', 1)
-            rest, former = text.rsplit(' ', 1)
-            return [award, former]
+        if table:
+            text = table[0].find_all('td')[1].text.strip()
+            if 'Former' in text:
+                award, rest = text.split(' ', 1)
+                rest, former = text.rsplit(' ', 1)
+                return [award, former]
+            else:
+                return [text, None]
         else:
-            return [text, None]
+            return ['', None]
 
 
 class MembersData:
