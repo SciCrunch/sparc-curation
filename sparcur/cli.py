@@ -1259,6 +1259,7 @@ done"""
                     paths.append(file)
 
         if paths:
+            n_skipped = 0
             paths = [p for p in paths if not p.is_dir()]
             search_exists = self.options.exists
             if self.options.limit:
