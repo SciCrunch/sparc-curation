@@ -1539,7 +1539,8 @@ class JPointer(str):
  (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm)]
 
 # register other types for fromJson
-register_type(IdentityJsonType, 'PennsieveRemoteMetadata')  # FIXME TODO fully abstract this
+register_type(IdentityJsonType, 'BlackfynnDatasetData')
+register_type(IdentityJsonType, 'PennsieveDatasetData')  # FIXME TODO fully abstract this
 
 # handle old json export that won't stop due to missing BRM
 # XXX let this be a reminder to never allow foreign json in unless it
