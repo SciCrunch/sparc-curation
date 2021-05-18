@@ -285,10 +285,43 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         if self.local_object_cache_path.exists():
             locsize = self.local_object_cache_path.size
             if locsize != meta.size:
-                raise NotImplementedError('TODO yield from local then fetch the rest starting at offset')
+                msg = (f'Partial download detected {locsize} != {meta.size} at'
+                       f'\n{self.local_object_cache_path}')
+                log.info(msg)
+                size = self.local_object_cache_path.size
+                kwargs = {}
+                if size > 0:
+                    if (self.local == self.local_object_cache_path
+                        and size > 4096):  # FIXME hardcoded chunksize
 
-            gen = chain((f'from local cache {self.local_object_cache_path}',),
-                        self.local_object_cache_path.data)
+                        # XXX there is a fantastic edge case where if
+                        # you try to read and write from the same file
+                        # only the first chunk will be written and if
+                        # you are retrieving from remote then the offset
+                        # would be greater than the chunksize so there
+                        # will be a gap, so we set chunksize here and
+                        # issue a critical log
+                        msg = ('You probably did not mean to do this. '
+                               f'Refetching {size - 4096} bytes.')
+                        log.critical(msg)
+                        kwargs['ranges'] = ((4096,),)
+                    else:
+                        kwargs['ranges'] = ((size,),)
+
+                if not hasattr(self._remote_class, '_api'):
+                    # see note below
+                    self._remote_class.anchorToCache(self.anchor)
+
+                rgen = self._remote_class.get_file_by_id(
+                    meta.id, meta.file_id, **kwargs)
+                gen = chain(
+                    (next(rgen),),
+                    self.local_object_cache_path.data,
+                    rgen)
+            else:
+                gen = chain(
+                    (f'from local cache {self.local_object_cache_path}',),
+                    self.local_object_cache_path.data)
         else:
             if not hasattr(self._remote_class, '_api'):
                 # NOTE we do not want to dereference self.remote

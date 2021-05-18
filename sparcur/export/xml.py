@@ -2,7 +2,7 @@ import pathlib
 import idlib
 import rdflib
 import dicttoxml
-from pysercomb.pyr.types import ProtcurExpression, Quantity
+from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ as AsJson
 from sparcur.core import OntTerm, get_all_errors
 from sparcur.utils import loge, is_list_or_tuple
 from sparcur import pipelines as pipes
@@ -19,9 +19,9 @@ def xml(dataset_blobs):
     def normv(v):
         if is_list_or_tuple(v):
             return [normv(_) for _ in v]
-        if isinstance(v, dict):
+        elif isinstance(v, dict):
             return {k:normv(v) for k, v in v.items()}
-        if isinstance(v, str) and v.startswith('http'):
+        elif isinstance(v, str) and v.startswith('http'):
             # needed for loading from json that has been serialized
             # rather than from our internal representation
             # probably better to centralized the reload ...
@@ -37,12 +37,14 @@ def xml(dataset_blobs):
                 loge.exception(e)
                 return v
                 #raise e
-        if isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
+        elif isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
             return ot.asCell()
-        if isinstance(v, ProtcurExpression):
+        elif isinstance(v, ProtcurExpression):
             return str(v)  # FIXME for xml?
-        if isinstance(v, Quantity):
+        elif isinstance(v, Quantity):
+            return str(v)
+        elif isinstance(v, AsJson):  # XXX returns value not tested, may be extremely strange
             return str(v)
         elif isinstance(v, pathlib.Path):
             return str(v)

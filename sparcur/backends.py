@@ -118,14 +118,26 @@ class BlackfynnRemote(aug.RemotePath):
             return cls._api.get_file_url(id, file_id)
 
     @classmethod
-    def get_file_by_id(cls, id, file_id):
+    def get_file_by_id(cls, id, file_id, ranges=tuple()):
         url = cls.get_file_url(id, file_id)
-        yield from cls.get_file_by_url(url)
+        yield from cls.get_file_by_url(url, ranges=ranges)
 
     @classmethod
-    def get_file_by_url(cls, url):
-        """ NOTE THAT THE FIRST YIELD IS HEADERS """
-        resp = cls._requests.get(url, stream=True)
+    def get_file_by_url(cls, url, ranges=tuple()):
+        """ NOTE THAT THE FIRST YIELD IS HEADERS
+        valid ranges are (start,) (-start,) (start, end)
+        """
+
+        kwargs = {}
+        if ranges:
+            # TODO validate probably
+            range_spec = ', '.join(
+                (str(r[0]) if r[0] < 0 else f'{r[0]}-')
+                if len(r) == 1 else '-'.join(str(se) for se in r)
+                for r in ranges)
+            kwargs['headers'] = {'Range': f'bytes={range_spec}'}
+
+        resp = cls._requests.get(url, stream=True, **kwargs)
         headers = resp.headers
         yield headers
         log.debug(f'reading from {url}')
@@ -1449,6 +1461,9 @@ class RemoteDatasetData:
     def data(self):
         """ for uniformity MetadataFile type """
         return self.fromCache()
+
+    def _no_return(self):
+        self()
 
     def __call__(self):
         # FIXME TODO switch to use dict transformers

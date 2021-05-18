@@ -1133,7 +1133,12 @@ def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
         if n_jobs <= 1:
             [p() for p in prepared]
         else:
-            Parallel(n_jobs=n_jobs)(delayed(p)() for p in prepared)
+            # FIXME Paralle isn't really parallel here ...
+            # can't use multiprocessing due to broken aug.RemotePath implementation
+            # LOL PYTHON everything is an object, except when you want to pickle it
+            # then some objects are more equal than others
+            Parallel(n_jobs=n_jobs)(delayed(p._no_return)() for p in prepared)
+
     elif id.type == 'dataset':
         RemotePath = backend_pennsieve(project_id)
         dataset = RemotePath(id)
@@ -1178,6 +1183,9 @@ a consistent view of the data from the file system snapshot.
 # NOTE check where this is used, currently it is only used in simple.pull.main
 # which will trigger only if pull is called without any other arguments and not
 # in an existing project which is not a good way to do any of this
+
+# XXXXXXX  This is mostly useless, fetch_remote_metadata_all works way better
+# because it can simply accpet a dataset id
 #+name: fetch_remote_metadata.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata.py
 from joblib import Parallel, delayed
@@ -1350,6 +1358,24 @@ def main(path=Path.cwd(), **kwargs):
 if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main, after=print)
+#+end_src
+****** Individual file
+#+name: fetch_file.py
+#+begin_src python :tangle ../sparcur/simple/fetch_file.py
+
+
+def main(path=None, **kwargs):
+    if path is not None:
+        # FIXME this will fail if the remote for the file is not in in
+        # the current project, or if the cachedir is not a child of
+        # the top level project directory e.g. in .operations/objects
+        cache = path.cache
+        cache.fetch(size_limit_mb=None)
+
+
+if __name__ == '__main__':
+    from sparcur.simple.utils import pipe_main
+    pipe_main(main)
 #+end_src
 ****** Metadata files
 # ugh I gave myself the name in a loop variable colliding with
@@ -2275,6 +2301,7 @@ from sparcur.config import auth
 __doc__ = f"""Common command line options for all sparcur.simple modules
 Usage:
     sparcur-simple manifest  [options]  [<path>...]
+    sparcur-simple datasets
     sparcur-simple for-racket
     sparcur-simple [options] [<path>...]
     sparcur-simple [options] [--dataset-id=<ID>...]
@@ -2611,10 +2638,25 @@ def main(id=None, **kwargs):
     if id is not None:
         print(id.uuid)
 
-    if 'for_racket' in kwargs and kwargs['for_racket']:
+    if ('datasets' in kwargs and kwargs['datasets'] or
+        'for_racket' in kwargs and kwargs['for_racket']):
         log.setLevel(60)  # logging.CRITICAL = 50
+        from sparcur.config import auth
+        from sparcur.simple.utils import backend_pennsieve
+        if 'project_id' in kwargs and kwargs['project_id']:
+            pass  # project_id from command line
+        else:
+            project_id = auth.get('remote-organization')
+
+        PennsieveRemote = backend_pennsieve(project_id)
+        root = PennsieveRemote(project_id)
+        datasets = list(root.children)
+
+    if 'datasets' in kwargs and kwargs['datasets']:
+        print('\n'.join([d.id for d in datasets]))
+
+    if 'for_racket' in kwargs and kwargs['for_racket']:
         import json
-        <<demo-remote-only>>
         _dsmeta = '\n'.join([f"({json.dumps(d.id)} {json.dumps(d.name)})"
                              for d in datasets])
         dsmeta = f"({_dsmeta})"

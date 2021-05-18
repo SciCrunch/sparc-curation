@@ -363,7 +363,7 @@ class ApiWrapper:
     _dp_class = None
 
     @classmethod
-    def _get_connection(cls, project_id):
+    def _get_connection(cls, project_id):#, retry=10):
         try:
             return cls._api_class(
                 api_token=auth.user_config.secrets(
@@ -374,6 +374,15 @@ class ApiWrapper:
             msg = (f'need record in secrets for {cls._sec_remote} '
                    f'organization {project_id}')
             raise exc.MissingSecretError(msg) from e
+
+        #except Exception as e:  # was absent dsn caching + rate limits
+            #from time import sleep
+            #if 0 < retry:
+                # exponential falloff with the final wait being 10 seconds
+                #sleep(10 ** (1 / retry))
+                #cls._get_connection(project_id, retry=retry - 1)
+            #else:
+                #raise e
 
     def __init__(self, project_id, anchor=None):
         # no changing local storage prefix in the middle of things
