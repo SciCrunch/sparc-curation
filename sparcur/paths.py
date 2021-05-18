@@ -282,6 +282,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         # TODO where to store the chain of prior versions? i.e. do
         # we just keep the xattrs in the object cache? how about file moves?
         # sigh git ...
+        rgen = None
         if self.local_object_cache_path.exists():
             locsize = self.local_object_cache_path.size
             if locsize != meta.size:
@@ -293,7 +294,6 @@ class BFPNCacheBase(PrimaryCache, EatCache):
                 if size > 0:
                     if (self.local == self.local_object_cache_path
                         and size > 4096):  # FIXME hardcoded chunksize
-
                         # XXX there is a fantastic edge case where if
                         # you try to read and write from the same file
                         # only the first chunk will be written and if
@@ -316,8 +316,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
                     meta.id, meta.file_id, **kwargs)
                 gen = chain(
                     (next(rgen),),
-                    self.local_object_cache_path.data,
-                    rgen)
+                    self.local_object_cache_path.data)
             else:
                 gen = chain(
                     (f'from local cache {self.local_object_cache_path}',),
@@ -341,6 +340,12 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         log.debug(self.data_headers)
         if self.local_object_cache_path.exists():
             yield from gen
+            if rgen is None:
+                return
+
+            yield from self.local_object_cache_path._data_setter(
+                rgen, append=True)
+
         else:
             # FIXME we MUST write the metadata first so that we know the expected size
             # so that in the event that the generator is only partially run out we know
@@ -358,12 +363,11 @@ class BFPNCacheBase(PrimaryCache, EatCache):
 
             yield from self.local_object_cache_path._data_setter(gen)
 
-            ls = self.local_object_cache_path.size
-            if ls != meta.size:
-                self.local_object_cache_path.unlink()
-                msg = f'{ls} != {meta.size} for {self}'
-                raise ValueError(msg)  # FIXME TODO
-
+        ls = self.local_object_cache_path.size
+        if ls != meta.size:
+            self.local_object_cache_path.unlink()
+            msg = f'{ls} != {meta.size} for {self}'
+            raise ValueError(msg)  # FIXME TODO
 
     def _meta_is_root(self, meta):
         return meta.id.startswith('N:organization:')
