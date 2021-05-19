@@ -222,6 +222,8 @@ class ContributorsPipeline(DatasourcePipeline):
         if 'contributor_orcid_id' in contributor:
             orcid = contributor['contributor_orcid_id']
             if type(orcid) == str and 'orcid.org' in orcid:
+                # FIXME at some point we need this step to run
+                # norm.NDDF.contributor_orcid
                 orcid = idlib.Orcid(orcid)  # FIXME reloading from json
 
             if isinstance(orcid, idlib.Orcid):
@@ -689,6 +691,11 @@ class JSONPipeline(Pipeline):
 
                 msg = '\n\t'.join(str(t) for t in garbage)
                 logd.warning(f'Garbage truck says:\n{msg}')
+                he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.ffail')
+                for path, value in garbage:
+                    he.addError(f'Filtered due to schema failure: {value}', json_path=path)
+
+                he.embedErrors(data)
 
             # get all error paths
             # filter the paths to remove
@@ -1035,8 +1042,15 @@ class SDSPipeline(JSONPipeline):
 
                [[['contributors']],
                 (lambda cs: [DT.derive(c, [[[['contributor_name']],  # FIXME [['name]] as missing a nesting level
-                                           De.contributor_name,  # and we got no warning ... :/
-                                           [['first_name'], ['last_name']]]])
+                                            De.contributor_name,  # and we got no warning ... :/
+                                            [['first_name'], ['last_name']]],
+                                           # XXXXXXXXXXX TODO actually do the normalization pass
+                                           # in a way that we can detect and warn
+                                           #[[['contributor_orcid']],
+                                            # FIXME need to error on this using nddf error
+                                            #norm.NormDatasetDescriptionFile()._contributor_orcid,
+                                            #[['contributor_orcid']]],
+                                           ])
                             for c in cs]),
                 []],
 
@@ -1477,6 +1491,7 @@ class PipelineEnd(JSONPipeline):
     _curation = [
         'DatasetStructure.curation-error',
         'SubjectsFile.curation-error',
+        'PipelineExtras.ffail',
         'PipelineExtras.data',
         'ProtocolData',  # FIXME this is here as a placeholder
     ]

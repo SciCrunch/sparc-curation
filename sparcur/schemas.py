@@ -674,13 +674,20 @@ class EmbeddedIdentifierSchema(JSONSchema):
                   'description': {'type': 'string'},},}
 
     @classmethod
-    def _to_pattern(cls, obj, *args, path=None, **kwargs):  # FIXME add tests
+    def _to_pattern(cls, obj, *args, path=None, alternates=None, **kwargs):  # FIXME add tests
         if (isinstance(obj, dict) and
             'allOf' in obj and
             (len(obj) == 1 or len(obj) == 2 and 'context_value' in obj) and  # FIXME extremely brittle
             len(obj['allOf']) == 2 and
             obj['allOf'][0] == cls.schema):
-            return obj['allOf'][1]['properties']['id']
+            pattern = obj['allOf'][1]['properties']['id']
+            if alternates is not None:
+                # FIXME SUPER brittle
+                system = obj['allOf'][1]['properties']['system']['enum'][0]
+                if system in alternates:
+                    pattern['pattern'] = pattern['pattern'] + '|' + alternates[system]
+
+            return pattern
 
         else:
             return obj
@@ -931,7 +938,9 @@ class ContributorExportSchema(JSONSchema):
 class ContributorSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(ContributorExportSchema.schema)
-    schema = JApplyRecursive(EIS._to_pattern, __schema)
+    schema = JApplyRecursive(
+        EIS._to_pattern, __schema,
+        alternates={'Orcid': idlib.Orcid._id_class.local_regex})
 
 
 class ContributorsExportSchema(JSONSchema):
@@ -947,10 +956,17 @@ class ContributorsExportSchema(JSONSchema):
               'items': ContributorExportSchema.schema,
             }
 
+
 class ContributorsSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(ContributorsExportSchema.schema)
-    schema = JApplyRecursive(EIS._to_pattern, __schema)
+    schema = JApplyRecursive(
+        EIS._to_pattern, __schema,  # watch out for singular vs plural
+        # >_< also watch out for non-commutative derivation chains,
+        # sigh this is exactly the kind of issue that I was worried
+        # about when I originally took this approach and yes, it is a
+        # mistake and is why DRY is a good thing
+        alternates={'Orcid': idlib.Orcid._id_class.local_regex})
 
 
 class ContributorOutExportSchema(JSONSchema):
@@ -1125,7 +1141,9 @@ class DatasetDescriptionExportSchema(JSONSchema):
 class DatasetDescriptionSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(DatasetDescriptionExportSchema.schema)
-    schema = JApplyRecursive(EIS._to_pattern, __schema)
+    schema = JApplyRecursive(
+        EIS._to_pattern, __schema,
+        alternates={'Orcid': idlib.Orcid._id_class.local_regex})
 
 
 class SubmissionSchema(JSONSchema):
