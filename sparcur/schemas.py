@@ -896,14 +896,16 @@ class ContributorExportSchema(JSONSchema):
             'contributor_orcid': EIS._allOf(
                 OrcidSchema,
                 context_value=idtype('sparc:hasORCIDId')),
-            'data_remote_user_id': EIS._allOf(
-                PennsieveIdSchema,
-                context_value=idtype('TEMP:hasDataRemoteUserId')),
-            'blackfynn_user_id': EIS._allOf(
-                BlackfynnIdSchema,
-                context_value=idtype('TEMP:hasBlackfynnUserId')),
+            #'data_remote_user_id': EIS._allOf(
+                #PennsieveIdSchema,
+                #context_value=idtype('TEMP:hasDataRemoteUserId')),
+            'data_remote_user_id': strcont(idtype('TEMP:hasDataRemoteUserId')),
+            #'blackfynn_user_id': EIS._allOf(
+                #BlackfynnIdSchema,
+                #context_value=idtype('TEMP:hasBlackfynnUserId')),
+            'blackfynn_user_id': strcont(idtype('TEMP:hasBlackfynnUserId')),
             'contributor_affiliation': {
-                'oneOf': [EIS._allOf(RorSchema),
+                'oneOf': [EIS._allOf(RorSchema),  # FIXME oneOf issues with EIS
                           {'type': 'string'}],
                 'context_value': idtype('TEMP:hasAffiliation')
             },
@@ -1197,11 +1199,17 @@ _software_schema = {'type': 'array',
 
 
 subsam_common_properties = {  # FIXME these should not be in the samples sheet, or if they are they refer to the sample
-    'species': strcont('sparc:animalSubjectIsOfSpecies'),
-    'strain': strcont('sparc:animalSubjectIsOfStrain'),
+    'species': {'anyOf': [EIS._allOf(OntTermSchema),
+                          {'type': 'string'},],
+                'context_value': 'sparc:animalSubjectIsOfSpecies'},
+    'strain': {'anyOf': [EIS._allOf(OntTermSchema),
+                         {'type': 'string'},],
+                'context_value': 'sparc:animalSubjectIsOfStrain'},
     'rrid_for_strain': EIS._allOf(RridSchema, context_value=idtype('TEMP:specimenRRID')),  # XXX CHANGE from sparc:specimenHasIdentifier
     'genus': strcont('sparc:animalSubjectIsOfGenus'),
-    'sex': {'type': 'string',
+    'sex': {'anyOf': [EIS._allOf(OntTermSchema),
+                      # FIXME oneOf fails when EIS is converted to input type
+                      {'type': 'string'}],
             'context_value': 'TEMP:hasBiologicalSex',  # FIXME idtype
             },  # sex as a variable ?
 
@@ -1663,11 +1671,10 @@ class MetaOutExportSchema(JSONSchema):
                                      },},
                              'context_value': idtype('TEMP:hasAdditionalLinks'),  # TODO
                              },
-        'species': {'oneOf': [
-            {'type': 'string',
-             'context_value': idtype('isAbout'),  # FIXME vs has part generated from participant
-             },
-            EIS._allOf(OntTermSchema),]},
+        'species': {'anyOf': [EIS._allOf(OntTermSchema),
+                              {'type': 'string',},],
+                    'context_value': idtype('isAbout'),  # FIXME vs has part generated from participant
+                    },
         'template_schema_version': {'type': 'string'},
         'organ': {'type': 'array',
                   'minItems': 1,
