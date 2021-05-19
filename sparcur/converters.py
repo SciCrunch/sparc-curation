@@ -9,7 +9,7 @@ from pyontutils.namespaces import rdf, rdfs, owl, dc
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur.core import OntId, OntTerm, lj
-from sparcur.utils import log, logd, loge, fromJson
+from sparcur.utils import log, logd, loge, fromJson, BlackfynnId
 from sparcur.protocols import ProtocolData
 
 
@@ -29,7 +29,9 @@ class TripleConverter(dat.HasErrors):
     @classmethod
     def setup(cls):
         for attr, predicate in cls.mapping:
-            def _func(self, value, p=predicate): return p, self.l(value)
+            def _func(self, value, p=predicate):
+                return p, self.l(value)
+
             setattr(cls, attr, _func)
 
     _pyru_loaded = False
@@ -49,6 +51,10 @@ class TripleConverter(dat.HasErrors):
             self.__class__._pyru_loaded = True
 
     def l(self, value):
+        if isinstance(value, BlackfynnId):
+            # FIXME this has to come first due ordering and impl issues with
+            # bfpnids being streams but not supporting all sorts of stuff
+            return rdflib.URIRef(value.uri_api)
         if isinstance(value, idlib.Stream) and hasattr(value, '_id_class'):
             if hasattr(value, 'asUri'):  # FIXME
                 return value.asUri(rdflib.URIRef)
@@ -124,9 +130,9 @@ class TripleConverter(dat.HasErrors):
                         continue
 
                     #log.debug((o, v))
-                    a = (isinstance(o, idlib.Stream) and hasattr(o, '_id_class')
+                    a = (isinstance(o, idlib.Stream) and hasattr(o, 'asUri')
                          or isinstance(o, OntTerm))
-                    b = (isinstance(v, idlib.Stream) and hasattr(v, '_id_class')
+                    b = (isinstance(v, idlib.Stream) and hasattr(v, 'asUri')
                          or isinstance(v, OntTerm))
                     if (a or b):
                         # FIXME this thing is a mess ...
@@ -176,6 +182,8 @@ class ContributorConverter(TripleConverter):
         ('contributor_affiliation', TEMP.hasAffiliation),
         ('affiliation', TEMP.hasAffiliation),  # FIXME iri vs literal
         ('blackfynn_user_id', TEMP.hasBlackfynnUserId),
+        ('data_remote_user_id', TEMP.hasDataRemoteUserId),
+        ('contributor_orcid', sparc.hasORCIDId),
         ('contributor_orcid_id', sparc.hasORCIDId),
         )
  
@@ -202,7 +210,9 @@ ContributorConverter.setup()
 class DatasetContributorConverter(TripleConverter):
     """ dataset <-> contributor mapping """
     known_skipped = ('id', 'contributor_name', 'first_name', 'last_name',
-                     'contributor_orcid_id', 'contributor_affiliation', 'blackfynn_user_id')
+                     'contributor_orcid_id', 'contributor_orcid',
+                     'contributor_affiliation',
+                     'data_remote_user_id', 'blackfynn_user_id')
 
     mapping = (
         ('is_contact_person', sparc.isContactPerson),

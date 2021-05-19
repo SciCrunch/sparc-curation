@@ -14,7 +14,7 @@ import requests
 import ontquery as oq
 from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
-from sparcur.utils import logd
+from sparcur.utils import logd, BlackfynnId, PennsieveId
 from sparcur.core import JEncode, JApplyRecursive, JPointer, OntCuries
 from pyontutils.utils import asStr
 from pyontutils.namespaces import TEMP, TEMPRAW, sparc, unit, PREFIXES as uPREFIXES, ilxtr
@@ -656,6 +656,8 @@ RorSchema = make_id_schema(idlib.Ror)
 OrcidSchema = make_id_schema(idlib.Orcid)
 PioSchema = make_id_schema(idlib.Pio)
 RridSchema = make_id_schema(idlib.Rrid)
+BlackfynnIdSchema = make_id_schema(BlackfynnId)
+PennsieveIdSchema = make_id_schema(PennsieveId)
 
 
 class EmbeddedIdentifierSchema(JSONSchema):
@@ -891,13 +893,20 @@ class ContributorExportSchema(JSONSchema):
             'middle_name': strcont('TEMP:middleName'),
             'last_name': {'type': 'string',
                           'context_value': 'sparc:lastName',},
-            'contributor_orcid': EIS._allOf(OrcidSchema, context_value=idtype('sparc:hasORCIDId')),
-            'data_remote_user_id': strcont(idtype('TEMP:hasDataRemoteUserId')),
-            'blackfynn_user_id': strcont(idtype('TEMP:hasBlackfynnUserId')),
-            'contributor_affiliation': {'anyOf': [EIS._allOf(RorSchema),
-                                                  {'type': 'string'}],
-                                        'context_value': idtype('TEMP:hasAffiliation')
-                                        },
+            'contributor_orcid': EIS._allOf(
+                OrcidSchema,
+                context_value=idtype('sparc:hasORCIDId')),
+            'data_remote_user_id': EIS._allOf(
+                PennsieveIdSchema,
+                context_value=idtype('TEMP:hasDataRemoteUserId')),
+            'blackfynn_user_id': EIS._allOf(
+                BlackfynnIdSchema,
+                context_value=idtype('TEMP:hasBlackfynnUserId')),
+            'contributor_affiliation': {
+                'oneOf': [EIS._allOf(RorSchema),
+                          {'type': 'string'}],
+                'context_value': idtype('TEMP:hasAffiliation')
+            },
             'contributor_role': {
                 'type':'array',
                 'context_value': idtype('TEMP:hasRole', base=str(TEMP)),
@@ -1654,9 +1663,11 @@ class MetaOutExportSchema(JSONSchema):
                                      },},
                              'context_value': idtype('TEMP:hasAdditionalLinks'),  # TODO
                              },
-        'species': {'type': 'string',
-                    'context_value': idtype('isAbout'),
-                    },
+        'species': {'oneOf': [
+            {'type': 'string',
+             'context_value': idtype('isAbout'),  # FIXME vs has part generated from participant
+             },
+            EIS._allOf(OntTermSchema),]},
         'template_schema_version': {'type': 'string'},
         'organ': {'type': 'array',
                   'minItems': 1,
@@ -1718,7 +1729,7 @@ class DatasetOutExportSchema(JSONSchema):
     __schema['properties'] = {
         'id': {'type': 'string',  # ye old multiple meta/bf id issue
                'pattern': '^N:dataset:'},
-        'meta': MetaOutExportSchema.schema,
+        'meta': MetaOutExportSchema.schema,  # XXXXXXXXXXX wrong types ??
         #'readme': {'type': 'string',},  # TODO ...
         'rmeta': {'type': 'object',
                   # FIXME TODO not entirely sure how to deal with embedding remote metadata about

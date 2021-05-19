@@ -1,7 +1,10 @@
+import copy
+import pickle
 import unittest
 import pytest
 import idlib
 from sparcur.utils import BlackfynnId, PennsieveId
+from idlib.streams import HelpTestStreams
 
 
 class TestBlackfynnId(unittest.TestCase):
@@ -60,8 +63,25 @@ class TestBlackfynnId(unittest.TestCase):
         except idlib.exc.MalformedIdentifierError as e:  # FIXME malformed id error?
             pass
 
+    def test_pickle(self):
+        thing = self._id_class(self.cases[0])
+        hrm = pickle.dumps(thing)
+        tv = pickle.loads(hrm)
+        assert tv == thing
+
+    def test_copy(self):
+        thing = self._id_class(self.cases[0])
+        thing_prime = copy.deepcopy(thing)
+        assert thing_prime == thing
+
 
 class TestPennsieveId(TestBlackfynnId):
 
     _id_class = PennsieveId
     cases = tuple([c.replace('blackfynn', 'pennsieve') for c in TestBlackfynnId.cases])
+
+
+@pytest.mark.skip('TODO, need merge of idlib and augpathlib')
+class TestIdlibPennsieveId(HelpTestStreams, unittest.TestCase):
+    stream = PennsieveId
+    ids = TestPennsieveId.cases

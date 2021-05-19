@@ -622,6 +622,9 @@ class BlackfynnId(idlib.Identifier):
      types, paths, path_elem_regex, uri_api_regex, org_pref,
      uri_human_regex, compiled) = make_bf_id_regex(top_level_domain)
 
+    def __reduce__(self):
+        return self.__class__, (self.id, self.type, self.file_id)
+
     def __new__(cls, id_uri_curie_uuid, type=None, file_id=None):
         # TODO validate structure
         # TODO binary uuid
@@ -675,6 +678,13 @@ class BlackfynnId(idlib.Identifier):
         # to unpack file_id because id and file_id are dissociated
         return self
 
+    def __init__(self, *args, **kwargs):
+        self._identifier = self.curie # XXXXXXXXXXXX FIXME this is probably going to cause issues
+
+    def __str__(self):
+        # uri_api would be a more consistent approach but there is a balance
+        return self.curie # XXXXXXXXXXXX FIXME this is probably going to cause issues
+
     def __repr__(self):
         file_id = '' if self.file_id is None else f', file_id={self.file_id}'
         return f'{self.__class__.__name__}({self.id}{file_id})'
@@ -705,8 +715,10 @@ class BlackfynnId(idlib.Identifier):
             endpoint = 'datasets/' + self.id
         elif self.type == 'organization':
             endpoint = 'organizations/' + self.id
+        elif self.type == 'user':
+            endpoint = 'users/' + self.id
         else:
-            raise NotImplementedError(f'{self.type} TODO need api endpoint')
+            raise NotImplementedError(f'TODO type {self.type} needs api endpoint')
 
         return f'https://api.{self.top_level_domain}/' + endpoint
 

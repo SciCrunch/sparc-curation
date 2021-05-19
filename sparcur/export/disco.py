@@ -49,7 +49,7 @@ def disco(dataset_blobs, graphs):
            'timestamp_updated_contents',
     ]
     chs = ['contributor_affiliation',
-           'contributor_orcid_id',
+           'contributor_orcid',  # XXX note the change from with _id
            'contributor_role',
            'is_contact_person',
            'name',
@@ -57,7 +57,7 @@ def disco(dataset_blobs, graphs):
            'last_name',
            'middle_name',
            'id',
-           'blackfynn_user_id',]
+           'data_remote_user_id',]
 
     datasets = [['id', 'submission_index', 'curation_index'] + dsh]
     contributors = [['id'] + chs]

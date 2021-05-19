@@ -16,7 +16,7 @@ from sparcur.core import (adops,
                           OntCuries,
                           OntId,
                           curies_runtime,)
-from sparcur.utils import loge, log
+from sparcur.utils import loge, log, BlackfynnId
 from sparcur.protocols import ProtcurData
 
 
@@ -186,8 +186,10 @@ class TriplesExportDataset(TriplesExport):
 
         cid = contributor['id']
 
-        if isinstance(cid, idlib.Stream):  # FIXME nasty branch
+        if isinstance(cid, idlib.Stream) and hasattr(cid, 'asUri'):  # FIXME nasty branch
             s = cid.asUri(rdflib.URIRef)
+        elif isinstance(cid, BlackfynnId):
+            s = rdflib.URIRef(cid.uri_api)
         elif isinstance(cid, dict):
             if isinstance(cid['id'], idlib.Stream):  # FIXME nasty branch
                 s = cid['id'].asUri(rdflib.URIRef)
@@ -196,8 +198,12 @@ class TriplesExportDataset(TriplesExport):
         else:
             s = rdflib.URIRef(cid)  # FIXME json reload needs to deal with this
 
+        if 'data_remote_user_id' in contributor:
+            userid = rdflib.URIRef(contributor['data_remote_user_id'].uri_api)  # FIXME
+            yield s, TEMP.hasDataRemoteUserId, userid
+
         if 'blackfynn_user_id' in contributor:
-            userid = rdflib.URIRef(contributor['blackfynn_user_id'])
+            userid = rdflib.URIRef(contributor['blackfynn_user_id'].uri_api)  # FIXME
             yield s, TEMP.hasBlackfynnUserId, userid
 
         yield s, rdf.type, owl.NamedIndividual

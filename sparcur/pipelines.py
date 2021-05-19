@@ -24,6 +24,7 @@ from sparcur import normalization as norm
 from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries, get_nested_by_key
 from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
+from sparcur.utils import PennsieveId  # XXXXX FIXME
 from sparcur.state import State
 from sparcur.config import auth
 from sparcur.derives import Derives
@@ -209,8 +210,8 @@ class ContributorsPipeline(DatasourcePipeline):
 
             if member is not None:
                 _base_uri = State.blackfynn_local_instance.bf._api._host  # FIXME XXX
-                userid = OntId(_base_uri + '/users/' + member.id)
-                contributor['blackfynn_user_id'] = userid
+                userid = PennsieveId(_base_uri + '/users/' + member.id)
+                #contributor['blackfynn_user_id'] = userid
                 contributor['data_remote_user_id'] = userid
 
         else:
@@ -219,8 +220,8 @@ class ContributorsPipeline(DatasourcePipeline):
             log.warning(f'No name!' + lj(contributor))
 
         orcid = None
-        if 'contributor_orcid_id' in contributor:
-            orcid = contributor['contributor_orcid_id']
+        if 'contributor_orcid' in contributor:
+            orcid = contributor['contributor_orcid']
             if type(orcid) == str and 'orcid.org' in orcid:
                 # FIXME at some point we need this step to run
                 # norm.NDDF.contributor_orcid
@@ -890,7 +891,7 @@ class LoadIR(JSONPipeline):
     """ Reload the internal python types from a json export """
 
     # TODO by key vs by path
-    #updates = [['contributors', 'contributor_orcid_id'], derives.LoadIR.function]
+    #updates = [['contributors', 'contributor_orcid'], derives.LoadIR.function]
 
     @classmethod
     def check(cls):
@@ -1454,7 +1455,7 @@ class PipelineEnd(JSONPipeline):
         'RawJsonDatasetDescription.data',
 
         'NormDatasetDescriptionFile',
-        #'NormDatasetDescriptionFile.contributor_orcid_id',
+        #'NormDatasetDescriptionFile.contributor_orcid',
         #'NormDatasetDescriptionFile.contributor_role',
         #'NormDatasetDescriptionFile.funding',
         #'NormDatasetDescriptionFile.originating_article_doi',
