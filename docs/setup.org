@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.0; orgstrap-block-checksum: 429cd137fc35934c4475a1c3c382ee0116a4a42ae0d4641dd4b39bebc1b90b6a; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.0; orgstrap-block-checksum: 7a2a2df9ff417697fb9d4a5593abf0ebf92eafbe69350b8ec92b570ade84ae3e; -*-
 #+TITLE: Developer and curator setup guide
 #+AUTHOR: Tom Gillespie
 # [[./setup.pdf]]
@@ -219,8 +219,8 @@ key1:
   key2:
     key3: fake-value
 #+END_SRC
-**** Blackfynn
-Once you have a Blackfynn account on the sparc org go to your
+**** Pennsieve
+Once you have a Pennsieve account on the sparc org go to your
 [[https://app.blackfynn.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/profile/][profile]]
 and create an API key. Put they key in =(-> blackfynn sparc key)= and the secret in =(-> blackfynn sparc secret)=.
 While you are there you should also connect your ORCiD (button at the bottom of the page).
@@ -264,12 +264,14 @@ Document id matches this pattern =https://docs.google.com/spreadsheets/d/{docume
 **** protocols.io
 To get protocols.io API keys [[https://www.protocols.io/create][create an account]],
 login, and go to your [[https://www.protocols.io/developers][developer page]].
-You will need to set the redirect uri on that page to match the redirect uri
-in the json below.
+
+*You will need to set the redirect uri on that page to match the*
+*redirect uri in the json below.*
 
 Use the information from that page to fill in a json file with the structure below.
 Add the full path to that json file to =(-> protocols-io api creds-file)= in secrets.yaml
 like you did for the google json file.
+
 #+CAPTION: protocols.io creds-file.json template
 #+BEGIN_SRC js
 {
@@ -284,6 +286,7 @@ like you did for the google json file.
     }
 }
 #+END_SRC
+# FIXME tell users to run spc shell I think? idlib.Pio._setup()
 You will be prompted for your protocols.io email and password the first
 time you run.
 **** Hypothes.is
@@ -842,6 +845,7 @@ sparc-export-to-server
 function fetch-and-run-reports () {
     local FN="/tmp/curation-export-$(date -Is).json"
     curl https://cassava.ucsd.edu/sparc/preview/exports/curation-export.json -o "${FN}"
+    spc sheets update Organs --export-file "${FN}"
     spc report all --sort-count-desc --to-sheets --export-file "${FN}"
 }
 fetch-and-run-reports
@@ -850,7 +854,7 @@ fetch-and-run-reports
 #+begin_src bash
 function preview-sparc-export-to-server () {
     : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
-    EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/integrated/
+    EXPORT_BASE=${SPARCUR_EXPORTS}/618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/integrated/
     FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
     FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
     pushd /var/www/sparc/sparc/preview
@@ -1062,6 +1066,13 @@ find . -type l -not -path '*operations*' -exec readlink -n {} \; -print
 #+begin_src bash
 for d in */; do printf "$(find "${d}" -print | wc -l) "; printf "$(getfattr --only-values -n user.bf.id "${d}") ${d}\n" ; done | sort -n
 #+end_src
+**** Debug units serialization
+Until we fix compound units parsing for the round trip we might
+accidentally encounter and error along the lines of
+=ValueError: Unit expression cannot have a scaling factor.=
+#+begin_src bash
+jq -C '.. | .units? // empty' /tmp/curation-export-*.json | sort -u
+#+end_src
 ** SODA
 Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
 #+header: :var parent_folder="~/files/blackfynn_local/"
@@ -1115,8 +1126,8 @@ Minor versions such as =dataset-template-1.2.1= are allowed.
 
 Attach =${CLEANROOM}/DatasetTemplate.zip= as a release asset.
 Update
-https://github.com/Blackfynn/docs.sparc.science/blob/master/pages/data_submission/submit_data.md
-https://github.com/Blackfynn/docs.sparc.science/blob/master/pages/sparc_portal/sparc_data_format.md
+https://github.com/Pennsieve/docs.sparc.science/blob/master/pages/data_submission/submit_data.md
+https://github.com/Pennsieve/docs.sparc.science/blob/master/pages/sparc_portal/sparc_data_format.md
 and
 with the new link.
 [[file:../../docs.sparc.science/pages/data_submission/submit_data.md][Link to the local copy.]]
@@ -1240,14 +1251,14 @@ except AttributeError as e:
 :END:
 If a dataset is removed, just move it manually to trash IF it is clear that it
 was supposed to be removed, otherwise to consult the curation team. You can confirm
-that it was actually removed by checking Blackfynn directly using DATASETID from
+that it was actually removed by checking Pennsieve directly using DATASETID from
 the error trace.
-#+begin_src 
+#+begin_example bash
 spc meta -u "$(spc goto ${DATASETID})"
-#+end_src
+#+end_example
 
 Example trace.
-#+begin_src 
+#+begin_example
 Future exception was never retrieved
 future: <Future finished exception=Exception("No dataset matching name or ID 'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053'.",)>
 Traceback (most recent call last):
@@ -1278,7 +1289,7 @@ sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc goto 'N:dataset:83e0
 Hackathon Team Materials
 sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ mv Hackathon\ Team\ Materials ../.trash/
 sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
-#+end_src
+#+end_example
 * Variables :noexport:
 :PROPERTIES:
 :VISIBILITY: folded
@@ -1411,6 +1422,21 @@ NIF-Ontology/
 :CUSTOM_ID: config-templates
 :VISIBILITY: folded
 :END:
+=~/.config/idlib/config.yaml=
+#+name: idlib-config-defaults
+#+caption: [[file:${HOME}/.config/idlib/config.yaml][~/.config/idlib/config.yaml]]
+#+header: :export neither
+#+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "idlib/config.yaml")))) (user-config-path "idlib/config.yaml")) :mkdirp yes
+auth-stores:
+  secrets:
+    path: '{:user-config-path}/orthauth/secrets.yaml'
+auth-variables:
+  cache-path:
+  log-path:
+  protocols-io-api-creds-file: protocols-io api creds-file
+  protocols-io-api-store-file: protocols-io api store-file
+#+end_src
+
 =~/.config/pyontutils/config.yaml=
 #+name: pyontutils-config-defaults
 #+caption: [[file:${HOME}/.config/pyontutils/config.yaml][~/.config/pyontutils/config.yaml]]
@@ -1451,26 +1477,36 @@ auth-stores:
   secrets:
     path: '{:user-config-path}/orthauth/secrets.yaml'
 auth-variables:
-  blackfynn-organization:
   cache-path:
+  datasets-no:
+  datasets-noexport:
+  datasets-sparse:
+  datasets-test:
   export-path:
+  google-api-service-account-file-readonly: google api saro
+  google-api-service-account-file-rw:
   hypothesis-api-key: hypothesis api default-user
   hypothesis-group: hypothesis group sparc-curation
   hypothesis-user:
   log-path:
-  protocols-io-api-creds-file: protocols-io api creds-file
-  protocols-io-api-store-file: protocols-io api store-file
+  preview:
+  remote-backoff-factor:
+  remote-cli-path:
+  remote-organization: N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0
+  resources:
+  sparse-limit:
 #+end_src
 
+Secrets template for full development setup.
 =~/.config/orthauth/secrets.yaml=
 #+name: secrets-template
 #+caption: [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
 #+header: :tangle-mode (identity #o600)
 #+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
-blackfynn:
+pennsieve:
   N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
-    key: *replace-me-with:your-blackfynn-api-key*
-    secret: *replace-me-with:your-blackfynn-api-secret*
+    key: *replace-me-with:your-pennsieve-api-key*
+    secret: *replace-me-with:your-pennsieve-api-secret*
 google:
   api:
     creds-file: *replace-me-with:/path/to/creds-file.json*
@@ -1492,6 +1528,31 @@ hypothesis:
 protocols-io:
   api:
     creds-file: *replace-me-with:/path/to/creds-file.json*
+    store-file: protocols-io-api-token-rw.pickle
+#+end_src
+
+Secrets template for minimal viewer setup.
+=~/.config/orthauth/secrets.yaml=
+#+name: secrets-viewer-minimal
+#+caption: [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
+#+header: :tangle-mode (identity #o600)
+#+begin_src yaml
+pennsieve:
+  N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
+    key: *replace-me-with:your-pennsieve-api-key*
+    secret: *replace-me-with:your-pennsieve-api-secret*
+google:
+  api:
+    saro: *replace-me-with:path-to-service-account.json*
+  sheets:
+    sparc-field-alignment: *replace-me-with:document-hash-id*
+    sparc-affiliations: *replace-me-with:document-hash-id*
+    anno-tags: *replace-me-with:document-hash-id*
+protocols-io:
+  # FIXME robobrowser not a dependency in some setup.py
+  # FIXME robobrowser has a broken werkzeug import that has to be fixed manually
+  api:
+    creds-file: client_secret_protocols.io.json
     store-file: protocols-io-api-token-rw.pickle
 #+end_src
 *** Bootstrap code
@@ -1759,6 +1820,12 @@ racket-json-view/
 
 (when (eq system-type 'windows-nt)
   (advice-add #'org-babel--shell-command-on-region :around #'orgstrap---advise-ob-scor-windows))
+
+(org-babel-do-load-languages 'org-babel-load-languages
+                             ;; TODO powershell
+                             (append org-babel-load-languages
+                                     '((shell . t)
+                                       (python . t))))
 #+end_src
 
 # Local Variables:
