@@ -294,7 +294,7 @@ function sparc-get-all-remote-data () {
     # need it to finish to set the PROJECT_PATH variable here
     echo python -m sparcur.simple.clone --project-id "${PROJECT_ID}" --parent-path "${PARENT_PATH}" "${maybe_slot[@]}"
     echo "Cloning top level"
-    set -o pipestatus
+    set -o pipefail
     PROJECT_PATH=$(python -m sparcur.simple.clone \
                           --project-id "${PROJECT_ID}" \
                           --parent-path "${PARENT_PATH}" \
