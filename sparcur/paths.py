@@ -80,6 +80,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
 
     _backup_cache = SqliteCache
     _not_exists_cache = SymlinkCache
+    _actually_crumple = False
 
     cypher = hashlib.sha256  # set the remote hash cypher on the cache class
 
@@ -109,6 +110,14 @@ class BFPNCacheBase(PrimaryCache, EatCache):
     def _fs_safe_id(self):
         id = self.identifier
         return id.type[0] + '-' + id.uuid
+
+    def crumple(self):
+        """Avoid creating massive numbers of inodes by trashing paths during
+           sync of old datasets."""
+        if self.__class__._actually_crumple:
+            super().crumple()
+        else:
+            self.unlink()
 
     @property
     def _trashed_path(self):
