@@ -1539,6 +1539,7 @@ class JPointer(str):
  (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm)]
 
 # register other types for fromJson
+register_type(IdentityJsonType, 'BlackfynnRemoteMetadata')  # legacy type string
 register_type(IdentityJsonType, 'BlackfynnDatasetData')
 register_type(IdentityJsonType, 'PennsieveDatasetData')  # FIXME TODO fully abstract this
 
