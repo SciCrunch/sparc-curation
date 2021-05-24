@@ -877,12 +877,31 @@ function preview-export-rest () {
 }
 #+end_src
 
+#+begin_src bash :dir "/ssh:cassava-sparc:" :eval never
+# git repos are in ~/files/venvs/sparcur-dev/git
+# use the development pull code
+source ~/files/venvs/sparcur-dev/bin/activate
+source ~/files/venvs/sparcur-dev/git/sparc-cruation/bin/pipeline-functions.sh
+pushd ~/files/
+PARENT_PATH=$(sparc-time-friendly)
+sparc-get-all-remote-data \
+    --symlink-objects-to ~/files/blackfynn_local/SPARC\ Consortium_20200601/.operations/objects/ \
+    --parent-path "${PARENT_PATH}"
+pushd "${PARENT_PATH}/SPARC Consortium"
+spc export
+find -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -print0 | \
+     xargs -0 -I{} -P8 -r -n 1 python -m sparcur.simple.path_metadata_validate --export-path ../exports/ {}
+echo "${PARENT_PATH}"
+unset PARENT_PATH
+#+end_src
+
 An example. Get =DATE1= from =spc export= or from the output of
 =preview-sparc-export-to-server=. Get =DATE2= from the file system
 path created by the initial call to =sparc-get-all-remote-data=.
-#+begin_src bash :eval never
+Export time is usually later than parent time.
+#+begin_src bash :dir /ssh:cassava|sudo:cassava :eval never
 preview-sparc-export-to-server
-preview-export-rest 2021-03-15T12:35:57,792099-07:00 2021-03-15T121043,216667-0700
+preview-export-rest ${EXPORT_PATH_TIME} ${PARENT_PATH_TIME}
 #+end_src
 *** Reporting
 :PROPERTIES:

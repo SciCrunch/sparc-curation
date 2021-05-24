@@ -194,32 +194,8 @@ digraph G {
 # FIXME this is really an env file not a bin file ...
 #+name: pipeline-functions-sparc-get-all-remote-data
 #+begin_src bash -r -l "\([[:space:]]*#[[:space:]]*(ref:%s)\|[[:space:]]*(ref:%s)\)$" :tangle ../bin/pipeline-functions.sh :mkdirp yes
-function sparc-get-all-remote-data () {
-    # NOTE not quite all the remote data, the google sheets
-    # don't have caching functionality yet
+function sparc-time-friendly () {
 
-    # parse args
-    local POSITIONAL=()
-    while [[ $# -gt 0 ]]
-    do
-    key="$1"
-    case $key in # (ref:(((((((sigh)
-        --project-id)         local PROJECT_ID="${2}"; shift; shift ;;
-        --symlink-objects-to) local SYMLINK_OBJECTS_TO="${2}"; shift; shift ;;
-        --log-path)           local LOG_PATH="${2}"; shift; shift ;;
-        --parent-path)        local PARENT_PATH="${2}"; shift; shift ;;
-        --only-filesystem)    local ONLY_FILESYSTEM="ONLY_FS"; shift ;;
-        -h|--help)            echo "${HELP}"; return ;;
-        ,*)                    POSITIONAL+=("$1"); shift ;;
-    esac
-    done
-
-    # Why, you might be asking, are we declaring a local project path here without assignment?
-    # Well. Let me tell you. Because local is a command with an exist status. So it _always_
-    # returns zero. So if you need to check the output of the command running in a subshell
-    # that you are assigning to a local variable _ALWAYS_ set local separately first.
-    # Yes, shellcheck does warn about this. See also https://superuser.com/a/1103711
-    local PROJECT_PATH
     local UTC_OFFSET_START
     local TIME_START_NO_OFFSET
 
@@ -246,11 +222,51 @@ function sparc-get-all-remote-data () {
     # representation is not entirely clear, however I _think_ that %FT%T%H%M%S,%6N%z is ok but
     # the -/+ must stay between the timezone and the rest, so we will have to grab tz by itself
     local TIME_START_SAFE=${TIME_START_NO_OFFSET_FS_OK//-/}${UTC_OFFSET_START_FS_OK}  # XXX unused
+    mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START_FRIENDLY}" || \
+        { CODE=$?; echo 'mv failed'; return $CODE; }
+    echo "${TIME_START_FRIENDLY}"
+
+}
+
+function sparc-get-all-remote-data () {
+    # NOTE not quite all the remote data, the google sheets
+    # don't have caching functionality yet
+
+    # parse args
+    local POSITIONAL=()
+    while [[ $# -gt 0 ]]
+    do
+    key="$1"
+    case $key in # (ref:(((((((sigh)
+        --project-id)         local PROJECT_ID="${2}"; shift; shift ;;
+        --symlink-objects-to) local SYMLINK_OBJECTS_TO="${2}"; shift; shift ;;
+        --log-path)           local LOG_PATH="${2}"; shift; shift ;;
+        --parent-path)        local PARENT_PATH="${2}"; shift; shift ;;
+        --only-filesystem)    local ONLY_FILESYSTEM="ONLY_FS"; shift ;;
+        -h|--help)            echo "${HELP}"; return ;;
+        ,*)                    POSITIONAL+=("$1"); shift ;;
+    esac
+    done
+
+    # Why, you might be asking, are we declaring a local project path here without assignment?
+    # Well. Let me tell you. Because local is a command with an exist status. So it _always_
+    # returns zero. So if you need to check the output of the command running in a subshell
+    # that you are assigning to a local variable _ALWAYS_ set local separately first.
+    # Yes, shellcheck does warn about this. See also https://superuser.com/a/1103711
+    local PROJECT_PATH
+
     if [[ -z "${PARENT_PATH}" ]]; then
-        mv "$(mktemp --directory sparcur-all-XXXXXX)" "${TIME_START_FRIENDLY}" || \
-            { CODE=$?; echo 'mv failed'; return $CODE; }
+        local PARENT_PATH
+        set -o pipefail
+        PARENT_PATH=$(sparc-time-friendly) || {
+        CODE=$?;
+        echo "Creating "'${PARENT_PATH}'" failed!"
+        set +o pipefail
+        return $CODE;
+        }
+        set +o pipefail
     fi
-    local PARENT_PATH=${PARENT_PATH:-$TIME_START_FRIENDLY}
+
     local LOG_PATH=${LOG_PATH:-"${PARENT_PATH}/logs"}
 
     #local LOG_PATH=$(python -c "from sparcur.config import auth; print(auth.get_path('log-path'))")
@@ -384,6 +400,8 @@ function sparc-get-all-remote-data () {
         echo "${PROJECT_PATH}"
         return 1
     fi
+    echo "All fetching completed successfully."
+
 }
 #+end_src
 *** _*Validate*_
