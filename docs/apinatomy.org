@@ -62,6 +62,9 @@ gsx:google-sheet-id
 
 #+name: flow-to-ttl
 #+begin_src elisp :results none
+(defvar-local apinat-converter-path nil
+  "full path to javascript apinatomy converter")
+
 (defun-local ex-do (&rest nothing)
   "Executor do. Eats the input since it is to be run by the executor."
   ;; maybe use this to resolve the ex-come-from flows?
@@ -112,8 +115,9 @@ gsx:google-sheet-id
     ;; and output paths are defined by convention
     (funcall (checksum-or #'-mx->)  model-id   xlsx) ; source/{model-id}.xlsx
     ;;; FIXME TODO message about opening the open physiology viewer
-    (funcall (out-or      #'-xj->)  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
-    (funcall (out-or      #'-jl->)  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
+    (-xjl-> xlsx json jsonld)
+    ;;(funcall (out-or      #'-xj->)  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
+    ;;(funcall (out-or      #'-jl->)  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
     (funcall (out-or      #'-lt->)  jsonld      ttl) ; derived/{model-id}.jsonld derived/{model-id}.ttl
     ))
 
@@ -193,17 +197,32 @@ gsx:google-sheet-id
            (message "save file (left bottom floppy) to download from viewer to %s" path-json)
            (ex-label 'viewer-after-open))))
 
-(defun-local -jl-> (path-json path-json-ld)
+(defun-local -jl-> (path-json path-jsonld)
   "Currently a manual step."
   (ex-do (ex-come-from 'viewer-after-open) ; This is amazing.
          ;; Allows decoupling of functional spec from the actual execution in the real world.
          ;; As a bonus we get to use my all time favorite control flow structure.
          (message "export flattened json-ld (right 2nd from bot white doc) to download from viewer to %s"
-                  path-json-ld)))
+                  path-jsonld)))
 
-(defun-local -lt-> (path-json-ld path-ttl)
+(defun-local -xjl-> (path-xlsx path-json path-jsonld)
+  ;; yay automated NOTE requires nodejs and open-physiology-viewer
+  (let ((path-xlsx (concat default-directory "/" path-xlsx))
+        (path-json (concat default-directory "/" path-json))
+        (path-jsonld (concat default-directory "/" path-jsonld))
+        (path-temp (make-temp-file "apinat-conversion" 'directory)))
+    (unwind-protect
+        (let* ((default-directory path-temp)
+               (_ (run-command apinat-converter-path "-m" "xlsx" "-i" path-xlsx))
+               (output-dir (car (directory-files default-directory nil "converted-*"))))
+          ;; '("model-flattened.jsonLD" "model-generated.json" "model.json" "model.jsonLD")
+          (rename-file (concat output-dir "/" "model.json") path-json t)
+          (rename-file (concat output-dir "/" "model-flattened.jsonLD") path-jsonld t))
+      (delete-directory path-temp 'recursive))))
+
+(defun-local -lt-> (path-jsonld path-ttl)
   ;; automated
-  (run-command "spc" "apinat" path-json-ld path-ttl))
+  (run-command "spc" "apinat" path-jsonld path-ttl))
 #+end_src
 
 #+name: all-ttl-models
@@ -227,8 +246,9 @@ gsx:google-sheet-id
     (let ((mtimes
            (mapcar (lambda (p)
                      (string-to-number
-                      (format-time-string "%s"
-                                          (file-attribute-modification-time (file-attributes p)))))
+                      (format-time-string
+                       "%s"
+                       (file-attribute-modification-time (file-attributes p)))))
                    (list ttl xlsx))))
       (message "%S" mtimes)
       (and (file-exists-p ttl)
@@ -247,6 +267,10 @@ gsx:google-sheet-id
 ;; FIXME do fetch all in one batch so we don't have
 ;; to wait for the ttl export between each model
 (update-all-models t)
+' ; or pick your own models
+(update-models '(vagus-nerve))
+' ; jsonld -> ttl conversion
+(-m-lt-> 'vagus-nerve)
 #+end_src
 
 if error clone the repo
@@ -294,6 +318,11 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
 The current command to deploy all is.
 #+begin_src bash
 for f in $(ls */derived/*.ttl); do apinat-deploy-from-ttl $f; done
+#+end_src
+
+Alternately use the following to deploy specific models.
+#+begin_src bash
+apinat-deploy-ttls $(git diff --name-only HEAD~1..HEAD | cut -d'/' -f 1 | sort -u)
 #+end_src
 
 If you add a new model you will need to update the imports in
@@ -352,10 +381,23 @@ function apinat-deploy-from-ttl () {
 \"${PATH_REMOTE_TARGET}\" \
 \"${PATH_REMOTE_LINK}\"'"
 }
+
+function apinat-deploy-ttls () {
+    # TODO do it in batch, derive the timesamps correctly etc.
+    for id in $@; do
+        apinat-deploy-from-ttl "${id}/derived/${id}.ttl"
+    done
+}
 #+end_src
 
 Check [[https://cassava.ucsd.edu/ApiNATOMY/ontologies/]] for success if needed.
 # [[tramp:/ssh:cassava|sudo:cassava:/var/www/sparc/ApiNATOMY/ontologies/sparc-data.ttl]]
+
+#+begin_src bash
+spc report changes \
+--ttl-file https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder/1620348301/keast-bladder.ttl \
+--ttl-compare https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder/1617055182/keast-bladder.ttl
+#+end_src
 ** Load and deploy graph
 Then run
 [[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
