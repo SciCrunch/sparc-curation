@@ -882,6 +882,7 @@ function preview-export-rest () {
 # use the development pull code
 source ~/files/venvs/sparcur-dev/bin/activate
 source ~/files/venvs/sparcur-dev/git/sparc-cruation/bin/pipeline-functions.sh
+export PYTHONBREAKPOINT=0  # ensure that breakpoints do not hang export
 pushd ~/files/
 PARENT_PATH=$(sparc-time-friendly)
 sparc-get-all-remote-data \

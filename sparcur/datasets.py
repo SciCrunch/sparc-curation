@@ -571,11 +571,14 @@ class Tabular(HasErrors):
 
                 if not rows:
                     ps = self.path.size
-                    pcs = self.path.cache.size
+                    pcs = self.path.cache.meta.size
                     if ps != pcs:
                         msg = ('We have a likely case of a file that '
                                f'failed to fetch {ps} != {pcs}! {self.path}')
-                        log.critical()
+                        log.critical(msg)
+                        self.addError(msg,
+                                      blame='fetch',
+                                      path=self.path)
 
                     return
 

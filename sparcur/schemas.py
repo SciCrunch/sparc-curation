@@ -905,7 +905,7 @@ class ContributorExportSchema(JSONSchema):
                 #context_value=idtype('TEMP:hasBlackfynnUserId')),
             'blackfynn_user_id': strcont(idtype('TEMP:hasBlackfynnUserId')),
             'contributor_affiliation': {
-                'oneOf': [EIS._allOf(RorSchema),  # FIXME oneOf issues with EIS
+                'anyOf': [EIS._allOf(RorSchema),  # FIXME oneOf issues with EIS
                           {'type': 'string'}],
                 'context_value': idtype('TEMP:hasAffiliation')
             },

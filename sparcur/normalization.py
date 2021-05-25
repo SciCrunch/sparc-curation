@@ -316,6 +316,7 @@ class NormValues(HasErrors):
 
     @staticmethod
     def _query(value, prefix):
+        raise NotImplementedError('We do not want to hit the network here!')
         for query_type in ('term', 'search'):
             terms = list(OntTerm.query(prefix=prefix, **{query_type:value}))
             if terms:
@@ -794,15 +795,17 @@ class NormSubjectsFile(NormValues):
         #wat = self._query(value, 'BIRNLEX')  # FIXME
         #yield wat
 
-    sex = NormSex
+    #sex = NormSex
     def sex(self, value):
         nv = NormSex(value)
+        # reminder we don't do ontlogy lookups during normalization
+        # because it requires network access
         #yield self._query(nv, 'PATO')
         return nv
 
     def gender(self, value):
         # FIXME gender -> sex for animals, requires two pass normalization ...
-        yield from self.sex(value)
+        return self.sex(value)
 
     def group(self, value):
         # trigger n/a
