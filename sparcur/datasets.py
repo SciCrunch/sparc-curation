@@ -657,14 +657,22 @@ class Tabular(HasErrors):
             raise exc.NoDataError(f'{self.path}') from e2
 
     def xlsx2(self):
+        # https://openpyxl.readthedocs.io/en/latest/datetime.html  # XXX OH NOOOOOOOOOOOOOOOOOOOOOO
+        # yeah ... iso8601 as a string :/
         wb = self._openpyxl.load_workbook(self.path)
+        wb.iso_dates=True  # XXX NOTE I think only relevant for writing, but will be useful when we run these in reverse
 
         if wb is None:
             raise exc.NoDataError(f'{self.path}')
 
         sheet = wb.active
         for row in sheet.rows:
-            yield [cell.value for cell in row]
+            yield [cell.value.date()
+                   # Who thought it was a good idea to make the internal
+                   # representation of dates and midnight indistinguishable !?!?
+                   if cell.is_date and cell.number_format == 'yyyy\\-mm\\-dd;@'
+                   else cell.value
+                   for cell in row]
 
     def xlsx1(self):
         kwargs = {

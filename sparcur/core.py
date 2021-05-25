@@ -3,7 +3,7 @@ import json
 import itertools
 from types import GeneratorType
 from pathlib import PurePath
-from datetime import datetime, time
+from datetime import datetime, date, time
 from functools import wraps
 from collections import deque, defaultdict
 import idlib
@@ -403,6 +403,8 @@ def json_export_type_converter(obj):
             return json_export_type_converter(obj.identifier)
             #return obj.asDict()  # FIXME need a no network/scigraph version
     elif isinstance(obj, datetime):
+        return isoformat(obj)
+    elif isinstance(obj, date):
         return isoformat(obj)
     elif isinstance(obj, time):
         return isoformat(obj)
