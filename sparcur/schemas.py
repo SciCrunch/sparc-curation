@@ -1530,7 +1530,7 @@ class PathTransitiveMetadataSchema(JSONSchema):
     schema = {'type': 'object',
               'properties': {
                   'type': {'type': 'string',
-                           'enum': ('PathTransitiveMetadata',),},
+                           'enum': ('path-metadata',),},
                   'records': {'type': 'array',
                               'items': PathSchema.schema,
                               'minItems': 1,},},}

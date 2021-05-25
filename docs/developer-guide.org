@@ -624,7 +624,6 @@ changed since last export, updates only those and then collects the
 outputs.
 **** Bash implementation                                             :ignore:
 #+name: pipeline-functions-sparc-export-all
-
 #+begin_src bash -r -l "\([[:space:]]*#[[:space:]]*(ref:%s)\|[[:space:]]*(ref:%s)\)$" :tangle ../bin/pipeline-functions.sh
 function sparc-export-all () {
     # parse args
@@ -734,11 +733,11 @@ digraph G {
 **** Bash implementation                                             :ignore:
 Desired invocation.
 #+begin_src bash
-sparcur-do-dataset ${UUID}
-sparcur-do-dataset dataset:${UUID}
-sparcur-do-dataset N:dataset:${UUID}
-sparcur-do-dataset https://api.pennsieve.io/datasets/N:dataset:${UUID}
-sparcur-do-dataset https://app.pennsieve.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/datasets/N:dataset:${UUID}
+sparc-fexport ${UUID}
+sparc-fexport dataset:${UUID}
+sparc-fexport N:dataset:${UUID}
+sparc-fexport https://api.pennsieve.io/datasets/N:dataset:${UUID}
+sparc-fexport https://app.pennsieve.io/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/datasets/N:dataset:${UUID}
 #+end_src
 Desired behavior.
 | dataset state | objects state     | action            | outcome                   |
@@ -751,84 +750,72 @@ symlinked to =exports/${UUID}/LATEST=. The last run dataset itself
 goes to =exports/datasets/LATEST=. We don't have to care about the
 project identifier because each UUID is unique.
 TODO Logging goes ????
-#+begin_src bash
-function sparcur-do-dataset () {
-    "First pass retrieve all remote data for a single dataset."
-    local DATASET_ID=$1
-    local DATASET_PATH
-    DATASET_PATH=$(python -m sparcur.simple.retrieve \
-                          --symlink-objects-to "TODO" \
-                          --dataset-id ${DATASET_ID})
-    # FIXME error handling
-    echo $DATASET_PATH
-    pushd "${DATASET_PATH}"
-}
-function sparcurl-do-already-fetched () {
-    local DATASET_DIR=$(basename .)
-    pushd ..
-    spc pull "${DATASET_DIR}"
-    popd
-    spc find --name '*.xlsx' \
-             --name '*.xml' \
-             --name 'submission*' \
-             --name 'code_description*' \
-             --name 'dataset_description*' \
-             --name 'subjects*' \
-             --name 'samples*' \
-             --name 'manifest*' \
-             --limit -1 \
-             --fetch
-}
-#+end_src
-FIXME xfil dataset_path correctly, i.e. when we export we need to be
-able to point directly to the dataset folder without having to guess
-about names so we need to have symlinked the dataset itself to a name
-that we can dereference correctly we need a layer of indirection so
-that all our stuff here can be stable even if we (for example) run all
-folders off a single sparc consortium top level folder. This is for later.
 
-This is now done via invariant path which is =${dataset_uuid}/dataset=.
-To avoid issues the symlink needs to be dereferenced so that it is possible
-to find the project (organization) level.
-
-*** _*Fetch and export*_
 This is a quick and dirty version that should just do the right thing
 given only the dataset id as an input.
 
-Usage =sparcur-fexport N:dataset:totally-not-a-uuid=. The id provided
+Usage =sparc-fexport N:dataset:totally-not-a-uuid=. The id provided
 may be any of the variants, url, curie, api, human, uuid, etc.
-#+begin_src bash
-# DSID="set it yourself"
-function sparcur-fexport () {
-    local ID=${1:-${DSID}}
-    local UUID
-    UUID=$(python -m sparcur.simple.utils --dataset-id "${ID}")
-    python -m sparcur.simple.retrieve --dataset-id "${ID}" &&  # TODO --symlink-objects-to
-    pushd "$(realpath "${UUID}/dataset")" &&
+
+#+name: pipeline-functions-sparc-fexport
+#+begin_src bash :tangle ../bin/pipeline-functions.sh :mkdirp yes
+function sparc-export () {
+    echo TODO not ready yet
+    return 1
+}
+
+function sparc-fexport () {
+
+    local DATASET_ID="${1}"
+    local DATASET_UUID
+    local DATASET_PATH
+    local EXPORT_PATH
+
+    DATASET_UUID="$(python -m sparcur.simple.utils --dataset-id ${DATASET_ID})"
+
+    python -m sparcur.simple.retrieve --dataset-id ${DATASET_UUID} &&
+
+    EXPORT_PATH="$(realpath "${DATASET_UUID}/exports")" &&
+    DATASET_PATH="$(realpath "${DATASET_UUID}/dataset")" &&
+    pushd "${DATASET_PATH}" &&
+
     # FIXME we shouldn't need this refetch so I think that retrieve is
     # broken if files/folders already exist
-    spc find --name '*.xlsx' \
-             --name '*.xml' \
-             --name 'submission*' \
-             --name 'code_description*' \
-             --name 'dataset_description*' \
-             --name 'subjects*' \
-             --name 'samples*' \
-             --name 'manifest*' \
-             --limit -1 \
-             --fetch &&
-    spc export
-    popd # do it yourself because we might need to explore?
+    python -m sparcur.cli find \
+        --name '*.xml' \
+        --name 'submission*' \
+        --name 'code_description*' \
+        --name 'dataset_description*' \
+        --name 'subjects*' \
+        --name 'samples*' \
+        --name 'manifest*' \
+        --name 'resources*' \
+        --name 'README*' \
+        --limit -1 \
+        --fetch
+    wait $!
+    python -m sparcur.cli export --export-path "${EXPORT_PATH}" &  # FIXME TODO this conflates phases
+    local pids[0]=$!
+    # FIXME TODO for now export_single_dataset produces this so we don't run it independently
+    # FIXME there is also a difference in the export folder because the path metadata targets
+    # the last updated data and thus overwrites if the data has not changed but the code has
+    #python -m sparcur.simple.path_metadata_validate --export-path "${EXPORT_PATH}" &
+    #local pids[1]=$!
+    local FAIL=0
+    # TODO log/notify export failure
+
+    for pid in "${pids[@]}"; do
+        wait $pid || { FAIL=$((FAIL+1)); echo "${pid} failed!"; }
+    done
+    if [[ $FAIL -ne 0 ]]; then
+        echo "${FAIL} commands failed. Cannot continue."
+        echo "${DATASET_UUID}"
+        echo "${DATASET_PATH}"
+        return 1
+    fi
+    popd # or do it yourself because we might need to explore??
 }
 #+end_src
-
-# FIXME TODO can we wrap this in a really light racket gui or something?
-# so that they can just click on buttons to run stuff and see the output?
-# it would be a lot easier than trying to route it through a python gui
-# or deal with the cli
-# https://github.com/telephil/racket-json-view
-# the thing is that we can't do this all remotely because they need to
-# be able to move the files
 
 # FIXME TODO
 #+begin_src bash
@@ -2165,6 +2152,7 @@ def prepare_dataset_export(path, export_path=None):  # FIXME do we need export_b
 
     export_latest_run = export_dataset_folder / 'LATEST_RUN'
     symlink_latest(export_parent, export_latest_run)
+    # FIXME need to symlink to LATEST
     return export_parent
 
 
@@ -2293,10 +2281,13 @@ def main(path=Path.cwd(), id=None, time_now=None,
     #    so we can't keep everything embedded
     # FIXME TODO embed the transitive cache updated value that is used in prepare_dataset_export
     if validate:  # FIXME raw vs validated and FIXME pipeline
+        from sparcur import schemas as sc
+        from sparcur.simple.transform import schema_validate
         Path.validate_path_json_metadata(tm)
+        schema_validate(tm, sc.PathTransitiveMetadataSchema)
 
     if _entry_point:
-        export_blob_path = export_blob(tm, 'path-metadata.json', **kwargs)
+        export_blob_path = export_blob(tm, 'path-metadata.json', **kwargs)  # FIXME naming for raw vs validated
         return export_blob_path
     else:
         return tm
@@ -2310,7 +2301,7 @@ if __name__ == '__main__':
 #+end_src
 ** Utility
 *** _*Init*_
-#+begin_src python :tangle ../sparcur/simple/__init__.py :exports none
+#+begin_src python :tangle ../sparcur/simple/__init__.py :exports none :shebang ""
 #+end_src
 *** _*Utils*_
 #+name: utils.py
@@ -2319,6 +2310,7 @@ from sparcur.config import auth
 __doc__ = f"""Common command line options for all sparcur.simple modules
 Usage:
     sparcur-simple manifest  [options]  [<path>...]
+    sparcur-simple get-uuid  <remote-id>...
     sparcur-simple datasets
     sparcur-simple for-racket
     sparcur-simple [options] [<path>...]
@@ -2422,6 +2414,18 @@ class Options(clif.Options):
                 return ids
 
         return self._cache_dataset_id
+
+    @property
+    def remote_id(self):
+        if not hasattr(self, '_cache_remote_id'):
+            ids = self._args['<remote-id>']
+            if ids:
+                identifiers = [PennsieveId(id) for id in ids]
+                self._cache_remote_id = identifiers
+            else:
+                return ids
+
+        return self._cache_remote_id
 
     @property
     def jobs(self):
@@ -2655,6 +2659,12 @@ class DataWrapper:
 def main(id=None, **kwargs):
     if id is not None:
         print(id.uuid)
+
+    if 'get_uuid' in kwargs and kwargs['get_uuid']:
+        for id in kwargs['remote_id']:
+            print(id.uuid)
+
+        return
 
     if ('datasets' in kwargs and kwargs['datasets'] or
         'for_racket' in kwargs and kwargs['for_racket']):

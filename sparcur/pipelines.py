@@ -1,6 +1,6 @@
 import copy
 import json
-from pathlib import Path
+import pathlib
 from itertools import chain
 from collections import deque, defaultdict
 import idlib
@@ -24,6 +24,7 @@ from sparcur import normalization as norm
 from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries, get_nested_by_key
 from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
+from sparcur.paths import Path
 from sparcur.utils import PennsieveId  # XXXXX FIXME
 from sparcur.state import State
 from sparcur.config import auth
@@ -259,7 +260,7 @@ class PathPipeline(PrePipeline):
     data_transformer_class = None
     def __init__(self, previous_pipeline, lifters, runtime_context):
         #log.debug(lj(previous_pipeline.data))
-        if isinstance(previous_pipeline, Path):
+        if isinstance(previous_pipeline, pathlib.Path):
             path = previous_pipeline
             template_schema_version = None
         else:
@@ -378,10 +379,11 @@ class PathTransitiveMetadataPipeline(PathPipeline):
         @property
         def data(self):
             # TODO dataset_id probably
-            blob = {'type': 'PathTransitiveMetadata',}
+            blob = {'type': 'path-metadata',}
             records = self.path._transitive_metadata()
             if records:
-                blob['records'] = records
+                blob['data'] = records
+                Path.validate_path_json_metadata(blob)
             else:
                 # FIXME TODO errors
                 pass
@@ -1771,7 +1773,7 @@ class ProtcurPipeline(Pipeline):
         annos = []
         for group_name in self._hypothesis_group_names:
             group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
-            cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+            cache_file = pathlib.Path(hyp.group_to_memfile(group_id + 'sparcur'))
             get_annos = hyp.AnnoReader(cache_file, group_id)
             annos.extend(get_annos())
             # FIXME hyputils has never been engineered to work with
