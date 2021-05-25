@@ -573,13 +573,17 @@ class Report:
         datasets = data['datasets']
 
         def detype(_v):
+            if isinstance(_v, dict) and '@value' in _v:
+                # jsonld
+                return (_v['@value'],)
+
             return ((_v.asJson(),) if hasattr(_v, 'asJson') else
                     ((_v.identifier,) if hasattr(_v, 'identifier')
                      else (_v if is_list_or_tuple(_v) else (_v,))))
 
         def anydict(_v):
             if isinstance(_v, dict):
-                return True
+                return [_v]
             elif not is_list_or_tuple(_v):
                 return False
 
@@ -612,6 +616,12 @@ class Report:
         header = sorted(vd, key=lambda k:len(vd[k]))
         cols = [[k, *sorted([str(v) for v in vd[k]])] for k in header]
         rows = list(zip_longest(*cols, fillvalue=None))
+        # FIXME something about the way we process updates is broken
+        # in cases where we try to replace the whole sheet, the end
+        # result is that if you delete all the content you get an
+        # index out of range error, and in other cases you wind up
+        # having multiple reports on top of eachother in the wrong
+        # columns
         return self._print_table(rows,
                                  title=f'{dict_key.capitalize()} Values Report',
                                  ext=ext)
