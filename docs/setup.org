@@ -911,8 +911,8 @@ preview-export-rest ${EXPORT_PATH_TIME} ${PARENT_PATH_TIME}
 turtle diff
 #+begin_src bash
 spc report changes \
---ttl-file https://cassava.ucsd.edu/sparc/archive/exports/2020-08-03T11:09:55,698159-07:00/curation-export.ttl \
---ttl-compare https://cassava.ucsd.edu/sparc/archive/exports/2020-07-31T02:01:25,430792-07:00/curation-export.ttl
+--ttl-file https://cassava.ucsd.edu/sparc/preview/archive/exports/2021-05-25T125039,817048-0700/curation-export.ttl \
+--ttl-compare https://cassava.ucsd.edu/sparc/preview/archive/exports/2021-05-24T141309,920776-0700/curation-export.ttl
 #+end_src
 #+CAPTION: reports
 #+BEGIN_SRC bash

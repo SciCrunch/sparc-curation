@@ -16,6 +16,7 @@ from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
 from sparcur.utils import logd, BlackfynnId, PennsieveId
 from sparcur.core import JEncode, JApplyRecursive, JPointer, OntCuries
+from sparcur.core import get_nested_by_key
 from pyontutils.utils import asStr
 from pyontutils.namespaces import TEMP, TEMPRAW, sparc, unit, PREFIXES as uPREFIXES, ilxtr
 
@@ -32,11 +33,16 @@ base_context = {
     # @base and _bfc are added at runtime and are dataset:{dataset-id-suffix}
     'meta': '@graph',
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
-    'subjects': 'TEMP:hasSubGraph',  #'_bfc:#subjects-graph',  # FIXME I think the fragment is the right thing to do here ...
-    'samples': 'TEMP:hasSubGraph',  #'_bfc:#samples-graph',
+    # the subgraphs arent' actually useful when we condense to triples
+    # we can add the predicates on the way back, the issue is that there
+    # is a name collision with the prefixes that we would like to use
+    # which is something of an annoying design failure I think ...
+    #'subjects': 'TEMP:hasSubGraph',  #'_bfc:#subjects-graph',  # FIXME I think the fragment is the right thing to do here ...
+    #'samples': 'TEMP:hasSubGraph',  #'_bfc:#samples-graph',
     #'contributors': '_bfc:#contributors-graph',  # FIXME broken I think
-    'contributors': 'TEMP:hasSubGraph',  # FIXME broken I think
+    #'contributors': 'TEMP:hasSubGraph',  # FIXME broken I think
     #'N:dataset': {'@id': 'https://api.pennsieve.io/datasets/'},  # darn it multiprefix issues
+    'idfall': {"@id": str(TEMP['id-fallthrough/']), "@prefix": True},
     **{p: {'@id': n, '@prefix': True}
        if [c for c in prefix_endswith if n.endswith(c)]
        else n for p, n in {**uPREFIXES, **OntCuries._dict}.items()
@@ -202,6 +208,24 @@ def json_version(version):
     }
 
 
+def get_runtime_context_specs():
+    # FIXME not clear we should be embedding context_runtime deeply in
+    # the schemas, though it is useful for being able to see things
+    # side by side
+    from pyontutils.utils import subclasses
+    collect = []
+    for cls in subclasses(JSONSchema):
+        JApplyRecursive(get_nested_by_key,
+                        cls.schema,
+                        'context_runtime',
+                        join_lists=False,
+                        collect=collect)
+
+    specs = tuple(set(tuple(l) for l in collect))
+    # FIXME convert to JPointer here?
+    return specs
+
+
 def _defunc(obj, *args, path=None, **kwargs):  # FIXME add tests
     if isinstance(obj, types.FunctionType):
         return asStr(ast.parse(inspect.getsource(obj).strip().strip(',')))
@@ -227,9 +251,13 @@ def update_include_paths(obj, *args, path=None, key='jsonld_include', moves=tupl
     return obj  # have to return this otherwise somehow everything is turned to None?
 
 
-def idtype(id, base=None):
+def idtype(id, base=str(TEMP['id-fallthrough/'])):
+    # we set base to id-fallthrough so we can easily pull out unmapped
+    # cases that should be identifiers
     out = {'@id': id, '@type': '@id'}
-    if base:
+    if base and id != '@id':
+        # for whatever reason @context for @id @id is not allowed so
+        # it should be set in an outer @context
         out['@context'] = {'@base': str(base)}
 
     return out
@@ -1269,10 +1297,29 @@ class SubjectExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'jsonld_include': {'@type': ['sparc:Subject', 'owl:NamedIndividual']},
+        '': [{'context_runtime': [
+                '#/meta/uri_api',
+                (lambda uri_api: uri_api + '/subjects/'),
+                '#/subjects/@context/@base']},
+             {'context_runtime': [
+                 '#/meta/uri_api',
+                 (lambda uri_api: {'@id': uri_api + '/subjects/',
+                                   '@prefix': True}),
+                 '#/@context/subjects']}],
         'required': ['subject_id', 'species'],
         'properties': {
             'subject_id': {'type': 'string',
                            'pattern': fs_safe_identifier_pattern,
+                           'context_value': {"@id": "@id",
+                                             "@type": "@id"},
+                           #'context_runtime': [  # TODO -> derive after add ?
+                               #'#/meta/uri_api',
+                               # FIXME the @id mapping seems to break the @context !?
+                                #(lambda uri_api: {
+                                    #'@id': '@id',
+                                    #'@context': {
+                                        #'@base': uri_api + '/subjects/'}}),
+                               #'#/subjects/@context/subject_id']
                            #'context_runtime':
                            #lambda base: {'@id': '@id',
                                          #'@type': '@id',
@@ -1324,6 +1371,15 @@ class SampleExportSchema(JSONSchema):
     schema = {
         'type': 'object',
         'jsonld_include': {'@type': ['sparc:Sample', 'owl:NamedIndividual']},
+        '': [{'context_runtime': [
+                '#/meta/uri_api',
+                (lambda uri_api: uri_api + '/samples/'),
+                '#/samples/@context/@base']},
+             {'context_runtime': [
+                 '#/meta/uri_api',
+                 (lambda uri_api: {'@id': uri_api + '/samples/',
+                                   '@prefix': True}),
+                 '#/@context/samples']}],
         'required': ['sample_id', 'subject_id'],
         'properties': {
             'sample_id': {'type': 'string',
@@ -1333,14 +1389,21 @@ class SampleExportSchema(JSONSchema):
                            'pattern': fs_safe_identifier_pattern,
                            },
             'primary_key': {'type': 'string',
-                            'context_runtime': [  # TODO -> derive after add ?
-                                '#/meta/uri_api',
+                            'context_value': {"@id": "@id",
+                                              "@type": "@id"},
+                            #'context_runtime': [  # TODO -> derive after add ?
+                                #'#/meta/uri_api',
+                                #(lambda uri_api: uri_api + '/samples/'),
                                 # FIXME the @id mapping seems to break the @context !?
-                                (lambda uri_api: {
-                                    '@id': '@id',
-                                    '@context': {
-                                        '@base': uri_api + '/samples/'}}),
-                                '#/samples/@context/primary_key'],
+                                # yep, this doesn't work because for some reason the
+                                # @id has to use the parent space, but I think this
+                                # approach to setting @base is probably safer
+                                #(lambda uri_api: {
+                                    #'@id': '@id',
+                                    #'@context': {
+                                        #'@base': uri_api + '/samples/'}}),
+                                #'#/samples/@context/primary_key',
+                                #'#/samples/@context/@base'],
                             #'context_runtime':
                             #lambda base: {'@id': '@id',
                                           #'@type': '@id',
@@ -1708,13 +1771,15 @@ class MetaOutExportSchema(JSONSchema):
                               'context_value': inttype('TEMP:hasNumberOfSamples'),
                               },})
 
-    schema = {'allOf': [__schema,
-                        {'anyOf': [
-                            #{'required': ['number_of_subjects']},
-                            #{'required': ['number_of_samples']},
+    schema = {
+        'jsonld_include': {'@type': ['sparc:Dataset', 'owl:NamedIndividual']},
+        'allOf': [__schema,
+                  {'anyOf': [
+                      #{'required': ['number_of_subjects']},
+                      #{'required': ['number_of_samples']},
                             {'required': ['subject_count']},  # FIXME extract subjects from samples ?
-                            {'required': ['sample_count']}
-                        ]}]}
+                      {'required': ['sample_count']}
+                  ]}]}
 
 
 class MetaOutSchema(JSONSchema):
@@ -1781,7 +1846,15 @@ class DatasetOutExportSchema(JSONSchema):
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
     schema = {
-        'jsonld_include': {'@type': ['sparc:Dataset', 'owl:NamedIndividual']},
+        'jsonld_include': {'@type': ['owl:Ontology']},
+        '': [{'context_runtime': [  # induces indentation bug in Eamcs I think
+                '#/meta/uri_api',
+                (lambda uri_api: {'@id': uri_api + '/', '@prefix': True}),
+                '#/@context/_pnc',]},
+            {'context_runtime': [
+                '#/meta/uri_api',
+                (lambda uri_api: uri_api + '/'),
+                '#/@context/@base',]}],
         'allOf': [__schema,
                   {'anyOf': [
                       {'required': ['subjects']},  # FIXME extract subjects from samples ?
@@ -1957,3 +2030,6 @@ class MISDatasetSchema(JSONSchema):
                                      'items': MISSpecimenSchema.schema},
               }
               }
+
+
+runtime_context_specs = get_runtime_context_specs()

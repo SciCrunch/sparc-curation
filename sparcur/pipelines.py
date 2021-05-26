@@ -22,8 +22,9 @@ from sparcur import converters as conv
 from sparcur import exceptions as exc
 from sparcur import normalization as norm
 from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_errors
-from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries, get_nested_by_key
-from sparcur.core import JApplyRecursive, json_identifier_expansion, dereference_all_identifiers
+from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
+from sparcur.core import json_identifier_expansion, dereference_all_identifiers
+from sparcur.core import JApplyRecursive, resolve_context_runtime, get_nested_by_key
 from sparcur.paths import Path
 from sparcur.utils import PennsieveId  # XXXXX FIXME
 from sparcur.state import State
@@ -1664,7 +1665,7 @@ class ToJsonLdPipeline(JSONPipeline):
     )
 
     updates = (
-        [['id'], lambda v: 'dataset:' + v.rsplit(':', 1)[-1] + '/#dataset-graph'],
+        [['id'], lambda v: 'dataset:' + v.rsplit(':', 1)[-1] + '/#dataset-graph'],  # FIXME incorrect, this needs to be the owl:Ontology identifier we are going to use
     )
 
     __includes = []
@@ -1686,31 +1687,33 @@ class ToJsonLdPipeline(JSONPipeline):
     )
 
     derives_after_adds = (
-        [[['meta', 'uri_api']],
-         DT.BOX(lambda uri_api: uri_api + '/'),
-         [['@context', '@base']]],
+        #[[['meta', 'uri_api']],
+         #DT.BOX(lambda uri_api: uri_api + '/'),
+         #[['@context', '@base']]],
 
-        [[['meta', 'uri_api']],
-         DT.BOX(lambda uri_api: {'@id': uri_api + '/', '@prefix': True}),
-         [['@context', '_bfc']]],
-
+        #[[['meta', 'uri_api']],
+         #DT.BOX(lambda uri_api: {'@id': uri_api + '/', '@prefix': True}),
+         #[['@context', '_bfc']]],
 
         [[['meta', 'uri_api']],
          DT.BOX(lambda uri_api: uri_api + '/#subjects-graph'),
          [['subjects', '@id']]],
 
-        [[['meta', 'uri_api']],
-         DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/subjects/'}}),
-         [['subjects', '@context', 'subject_id']]],
-
+        #[[['meta', 'uri_api']],
+         #DT.BOX(lambda uri_api: {
+             #'@id': '@id',
+             #'@type': '@id',
+             # FIXME the @base in the context for subject_id isn't work even in the js version?
+             #'@context': {'@base': uri_api + '/subjects/'}}),
+         #[['subjects', '@context', 'subject_id']]],
 
         [[['meta', 'uri_api']],
          DT.BOX(lambda uri_api: uri_api + '/#samples-graph'),
          [['samples', '@id']]],
 
-        [[['meta', 'uri_api']],
-         DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/samples/'}}),
-         [['samples', '@context', 'primary_key']]],
+        #[[['meta', 'uri_api']],
+         #DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/samples/'}}),
+         #[['samples', '@context', 'primary_key']]],
 
 
         [[['meta', 'uri_api']],
@@ -1736,6 +1739,8 @@ class ToJsonLdPipeline(JSONPipeline):
     def augmented_after_added(self):
         data = super().added
         DictTransformer.derive(data, self.derives_after_adds, source_key_optional=True)
+        # FIXME sort of out of place, but technically augment
+        resolve_context_runtime(sc.runtime_context_specs, data)
         return data
 
     @property

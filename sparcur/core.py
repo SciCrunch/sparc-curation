@@ -441,10 +441,11 @@ def JFixKeys(obj):
         return obj
 
 
-def get_nested_by_key(obj, key, *args, path=None, asExport=True, collect=tuple()):
+def get_nested_by_key(obj, key, *args, path=None, asExport=True,
+                      join_lists=True, collect=tuple()):
     if isinstance(obj, dict) and key in obj:
         value = obj[key]
-        if is_list_or_tuple(value):
+        if is_list_or_tuple(value) and join_lists:
             for v in value:
                 n = json_export_type_converter(v)
                 collect.append(n if n is not None and asExport else v)
@@ -1534,6 +1535,27 @@ class JPointer(str):
         
     def asList(self):
         return self.split('/')
+
+    def dereference(self, blob):
+        sharp, *path = self.asList()
+        assert sharp == '#'
+        return adops.get(blob, path)
+
+    def update(self, blob, value):
+        sharp, *path = self.asList()
+        assert sharp == '#'
+        adops.update(blob, path, value)
+
+
+def resolve_context_runtime(specs, *blobs):
+    """ [source-path lambda-function target-path] """
+    # TODO see if we need multi source multi target
+    for source, function, target in specs:
+        s = JPointer(source)
+        t = JPointer(target)
+        for blob in blobs:
+            value = function(s.dereference(blob))
+            t.update(blob, value)
 
 
 # register idlib classes for fromJson

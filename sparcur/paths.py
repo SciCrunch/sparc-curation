@@ -547,8 +547,25 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             raise exc.NoCachedMetadataError(self) from e
 
     @property
+    def cache_file_id(self):
+        if self.is_dir():
+            return
+
+        try:
+            return (self.getxattr('bf.file_id').decode()
+                    if self.is_file() else
+                    self.cache_meta.file_id)
+        except FileNotFoundError as e:
+            # in the event we try to blindly get cached metadata for a
+            # path in a manifest that does not exist
+            raise e
+        except OSError as e:
+            raise exc.NoCachedMetadataError(self) from e
+
+    @property
     def cache_identifier(self):
-        return self._cache_class._id_class(self.cache_id)
+        return self._cache_class._id_class(
+            self.cache_id, file_id=self.cache_file_id)
 
     @property
     def rchildren_dirs(self):
@@ -563,7 +580,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             return self.cache.populateJsonMetadata(blob)
         else:
             return self._jsonMetadata()
-
 
     xattr_prefix = BlackfynnCache.xattr_prefix
     _xattr_meta = aug.EatCache.meta

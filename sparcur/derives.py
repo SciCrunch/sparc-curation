@@ -154,7 +154,7 @@ class Derives:
 
             he.embedErrors(lifted)
 
-        lifted['prov'] = dataset_relative_path
+        lifted['prov:wasDerivedFrom'] = dataset_relative_path.cache_identifier
         lifted['dataset_relative_path'] = record_drp
         lifted['manifest_record'] = {
             k:v for k, v in record.items() if k != 'filetype'
