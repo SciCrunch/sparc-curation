@@ -24,26 +24,28 @@ def wrap_tables(*tables, title=None):
                    title=title)
 
 
-def get_dataset_index(project_path):
-    {c.cache.id:c for c in project_path.children}
+def get_dataset_index(data):
+    {d['id']:d for d in data['datasets']}
 
     
-def make_app(report, project_path, name='spc-server'):
+def make_app(report, name='spc-server'):
     app = Flask(name)
     yield app
 
     bp = '/dashboard'
 
     @app.route(f'{bp}/datasets')
-    def route_datasets(id):
-        table, title = report._print_paths(project_path.children)
+    def route_datasets(id=None):
+        # TODO improve this to pull from meta add uris etc.
+        table, title = report.size()
         return wrap_tables(table, title=title)
 
     @app.route(f'{bp}/datasets/<id>')
     @app.route(f'{bp}/datasets/<id>/ttl')
     @app.route(f'{bp}/datasets/<id>/json')
     def route_datasets_id(id, ext=None):
-        dataset_index = get_dataset_index(project_path)
+        data = report._data_ir()
+        dataset_index = get_dataset_index(data)
         if id not in dataset_index:
             return abort(404)
 
@@ -87,11 +89,12 @@ def make_app(report, project_path, name='spc-server'):
     @app.route(f'{bp}/reports/size')
     @app.route(f'{bp}/reports/size<ext>')
     def route_reports_size(ext=wrap_tables):
-        return report.size(dirs=project_path.children, ext=ext)
+        return report.size(ext=ext)
 
     @app.route(f'{bp}/reports/filetypes')
     @app.route(f'{bp}/reports/filetypes<ext>')
     def route_reports_filetypes(ext=None):
+        return 'TODO reimplement from path metadata.'
         if ext is not None:  # TODO
             return 'Not found', 404
 
@@ -104,7 +107,8 @@ def make_app(report, project_path, name='spc-server'):
     @app.route(f'{bp}/reports/pathids')
     @app.route(f'{bp}/reports/pathids<ext>')
     def route_reports_pathids(ext=wrap_tables):
-        return report.pathids(ext=ext)
+        return 'Needs to be reimplemented from path metadata if we still want it.'
+        #return report.pathids(ext=ext)
 
     @app.route(f'{bp}/reports/keywords')
     @app.route(f'{bp}/reports/keywords<ext>')

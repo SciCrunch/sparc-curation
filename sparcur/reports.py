@@ -3,6 +3,7 @@ import sys
 import json
 import types
 import pprint
+from pathlib import PurePath
 from itertools import chain, zip_longest
 from collections import Counter, defaultdict
 import idlib
@@ -331,7 +332,7 @@ class Report:
         self.subjects_values()
         self.completeness()
         self.keywords()
-        #self.size(dirs=list(self.datasets_local))  # TODO needs to be reworked to use latest_ir
+        self.size()
         self.overview()
         #self.test()  # just a test
         #self.errors()  # TODO too much for now
@@ -697,20 +698,19 @@ class Report:
 
 
     @sheets.Reports.makeReportSheet('id')
-    def size(self, dirs=None, ext=None):
-        if dirs is None:
-            dirs = self.paths
-        intrs = [self.Integrator(p) for p in dirs]
-        if not intrs:
-            intrs = self.cwdintr,
-
+    def size(self, ext=None):
+        data = self._data_ir()
+        project_path = PurePath(data['prov']['export_project_path'])
         rows = [['path', 'id', 'sparse', 'dirs', 'files', 'size', 'hr'],
-                *sorted([[d.name,
-                          d.id,
-                          'x' if d.path.cache.is_sparse() else '',
-                          c['dirs'], c['files'], c['size'], c['size'].hr]
-                         for d in intrs
-                         for c in (d.datasetdata.counts,)],
+                *sorted([[(project_path / m['folder_name']).name
+                          if 'folder_name' in m else '',
+                          d['id'],
+                          'x' if 'sparse' in m and m['sparse'] else '?'] +
+                         [int(m[k]) if k in m else float('-inf')
+                          for k in ['dirs', 'files', 'size']] +
+                         [aug.FileSize(m['size']).hr
+                          if 'size' in m else float('-inf')]
+                         for d in data['datasets'] for m in [d['meta']]],
                         key=lambda r: -r[-2])]
 
         return self._print_table(rows, title='Size Report',

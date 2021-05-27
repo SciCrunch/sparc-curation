@@ -244,10 +244,6 @@ class Derives:
                     for blob_sample in samples]
         return subjects,
 
-    # FIXME bad that we need to call these here
-    register_type(None, 'SampleDirs')
-    register_type(None, 'SubjectDirs')
-
     @staticmethod
     def validate_structure(path, dir_structure, subjects, samples):
 

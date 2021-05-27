@@ -129,7 +129,9 @@ class DatasetMetadata(HasErrors):
                     uri_api=self.cache.uri_api,
                     timestamp_created=cmeta.created,
                     timestamp_updated=cmeta.updated,
+                    # FIXME vs the dataset updated time now touched for transitive updates
                     timestamp_updated_contents=self.updated_cache_transitive(),
+                    sparse=self.path.is_sparse(),
                         ))
         else:
             return dict(id=self.id,

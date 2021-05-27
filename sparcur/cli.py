@@ -518,6 +518,7 @@ class Main(Dispatcher):
             (self.options.show and not self.options.export) or
             self.options.sheets or
             self.options.goto or
+            self.options.server or
             self.options.apinat or
             self.options.tofetch or  # size does need a remote but could do it lazily
             self.options.filetypes or
@@ -528,6 +529,7 @@ class Main(Dispatcher):
             self.options.fab or
             (self.options.fix and self.options.cache) or
             (self.options.report and not self.options.raw) or
+            (self.options.report and self.options.size) or
             (self.options.report and self.options.export_file) or
             (self.options.report and self.options.protocols) or
             (self.options.export and self.options.schemas) or
@@ -1459,12 +1461,13 @@ done"""
             self.dataset_index = {d.meta.id:self.Integrator(d)
                                   for d in self.datasets}
         else:
-            from sparcur import export as ex
-            data = self._export(ex.Export).latest_ir
-            self.dataset_index = {d['id']:d for d in data['datasets']}
+            #from sparcur import export as ex
+            #data = self._export(ex.Export).latest_ir
+            #self.dataset_index = {d['id']:d for d in data['datasets']}
+            pass
 
         report = Report(self)
-        app, *_ = make_app(report, self.project_path)
+        app, *_ = make_app(report)
         self.app = app  # debug only
         app.debug = False
         app.run(host='localhost', port=self.options.port, threaded=True)

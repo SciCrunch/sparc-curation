@@ -1576,3 +1576,8 @@ register_type(None, 'publication')
 register_type(None, 'revision')
 register_type(None, 'embargo')
 register_type(None, 'removal')
+
+# FIXME bad that we need to call these here
+# needed in derives and needed when loading from ir
+register_type(None, 'SampleDirs')
+register_type(None, 'SubjectDirs')

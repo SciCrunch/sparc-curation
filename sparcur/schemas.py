@@ -1658,6 +1658,7 @@ class MetaOutExportSchema(JSONSchema):
                       'contributor_count',
                       'uri_human',  # from DatasetMetadata
                       'uri_api',  # from DatasetMetadata
+                      'sparse',  # tells you whether files/dirs/size is reliable
                       'files',
                       'dirs',
                       'size',
@@ -1687,6 +1688,9 @@ class MetaOutExportSchema(JSONSchema):
         'size': {'type': 'integer',
                  'context_value': inttype('TEMP:hasSizeInBytes'),
                  },
+        'sparse': {'type': 'integer',
+                   'context_value': inttype('TEMP:sparseClone'),
+                   },
         'folder_name': {'context_value': 'rdfs:label',
                         **string_noltws},
         'title': {'context_value': 'dc:title',

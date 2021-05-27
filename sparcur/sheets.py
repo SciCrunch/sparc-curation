@@ -158,9 +158,11 @@ class Reports(Sheet):
                     kwargs['ext'] = True
                 elif isinstance(kwargs['ext'], bool) and kwargs['ext']:
                     pass  # already went through
-                else:
+                elif self.options.to_sheets:
                     msg = 'Should not have extension and export to sheets.'
                     raise TypeError(msg)
+                else:
+                    pass
 
                 out = method(self, *args, **kwargs)
 
