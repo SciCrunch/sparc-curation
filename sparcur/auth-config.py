@@ -11,6 +11,9 @@
       'default': '{:user-log-path}/sparcur',
       'environment-variables': 'SPARCUR_LOG_PATH LOG_PATH'},
   'resources': ['../resources/',],
+  'export-url': {
+      'default': None,
+      'environment-variables': 'SPARCUR_EXPORT_URL'},
   'remote-cli-path': {
       'default': None,
       'environment-variables': 'REMOTE_CLI_PATH'},

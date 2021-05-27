@@ -466,6 +466,7 @@ class Main(Dispatcher):
                         '_datasets_with_extension',
                         '_timestamp',
                         '_folder_timestamp',
+                        '_pyru_loaded',
                         '_data_ir',
                         '_protcur',
                         )
@@ -629,9 +630,10 @@ class Main(Dispatcher):
     _pyru_loaded = False
 
     def _data_ir(self, org_id=None):  # FIXME org_id should NOT implicitly indicate that we are in no_export
-        if self.options.raw:
-            data = self.summary.data_for_export(UTCNOWISO())
-        elif self.options.export_file:
+        if hasattr(self, '_cache_data_ir'):
+            return self._cache_data_ir
+
+        if self.options.export_file or self.options.published:
             if not self.__class__._pyru_loaded:
                 self.__class__._pyru_loaded = True
                 from pysercomb.pyr import units as pyru
@@ -642,14 +644,25 @@ class Main(Dispatcher):
                 (pyru._Quant, pyru.Range, pyru.Approximately, *iso8601s)]
                 pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
+        if self.options.raw:
+            data = self.summary.data_for_export(UTCNOWISO())
+
+        elif self.options.export_file:
             with open(self.options.export_file, 'rt') as f:
                 data = fromJson(json.load(f))
         elif self.options.published:
-            raise NotImplementedError('TODO')
-            data = requests.get('some cassava url')
+            url = auth.get('export-url')
+            if url is not None:
+                import requests
+                raw = requests.get(url).json()
+                data = fromJson(raw)
+            else:
+                raise ValueError('must set export-url')
         else:
             from sparcur import export as ex
             data = self._export(ex.Export, org_id=org_id).latest_ir
+
+        self._cache_data_ir = data
         return data
 
     def _protcur(self):
@@ -1646,6 +1659,9 @@ class Report(reports.Report, Dispatcher):
     _paths = Main._paths
 
     _print_table = Main._print_table
+
+    _pyru_loaded = False
+    _data_ir = Main._data_ir  # done statically for server
 
 
 class Shell(Dispatcher):

@@ -7,19 +7,31 @@ from sparcur.server import make_app
 from sparcur.backends import BlackfynnRemote
 from sparcur.curation import Summary
 
-defaults = {o.name:o.value if o.argcount else None for o in parse_defaults(clidoc)}
+defaults = {o.name:o.value if o.argcount else None
+            for o in parse_defaults(clidoc)}
+
 args = {'server': True,
         '--raw': False,
         '--latest': True,
+        '--preview': False,  # set via
         '--sort-count-desc': True,
         '--tab-table': False,
         '<path>': [],
         '--verbose': False,
+        '--to-sheets': False,
 
-        '--export-path': auth.get_path('export-path'),
+        #'--export-path': auth.get_path('export-path'),
+        '--export-path': None,  # don't leak this
         '--partial': False,
         '--open': False,
         '--debug': False,
+
+        '--export-file': None,  # when/where to pass this?
+        '--published': True,  # lo and behold the solution! (hits export-url)
+        '--ttl-file': None,  # FIXME TODO needed for terms
+        '--ttl-compare': None,  # FIXME TODO needed for terms
+        'hubmap': False,
+        'hubmap-anatomy': False,
 }
 
 options = Options(args, defaults)
