@@ -706,11 +706,11 @@ class Report:
                           if 'folder_name' in m else '',
                           d['id'],
                           'x' if 'sparse' in m and m['sparse'] else '?'] +
-                         [int(m[k]) if k in m else float('-inf')
+                         [int(m[k]) if k in m else -1  # float('-inf')
                           for k in ['dirs', 'files', 'size']] +
                          [aug.FileSize(m['size']).hr
-                          if 'size' in m else float('-inf')]
-                         for d in data['datasets'] for m in [d['meta']]],
+                          if 'size' in m else -1  # float('-inf')
+                          ] for d in data['datasets'] for m in [d['meta']]],
                         key=lambda r: -r[-2])]
 
         return self._print_table(rows, title='Size Report',
