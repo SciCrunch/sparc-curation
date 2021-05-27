@@ -184,7 +184,11 @@ class Reports(Sheet):
                         report.update(rows_stringified)
                     else:
                         report.fetch()
-                        if report.index_columns:
+                        if report.index_columns and report.values:
+                            # FIXME bad assumption that column
+                            # ordering remains the same?  FIXME upsert
+                            # should be ok in this situation but
+                            # dropping the header causes issues
                             report.upsert(*rows_stringified[1:])
                         else:
                             report.update(rows)
