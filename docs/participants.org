@@ -12,9 +12,12 @@
     Participants are always identified and identifiable. They can be
     though of as the minimum identifiable thing from which data was
     generated, or from which another identifiable thing was generated.
-  - =specimen=
+    Nearly equivalent to a BFO material entity, but some Ontologies
+    don't make biological entities subClassOf material entities.
+  - =specimen= (object)
     - A non-collective (atomic) =participant=. Covers both samples and
       subjects.
+    - BFO object.
   - =population=
     - Populations are collective participants that are opaque to their
       individual members but still have relations to generated data
@@ -27,6 +30,7 @@
     - There are many cases in data systems where the data or derived
       parts cannot be associated to an individual parent but only to a
       population of parents of the same type.
+    - BFO object aggregate.
 - =participant set=
   - Distinct from population in that all the members of the set must
     be individually identified. Set membership is metadata about an
@@ -84,11 +88,12 @@ statistical sense.
       - =cell bits=
       - ...
  - =population type=
-   - =subject population=
-   - =sample population=
-     - =cell population=
+   - =population population=
+   - =specimen population=
+     - =subject population=
+     - =sample population=
+       - =cell population=
    - ...
-
 
 Each =specimen= type has a corresponding =population= type. For many
 use cases population types should be materialized. While it is
