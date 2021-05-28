@@ -545,10 +545,16 @@ class Report:
         key = self._sort_key
         # FIXME we need the blob wrapper in addition to the blob generator
         # FIXME these are the normalized ones ...
-        s_headers = tuple(k for dataset_blob in datasets
-                          if dict_key in dataset_blob  # FIXME inputs?
-                          for s_blob in dataset_blob[dict_key]
-                          for k in s_blob)
+        s_headers = tuple(
+            uk for dataset_blob in datasets
+            if dict_key in dataset_blob  # FIXME inputs?
+            # unique so that we don't bias by the number of specimens
+            # in a given study, there is an issue with sparse
+            # reporting over different specimens in the same study,
+            # but not much we can do about that
+            for uk in set(
+                    k for s_blob in dataset_blob[dict_key]
+                    for k in s_blob))
         counts = tuple(kv for kv in sorted(Counter(s_headers).items(),
                                             key=key))
 

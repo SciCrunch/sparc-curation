@@ -131,7 +131,7 @@ class DatasetMetadata(HasErrors):
                     timestamp_updated=cmeta.updated,
                     # FIXME vs the dataset updated time now touched for transitive updates
                     timestamp_updated_contents=self.updated_cache_transitive(),
-                    sparse=self.path.is_sparse(),
+                    sparse=self.cache.is_sparse(),
                         ))
         else:
             return dict(id=self.id,
