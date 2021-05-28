@@ -1238,7 +1238,7 @@ subsam_common_properties = {  # FIXME these should not be in the samples sheet, 
     'sex': {'anyOf': [EIS._allOf(OntTermSchema),
                       # FIXME oneOf fails when EIS is converted to input type
                       {'type': 'string'}],
-            'context_value': 'TEMP:hasBiologicalSex',  # FIXME idtype
+            'context_value': idtype('sparc:hasBiologicalSex'),
             },  # sex as a variable ?
 
     'body_mass':{'context_value': 'sparc:animalSubjectHasWeight',

@@ -474,7 +474,7 @@ class SubjectConverter(TripleConverter):
         ['body_mass', sparc.animalSubjectHasWeight],  # TODO
         ['body_weight', sparc.animalSubjectHasWeight],
         ['height_inches', TEMP.subjectHasHeight],  # FIXME converted in datasets sigh
-        ['sex', TEMP.hasBiologicalSex],
+        ['sex', sparc.hasBiologicalSex],
         ['gender', sparc.hasGender],
         ['age', TEMP.hasAge],
         ['age_years', TEMP.hasAge],  # FIXME this is ok because we catch it when converting but
