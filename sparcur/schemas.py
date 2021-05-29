@@ -271,6 +271,10 @@ def inttype(id):
     return {'@id': id, '@type': 'xsd:integer'}
 
 
+def booltype(id):
+    return {'@id': id, '@type': 'xsd:boolean'}
+
+
 def cont(id, type):
     return {'type': type, 'context_value': id}
 
@@ -1688,8 +1692,8 @@ class MetaOutExportSchema(JSONSchema):
         'size': {'type': 'integer',
                  'context_value': inttype('TEMP:hasSizeInBytes'),
                  },
-        'sparse': {'type': 'integer',
-                   'context_value': inttype('TEMP:sparseClone'),
+        'sparse': {'type': 'boolean',
+                   'context_value': booltype('TEMP:sparseClone'),
                    },
         'folder_name': {'context_value': 'rdfs:label',
                         **string_noltws},

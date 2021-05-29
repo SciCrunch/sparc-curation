@@ -763,12 +763,15 @@ class PennsieveId(BlackfynnId):
      uri_human_regex, compiled) = make_bf_id_regex(top_level_domain)
 
 
-class LocId:
+class LocId(idlib.Identifier):
 
     def __init__(self, id, type):
         self.id = id
         self.type = type
         self.curie = id  # FIXME depends on how id was generated
         sysid, path = id.split(':', 1)
+        if '/' not in path:
+            raise TypeError(f'WHAT HAVE YOU DONE {path}')
         self.uri_api = 'file://' + path
         self.uri_human = self.uri_api
+        self._identifier = self.uri_api

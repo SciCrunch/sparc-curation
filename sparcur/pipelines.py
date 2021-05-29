@@ -114,10 +114,8 @@ class RemoteDatasetDataPipeline(DatasourcePipeline):
         if not hasattr(self.__class__, 'RemoteDatasetData'):
             if lifters.remote == 'pennsieve':
                 from sparcur.backends import PennsieveDatasetData as RDD
-
             elif lifters.remote == 'local':
                 from sparcur.backends import LocalDatasetData as RDD
-
             elif lifters.remote == 'blackfynn':  # deprecated but kept just in case
                 from sparcur.backends import BlackfynnDatasetData as RDD
             else:
@@ -1137,7 +1135,7 @@ class SDSPipeline(JSONPipeline):
             if path not in (saf, suf):
                 for_super.append((path, error, subpipeline_class))
 
-        if paths and saf not in paths and suf not in paths:
+        if paths and (saf in paths or suf in paths):
             logd.error(f'samples_file nor subjects_file')
 
         super().subpipeline_errors(for_super)

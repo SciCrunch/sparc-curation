@@ -1090,7 +1090,9 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
     _asserted_anchor = None
     _dataset_dirs = []
 
-    _jsonMetadata = BlackfynnCache._jsonMetadata
+    _jsonMetadata = BFPNCacheBase._jsonMetadata
+    populateJsonMetadata = BFPNCacheBase.populateJsonMetadata
+    cypher = BFPNCacheBase.cypher
 
     def _type(self):
         if self.is_file():
@@ -1157,6 +1159,10 @@ class PathL(Path):
     # only way to be sure, clunky and aweful, but unavoidable
 
     _cache_class = CacheL
+
+    @property
+    def cache_identifier(self):
+        return self.cache.identifier
 
 
 PathL._bind_flavours()

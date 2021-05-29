@@ -134,12 +134,17 @@ class DatasetMetadata(HasErrors):
                     sparse=self.cache.is_sparse(),
                         ))
         else:
-            return dict(id=self.id,
-                        meta=dict(folder_name=self.name,
-                                  uri_human=None,
-                                  uri_api=None,
-                                  timestamp_created=None,
-                                  timestamp_updated=None,
+            raise NotImplementedError('use CacheL instead')
+            path = self._path
+            meta = path.meta
+            #uri = quote(path.resolve().as_uri(), safe=':/')
+            uri = path.resolve().as_uri()
+            return dict(id=meta.id,
+                        meta=dict(folder_name=path.name,
+                                  uri_human=uri,
+                                  uri_api=uri,
+                                  timestamp_created=None,  # cannot get birthdate on all file systems
+                                  timestamp_updated=meta.updated,
                         ))
 
 
@@ -662,6 +667,8 @@ class Tabular(HasErrors):
             raise exc.NoDataError(f'{self.path}') from e2
 
     def xlsx2(self):
+        # FIXME this has horrible performance on sheets with lots of empty cells
+        # which apparently happens really frequently in our workflows?!
         # https://openpyxl.readthedocs.io/en/latest/datetime.html  # XXX OH NOOOOOOOOOOOOOOOOOOOOOO
         # yeah ... iso8601 as a string :/
         wb = self._openpyxl.load_workbook(self.path)
