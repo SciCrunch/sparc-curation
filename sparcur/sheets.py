@@ -1,7 +1,9 @@
 from functools import wraps
 from collections import defaultdict
 from urllib.parse import quote
+from datetime import datetime, date
 import idlib
+from pyontutils.utils import isoformat
 from pyontutils.sheets import Sheet as SheetBase
 from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
@@ -127,6 +129,10 @@ class Reports(Sheet):
                     return cell_value.asUri()
                 except AttributeError as e:
                     breakpoint()
+            elif (isinstance(cell_value, date) or
+                  isinstance(cell_value, datetime)):
+                # the default json encoder doesn't know what to do with these
+                return isoformat(cell_value)
             elif isinstance(cell_value, str):
                 if cell_value.lower() == 'x':
                     return True
