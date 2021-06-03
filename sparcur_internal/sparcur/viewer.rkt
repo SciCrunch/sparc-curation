@@ -76,7 +76,7 @@
 
 (define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "for-racket"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
-(define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--dataset-id" (dataset-id ds)))
+(define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1" "--dataset-id" (dataset-id ds)))
 (define argv-spc-find-meta
   (python-mod-args
    "sparcur.cli"

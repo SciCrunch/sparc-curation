@@ -322,9 +322,7 @@ class Options(clif.Options):
 
     @property
     def sparse_limit(self):
-        l = int(self._args['--sparse-limit'])
-        if l >= 0:
-            return l
+        return int(self._args['--sparse-limit'])
 
     @property
     def level(self):

@@ -256,9 +256,10 @@ class BFPNCacheBase(PrimaryCache, EatCache):
 
         if self.is_dataset():
             package_count = self._package_count()
-            sparse_remote = (False
-                             if sparse_limit is None else
-                             package_count >= sparse_limit)
+            sparse_remote = (
+                False
+                if sparse_limit is None or sparse_limit < 0 else
+                package_count >= sparse_limit)
             sparse_cache = self.is_sparse()
             if sparse_remote:
                 if not sparse_cache:
