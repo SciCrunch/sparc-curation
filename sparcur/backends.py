@@ -1419,7 +1419,7 @@ class RemoteDatasetData:
         self.ntfs_safe_id = self.id.split(':')[-1]  # sigh
         self.cache = self.cache_base / self.ntfs_safe_id
         if not self.cache_base.exists():
-            self.cache_base.mkdir()
+            self.cache_base.mkdir(parents=True)
 
     @property
     def _cache_path(self):
