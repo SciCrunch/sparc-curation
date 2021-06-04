@@ -45,6 +45,15 @@ SCIGRAPH_API_KEY=$(python -c 'from pyontutils.config import auth; print(auth.get
 HOME=/tmp/test-home python -m sparcur.simple.validate
 #+end_src
 
+Example python usage
+#+begin_src python
+from sparcur.simple.validate import main as validate
+from pathlib import Path
+
+path = Path('../resources/DatasetTemplate')
+blob = validate(path)
+#+end_src
+
 # #+header: :epilogue "import pprint; return pprint.pformat(data.keys())"
 # #+header: :epilogue "import pprint; return pprint.pformat(data)"
 #+begin_src python :results drawer :exports both :cache yes :tangle ../sparcur/simple/validate.py
@@ -113,6 +122,8 @@ def makeValidator(dataset_path, time_now=None):
         modality = None
         organ_term = None
         protocol_uris = tuple()
+
+        award_manual = None
 
     return pipes.PipelineEnd(dataset_path, lifters, context)
     return pipes.SDSPipeline(dataset_path, lifters, context)  # shouldn't need network
