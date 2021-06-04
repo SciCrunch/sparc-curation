@@ -1108,6 +1108,9 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
                 return 'dataset'
             else:
                 return 'collection'
+        elif not self.exists():
+            log.warning(f'File should exist? {self!r}!')
+            raise FileNotFoundError(self)
         else:
             msg = f"unsupported inode type at path\n'{self.as_posix()}'"
             raise TypeError(msg)
