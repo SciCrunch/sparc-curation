@@ -54,8 +54,10 @@ path = Path('../resources/DatasetTemplate')
 blob = validate(path)
 #+end_src
 
+Implementation of =sparcur.simple.validate=.
 # #+header: :epilogue "import pprint; return pprint.pformat(data.keys())"
 # #+header: :epilogue "import pprint; return pprint.pformat(data)"
+#+name: validate.py
 #+begin_src python :results drawer :exports both :cache yes :tangle ../sparcur/simple/validate.py
 import augpathlib as aug
 from sparcur import pipelines as pipes
