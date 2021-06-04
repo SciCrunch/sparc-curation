@@ -1712,6 +1712,19 @@ python -m sparcur.simple.retrieve \
 --symlink-objects-to /mnt/str/tom/cache/bf-object-cache
 #+end_src
 
+Example python usage.
+#+begin_src python
+from sparcur.paths import Path
+from sparcur.utils import PennsieveId
+from sparcur.simple.retrieve import main as retrieve
+p = PennsieveId('N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0')
+d = PennsieveId('N:dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18')
+ppp = Path('~/files/sparc-datasets').expanduser()
+retrieve(id=d, dataset_id=d, project_id=p, parent_parent_path=ppp)
+#+end_src
+
+=sparcur.simple.retrieve= implementation
+
 # FIXME xml fetching still broken sporadically
 #+name: retrieve.py
 #+begin_src python :tangle ../sparcur/simple/retrieve.py

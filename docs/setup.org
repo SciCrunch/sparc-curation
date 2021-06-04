@@ -1575,6 +1575,15 @@ protocols-io:
     creds-file: client_secret_protocols.io.json
     store-file: protocols-io-api-token-rw.pickle
 #+end_src
+
+Secrets template for minimal SODA =sparcur.simple.retrieve= setup.
+=~/.config/orthauth/secrets.yaml=
+#+begin_src yaml
+pennsieve:
+  N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
+    key: *replace-me-with:your-pennsieve-api-key*
+    secret: *replace-me-with:your-pennsieve-api-secret*
+#+end_src
 *** Bootstrap code
 :PROPERTIES:
 :CUSTOM_ID: bootstrap-code
