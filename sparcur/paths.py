@@ -1109,7 +1109,8 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
             else:
                 return 'collection'
         else:
-            raise TypeError('unsupported inode type')
+            msg = f"unsupported inode type at path\n'{self.as_posix()}'"
+            raise TypeError(msg)
 
     @property
     def identifier(self):
