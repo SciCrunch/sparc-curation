@@ -33,6 +33,10 @@ root = PennsieveRemote(PennsieveRemote.root)
 datasets = list(root.children)
 #+end_src
 ** Validate a dataset
+:PROPERTIES:
+:header-args:python: :comments link :exports code :mkdirp yes
+:header-args:python+: :shebang "#!/usr/bin/env python3"
+:END:
 You can run this example block and it will validate the [[file:../resources/DatasetTemplate][DatasetTemplate]].
 
 # XXX when testing this you need to set an alternate sandboxed home
