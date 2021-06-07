@@ -488,7 +488,9 @@ class Export(ExportBase):
                    **sc.protcur_context,
                    }
         for f in ('meta', 'subjects', 'samples', 'contributors'):
-            context.pop(f)  # FIXME HACK meta @graph for datasets
+            # subjects samples and contributors no longer included in context directly
+            if f in context:
+                context.pop(f)  # FIXME HACK meta @graph for datasets
 
         ontology_header = {  # FIXME should probably not be added here since it is obscure ...
             '@id': 'https://cassava.ucsd.edu/sparc/ontologies/protcur.ttl',
