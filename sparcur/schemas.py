@@ -1276,15 +1276,15 @@ subsam_common_properties = {  # FIXME these should not be in the samples sheet, 
     'organism_rrid': strcont('TEMP:organismRRID'),
 
     # fields that require additional information
-    'experiment_date': strcont('TEMP:protocolExecutionDate'),  # FIXME needs to reference a protocol
-    'injection_date': strcont('TEMP:protocolExecutionDate'),  # FIXME needs to reference a protocol
-    'date_of_euthanasia': strcont('TEMP:protocolExecutionDate'),
-    'date_of_injection': strcont('TEMP:protocolExecutionDate'),
+    'experiment_date': strcont('TEMP:protocolPerformanceDate'),  # FIXME needs to reference a protocol
+    'injection_date': strcont('TEMP:protocolPerformanceDate'),  # FIXME needs to reference a protocol
+    'date_of_euthanasia': strcont('TEMP:protocolPerformanceDate'),
+    'date_of_injection': strcont('TEMP:protocolPerformanceDate'),
 
     # fields that are actually about files
-    'sha1': strcont('TEMP:hasDigitalArtifactThatIsAboutItWithHash'),
-    'filename': strcont('TEMP:hasDigitalArtifactThatIsAboutIt'),
-    'upload_filename': strcont('TEMP:hasDigitalArtifactThatIsAboutIt'),
+    'sha1': strcont('TEMPRAW:hasDigitalArtifactThatIsAboutItWithHash'),
+    'filename': strcont('TEMPRAW:hasDigitalArtifactThatIsAboutIt'),
+    'upload_filename': strcont('TEMPRAW:hasDigitalArtifactThatIsAboutIt'),
     'dataset_id': strcont('TEMP:providerDatasetIdentifier'),  # FIXME need a global convention for this
 
     # fields that are actually about performances

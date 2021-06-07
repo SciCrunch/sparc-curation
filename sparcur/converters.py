@@ -235,7 +235,8 @@ class MetaConverter(TripleConverter):
         #['award_number', TEMP.hasAwardNumber],
         ['species', isAbout],
         ['organ', isAbout],
-        ['modality', TEMP.hasExperimentalModality],
+        ['modality', TEMP.hasExperimentalApproach],
+        ['approach', TEMP.hasExperimentalApproach],
         ['techniques', TEMP.protocolEmploysTechnique],
         ['uri_api', TEMP.hasUriApi],
         ['uri_human', TEMP.hasUriHuman],
@@ -403,18 +404,17 @@ file_related = [
     # FIXME we don't want to export this, we want to use it to point
     # to a blackfynn package id, but that processing has to come during
     # the pipeline stage not here ...
-    ['sha1', TEMP.hasDigitalArtifactThatIsAboutItWithHash],
-    ['filename', TEMP.hasDigitalArtifactThatIsAboutIt],  #
-    ['upload_filename', TEMP.hasDigitalArtifactThatIsAboutIt],
+    ['sha1', TEMPRAW.hasDigitalArtifactThatIsAboutItWithHash],
+    ['filename', TEMPRAW.hasDigitalArtifactThatIsAboutIt],  #
+    ['upload_filename', TEMPRAW.hasDigitalArtifactThatIsAboutIt],
     ['dataset_id', TEMP.providerDatasetIdentifier],  # FIXME need a global convention for this
-    ['experimental_log_file_name', TEMP.hasDigitalArtifactThatIsAboutIt],  # FIXME maybe more specific
+    ['experimental_log_file_name', TEMPRAW.hasDigitalArtifactThatIsAboutIt],  # FIXME maybe more specific
     ]
 
 performance_related = [
 
-    # TODO execution -> performance
-    ['experiment_number', TEMP.localExecutionNumber],  # FIXME TODO
-    ['session', TEMP.localExecutionNumber],
+    ['experiment_number', TEMP.localPerformanceNumber],
+    ['session', TEMP.localPerformanceNumber],
 
     #['protocol_title']  # skip, but maybe cross reference the metadata?
 
@@ -450,10 +450,10 @@ subject_ambiguous = [
         ['stimulating_electrode_type', sparc.stimulatorUtilized],  # FIXME instance vs type
 
         #require extras
-        ['experiment_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
+        ['experiment_date', TEMP.protocolPerformanceDate],  # FIXME needs to reference a protocol
         # could be the injection date for a particular sample rather than the subject
-        ['injection_date', TEMP.protocolExecutionDate],  # FIXME needs to reference a protocol
-        ['date_of_injection', TEMP.protocolExecutionDate],
+        ['injection_date', TEMP.protocolPerformanceDate],  # FIXME needs to reference a protocol
+        ['date_of_injection', TEMP.protocolPerformanceDate],
 ]
 
 
@@ -489,7 +489,7 @@ class SubjectConverter(TripleConverter):
         ['organism_rrid', TEMP.TODO],
 
         # require extras
-        ['date_of_euthanasia', TEMP.protocolExecutionDate],
+        ['date_of_euthanasia', TEMP.protocolPerformanceDate],
 
     ]
     mapping = always_subject + subject_ambiguous + file_related + performance_related + utility
