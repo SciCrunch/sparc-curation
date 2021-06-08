@@ -1426,11 +1426,11 @@ links to the current implementation, from outside in. In reverse order
 the basic steps are pull from dataset packages endpoint, resolve
 hierarchy, convert to remote paths, and covert to cache paths which
 materialize the pull as folders or symlinks.
-1. [[wt-gh-pull:sparcur/paths.py#L941-L996][entry point to pull]]
-   1. [[wt-gh-pull:sparcur/paths.py#L973][the call in pull that actually retrieves data]]
-2. [[wt-gh-pull:sparcur/backends.py#L696-L798][the implementation of rchildren for Pennsieve]]
-3. [[wt-gh-pull:sparcur/backends.py#L777-L792][looping over packages to covert them to paths]]
-4. [[wt-gh-pull:sparcur/monkey.py#L115-L349][transform dataset packages endpoint json into Pennsieve api objects]]
+1. [[https://github.com/SciCrunch/sparc-curation/blob/0661c3ebd164d0beaa6c57382a459ffd28d9dc92/sparcur/paths.py#L941-L996][entry point to pull]]
+   1. [[https://github.com/SciCrunch/sparc-curation/blob/0661c3ebd164d0beaa6c57382a459ffd28d9dc92/sparcur/paths.py#L973][the call in pull that actually retrieves data]]
+2. [[https://github.com/SciCrunch/sparc-curation/blob/0661c3ebd164d0beaa6c57382a459ffd28d9dc92/sparcur/backends.py#L696-L798][the implementation of rchildren for Pennsieve]]
+3. [[https://github.com/SciCrunch/sparc-curation/blob/0661c3ebd164d0beaa6c57382a459ffd28d9dc92/sparcur/backends.py#L777-L792][looping over packages to covert them to paths]]
+4. [[https://github.com/SciCrunch/sparc-curation/blob/0661c3ebd164d0beaa6c57382a459ffd28d9dc92/sparcur/monkey.py#L115-L349][transform dataset packages endpoint json into Pennsieve api objects]]
 ***** Fetch
 #+caption: NOTE this block is unused!
 #+begin_src python :tangle ../sparcur/simple/fetch.py :exports none
