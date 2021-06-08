@@ -3,6 +3,7 @@
 #+OPTIONS: num:nil ^:nil h:7 broken-links:t
 #+LATEX_HEADER: \usepackage[margin=0.8in]{geometry}
 #+STARTUP: showall
+#+link: wt-gh-pull https://github.com/SciCrunch/sparc-curation/blob/0661c3ebd164d0beaa6c57382a459ffd28d9dc92/
 
 # [[file:developer-guide.pdf]]
 # [[file:developer-guide.html]]
@@ -1419,6 +1420,17 @@ if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main, after=print)
 #+end_src
+****** Internal implementation
+The non-simple implementation of this is quite convoluted so here are
+links to the current implementation, from outside in. In reverse order
+the basic steps are pull from dataset packages endpoint, resolve
+hierarchy, convert to remote paths, and covert to cache paths which
+materialize the pull as folders or symlinks.
+1. [[wt-gh-pull:sparcur/paths.py#L941-L996][entry point to pull]]
+   1. [[wt-gh-pull:sparcur/paths.py#L973][the call in pull that actually retrieves data]]
+2. [[wt-gh-pull:sparcur/backends.py#L696-L798][the implementation of rchildren for Pennsieve]]
+3. [[wt-gh-pull:sparcur/backends.py#L777-L792][looping over packages to covert them to paths]]
+4. [[wt-gh-pull:sparcur/monkey.py#L115-L349][transform dataset packages endpoint json into Pennsieve api objects]]
 ***** Fetch
 #+caption: NOTE this block is unused!
 #+begin_src python :tangle ../sparcur/simple/fetch.py :exports none
