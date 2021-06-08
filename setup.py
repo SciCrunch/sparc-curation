@@ -37,8 +37,10 @@ with open('README.md', 'rt') as f:
     long_description = f.read()
 
 RELEASE = '--release' in sys.argv
-if RELEASE:
-    sys.argv.remove('--release')
+PIPGIT = 'egg_info' in sys.argv and not Path('sparcur', 'simple').exists()
+if RELEASE or PIPGIT:
+    if RELEASE:
+        sys.argv.remove('--release')
 
     tangle_files(
         './docs/developer-guide.org',)
