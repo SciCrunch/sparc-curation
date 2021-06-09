@@ -679,12 +679,18 @@ class Tabular(HasErrors):
 
         sheet = wb.active
         for row in sheet.rows:
-            yield [cell.value.date()
-                   # Who thought it was a good idea to make the internal
-                   # representation of dates and midnight indistinguishable !?!?
-                   if cell.is_date and cell.number_format == 'yyyy\\-mm\\-dd;@'
-                   else cell.value
-                   for cell in row]
+            fixed_row = [
+                cell.value.date()
+                # Who thought it was a good idea to make the internal
+                # representation of dates and midnight indistinguishable !?!?
+                if cell.value and cell.is_date and
+                cell.number_format in ('yyyy\\-mm\\-dd;@', 'YYYY\\-MM\\-DD')
+                else cell.value
+                for cell in row]
+            lfr = len(fixed_row)
+            if lfr > 30:
+                logd.warning(f'Long row {lfr} > 30 detect in {self.path}')
+            yield fixed_row
 
     def xlsx1(self):
         kwargs = {
