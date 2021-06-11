@@ -431,6 +431,13 @@ systems the HOME environment variable needs to be set.
 setx HOME %USERPROFILE%
 setx PATH "C:\Program Files\Git\bin;%PATH%"
 #+end_src
+
+An additional method that could be used to create an executable emacs instance is by using =Chocolatey= to install emacs. You will need to be in a Powershell instance with elevated permissions for this case. [[https://chocolatey.org/install]]
+#+begin_src powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+choco install emacs
+#+end_src
+
 ***** Group policy for file system issues
 ****** Long Paths
 Datasets in SPARC often have long names. Windows 10 default settings
