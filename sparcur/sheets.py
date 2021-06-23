@@ -514,7 +514,7 @@ class Organs(FieldAlignment):
             except StopIteration:
                 log.info(f'no term for technique {value}')
 
-    def _update_dataset_metadata(self, id, name, award, update_techniques=False):
+    def _update_dataset_metadata(self, id, name, award, species, update_techniques=False):
         try:
             row_index = self._dataset_row_index(id)
             row = self.row_object(row_index)
@@ -534,8 +534,12 @@ class Organs(FieldAlignment):
             if cell_award.value != award:
                 cell_award.value = award
 
+            cell_species = row.species()
+            if cell_species.value != species:
+                cell_species.value = species
+
         except KeyError as e:
-            row = ['', '', name, id, award]  # XXX this was causing index errors
+            row = ['', '', name, id, award, species]  # XXX this was causing index errors
             # because the columns were not being padded by appendRow
             self._appendRow(row)
 
@@ -544,15 +548,30 @@ class Organs(FieldAlignment):
         if oi is not OntTerm:
             OntTerm.query._instrumented = OntTerm
 
+        def cformat(cell):
+            if isinstance(cell, OntTerm):
+                cell = cell.asCell()
+
+            return cell
+
         try:
             dataset_blobs = ir['datasets']
             self._wat = self.values[8]
             for blob in dataset_blobs:
                 meta = blob['meta']
+                #species = adops.get(blob, ['subjects', int, 'species'], on_failure='')  # TODO not implemented
+                if 'subjects' in blob:
+                    species = '\n'.join(sorted(set(
+                        [cformat(s['species']) for s in blob['subjects']
+                         if 'species' in s])))
+                else:
+                    species = ''
+
                 self._update_dataset_metadata(
                     id=blob['id'],
                     name=adops.get(blob, ['meta', 'folder_name'], on_failure=''),
                     award=adops.get(blob, ['meta', 'award_number'], on_failure=''),
+                    species=species,
                 )
         finally:
             # FIXME this is so dumb :/
