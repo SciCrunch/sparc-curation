@@ -1127,7 +1127,7 @@ make-template-zip () {
     pushd ${CLEANROOM}
     git clone https://github.com/SciCrunch/sparc-curation.git &&
     pushd ${CLEANROOM}/sparc-curation/resources
-    zip -r DatasetTemplate.zip DatasetTemplate
+    zip -x '*.gitkeep' -r DatasetTemplate.zip DatasetTemplate
     mv DatasetTemplate.zip ${CLEANROOM}
     popd
     rm -rf ${CLEANROOM}/sparc-curation
