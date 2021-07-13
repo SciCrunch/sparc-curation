@@ -868,12 +868,58 @@ WHERE {
   ?dataset_sim ?p ?dataset .
 } LIMIT 10
 #+end_src
+* Use cases
+:PROPERTIES:
+:header-args:sparql: :url http://localhost:9999/blazegraph/sparql
+:header-args:sparql+: :format text/csv
+:header-args:sparql+: :results table
+:END:
+** ApiNATOMY
+*** Summary statistics
+# aka dashboard queries
+ApiNATOMY sourced
+
+1. number of lyphs
+   generated vs input
+   s? rdf:type element:Lyph
+2. publications referenced
+   apinaomty:publications
+   average number of publications per unit? (for now no)
+   will also want the full listing of publications
+   select count distinct o?
+   select distinct o?
+   s? apinat:publication o?
+3. species
+   both model level and lyph level
+4. terms employed in annotation
+   count of apinatomy:external by prefix UBERON, GO, CHEBI, etc.
+   full listing of terms as well
+   select count distinct o?
+   select distinct o?
+   s? apinat:external o?
+5. number of neurulated groups aka neuron populations
+
+NPO sourced
+Keast
+Bolser Lewis
+First pass NLP output
+
+1. number of neuron populations aka neuron types
+2. number of distinct phenotypes
+3. number of dimensions
+4. number of phenotype values per phenotype dimension
+   1. number of anatomical regions
+   2. number of species
+   3. number of ...
+
 * Bootstrap :noexport:
 :PROPERTIES:
 :visibility:  folded
 :END:
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes
+(defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
+
 (defun orgstrap---noconfirm-eval-sparql (lang _body)
   "Run sparql queries without confirmation dialogue."
   (not (string= lang "sparql")))
