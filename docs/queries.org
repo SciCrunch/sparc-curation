@@ -1,27 +1,37 @@
 # -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 93bfa8161f556112d8fb98f5576200a6d642293f29d3c6034acced48980bcc25; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
+# [[file:queries.html]]
+
+#+title: SPARC queries
+
+#+options: ^:nil
 
 # TODO consider a setup file for these maybe?
 # or populate additional local curies via orgstrap
 # FIXME doi collides which is bad
 #+link: doi https://doi.org/
+#+link: PMID http://www.ncbi.nlm.nih.gov/pubmed/
 #+link: dataset https://api.pennsieve.io/datasets/N:dataset:
 #+link: datasetbf https://api.blackfynn.io/datasets/N:dataset:
 #+link: TEMP http://uri.interlex.org/temp/uris/
 #+link: TEMPRAW http://uri.interlex.org/temp/uris/raw/
 #+link: awards http://uri.interlex.org/temp/uris/awards/
 #+link: rdf http://www.w3.org/1999/02/22-rdf-syntax-ns#
+#+link: FMA http://purl.org/sig/ont/fma/fma
 #+link: IAO http://purl.obolibrary.org/obo/IAO_
 #+link: UBERON http://purl.obolibrary.org/obo/UBERON_
 #+link: NCBITaxon http://purl.obolibrary.org/obo/NCBITaxon_
 #+link: PATO http://purl.obolibrary.org/obo/PATO_
 #+link: CHEBI http://purl.obolibrary.org/obo/CHEBI_
 #+link: GO http://purl.obolibrary.org/obo/GO_
+#+link: CL http://purl.obolibrary.org/obo/CL_
+#+link: EMAPA http://purl.obolibrary.org/obo/EMAPA_
 #+link: oboInOwl http://www.geneontology.org/formats/oboInOwl#
 #+link: BIRNLEX http://uri.neuinfo.org/nif/nifstd/birnlex_
 #+link: owl http://www.w3.org/2002/07/owl#
 #+link: rdfs http://www.w3.org/2000/01/rdf-schema#
 #+link: dc http://purl.org/dc/elements/1.1/
+#+link: ILX http://uri.interlex.org/base/ilx_
 #+link: ilxtr http://uri.interlex.org/tgbugs/uris/readable/
 #+link: tech http://uri.interlex.org/tgbugs/uris/readable/technique/
 #+link: asp http://uri.interlex.org/tgbugs/uris/readable/aspect/
@@ -29,11 +39,23 @@
 #+link: ilxtio http://uri.interlex.org/tgbugs/uris/indexes/ontologies/
 #+link: hyp-protcur https://uilx.org/tgbugs/u/hypothesis/protcur/
 #+link: NLXINV http://uri.neuinfo.org/nif/nifstd/nlx_inv_
+#+link: SAO http://uri.neuinfo.org/nif/nifstd/sao
+#+link: NLX http://uri.neuinfo.org/nif/nifstd/nlx_
 #+link: pio.api https://www.protocols.io/api/v3/protocols/
 #+link: pio.view https://www.protocols.io/view/
 #+link: ror https://ror.org/
 #+link: SCR http://scicrunch.org/resolver/SCR_
-# FIXME definition is not expanding as expected, probably because my implementation is wrong
+#+link: apinatomy https://apinatomy.org/uris/readable/
+#+link: elements https://apinatomy.org/uris/elements/
+#+link: aacar https://apinatomy.org/uris/models/ard-arm-cardiac/ids/
+#+link: bolew https://apinatomy.org/uris/models/bolser-lewis/ids/
+#+link: kblad https://apinatomy.org/uris/models/keast-bladder/ids/
+#+link: bromo https://apinatomy.org/uris/models/bronchomotor/ids/
+#+link: scaft https://apinatomy.org/uris/models/scaffold-test/ids/
+#+link: vagnr https://apinatomy.org/uris/models/vagus-nerve/ids/
+#+link: sdcol https://apinatomy.org/uris/models/sawg-distal-colon/ids/
+# FIXME definition is not expanding as expected, probably because my
+# implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
 
 #+property: header-args :eval no-export
@@ -45,101 +67,6 @@
 :header-args:sparql+: :var limit="10"
 :END:
 # :header-args:sparql: :url http://localhost:10035/repositories/test
-** Subject reconciliation
-# #+header: :cache yes
-#+name: potential-duplicate-subjects
-#+begin_src sparql
-# :results table
-# RUN:block
-SELECT distinct ?s1 ?s2 ?id ?dataset1 ?dataset2 ?species1 ?species2 ?award1 ?award2
-WHERE {
-
-  # Give me all subjects with duplicate IDs with unique datasets
-  { SELECT ?id
-    WHERE {
-	  ?s1 a owl:NamedIndividual ;
-	  TEMP:localId ?id ;
-	  TEMP:hasDerivedInformationAsParticipant ?datasetx .
-	  ?s2 a owl:NamedIndividual ;
-	  TEMP:localId ?id ;
-	  TEMP:hasDerivedInformationAsParticipant ?datasety .
-	  filter(?datasetx != ?datasety)
-    } GROUP BY ?id having (count(?id) > 1)}
-
-  # filter out the cases where there can't be a match because species doesn't match
-  ?s1 TEMP:localId ?id ;
-  sparc:animalSubjectIsOfSpecies ?species1;
-  TEMP:hasDerivedInformationAsParticipant ?dataset1 .
-  ?s2 TEMP:localId ?id ;
-  sparc:animalSubjectIsOfSpecies ?species2;
-  TEMP:hasDerivedInformationAsParticipant ?dataset2 .
-  filter(?s1 != ?s2)
-  filter(STR(IRI(?s1)) < STR(IRI(?s2))) # this is a hack to filter out duplicate triples
-  filter(?species1 != ?species2)
-  filter(STR(IRI(?species1)) < STR(IRI(?species2))) # hack to filter dupe triples
-
-  # filter to find non-matching awards
-  # using contact person doesn't make sense as they are 1:1 with award right now
-  ?dataset1 a owl:NamedIndividual ;
-  TEMP:hasAwardNumber ?award1 .
-  ?dataset2 a owl:NamedIndividual ;
-  TEMP:hasAwardNumber ?award2 .
-  filter(?dataset1 != ?dataset2)
-  filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2))) # hack to filter dupe triples
-  filter(?award1 != ?award2)
-  filter(STR(IRI(?award1)) < STR(IRI(?award2))) # hack to filter dupe triples
-
-} order by ?id limit 1000
-#+end_src
-
-# *[[RUN:][Run Query ▶]]*
-# #+header: :results drawer output
-#+header: :epilogue "return result"
-#+name: process-duplicate-subjects
-#+begin_src python :var data=potential-duplicate-subjects() :exports results
-from collections import defaultdict, OrderedDict
-import itertools
-from sparcur.core import OntId
-
-def func(data):
-    idmap = defaultdict(lambda: defaultdict(list)) # change to list; order for local_id
-    for row in data:
-        subj1, subj2, local_id = row[0], row[1], row[2]
-        if not idmap[subj1]['local_id']:
-            idmap[subj1]['local_id'].append(local_id)
-        idmap[subj1]['cluster'].append(subj2)
-        idmap[subj1]['local_id'].append(local_id)
-        value_pairs = [(row[i], row[i+1]) for i in range(3, len(row), 2)]
-        value_pairs_len = len(value_pairs)
-        for i, value_pair in enumerate(value_pairs):
-            v1, v2 = value_pair
-            if v1 not in idmap[subj1][i]:
-                idmap[subj1][i].append(v1)
-            idmap[subj1][i].append(v2)
-    header = ['cluster', 'local_id'] + [i for i in range(value_pairs_len)] # todo: replace this with sparql headers if possible
-    columns = defaultdict(list)
-    subjs = sorted([(v, v.split('/')[-1]) for v in idmap], key=lambda x: x[1])
-    for subj, _ in subjs:
-        padding_max = max([len(v) for v in idmap[subj].values()])
-        for colname, values in idmap[subj].items():
-            values = list(values)
-            values = [subj] + values if colname == 'cluster' else values
-            padding = padding_max - len(values) if len(values) < padding_max else 0
-            columns[colname] += values # + ['-'] * padding + ['']
-    thing = [list(_) for _ in itertools.zip_longest(*[columns[k] for k in header])]
-    for index in (0, 2, 3, 4):
-        for row in thing:
-            row[index] = OntId(row[index]).curie  # shorten iris
-    hardcoded_header =  [f'individuals (n={len(thing)})',
-                         f'id (n={len(set([r[1] for r in thing]))})',
-                         'datasets', 'species', 'awards']
-    table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in thing), key=lambda row:(row[1], row[3], row[4], row[2]))
-    return table
-
-
-result = func(data)
-#+end_src
-
 ** Datasets
 *** Dataset Predicates
 #+begin_src sparql
@@ -204,7 +131,8 @@ SELECT DISTINCT
 WHERE {
     ?dataset rdf:type sparc:Dataset .
     ?dataset isAbout: ?about .
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 
 #+RESULTS:
@@ -719,46 +647,49 @@ SELECT DISTINCT
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:completenessOfDataset ?completeness .
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 
 #+RESULTS:
-| dataset                                                                          | completeness |
-|----------------------------------------------------------------------------------+--------------|
-| https://api.blackfynn.io/datasets/N:dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | batch        |
-| https://api.blackfynn.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | hasNext      |
-| https://api.blackfynn.io/datasets/N:dataset:02786240-2033-4f86-808d-daf345ce3165 | complete     |
-| https://api.blackfynn.io/datasets/N:dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | complete     |
-| https://api.blackfynn.io/datasets/N:dataset:093c54b7-34c3-4204-9cea-0e2bdfd1fa93 | Complete     |
-| https://api.blackfynn.io/datasets/N:dataset:0a5a2827-2b39-4085-87ea-2b7fbbe27cc8 | batch        |
-| https://api.blackfynn.io/datasets/N:dataset:0b14782a-382d-430d-857e-acc333e3c324 | Complete     |
-| https://api.blackfynn.io/datasets/N:dataset:0c23200d-d821-4732-a467-9f73ab2862f0 | Complete     |
-| https://api.blackfynn.io/datasets/N:dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | complete     |
-| https://api.blackfynn.io/datasets/N:dataset:1284a4e8-21e1-4b9f-9280-6ba06f6b9a50 | Batch        |
+| dataset                                      | completeness         |
+|----------------------------------------------+----------------------|
+| dataset:0426ab91-194d-431d-acf7-f9dfad26e295 | hasNEXT              |
+| dataset:3b28ba19-e7ca-4ee2-be69-34029c31060a | Yes                  |
+| dataset:88d3bbc6-014e-4ba3-a5ca-b27eddccfcc7 | hasNext, hasChildren |
+| dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | hasNEXT              |
+| dataset:a9b14217-9084-4fd8-ae0a-5e801e708e86 | part, Q4 yr 2        |
+| dataset:ac2279ba-b8b0-4214-98af-437111a2ae61 | Ongoing study        |
+| dataset:bfa288a0-1f6e-482f-858e-9529baa50b0f | On going             |
+| dataset:c0b435a5-15d9-4cc8-9eb9-3c4a00626690 | hasNext, hasChildren |
+| dataset:d484110a-e6e3-4574-aab2-418703c978e2 | hasNext              |
+| dataset:dae2fef9-05e6-418f-8374-3af267643340 | hasNext              |
 *** Dataset collections
-#+begin_src sparql :var limit="10"
+#+begin_src sparql
 SELECT DISTINCT
 ?title
 ?dataset
 WHERE {
-  ?startdataset TEMP:collectionTitle ?title .
-  ?dataset  TEMP:collectionTitle ?title .
-} ORDER BY ASC(?title) LIMIT ?limit
+    ?startdataset TEMP:collectionTitle ?title .
+    ?dataset  TEMP:collectionTitle ?title .
+}
+ORDER BY ASC(?title)
+LIMIT ?limit
 #+end_src
 
 #+RESULTS:
-| title                                                                                          | dataset                                                                          |
-|------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------|
-| A multi-scale model of cardiac electrophysiology                                               | https://api.blackfynn.io/datasets/N:dataset:c5c2f40f-76be-4979-bfc4-b9f9947231cf |
-| AAV Serotypes 6_8_9 Intrapancreatic 4 weeks                                                    | https://api.blackfynn.io/datasets/N:dataset:fce3f57f-18ea-4453-887e-58a885e90e7e |
-| AAV8 Titer and Route                                                                           | https://api.blackfynn.io/datasets/N:dataset:458d3e2c-8f75-4298-bf10-8322b058b148 |
-| AAV8 Titer and Route                                                                           | https://api.blackfynn.io/datasets/N:dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a |
-| AAVretro Serotype Intrapancreatic 4 weeks                                                      | https://api.blackfynn.io/datasets/N:dataset:43da251b-59bd-43fa-8a8a-3a0276da968f |
-| Acute effects of gastric electrical stimulation settings on gastric motility assessed with MRI | https://api.blackfynn.io/datasets/N:dataset:c2564991-28d5-42cf-bfb6-8f93b874a5af |
-| Acute effects of vagus nerve stimulation settings on gastric motility assessed with MRI        | https://api.blackfynn.io/datasets/N:dataset:76593e2b-2343-44db-9d47-f7c15f3e2afa |
-| Afferent Fiber Interactions with Renal Glomeruli                                               | https://api.blackfynn.io/datasets/N:dataset:55ceb112-2519-41c8-b808-f05dd4dd87d1 |
-| Anatomy and Histology of the Domestic Pig in the Context of Vagus Nerve Stimulation            | https://api.blackfynn.io/datasets/N:dataset:f1f7598c-ab36-4cff-95a2-85917e951407 |
-| Assessment of gastric emptying and motility with MRI under gastric electrical stimulation      | https://api.blackfynn.io/datasets/N:dataset:6f7e029d-684e-4603-9dea-ec82a53c5a75 |
+| title                                                                                                                                   | dataset                                      |
+|-----------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------|
+| A multi-scale model of cardiac electrophysiology                                                                                        | dataset:c5c2f40f-76be-4979-bfc4-b9f9947231cf |
+| AAV Serotypes 6_8_9 Intrapancreatic 4 weeks                                                                                             | dataset:fce3f57f-18ea-4453-887e-58a885e90e7e |
+| AAV8 Titer and Route                                                                                                                    | dataset:458d3e2c-8f75-4298-bf10-8322b058b148 |
+| AAV8 Titer and Route                                                                                                                    | dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a |
+| AAVretro Serotype Intrapancreatic 4 weeks                                                                                               | dataset:43da251b-59bd-43fa-8a8a-3a0276da968f |
+| Acute Effects of Efferent/Afferent Vagus Nerve Stimulation (VNS) on neural activity accessed with functional Magnetic Resonance Imaging | dataset:99592359-0c48-4b0c-ab3d-b8b1b79bb7bf |
+| Acute Effects of Gastric Electrical Stimulation (GES) Settings on neural activity accessed with functional Magnetic Resonance Imaging   | dataset:2f4afec4-6e4d-4c20-b913-8e115fc8631b |
+| Acute Effects of Vagus Nerve Stimulation (VNS) Settings on neural activity in the nucleus of solitary tract (NTS)                       | dataset:e25a096b-7180-471a-847d-4aa711113d54 |
+| Acute Effects of efferent/afferent Vagus Nerve Stimulation (VNS) on neural activity accessed with functional Magnetic Resonance Imaging | dataset:70f8888b-0b9e-4e9d-93ca-2103e8828512 |
+| Acute effects of gastric electrical stimulation settings on gastric motility assessed with MRI                                          | dataset:c2564991-28d5-42cf-bfb6-8f93b874a5af |
 
 ** Subjects
 *** Members
@@ -770,22 +701,23 @@ WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:isAboutParticipant ?subject .
   ?subject a sparc:Subject .
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 
 #+RESULTS:
-| dataset                                      | subject                                                       |
-|----------------------------------------------+---------------------------------------------------------------|
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I10 |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I2  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I3  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I4  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I5  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I6  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I7  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I8  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-I9  |
-| dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6 | dataset:b32a8e3e-4e3a-49eb-bac2-3e11c99659b6/subjects/sub-J1  |
+| dataset                                      | subject                                                        |
+|----------------------------------------------+----------------------------------------------------------------|
+| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11050    |
+| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11051    |
+| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11052    |
+| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11053    |
+| dataset:6b29ddff-86fc-4dc3-bb78-8e572a788a85 | dataset:6b29ddff-86fc-4dc3-bb78-8e572a788a85/subjects/sub-cat5 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10   |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-11   |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-12   |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-13   |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-14   |
 
 *** Total
 #+begin_src sparql
@@ -902,22 +834,23 @@ WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:isAboutParticipant ?sample .
   ?sample a sparc:Sample .
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 
 #+RESULTS:
-| dataset                                      | sample                                                             |
-|----------------------------------------------+--------------------------------------------------------------------|
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17068_sam1 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17068_sam2 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17074_sam1 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17074_sam2 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17075_sam1 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17075_sam2 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17077_sam1 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17077_sam2 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17078_sam1 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/samples/sub17078_sam2 |
+| dataset                                      | sample                                                                   |
+|----------------------------------------------+--------------------------------------------------------------------------|
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60A-3 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60A-4 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-1 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-2 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-3 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-4 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_65A-1 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-1 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-3 |
+| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-4 |
 
 *** Total
 #+begin_src sparql
@@ -962,9 +895,8 @@ WHERE {
 | TEMP:localPerformanceNumber               |
 
 *** Sample Metadata
-
 #+name: sample-metadata
-#+begin_src sparql :var
+#+begin_src sparql
 SELECT DISTINCT
 ?subject_lid
 
@@ -1068,7 +1000,9 @@ WHERE {
   ?dataset isAbout: ?ae .  # TODO not 100% on the modelling here
   ?ae rdfs:label ?l_ae .
   ?ae rdfs:subClassOf* UBERON:0001062 .  # have to load uberon for this
-} ORDER BY ASC(?l_ae) LIMIT 10 
+}
+ORDER BY ASC(?l_ae)
+LIMIT ?limit
 #+end_src
 
 #+RESULTS:
@@ -1344,8 +1278,46 @@ WHERE {
   ?file a sparc:Manifest .
   ?file TEMP:hasParent ?dataset . # this is the tricky bit, because we conflate the identifier for dataset and the folder
   ?file TEMP:hasErrors 0 .
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
+** Contributors
+*** Count
+#+begin_src sparql
+SELECT DISTINCT
+(COUNT(DISTINCT ?person) as ?cp)
+WHERE {
+  ?person a sparc:Person .
+}
+LIMIT ?limit
+#+end_src
+
+#+RESULTS:
+|  cp |
+|-----|
+| 656 |
+
+*** ORCiD
+Count the number of contributors that have ORCiDs.
+#+begin_src sparql
+SELECT DISTINCT
+(COUNT(DISTINCT ?person) as ?cp)
+#?fn
+#?ln
+WHERE {
+  ?person a sparc:Person .
+  ?person sparc:firstName ?fn .
+  ?person sparc:lastName ?ln .
+  FILTER CONTAINS(str(?person), "orcid.org")
+}
+LIMIT ?limit
+#+end_src
+
+#+RESULTS:
+|  cp |
+|-----|
+| 257 |
+
 ** Other
 NOTE These are not yet in the ttl file, the queries written here will not work yet.
 *** File types
@@ -1365,7 +1337,8 @@ SELECT DISTINCT
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:containsFileWithType ?file_type .  # TODO not 100% on the modelling here
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 *** Has Raw Data
 #+begin_src sparql
@@ -1375,7 +1348,8 @@ SELECT DISTINCT
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:containsFolderForRawData ?raw .  # TODO not 100% on the modelling here
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 *** Has Derived Data
 #+begin_src sparql
@@ -1385,7 +1359,8 @@ SELECT DISTINCT
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:containsFolderForDerivedData ?derived .  # TODO not 100% on the modelling here
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 *** Has Code
 #+begin_src sparql
@@ -1395,7 +1370,8 @@ SELECT DISTINCT
 WHERE {
   ?dataset a sparc:Dataset .
   ?dataset TEMP:containsFolderForCode ?code .  # TODO not 100% on the modelling here
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
 *** Used in simulation
 This modeling is extremely preliminary.
@@ -1414,13 +1390,174 @@ WHERE {
   # ?dataset_sim TEMP:isSubstrateForSomeComputationalSimulation true .  # FIXME this is bad bad bad
   VALUES ?p {TEMP:derivesParametersFrom TEMP:derivesValidationDataFrom ilxtr:hasInformationInput} .
   ?dataset_sim ?p ?dataset .
-} LIMIT 10
+}
+LIMIT ?limit
 #+end_src
+** Subject reconciliation
+# #+header: :cache yes
+#+name: potential-duplicate-subjects
+#+begin_src sparql
+# :results table
+# RUN:block
+SELECT distinct ?s1 ?s2 ?id ?dataset1 ?dataset2 ?species1 ?species2 ?award1 ?award2
+WHERE {
+
+  # Give me all subjects with duplicate IDs with unique datasets
+  { SELECT ?id
+    WHERE {
+	  ?s1 a owl:NamedIndividual ;
+	  TEMP:localId ?id ;
+	  TEMP:hasDerivedInformationAsParticipant ?datasetx .
+	  ?s2 a owl:NamedIndividual ;
+	  TEMP:localId ?id ;
+	  TEMP:hasDerivedInformationAsParticipant ?datasety .
+	  filter(?datasetx != ?datasety)
+    } GROUP BY ?id having (count(?id) > 1)}
+
+  # filter out the cases where there can't be a match because species doesn't match
+  ?s1 TEMP:localId ?id ;
+  sparc:animalSubjectIsOfSpecies ?species1;
+  TEMP:hasDerivedInformationAsParticipant ?dataset1 .
+  ?s2 TEMP:localId ?id ;
+  sparc:animalSubjectIsOfSpecies ?species2;
+  TEMP:hasDerivedInformationAsParticipant ?dataset2 .
+  filter(?s1 != ?s2)
+  filter(STR(IRI(?s1)) < STR(IRI(?s2))) # this is a hack to filter out duplicate triples
+  filter(?species1 != ?species2)
+  filter(STR(IRI(?species1)) < STR(IRI(?species2))) # hack to filter dupe triples
+
+  # filter to find non-matching awards
+  # using contact person doesn't make sense as they are 1:1 with award right now
+  ?dataset1 a owl:NamedIndividual ;
+  TEMP:hasAwardNumber ?award1 .
+  ?dataset2 a owl:NamedIndividual ;
+  TEMP:hasAwardNumber ?award2 .
+  filter(?dataset1 != ?dataset2)
+  filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2))) # hack to filter dupe triples
+  filter(?award1 != ?award2)
+  filter(STR(IRI(?award1)) < STR(IRI(?award2))) # hack to filter dupe triples
+
+} order by ?id limit 1000
+#+end_src
+
+# *[[RUN:][Run Query ▶]]*
+# #+header: :results drawer output
+#+header: :epilogue "return result"
+#+name: process-duplicate-subjects
+#+begin_src python :var data=potential-duplicate-subjects() :exports results
+from collections import defaultdict, OrderedDict
+import itertools
+from sparcur.core import OntId
+
+def func(data):
+    idmap = defaultdict(lambda: defaultdict(list)) # change to list; order for local_id
+    for row in data:
+        subj1, subj2, local_id = row[0], row[1], row[2]
+        if not idmap[subj1]['local_id']:
+            idmap[subj1]['local_id'].append(local_id)
+        idmap[subj1]['cluster'].append(subj2)
+        idmap[subj1]['local_id'].append(local_id)
+        value_pairs = [(row[i], row[i+1]) for i in range(3, len(row), 2)]
+        value_pairs_len = len(value_pairs)
+        for i, value_pair in enumerate(value_pairs):
+            v1, v2 = value_pair
+            if v1 not in idmap[subj1][i]:
+                idmap[subj1][i].append(v1)
+            idmap[subj1][i].append(v2)
+    header = ['cluster', 'local_id'] + [i for i in range(value_pairs_len)] # todo: replace this with sparql headers if possible
+    columns = defaultdict(list)
+    subjs = sorted([(v, v.split('/')[-1]) for v in idmap], key=lambda x: x[1])
+    for subj, _ in subjs:
+        padding_max = max([len(v) for v in idmap[subj].values()])
+        for colname, values in idmap[subj].items():
+            values = list(values)
+            values = [subj] + values if colname == 'cluster' else values
+            padding = padding_max - len(values) if len(values) < padding_max else 0
+            columns[colname] += values # + ['-'] * padding + ['']
+    thing = [list(_) for _ in itertools.zip_longest(*[columns[k] for k in header])]
+    for index in (0, 2, 3, 4):
+        for row in thing:
+            row[index] = OntId(row[index]).curie  # shorten iris
+    hardcoded_header =  [f'individuals (n={len(thing)})',
+                         f'id (n={len(set([r[1] for r in thing]))})',
+                         'datasets', 'species', 'awards']
+    table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in thing), key=lambda row:(row[1], row[3], row[4], row[2]))
+    return table
+
+
+result = func(data)
+#+end_src
+
+#+RESULTS: process-duplicate-subjects
+| individuals (n=94)                                           | id (n=10) | datasets                                     | species         | awards             |
+|--------------------------------------------------------------+-----------+----------------------------------------------+-----------------+--------------------|
+| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-1  | sub-1     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
+| dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b/subjects/sub-1  | sub-1     | dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | NCBITaxon:10116 | awards:OT2OD024912 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | sub-10    | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-10 | sub-10    | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-10 | sub-10    | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10 | sub-10    | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-10 | sub-10    | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-10 | sub-10    | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-11 | sub-11    | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-11 | sub-11    | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-11 | sub-11    | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-11 | sub-11    | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-11 | sub-11    | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-11 | sub-11    | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-12 | sub-12    | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-12 | sub-12    | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-12 | sub-12    | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-12 | sub-12    | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-12 | sub-12    | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-12 | sub-12    | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-4  | sub-4     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
+| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-4  | sub-4     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-4  | sub-4     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-4  | sub-4     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-4  | sub-4     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-5  | sub-5     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
+| dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb/subjects/sub-5  | sub-5     | dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb | NCBITaxon:10116 | awards:OT2OD025340 |
+| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-5  | sub-5     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-5  | sub-5     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-5  | sub-5     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-5  | sub-5     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-5  | sub-5     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-5  | sub-5     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-6  | sub-6     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
+| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-6  | sub-6     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-6  | sub-6     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-6  | sub-6     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-6  | sub-6     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-6  | sub-6     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-6  | sub-6     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-7  | sub-7     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-7  | sub-7     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-7  | sub-7     | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-7  | sub-7     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-7  | sub-7     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-7  | sub-7     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-8  | sub-8     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-8  | sub-8     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-8  | sub-8     | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-8  | sub-8     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-8  | sub-8     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-8  | sub-8     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-8  | sub-8     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-9  | sub-9     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
+| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-9  | sub-9     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-9  | sub-9     | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
+| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-9  | sub-9     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
+| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+
 * Use cases
 :PROPERTIES:
 :header-args:sparql: :url http://localhost:9999/blazegraph/sparql
 :header-args:sparql+: :format text/csv
 :header-args:sparql+: :results table
+:header-args:sparql+: :var limit="10"
 :END:
 ** ApiNATOMY
 *** Summary statistics
@@ -1430,6 +1567,39 @@ ApiNATOMY sourced
 1. number of lyphs
    generated vs input
    s? rdf:type element:Lyph
+   #+begin_src sparql :var limit="200"
+   SELECT DISTINCT
+   (COUNT(DISTINCT ?s) as ?input_lyphs)
+   #?s
+   #?p
+   #?o
+   WHERE {
+     ?s a elements:Lyph .
+     #?s ?p ?o .
+     FILTER NOT EXISTS { ?s apinatomy:isTemplate true . }
+     FILTER NOT EXISTS { ?s apinatomy:generated true . }
+     #FILTER ( ! ( ?p = apinatomy:isTemplate && ?o = true ) )
+     #FILTER ( ! ( ?p = apinatomy:generated && ?o = true ) )
+     #?s apinatomy:generated ?o .
+   }
+   LIMIT ?limit
+   #+end_src
+
+   #+RESULTS:
+   | input_lyphs |
+   |-------------|
+   |         763 |
+
+   #+begin_src sparql
+   SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
+   WHERE { ?s a elements:Lyph . }
+   #+end_src
+
+   #+RESULTS:
+   | total_lyphs |
+   |-------------|
+   |        7751 |
+
 2. publications referenced
    apinaomty:publications
    average number of publications per unit? (for now no)
@@ -1437,6 +1607,17 @@ ApiNATOMY sourced
    select count distinct o?
    select distinct o?
    s? apinat:publication o?
+   #+begin_src sparql
+   SELECT DISTINCT
+   (COUNT(DISTINCT ?pub) as ?publications)
+   WHERE { ?s apinatomy:publications ?pub . }
+   #+end_src
+
+   #+RESULTS:
+   | publications |
+   |--------------|
+   |           26 |
+
 3. species
    both model level and lyph level
 4. terms employed in annotation
@@ -1445,6 +1626,55 @@ ApiNATOMY sourced
    select count distinct o?
    select distinct o?
    s? apinat:external o?
+   #+begin_src sparql
+   SELECT
+   ?prefix
+   (COUNT(?s) AS ?count)
+   WHERE {
+     VALUES ?prefix {
+       "UBERON" "EMAPA" "fma" "CHEBI" "GO" "sao" "CL" "nlx" "ilx" "tgbugs" "NCBITaxon"
+       "pubmed" "doi" "ncit" # problems
+       "" }
+     ?s a elements:External .
+     FILTER CONTAINS(str(?s), ?prefix)
+   }
+   GROUP BY ?prefix
+   ORDER BY ?count
+   #+end_src
+
+   #+RESULTS:
+   | prefix    | count |
+   |-----------+-------|
+   | CL        |     1 |
+   | nlx       |     1 |
+   | doi       |     1 |
+   | sao       |     2 |
+   | NCBITaxon |     2 |
+   | ncit      |     4 |
+   | GO        |     5 |
+   | CHEBI     |    11 |
+   | EMAPA     |    17 |
+   | tgbugs    |    20 |
+   | pubmed    |    26 |
+   | ilx       |    76 |
+   | fma       |    89 |
+   | UBERON    |   182 |
+   |           |   437 |
+
+5. external issues
+   publications appearing as external ids, unmapped prefixes etc.
+   #+begin_src sparql :var limit="500"
+   SELECT DISTINCT
+   ?l ?s
+   WHERE {
+       ?s a elements:External .
+       ?l ?p ?s .
+       FILTER(CONTAINS(str(?s), "doi") || CONTAINS(str(?s), "pubmed") || CONTAINS(str(?s), "ncit"))
+   }
+   ORDER BY ?l ?s
+   LIMIT ?limit
+   #+end_src
+
 5. number of neurulated groups aka neuron populations
 
 NPO sourced
@@ -1453,6 +1683,14 @@ Bolser Lewis
 First pass NLP output
 
 1. number of neuron populations aka neuron types
+   # TODO load NPO, and we have to use robot to reason the NPO graph
+   #+begin_src sparql
+   SELECT DISTINCT
+   ?s
+   WHERE {
+       ?s rdfs:subClassOf+ SAO:1813327414 . # NOTE this counts cells
+   }
+   #+end_src
 2. number of distinct phenotypes
 3. number of dimensions
 4. number of phenotype values per phenotype dimension
