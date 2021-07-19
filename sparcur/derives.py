@@ -247,6 +247,10 @@ class Derives:
     @staticmethod
     def validate_structure(path, dir_structure, subjects, samples):
 
+        he = HasErrors(pipeline_stage='Derives.validate_structure')
+
+        # FIXME TODO handle pools as well and figure out cases where subjects/samples are metadata only
+
         # for dataset templates of the 1.* series
         # general approach: set of all specimen ids and set of all
         # folder names take the ones that match ignore the known ok
@@ -312,6 +316,7 @@ class Derives:
         else:
             logd.warning('miscount sample dirs, TODO')
             template_version_less_than_2 = True  # FIXME TODO
+            bad_dirs = []
             if template_version_less_than_2:
                 # handle old aweful nonsense
                 # 1. construct subject sample lookups using tuple
@@ -323,7 +328,19 @@ class Derives:
                             # TODO zero candidates error
                             actual = []
                             for level, drp, rparts in candidates:
+                                if level < 2:
+                                    msg = (f'Bad location for specimen folder! {drp}')
+                                    if he.addError(msg,
+                                                   blame='submission',
+                                                   path=path):
+                                        logd.error(msg)
+                                    bad_dirs.append(dirs.pop(sample_id))
+                                    continue
                                 p_sample_id, p_subject_id, *p_rest = rparts
+                                if level < 3:
+                                    # p_subject_id will be primary derivatie or source
+                                    log.warning(f'TODO new structure {drp}')
+
                                 assert sample_id == p_sample_id  # this should always be true
                                 subject_id = blob['subject_id']
                                 if subject_id == p_subject_id:
@@ -361,7 +378,6 @@ class Derives:
         else:
             pass # TODO embed an error
 
-        he = HasErrors(pipeline_stage='Derives.validate_structure')
         if not_done_specs:
             msg = ('There are specimens that have no corresponding '
                    f'directory!\n{not_done_specs}')
