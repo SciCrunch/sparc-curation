@@ -1,0 +1,41 @@
+@prefix : <file:///ERROR/EMPTY/PREFIX/BANNED/> .
+@prefix CHEBI: <http://purl.obolibrary.org/obo/CHEBI_> .
+@prefix CL: <http://purl.obolibrary.org/obo/CL_> .
+@prefix EMAPA: <http://purl.obolibrary.org/obo/EMAPA_> .
+@prefix FMA: <http://purl.org/sig/ont/fma/fma> .
+@prefix GO: <http://purl.obolibrary.org/obo/GO_> .
+@prefix ILX: <http://uri.interlex.org/base/ilx_> .
+@prefix NCBITaxon: <http://purl.obolibrary.org/obo/NCBITaxon_> .
+@prefix NLX: <http://uri.neuinfo.org/nif/nifstd/nlx_> .
+@prefix PMID: <https://www.ncbi.nlm.nih.gov/pubmed/> .
+@prefix SAO: <http://uri.neuinfo.org/nif/nifstd/sao> .
+@prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
+@prefix apinatomy: <https://apinatomy.org/uris/readable/> .
+@prefix elements: <https://apinatomy.org/uris/elements/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix aacar: <https://apinatomy.org/uris/models/ard-arm-cardiac/ids/> .
+@prefix bolew: <https://apinatomy.org/uris/models/bolser-lewis/ids/> .
+@prefix kblad: <https://apinatomy.org/uris/models/keast-bladder/ids/> .
+@prefix bromo: <https://apinatomy.org/uris/models/bronchomotor/ids/> .
+@prefix scaft: <https://apinatomy.org/uris/models/scaffold-test/ids/> .
+@prefix vagnr: <https://apinatomy.org/uris/models/vagus-nerve/ids/> .
+@prefix sdcol: <https://apinatomy.org/uris/models/sawg-distal-colon/ids/> .
+
+<https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
+    owl:imports <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl>,
+        # <https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl> ,
+        <file:///tmp/scigraph-build/sparc-data/curation-export.owl>,
+        <https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl> ;
+    owl:imports <https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/ard-arm-cardiac.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/vagus-nerve.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl> .
+
+## Serialized using the ttlser deterministic serializer v1.2.0

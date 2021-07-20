@@ -1,39 +1,9 @@
 ontologies:
-  #- url: http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl
-  #- url: http://ontology.neuinfo.org/NIF/extra.ttl
-  #- url: http://ontology.neuinfo.org/NIF/ttl/nif.ttl
-  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl
+  - url: /tmp/scigraph-build/sparc-data/sparc-data.ttl
     reasonerConfiguration:
       factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
       addDirectInferredEdges: true
       removeUnsatisfiableClasses: true
-  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/Bolser-Lewis-Model2.ttl
-    reasonerConfiguration:
-      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-      addDirectInferredEdges: true
-      removeUnsatisfiableClasses: true
-  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/test-bolew.ttl
-    reasonerConfiguration:
-      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-      addDirectInferredEdges: true
-      removeUnsatisfiableClasses: true
-  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-spinal.ttl
-    reasonerConfiguration:
-      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-      addDirectInferredEdges: true
-      removeUnsatisfiableClasses: true
-  - url: https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-spinal-full.ttl
-    reasonerConfiguration:
-      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-      addDirectInferredEdges: true
-      removeUnsatisfiableClasses: true
-  - url: https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl
-    reasonerConfiguration:
-      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-      addDirectInferredEdges: true
-      removeUnsatisfiableClasses: true
-#  - url: https://cassava.ucsd.edu/sparc/exports/curation-export.ttl
-#    reasonerConfiguration:
-#      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-#      addDirectInferredEdges: true
-#      removeUnsatisfiableClasses: true
+#  - url: http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl
+#  - url: http://ontology.neuinfo.org/NIF/extra.ttl
+#  - url: http://ontology.neuinfo.org/NIF/ttl/nif.ttl
