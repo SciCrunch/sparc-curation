@@ -678,6 +678,8 @@ class Tabular(HasErrors):
             raise exc.NoDataError(f'{self.path}')
 
         sheet = wb.active
+        longrs = 0
+        emptyrs = 0
         for row in sheet.rows:
             fixed_row = [
                 cell.value.date()
@@ -687,10 +689,28 @@ class Tabular(HasErrors):
                 cell.number_format in ('yyyy\\-mm\\-dd;@', 'YYYY\\-MM\\-DD')
                 else cell.value
                 for cell in row]
+
+            if not [v for v in fixed_row if v]:
+                emptyrs += 1
+                continue
+
             lfr = len(fixed_row)
             if lfr > 30:
-                logd.warning(f'Long row {lfr} > 30 detect in {self.path}')
+                longrs += 1
+                if longrs < 1:
+                    msg = f'Long row {lfr} > 30 detected in {self.path}'
+                    if self.addError(msg,
+                                     blame='submission',
+                                     path=self.path):
+                        logd.warning(msg)
             yield fixed_row
+
+        if emptyrs > 0:
+            msg = f'{emptyrs} empty rows detected in {self.path}'
+            if self.addError(msg,
+                             blame='submission',
+                             path=self.path):
+                logd.warning(msg)
 
     def xlsx1(self):
         kwargs = {
