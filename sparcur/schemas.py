@@ -383,6 +383,7 @@ class HasSchema:
                 if not ok:
                     if fail:
                         logd.error('schema validation has failed and fail=True')
+                        logd.critical(f'failing dataset is {data["id"]}')
                         raise norm_or_error
 
                     # I have no idea why this if statement used to be in
@@ -617,9 +618,10 @@ class ToExport(RuntimeSchema):
         cls.schema = json_version(version)
 
 
-metadata_filename_pattern = r'^.+\/[a-z-_\/]+\.(xlsx|csv|tsv|json)$'
+metadata_filename_pattern = r'^.+\/[A-Za-z-_\/]+\.(xlsx|csv|tsv|json)$'
 
 simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
+simple_file_url_pattern = r'^file:\/\/'
 
 # no whitespace no colons for subject and sample identifiers
 # and no forward slashes and no pipes
@@ -1802,10 +1804,12 @@ class DatasetOutExportSchema(JSONSchema):
         a key piece of information that we use to link everything together. """
 
     __schema = copy.deepcopy(DatasetStructureSchema.schema['allOf'][0])
-    __schema['required'] = ['id',
-                            'meta',
-                            'contributors',
-                            'prov']
+    __schema['required'] = [
+        'id',
+        'meta',
+        'contributors',
+        'path_metadata',  # required for the time being as a sanity check on manifest structure, will move elsewhere in the future
+        'prov']
     __schema['properties'] = {
         'id': {'type': 'string',  # ye old multiple meta/bf id issue
                'pattern': '^N:dataset:'},
@@ -1819,6 +1823,7 @@ class DatasetOutExportSchema(JSONSchema):
                       'type': 'string',
                       'context_value': {'@id': 'TEMP:readmeText', '@type': 'ilxtr:Markdown'},
                   },},},
+        'path_metadata': {'type': 'array'},
         'prov': ProvSchema.schema,
         'errors': ErrorSchema.schema,
         'contributors': ContributorsOutExportSchema.schema,
@@ -1917,8 +1922,13 @@ class PostSchema(JSONSchema):
     """ This is used to validate only the status schema part that is added to the DatasetOutSchema """
     schema = {
         'type': 'object',
-        'required': ['status'],
-        'properties': {'status': StatusSchema.schema,}
+        'required': [
+            #'path_metadata',  # issue resolved for now determined to be non-fatal
+            'status',
+        ],
+        'properties': {
+            'path_metadata': {'type': 'array'},
+            'status': StatusSchema.schema,},
     }
 
 

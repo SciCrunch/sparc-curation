@@ -1631,9 +1631,9 @@ class PipelineEnd(JSONPipeline):
             return super().data
         except Exception as e:
             if hasattr(self.path, 'cache') and self.path.cache is not None:
-                raise exc.StopTheWorld(self.path.cache) from e
+                raise exc.StopTheWorld(repr(self.path.cache)) from e
             else:
-                raise exc.StopTheWorld(self.path) from e
+                raise exc.StopTheWorld(repr(self.path)) from e
 
 
 class IrToExportJsonPipeline(JSONPipeline):
