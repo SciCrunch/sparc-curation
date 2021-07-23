@@ -587,3 +587,45 @@ cypherResources:
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
       RETURN path1, path2, path3
+
+  - path: /dynamic/demos/apinat/neru-1/{neupop-id}
+    operations:
+      - summary: Return the housing regions and publications for neurulated groups.
+        parameters:
+         - name: neupop-id
+           description: neuron population identifier
+           paramType: path
+    query: |
+      MATCH (neupop:Class{iri: "http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"})
+      -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+      // publications
+      WITH neugrp, a
+      MATCH path = (neugrp)
+      -[:apinatomy:publications]->(pub)
+      -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+
+      WITH neugrp, a, path
+      MATCH (neugrp)
+      -[b:apinatomy:links]->(link)
+      -[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+      -[d:apinatomy:layerIn*0..1]->(lyph)
+      -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+      WITH lyph, a, b, c, d, path
+      MATCH (lyph)
+      -[e:apinatomy:external]->(region)
+      RETURN a, b, c, d, e, path
+
+      UNION
+
+      // this part usually only returns the soma housing lyph
+      MATCH (neupop:Class{iri: "http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"})
+      -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+      -[b:apinatomy:lyphs]->(lyph)
+      -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
+      -[d:apinatomy:external*0..1]->(region)
+      // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+      //-[c:apinatomy:internalIn*0..1]->(e)
+      //-[d:apinatomy:external*0..1]->(region)
+      return a, b, c, d, null AS e, null AS path
