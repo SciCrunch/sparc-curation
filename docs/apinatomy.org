@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 03bbd6867a3e7164ad35c6141ca4a708e19639661a830c63cf3119cd4ffb5ab8; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 43a9c75ef6dfe1d062d7b0039caacb4bdc0553cc35347a78294089063246a2d9; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+options: num:nil
@@ -43,6 +43,24 @@ mkdir /var/www/sparc/ApiANTOMY/ontologies
 chown -R nginx:nginx /var/www/sparc/ApiANTOMY
 #+end_src
 * SciGraph pipeline
+** Parallel build
+#+begin_src bash
+function apinat-build () {
+    emacs --quick --batch \
+    --funcall toggle-debug-on-error \
+    --load ~/git/orgstrap/orgstrap-batch-helper.el \
+    --visit ~/git/sparc-curation/docs/apinatomy.org \
+    -- ${@}
+}
+#+end_src
+
+#+begin_src bash
+export -f apinat-build
+ls -d *{-,bron}* | \
+xargs -P10 -r -n 1 -I {} \
+      bash -c 'apinat-build --repo $(pwd) --secrets ~/path/to/secrets.sxpr --model-id ${@}' _ {}
+#+end_src
+
 ** Export to ttl
 #+link: r-apin-mod git:79316499d7987f73a56ce2bc54d07afe91886cd1:
 
@@ -173,7 +191,10 @@ gsx:google-sheet-id
                                "-t" "json-flattened"
                                "-i" google-sheet-id
                                "-o" path-internal)))
-          ;; '("model-flattened.jsonLD" "model-generated.json" "model.json" "model.jsonLD")
+          (cl-loop for path in (list path-xlsx path-json path-jsonld) do
+                   (let ((parent (file-name-directory path)))
+                     (unless (file-directory-p parent)
+                       (make-directory parent t))))
           (rename-file (concat path-internal "/" "model.xlsx") path-xlsx t)
           (rename-file (concat path-internal "/" "model.json") path-json t)
           (rename-file (concat path-internal "/" "model-flattened.jsonld") path-jsonld t))
@@ -461,16 +482,8 @@ When you have a query working as desired add it or update it in
 # TODO need that local/remote git link ...
 See also [[file:../../pyontutils/nifstd/scigraph/README.org::#sparc-data-services-build-deploy][data services build and deploy]].
 * Add new ApiNATOMY model to SciGraph load
-Edit [[file:../resources/scigraph/ontologies-sparc-data.yaml][ontologies-sparc-data.yaml]].
-To add a new entry that looks like the following. Change the name =my-model.ttl=
-to match the name of the file that you scp to cassava.
-#+begin_src yaml
-  - url: https://localhost/ApiNATOMY/ontologies/my-model.ttl
-    reasonerConfiguration:
-      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
-      addDirectInferredEdges: true
-      removeUnsatisfiableClasses: true
-#+end_src
+Edit [[file:../resources/scigraph/sparc-data.ttl][sparc-data.ttl]] and
+add a new line to the second =owl:import= statement.
 * ApiNATOMY model server specification
 :PROPERTIES:
 :visibility: folded
@@ -581,6 +594,7 @@ obj:   {n_pair}''')
 | Individual |     1714 |    25940 |
 | Statement  |     8274 |   318378 |
 | owl:Class  |      n/a |      395 |
+
 * Bootstrap :noexport:
 
 #+name: orgstrap
@@ -638,26 +652,118 @@ obj:   {n_pair}''')
 
 <<all-ttl-models>>
 
-;; (message "%s" command-line-args)
-;; (message "%s" command-line-args-left)
+<<temp-parse-args>>
+
+(unless (fboundp #'oa-path)
+  <<temp-orthauth>>
+  )
 
 (let ((args-left command-line-args-left))
   (setq command-line-args-left nil) ; prevent emacs from trying to open our other arguments
   (when (and noninteractive ; have to use this since --batch is stripped
-             (string= (car args-left) "--")
-             (string= (cadr args-left) "--model-id"))
-    (let ((model-id (intern (caddr args-left))))
+             (string= (car args-left) "--"))
+    (let* ((command-line-args-left args-left)
+           (args-alist (parse-args
+                        (:repo "~/git/apinatomy-models/")
+                        (:converter "apinat-converter")
+                        (:model-id nil)
+                        (:secrets nil)))
+           (*apinatomy-model-repository* (cdr (assq 'repo args-alist)))
+           (apinat-converter-path (cdr (assq 'converter args-alist)))
+           (model-id (intern (cdr (assq 'model-id args-alist))))
+           (oa-secrets (cdr (assq 'secrets args-alist))))
       (message "updating %s" model-id)
       (update-models (list model-id)))))
 #+end_src
 
-#+begin_src bash
-emacs -q --batch \
--f toggle-debug-on-error \
--l ~/git/orgstrap/orgstrap-batch-helper.el \
---visit ~/git/sparc-curation/docs/apinatomy.org \
--- --model-id keast-bladder
+Temporary extract of functionality needed to manage =model-id= to =google-sheet-id= mapping.
+#+name: temp-orthauth
+#+begin_src elisp :results none
+(defvar oa-secrets nil "path to secrets file")
+
+(defun oa--resolve-path (plist elements)
+  "recursively `cl-getf' in order keywords from ELEMENTS in nested plists inside PLIST"
+  (if elements
+      (oa--resolve-path (cl-getf plist (car elements)) (cdr elements))
+    plist))
+
+(defun oa-read (path)
+  "read the first sexpression in the file at path"
+  (with-temp-buffer
+    (insert-file-contents path)
+    (read (buffer-string))))
+
+(defun oa-path (&rest elements)
+  "Retrieve value at nested path defined by keywords provided in ELEMENTS in `oa-secrets'"
+  (let ((plist (oa-read oa-secrets)))
+    (oa--resolve-path plist elements)))
 #+end_src
+
+Temporary extract for simple command line argument parsing.
+#+name: temp-parse-args
+#+begin_src elisp :results none
+;;; from git share parse-args
+
+(defun saner-string-to-number (string &optional base)
+  "vanilla `string-to-number' has a degenerate case with \"0\""
+  (let ((maybe-zero (string-to-number string base)))
+    (if (= maybe-zero 0)
+        (if (string= maybe-zero "0")
+            0
+          (error "%S is not a number!" string))
+      maybe-zero)))
+
+(defun norm-arg (arg)
+  (let ((int (ignore-errors (saner-string-to-number arg))))
+    (if int int arg)))
+
+(defun keyword-name (keyword)
+  (unless (keywordp keyword)
+    (error "%s is not a keyword! %s" keyword (type-of keyword)))
+  (substring (symbol-name keyword) 1))
+
+(defun process-keyword (element)
+  (unless (listp element)
+    (error "%s not a list! %s" element (type-of element)))
+  (let* ((kw (car element))
+         ;;(sl (string-downcase (symbol-name kw)))
+         (sl (keyword-name kw)) ; emacs is case preserving
+         (assign (cdr element))  ; FIXME default? FIXME XXX empty vs explicit nil
+         ;;(real-assign (if assign (car assign) (intern (symbol-name kw))))
+         (real-assign (intern (keyword-name kw)))
+         (default (if assign (car assign) assign)) ; FIXME
+         (p (if assign
+                `(progn (setf ,real-assign (norm-arg (cadr args)))
+                        ;; equivalent of bash shift shift
+                        (setf args (cddr args)))
+                `(progn (setf ,real-assign t)
+                        ;; equivalent of bash shift
+                        (setf args (cdr args))))))
+    (list `(,real-assign ,default)  ; default
+          `(,(intern (format "--%s" sl)) ,p)  ; case
+          `(cons ',real-assign ,real-assign))))
+
+(defmacro parse-args (&rest keywords)
+  "(parse-args (:port port) (:pid pid) (:flag))
+
+   NOTE if the default value if a kwarg is nil rather than
+   empty i.e. (:asdf nil) vs (:asdf) the form with nil will
+   not fail but will be nil unless some value is provided
+   AND it will eat the next kwarg this is probably a misdesign"
+  (cl-destructuring-bind (defaults cases returns)
+      (apply #'cl-mapcar #'list ; `cl-mapcar' required for this to work
+             (mapcar #'process-keyword keywords))
+    `(let ((args (cdr command-line-args-left))
+           ,@defaults)
+       (cl-do ()
+           ((null args) nil)
+         (cl-case (intern (car args))
+           ,@cases
+           (otherwise (progn (message "unhandled: %s" (car args))
+                             (setf args (cdr args))))))
+       (list ,@returns))))
+#+end_src
+
 ** Local Variables :ARCHIVE:
 
 # Local Variables:
