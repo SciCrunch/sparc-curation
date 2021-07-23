@@ -23,6 +23,7 @@
 @prefix scaft: <https://apinatomy.org/uris/models/scaffold-test/ids/> .
 @prefix vagnr: <https://apinatomy.org/uris/models/vagus-nerve/ids/> .
 @prefix sdcol: <https://apinatomy.org/uris/models/sawg-distal-colon/ids/> .
+@prefix sstom: <https://apinatomy.org/uris/models/sawg-stomach/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
     owl:imports <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl>,
@@ -35,6 +36,7 @@
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/ard-arm-cardiac.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/vagus-nerve.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl> .
 
