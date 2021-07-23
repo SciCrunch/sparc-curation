@@ -12,12 +12,15 @@
 #+category: sparc
 
 #+property: header-args :eval no-export
-#+property: header-args:sparql :url http://localhost:9999/blazegraph/sparql
+
 # header-args:sparql :url http://localhost:10035/repositories/test
+#+property: header-args:sparql :url http://localhost:9999/blazegraph/sparql
 #+property: header-args:sparql+ :format text/csv
 #+property: header-args:sparql+ :results table
 #+property: header-args:sparql+ :exports both
 #+property: header-args:sparql+ :var limit="10"
+
+#+property: header-args:cypher :scigraph http://localhost:9000/scigraph
 
 # TODO consider a setup file for these maybe?
 # or populate additional local curies via orgstrap
@@ -1584,6 +1587,84 @@ result = func(data)
 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
 | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
 | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
+* SciGraph cypher resources dynamic queries
+These can be tested against the execute endpoint as well (if the
+SciGraph server is running the patch to align the behavior).
+** neru-1
+# #+header: :results drawer :limit 1
+#+header: :limit 999999 :file ./images/neru-1.svg
+#+header: :var neupop-id="http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"
+#+name: cypher-neru-1
+#+begin_src cypher :var neupop-id
+MATCH (neupop:Class{iri: "${neupop-id}"})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+// publications
+WITH neugrp, a
+MATCH path = (neugrp)
+-[:apinatomy:publications]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+
+WITH neugrp, a, path
+MATCH (neugrp)
+-[b:apinatomy:links]->(link)
+-[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+WITH lyph, a, b, c, d, path
+MATCH (lyph)
+-[e:apinatomy:external]->(region)
+RETURN a, b, c, d, e, path
+
+UNION
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: "${neupop-id}"})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+-[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
+-[d:apinatomy:external*0..1]->(region)
+// this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+//-[c:apinatomy:internalIn*0..1]->(e)
+//-[d:apinatomy:external*0..1]->(region)
+return a, b, c, d, null AS e, null AS path
+#+end_src
+
+
+** yaml file
+#+name: cypher-resources
+#+header: :noweb yes
+#+begin_src yaml :tangle ../resources/scigraph/cypher-resources.tangled.yaml
+cypherResources:
+  - path:
+    operations:
+      - summary: do the thing
+        parameters:
+          - name: some-id
+            description: does something
+            paramType:
+    query: &name |
+      <<block-name>>
+#+end_src
+
+* Sanity checks
+Other queries run against various representations of the data.
+** JSON
+#+name: &jq-count-datasets
+: jq -c '.datasets | length'
+
+#+name: &jq-count-path-metadata
+: jq -c '[paths | select(.[-1] == "path_metadata")] | length'
+
+#+begin_src bash :noweb yes
+function path-metadata-coverage () {
+    local PATH_EXPORT_JSON=$1
+    local COUNT_T=$(<<&jq-count-datasets()>> "${PATH_EXPORT_JSON}")
+    local COUNT_PM=$(<<&jq-count-path-metadata()>> "${PATH_EXPORT_JSON}")
+    awk -v t=${COUNT_T} -v pm=${COUNT_PM} 'BEGIN { print ( pm / t ) }'
+}
+#+end_src
 * Use cases
 ** ApiNATOMY
 *** Summary statistics
