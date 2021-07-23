@@ -1,10 +1,23 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 93bfa8161f556112d8fb98f5576200a6d642293f29d3c6034acced48980bcc25; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 3fb8722c90dc973815e3344bbe119e78b7d07ee38ef3f16fa527329b5bde2097; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
+
+# [[file:queries.pdf]]
 # [[file:queries.html]]
 
 #+title: SPARC queries
 
 #+options: ^:nil
+
+#+startup: showall
+#+category: sparc
+
+#+property: header-args :eval no-export
+#+property: header-args:sparql :url http://localhost:9999/blazegraph/sparql
+# header-args:sparql :url http://localhost:10035/repositories/test
+#+property: header-args:sparql+ :format text/csv
+#+property: header-args:sparql+ :results table
+#+property: header-args:sparql+ :exports both
+#+property: header-args:sparql+ :var limit="10"
 
 # TODO consider a setup file for these maybe?
 # or populate additional local curies via orgstrap
@@ -58,15 +71,25 @@
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
 
-#+property: header-args :eval no-export
+* Tutorial :noexport:
+For an overview of the SPARC Knowledge Graph see the [[*Introduction][Introduction]].
+Copy from the protc tutorial.
+* Introduction
+The SPARC Knowledge Graph ...
+1. SPARC dataset metadata graph
+2. connectivity knowledge base
+3. ontology (SciGraph can have everything, blazegraph may be not the whole ontolgy)
+* for kg release :noexport:
+** TODO instructions for kg
+need to include instructions for increasing the limit and return a csv
+tsv result to a file, include button to call the previous block
+without a limit and save results to a file
+** TODO pick which of the various versions of this document we are going to link
+github
+ontology.neuinfo.org/docs/
+etc.
+** TODO button to start, stop, reset services in case a bad query is run
 * SPARQL
-:PROPERTIES:
-:header-args:sparql: :url http://localhost:9999/blazegraph/sparql
-:header-args:sparql+: :format text/csv
-:header-args:sparql+: :results table
-:header-args:sparql+: :var limit="10"
-:END:
-# :header-args:sparql: :url http://localhost:10035/repositories/test
 ** Datasets
 *** Dataset Predicates
 #+begin_src sparql
@@ -344,6 +367,7 @@ LIMIT ?limit
 | dataset:e2c90515-bbdb-4436-a48c-aafaefb604e6 |             2020-02-28 |
 
 **** Award affiliations
+Can we see the multi-institutional nature of SPARC collaborations?
 #+begin_src sparql
 SELECT DISTINCT
 ?award
@@ -693,6 +717,7 @@ LIMIT ?limit
 
 ** Subjects
 *** Members
+Show me all of the experimental subjects that a dataset contains information about.
 #+begin_src sparql
 SELECT DISTINCT
 ?dataset
@@ -720,6 +745,7 @@ LIMIT ?limit
 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-14   |
 
 *** Total
+Show me the total number of subjects in the knowledge graph.
 #+begin_src sparql
 SELECT DISTINCT
 (COUNT(DISTINCT ?subject) as ?count_subject)
@@ -736,6 +762,7 @@ WHERE {
 |          2271 |
 
 *** Subject Metadata
+Show me a regularized set of metadata for all subjects that includes the following.
 - Identifier
 - Group
 - Species
@@ -826,6 +853,7 @@ WHERE {
 
 ** Samples
 *** Members
+Show me all of the experimental samples that a dataset contains information about.
 #+begin_src sparql
 SELECT DISTINCT
 ?dataset
@@ -853,6 +881,7 @@ LIMIT ?limit
 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-4 |
 
 *** Total
+Show me the total number of subjects in the knowledge graph.
 #+begin_src sparql
 SELECT DISTINCT
 (COUNT(DISTINCT ?subject) as ?count_subject)
@@ -895,6 +924,10 @@ WHERE {
 | TEMP:localPerformanceNumber               |
 
 *** Sample Metadata
+Show me a regularized set of metadata for all subjects that includes the following.
+- Identifier
+- Group
+- Anatomical entity
 #+name: sample-metadata
 #+begin_src sparql
 SELECT DISTINCT
@@ -1551,20 +1584,28 @@ result = func(data)
 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
 | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
 | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-
 * Use cases
-:PROPERTIES:
-:header-args:sparql: :url http://localhost:9999/blazegraph/sparql
-:header-args:sparql+: :format text/csv
-:header-args:sparql+: :results table
-:header-args:sparql+: :var limit="10"
-:END:
 ** ApiNATOMY
 *** Summary statistics
+**** Dashboard
+
+**** Queries
 # aka dashboard queries
 ApiNATOMY sourced
 
-1. number of lyphs
+1. number of models
+   #+begin_src sparql
+   SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
+   WHERE { ?s a elements:Lyph . }
+   #+end_src
+
+   #+RESULTS:
+   | total_lyphs |
+   |-------------|
+   |        7751 |
+
+
+2. number of lyphs
    generated vs input
    s? rdf:type element:Lyph
    #+begin_src sparql :var limit="200"
@@ -1600,7 +1641,7 @@ ApiNATOMY sourced
    |-------------|
    |        7751 |
 
-2. publications referenced
+3. publications referenced
    apinaomty:publications
    average number of publications per unit? (for now no)
    will also want the full listing of publications
@@ -1618,9 +1659,9 @@ ApiNATOMY sourced
    |--------------|
    |           26 |
 
-3. species
+4. species
    both model level and lyph level
-4. terms employed in annotation
+5. terms employed in annotation
    count of apinatomy:external by prefix UBERON, GO, CHEBI, etc.
    full listing of terms as well
    select count distinct o?
@@ -1629,7 +1670,7 @@ ApiNATOMY sourced
    #+begin_src sparql
    SELECT
    ?prefix
-   (COUNT(?s) AS ?count)
+   (COUNT(DISTINCT ?s) AS ?count)
    WHERE {
      VALUES ?prefix {
        "UBERON" "EMAPA" "fma" "CHEBI" "GO" "sao" "CL" "nlx" "ilx" "tgbugs" "NCBITaxon"
@@ -1661,8 +1702,9 @@ ApiNATOMY sourced
    | UBERON    |   182 |
    |           |   437 |
 
-5. external issues
+6. external issues
    publications appearing as external ids, unmapped prefixes etc.
+   FIXME where are these coming from?
    #+begin_src sparql :var limit="500"
    SELECT DISTINCT
    ?l ?s
@@ -1675,7 +1717,7 @@ ApiNATOMY sourced
    LIMIT ?limit
    #+end_src
 
-5. number of neurulated groups aka neuron populations
+7. number of neurulated groups aka neuron populations
 
 NPO sourced
 Keast
@@ -1716,6 +1758,67 @@ First pass NLP output
 ;;  (compactify-current-buffer default-curies))
 
 ;;(advice-add #'sparql-execute-query :after #'orgstrap---advise-sparql-execute-query)
+
+(unless (featurep 'reval)
+  (defvar reval-cache-directory (concat user-emacs-directory "reval/cache/"))
+  (defun reval-minimal (cypher checksum path-or-url &rest alternates)
+    "Simplified and compact implementation of reval."
+    (let* (done (o url-handler-mode) (csn (symbol-name checksum))
+           (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
+                               "-" (file-name-nondirectory path-or-url))))
+      (url-handler-mode)
+      (unwind-protect
+          (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
+                   do (when (file-exists-p path-or-url)
+                        (let* ((buffer (find-file-noselect path-or-url))
+                               (buffer-checksum (intern (secure-hash cypher buffer))))
+                          (if (eq buffer-checksum checksum)
+                              (progn
+                                (unless (string= path-or-url cache-path)
+                                  (let ((parent-path (file-name-directory cache-path))
+                                        make-backup-files)
+                                    (unless (file-directory-p parent-path)
+                                      (make-directory parent-path t))
+                                    (with-current-buffer buffer
+                                      (write-file cache-path))))
+                                (eval-buffer buffer)
+                                (setq done t))
+                            (kill-buffer buffer) ; kill so cannot accidentally evaled
+                            (error "reval: checksum mismatch! %s" path-or-url))))
+                   until done)
+        (unless o
+          (url-handler-mode 0)))))
+  (defalias 'reval #'reval-minimal)
+  (reval 'sha256 'f978168b5c0fc0ce43f69c748847e693acc545df9a3ff1d9def57bdb1fc63c4a
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/649fd0cdcb831dcd840c66ee324005165ce970ca/reval.el"))
+
+(unless (featurep 'ow)
+  (reval 'sha256 'a90b12c386d60882cadeb6b6557f7eb05378bfcf94f68f7f8512a9edfeb34d6c
+         ;;"~/git/orgstrap/ow.el"
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/98350dc97b6a079d35c94b1798501a62cbbdf176/ow.el"))
+
+(unless (featurep 'blazegraph)
+  (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31 "https://raw.githubusercontent.com/tgbugs/orgstrap/1e1fa08f9c1c059b393f737fcf19b55082bf660/services/blazegraph.el"))
+
+(when orgstrap-do-packages-emacs
+  (ow-enable-use-package)
+
+  (ow-use-packages
+   sparql-mode
+   ob-cypher
+   (org-plus-contrib
+    :mode ("\\.org\\'" . org-mode)
+    :init
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((cypher . t)
+       (sparql . t))))))
+
+(unless (featurep 'ob-cypher-scigraph)
+  (reval 'sha256 'cd08900d69b159b724860869ab8bc4d31b6eaf5efa5d351331e12ae29dcb1d42
+         "https://raw.githubusercontent.com/tgbugs/ob-cypher/881edb3af9226675760897e08fc4c16eb888be08/ob-cypher.el")
+  (provide 'ob-cypher-scigraph))
+
 #+end_src
 
 ** Local Variables :ARCHIVE:
