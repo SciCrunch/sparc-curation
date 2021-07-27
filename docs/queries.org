@@ -11,6 +11,7 @@
 #+startup: showall
 #+category: sparc
 
+:properties:
 #+property: header-args :eval no-export
 
 # header-args:sparql :url http://localhost:10035/repositories/test
@@ -21,7 +22,9 @@
 #+property: header-args:sparql+ :var limit="10"
 
 #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
+:end:
 
+:prefixes:
 # TODO consider a setup file for these maybe?
 # or populate additional local curies via orgstrap
 # FIXME doi collides which is bad
@@ -73,6 +76,7 @@
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
+:end:
 
 * Tutorial :noexport:
 For an overview of the SPARC Knowledge Graph see the [[*Introduction][Introduction]].
@@ -1590,13 +1594,85 @@ result = func(data)
 * SciGraph cypher resources dynamic queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
-** neru-1
+** neru-2
 # #+header: :results drawer :limit 1
+#+header: :limit 999999 :file ./images/neru-2.svg
+#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+name: cypher-neru-2
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+// publications
+WITH neugrp, a
+MATCH path = (neugrp)
+-[:apinatomy:publications]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+
+WITH neugrp, a, path
+MATCH (neugrp)
+-[b:apinatomy:links]->(link)
+-[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+WITH neugrp, link, lyph, a, b, c, d, path
+MATCH (lyph)
+-[e:apinatomy:external]->(region)
+
+// use apinatomy:next to extract ordering information
+WITH neugrp, link, a, b, c, d, e, path
+MATCH (link)
+-[f:apinatomy:next*0..]->()
+//-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+// FIXME these should be collapsing into a single relationship
+-[g:apinatomy:target*0..1]->()
+-[h:apinatomy:rootOf*0..1]->()
+-[i:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+
+RETURN a, b, c, d, e, f, g,h,i, path
+
+UNION
+
+// use :apinatomy:next to provider ordering for the links
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+-[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
+-[d:apinatomy:external*0..1]->(region)
+// this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+//-[c:apinatomy:internalIn*0..1]->(e)
+//-[d:apinatomy:external*0..1]->(region)
+RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path
+#+end_src
+
+#+RESULTS: cypher-neru-2
+
+#+header: :limit 999999 :file ./images/neru-debug.svg
+#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+begin_src cypher
+MATCH path = (neupop:Class{iri: $neupop_id})
+-[:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:links]->()
+-[:apinatomy:next*0..]->()
+// -[:apinatomy:nextChainStartLevels*0..]-()
+//-[:apinatomy:prevChainEndLevels*0..]-()
+-[:apinatomy:levelIn*0..]->()
+RETURN path
+#+end_src
+
+#+RESULTS:
+
+** neru-1
+# #+header: :var neupop_id="http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"
 #+header: :limit 999999 :file ./images/neru-1.svg
-#+header: :var neupop-id="http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"
+#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-1
-#+begin_src cypher :var neupop-id
-MATCH (neupop:Class{iri: "${neupop-id}"})
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 
 // publications
@@ -1620,7 +1696,7 @@ RETURN a, b, c, d, e, path
 UNION
 
 // this part usually only returns the soma housing lyph
-MATCH (neupop:Class{iri: "${neupop-id}"})
+MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 -[b:apinatomy:lyphs]->(lyph)
 -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
@@ -1631,6 +1707,7 @@ MATCH (neupop:Class{iri: "${neupop-id}"})
 return a, b, c, d, null AS e, null AS path
 #+end_src
 
+#+RESULTS: cypher-neru-1
 
 ** yaml file
 #+name: cypher-resources
