@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 43a9c75ef6dfe1d062d7b0039caacb4bdc0553cc35347a78294089063246a2d9; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 66bb730f2134186f319eb0cbd86eb31b89a7703523eb53c5f5182fe75ea2f3bd; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+options: num:nil
@@ -46,8 +46,9 @@ chown -R nginx:nginx /var/www/sparc/ApiANTOMY
 ** Parallel build
 #+begin_src bash
 function apinat-build () {
+    # add this line if you need to get a traceback on error
+    # --funcall toggle-debug-on-error \
     emacs --quick --batch \
-    --funcall toggle-debug-on-error \
     --load ~/git/orgstrap/orgstrap-batch-helper.el \
     --visit ~/git/sparc-curation/docs/apinatomy.org \
     -- ${@}
@@ -56,9 +57,13 @@ function apinat-build () {
 
 #+begin_src bash
 export -f apinat-build
+pushd ~/git/apinatomy-models
 ls -d *{-,bron}* | \
-xargs -P10 -r -n 1 -I {} \
+xargs -P10 -r -I {} \
       bash -c 'apinat-build --repo $(pwd) --secrets ~/path/to/secrets.sxpr --model-id ${@}' _ {}
+
+# only add models where the json has changed since the xlsx is opaque
+git add -u $(git status --porcelain | grep json | grep M | cut -d' ' -f3 | cut -d'/' -f1)
 #+end_src
 
 ** Export to ttl
@@ -82,6 +87,9 @@ gsx:google-sheet-id
 #+begin_src elisp :results none
 (defvar-local apinat-converter-path nil
   "full path to javascript apinatomy converter")
+
+(defvar-local apinat-converter-debug nil
+  "dynamic variable used to control debug behavior")
 
 (defun-local ex-do (&rest nothing)
   "Executor do. Eats the input since it is to be run by the executor."
@@ -198,7 +206,8 @@ gsx:google-sheet-id
           (rename-file (concat path-internal "/" "model.xlsx") path-xlsx t)
           (rename-file (concat path-internal "/" "model.json") path-json t)
           (rename-file (concat path-internal "/" "model-flattened.jsonld") path-jsonld t))
-      (delete-directory path-temp 'recursive))))
+      (unless apinat-converter-debug
+        (delete-directory path-temp 'recursive)))))
 
 (defun-local -mj-> (model-id path-json) "`model-id' to `path-json'")
 
@@ -667,13 +676,15 @@ obj:   {n_pair}''')
                         (:repo "~/git/apinatomy-models/")
                         (:converter "apinat-converter")
                         (:model-id nil)
-                        (:secrets nil)))
-           (*apinatomy-model-repository* (cdr (assq 'repo args-alist)))
-           (apinat-converter-path (cdr (assq 'converter args-alist)))
-           (model-id (intern (cdr (assq 'model-id args-alist))))
-           (oa-secrets (cdr (assq 'secrets args-alist))))
-      (message "updating %s" model-id)
-      (update-models (list model-id)))))
+                        (:secrets nil)
+                        (:debug))))
+      (let ((*apinatomy-model-repository* (cdr (assq 'repo args-alist)))
+            (apinat-converter-path (cdr (assq 'converter args-alist)))
+            (apinat-converter-debug (cdr (assq 'debug args-alist)))
+            (model-id (intern (cdr (assq 'model-id args-alist))))
+            (oa-secrets (cdr (assq 'secrets args-alist))))
+        (message "updating %s" model-id)
+        (update-models (list model-id))))))
 #+end_src
 
 Temporary extract of functionality needed to manage =model-id= to =google-sheet-id= mapping.
