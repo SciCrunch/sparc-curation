@@ -434,7 +434,7 @@ deleted or that something else has gone wrong. If dataset is null and =hasUri= i
 that the protocol is present only in =protcur.ttl= and the additional identifiers have not been
 processed.
 
-#+header: :results file :file ./reports/dataset-report.csv
+#+header: :results file :file ./reports/protocol-report.csv
 #+begin_src sparql
 select distinct
 ?protocol
@@ -454,7 +454,7 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 #+end_src
 
 #+RESULTS:
-[[file:./reports/dataset-report.csv]]
+[[file:./reports/protocol-report.csv]]
 
 *** Conditions studied
 *** Experimental groups
