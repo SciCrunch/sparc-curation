@@ -407,7 +407,55 @@ LIMIT ?limit
 | awards:OT2OD023847                 | ror:04402f517 | University of Nevada, Reno School of Medicine     |
 | awards:OT2OD023848                 | ror:05a0ya142 | Broad Institute                                   |
 
-** Experimental Protocol
+** Protocols
+*** Protocol general report
+# TODO (make-directory "./reports/")
+
+How to interpret this report.
+
+The rows are ordered by
+1. whether there is a dataset directly associated with the protocol id
+2. whether the protocol has a human readable uri.
+3. by the number of protcur annotations that have been made on the protocol
+
+If there are zero protcur annotations it usually means that only the minimal protocol curation
+workflow was completed. If there the number of protocol annotations is null it means that no
+annotations of any kind have been made on that protocol. This can only happen for protocols that
+come from the dataset description file.
+
+If the dataset is null and there are annotations it usually means that the protocol is transitively
+related to a dataset. There are annotations on the protocols that link them directly to the dataset
+in question but we are not currently pulling them into the knowledge graph. It also means that the
+protocol url in question was not listed in the dataset description file but may have been listed in
+another protocol or in a collection of protocols.
+
+If =hasUri= is false and dataset is not null then it usually means that the protocol has been
+deleted or that something else has gone wrong. If dataset is null and =hasUri= is null it just means
+that the protocol is present only in =protcur.ttl= and the additional identifiers have not been
+processed.
+
+#+header: :results file :file ./reports/dataset-report.csv
+#+begin_src sparql
+select distinct
+?protocol
+?n
+(sample(?dataset) AS ?datasetx)
+?doi_protocol
+(sample(bound(?urih_protocol)) as ?hasUri)
+where {
+  ?protocol a sparc:Protocol .
+  optional { ?protocol TEMP:hasNumberOfProtcurAnnotations ?n . }
+  optional { ?dataset TEMP:hasProtocol ?protocol . }
+  optional { ?protocol TEMP:hasDoi ?doi_protocol .}
+  optional { ?protocol TEMP:hasUriHuman ?urih_protocol .}
+}
+group by ?protocol ?n ?doi_protocol ?hasUri
+order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
+#+end_src
+
+#+RESULTS:
+[[file:./reports/dataset-report.csv]]
+
 *** Conditions studied
 *** Experimental groups
 #+name: experimental-groups-core
