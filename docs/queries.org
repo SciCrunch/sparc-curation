@@ -11,6 +11,8 @@
 #+startup: showall
 #+category: sparc
 
+#+latex_header: \usepackage[inkscapelatex=false]{svg}
+
 :properties:
 #+property: header-args :eval no-export
 
@@ -1596,7 +1598,7 @@ These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru-2
 # #+header: :results drawer :limit 1
-#+header: :limit 999999 :file ./images/neru-2.svg :results file
+#+header: :limit 999999 :file ./images/neru-2.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-2
 #+begin_src cypher
@@ -1650,7 +1652,7 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 #+RESULTS: cypher-neru-2
 [[file:./images/neru-2.svg]]
 
-#+header: :limit 999999 :file ./images/neru-debug.svg :results file
+#+header: :limit 999999 :file ./images/neru-debug.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+begin_src cypher
 MATCH path = (neupop:Class{iri: $neupop_id})
@@ -1668,7 +1670,7 @@ RETURN path
 
 ** neru-1
 # #+header: :results drawer :limit 1
-#+header: :limit 999999 :file ./images/neru-1.svg :results file
+#+header: :limit 999999 :file ./images/neru-1.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-1
 #+begin_src cypher
