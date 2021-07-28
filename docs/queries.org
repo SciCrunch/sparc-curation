@@ -1596,7 +1596,7 @@ These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru-2
 # #+header: :results drawer :limit 1
-#+header: :limit 999999 :file ./images/neru-2.svg
+#+header: :limit 999999 :file ./images/neru-2.svg :results file
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-2
 #+begin_src cypher
@@ -1635,8 +1635,6 @@ RETURN a, b, c, d, e, f, g,h,i, path
 
 UNION
 
-// use :apinatomy:next to provider ordering for the links
-
 // this part usually only returns the soma housing lyph
 MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
@@ -1650,8 +1648,9 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 #+end_src
 
 #+RESULTS: cypher-neru-2
+[[file:./images/neru-2.svg]]
 
-#+header: :limit 999999 :file ./images/neru-debug.svg
+#+header: :limit 999999 :file ./images/neru-debug.svg :results file
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+begin_src cypher
 MATCH path = (neupop:Class{iri: $neupop_id})
@@ -1665,10 +1664,11 @@ RETURN path
 #+end_src
 
 #+RESULTS:
+[[file:./images/neru-debug.svg]]
 
 ** neru-1
-# #+header: :var neupop_id="http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"
-#+header: :limit 999999 :file ./images/neru-1.svg
+# #+header: :results drawer :limit 1
+#+header: :limit 999999 :file ./images/neru-1.svg :results file
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-1
 #+begin_src cypher
@@ -1708,6 +1708,7 @@ return a, b, c, d, null AS e, null AS path
 #+end_src
 
 #+RESULTS: cypher-neru-1
+[[file:./images/neru-1.svg]]
 
 ** yaml file
 #+name: cypher-resources
@@ -1956,7 +1957,8 @@ First pass NLP output
          "https://raw.githubusercontent.com/tgbugs/orgstrap/98350dc97b6a079d35c94b1798501a62cbbdf176/ow.el"))
 
 (unless (featurep 'blazegraph)
-  (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31 "https://raw.githubusercontent.com/tgbugs/orgstrap/1e1fa08f9c1c059b393f737fcf19b55082bf660/services/blazegraph.el"))
+  (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/1e1fa08f9c1c059b393f737fcf19b55082bf660/services/blazegraph.el"))
 
 (when orgstrap-do-packages-emacs
   (ow-enable-use-package)
