@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 66bb730f2134186f319eb0cbd86eb31b89a7703523eb53c5f5182fe75ea2f3bd; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 47c4b44c586e0f7388613562bc0ba4c0b2e784e01788efed8232eec3ae0d1aee; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+options: num:nil
@@ -43,8 +43,35 @@ mkdir /var/www/sparc/ApiANTOMY/ontologies
 chown -R nginx:nginx /var/www/sparc/ApiANTOMY
 #+end_src
 * SciGraph pipeline
+** Everything
+#+begin_src bash :noweb yes :tangle ../bin/apinat-functions.sh
+function apinat-full-to-prod () {
+    echo this is not ready
+    return 1
+
+    apinat-build-all &&
+    pushd ~/git/apinatomy-models
+    git commit &&
+    popd
+    echo This would deploy: $(git diff --name-only HEAD~1..HEAD | cut -d'/' -f 1 | sort -u)
+    <<&are-you-sure>>
+    apinat-deploy-ttls $(git diff --name-only HEAD~1..HEAD | cut -d'/' -f 1 | sort -u)
+    ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-data &&
+    ~/git/pyontutils/nifstd/scigraph/bin/run-deploy-graph-sparc-data
+}
+
+function apinat-full-to-dev () {
+    apinat-build-all &&
+    ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-data-dev &&
+    echo TODO figure out the dance we have to do for docker may need a separate function
+}
+#+end_src
 ** Parallel build
-#+begin_src bash
+For the time being (until a bit more machinery is in place for
+orthauth style configuration in elisp) you can put the path to
+=secrets.sxpr= in =orgstrap-batch-helper.el= with the following
+expression =(setq oa-secrets "/path/to/secrets.sxpr")=.
+#+begin_src bash :noweb no :tangle ../bin/apinat-functions.sh :mkdirp yes
 function apinat-build () {
     # add this line if you need to get a traceback on error
     # --funcall toggle-debug-on-error \
@@ -53,17 +80,18 @@ function apinat-build () {
     --visit ~/git/sparc-curation/docs/apinatomy.org \
     -- ${@}
 }
-#+end_src
 
-#+begin_src bash
-export -f apinat-build
-pushd ~/git/apinatomy-models
-ls -d *{-,bron}* | \
-xargs -P10 -r -I {} \
-      bash -c 'apinat-build --repo $(pwd) --secrets ~/path/to/secrets.sxpr --model-id ${@}' _ {}
+function apinat-build-all () {
+    export -f apinat-build
+    pushd ~/git/apinatomy-models
+    ls -d *{-,bron}* | \
+    xargs -P10 -r -I {} \
+        bash -c 'apinat-build --repo $(pwd) --model-id ${@}'" ${@}" _ {}
 
-# only add models where the json has changed since the xlsx is opaque
-git add -u $(git status --porcelain | grep json | grep M | cut -d' ' -f3 | cut -d'/' -f1)
+    # only add models where the json has changed since the xlsx is opaque
+    git add -u $(git status --porcelain | grep json | grep M | cut -d' ' -f3 | cut -d'/' -f1)
+    popd
+}
 #+end_src
 
 ** Export to ttl
@@ -352,24 +380,6 @@ New-Item -Path * -Name derived -ItemType "directory"
 pushd ~/git/apinatomy-models/
 find -maxdepth 1 -type d -not -path '*.git*' -not -path '.' -exec mkdir {}/derived \;
 #+end_src
-** ttl deprecated :noexport:
-Until this is fully automated you need to obtain the flattened jsonld
-export of any files to be converted to ttl.
-
-Make sure SciGraph services and InterLex are accessible for OntTerm.
-
-Run this block in emacs with =C-c C-c= or tangle and run with the block below
-#+name: apinat-export
-#+header: :shebang "#!/usr/bin/env bash" :tangle-mode (identity #o0755)
-#+begin_src bash :dir ../ :tangle ../export-apinatomy-tests :async
-spc apinat bolser-lewis.jsonld bolser-lewis.ttl
-spc apinat keast-bladder.jsonld keast-bladder.ttl
-spc apinat bronchomotor.jsonld bronchomotor.ttl
-#+end_src
-# note have to export to working dir not ../bin/ because
-# there is no test folder inside of bin and python can't
-# look backward up the folder hierarchy to find it
-
 ** Deploy ttl
 After running the ttl export define the functions in
 ref:deploy-ontology-file and then run ~apinat-deploy-from-ttl
@@ -403,7 +413,7 @@ described here. See also [[file:./../resources/scigraph/ontologies-sparc-data.ya
 # too big to bite off right now
 
 #+name: deploy-ontology-file
-#+begin_src bash
+#+begin_src bash :tangle ../bin/apinat-functions.sh
 function apinat-remote-operations () {
     local PATH_SOURCE="${1}"
     local PATH_TARGET="${2}"
@@ -667,6 +677,15 @@ obj:   {n_pair}''')
   <<temp-orthauth>>
   )
 
+(defun apinat---pre-tangle () ; (ref:sure)
+  ;; FIXME hardcoded paths issues
+  (unless (assq '&are-you-sure org-babel-library-of-babel)
+    (org-babel-lob-ingest "~/git/pyontutils/nifstd/scigraph/README.org")))
+
+(add-hook 'org-babel-pre-tangle-hook #'apinat---pre-tangle nil t)
+
+;; entry point for use from command line
+
 (let ((args-left command-line-args-left))
   (setq command-line-args-left nil) ; prevent emacs from trying to open our other arguments
   (when (and noninteractive ; have to use this since --batch is stripped
@@ -676,7 +695,7 @@ obj:   {n_pair}''')
                         (:repo "~/git/apinatomy-models/")
                         (:converter "apinat-converter")
                         (:model-id nil)
-                        (:secrets nil)
+                        (:secrets oa-secrets)
                         (:debug))))
       (let ((*apinatomy-model-repository* (cdr (assq 'repo args-alist)))
             (apinat-converter-path (cdr (assq 'converter args-alist)))
@@ -686,6 +705,10 @@ obj:   {n_pair}''')
         (message "updating %s" model-id)
         (update-models (list model-id))))))
 #+end_src
+
+[[(sure)]] Ensure that the
+[[file:~/git/pyontutils/nifstd/scigraph/README.org::&are-you-sure][&are-you-sure]]
+block can be nowebbed for tangling.
 
 Temporary extract of functionality needed to manage =model-id= to =google-sheet-id= mapping.
 #+name: temp-orthauth
