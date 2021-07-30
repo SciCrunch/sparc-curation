@@ -5,6 +5,7 @@
 @prefix FMA: <http://purl.org/sig/ont/fma/fma> .
 @prefix GO: <http://purl.obolibrary.org/obo/GO_> .
 @prefix ILX: <http://uri.interlex.org/base/ilx_> .
+@prefix ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/> .
 @prefix NCBITaxon: <http://purl.obolibrary.org/obo/NCBITaxon_> .
 @prefix NLX: <http://uri.neuinfo.org/nif/nifstd/nlx_> .
 @prefix PMID: <https://www.ncbi.nlm.nih.gov/pubmed/> .
@@ -31,12 +32,12 @@
         <file:///tmp/scigraph-build/sparc-data/curation-export.owl>,
         <https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl> ;
     owl:imports <https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder.ttl>,
-        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/ard-arm-cardiac.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
-        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl> ;
+    ilxtr:imports-dev <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/vagus-nerve.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl> .
 
