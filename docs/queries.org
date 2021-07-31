@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 3fb8722c90dc973815e3344bbe119e78b7d07ee38ef3f16fa527329b5bde2097; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e42e20c1ed711c5f5161f9b531e2e10c1f6e383ab9afb7b0f43146601e96e3bd; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 
 # [[file:queries.pdf]]
@@ -98,7 +98,7 @@ github
 ontology.neuinfo.org/docs/
 etc.
 ** TODO button to start, stop, reset services in case a bad query is run
-* SPARQL
+* Data queries
 ** Datasets
 *** Dataset Predicates
 #+begin_src sparql
@@ -1641,10 +1641,169 @@ result = func(data)
 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
 | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
 | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-* SciGraph cypher resources dynamic queries
+* SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
-** neru-2
+** neru
+*** neru-3
+# #+header: :results drawer :limit 1
+#+header: :limit 999999 :file ./images/neru-3.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+name: cypher-neru-3
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+// publications
+WITH neugrp, a
+MATCH path = (neugrp)
+-[:apinatomy:publications]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+
+WITH neugrp, a, path
+MATCH (neugrp)
+-[b:apinatomy:links]->(link)
+-[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+WITH neugrp, link, lyph, a, b, c, d, path
+MATCH (lyph)
+-[e:apinatomy:external]->(region)
+
+// use apinatomy:next to extract ordering information
+WITH neugrp, link, a, b, c, d, e, path
+MATCH p2 = (link)
+-[:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:topology]->()
+
+WITH neugrp, link, a, b, c, d, e, path, p2, cl
+MATCH (cl)
+-[x:apinatomy:inheritedExternal*0..1]->()
+
+WITH neugrp, link, a, b, c, d, e, path, p2, x
+MATCH (link)
+-[f:apinatomy:next*0..]->()
+//-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+// FIXME these should be collapsing into a single relationship
+-[g:apinatomy:target*0..1]->()
+-[h:apinatomy:rootOf*0..1]->()
+-[i:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+
+RETURN a, b, c, d, e, f, g,h,i, path, p2, x
+
+UNION
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+-[c:apinatomy:internalIn]->()
+-[d:apinatomy:external*0..1]->(region)
+// this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+//-[c:apinatomy:internalIn*0..1]->()
+//-[d:apinatomy:external*0..1]->(region)
+RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, null as p2, null as x
+#+end_src
+
+#+RESULTS: cypher-neru-3
+[[file:./images/neru-3.svg]]
+
+#+name: cypher-neru-helper
+#+begin_src cypher :noweb yes :results drawer :limit 99999999
+<<cypher-neru-3>>
+#+end_src
+
+# #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
+# #+header: :var result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6")
+#+header: :results drawer
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
+#+header: :var result=(identity nil)
+#+name: python-process-neru
+#+begin_src python
+from nifstd_tools.simplify import simplify
+
+
+def query(neupop_id):
+    resp = requests.get('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
+                        f'demos/apinat/neru-3/{neupop_id}.json?limit=9999999')
+    resp = requests.get(url, headers={'Accept': 'application/json'})
+    blob = resp.json()
+    return blob
+
+
+def deblob(blob):
+    blob = simplify([['apinatomy:target', 'apinatomy:rootOf', 'apinatomy:levels'],
+                     ['apinatomy:conveyingLyph', 'apinatomy:topology'],
+                     ['apinatomy:conveyingLyph', 'apinatomy:inheritedExternal'],], blob)
+    edges = blob['edges']
+    for e in edges:
+        if e['pred'] == 'apinatomy:target-apinatomy:rootOf-apinatomy:levels':
+            e['pred'] = 'apinatomy:next*'
+        if e['pred'] == 'apinatomy:conveyingLyph-apinatomy:topology':
+            e['pred'] = 'apinatomy:topology*'
+        if e['pred'] == 'apinatomy:conveyingLyph-apinatomy:inheritedExternal':
+            e['pred'] = 'apinatomy:inheritedExternal*'
+
+    blob['edges'] = [dict(s) for s in set(frozenset({k:v for k, v in d.items()
+                                                     if k != 'meta'}.items()) for d in blob['edges'])]
+    sos = set(sov for e in blob['edges'] for sov in (e['sub'], e['obj']))
+    blob['nodes'] = [n for n in blob['nodes'] if n['id'] in sos]
+    somas = [e for e in edges if e['pred'] == 'apinatomy:internalIn']
+    externals = [e for e in edges if e['pred'] == 'apinatomy:external']
+    ordering_edges = [e for e in edges if e['pred'] == 'apinatomy:next']
+    return blob, edges, somas, externals, ordering_edges
+
+
+def main(blob=None, blob_string=None, neupop_id=None):
+    if blob_string is not None:
+        import json
+        blob = json.loads(result)
+
+    if blob is None:
+        blob = query('ilxtr:neuron-type-keast-6')
+
+
+    blob, edges, somas, externals, ordering_edges = v = deblob(blob)
+    return v
+
+#+end_src
+
+#+begin_src elisp :results none
+(defun-local json->svg-file (json-string path)
+  (let* ((tmp (org-babel-temp-file "cypher-dot-"))
+         (dot (ob-cypher/scigraph/json-to-dot json-string))
+         (cmd (format
+               (concat
+                "dot "
+                "-Efontname='Dejavu Sans Mono' "
+                "-Nfontname='Dejavu Sans Mono' "
+                "-Grankdir=LR "
+                "-T%s -o %s %s")
+               (file-name-extension path) path tmp)))
+    (with-temp-file tmp
+      (insert dot))
+    (org-babel-eval cmd "")
+    path))
+#+end_src
+
+Use this block to run the next block an all dependencies without being asked again.
+#+begin_src elisp :results none
+(ow-confirm-once "neru-simplified")
+#+end_src
+
+#+header: :var json-string=python-process-neru(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6"))
+#+header: :var path="./images/neru-simplified.svg" :results file
+#+name: neru-simplified
+#+begin_src elisp
+(json->svg-file json-string path)
+#+end_src
+
+#+RESULTS: neru-simplified
+[[file:./images/neru-simplified.svg]]
+
+*** neru-2
 # #+header: :results drawer :limit 1
 #+header: :limit 999999 :file ./images/neru-2.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
@@ -1716,7 +1875,7 @@ RETURN path
 #+RESULTS:
 [[file:./images/neru-debug.svg]]
 
-** neru-1
+*** neru-1
 # #+header: :results drawer :limit 1
 #+header: :limit 999999 :file ./images/neru-1.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
@@ -1760,6 +1919,157 @@ return a, b, c, d, null AS e, null AS path
 #+RESULTS: cypher-neru-1
 [[file:./images/neru-1.svg]]
 
+*** neur projects to
+# TODO dot ignore directionality in layout for certain edges e.g. apinat:topology
+# #+header: :results drawer :limit 1
+#+header: :limit 999999 :file ./images/neru-projects.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-11"
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:lyphs]->(end_lyph)
+-[t:apinatomy:topology]->(top)
+WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.org/uris/readable/BAG2"]
+WITH neugrp, end_lyph, t
+MATCH (type) // FIXME we need more information in the models
+<-[x:apinatomy:inheritedExternal*0..1]-(end_lyph)
+-[a:apinatomy:conveys]->(link)
+-[b:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[c:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+WITH neugrp, lyph, a,b,c,t,x
+MATCH (lyph)
+-[e:apinatomy:external]->(region)
+RETURN e, a,b,c,t,x
+
+#+end_src
+
+#+RESULTS:
+[[file:./images/neru-projects.svg]]
+
+*** neur populations projecting to
+Given an anatomical region return a list of neuron types that project to that region.
+
+# FIXME TODO need to also be able to query layers i.e. rexed lamina vii
+#+header: :limit 999999 :file ./images/neru-axons-bag.svg :results file :exports both
+#+header: :var region_id="UBERON:0001989" :note vagus nerve
+#+header: :var type_id="SAO:280355188" :note regional part of axon
+#+name: cypher-neru-axons-bag
+#+begin_src cypher :noweb yes
+<<cypher-neru-terminal-type>>
+#+end_src
+
+#+RESULTS: cypher-neru-axons-bag
+[[file:./images/neru-axons-bag.svg]]
+
+*** neur populations with axons in
+Given an anatomical region return a list of neuron types with axons that are located in that region.
+
+# TODO compare with an NPO based query
+#+header: :limit 999999 :file ./images/neru-axons.svg :results file :exports both
+#+header: :var region_id="UBERON:0001759" :note vagus nerve
+#+header: :var type_id="SAO:280355188" :note regional part of axon
+#+name: cypher-neru-axons
+#+begin_src cypher :noweb yes
+<<cypher-neru-process-type>>
+RETURN e, neupop, neugrp
+#+end_src
+
+#+RESULTS: cypher-neru-axons
+[[file:./images/neru-axons.svg]]
+
+*** neur populations dendriting to
+#+header: :limit 999999 :file ./images/neru-dendrites-bag.svg :results file :exports both
+#+header: :var region_id="UBERON:0001989" :note vagus nerve
+#+header: :var type_id="SAO:420754792" :note regional part of dendrite
+#+name: cypher-neru-dendrites-bag
+#+begin_src cypher :noweb yes
+<<cypher-neru-terminal-type>>
+#+end_src
+
+#+RESULTS: cypher-neru-dendrites-bag
+[[file:./images/neru-dendrites-bag.svg]]
+
+*** neur populations with dendrites in
+Given an anatomical region return a list of neuron types with dendrites that are located in that region.
+
+# TODO compare with an NPO based query
+#+header: :limit 999999 :file ./images/neru-dendrites.svg :results file :exports both
+#+header: :var region_id="UBERON:0001759" :note vagus nerve
+#+header: :var type_id="SAO:420754792" :note regional part of dendrite
+#+name: cypher-neru-dendrites
+#+begin_src cypher :noweb yes
+<<cypher-neru-process-type>>
+RETURN e, neupop, neugrp
+#+end_src
+
+# #+call: does not work here because we can't override a bunch of the other settings
+
+#+RESULTS: cypher-neru-dendrites
+[[file:./images/neru-dendrites.svg]]
+
+*** neur populations with processes in
+Given an anatomical region return a list of neuron types with processes that are located in that region.
+
+#+name: cypher-neru-processes-base
+#+begin_src cypher :eval never
+MATCH (neupop)
+-[e:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:links]->(link)
+-[:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer)
+-[:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+#+end_src
+
+TODO Need to expand =region_id= using the Uberon partonomy to answer more generic queries.
+# #+header: :var region_id="UBERON:0018683" :note splanchnic nerve
+# #+header: :var region_id="UBERON:0035769" :note mesenteric ganglion
+# #+header: :results drawer :limit 10
+#+header: :limit 999999 :file ./images/neru-processes.svg :results file :exports both
+#+header: :var region_id="UBERON:0001759" :note vagus nerve
+#+name: cypher-neru-processes
+#+begin_src cypher :noweb yes
+// dendrites and axons
+<<cypher-neru-processes-base>>
+RETURN e, neupop, neugrp
+
+UNION
+
+// somas
+MATCH (neupop)
+-[e:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:lyphs]->(lyph)
+-[:apinatomy:internalIn]->()
+-[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+RETURN e, neupop, neugrp
+
+#+end_src
+
+#+RESULTS: cypher-neru-processes
+[[file:./images/neru-processes.svg]]
+
+Helper blocks for more specialized queries.
+#+caption: process type helper
+#+name: cypher-neru-process-type
+#+begin_src cypher :noweb yes :eval never
+<<cypher-neru-processes-base>>
+WITH e, neupop, neugrp, link
+MATCH (link)
+-[:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:inheritedExternal]->(:Class {iri: $type_id})
+#+end_src
+
+#+caption: terminal type helper
+#+name: cypher-neru-terminal-type
+#+begin_src cypher :noweb yes :eval never
+<<cypher-neru-process-type>>
+WITH e, neupop, neugrp, cl
+MATCH (cl)
+-[:apinatomy:topology]-(top)
+WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.org/uris/readable/BAG2"]
+RETURN e, neupop, neugrp
+#+end_src
+
 ** yaml file
 #+name: cypher-resources
 #+header: :noweb yes
@@ -1802,7 +2112,28 @@ function path-metadata-coverage () {
 # aka dashboard queries
 ApiNATOMY sourced
 
-1. number of models
+1. models
+   #+name: sparql-apinat-models
+   #+begin_src sparql
+   # SELECT (COUNT(DISTINCT ?s) as ?total_models)
+   SELECT DISTINCT
+   (?s as ?id)
+   (str(?l) as ?label)
+   WHERE {
+     ?s a elements:Graph .
+     ?s rdfs:label ?l.
+   }
+   #+end_src
+
+   #+name: cypher-apinat-models
+   #+begin_src cypher
+   MATCH (g)
+   -[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"})
+   RETURN g
+   #+end_src
+
+2. number of lyphs
+
    #+begin_src sparql
    SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
    WHERE { ?s a elements:Lyph . }
@@ -1840,16 +2171,6 @@ ApiNATOMY sourced
    |-------------|
    |         763 |
 
-   #+begin_src sparql
-   SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
-   WHERE { ?s a elements:Lyph . }
-   #+end_src
-
-   #+RESULTS:
-   | total_lyphs |
-   |-------------|
-   |        7751 |
-
 3. publications referenced
    apinaomty:publications
    average number of publications per unit? (for now no)
@@ -1882,7 +2203,7 @@ ApiNATOMY sourced
    (COUNT(DISTINCT ?s) AS ?count)
    WHERE {
      VALUES ?prefix {
-       "UBERON" "EMAPA" "fma" "CHEBI" "GO" "sao" "CL" "nlx" "ilx" "tgbugs" "NCBITaxon"
+       "UBERON" "EMAPA" "fma" "CHEBI" "GO" "sao" "CL" "nlx" "ilx" "tgbugs" "NCBITaxon" "NCIT"
        "pubmed" "doi" "ncit" # problems
        "" }
      ?s a elements:External .
@@ -1927,6 +2248,18 @@ ApiNATOMY sourced
    #+end_src
 
 7. number of neurulated groups aka neuron populations
+   #+begin_src sparql
+   SELECT DISTINCT
+   ?group
+   (str(?l) as ?label)
+   WHERE {
+     ?group a elements:Group .
+     ?group apinatomy:description ?d
+     filter(contains(str(?d), "dynamic"))
+     ?group rdfs:label ?l .
+   }
+   order by ?group
+   #+end_src
 
 NPO sourced
 Keast
@@ -1957,10 +2290,8 @@ First pass NLP output
 #+begin_src elisp :results none :lexical yes
 (defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
 
-(defun orgstrap---noconfirm-eval-sparql (lang _body)
-  "Run sparql queries without confirmation dialogue."
-  (not (string= lang "sparql")))
-(setq-local ocbe org-confirm-babel-evaluate) ; hack that works due to dynamic scope
+;; somehow this gets around lexical scope
+(setq-local org-confirm-babel-evaluate (lambda (lang _body) (not (member lang '("cypher" "sparql")))))
 
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)
@@ -2012,8 +2343,8 @@ First pass NLP output
 
 (when orgstrap-do-packages-emacs
   (ow-enable-use-package)
-
   (ow-use-packages
+   (cypher-mode :init (require 'cypher-mode) (set-face-attribute 'cypher-pattern-face nil :background nil))
    sparql-mode
    ob-cypher
    (org-plus-contrib
@@ -2029,6 +2360,21 @@ First pass NLP output
          "https://raw.githubusercontent.com/tgbugs/ob-cypher/881edb3af9226675760897e08fc4c16eb888be08/ob-cypher.el")
   (provide 'ob-cypher-scigraph))
 
+;; temporary inclusion
+
+(defun ow-confirm-once (block-name &optional universal-argument) ; TODO move into orgware for real
+  "Use to confirm running a chain of dependent blocks starting with BLOCK-NAME.
+This retains single confirmation at the entry point for the block."
+  ;; TODO consider a header arg for a variant of this in org babel proper
+  (interactive "P")
+  (let ((org-confirm-babel-evaluate (lambda (_l _b) nil)))
+    (save-excursion
+      (when (org-babel-find-named-block block-name)
+        ;; goto won't raise an error which results in the block where
+        ;; `ow-confirm-once' is being used being called an infinite
+        ;; number of times and blowing the stack
+        (org-babel-goto-named-src-block block-name)
+        (org-babel-execute-src-block)))))
 #+end_src
 
 ** Local Variables :ARCHIVE:
