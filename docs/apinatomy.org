@@ -1,7 +1,8 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 47c4b44c586e0f7388613562bc0ba4c0b2e784e01788efed8232eec3ae0d1aee; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 150ebc3b0d2c2e42ede070a6d47f4b3328c7e8462fcd0abed8fd4861dcfa71f0; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
-#+options: num:nil
+# reminder that num:nil breaks table of contents so if one is nil both should probably be nil
+#+options: num:nil toc:nil
 #+startup: showall
 #+property: header-args:elisp :lexical yes
 #+property: header-args :eval no-export
@@ -9,17 +10,21 @@
 # [[file:./apinatomy.pdf]]
 # [[file:./apinatomy.html]]
 
-* Using this file :noexport:
-You can also tangle this file to produce [[file:../export-apinatomy-tests]]
-and then run that file from the working directory of this sparc-curation repo.
-#+begin_src bash
-emacs --batch \
-      --load org \
-      --load ob-shell \
-      --load ob-python \
-      --eval '(org-babel-tangle-file "./docs/apinatomy.org")'
+# This block works like a super powered shebang line :D! It is used to
+# pass the correct arguments to emacs in order to run this file.
+#+name: orgstrap-shebang-block
+#+begin_src bash :exports none :eval never :results none
+exec emacs --quick --batch \
+    --load ~/git/orgstrap/orgstrap-batch-helper.el \
+    --visit "${0}" \
+    -- "${@}"
+exit
+#+end_src
 
-./export-apinatomy-tests
+* Using this file :noexport:
+This is an executable org file! Here is an example of how to use it to build an apinatomy model.
+#+begin_src bash
+./apinatomy.org --model-id keast-bladder
 #+end_src
 * ApiNATOMY to RDF/OWL2 conversion
 :PROPERTIES:
@@ -113,11 +118,14 @@ gsx:google-sheet-id
 
 #+name: flow-to-ttl
 #+begin_src elisp :results none
-(defvar-local apinat-converter-path nil
-  "full path to javascript apinatomy converter")
+(defvar-local apinat-model-repo "~/git/apinatomy-models/"
+  "Path to a local copy of the apinatomy-models repository.")
+
+(defvar-local apinat-converter-command "apinat-converter"
+  "Command name or full path to javascript apinatomy converter.")
 
 (defvar-local apinat-converter-debug nil
-  "dynamic variable used to control debug behavior")
+  "Dynamic variable used to control debug behavior.")
 
 (defun-local ex-do (&rest nothing)
   "Executor do. Eats the input since it is to be run by the executor."
@@ -144,11 +152,9 @@ gsx:google-sheet-id
   ;; but would need a solution
   "AAAAAAAAA!")
 
-(defvar *apinatomy-model-repository* "~/git/apinatomy-models/")
-
 (defmacro apinat--with-model (model-id &rest body)
   (declare (indent defun))
-  `(let ((default-directory (expand-file-name (symbol-name ,model-id) *apinatomy-model-repository*))
+  `(let ((default-directory (expand-file-name (symbol-name ,model-id) apinat-model-repo))
          (xlsx    (format "source/%s.xlsx"    model-id))
          (json    (format "source/%s.json"    model-id))
          (jsonld  (format "derived/%s.jsonld" model-id))
@@ -220,7 +226,7 @@ gsx:google-sheet-id
         (let* ((default-directory path-temp)
                (google-sheet-id (symbol-name (-ms-> model-id)))
                (path-internal (concat path-temp "/build")) ; should not exist to avoid date suffix
-               (_ (run-command apinat-converter-path
+               (_ (run-command apinat-converter-command
                                "-f" "id"
                                "-t" "xlsx"
                                "-t" "json"
@@ -299,7 +305,7 @@ gsx:google-sheet-id
         (path-temp (make-temp-file "apinat-conversion" 'directory)))
     (unwind-protect
         (let* ((default-directory path-temp)
-               (_ (run-command apinat-converter-path "-m" "xlsx" "-i" path-xlsx))
+               (_ (run-command apinat-converter-command "-m" "xlsx" "-i" path-xlsx))
                (output-dir (car (directory-files default-directory nil "converted-*"))))
           ;; '("model-flattened.jsonLD" "model-generated.json" "model.json" "model.jsonLD")
           (rename-file (concat output-dir "/" "model.json") path-json t)
@@ -322,7 +328,7 @@ gsx:google-sheet-id
 
 (defun-local all-models ()
   ;;(let ((default-directory (git-share-local r-apin-mod:HEAD:)) ; TODO ))
-  (let ((default-directory (expand-file-name *apinatomy-model-repository*)))
+  (let ((default-directory (expand-file-name apinat-model-repo)))
     ;; you could use something like model-repository but then you have to make
     ;; a bunch of concatentations, better just to switch the default directory
     ;; so that the context deals with alignment between name and local referent
@@ -618,9 +624,6 @@ obj:   {n_pair}''')
 
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes :noweb yes
-;; TODO suppress the welcome screen
-;; TODO automatically run flow-to-ttl probably
-
 ;;; load remote code
 
 (unless (featurep 'reval)
@@ -653,13 +656,14 @@ obj:   {n_pair}''')
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
-  (reval 'sha256 'f978168b5c0fc0ce43f69c748847e693acc545df9a3ff1d9def57bdb1fc63c4a
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/649fd0cdcb831dcd840c66ee324005165ce970ca/reval.el"))
+  (reval 'sha256 '880e91f8e9137c7fb7a14e2c6e68fc28d141a70bf9d9395f6dbacac5e0f296d6
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/b7618727eee4c0d74c0e7271e3b8d36f3432a247/reval.el"))
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'a90b12c386d60882cadeb6b6557f7eb05378bfcf94f68f7f8512a9edfeb34d6c
-           (concat ghost "98350dc97b6a079d35c94b1798501a62cbbdf176" "/ow.el"))))
+    (reval 'sha256 'c8ecf1b7cd8822b75a30f98dc05ec0e5355b224557527edd363af9545dd11d15
+           "~/git/orgstrap/ow.el"
+           (concat ghost "b7618727eee4c0d74c0e7271e3b8d36f3432a247" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package
@@ -684,119 +688,21 @@ obj:   {n_pair}''')
 
 (add-hook 'org-babel-pre-tangle-hook #'apinat---pre-tangle nil t)
 
-;; entry point for use from command line
+;; entry point for batch command line
 
-(let ((args-left command-line-args-left))
-  (setq command-line-args-left nil) ; prevent emacs from trying to open our other arguments
-  (when (and noninteractive ; have to use this since --batch is stripped
-             (string= (car args-left) "--"))
-    (let* ((command-line-args-left args-left)
-           (args-alist (parse-args
-                        (:repo "~/git/apinatomy-models/")
-                        (:converter "apinat-converter")
-                        (:model-id nil)
-                        (:secrets oa-secrets)
-                        (:debug))))
-      (let ((*apinatomy-model-repository* (cdr (assq 'repo args-alist)))
-            (apinat-converter-path (cdr (assq 'converter args-alist)))
-            (apinat-converter-debug (cdr (assq 'debug args-alist)))
-            (model-id (intern (cdr (assq 'model-id args-alist))))
-            (oa-secrets (cdr (assq 'secrets args-alist))))
-        (message "updating %s" model-id)
-        (update-models (list model-id))))))
+(ow-cli-gen
+    ((:model-id nil) ; the id of the model to build
+     ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
+     ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
+     ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
+     ((:debug) apinat-converter-debug)) ; enable debug mode
+  (message "updating %s" model-id)
+  (update-models (list (intern model-id))))
 #+end_src
 
 [[(sure)]] Ensure that the
 [[file:~/git/pyontutils/nifstd/scigraph/README.org::&are-you-sure][&are-you-sure]]
 block can be nowebbed for tangling.
-
-Temporary extract of functionality needed to manage =model-id= to =google-sheet-id= mapping.
-#+name: temp-orthauth
-#+begin_src elisp :results none
-(defvar oa-secrets nil "path to secrets file")
-
-(defun oa--resolve-path (plist elements)
-  "recursively `cl-getf' in order keywords from ELEMENTS in nested plists inside PLIST"
-  (if elements
-      (oa--resolve-path (cl-getf plist (car elements)) (cdr elements))
-    plist))
-
-(defun oa-read (path)
-  "read the first sexpression in the file at path"
-  (with-temp-buffer
-    (insert-file-contents path)
-    (read (buffer-string))))
-
-(defun oa-path (&rest elements)
-  "Retrieve value at nested path defined by keywords provided in ELEMENTS in `oa-secrets'"
-  (let ((plist (oa-read oa-secrets)))
-    (oa--resolve-path plist elements)))
-#+end_src
-
-Temporary extract for simple command line argument parsing.
-#+name: temp-parse-args
-#+begin_src elisp :results none
-;;; from git share parse-args
-
-(defun saner-string-to-number (string &optional base)
-  "vanilla `string-to-number' has a degenerate case with \"0\""
-  (let ((maybe-zero (string-to-number string base)))
-    (if (= maybe-zero 0)
-        (if (string= maybe-zero "0")
-            0
-          (error "%S is not a number!" string))
-      maybe-zero)))
-
-(defun norm-arg (arg)
-  (let ((int (ignore-errors (saner-string-to-number arg))))
-    (if int int arg)))
-
-(defun keyword-name (keyword)
-  (unless (keywordp keyword)
-    (error "%s is not a keyword! %s" keyword (type-of keyword)))
-  (substring (symbol-name keyword) 1))
-
-(defun process-keyword (element)
-  (unless (listp element)
-    (error "%s not a list! %s" element (type-of element)))
-  (let* ((kw (car element))
-         ;;(sl (string-downcase (symbol-name kw)))
-         (sl (keyword-name kw)) ; emacs is case preserving
-         (assign (cdr element))  ; FIXME default? FIXME XXX empty vs explicit nil
-         ;;(real-assign (if assign (car assign) (intern (symbol-name kw))))
-         (real-assign (intern (keyword-name kw)))
-         (default (if assign (car assign) assign)) ; FIXME
-         (p (if assign
-                `(progn (setf ,real-assign (norm-arg (cadr args)))
-                        ;; equivalent of bash shift shift
-                        (setf args (cddr args)))
-                `(progn (setf ,real-assign t)
-                        ;; equivalent of bash shift
-                        (setf args (cdr args))))))
-    (list `(,real-assign ,default)  ; default
-          `(,(intern (format "--%s" sl)) ,p)  ; case
-          `(cons ',real-assign ,real-assign))))
-
-(defmacro parse-args (&rest keywords)
-  "(parse-args (:port port) (:pid pid) (:flag))
-
-   NOTE if the default value if a kwarg is nil rather than
-   empty i.e. (:asdf nil) vs (:asdf) the form with nil will
-   not fail but will be nil unless some value is provided
-   AND it will eat the next kwarg this is probably a misdesign"
-  (cl-destructuring-bind (defaults cases returns)
-      (apply #'cl-mapcar #'list ; `cl-mapcar' required for this to work
-             (mapcar #'process-keyword keywords))
-    `(let ((args (cdr command-line-args-left))
-           ,@defaults)
-       (cl-do ()
-           ((null args) nil)
-         (cl-case (intern (car args))
-           ,@cases
-           (otherwise (progn (message "unhandled: %s" (car args))
-                             (setf args (cdr args))))))
-       (list ,@returns))))
-#+end_src
 
 ** Local Variables :ARCHIVE:
 
