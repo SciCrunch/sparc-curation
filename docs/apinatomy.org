@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 150ebc3b0d2c2e42ede070a6d47f4b3328c7e8462fcd0abed8fd4861dcfa71f0; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 150ebc3b0d2c2e42ede070a6d47f4b3328c7e8462fcd0abed8fd4861dcfa71f0; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -14,12 +14,28 @@
 # pass the correct arguments to emacs in order to run this file.
 #+name: orgstrap-shebang-block
 #+begin_src bash :exports none :eval never :results none
-exec emacs --quick --batch \
-    --load ~/git/orgstrap/orgstrap-batch-helper.el \
-    --visit "${0}" \
-    -- "${@}"
+function = () { :; }
+function silentlycontinue () { :; }
+
+$ErrorActionPreference= "silentlycontinue"
+null="/dev/stdout"
+__FILE="${0}"
+__PARGS=${@}
+function posix () {
+    test $ZSH_VERSION && { setopt shwordsplit; _IFS=$IFS; unset IFS; } || true
+    emacs --quick --batch --load ~/git/orgstrap/orgstrap-batch-helper.el --visit "${__FILE}" -- ${__PARGS}
+    test $ZSH_VERSION && { unsetopt shwordsplit; IFS=$_IFS; } || true
+}
+"posix" > $null
+"exit" > $null
+$ErrorActionPreference= "Continue"
+
+$org=(Get-Item $MyInvocation.MyCommand.Source).Target
+emacs --quick --batch --load ~/git/orgstrap/orgstrap-batch-helper.el --visit $org -- $args
 exit
+<# open powershell comment
 #+end_src
+# FIXME $org is a temporary hack until I can work out what is going on with `vc-mode'
 
 * Using this file :noexport:
 This is an executable org file! Here is an example of how to use it to build an apinatomy model.
@@ -705,7 +721,7 @@ obj:   {n_pair}''')
 block can be nowebbed for tangling.
 
 ** Local Variables :ARCHIVE:
-
+# close powershell comment #>
 # Local Variables:
 # eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable) (let ((ocbe org-confirm-babel-evaluate)) (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (unwind-protect (save-excursion (org-babel-goto-named-src-block "orgstrap") (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility))))
 # End:
