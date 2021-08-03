@@ -1790,7 +1790,7 @@ def main(blob=None, blob_string=None, neupop_id=None):
     path))
 #+end_src
 
-Use this block to run the next block an all dependencies without being asked again.
+# Use this block to run the next block an all dependencies without being asked again.
 #+begin_src elisp :results none :exports none
 (ow-babel-eval "neru-simplified")
 #+end_src
