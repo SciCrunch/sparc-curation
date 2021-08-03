@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: e42e20c1ed711c5f5161f9b531e2e10c1f6e383ab9afb7b0f43146601e96e3bd; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 52df79a9ed33a33f4dc972469b41d2eeacddfe8f1e8e04967f1987f40ea7980e; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 
 # [[file:queries.pdf]]
@@ -1714,16 +1714,25 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 <<cypher-neru-3>>
 #+end_src
 
-Python code to simplify =neru-3=.
-# #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
-# #+header: :var result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6")
-# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nreturn json.dumps(b, indent=1, sort_keys=False)"
+Python code to simplify =neru-3= and supporting functions to extract terminal regions.
+# FIXME the python will run the epilogue for in a babel call but jupyter-python will not, fun times
+# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nprint(json.dumps(b, indent=1, sort_keys=False))"
 #+header: :results drawer
-#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
 #+header: :var result=(identity nil)
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
 #+name: python-process-neru
-#+begin_src python
+#+begin_src jupyter-python :session pys
 from nifstd_tools.simplify import simplify
+
+
+axon = 'SAO:280355188'
+dend = 'SAO:420754792'
+bag = 'apinatomy:BAG'
+top = 'apinatomy:topology*'
+ie = 'apinatomy:inheritedExternal*'
+ext = 'apinatomy:external'
+fasIn = 'apinatomy:fasciculatesIn'
+layerIn = 'apinatomy:layerIn'
 
 
 def query(neupop_id):
@@ -1758,6 +1767,55 @@ def deblob(blob):
     return blob, edges, somas, externals, ordering_edges
 
 
+
+def sub(e, match=None):
+    return e['sub'] == match if match is not None else e['sub']
+
+
+def pred(e, match=None):
+    return e['pred'] == match if match is not None else e['pred']
+
+
+def obj(e, match=None):
+    return e['obj'] == match if match is not None else e['obj']
+
+
+def ematch(blob, select, match, *matches, matchf=lambda ms: True):
+    return [e for e in blob['edges'] if select(e, match) and matchf(matches)]
+
+
+def find_terminals(blob, type):
+    return [es for es in blob['edges']
+            if
+            pred(es, ie) and
+            obj(es, type) and
+            ematch(blob,
+                   (lambda e, m:
+                    sub(e, m) and
+                    pred(e, top) and
+                    obj(e, bag)),
+                   sub(es))]
+
+def find_region(blob, edge):
+    collect = []
+    def select(e, m, collect=collect):
+        if sub(e, m):
+            #print(e)
+            if pred(e, layerIn) or pred(e, fasIn):
+                return ematch(blob, select, obj(e))
+            elif pred(e, ext):
+                region = obj(e)
+                collect.extend([b for b in blob['nodes'] if b['id'] == region])
+                return region
+
+    ematch(blob, select, sub(edge))
+    return collect
+
+
+def find_terminal_regions(blob, type):
+    return [region for es in find_terminals(blob, type) for region in find_region(blob, es)]
+
+
 def main(blob=None, blob_string=None, neupop_id=None):
     if blob_string is not None:
         import json
@@ -1772,6 +1830,50 @@ def main(blob=None, blob_string=None, neupop_id=None):
 
 #+end_src
 
+# we need this block because jupyter-python doesn't include the epilogue when being called by another block wew
+# #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
+# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nreturn json.dumps(b, indent=1, sort_keys=False)"
+# #+header: :var result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6")
+#+header: :results drawer
+#+header: :var result=(identity nil)
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
+#+name: python-neru-helper
+#+begin_src python :noweb yes :exports none
+<<python-process-neru>>
+#+end_src
+
+Find the ontology identifiers for terminal regions.
+#+name: neru-find-terminal-regions
+#+begin_src jupyter-python :session pys :exports both
+from pprint import pprint
+
+blob, *_ = main(neupop_id='ilxtr:neuron-type-keast-6')
+
+# find terminal regions
+axon_terminal_regions = find_terminal_regions(blob, axon)
+dend_terminal_regions = find_terminal_regions(blob, dend)
+pprint(axon_terminal_regions)
+pprint(dend_terminal_regions)
+#+end_src
+
+#+RESULTS: neru-find-terminal-regions
+#+begin_example
+[{'id': 'UBERON:0016508',
+  'lbl': 'pelvic ganglion',
+  'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['pelvic ganglion'],
+           'https://apinatomy.org/uris/readable/generated': [True],
+           'types': ['Class']}}]
+[{'id': 'UBERON:0006448',
+  'lbl': None,
+  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
+           'types': ['Class']}},
+ {'id': 'UBERON:0006450',
+  'lbl': None,
+  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
+           'types': ['Class']}}]
+#+end_example
+
+# FIXME move this to orgstrap
 #+begin_src elisp :results none :exports none
 (defun-local json->svg-file (json-string path)
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
@@ -1795,7 +1897,7 @@ def main(blob=None, blob_string=None, neupop_id=None):
 (ow-babel-eval "neru-simplified")
 #+end_src
 
-#+header: :var json-string=python-process-neru(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6"))
+#+header: :var json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6"))
 #+header: :var path="./images/neru-simplified.svg" :results file
 #+name: neru-simplified
 #+begin_src elisp :exports none
@@ -2330,21 +2432,23 @@ First pass NLP output
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
-  (reval 'sha256 'f978168b5c0fc0ce43f69c748847e693acc545df9a3ff1d9def57bdb1fc63c4a
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/649fd0cdcb831dcd840c66ee324005165ce970ca/reval.el"))
+  (reval 'sha256 '880e91f8e9137c7fb7a14e2c6e68fc28d141a70bf9d9395f6dbacac5e0f296d6
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/b7618727eee4c0d74c0e7271e3b8d36f3432a247/reval.el"))
 
-(unless (featurep 'ow)
-  (reval 'sha256 'a90b12c386d60882cadeb6b6557f7eb05378bfcf94f68f7f8512a9edfeb34d6c
-         ;;"~/git/orgstrap/ow.el"
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/98350dc97b6a079d35c94b1798501a62cbbdf176/ow.el"))
-
-(unless (featurep 'blazegraph)
-  (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/1e1fa08f9c1c059b393f737fcf19b55082bf660/services/blazegraph.el"))
+(let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
+  (unless (featurep 'ow)
+    (reval 'sha256 'c8ecf1b7cd8822b75a30f98dc05ec0e5355b224557527edd363af9545dd11d15
+           ;; "~/git/orgstrap/ow.el"
+           (concat ghost "b7618727eee4c0d74c0e7271e3b8d36f3432a247" "/ow.el")))
+  (unless (featurep 'blazegraph)
+    (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
+           ;;"~/git/orgstrap/services/blazegraph.el"
+           (concat ghost "1e1fa08f9c1c059b393f737fcf19b55082bf660" "/services/blazegraph.el"))))
 
 (when orgstrap-do-packages-emacs
   (ow-enable-use-package)
   (ow-use-packages
+   jupyter
    (cypher-mode :init (require 'cypher-mode) (set-face-attribute 'cypher-pattern-face nil :background nil))
    sparql-mode
    ob-cypher
@@ -2354,28 +2458,14 @@ First pass NLP output
     (org-babel-do-load-languages
      'org-babel-load-languages
      '((cypher . t)
-       (sparql . t))))))
+       (sparql . t)
+       (python . t)
+       (jupyter . t))))))
 
 (unless (featurep 'ob-cypher-scigraph)
   (reval 'sha256 'cd08900d69b159b724860869ab8bc4d31b6eaf5efa5d351331e12ae29dcb1d42
          "https://raw.githubusercontent.com/tgbugs/ob-cypher/881edb3af9226675760897e08fc4c16eb888be08/ob-cypher.el")
   (provide 'ob-cypher-scigraph))
-
-;; temporary inclusion
-
-(defun ow-confirm-once (block-name &optional universal-argument) ; TODO move into orgware for real
-  "Use to confirm running a chain of dependent blocks starting with BLOCK-NAME.
-This retains single confirmation at the entry point for the block."
-  ;; TODO consider a header arg for a variant of this in org babel proper
-  (interactive "P")
-  (let ((org-confirm-babel-evaluate (lambda (_l _b) nil)))
-    (save-excursion
-      (when (org-babel-find-named-block block-name)
-        ;; goto won't raise an error which results in the block where
-        ;; `ow-confirm-once' is being used being called an infinite
-        ;; number of times and blowing the stack
-        (org-babel-goto-named-src-block block-name)
-        (org-babel-execute-src-block)))))
 #+end_src
 
 ** Local Variables :ARCHIVE:
