@@ -1707,16 +1707,17 @@ MATCH (neupop:Class{iri: $neupop_id})
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, null as p2, null as x
 #+end_src
 
-#+RESULTS: cypher-neru-3
 [[file:./images/neru-3.svg]]
 
 #+name: cypher-neru-helper
-#+begin_src cypher :noweb yes :results drawer :limit 99999999
+#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
 <<cypher-neru-3>>
 #+end_src
 
+Python code to simplify =neru-3=.
 # #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
 # #+header: :var result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6")
+# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nreturn json.dumps(b, indent=1, sort_keys=False)"
 #+header: :results drawer
 #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
 #+header: :var result=(identity nil)
@@ -1726,8 +1727,9 @@ from nifstd_tools.simplify import simplify
 
 
 def query(neupop_id):
-    resp = requests.get('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
-                        f'demos/apinat/neru-3/{neupop_id}.json?limit=9999999')
+    import requests
+    url = ('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
+           f'demos/apinat/neru-3/{neupop_id}?limit=9999999')
     resp = requests.get(url, headers={'Accept': 'application/json'})
     blob = resp.json()
     return blob
@@ -1770,7 +1772,7 @@ def main(blob=None, blob_string=None, neupop_id=None):
 
 #+end_src
 
-#+begin_src elisp :results none
+#+begin_src elisp :results none :exports none
 (defun-local json->svg-file (json-string path)
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
          (dot (ob-cypher/scigraph/json-to-dot json-string))
@@ -1789,18 +1791,17 @@ def main(blob=None, blob_string=None, neupop_id=None):
 #+end_src
 
 Use this block to run the next block an all dependencies without being asked again.
-#+begin_src elisp :results none
-(ow-confirm-once "neru-simplified")
+#+begin_src elisp :results none :exports none
+(ow-babel-eval "neru-simplified")
 #+end_src
 
 #+header: :var json-string=python-process-neru(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6"))
 #+header: :var path="./images/neru-simplified.svg" :results file
 #+name: neru-simplified
-#+begin_src elisp
+#+begin_src elisp :exports none
 (json->svg-file json-string path)
 #+end_src
 
-#+RESULTS: neru-simplified
 [[file:./images/neru-simplified.svg]]
 
 *** neru-2
