@@ -2022,7 +2022,17 @@ return a, b, c, d, null AS e, null AS path
 #+RESULTS: cypher-neru-1
 [[file:./images/neru-1.svg]]
 
-*** neur projects to
+*** neru model populations
+Given an ApiNATOMY model id return the identifiers for the neuron populations that are present in the model.
+#+header: :var model_id="https://apinatomy.org/uris/models/keast-bladder" :limit 99
+#+begin_src cypher
+MATCH (start:Ontology {iri: $model_id})
+<-[:isDefinedBy]-(external:Class)
+-[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"}) // FIXME
+RETURN external
+#+end_src
+
+*** neru projects to
 # TODO dot ignore directionality in layout for certain edges e.g. apinat:topology
 # #+header: :results drawer :limit 1
 #+header: :limit 999999 :file ./images/neru-projects.svg :results file :exports both
@@ -2050,7 +2060,7 @@ RETURN e, a,b,c,t,x
 #+RESULTS:
 [[file:./images/neru-projects.svg]]
 
-*** neur populations projecting to
+*** neru populations projecting to
 Given an anatomical region return a list of neuron types that project to that region.
 
 # FIXME TODO need to also be able to query layers i.e. rexed lamina vii
@@ -2065,7 +2075,7 @@ Given an anatomical region return a list of neuron types that project to that re
 #+RESULTS: cypher-neru-axons-bag
 [[file:./images/neru-axons-bag.svg]]
 
-*** neur populations with axons in
+*** neru populations with axons in
 Given an anatomical region return a list of neuron types with axons that are located in that region.
 
 # TODO compare with an NPO based query
@@ -2081,7 +2091,7 @@ RETURN e, neupop, neugrp
 #+RESULTS: cypher-neru-axons
 [[file:./images/neru-axons.svg]]
 
-*** neur populations dendriting to
+*** neru populations dendriting to
 #+header: :limit 999999 :file ./images/neru-dendrites-bag.svg :results file :exports both
 #+header: :var region_id="UBERON:0001989" :note vagus nerve
 #+header: :var type_id="SAO:420754792" :note regional part of dendrite
@@ -2093,7 +2103,7 @@ RETURN e, neupop, neugrp
 #+RESULTS: cypher-neru-dendrites-bag
 [[file:./images/neru-dendrites-bag.svg]]
 
-*** neur populations with dendrites in
+*** neru populations with dendrites in
 Given an anatomical region return a list of neuron types with dendrites that are located in that region.
 
 # TODO compare with an NPO based query
@@ -2111,7 +2121,7 @@ RETURN e, neupop, neugrp
 #+RESULTS: cypher-neru-dendrites
 [[file:./images/neru-dendrites.svg]]
 
-*** neur populations with processes in
+*** neru populations with processes in
 Given an anatomical region return a list of neuron types with processes that are located in that region.
 
 #+name: cypher-neru-processes-base
