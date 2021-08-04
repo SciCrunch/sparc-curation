@@ -108,6 +108,64 @@ def make_rand(n, width=80):
 
 
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class TestFilenames(_TestOperation, unittest.TestCase):
+
+    _evil_names = (
+        # '......................',  # this breaks the agent with infinite timeout
+        '!@#$%^&*()[]{}`~;:,',
+        '(╯°□°）╯︵ ┻━┻)',
+        'הָיְתָהtestالصفحات التّحول',
+        '᚛ᚄᚓᚐᚋᚒᚄ ᚑᚄᚂᚑᚏᚅ᚜',
+        'Z̮̞̠͙͔ͅḀ̗̞͈̻̗Ḷ͙͎̯̹̞͓G̻O̭̗̮',
+        # '𝕿𝖍𝖊 𝖖𝖚𝖎𝖈𝖐 𝖇𝖗𝖔𝖜𝖓 𝖋𝖔𝖝 𝖏𝖚𝖒𝖕𝖘 𝖔𝖛𝖊𝖗 𝖙𝖍𝖊 𝖑𝖆𝖟𝖞 𝖉𝖔𝖌',  # this breaks the agent with ERRORED
+        'evil file space',
+        'evil_file underscore',
+        'evil-file dash',
+        'evil%20file percent 20',
+        'hello%20world%20%60~%21%40%23%24%25%5E%26%2A%28%29%5B%5D%7B%7D%27',
+        # the problem is that we don't know whether we can actually
+        # decode a file name, and wthe database stores the encoded filename
+        'hello%20world',
+        'hello%20world~',
+    )
+
+    @staticmethod
+    def _op(test_folder, fsize, name):
+        test_file_a = test_folder / (name + '.ext')
+        test_file_b = test_folder / (name + '.txe')
+        test_folder_i = test_folder / name
+
+        test_file_a.data = iter((make_rand(fsize),))
+        test_file_b.data = iter((make_rand(fsize),))
+
+        remote_a = test_file_a.upload()
+        name_a = remote_a.bfobject.name
+
+        remote_b = test_file_b.upload()
+        name_b = remote_b.bfobject.name
+
+        try:
+            remote_i = test_folder_i.mkdir_remote()
+            name_i = remote_i.bfobject.name
+        except Exception as e:
+            name_i = e
+
+        return name_a, name_b, name_i
+
+    def test_filenames_evil(self):
+        test_folder = self.test_base / 'pandora'
+        test_folder.mkdir_remote()
+        test_folder.__class__.upload = Path.upload
+        results = []
+        fsize = 1024  # needed for uniqueish hashes colloisions will still happen
+        for name in self._evil_names:
+            name_a, name_b, name_i = self._op(test_folder, fsize, name)
+            results.append((name_a, name_b, name_i))
+
+        #breakpoint()
+
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestUpdate(_TestOperation, unittest.TestCase):
 
     @pytest.mark.skip('the question has been answered')
