@@ -115,6 +115,7 @@ class TestFilenames(_TestOperation, unittest.TestCase):
         '!@#$%^&*()[]{}`~;:,',
         '(╯°□°）╯︵ ┻━┻)',
         'הָיְתָהtestالصفحات التّحول',
+        'הָיְתָהtestالصفحا تالتّحول',  # check bucket names
         '᚛ᚄᚓᚐᚋᚒᚄ ᚑᚄᚂᚑᚏᚅ᚜',
         'Z̮̞̠͙͔ͅḀ̗̞͈̻̗Ḷ͙͎̯̹̞͓G̻O̭̗̮',
         # '𝕿𝖍𝖊 𝖖𝖚𝖎𝖈𝖐 𝖇𝖗𝖔𝖜𝖓 𝖋𝖔𝖝 𝖏𝖚𝖒𝖕𝖘 𝖔𝖛𝖊𝖗 𝖙𝖍𝖊 𝖑𝖆𝖟𝖞 𝖉𝖔𝖌',  # this breaks the agent with ERRORED
@@ -129,6 +130,46 @@ class TestFilenames(_TestOperation, unittest.TestCase):
         'hello%20world~',
     )
 
+    @property
+    def _more_evil_names(self):
+        # class scope strikes back! LOL PYTHON
+        return [
+            name
+          for char in
+            ('\x07',
+             #'/',  # have to do this in a different way on unix
+             '\\',
+             '|',
+             '!',
+             '@',
+             '#',
+             '$',
+             '%',
+             '^',
+             '&',
+             '*',
+             '(',
+             ')',
+             '[',
+             ']',
+             '{',
+             '}',
+             "'",
+             '`',
+             '~',
+             ';',
+             ':',
+             ',',
+             '"',
+             '?',
+             '<',
+             '>',
+             )
+          for name in
+            (f'prefix{char}',
+             f'prefix{char}suffix',
+             f'{char}suffix',)]
+
     @staticmethod
     def _op(test_folder, fsize, name):
         test_file_a = test_folder / (name + '.ext')
@@ -138,11 +179,17 @@ class TestFilenames(_TestOperation, unittest.TestCase):
         test_file_a.data = iter((make_rand(fsize),))
         test_file_b.data = iter((make_rand(fsize),))
 
-        remote_a = test_file_a.upload()
-        name_a = remote_a.bfobject.name
+        try:
+            remote_a = test_file_a.upload()
+            name_a = remote_a.bfobject.name
+        except Exception as e:
+            name_a = e
 
-        remote_b = test_file_b.upload()
-        name_b = remote_b.bfobject.name
+        try:
+            remote_b = test_file_b.upload()
+            name_b = remote_b.bfobject.name
+        except Exception as e:
+            name_b = e
 
         try:
             remote_i = test_folder_i.mkdir_remote()
@@ -152,13 +199,20 @@ class TestFilenames(_TestOperation, unittest.TestCase):
 
         return name_a, name_b, name_i
 
-    def test_filenames_evil(self):
+    def test_filenames_more_evil(self):
+        return self.test_filenames_evil(self._more_evil_names)
+
+    def test_filenames_evil(self, names=_evil_names):
+        #if names != self._evil_names:
+            #breakpoint()
         test_folder = self.test_base / 'pandora'
         test_folder.mkdir_remote()
         test_folder.__class__.upload = Path.upload
         results = []
         fsize = 1024  # needed for uniqueish hashes colloisions will still happen
-        for name in self._evil_names:
+        # FIXME this pretty clearly reveals a need for
+        # batching to multiplex the fetch ... SIGH
+        for name in names:
             name_a, name_b, name_i = self._op(test_folder, fsize, name)
             results.append((name_a, name_b, name_i))
 

@@ -375,12 +375,20 @@ class BlackfynnRemote(aug.RemotePath):
             realname = os.path.basename(self.bfobject.s3_key)
             if name != realname:  # mega weirdness
                 if realname.startswith(name):
+                    # FIXME also check for other things that match?
                     name = realname
-
                 else:
                     realpath = PurePath(realname)
                     namepath = PurePath(name)
-                    if namepath.suffixes:
+                    if realname.count('_') > name.count('_'):
+                        if namepath.suffixes == realpath.suffixes:
+                            # something was normalized in the s3 key but
+                            # we still have the suffix
+                            pass
+                        else:
+                            # normalized and suffixes do not match
+                            log.critical(f'norm {namepath!r} -?-> {realpath!r}')
+                    elif namepath.suffixes:
                         log.critical(f'sigh {namepath!r} -?-> {realpath!r}')
 
                     else:
@@ -1182,12 +1190,12 @@ class BlackfynnRemote(aug.RemotePath):
         if self.is_dataset():
             d = self
         else:
-            d = local_path.cache.dataset.remote
+            d = local_path.parent.cache.dataset.remote
 
         # can't filter by filename because it misses on silent rename
         cands = [f for f in d.bfobject._packages(latest_only=True)
                  if hasattr(f, 'filename') and
-                 f.filename == local_path.name and
+                 #f.filename == local_path.name and  # renaming is hard
                  f.checksum == checksum.hex()]
 
         # and f.filename == local_path.name and f.checksum == checksum
