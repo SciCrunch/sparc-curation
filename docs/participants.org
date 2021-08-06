@@ -22,6 +22,9 @@
     - Populations are collective participants that are opaque to their
       individual members but still have relations to generated data
       and sample/specimen derivation chains. [fn:nomen]
+    - Populations can have identified members and are useful for
+      reporting aggregate statistics or as a fallback when the exact
+      relations between specimens are unknown or unreported.
     - Members of a =population= should have the same =specimen type=,
       though this is somewhat dependent on what aspects were being
       measured. For example if the only aspect of interest is the mass
