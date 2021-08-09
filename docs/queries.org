@@ -13,7 +13,7 @@
 
 #+latex_header: \usepackage[inkscapelatex=false]{svg}
 
-:properties:
+#+begin: properties
 #+property: header-args :eval no-export
 
 # header-args:sparql :url http://localhost:10035/repositories/test
@@ -22,11 +22,14 @@
 #+property: header-args:sparql+ :results table
 #+property: header-args:sparql+ :exports both
 #+property: header-args:sparql+ :var limit="10"
+# TODO figure out how to allow missing limit to not set epilogue, likely requires modifications to core
+# XXX of course that would require epilogue to actually be implemented :/
+# #+property: header-args:sparql+ :epilogue "LIMIT ?limit"
 
 #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
-:end:
+#+end:
 
-:prefixes:
+#+begin: prefixes
 # TODO consider a setup file for these maybe?
 # or populate additional local curies via orgstrap
 # FIXME doi collides which is bad
@@ -78,16 +81,94 @@
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
-:end:
+#+end:
 
 * Tutorial :noexport:
-For an overview of the SPARC Knowledge Graph see the [[*Introduction][Introduction]].
+For an overview of the SPARC Knowledge Graph see the [[#introduction][Introduction]].
 Copy from the protc tutorial.
 * Introduction
+:PROPERTIES:
+:CUSTOM_ID:  introduction
+:END:
 The SPARC Knowledge Graph ...
+** SPARC Content
 1. SPARC dataset metadata graph
+   1. Datasets
+      1. Publicly released datasets, including those under embargo.
+         (doi must resolve).
+   2. Protocols
+      1. Hypothesis Annotations
+      2. Processed Hypothesis annotations
+      3. SPARC Protocols on Protocols.io
 2. connectivity knowledge base
+   1. ApiNATOMY
+      1. Introduction
+      2. models
+         1. bolser-lewis
+         2. keast-bladder
+         3. bronchomotor
+         4. ard-arm-cardiac
+         5. sawg-distal-colon
+         6. +sawg-stomach+
+   2. NPO
+      1. Introduction
+      2. evidence based modesl
+         1. nerves.ttl
+      3. NPO stubs
 3. ontology (SciGraph can have everything, blazegraph may be not the whole ontolgy)
+   1. NIF-Ontology+
+
+collateral versus difference populations
+** Ontology content
+What ontologies are part of this release?
+NIF-Ontology @@comment: link to a more detailed description@@
+The NIF-Ontology imports Uberon, Human Disease Ontology DOID, PR, and subsets of ChEBI, NCBITaxon, NCBIGene
+In addition we import. The MONDO Disease Ontology, the Human Phenotype Ontology, Foundationaly Model of Anatomy, and CL.
+
+The two releases have slightly different ontology content due to their
+different use cases.
+
+1. SciGraph
+   Everything.
+2. Blazegraph
+   Not quite everything. TODO
+   Only the subset that is used in the SPARC content or connectivity portions of the Knowledge Base.
+
+** Compiled content
+In order to create an accessible version of the Knowledge Base that
+can be queried we convert and enrich the SPARC Content by loading it
+into both a property graph (Neo4j) and also into an triple store
+(Blazegraph), and by augmenting it with the NIF-Ontology which pulls
+in a number of community ontologies.
+
+SPARC Content + NIF-Ontology + Community ontologies
+
+Why do we have two representations?
+
+There are two representations becuase we have found that they serve
+different use case.  The triplestore is useful for executing basic
+comptency queries over the dataset releases, but there are not
+existing APIs that are straight forward for devopers to consume. On
+the other hand, SciGraph provides a developer friendly REST API that
+is much easier to use in production systems.
+
+Both of these databases are available in the docker image we provide
+since they are needed to run the queries in this file.  You can
+download the compiled versions of each database seprately as well.
+*** SciGraph zipped Neo4j database.
+*** Blazegraph journal file.
+** How run and query the database
+*** Here's what you can do
+In addition to the underlying raw data, we also provide two
+representations of the knowldge base that can be queried directly
+using the SPARQL or Cypher query languages.
+
+RDF / Blazegraph / SPARQL
+Property Graph / SciGraph / Cypher
+*** Here's what you have to do first
+We provide these as docker images ...
+*** Here are the compiled files
+
 * for kg release :noexport:
 ** TODO instructions for kg
 need to include instructions for increasing the limit and return a csv
