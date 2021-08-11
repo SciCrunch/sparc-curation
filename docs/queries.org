@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 52df79a9ed33a33f4dc972469b41d2eeacddfe8f1e8e04967f1987f40ea7980e; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 260778d236c206bec71c36803f38e3159c2c1112fee2a6a376cde1dbde4cf502; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 
 # [[file:queries.pdf]]
@@ -2554,8 +2554,7 @@ First pass NLP output
        (jupyter . t))))))
 
 (unless (featurep 'ob-cypher-scigraph)
-  (reval 'sha256 'cd08900d69b159b724860869ab8bc4d31b6eaf5efa5d351331e12ae29dcb1d42
-         "https://raw.githubusercontent.com/tgbugs/ob-cypher/881edb3af9226675760897e08fc4c16eb888be08/ob-cypher.el")
+  (reval 'sha256 '5ff499f4db30ebbe57979041a229d7da224ab1396a266caebae2a750b4ace310 "https://raw.githubusercontent.com/tgbugs/ob-cypher/03f8cff2a6a7a12e706a3e11db081d241a85e66/ob-cypher.el")
   (provide 'ob-cypher-scigraph))
 #+end_src
 
