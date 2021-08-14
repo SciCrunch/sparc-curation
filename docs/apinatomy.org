@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 150ebc3b0d2c2e42ede070a6d47f4b3328c7e8462fcd0abed8fd4861dcfa71f0; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: cbf50ae5be0ecc8a1f980756ecde8143f1d509a9912997f7f1aef27c88a4e193; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -10,32 +10,19 @@
 # [[file:./apinatomy.pdf]]
 # [[file:./apinatomy.html]]
 
-# This block works like a super powered shebang line :D! It is used to
-# pass the correct arguments to emacs in order to run this file.
-#+name: orgstrap-shebang-block
-#+begin_src bash :exports none :eval never :results none
-function = () { :; }
-function silentlycontinue () { :; }
-
+#+name: orgstrap-shebang
+#+begin_src bash :eval never :results none :exports none
+{ __p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > ${null="/dev/null"}
+$file= $MyInvocation.MyCommand.Source
 $ErrorActionPreference= "silentlycontinue"
-null="/dev/stdout"
-__FILE="${0}"
-__PARGS=${@}
-function posix () {
-    test $ZSH_VERSION && { setopt shwordsplit; _IFS=$IFS; unset IFS; } || true
-    emacs --quick --batch --load ~/git/orgstrap/orgstrap-batch-helper.el --visit "${__FILE}" -- ${__PARGS}
-    test $ZSH_VERSION && { unsetopt shwordsplit; IFS=$_IFS; } || true
-}
-"posix" > $null
-"exit" > $null
+file=$0
+args=$@
 $ErrorActionPreference= "Continue"
-
-$org=(Get-Item $MyInvocation.MyCommand.Source).Target
-emacs --quick --batch --load ~/git/orgstrap/orgstrap-batch-helper.el --visit $org -- $args
+{ PATH=$__op;rm ${__p}/=;rmdir ${__p};} > $null
+emacs -batch -no-site-file -eval "(let (vc-follow-symlinks) (defun orgstrap--confirm-eval (l _) (not (memq (intern l) '(elisp emacs-lisp)))) (let ((file (pop argv))) (find-file-literally file)) (let ((enable-local-eval t) (enable-local-variables :all) (major-mode 'org-mode)) (require 'org) (org-set-regexps-and-options) (hack-local-variables)))" "${file}" -- $args
 exit
-<# open powershell comment
+<# powershell open
 #+end_src
-# FIXME $org is a temporary hack until I can work out what is going on with `vc-mode'
 
 * Using this file :noexport:
 This is an executable org file! Here is an example of how to use it to build an apinatomy model.
@@ -92,20 +79,14 @@ For the time being (until a bit more machinery is in place for
 orthauth style configuration in elisp) you can put the path to
 =secrets.sxpr= in =orgstrap-batch-helper.el= with the following
 expression =(setq oa-secrets "/path/to/secrets.sxpr")=.
+#+name: &aba
 #+begin_src bash :noweb no :tangle ../bin/apinat-functions.sh :mkdirp yes
-function apinat-build () {
-    # add this line if you need to get a traceback on error
-    # --funcall toggle-debug-on-error \
-    emacs --quick --batch \
-    --load ~/git/orgstrap/orgstrap-batch-helper.el \
-    --visit ~/git/sparc-curation/docs/apinatomy.org \
-    -- ${@}
-}
-
 function apinat-build-all () {
-    export -f apinat-build
     pushd ~/git/apinatomy-models
-    ls -d *{-,bron}* | \
+    pushd models
+    local ids=$(ls -d *)
+    popd
+    echo $ids | \
     xargs -P10 -r -I {} \
         bash -c 'apinat-build --repo $(pwd) --model-id ${@}'" ${@}" _ {}
 
@@ -170,7 +151,9 @@ gsx:google-sheet-id
 
 (defmacro apinat--with-model (model-id &rest body)
   (declare (indent defun))
-  `(let ((default-directory (expand-file-name (symbol-name ,model-id) apinat-model-repo))
+  `(let ((default-directory (expand-file-name
+                             (symbol-name ,model-id)
+                             (expand-file-name "models" apinat-model-repo)))
          (xlsx    (format "source/%s.xlsx"    model-id))
          (json    (format "source/%s.json"    model-id))
          (jsonld  (format "derived/%s.jsonld" model-id))
@@ -196,11 +179,11 @@ gsx:google-sheet-id
     ;;(funcall (out-or      #'-xj->)  xlsx       json) ; source/{model-id}.xlsx source/{model-id}.json
     ;;(funcall (out-or      #'-jl->)  json     jsonld) ; source/{model-id}.json derived/{model-id}.jsonld
     (funcall (out-or      #'-lt->)  jsonld      ttl) ; derived/{model-id}.jsonld derived/{model-id}.ttl
-                      )
+    )
 
   (apinat--with-model model-id
-                      (-mxjl-> model-id xlsx json jsonld)
-                      (-lt-> jsonld ttl)))
+    (-mxjl-> model-id xlsx json jsonld)
+    (-lt-> jsonld ttl)))
 
 (defun-local checksum-or (fun)
   (lambda (thing path-out)
@@ -265,11 +248,11 @@ gsx:google-sheet-id
 
 (defun-local -m-lt-> (model-id)
   (apinat--with-model model-id
-                      (funcall (out-or #'-lt->) jsonld ttl)))
+    (funcall (out-or #'-lt->) jsonld ttl)))
 
 (defun-local -m-x-> (model-id)
   (apinat--with-model model-id
-                      (-mx-> model-id xlsx)))
+    (-mx-> model-id xlsx)))
 
 (defun-local -ms-> (model-id)
   (oa-path :google :sheets (if (keywordp model-id)
@@ -344,7 +327,7 @@ gsx:google-sheet-id
 
 (defun-local all-models ()
   ;;(let ((default-directory (git-share-local r-apin-mod:HEAD:)) ; TODO ))
-  (let ((default-directory (expand-file-name apinat-model-repo)))
+  (let ((default-directory (expand-file-name "models" apinat-model-repo)))
     ;; you could use something like model-repository but then you have to make
     ;; a bunch of concatentations, better just to switch the default directory
     ;; so that the context deals with alignment between name and local referent
@@ -371,6 +354,27 @@ gsx:google-sheet-id
   (update-models (if skip-recent
                      (filter-recent-models (mapcar #'intern (all-models)))
                    (mapcar #'intern (all-models)))))
+
+(defvar-local apinat-process-results nil)
+
+(defun sentinel (process message)
+  (when (memq (process-status process) '(exit signal))
+    (message "completed: %S" process)
+    (setq apinat-process-results
+          (cons (list (process-exit-status process)
+                      (with-current-buffer (process-buffer process)
+                        (buffer-string)))
+                apinat-process-results))))
+
+(defun-local update-all-models-async ()
+  (let ((model-ids (all-models)))
+    (message "updating all models %s" model-ids)
+    (dolist (model-id model-ids)
+      ;; FIXME TODO wait for all processes to finish or something
+      (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets))
+    (while (< (length apinat-process-results) (length model-ids))
+      (sleep-for 5)
+      (message "complete: %s/%s" (length apinat-process-results) (length model-ids)))))
 #+end_src
 
 #+begin_src elisp
@@ -677,25 +681,22 @@ obj:   {n_pair}''')
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'c8ecf1b7cd8822b75a30f98dc05ec0e5355b224557527edd363af9545dd11d15
-           "~/git/orgstrap/ow.el"
-           (concat ghost "b7618727eee4c0d74c0e7271e3b8d36f3432a247" "/ow.el"))))
+    (reval 'sha256 '9683db93bf95cf2c82e7788e9cf26a594e76b19399d7f3d5524900aed5738471
+           (concat ghost "a2451655831f09f28301b1e9b4bc74eec5be2d28" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package
   (defalias 'run-command #'ow-run-command))
+
+;; (ow-enable-use-package)
+
+;; (ow-use-packages docopt)
 
 ;; local function definitions
 
 <<flow-to-ttl>>
 
 <<all-ttl-models>>
-
-<<temp-parse-args>>
-
-(unless (fboundp #'oa-path)
-  <<temp-orthauth>>
-  )
 
 (defun apinat---pre-tangle () ; (ref:sure)
   ;; FIXME hardcoded paths issues
@@ -707,13 +708,18 @@ obj:   {n_pair}''')
 ;; entry point for batch command line
 
 (ow-cli-gen
-    ((:model-id nil) ; the id of the model to build
+    ((:install)
+     (:all)
+     (:model-id nil) ; the id of the model to build
      ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
      ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
      ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
      ((:debug) apinat-converter-debug)) ; enable debug mode
-  (message "updating %s" model-id)
-  (update-models (list (intern model-id))))
+  (when (or all model-id)
+    (message "updating %s" (or model-id "all"))
+    (if all
+        (update-all-models-async)
+      (update-models (list (intern model-id))))))
 #+end_src
 
 [[(sure)]] Ensure that the
@@ -723,5 +729,5 @@ block can be nowebbed for tangling.
 ** Local Variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable) (let ((ocbe org-confirm-babel-evaluate)) (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (unwind-protect (save-excursion (org-babel-goto-named-src-block "orgstrap") (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility)) (warn "No orgstrap block."))))
 # End:
