@@ -1003,6 +1003,24 @@ tar --force-local --xattrs -xvzf 2019-07-17T10\:44\:16\,457344.tar.gz
 #+begin_src bash
 find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
+*** Archiving releases
+#+begin_src bash
+pushd /path/to/backup
+rsync -z -v -r -e ssh cassava:/var/www/sparc sparc-$(date -I)
+#+end_src
+
+#+begin_src bash
+pushd /path/to/backup
+pushd sparc-*/sparc/archive/exports
+find -maxdepth 1 -not -path '.' -type d -exec tar -cvJf '{}.tar.xz' '{}' \;
+find -maxdepth 1 -not -path '.' -type d -exec rm -r '{}' \;
+popd
+pushd sparc-*/sparc/preview/archive/exports
+find -maxdepth 1 -not -path '.' -type d -exec tar -cvJf '{}.tar.xz' '{}' \;
+find -maxdepth 1 -not -path '.' -type d -exec rm -r '{}' \;
+popd
+#+end_src
+
 *** Other random commands
 **** Duplicate top level and ./.operations/objects
 :PROPERTIES:
