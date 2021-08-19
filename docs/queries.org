@@ -83,9 +83,27 @@
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
 #+end:
 
+#+name: orgstrap-shebang
+#+begin_src bash :eval never :results none :exports none
+{ __p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > ${null="/dev/null"}
+$file= $MyInvocation.MyCommand.Source
+$ErrorActionPreference= "silentlycontinue"
+file=$0
+args=$@
+$ErrorActionPreference= "Continue"
+{ PATH=$__op;rm ${__p}/=;rmdir ${__p};} > $null
+emacs -batch -no-site-file -eval "(let (vc-follow-symlinks) (defun orgstrap--confirm-eval (l _) (not (memq (intern l) '(elisp emacs-lisp)))) (let ((file (pop argv)) enable-local-variables) (find-file-literally file) (end-of-line) (when (eq (char-before) ?\^m) (let ((coding-system-for-read 'utf-8)) (revert-buffer nil t t)))) (let ((enable-local-eval t) (enable-local-variables :all) (major-mode 'org-mode)) (require 'org) (org-set-regexps-and-options) (hack-local-variables)))" "${file}" -- $args
+exit
+<# powershell open
+#+end_src
+
 * Tutorial :noexport:
 For an overview of the SPARC Knowledge Graph see the [[#introduction][Introduction]].
 Copy from the protc tutorial.
+
+#+begin_src bash
+emacs -eval '(progn (url-copy-file "https://raw.githubusercontent.com/SciCrunch/sparc-curation/master/docs/queries.org" "~/queries.org" t) (find-file "~/queries.org"))'
+#+end_src
 * Introduction
 :PROPERTIES:
 :CUSTOM_ID:  introduction
@@ -1565,9 +1583,86 @@ WHERE {
 LIMIT ?limit
 #+end_src
 ** Subject reconciliation
+first pass requires that the subject_id be identical
+*** v2
+#+name: pds-v2-count
+#+begin_src sparql :noweb no-export
+SELECT (count(*) as ?count) {
+  <<pds-v2>>
+}
+#+end_src
+
+#+RESULTS: pds-v2-count
+| count |
+|-------|
+|   608 |
+
+#+name: pds-v2
+#+begin_src sparql :epilogue "\nLIMIT ?limit\n" :var limit="9"
+SELECT DISTINCT ?s ?dataset (str(?id) as ?local_id) ?award ?species
+WHERE {
+
+  ?s a sparc:Subject;
+     TEMP:localId ?id;
+     TEMP:hasDerivedInformationAsParticipant ?dataset ;
+     sparc:animalSubjectIsOfSpecies ?species .
+  ?dataset a sparc:Dataset ;
+           TEMP:hasAwardNumber ?award .
+
+ { SELECT DISTINCT ?id
+    WHERE {
+	  ?s a sparc:Subject ;
+	      TEMP:localId ?id ;
+	      TEMP:hasDerivedInformationAsParticipant ?dataset .
+    } GROUP BY ?id HAVING (count(?id) > 1) }
+
+}
+ORDER BY ?id
+#+end_src
+
+# #+header: :results drawer output
+#+header: :epilogue "return table" :results value table
+#+header: :var by_id=(identity t)
+#+name: pds-v2-python
+#+begin_src python :var data=pds-v2(limit="99999") :exports results
+import sys
+from pprint import pprint
+from collections import Counter
+counts = Counter([(id, species, award) for _, _, id, species, award in data])
+#print(len([c for c in counts.values() if c > 1]))
+#pprint(counts)
+multi = [row for row in data if counts[tuple(row[2:])] > 1]
+
+for index in (0, 1, 3, 4):
+    for row in multi:
+        try:
+            row[index] = OntId(row[index]).curie  # shorten iris
+        except Exception as e:
+            sys.stderr.write(f'not a curie! {row[index]}')  # FIXME how to stderr
+
+hardcoded_header =  [
+    f'individuals (n={len(multi)})',
+    'dataset',
+    f'id (n={len(set([r[2] for r in multi]))})',
+    'awards',
+    'species']
+
+key_id = lambda row:(row[2], row[3], row[4], row[1])
+key_award_species_dataset_id = lambda row:(row[3], row[1], row[2], row[4])
+table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in multi))#, key=(key_id if by_id else key_award_species_dataset_id))
+#+end_src
+
+#+begin_src elisp :results none :exports none
+(let ((org-table-convert-region-max-lines most-positive-fixnum))
+  (ow-babel-eval "pds-v2-python"))
+#+end_src
+
+#+RESULTS: pds-v2-python
+
+*** v1
 # #+header: :cache yes
 #+name: potential-duplicate-subjects
-#+begin_src sparql
+#+begin_src sparql :cache yes
 # :results table
 # RUN:block
 SELECT distinct ?s1 ?s2 ?id ?dataset1 ?dataset2 ?species1 ?species2 ?award1 ?award2
@@ -1594,8 +1689,9 @@ WHERE {
   TEMP:hasDerivedInformationAsParticipant ?dataset2 .
   filter(?s1 != ?s2)
   filter(STR(IRI(?s1)) < STR(IRI(?s2))) # this is a hack to filter out duplicate triples
-  filter(?species1 != ?species2)
-  filter(STR(IRI(?species1)) < STR(IRI(?species2))) # hack to filter dupe triples
+
+  #filter(?species1 != ?species2)
+  #filter(STR(IRI(?species1)) < STR(IRI(?species2))) # hack to filter dupe triples
 
   # filter to find non-matching awards
   # using contact person doesn't make sense as they are 1:1 with award right now
@@ -1603,21 +1699,26 @@ WHERE {
   TEMP:hasAwardNumber ?award1 .
   ?dataset2 a owl:NamedIndividual ;
   TEMP:hasAwardNumber ?award2 .
-  filter(?dataset1 != ?dataset2)
-  filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2))) # hack to filter dupe triples
-  filter(?award1 != ?award2)
-  filter(STR(IRI(?award1)) < STR(IRI(?award2))) # hack to filter dupe triples
+  # ?id ?award ?species  # there needs to be more than one match so, not unique
 
-} order by ?id limit 1000
+  #filter(?dataset1 != ?dataset2)
+  #filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2))) # hack to filter dupe triples
+
+  #filter(?award1 != ?award2)
+  #filter(STR(IRI(?award1)) < STR(IRI(?award2))) # hack to filter dupe triples
+
+} order by ?id limit ?limit
 #+end_src
 
 # *[[RUN:][Run Query ▶]]*
 # #+header: :results drawer output
 #+header: :epilogue "return result"
 #+name: process-duplicate-subjects
-#+begin_src python :var data=potential-duplicate-subjects() :exports results
-from collections import defaultdict, OrderedDict
+#+begin_src python :var data=potential-duplicate-subjects(limit="99999") :exports results
+from pprint import pprint
+import sys
 import itertools
+from collections import defaultdict, OrderedDict, Counter
 from sparcur.core import OntId
 
 def func(data):
@@ -1645,10 +1746,17 @@ def func(data):
             values = [subj] + values if colname == 'cluster' else values
             padding = padding_max - len(values) if len(values) < padding_max else 0
             columns[colname] += values # + ['-'] * padding + ['']
-    thing = [list(_) for _ in itertools.zip_longest(*[columns[k] for k in header])]
+    __thing = [list(_) for _ in itertools.zip_longest(*[columns[k] for k in header])]
+    _thing = sorted(list(_) for _ in set(tuple(_) for _ in __thing))
+    counts = Counter([(id, species, award) for _, id, _, species, award in _thing])
+    thing = [row for row in _thing if counts[tuple(row[x] for x in [1, 3, 4])] > 1]  # remove unique rows since there is no chance they will match
     for index in (0, 2, 3, 4):
         for row in thing:
-            row[index] = OntId(row[index]).curie  # shorten iris
+            try:
+                row[index] = OntId(row[index]).curie  # shorten iris
+            except Exception as e:
+                sys.stderr.write(f'not a curie! {row[index]}')  # FIXME how to stderr
+
     hardcoded_header =  [f'individuals (n={len(thing)})',
                          f'id (n={len(set([r[1] for r in thing]))})',
                          'datasets', 'species', 'awards']
@@ -1660,68 +1768,6 @@ result = func(data)
 #+end_src
 
 #+RESULTS: process-duplicate-subjects
-| individuals (n=94)                                           | id (n=10) | datasets                                     | species         | awards             |
-|--------------------------------------------------------------+-----------+----------------------------------------------+-----------------+--------------------|
-| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-1  | sub-1     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
-| dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b/subjects/sub-1  | sub-1     | dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | NCBITaxon:10116 | awards:OT2OD024912 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-10 | sub-10    | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-10 | sub-10    | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-10 | sub-10    | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10 | sub-10    | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-10 | sub-10    | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-10 | sub-10    | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-11 | sub-11    | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-11 | sub-11    | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-11 | sub-11    | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-11 | sub-11    | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-11 | sub-11    | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-11 | sub-11    | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-12 | sub-12    | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-12 | sub-12    | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-12 | sub-12    | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-12 | sub-12    | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-12 | sub-12    | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-12 | sub-12    | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-4  | sub-4     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-4  | sub-4     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-4  | sub-4     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-4  | sub-4     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-4  | sub-4     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-5  | sub-5     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
-| dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb/subjects/sub-5  | sub-5     | dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb | NCBITaxon:10116 | awards:OT2OD025340 |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-5  | sub-5     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-5  | sub-5     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-5  | sub-5     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-5  | sub-5     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-5  | sub-5     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-5  | sub-5     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:64c64ed8-31b1-4011-80b6-21a873e8c807/subjects/sub-6  | sub-6     | dataset:64c64ed8-31b1-4011-80b6-21a873e8c807 | NCBITaxon:10090 | awards:OT2OD024909 |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-6  | sub-6     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-6  | sub-6     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-6  | sub-6     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-6  | sub-6     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-6  | sub-6     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-6  | sub-6     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-7  | sub-7     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-7  | sub-7     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-7  | sub-7     | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-7  | sub-7     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-7  | sub-7     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-7  | sub-7     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-8  | sub-8     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-8  | sub-8     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-8  | sub-8     | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-8  | sub-8     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-8  | sub-8     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-8  | sub-8     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-8  | sub-8     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef/subjects/sub-9  | sub-9     | dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606  | awards:OT2OD024899 |
-| dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203/subjects/sub-9  | sub-9     | dataset:02d6f93c-56cd-471b-bbb9-99f65f47d203 | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:60739e5f-5210-4d04-935d-9f2645b3977f/subjects/sub-9  | sub-9     | dataset:60739e5f-5210-4d04-935d-9f2645b3977f | NCBITaxon:9615  | awards:OT2OD025308 |
-| dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb/subjects/sub-9  | sub-9     | dataset:3951ecbd-e20f-4650-8385-1b45f4a9b7fb | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-9  | sub-9     | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:92f31530-41e6-4844-8ed8-6d1d534254f5/subjects/sub-9  | sub-9     | dataset:92f31530-41e6-4844-8ed8-6d1d534254f5 | NCBITaxon:9825  | awards:OT2OD025340 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14/subjects/sub-9  | sub-9     | dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | NCBITaxon:9825  | awards:OT2OD025340 |
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
@@ -2104,13 +2150,38 @@ return a, b, c, d, null AS e, null AS path
 [[file:./images/neru-1.svg]]
 
 *** neru model populations
-Given an ApiNATOMY model id return the identifiers for the neuron populations that are present in the model.
+Given an ApiNATOMY model id return the identifiers for the neuron
+populations that are present in the model.
 #+header: :var model_id="https://apinatomy.org/uris/models/keast-bladder" :limit 99
 #+begin_src cypher
 MATCH (start:Ontology {iri: $model_id})
 <-[:isDefinedBy]-(external:Class)
 -[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"}) // FIXME
 RETURN external
+#+end_src
+
+*** neru model populations and references
+Given an ApiNATOMY model id return the identifiers for the neuron
+populations that are present in the model and the identifiers for
+references that provide supporting evidence.
+#+header: :var model_id="https://apinatomy.org/uris/models/keast-bladder" :limit 99
+#+begin_src cypher
+MATCH (start:Ontology {iri: $model_id})
+<-[:isDefinedBy]-(external:Class)
+-[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"}) // FIXME
+WITH external
+MATCH (external)
+-[e:type]->()
+RETURN e
+UNION
+MATCH (start:Ontology {iri: $model_id})
+<-[:isDefinedBy]-(graph:NamedIndividual)
+-[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"}) // elements don't have a superclass right now
+WITH graph
+MATCH (graph)
+-[:apinatomy:publications]->(pub)
+-[e:type]-()
+RETURN e
 #+end_src
 
 *** neru projects to
@@ -2173,6 +2244,7 @@ RETURN e, neupop, neugrp
 [[file:./images/neru-axons.svg]]
 
 *** neru populations dendriting to
+Given an anatomical region return a list of neuron types that have dendrite terminals in that region.
 #+header: :limit 999999 :file ./images/neru-dendrites-bag.svg :results file :exports both
 #+header: :var region_id="UBERON:0001989" :note vagus nerve
 #+header: :var type_id="SAO:420754792" :note regional part of dendrite
@@ -2298,6 +2370,76 @@ function path-metadata-coverage () {
 }
 #+end_src
 * Use cases
+** Connectivity dashboard
+*** organs
+:PROPERTIES:
+:CREATED:  [2021-08-06 Fri 13:10]
+:END:
+# FIXME looking for the ya' or ya" evil commands, I know I've used them before
+# reval maybe? nope `url-unhex-string-at-point' `evil-inner-double-quote'
+# "with escape \" yeah? "
+# org doesn't have strings but evil works
+#+begin_src ttl
+@prefix l: <http://www.w3.org/2000/01/rdf-schema#label> .
+@prefix e: <http://uri.interlex.org/tgbugs/uris/readable/hasExistingId> .
+@prefix FMA: <http://purl.org/sig/ont/fma/fma> .
+@prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
+
+# tissue
+UBERON:0001013 l: "adipose tissue"; e: FMA:20110 .
+
+# nerves
+# cranial (strict)
+UBERON:0001646 l: "abducens nerve"; e: FMA:50867 .
+UBERON:0001647 l: "facial nerve"; e: FMA:50868 .
+UBERON:0001649 l: "glossopharyngeal nerve"; e: FMA:50870 .
+UBERON:0001650 l: "hypoglossal nerve"; e: FMA:50871 .
+UBERON:0001643 l: "oculomotor nerve"; e: FMA:50864 .
+UBERON:0001579 l: "olfactory nerve"; e: FMA:46787 .
+UBERON:0001645 l: "trigeminal nerve"; e: FMA:50866 .
+UBERON:0001644 l: "trochlear nerve"; e: FMA:50865 .
+UBERON:0001759 l: "vagus nerve"; e: FMA:5731 .
+UBERON:0003723 l: "vestibulocochlear nerve"; e: FMA:50869 .
+
+# other
+"pudendal nerve"
+"thoracic splanchnic nerve"
+"sciatic nerve"
+UBERON:0002019 l: "accessory XI nerve"; e: FMA:6720 .
+
+# ganglia
+UBERON:0001805 l: "autonomic ganglion"; e: FMA:5889 .
+
+# regions
+UBERON:0002298 l: "brainstem"; e: FMA:79876 .
+UBERON:0001016 l: "nervous system"; e: FMA:7157 .
+UBERON:0000010 l: "peripheral nervous system"; e: FMA:9903 .
+UBERON:0000013 l: "sympathetic nervous system"; e: FMA:9906 .
+
+# organs
+UBERON:0000955 l: "brain"; e: FMA:50801 .
+UBERON:0001155 l: "colon"; e: FMA:14543 .
+UBERON:0002110 l: "gallbladder"; e: FMA:7202 .
+UBERON:0000948 l: "heart"; e: FMA:7088 .
+UBERON:0000160 l: "intestine"; e: FMA:7199 .
+UBERON:0002113 l: "kidney"; e: FMA:7203 .
+UBERON:0000059 l: "large intestine"; e: FMA:7201 .
+UBERON:0002107 l: "liver"; e: FMA:7197 .
+UBERON:0001556 l: "lower urinary tract"; e: FMA:45659 .
+UBERON:0002048 l: "lung"; e: FMA:68877 .
+UBERON:0001630 l: "muscle organ"; FMA:5022 .
+UBERON:0001264 l: "pancreas"; e: FMA:7198 .
+UBERON:0002097 l: "skin of body"; e: FMA:7163 .
+UBERON:0002108 l: "small intestine"; e: FMA:7200 .
+UBERON:0002240 l: "spinal cord"; e: FMA:7647 .
+UBERON:0002106 l: "spleen"; e: FMA:7196 .
+UBERON:0000945 l: "stomach"; e: FMA:7148 .
+UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
+#+end_src
+*** nerves
+
+*** neuron population by organ
+*** neuron population by nerve
 ** ApiNATOMY
 *** Summary statistics
 **** Dashboard
@@ -2559,7 +2701,7 @@ First pass NLP output
 #+end_src
 
 ** Local Variables :ARCHIVE:
-
+# close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable) (let ((ocbe org-confirm-babel-evaluate)) (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (unwind-protect (save-excursion (org-babel-goto-named-src-block "orgstrap") (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility)) (warn "No orgstrap block."))))
 # End:
