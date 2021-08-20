@@ -2650,26 +2650,23 @@ RETURN phenotype
 #+header: :var start-id=(identity nil)
 #+name: cyres-apinat-bundles-start-id
 #+begin_src cypher
-MATCH path1 = (start:Class{iri: '${start-id}'})
+MATCH path1 = (start:Class{iri: "${start-id}"})
 -[:apinatomy:annotates]->(start_housing)
 -[:apinatomy:subtypes*0..1]->()
 -[:apinatomy:clones*0..1]->(layer_or_end)
 -[:apinatomy:layers*0..1]->()
--[:apinatomy:bundles]->(link)
--[:apinatomy:source|apinatomy:prevChainEndLevels|apinatomy:prev*1..]->(nodeRoot)
+-[:apinatomy:bundles]->(linkStart)
+-[:apinatomy:prevChainEndLevels|apinatomy:prev|apinatomy:source*1..]->(link)
 -[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
 -[:apinatomy:conveyingLyph]->()
 -[:apinatomy:supertype*0..1]->(soma:NamedIndividual)
 -[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
-RETURN path1
-UNION
-MATCH path1 = (start:Class{iri: '${start-id}'})
--[:apinatomy:bundles]->(link)
--[:apinatomy:source|apinatomy:prevChainEndLevels|apinatomy:prev*1..]->(nodeRoot)
--[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
--[:apinatomy:conveyingLyph]->(soma:NamedIndividual)
--[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
-RETURN path1
+WITH path1, link
+OPTIONAL MATCH path2 = (link)
+-[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:layerIn*0..1]->(end)
+-[:apinatomy:external]->(external)
+RETURN path1, path2
 #+end_src
 **** old-bundles/{start-id}
 #+header: :var start-id=(identity nil)
