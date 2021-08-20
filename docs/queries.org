@@ -2698,6 +2698,9 @@ MATCH (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:annotates]->(soma:NamedIndividual)
 RETURN soma
 #+end_src
+
+#+call: cyres-apinat-somas() :limit 9999
+
 **** housing-lyphs
 #+name: cyres-apinat-housing-lyphs
 #+begin_src cypher
@@ -3131,6 +3134,60 @@ cypherResources:
       <<cypher-neru-3>>
 
 #+end_src
+* ApiNATOMY competency queries
+** expected counts per model
+Expected number of somas and neupops.
+| model-id      | somas | neupops |
+|---------------+-------+---------|
+| keast-bladder |    30 |      20 |
+| bolew         |       |         |
+
+*** somas
+somas >= neupops
+
+*** populations
+
+*** neuron part per region per model
+| model-id      | diag abbrev | external | somas | axons | axon term | dend | dend term |
+|---------------+-------------+----------+-------+-------+-----------+------+-----------|
+| bolser-lewis  | SCG         |          |    17 |       |           |      |           |
+| keast-bladder |             |          |       |       |           |      |           |
+|               |             |          |       |       |           |      |           |
+
+** expected locations
+use NPO as a top down constraint on the locations of somas etc.
+*** somas
+could do this by population or generically
+*** population process location
+soma-processes
+can also be checked using NPO but not needed for simple cases
+| model-id     | neupop | diag abbrev | external |
+|--------------+--------+-------------+----------|
+| bolser-lewis | q      | PN          |          |
+| bolser-lewis | q      | C4          |          |
+| bolser-lewis | q      | PHRNIC      |          |
+| bolser-lewis | q      | DIAPHRAGM   |          |
+*** location process populations
+bundles
+NPO here as well
+| model-id     | diag abbrev | external | neupop  |
+|--------------+-------------+----------+---------|
+| bolser-lewis | VAGUS       |          | 9 total |
+
+** cross model
+*** expect populations from models to have processes in common location
+| external | diag abbrev  | model-id          | neupop      |
+|----------+--------------+-------------------+-------------|
+|          | T1           | bolser-lewis      | x y         |
+|          | T1           | keast-bladder     | 20          |
+|          | DIENC        | bolser-lewis      | z           |
+|          | Diencephalon | keast-bladder     | 15 16 17 18 |
+|          | IMG          | keast-bladder     | 3 6 7 11    |
+|          | IMG          | sawg-distal-colon | D H G F B Q |
+|          | LumSplN      | keast-bladder     | 6 7 11      |
+|          | LumSplN      | sawg-distal-colon | B           |
+*** visualize all populations that have some process in the IMG
+Images of nerus that have some process in the IMG, from =keast-bladder= and =sawg-distal-colon=.
 
 * Sanity checks
 Other queries run against various representations of the data.
@@ -3282,6 +3339,7 @@ UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
 | neupops         |    49 |
 | neupops pattern |    49 |
 
+# TODO links to a way to view the terms per ontology if possible
 #+RESULTS: sparql-apinat-prefixes
 | prefix    | count |
 |-----------+-------|
@@ -3356,6 +3414,14 @@ select
 <<apinat-model-summary-where>>
 #+end_src
 
+# TODO add the presence of the schematic svg and pdf to the dashboard
+# so we need to ingest the state of the repo during export
+# TODO dois for the published models
+
+# TODO open the folder in git
+# TODO open a linke to the ttl file
+# TODO open a link to the list of publications -> zenodo record
+
 # have to union over the aggregated group by results and the total
 # separately and then we can get the table to work correctly
 #+name: apinat-model-summary-where
@@ -3392,7 +3458,7 @@ WHERE {
   union
   {
     { select (count(distinct(?graph_)) as ?graph  ) where { ?graph_ a elements:Graph } }
-    bind("TOTAL" as ?label)
+    bind("Total unique" as ?label)
     { select (count(distinct(?o)) as ?lyphs       ) where { ?graph_ apinatomy:lyphs        ?o . } }
     { select (count(distinct(?o)) as ?lyphs_input ) where
       { ?graph_ apinatomy:lyphs ?o .
