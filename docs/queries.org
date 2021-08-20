@@ -1,8 +1,22 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: ce2e93b6a068ab6be3d1d01263d2099f1b80f6f0a8c599bc2ffef23ff342fd5f; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: c19e53db0641a181f656073f2016f76552335fc264c1252d842fae5448bd6d09; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 
 # [[file:queries.pdf]]
 # [[file:queries.html]]
+
+#+name: orgstrap-shebang
+#+begin_src bash :eval never :results none :exports none
+{ __p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > ${null="/dev/null"}
+$file= $MyInvocation.MyCommand.Source
+$ErrorActionPreference= "silentlycontinue"
+file=$0
+args=$@
+$ErrorActionPreference= "Continue"
+{ PATH=$__op;rm ${__p}/=;rmdir ${__p};} > $null
+emacs -batch -no-site-file -eval "(let (vc-follow-symlinks) (defun orgstrap--confirm-eval (l _) (not (memq (intern l) '(elisp emacs-lisp)))) (let ((file (pop argv)) enable-local-variables) (find-file-literally file) (end-of-line) (when (eq (char-before) ?\^m) (let ((coding-system-for-read 'utf-8)) (revert-buffer nil t t)))) (let ((enable-local-eval t) (enable-local-variables :all) (major-mode 'org-mode)) (require 'org) (org-set-regexps-and-options) (hack-local-variables)))" "${file}" -- $args
+exit
+<# powershell open
+#+end_src
 
 #+title: SPARC queries
 
@@ -107,20 +121,6 @@
 #+link: skos http://www.w3.org/2004/02/skos/core#
 #+link: obo http://purl.obolibrary.org/obo/
 #+end:
-
-#+name: orgstrap-shebang
-#+begin_src bash :eval never :results none :exports none
-{ __p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > ${null="/dev/null"}
-$file= $MyInvocation.MyCommand.Source
-$ErrorActionPreference= "silentlycontinue"
-file=$0
-args=$@
-$ErrorActionPreference= "Continue"
-{ PATH=$__op;rm ${__p}/=;rmdir ${__p};} > $null
-emacs -batch -no-site-file -eval "(let (vc-follow-symlinks) (defun orgstrap--confirm-eval (l _) (not (memq (intern l) '(elisp emacs-lisp)))) (let ((file (pop argv)) enable-local-variables) (find-file-literally file) (end-of-line) (when (eq (char-before) ?\^m) (let ((coding-system-for-read 'utf-8)) (revert-buffer nil t t)))) (let ((enable-local-eval t) (enable-local-variables :all) (major-mode 'org-mode)) (require 'org) (org-set-regexps-and-options) (hack-local-variables)))" "${file}" -- $args
-exit
-<# powershell open
-#+end_src
 
 * Tutorial :noexport:
 For an overview of the SPARC Knowledge Graph see the [[#introduction][Introduction]].
@@ -2350,13 +2350,509 @@ WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.
 RETURN e, neupop, neugrp
 #+end_src
 
+** existing
+*** sparc
+:PROPERTIES:
+:header-args:cypher: :scigraph http://localhost:9000/scigraph
+:END:
+**** organParts
+#+name: desc-organ-parts
+Get the parts list for an organ including nerves and blood vessles
+#+header: :var id=(identity nil)
+#+name: cyres-organ-parts
+#+begin_src cypher
+// depth of 6 captures everything, 5 is too shallow, 40 is WAY too deep
+MATCH path = (start:Class{iri: "${id}"})
+<-[:subClassOf|ilxtr:includedForSPARCUnder|fma:regional_part_of|fma:constitutional_part_of|fma:related_part_of*0..6]-(part)
+<-[:fma:arterial_supply_of|fma:nerve_supply_of|fma:venous_drainage_of|fma:continuous_with*0..1]-(sup)
+<-[:subClassOf|fma:constitutional_part_of|fma:branch|fma:tributary|fma:branch_of*0..1]-(a_bit_more)
+RETURN path
+UNION  // for this query UNION seems to be MUCH faster than using WITH
+MATCH path = (start:Class{iri: "${id}"})
+// this one does not need to be inverted ? except for the INCOMING flag
+<-[:fma:arterial_supply_of|fma:venous_drainage_of]-(vessel)
+<-[:fma:branch|fma:tributary]-(more_vessel)
+<-[:fma:branch|fma:tributary|fma:regional_part]-(even_more_vessel)
+RETURN path
+#+end_src
+
+# heart test query
+#+call: cyres-organ-parts(id="FMA:7088", limit=1) :results table
+
+**** parcellationArtifacts
+#+name: cyres-parcellation-artifacts
+#+begin_src cypher
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+#+end_src
+**** parcellationArtifacts/{species-id}
+#+header: :var species-id=(identity nil)
+#+name: cyres-parcellation-artifacts-species-id
+#+begin_src cypher
+MATCH (parent)
+-[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+#+end_src
+**** artifactRoots/{artifact-id}
+#+header: :var artifact-id=(identity nil)
+#+name: cyres-artifact-roots-artifact-id
+#+begin_src cypher
+MATCH path = (root)
+-[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
+-(artifact:Class{iri: "${artifact-id}"})
+RETURN path
+#+end_src
+**** artifactLabels/{artifact-id}
+#+header: :var artifact-id=(identity nil)
+#+name: cyres-artifact-labels-artifact-id
+#+begin_src cypher
+MATCH path = (label)
+-[:subClassOf]->(root)
+-[:ilxtr:isDefinedBy]->(a)<-[:subClassOf*0..2]
+-(artifact:Class{iri: "${artifact-id}"})
+WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+#+end_src
+**** rootLabels/{root-id}
+#+header: :var root-id=(identity nil)
+#+name: cyres-root-labels-root-id
+#+begin_src cypher
+MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
+WITH label
+MATCH path = (label)-[relation*0..1]-(maybe)
+WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
+      AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
+      AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+#+end_src
+**** parcellationRoots
+#+name: cyres-parcellation-roots
+#+begin_src cypher
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+return path
+UNION
+MATCH path = (root)
+-[:ilxtr:isDefinedBy]->(artifact)
+-[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species)
+RETURN path
+#+end_src
+**** parcellationRoots/{species-id}
+#+header: :var species-id=(identity nil)
+#+name: cyres-parcellation-roots-species-id
+#+begin_src cypher
+MATCH (parent)
+-[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+return path
+UNION
+MATCH (parent)
+-[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (root)
+-[:ilxtr:isDefinedBy]->(artifact)
+-[:subClassOf*0..2]->(parent)
+RETURN path
+#+end_src
+**** parcellationRoots/{species-id}/{region-id}
+#+header: :var species-id=(identity nil)
+#+header: :var region-id=(identity nil)
+#+name: cyres-parcellation-roots-species-id-region-id
+#+begin_src cypher
+MATCH
+(region:Class{iri: "${region-id}"})
+<-[:ilxtr:isDefinedInRegion]-
+(parent)
+-[:ilxtr:isDefinedInTaxon]->
+(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+UNION
+MATCH
+(region:Class{iri: "${region-id}"})
+<-[:ilxtr:isDefinedInRegion]-
+(parent)
+-[:ilxtr:isDefinedInTaxon]->
+(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (root)
+-[:ilxtr:isDefinedBy]->(artifact)
+-[:subClassOf*0..2]->(parent)
+RETURN path
+#+end_src
+**** parcellationRootsFMA/{species-id}/{fma-id}
+#+header: :var species-id=(identity nil)
+#+header: :var region-id=(identity nil)
+#+name: cyres-parcellation-roots-fma-species-id-region-id
+#+begin_src cypher
+MATCH (fma:Class{iri: "${fma-id}"})
+WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
+MATCH (region)
+-[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
+WHERE any(x IN
+          region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
+          WHERE x =~ curie)
+WITH region
+MATCH
+(region)
+<-[:ilxtr:isDefinedInRegion]-
+(parent)
+-[:ilxtr:isDefinedInTaxon]->
+(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+UNION
+MATCH (fma:Class{iri: "${fma-id}"})
+WITH "FMA:" + toString(fma.`http://purl.org/sig/ont/fma/FMAID`) AS curie
+MATCH (region)
+-[:subClassOf*]->(start:Class{iri: "http://purl.obolibrary.org/obo/UBERON_0001062"})
+WHERE any(x IN
+          region.`http://www.geneontology.org/formats/oboInOwl#hasDbXref`
+          WHERE x =~ curie)
+WITH region
+MATCH
+(region)
+<-[:ilxtr:isDefinedInRegion]-
+(parent)
+-[:ilxtr:isDefinedInTaxon]->
+(species:Class{iri: "${species-id}"})
+WITH parent
+MATCH path = (root)
+-[:ilxtr:isDefinedBy]->(artifact)
+-[:subClassOf*0..2]->(parent)
+RETURN path
+#+end_src
+**** parcellationGraph
+#+name: cyres-parcellation-graph
+#+begin_src cypher
+MATCH path = (artifact)
+-[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species)
+WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+return path
+UNION
+MATCH path = (maybe)
+-[relation*0..1]-(label)
+-[:subClassOf]->(root)
+-[:ilxtr:isDefinedBy]->(artifact)
+-[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species)
+WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
+      AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
+      AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
+RETURN path
+#+end_src
+**** organList
+# TODO generate from the canonical organ list above
+#+name: cyres-organ-list
+#+begin_src cypher
+MATCH (n)
+WHERE n.iri IN [
+        "http://purl.org/sig/ont/fma/fma7195",  // lung
+        "http://purl.org/sig/ont/fma/fma7088",  // heart
+        "http://purl.org/sig/ont/fma/fma7197",  // liver
+        "http://purl.org/sig/ont/fma/fma7198",  // pancreas
+        "http://purl.org/sig/ont/fma/fma7203",  // kidney
+        "http://purl.org/sig/ont/fma/fma7148",  // stomach
+        "http://purl.org/sig/ont/fma/fma7196",  // spleen
+        "http://purl.org/sig/ont/fma/fma14543", // colon
+        "http://purl.org/sig/ont/fma/fma7201",  // large intestine
+        "http://purl.org/sig/ont/fma/fma7200",  // small intestine
+        "http://purl.org/sig/ont/fma/fma7199",  // intestine
+        "http://purl.org/sig/ont/fma/fma15900", // urinary bladder
+        "http://purl.org/sig/ont/fma/fma45659", // lower urinary tract
+        "http://purl.org/sig/ont/fma/fma7157",  // nervous system
+        "http://purl.org/sig/ont/fma/fma9903",  // peripheral nervous system
+        "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
+        "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
+        "http://purl.org/sig/ont/fma/fma50801", // brain
+        "http://purl.org/sig/ont/fma/fma5889"   // autonomic ganglion
+        ]
+RETURN n
+#+end_src
+**** speciesList
+#+name: cyres-species-list
+#+begin_src cypher
+MATCH (n)
+WHERE n.iri IN [
+        "http://purl.obolibrary.org/obo/NCBITaxon_9378",   // Suncus murinus
+        "http://purl.obolibrary.org/obo/NCBITaxon_9606",   // Homo sapiens
+        "http://purl.obolibrary.org/obo/NCBITaxon_9685",   // Felis catus
+        "http://purl.obolibrary.org/obo/NCBITaxon_9823",   // Sus scrofa
+        "http://purl.obolibrary.org/obo/NCBITaxon_10090",  // Mus musculus
+        "http://purl.obolibrary.org/obo/NCBITaxon_10116"   // Rattus norvegicus
+        ]
+RETURN n
+#+end_src
+*** shortestSimple
+# FIXME TODO make sure this actuall works as expected, I think it will?
+#+header: :var start_id=(identity nil)
+#+header: :var end_id=(identity nil)
+#+header: :var max_depth=(identity nil)
+#+header: :var relationship=(identity nil)
+#+name: cyres-shortest-simple
+#+begin_src cypher
+MATCH (start:Class{iri: '${start_id}'})
+WITH start
+MATCH (end:Class{iri: '${end_id}'})
+WITH start, end
+MATCH path = shortestPath((start)-[:${relationship}*..${max_depth}]->(end))
+RETURN path
+#+end_src
+*** neurons
+**** connectivity
+#+header: :var start_id=(identity nil)
+#+name: cyres-neurons-connectivity
+#+begin_src cypher
+MATCH (blank)-
+[entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
+->(location:Class{iri: '${start_id}'})
+WITH location, entrytype, blank
+MATCH (phenotype)<-[predicate]-(blank)<-[:equivalentClass]-(neuron)
+WHERE NOT (phenotype.iri =~ ".*_:.*")
+// RETURN phenotype, (phenotype)-[predicate]-(neuron) as e
+// WITH location, predicate, phenotype, neuron
+RETURN location, entrytype, neuron, predicate, phenotype
+#+end_src
+**** connectedRegions
+#+header: :var start_id=(identity nil)
+#+name: cyres-neurons-connected-regions
+#+begin_src cypher
+MATCH (blank)-
+[entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
+->(location:Class{iri: '${start_id}'})
+WITH entrytype, blank
+MATCH (phenotype)<-[:${target_predicate}]-(blank)
+// WHERE NOT (phenotype.iri =~ ".*_:.*")
+RETURN phenotype
+#+end_src
+*** apinat
+**** bundles/{start-id}
+#+header: :var start-id=(identity nil)
+#+name: cyres-apinat-bundles-start-id
+#+begin_src cypher
+MATCH path1 = (start:Class{iri: '${start-id}'})
+-[:apinatomy:annotates]->(start_housing)
+-[:apinatomy:subtypes*0..1]->()
+-[:apinatomy:clones*0..1]->(layer_or_end)
+-[:apinatomy:layers*0..1]->()
+-[:apinatomy:bundles]->(link)
+-[:apinatomy:source|apinatomy:prevChainEndLevels|apinatomy:prev*1..]->(nodeRoot)
+-[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
+-[:apinatomy:conveyingLyph]->()
+-[:apinatomy:supertype*0..1]->(soma:NamedIndividual)
+-[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+RETURN path1
+UNION
+MATCH path1 = (start:Class{iri: '${start-id}'})
+-[:apinatomy:bundles]->(link)
+-[:apinatomy:source|apinatomy:prevChainEndLevels|apinatomy:prev*1..]->(nodeRoot)
+-[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
+-[:apinatomy:conveyingLyph]->(soma:NamedIndividual)
+-[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+RETURN path1
+#+end_src
+**** old-bundles/{start-id}
+#+header: :var start-id=(identity nil)
+#+name: cyres-apinat-old-bundles-start-id
+#+begin_src cypher
+MATCH path1 = (start:Class{iri: '${start-id}'})
+-[:apinatomy:annotates]->(start_housing)
+-[:apinatomy:bundlesChains]->(chain)
+-[:apinatomy:root]->(root)
+-[:apinatomy:internalIn]->(layer_or_end)  # this hits a cycle back to start_housing
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:external]->(layer_or_end_external)
+WITH path1, root, layer_or_end AS layer
+OPTIONAL MATCH path2 = (layer)
+-[:apinatomy:layerIn]->(end_housing)
+-[:apinatomy:external]->(end_housing_external)
+WITH path1, path2, root
+MATCH path3 = (root) // in the layer case this hits an additional lyph
+<-[:apinatomy:target|apinatomy:source]-(link)
+<-[:apinatomy:conveys]-(soma)
+<-[:apinatomy:annotates]-(soma_NLX)
+RETURN path1, path2, path3
+#+end_src
+**** somas
+#+name: cyres-apinat-somas
+#+begin_src cypher
+MATCH (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)
+RETURN soma
+#+end_src
+**** housing-lyphs
+#+name: cyres-apinat-housing-lyphs
+#+begin_src cypher
+MATCH path = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+-[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+-[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
+-[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+-[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+RETURN path
+#+end_src
+**** housing-lyphs/{start-id}
+#+header: :var start-id=(identity nil)
+#+name: cyres-apinat-housing-lyphs-start-id
+#+begin_src cypher
+MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+-[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+-[:apinatomy:internalIn]->(layer_or_end)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:external]->(layer_or_end_external:Class{iri: '${start-id}'})
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+WITH path1, root
+MATCH path2 = (root)
+-[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
+-[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+-[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+RETURN path1, path2
+
+UNION
+
+MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
+-[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
+-[:apinatomy:internalIn]->(layer)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:layerIn]->(end_housing)
+-[:apinatomy:external]->(end_housing_external:Class{iri: '${start-id}'})
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+WITH path1, root
+MATCH path2 = (root)
+-[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
+-[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
+-[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+RETURN path1, path2
+#+end_src
+**** soma-processes
+#+name: cyres-apinat-soma-processes
+#+begin_src cypher
+MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+-[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+-[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+-[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:external]->(external)
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+WITH path1, nodeRoot, layer_or_end AS layer
+OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+-[:apinatomy:layerIn]->(end_housing)
+-[:apinatomy:external]->(end_housing_external)
+WITH path1, path2, nodeRoot
+MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
+-[:apinatomy:rootOf]->(chain)
+RETURN path1, path2, path3
+#+end_src
+**** soma-processes/{start-id}
+#+header: :var start-id=(identity nil)
+#+name: cyres-apinat-soma-processes-start-id
+#+begin_src cypher
+MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+-[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+-[:apinatomy:internalIn]->(layer_or_end)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:layerIn*0..1]->(layerSoma)  // don't need to see both layer and housing for soma
+-[:apinatomy:external]->(externalEndSoma:Class{iri: '${start-id}'})
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+WITH path1, nodeRoot
+MATCH path3 = (chain)
+<-[:apinatomy:rootOf]-(nodeRoot)
+-[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)
+-[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:external]->(external)
+WITH path1, path3, nodeRoot, layer_or_end AS layer
+OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+-[:apinatomy:layerIn]->(end_housing)
+-[:apinatomy:external]->(end_housing_external)
+RETURN path1, path2, path3
+#+end_src
+**** weird-soma-processes/{process-id}
+#+header: :var process-id=(identity nil)
+#+name: cyres-apinat-weird-soma-processes-process-id
+#+begin_src cypher
+MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+-[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+-[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+-[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:external]->(external:Class{iri: '${process-id}'})
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+WITH path1, nodeRoot, layer_or_end AS layer
+OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+-[:apinatomy:layerIn]->(end_housing)
+-[:apinatomy:external]->(end_housing_external)
+WITH path1, path2, nodeRoot
+MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
+-[:apinatomy:rootOf]->(chain)
+RETURN path1, path2, path3
+
+UNION
+
+MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
+-[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
+-[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
+-[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
+-[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:cloneOf*0..1]->()
+-[:apinatomy:supertype*0..1]->()
+-[:apinatomy:external]->(external)
+WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
+WITH path1, nodeRoot, layer_or_end AS layer
+MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
+-[:apinatomy:layerIn]->(end_housing)
+-[:apinatomy:external]->(end_housing_external:Class{iri: '${process-id}'})
+WITH path1, path2, nodeRoot
+MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
+-[:apinatomy:rootOf]->(chain)
+RETURN path1, path2, path3
+#+end_src
 ** yaml file
-#+name: cypher-resources
-#+header: :noweb yes
-#+begin_src yaml :tangle ../resources/scigraph/cypher-resources.tangled.yaml
+Example template.
+#+begin_src yaml
 cypherResources:
   - path:
-    operations:
+    operations: &name-ops
       - summary: do the thing
         parameters:
           - name: some-id
@@ -2364,6 +2860,279 @@ cypherResources:
             paramType:
     query: &name |
       <<block-name>>
+#+end_src
+
+#+name: cypher-resources
+#+begin_src yaml :noweb yes :tangle ../resources/scigraph/cypher-resources.tangled.yaml
+cypherResources:
+  - path: /dynamic/prod/sparc/organParts/{id}
+    operations: &organParts-ops
+      - summary: <<nonl(desc-organ-parts())>>
+        parameters:
+         - name: id
+           description: ontology id of the organ
+           paramType: path
+    query: &organParts |
+      <<cyres-organ-parts>>
+
+  - path: /dynamic/test/sparc/organParts/{id}
+    operations: *organParts-ops
+    query: *organParts
+
+  - path: /dynamic/prod/sparc/parcellationArtifacts
+    operations:
+      - summary: Get the graph of all parcellation artifacts for all species
+    query: |
+      <<cyres-parcellation-artifacts>>
+
+  - path: /dynamic/prod/sparc/parcellationArtifacts/{species-id}
+    operations:
+      - summary: Get the graph of all parcellation artifacts for a single species
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
+    query: |
+      <<cyres-parcellation-artifacts-species-id>>
+
+  - path: /dynamic/prod/sparc/artifactRoots/{artifact-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single artifact WARNING this can return no results
+        parameters:
+         - name: artifact-id
+           description: ontology id of the parcellation artifact
+           paramType: path
+    query: |
+      <<cyres-artifact-roots-artifact-id>>
+
+  - path: /dynamic/prod/sparc/artifactLabels/{artifact-id}
+    operations:
+      - summary: Get the graph of all parcellation labels for a single artifact WARNING this can return no results
+        parameters:
+         - name: artifact-id
+           description: ontology id of the parcellation artifact
+           paramType: path
+    query: |
+      <<cyres-artifact-labels-artifact-id>>
+
+  - path: /dynamic/prod/sparc/rootLabels/{root-id}
+    operations: &rootLabes-ops
+      - summary: Get the list of all parcellation labels for a single label root
+        parameters:
+         - name: root-id
+           description: ontology id of the parcellation label root
+           paramType: path
+    query: &rootLabels |
+      <<cyres-root-labels-root-id>>
+
+  - path: /dynamic/test/sparc/rootLabels/{root-id}
+    operations: *rootLabes-ops
+    query: *rootLabels
+
+  - path: /dynamic/prod/sparc/parcellationRoots
+    operations:
+      - summary: Get the graph of all parcellation label roots for all species
+    query: |
+      <<cyres-parcellation-roots>>
+
+  - path: /dynamic/prod/sparc/parcellationRoots/{species-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single species
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
+    query: |
+      <<cyres-parcellation-roots-species-id>>
+
+  - path: /dynamic/prod/sparc/parcellationRoots/{species-id}/{region-id}
+    operations:
+      - summary: Get the graph of all parcellation label roots for a single species and anatomical region
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
+         - name: region-id
+           description: ontology id of the anatomical region
+           paramType: path
+    query: |
+      <<cyres-parcellation-roots-species-id-region-id>>
+
+  - path: /dynamic/prod/sparc/parcellationRootsFMA/{species-id}/{fma-id}
+    operations: &parcellationRootsFMA-ops
+      - summary: Get the graph of all parcellation label roots for a single species and anatomical region
+        parameters:
+         - name: species-id
+           description: ontology id of the species
+           paramType: path
+         - name: fma-id
+           description: ontology id of the anatomical region
+           paramType: path
+    query: &parcellationRootsFMA |
+      <<cyres-parcellation-roots-fma-species-id-region-id>>
+
+  - path: /dynamic/test/sparc/parcellationRootsFMA/{species-id}/{fma-id}
+    operations: *parcellationRootsFMA-ops
+    query: *parcellationRootsFMA
+
+  - path: /dynamic/prod/sparc/parcellationGraph
+    operations:
+      - summary: Get the graph of all parcellation labels for all species
+    query: |
+      <<cyres-parcellation-graph>>
+
+  - path: /dynamic/prod/sparc/organList
+    operations: &organList-ops
+      - summary: Get the list of all FMA organ identifiers relevant to SPARC
+    query: &organList |
+      <<cyres-organ-list>>
+
+  - path: /dynamic/test/sparc/organList
+    operations: *organList-ops
+    query: *organList
+
+  - path: /dynamic/prod/sparc/speciesList
+    operations: &speciesList-ops
+      - summary: Get the list of all NCBITaxon species identifiers relevant to SPARC
+    query: &speciesList |
+      <<cyres-species-list>>
+
+  - path: /dynamic/test/sparc/speciesList
+    operations: *speciesList-ops
+    query: *speciesList
+
+  - path: /dynamic/shortestSimple
+    query: |
+      <<cyres-shortest-simple>>
+    operations:
+      - summary: Get the shortest path between two IDs
+        parameters:
+          - name: start_id
+            description: The starting node (ex UBERON:0005751)
+            paramType: query
+          - name: end_id
+            description: The ending node (ex UBERON:0001255)
+            paramType: query
+          - name: max_depth
+            description: the maximum depth to traverse
+            paramType: query
+          - name: relationship
+            description: The property to traverse (ex subClassOf or subClassOf|partOf|isA)
+            paramType: query
+            required: false
+
+  - path: /dynamic/neurons/connectivity
+    query: |
+      <<cyres-neurons-connectivity>>
+    operations:
+      - summary: Get connected anatomical regions by neuron type
+        parameters:
+          - name: start_id
+            description: The starting location (eg UBERON:0001759)
+            paramType: query
+
+  - path: /dynamic/neurons/connectedRegions
+    query: |
+      <<cyres-neurons-connected-regions>>
+    operations:
+      - summary: Get connected anatomical regions by starting location and target relationship
+        parameters:
+          - name: start_id
+            description: The starting location (eg UBERON:0001759)
+            paramType: query
+          - name: target_predicate
+            description: The predicate for the type of connectivity (eg ilxtr:hasPresynapticTerminalsIn)
+            paramType: query
+            required: false
+
+  - path: /dynamic/demos/apinat/bundles/{start-id}
+    operations:
+      - summary: Return the paths to somas from an anatomical region (aka connected-somas)
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      <<cyres-apinat-bundles-start-id>>
+
+  - path: /dynamic/demos/apinat/old-bundles/{start-id}
+    operations:
+      - summary: Return the paths to somas from an anatomical region (aka connected-somas)
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      <<cyres-apinat-old-bundles-start-id>>
+
+  - path: /dynamic/demos/apinat/somas
+    operations:
+      - summary: List all the somas for a given graph (TODO on the given graph)
+    query: |
+      <<cyres-apinat-somas>>
+
+  - path: /dynamic/demos/apinat/housing-lyphs
+    operations:
+      - summary: List all the housing lyphs (neuronal processes) for all starting points.
+    query: |
+      <<cyres-apinat-housing-lyphs>>
+
+  - path: /dynamic/demos/apinat/housing-lyphs/{start-id}
+    operations:
+      - summary: List all the housing lyphs for a starting point.
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      <<cyres-apinat-housing-lyphs-start-id>>
+
+  - path: /dynamic/demos/apinat/soma-processes
+    operations:
+      - summary: List all the neuronal processes for all somas.
+    query: |
+      <<cyres-apinat-soma-processes>>
+
+  - path: /dynamic/demos/apinat/soma-processes/{start-id}
+    operations:
+      - summary: List all the neuronal processes for somas located in start-id.
+        parameters:
+         - name: start-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      <<cyres-apinat-soma-processes-start-id>>
+
+  - path: /dynamic/demos/apinat/weird-soma-processes/{process-id}
+    operations:
+      - summary: List all the neuronal processes for somas where some processes is in process-id.
+        parameters:
+         - name: process-id
+           description: ontology id of the starting point
+           paramType: path
+    query: |
+      <<cyres-apinat-weird-soma-processes-process-id>>
+
+  - path: /dynamic/demos/apinat/neru-1/{neupop-id}
+    operations: &neru-ops
+      - summary: Return the housing regions and publications for neurulated groups.
+        parameters:
+         - name: neupop-id
+           description: neuron population identifier
+           paramType: path
+    query: |
+      <<cypher-neru-1>>
+
+  - path: /dynamic/demos/apinat/neru-2/{neupop_id}
+    operations: *neru-ops
+    query: |
+      <<cypher-neru-2>>
+
+  - path: /dynamic/demos/apinat/neru-3/{neupop_id}
+    operations: *neru-ops
+    query: |
+      <<cypher-neru-3>>
+
 #+end_src
 
 * Sanity checks
@@ -2912,7 +3681,12 @@ WHERE {
 (defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
 
 ;; somehow this gets around lexical scope FIXME no not really
-(setq-local org-confirm-babel-evaluate (lambda (lang _body) (not (member lang '("cypher" "sparql")))))
+(setq-local
+ org-confirm-babel-evaluate
+ (lambda (lang _body)
+   (not (or (member lang '("cypher" "sparql"))
+            (eq (intern (orgstrap-get-named-src-block-checksum "nonl"))
+                '6f941ab9e081045c990e9ae4d7dee4604b20724db41883e137ff925f6a9a7875)))))
 
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)
@@ -2955,9 +3729,9 @@ WHERE {
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'c8ecf1b7cd8822b75a30f98dc05ec0e5355b224557527edd363af9545dd11d15
+    (reval 'sha256 '9683db93bf95cf2c82e7788e9cf26a594e76b19399d7f3d5524900aed5738471
            ;; "~/git/orgstrap/ow.el"
-           (concat ghost "b7618727eee4c0d74c0e7271e3b8d36f3432a247" "/ow.el")))
+           (concat ghost "a2451655831f09f28301b1e9b4bc74eec5be2d28" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
            ;;"~/git/orgstrap/services/blazegraph.el"
@@ -2966,6 +3740,7 @@ WHERE {
 (when orgstrap-do-packages-emacs
   (ow-enable-use-package)
   (ow-use-packages
+   orgstrap
    jupyter
    (cypher-mode :init (require 'cypher-mode) (set-face-attribute 'cypher-pattern-face nil :background nil))
    sparql-mode
@@ -2983,10 +3758,49 @@ WHERE {
 (unless (fboundp #'ob-cypher/scigraph/query)
   (reval 'sha256 'e630298fa637caff064f500d7c6de7e0a98263796c79cb171f10754d531c3eef
          "https://raw.githubusercontent.com/tgbugs/ob-cypher/9d80fcb193819a6ce7307bb92369b269b4176d43/ob-cypher.el"))
+
+;; see orgware.org for a longer note on noweb and empty lines
+(defun ow---strip-empty-lines ()
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "^ +$" nil t)
+      (replace-match ""))))
+(add-hook 'org-babel-tangle-body-hook #'ow---strip-empty-lines)
+
+;; command line interface
+(ow-cli-gen
+    ((:tangle)
+     (:report-apinat)
+     (:report-organs))
+  (when tangle (org-babel-tangle))
+  (when report-apinat)
+  (when report-organs))
+
+;; note that we had to remove the call to `org-set-startup-visibility'
+;; from the elvs in order to get this to work
+(when enable-local-eval ; FIXME HACK how to know when this was called
+  ;; by the elvs? we don't want this running on a manual trigger
+  (mapcar (lambda (dblock-name)
+            (save-excursion (org-find-dblock dblock-name) (org-cycle)))
+          '("properties" "prefixes"))
+  (save-excursion
+    (goto-char (org-babel-find-named-block "orgstrap-shebang"))
+    (org-cycle))
+  (goto-char (point-min)))
+
+;; if we make it all the way through the block make sure that we don't
+;; run the orgstrap elvs again so that that ocbe doesn't get klobbered
+(setq-local enable-local-eval nil)
+#+end_src
+
+Tangle helper for bare paragraphs.
+#+name: nonl
+#+begin_src elisp :var paragraph=""
+(string-trim (replace-regexp-in-string "\n" " " paragraph))
 #+end_src
 
 ** Local Variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block))) (warn "No orgstrap block."))))
 # End:
