@@ -55,8 +55,10 @@
 #+link: owl http://www.w3.org/2002/07/owl#
 #+link: rdfs http://www.w3.org/2000/01/rdf-schema#
 #+link: dc http://purl.org/dc/elements/1.1/
+#+link: dcterms http://purl.org/dc/terms/
 #+link: ILX http://uri.interlex.org/base/ilx_
 #+link: ilxtr http://uri.interlex.org/tgbugs/uris/readable/
+#+link: sparc http://uri.interlex.org/tgbugs/uris/readable/sparc/
 #+link: tech http://uri.interlex.org/tgbugs/uris/readable/technique/
 #+link: asp http://uri.interlex.org/tgbugs/uris/readable/aspect/
 #+link: unit http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/
@@ -81,6 +83,29 @@
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
+#+link: rawmethods https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/methods/ttl/
+#+link: rawneurons https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/
+#+link: cassont https://cassava.ucsd.edu/sparc/ontologies/
+#+link: sparc-olymp-apinat https://sparc.olympiangods.org/ApiNATOMY/ontologies/
+#+link: prov http://www.w3.org/ns/prov#
+#+link: foaf http://xmlns.com/foaf/0.1/
+#+link: NIFRID http://uri.neuinfo.org/nif/nifstd/readable/
+#+link: swrl http://www.w3.org/2003/11/swrl#
+#+link: prism http://prismstandard.org/namespaces/basic/2.1/
+#+link: BFO http://purl.obolibrary.org/obo/BFO_
+#+link: RO http://purl.obolibrary.org/obo/RO_
+#+link: UBPROP http://purl.obolibrary.org/obo/UBPROP_
+#+link: chebi http://purl.obolibrary.org/obo/chebi/
+#+link: ncbitaxon http://purl.obolibrary.org/obo/ncbitaxon#
+#+link: cl http://purl.obolibrary.org/obo/cl#
+#+link: MIRO http://uri.interlex.org/MIRO/uris/readable/
+#+link: bibo http://purl.org/ontology/bibo/
+#+link: cito http://purl.org/spar/cito/
+#+link: swrl http://swrl.stanford.edu/ontologies/3.3/swrla.owl#
+#+link: doap http://usefulinc.com/ns/doap#
+#+link: xsd http://www.w3.org/2001/XMLSchema#
+#+link: skos http://www.w3.org/2004/02/skos/core#
+#+link: obo http://purl.obolibrary.org/obo/
 #+end:
 
 #+name: orgstrap-shebang
@@ -2358,6 +2383,34 @@ function path-metadata-coverage () {
     awk -v t=${COUNT_T} -v pm=${COUNT_PM} 'BEGIN { print ( pm / t ) }'
 }
 #+end_src
+* General queries
+General metadata and housekeeping queries.
+** predicates
+#+name: predicates-all
+#+begin_src sparql
+select distinct ?p ?l where { ?s ?p ?o . optional { ?p rdfs:label ?l . } } order by ?p
+#+end_src
+
+#+name: predicates-version
+#+begin_src sparql
+select ?s ?p ?o where {
+values ?p { prov:startedAtTime prov:wasGeneratedBy dc:date owl:versionInfo TEMP:TimestampExportStart }
+?s ?p ?o . } order by desc(str(?o))
+#+end_src
+
+** TODO versions
+Useful version information is not present in all ontology files at the moment.
+
+*** curation-export.ttl
+#+begin_src sparql
+select ?s ?tes ?vi where {
+  ?s TEMP:TimestampExportStart ?tes ;
+     owl:versionInfo ?vi .
+}
+#+end_src
+
+*** TODO protcur.ttl
+*** TODO apinat models
 * Use cases
 ** Connectivity dashboard
 *** organs
@@ -2432,20 +2485,73 @@ UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
 ** ApiNATOMY
 *** Summary statistics
 **** Dashboard
+# TODO configure header args for development vs production
+#+begin_src elisp :results none :exports none
+(ow-babel-eval "apinat-dashboard-model-summary")
+(ow-babel-eval "apinat-dashboard-overview")
+(ow-babel-eval "sparql-apinat-prefixes")
+#+end_src
+
+#+RESULTS: apinat-dashboard-model-summary
+| label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops |
+|------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------|
+| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   498 |         107 |       169 |          238 |    29 |      29 |
+| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  1281 |         139 |       175 |           25 |    23 |      20 |
+| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1127 |         127 |       127 |            1 |    23 |         |
+| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   868 |         143 |       127 |            6 |    19 |         |
+| SAWG_colon-all                                                         | sdcol:sawg-distal-colon |   406 |          78 |        99 |            4 |     1 |         |
+| Keast Bladder Model Scaffold Test                                      | scaft:scaffold-test     |  1290 |         145 |       162 |            4 |     2 |         |
+| TOTAL                                                                  | 7                       |  5520 |         761 |       454 |          275 |    97 |      49 |
+
+#+RESULTS: apinat-dashboard-overview
+| element         | count |
+|-----------------+-------|
+| models          |     7 |
+| models scigraph |     8 |
+| lyphs           |  5525 |
+| lyphs input     |   761 |
+| externals       |   459 |
+| publications    |   275 |
+| nerus           |    97 |
+| neupops         |    49 |
+| neupops pattern |    49 |
+
+#+RESULTS: sparql-apinat-prefixes
+| prefix    | count |
+|-----------+-------|
+| CL        |     1 |
+| nlx       |     1 |
+| NCBITaxon |     2 |
+| ncit      |     2 |
+| NCIT      |     4 |
+| sao       |     4 |
+| GO        |     5 |
+| CHEBI     |    11 |
+| pubmed    |    14 |
+| EMAPA     |    17 |
+| tgbugs    |    49 |
+| ilx       |    76 |
+| fma       |    91 |
+| UBERON    |   182 |
+| :SUM:     |   459 |
+| :TOTAL:   |   459 |
+
 #+header: :var n-sparql-apinat-models=n-sparql-apinat-models()
 #+header: :var cypher-apinat-models=cypher-apinat-models()
 #+header: :var n-sparql-apinat-lyphs=n-sparql-apinat-lyphs()
 #+header: :var n-sparql-apinat-lyphs-input=n-sparql-apinat-lyphs-input()
+#+header: :var n-sparql-apinat-external=n-sparql-apinat-external()
 #+header: :var n-sparql-apinat-publications=n-sparql-apinat-publications()
 #+header: :var n-apinat-nerus=n-apinat-nerus()
 #+header: :var n-apinat-neupops=n-apinat-neupops()
 #+header: :var n-apinat-neupops-pat=n-apinat-neupops-pat()
 #+name: apinat-dashboard-overview
-#+begin_src elisp
+#+begin_src elisp :exports results
 (let ((models (caar n-sparql-apinat-models))
       (models-cypher (length cypher-apinat-models))
       (lyphs (caar n-sparql-apinat-lyphs))
       (lyphs-input (caar n-sparql-apinat-lyphs-input))
+      (externals (caar n-sparql-apinat-external))
       (publications (caar n-sparql-apinat-publications))
       (nerus (caar n-apinat-nerus))
       (neupops (caar n-apinat-neupops))
@@ -2457,29 +2563,13 @@ UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
    (list "models scigraph" models-cypher)
    (list "lyphs" lyphs)
    (list "lyphs input" lyphs-input)
+   (list "externals" externals)
    (list "publications" publications)
    (list "nerus" nerus)
    (list "neupops" neupops)
    (list "neupops pattern" neupops-pat)
 ))
 #+end_src
-
-# TODO configure header args for development vs production
-#+begin_src elisp :results none :exports none
-(ow-babel-eval "apinat-dashboard-overview")
-#+end_src
-
-#+RESULTS: apinat-dashboard-overview
-| element         | count |
-|-----------------+-------|
-| models          |     7 |
-| models scigraph |     8 |
-| lyphs           |  5525 |
-| lyphs input     |   761 |
-| publications    |   275 |
-| nerus           |    97 |
-| neupops         |    49 |
-| neupops pattern |    49 |
 
 #+name: apinat-dashboard-model-summary
 #+begin_src sparql :noweb no-export
@@ -2499,17 +2589,6 @@ select
 ?neupops
 <<apinat-model-summary-where>>
 #+end_src
-
-#+RESULTS: apinat-dashboard-model-summary
-| label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops |
-|------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------|
-| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   498 |         107 |       169 |          238 |    29 |      29 |
-| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  1281 |         139 |       175 |           25 |    23 |      20 |
-| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1127 |         127 |       127 |            1 |    23 |         |
-| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   868 |         143 |       127 |            6 |    19 |         |
-| SAWG_colon-all                                                         | sdcol:sawg-distal-colon |   406 |          78 |        99 |            4 |     1 |         |
-| Keast Bladder Model Scaffold Test                                      | scaft:scaffold-test     |  1290 |         145 |       162 |            4 |     2 |         |
-| TOTAL                                                                  | 7                       |  5520 |         761 |       454 |          275 |    97 |      49 |
 
 # have to union over the aggregated group by results and the total
 # separately and then we can get the table to work correctly
@@ -2574,275 +2653,265 @@ WHERE {
 
 **** Queries
 # aka dashboard queries
-ApiNATOMY sourced
+***** ApiNATOMY sourced
+****** models
+#+name: n-sparql-apinat-models
+#+begin_src sparql :noweb no-export
+SELECT (COUNT(*) as ?count) {
+  <<sparql-apinat-models>>
+}
+#+end_src
 
-1. models
-   #+name: n-sparql-apinat-models
-   #+begin_src sparql :noweb no-export
-   SELECT (COUNT(*) as ?count) {
-     <<sparql-apinat-models>>
-   }
-   #+end_src
+# FIXME owl:Ontology vs elements:Graph
+#+name: sparql-apinat-models
+#+begin_src sparql
+# SELECT (COUNT(DISTINCT ?s) as ?total_models)
+SELECT DISTINCT
+(?s as ?id)
+(str(?l) as ?label)
+WHERE {
+  ?s a elements:Graph .
+  ?s rdfs:label ?l.
+}
+#+end_src
 
-   # FIXME owl:Ontology vs elements:Graph
-   #+name: sparql-apinat-models
-   #+begin_src sparql
-   # SELECT (COUNT(DISTINCT ?s) as ?total_models)
-   SELECT DISTINCT
-   (?s as ?id)
-   (str(?l) as ?label)
-   WHERE {
-     ?s a elements:Graph .
-     ?s rdfs:label ?l.
-   }
-   #+end_src
+# FIXME we need a way to issue cypher queries that can return
+# something other than the graph results so that we can match
+# sparql unfortunately that is a larger engineering undertaking the
+# requires modifying scigraph again
+#+name: cypher-apinat-models
+#+begin_src cypher
+MATCH (g)
+-[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"})
+RETURN g
+#+end_src
 
-   # FIXME we need a way to issue cypher queries that can return
-   # something other than the graph results so that we can match
-   # sparql unfortunately that is a larger engineering undertaking the
-   # requires modifying scigraph again
-   #+name: cypher-apinat-models
-   #+begin_src cypher
-   MATCH (g)
-   -[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"})
-   RETURN g
-   #+end_src
+****** number of lyphs
+#+name: n-sparql-apinat-lyphs
+#+begin_src sparql
+SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
+WHERE { ?s a elements:Lyph . }
+#+end_src
 
-2. number of lyphs
+#+RESULTS: n-sparql-apinat-lyphs
+| total_lyphs |
+|-------------|
+|        5525 |
 
-   #+name: n-sparql-apinat-lyphs
-   #+begin_src sparql
-   SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
-   WHERE { ?s a elements:Lyph . }
-   #+end_src
+generated vs input
+s? rdf:type element:Lyph
+#+name: n-sparql-apinat-lyphs-input
+#+begin_src sparql :var limit="200"
+SELECT DISTINCT
+(COUNT(DISTINCT ?s) as ?input_lyphs)
+#?s
+#?p
+#?o
+WHERE {
+  ?s a elements:Lyph .
+  #?s ?p ?o .
+  FILTER NOT EXISTS { ?s apinatomy:isTemplate true . }
+  FILTER NOT EXISTS { ?s apinatomy:generated true . }
+  #FILTER ( ! ( ?p = apinatomy:isTemplate && ?o = true ) )
+  #FILTER ( ! ( ?p = apinatomy:generated && ?o = true ) )
+  #?s apinatomy:generated ?o .
+}
+LIMIT ?limit
+#+end_src
 
-   #+RESULTS: n-sparql-apinat-lyphs
-   | total_lyphs |
-   |-------------|
-   |        5525 |
+#+RESULTS: n-sparql-apinat-lyphs-input
+| input_lyphs |
+|-------------|
+|         761 |
 
-   generated vs input
-   s? rdf:type element:Lyph
-   #+name: n-sparql-apinat-lyphs-input
-   #+begin_src sparql :var limit="200"
-   SELECT DISTINCT
-   (COUNT(DISTINCT ?s) as ?input_lyphs)
-   #?s
-   #?p
-   #?o
-   WHERE {
-     ?s a elements:Lyph .
-     #?s ?p ?o .
-     FILTER NOT EXISTS { ?s apinatomy:isTemplate true . }
-     FILTER NOT EXISTS { ?s apinatomy:generated true . }
-     #FILTER ( ! ( ?p = apinatomy:isTemplate && ?o = true ) )
-     #FILTER ( ! ( ?p = apinatomy:generated && ?o = true ) )
-     #?s apinatomy:generated ?o .
-   }
-   LIMIT ?limit
-   #+end_src
+****** publications referenced
+apinaomty:publications
+average number of publications per unit? (for now no)
+will also want the full listing of publications
+select count distinct o?
+select distinct o?
+s? apinat:publication o?
+#+name: n-sparql-apinat-publications
+#+begin_src sparql
+SELECT DISTINCT
+(COUNT(DISTINCT ?pub) as ?publications)
+WHERE { ?s apinatomy:publications ?pub . }
+#+end_src
 
-   #+RESULTS: n-sparql-apinat-lyphs-input
-   | input_lyphs |
-   |-------------|
-   |         761 |
+#+RESULTS: n-sparql-apinat-publications
+| publications |
+|--------------|
+|          275 |
 
-3. publications referenced
-   apinaomty:publications
-   average number of publications per unit? (for now no)
-   will also want the full listing of publications
-   select count distinct o?
-   select distinct o?
-   s? apinat:publication o?
-   #+name: n-sparql-apinat-publications
-   #+begin_src sparql
-   SELECT DISTINCT
-   (COUNT(DISTINCT ?pub) as ?publications)
-   WHERE { ?s apinatomy:publications ?pub . }
-   #+end_src
+****** TODO species
+both model level and lyph level
+****** terms employed in annotation
+count of apinatomy:external by prefix UBERON, GO, CHEBI, etc.
+full listing of terms as well
 
-   #+RESULTS: n-sparql-apinat-publications
-   | publications |
-   |--------------|
-   |          275 |
+# sadly noweb is way faster for solving this problem than trying to do the right thing >_<
+#+name: apinat-search-prefixes
+: "UBERON" "EMAPA" "fma" "CHEBI" "GO" "sao" "CL" "nlx" "ilx" "tgbugs" "NCBITaxon" "NCIT" "pubmed" "doi" "ncit"
 
-4. species
-   both model level and lyph level
-5. terms employed in annotation
-   count of apinatomy:external by prefix UBERON, GO, CHEBI, etc.
-   full listing of terms as well
-   select count distinct o?
-   select distinct o?
-   s? apinat:external o?
-   #+name: sparql-apinat-prefixes
-   #+begin_src sparql
-   SELECT
-   ?prefix
-   (COUNT(DISTINCT ?s) AS ?count)
-   WHERE {
-     VALUES ?prefix {
-       "UBERON" "EMAPA" "fma" "CHEBI" "GO" "sao" "CL" "nlx" "ilx" "tgbugs" "NCBITaxon" "NCIT"
-       "pubmed" "doi" "ncit" # problems
-       "" }
-     ?s a elements:External .
-     FILTER CONTAINS(str(?s), ?prefix)
-   }
-   GROUP BY ?prefix
-   ORDER BY ?count
-   #+end_src
+#+name: sparql-apinat-prefixes
+#+begin_src sparql :noweb yes
+SELECT
+?prefix
+(COUNT(DISTINCT ?s) AS ?count)
+WHERE {
+  {
+    VALUES ?prefix { <<apinat-search-prefixes()>> }
+    ?s a elements:External .
+    FILTER CONTAINS(str(?s), ?prefix)
+  } UNION {
+    SELECT (":SUM:" AS ?prefix) ?s
+    {
+      VALUES ?pre { <<apinat-search-prefixes()>> }
+      ?s a elements:External .
+      FILTER CONTAINS(str(?s), ?pre)
+    }
+  } UNION {
+    BIND(":TOTAL:" AS ?prefix)
+    { SELECT ?s WHERE { ?s a elements:External . } }
+  }
+}
+GROUP BY ?prefix
+ORDER BY ?count
+#+end_src
 
-   #+RESULTS: sparql-apinat-prefixes
-   | prefix    | count |
-   |-----------+-------|
-   | CL        |     1 |
-   | nlx       |     1 |
-   | NCBITaxon |     2 |
-   | ncit      |     2 |
-   | sao       |     4 |
-   | NCIT      |     4 |
-   | GO        |     5 |
-   | CHEBI     |    11 |
-   | pubmed    |    14 |
-   | EMAPA     |    17 |
-   | tgbugs    |    49 |
-   | ilx       |    76 |
-   | fma       |    91 |
-   | UBERON    |   182 |
-   |           |   459 |
-   |-----------+-------|
-   | sum       |   459 |
-   #+TBLFM: @17$2='(+ @1$2..@-2$2);N
-   # FIXME will be overwritten on rerun
+#+name: n-sparql-apinat-external
+#+begin_src sparql
+SELECT (COUNT(DISTINCT(?s)) as ?count) WHERE { ?s a elements:External . }
+#+end_src
 
-6. external issues
-   publications appearing as external ids, unmapped prefixes etc.
-   FIXME where are these coming from?
-   #+begin_src sparql :var limit="500"
-   SELECT DISTINCT
-   ?l ?s
-   WHERE {
-       ?s a elements:External .
-       ?l ?p ?s .
-       FILTER(CONTAINS(str(?s), "doi") || CONTAINS(str(?s), "pubmed") || CONTAINS(str(?s), "ncit"))
-   }
-   ORDER BY ?l ?s
-   LIMIT ?limit
-   #+end_src
+******* external issues
+publications appearing as external ids, unmapped prefixes etc.
+FIXME where are these coming from?
+#+begin_src sparql :var limit="500"
+SELECT DISTINCT
+?l ?s
+WHERE {
+    ?s a elements:External .
+    ?l ?p ?s .
+    FILTER(CONTAINS(str(?s), "doi") || CONTAINS(str(?s), "pubmed") || CONTAINS(str(?s), "ncit"))
+}
+ORDER BY ?l ?s
+LIMIT ?limit
+#+end_src
 
-7. number of neurulated groups aka neuron populations
-   # TODO by model
-   #+name: n-apinat-nerus
-   #+begin_src sparql :noweb yes
-   SELECT (COUNT(*) as ?count) {
-     <<apinat-nerus>>
-   }
-   #+end_src
+****** Number of neurulated groups
+Total neuron populations including those that are unidentified or are in error
+# TODO by model
+#+name: n-apinat-nerus
+#+begin_src sparql :noweb yes
+SELECT (COUNT(*) as ?count) {
+  <<apinat-nerus>>
+}
+#+end_src
 
-   #+RESULTS: n-apinat-nerus
-   | count |
-   |-------|
-   |    97 |
+#+RESULTS: n-apinat-nerus
+| count |
+|-------|
+|    97 |
 
-   #+name: apinat-nerus
-   #+begin_src sparql
-   SELECT DISTINCT
-   ?group
-   (str(?l) as ?label)
-   WHERE {
-     ?group a elements:Group .
-     ?group apinatomy:description ?d
-     filter(contains(str(?d), "dynamic"))
-     ?group rdfs:label ?l .
-   }
-   order by ?group
-   #+end_src
+#+name: apinat-nerus
+#+begin_src sparql
+SELECT DISTINCT
+?group
+(str(?l) as ?label)
+WHERE {
+  ?group a elements:Group .
+  ?group apinatomy:description ?d
+  filter(contains(str(?d), "dynamic"))
+  ?group rdfs:label ?l .
+}
+order by ?group
+#+end_src
 
-8. Number of neuron populations with external ids and correct subClassOf.
-   #+name: n-apinat-neupops
-   #+begin_src sparql :noweb yes
-   SELECT (COUNT(*) as ?count) {
-     <<apinat-neupops>>
-   }
-   #+end_src
+****** Number of neuron populations with external ids and correct subClassOf.
+#+name: n-apinat-neupops
+#+begin_src sparql :noweb yes
+SELECT (COUNT(*) as ?count) {
+  <<apinat-neupops>>
+}
+#+end_src
 
-   #+RESULTS: n-apinat-neupops
-   | count |
-   |-------|
-   |    49 |
+#+RESULTS: n-apinat-neupops
+| count |
+|-------|
+|    49 |
 
-   #+name: apinat-neupops
-   #+begin_src sparql
-   SELECT DISTINCT
-   ?neupop
-   (str(?pl) as ?preferred_label)
-   (str(?l) as ?label)
-   WHERE {
-     ?neupop a elements:External .
-     ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
-     OPTIONAL { ?neupop skos:prefLabel ?pl . }
-     OPTIONAL { ?neupop rdfs:label ?l . }
-   }
-   #+end_src
+#+name: apinat-neupops
+#+begin_src sparql
+SELECT DISTINCT
+?neupop
+(str(?pl) as ?preferred_label)
+(str(?l) as ?label)
+WHERE {
+  ?neupop a elements:External .
+  ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
+  OPTIONAL { ?neupop skos:prefLabel ?pl . }
+  OPTIONAL { ?neupop rdfs:label ?l . }
+}
+#+end_src
 
-9. Number of neuron populations with external ids that match the =neuron-type= pattern.
+****** Number of neuron populations with external ids that match the =neuron-type= pattern.
+#+name: n-apinat-neupops-pat
+#+begin_src sparql :noweb yes
+SELECT (COUNT(*) as ?count) {
+  <<apinat-neupops-pat>>
+}
+#+end_src
 
-   #+name: n-apinat-neupops-pat
-   #+begin_src sparql :noweb yes
-   SELECT (COUNT(*) as ?count) {
-     <<apinat-neupops-pat>>
-   }
-   #+end_src
+#+RESULTS: n-apinat-neupops-pat
+| count |
+|-------|
+|    49 |
 
-   #+RESULTS: n-apinat-neupops-pat
-   | count |
-   |-------|
-   |    49 |
+#+name: apinat-neupops-pat
+#+begin_src sparql
+SELECT DISTINCT
+?neupop
+(str(?pl) as ?preferred_label)
+(str(?l) as ?label)
+WHERE {
+  ?neupop a elements:External .
+  ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
+  FILTER CONTAINS(str(?neupop), "/neuron-type-")
+  OPTIONAL { ?neupop skos:prefLabel ?pl . }
+  OPTIONAL { ?neupop rdfs:label ?l . }
+}
+#+end_src
 
-   #+name: apinat-neupops-pat
-   #+begin_src sparql
-   SELECT DISTINCT
-   ?neupop
-   (str(?pl) as ?preferred_label)
-   (str(?l) as ?label)
-   WHERE {
-     ?neupop a elements:External .
-     ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
-     FILTER CONTAINS(str(?neupop), "/neuron-type-")
-     OPTIONAL { ?neupop skos:prefLabel ?pl . }
-     OPTIONAL { ?neupop rdfs:label ?l . }
-   }
-   #+end_src
-
-NPO sourced
+***** NPO sourced queries
 Keast
 Bolser Lewis
 First pass NLP output
-
-1. number of neuron populations aka neuron types
-   # TODO load NPO, and we have to use robot to reason the NPO graph
-   #+begin_src sparql
-   SELECT DISTINCT
-   ?s
-   WHERE {
-       ?s rdfs:subClassOf+ SAO:1813327414 . # NOTE this counts cells
-   }
-   #+end_src
-2. number of distinct phenotypes
-3. number of dimensions
-4. number of phenotype values per phenotype dimension
-   1. number of anatomical regions
-   2. number of species
-   3. number of ...
-
+****** number of neuron populations aka neuron types
+# TODO load NPO, and we have to use robot to reason the NPO graph
+#+begin_src sparql
+SELECT DISTINCT
+?s
+WHERE {
+    ?s rdfs:subClassOf+ SAO:1813327414 . # NOTE this counts cells
+}
+#+end_src
+****** number of distinct phenotypes
+****** number of dimensions
+****** number of phenotype values per phenotype dimension
+******* number of anatomical regions
+******* number of species
+******* number of x
 * Bootstrap :noexport:
 :PROPERTIES:
 :visibility:  folded
 :END:
+
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes
 (defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
 
-;; somehow this gets around lexical scope
+;; somehow this gets around lexical scope FIXME no not really
 (setq-local org-confirm-babel-evaluate (lambda (lang _body) (not (member lang '("cypher" "sparql")))))
 
 ;; TODO
