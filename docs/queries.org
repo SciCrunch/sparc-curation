@@ -1587,7 +1587,7 @@ first pass requires that the subject_id be identical
 *** v2
 #+name: pds-v2-count
 #+begin_src sparql :noweb no-export
-SELECT (count(*) as ?count) {
+SELECT (COUNT(*) as ?count) {
   <<pds-v2>>
 }
 #+end_src
@@ -1649,7 +1649,7 @@ hardcoded_header =  [
 
 key_id = lambda row:(row[2], row[3], row[4], row[1])
 key_award_species_dataset_id = lambda row:(row[3], row[1], row[2], row[4])
-table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in multi))#, key=(key_id if by_id else key_award_species_dataset_id))
+table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in multi))#, key=(key_id if by_id else key_award_species_dataset_id)
 #+end_src
 
 #+begin_src elisp :results none :exports none
@@ -1690,23 +1690,12 @@ WHERE {
   filter(?s1 != ?s2)
   filter(STR(IRI(?s1)) < STR(IRI(?s2))) # this is a hack to filter out duplicate triples
 
-  #filter(?species1 != ?species2)
-  #filter(STR(IRI(?species1)) < STR(IRI(?species2))) # hack to filter dupe triples
-
   # filter to find non-matching awards
   # using contact person doesn't make sense as they are 1:1 with award right now
   ?dataset1 a owl:NamedIndividual ;
   TEMP:hasAwardNumber ?award1 .
   ?dataset2 a owl:NamedIndividual ;
   TEMP:hasAwardNumber ?award2 .
-  # ?id ?award ?species  # there needs to be more than one match so, not unique
-
-  #filter(?dataset1 != ?dataset2)
-  #filter(STR(IRI(?dataset1)) < STR(IRI(?dataset2))) # hack to filter dupe triples
-
-  #filter(?award1 != ?award2)
-  #filter(STR(IRI(?award1)) < STR(IRI(?award2))) # hack to filter dupe triples
-
 } order by ?id limit ?limit
 #+end_src
 
@@ -2443,12 +2432,159 @@ UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
 ** ApiNATOMY
 *** Summary statistics
 **** Dashboard
+#+header: :var n-sparql-apinat-models=n-sparql-apinat-models()
+#+header: :var cypher-apinat-models=cypher-apinat-models()
+#+header: :var n-sparql-apinat-lyphs=n-sparql-apinat-lyphs()
+#+header: :var n-sparql-apinat-lyphs-input=n-sparql-apinat-lyphs-input()
+#+header: :var n-sparql-apinat-publications=n-sparql-apinat-publications()
+#+header: :var n-apinat-nerus=n-apinat-nerus()
+#+header: :var n-apinat-neupops=n-apinat-neupops()
+#+header: :var n-apinat-neupops-pat=n-apinat-neupops-pat()
+#+name: apinat-dashboard-overview
+#+begin_src elisp
+(let ((models (caar n-sparql-apinat-models))
+      (models-cypher (length cypher-apinat-models))
+      (lyphs (caar n-sparql-apinat-lyphs))
+      (lyphs-input (caar n-sparql-apinat-lyphs-input))
+      (publications (caar n-sparql-apinat-publications))
+      (nerus (caar n-apinat-nerus))
+      (neupops (caar n-apinat-neupops))
+      (neupops-pat (caar n-apinat-neupops-pat)))
+  (list
+   (list "element" "count")
+   'hline
+   (list "models" models)
+   (list "models scigraph" models-cypher)
+   (list "lyphs" lyphs)
+   (list "lyphs input" lyphs-input)
+   (list "publications" publications)
+   (list "nerus" nerus)
+   (list "neupops" neupops)
+   (list "neupops pattern" neupops-pat)
+))
+#+end_src
+
+# TODO configure header args for development vs production
+#+begin_src elisp :results none :exports none
+(ow-babel-eval "apinat-dashboard-overview")
+#+end_src
+
+#+RESULTS: apinat-dashboard-overview
+| element         | count |
+|-----------------+-------|
+| models          |     7 |
+| models scigraph |     8 |
+| lyphs           |  5525 |
+| lyphs input     |   761 |
+| publications    |   275 |
+| nerus           |    97 |
+| neupops         |    49 |
+| neupops pattern |    49 |
+
+#+name: apinat-dashboard-model-summary
+#+begin_src sparql :noweb no-export
+select
+?label
+?graph
+?lyphs
+?lyphs_input
+#?links
+#?nodes
+#?chains
+#?coalescences
+?externals
+?publications
+#?groups
+?nerus
+?neupops
+<<apinat-model-summary-where>>
+#+end_src
+
+#+RESULTS: apinat-dashboard-model-summary
+| label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops |
+|------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------|
+| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   498 |         107 |       169 |          238 |    29 |      29 |
+| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  1281 |         139 |       175 |           25 |    23 |      20 |
+| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1127 |         127 |       127 |            1 |    23 |         |
+| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   868 |         143 |       127 |            6 |    19 |         |
+| SAWG_colon-all                                                         | sdcol:sawg-distal-colon |   406 |          78 |        99 |            4 |     1 |         |
+| Keast Bladder Model Scaffold Test                                      | scaft:scaffold-test     |  1290 |         145 |       162 |            4 |     2 |         |
+| TOTAL                                                                  | 7                       |  5520 |         761 |       454 |          275 |    97 |      49 |
+
+# have to union over the aggregated group by results and the total
+# separately and then we can get the table to work correctly
+#+name: apinat-model-summary-where
+#+begin_src sparql :eval never
+WHERE {
+  # ?model apinatomy:hasGraph ?graph  # TODO broken conversion to literal instead of uri at the moment
+
+  # sadly it seems that no one has managed to write an optimization that converts
+  # into this form when querying multiple predicates in the same expression
+  {
+    ?graph a elements:Graph ;
+           rdfs:label ?label .
+    { select ?graph (count(distinct(?o)) as ?lyphs       ) where { ?graph apinatomy:lyphs        ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?lyphs_input ) where
+      { ?graph apinatomy:lyphs ?o .
+           filter not exists { ?o apinatomy:isTemplate true . }
+           filter not exists { ?o apinatomy:generated  true . } }                                       group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?links       ) where { ?graph apinatomy:links        ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?nodes       ) where { ?graph apinatomy:nodes        ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?chains      ) where { ?graph apinatomy:chains       ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?coalescences) where { ?graph apinatomy:coalescences ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?externals   ) where { ?graph apinatomy:external     ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?publications) where { ?graph apinatomy:publications ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?groups      ) where { ?graph apinatomy:groups       ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?nerus       ) where
+      { ?graph apinatomy:groups ?o .
+                                ?o apinatomy:description ?d .
+                                     filter(contains(str(?d), "dynamic")) }                             group by ?graph }
+    optional
+    { select ?graph (count(distinct(?o)) as ?neupops     ) where
+      { ?graph apinatomy:external ?o .
+                                  ?o rdfs:subClassOf+ ilxtr:NeuronEBM . }                               group by ?graph }
+  }
+  union
+  {
+    { select (count(distinct(?graph_)) as ?graph  ) where { ?graph_ a elements:Graph } }
+    bind("TOTAL" as ?label)
+    { select (count(distinct(?o)) as ?lyphs       ) where { ?graph_ apinatomy:lyphs        ?o . } }
+    { select (count(distinct(?o)) as ?lyphs_input ) where
+      { ?graph_ apinatomy:lyphs ?o .
+           filter not exists { ?o apinatomy:isTemplate true . }
+           filter not exists { ?o apinatomy:generated  true . } } }
+    { select (count(distinct(?o)) as ?links       ) where { ?graph_ apinatomy:links        ?o . } }
+    { select (count(distinct(?o)) as ?nodes       ) where { ?graph_ apinatomy:nodes        ?o . } }
+    { select (count(distinct(?o)) as ?chains      ) where { ?graph_ apinatomy:chains       ?o . } }
+    { select (count(distinct(?o)) as ?coalescences) where { ?graph_ apinatomy:coalescences ?o . } }
+    { select (count(distinct(?o)) as ?externals   ) where { ?graph_ apinatomy:external     ?o . } }
+    { select (count(distinct(?o)) as ?publications) where { ?graph_ apinatomy:publications ?o . } }
+    { select (count(distinct(?o)) as ?groups      ) where { ?graph_ apinatomy:groups       ?o . } }
+    { select (count(distinct(?o)) as ?nerus       ) where
+      { ?graph_ apinatomy:groups ?o .
+                                 ?o apinatomy:description ?d .
+                                      filter(contains(str(?d), "dynamic")) } }
+    optional
+    { select (count(distinct(?o)) as ?neupops     ) where
+      { ?graph_ apinatomy:external ?o .
+                                   ?o rdfs:subClassOf+ ilxtr:NeuronEBM . } }
+  }
+}
+#+end_src
 
 **** Queries
 # aka dashboard queries
 ApiNATOMY sourced
 
 1. models
+   #+name: n-sparql-apinat-models
+   #+begin_src sparql :noweb no-export
+   SELECT (COUNT(*) as ?count) {
+     <<sparql-apinat-models>>
+   }
+   #+end_src
+
+   # FIXME owl:Ontology vs elements:Graph
    #+name: sparql-apinat-models
    #+begin_src sparql
    # SELECT (COUNT(DISTINCT ?s) as ?total_models)
@@ -2461,6 +2597,10 @@ ApiNATOMY sourced
    }
    #+end_src
 
+   # FIXME we need a way to issue cypher queries that can return
+   # something other than the graph results so that we can match
+   # sparql unfortunately that is a larger engineering undertaking the
+   # requires modifying scigraph again
    #+name: cypher-apinat-models
    #+begin_src cypher
    MATCH (g)
@@ -2470,20 +2610,20 @@ ApiNATOMY sourced
 
 2. number of lyphs
 
+   #+name: n-sparql-apinat-lyphs
    #+begin_src sparql
    SELECT (COUNT(DISTINCT ?s) as ?total_lyphs)
    WHERE { ?s a elements:Lyph . }
    #+end_src
 
-   #+RESULTS:
+   #+RESULTS: n-sparql-apinat-lyphs
    | total_lyphs |
    |-------------|
-   |        7751 |
+   |        5525 |
 
-
-2. number of lyphs
    generated vs input
    s? rdf:type element:Lyph
+   #+name: n-sparql-apinat-lyphs-input
    #+begin_src sparql :var limit="200"
    SELECT DISTINCT
    (COUNT(DISTINCT ?s) as ?input_lyphs)
@@ -2502,10 +2642,10 @@ ApiNATOMY sourced
    LIMIT ?limit
    #+end_src
 
-   #+RESULTS:
+   #+RESULTS: n-sparql-apinat-lyphs-input
    | input_lyphs |
    |-------------|
-   |         763 |
+   |         761 |
 
 3. publications referenced
    apinaomty:publications
@@ -2514,16 +2654,17 @@ ApiNATOMY sourced
    select count distinct o?
    select distinct o?
    s? apinat:publication o?
+   #+name: n-sparql-apinat-publications
    #+begin_src sparql
    SELECT DISTINCT
    (COUNT(DISTINCT ?pub) as ?publications)
    WHERE { ?s apinatomy:publications ?pub . }
    #+end_src
 
-   #+RESULTS:
+   #+RESULTS: n-sparql-apinat-publications
    | publications |
    |--------------|
-   |           26 |
+   |          275 |
 
 4. species
    both model level and lyph level
@@ -2533,6 +2674,7 @@ ApiNATOMY sourced
    select count distinct o?
    select distinct o?
    s? apinat:external o?
+   #+name: sparql-apinat-prefixes
    #+begin_src sparql
    SELECT
    ?prefix
@@ -2549,24 +2691,28 @@ ApiNATOMY sourced
    ORDER BY ?count
    #+end_src
 
-   #+RESULTS:
+   #+RESULTS: sparql-apinat-prefixes
    | prefix    | count |
    |-----------+-------|
    | CL        |     1 |
    | nlx       |     1 |
-   | doi       |     1 |
-   | sao       |     2 |
    | NCBITaxon |     2 |
-   | ncit      |     4 |
+   | ncit      |     2 |
+   | sao       |     4 |
+   | NCIT      |     4 |
    | GO        |     5 |
    | CHEBI     |    11 |
+   | pubmed    |    14 |
    | EMAPA     |    17 |
-   | tgbugs    |    20 |
-   | pubmed    |    26 |
+   | tgbugs    |    49 |
    | ilx       |    76 |
-   | fma       |    89 |
+   | fma       |    91 |
    | UBERON    |   182 |
-   |           |   437 |
+   |           |   459 |
+   |-----------+-------|
+   | sum       |   459 |
+   #+TBLFM: @17$2='(+ @1$2..@-2$2);N
+   # FIXME will be overwritten on rerun
 
 6. external issues
    publications appearing as external ids, unmapped prefixes etc.
@@ -2584,6 +2730,20 @@ ApiNATOMY sourced
    #+end_src
 
 7. number of neurulated groups aka neuron populations
+   # TODO by model
+   #+name: n-apinat-nerus
+   #+begin_src sparql :noweb yes
+   SELECT (COUNT(*) as ?count) {
+     <<apinat-nerus>>
+   }
+   #+end_src
+
+   #+RESULTS: n-apinat-nerus
+   | count |
+   |-------|
+   |    97 |
+
+   #+name: apinat-nerus
    #+begin_src sparql
    SELECT DISTINCT
    ?group
@@ -2595,6 +2755,62 @@ ApiNATOMY sourced
      ?group rdfs:label ?l .
    }
    order by ?group
+   #+end_src
+
+8. Number of neuron populations with external ids and correct subClassOf.
+   #+name: n-apinat-neupops
+   #+begin_src sparql :noweb yes
+   SELECT (COUNT(*) as ?count) {
+     <<apinat-neupops>>
+   }
+   #+end_src
+
+   #+RESULTS: n-apinat-neupops
+   | count |
+   |-------|
+   |    49 |
+
+   #+name: apinat-neupops
+   #+begin_src sparql
+   SELECT DISTINCT
+   ?neupop
+   (str(?pl) as ?preferred_label)
+   (str(?l) as ?label)
+   WHERE {
+     ?neupop a elements:External .
+     ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
+     OPTIONAL { ?neupop skos:prefLabel ?pl . }
+     OPTIONAL { ?neupop rdfs:label ?l . }
+   }
+   #+end_src
+
+9. Number of neuron populations with external ids that match the =neuron-type= pattern.
+
+   #+name: n-apinat-neupops-pat
+   #+begin_src sparql :noweb yes
+   SELECT (COUNT(*) as ?count) {
+     <<apinat-neupops-pat>>
+   }
+   #+end_src
+
+   #+RESULTS: n-apinat-neupops-pat
+   | count |
+   |-------|
+   |    49 |
+
+   #+name: apinat-neupops-pat
+   #+begin_src sparql
+   SELECT DISTINCT
+   ?neupop
+   (str(?pl) as ?preferred_label)
+   (str(?l) as ?label)
+   WHERE {
+     ?neupop a elements:External .
+     ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
+     FILTER CONTAINS(str(?neupop), "/neuron-type-")
+     OPTIONAL { ?neupop skos:prefLabel ?pl . }
+     OPTIONAL { ?neupop rdfs:label ?l . }
+   }
    #+end_src
 
 NPO sourced
