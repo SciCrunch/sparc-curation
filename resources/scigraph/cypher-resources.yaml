@@ -328,15 +328,15 @@ cypherResources:
 
   - path: /dynamic/neurons/connectivity
     query: |
-            MATCH (blank)-
-            [entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
-            ->(location:Class{iri: '${start_id}'})
-            WITH location, entrytype, blank
-            MATCH (phenotype)<-[predicate]-(blank)<-[:equivalentClass]-(neuron)
-            WHERE NOT (phenotype.iri =~ ".*_:.*")
-            // RETURN phenotype, (phenotype)-[predicate]-(neuron) as e
-            // WITH location, predicate, phenotype, neuron
-            RETURN location, entrytype, neuron, predicate, phenotype
+      MATCH (blank)-
+      [entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
+      ->(location:Class{iri: '${start_id}'})
+      WITH location, entrytype, blank
+      MATCH (phenotype)<-[predicate]-(blank)<-[:equivalentClass]-(neuron)
+      WHERE NOT (phenotype.iri =~ ".*_:.*")
+      // RETURN phenotype, (phenotype)-[predicate]-(neuron) as e
+      // WITH location, predicate, phenotype, neuron
+      RETURN location, entrytype, neuron, predicate, phenotype
     operations:
       - summary: Get connected anatomical regions by neuron type
         parameters:
@@ -346,13 +346,13 @@ cypherResources:
 
   - path: /dynamic/neurons/connectedRegions
     query: |
-            MATCH (blank)-
-            [entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
-            ->(location:Class{iri: '${start_id}'})
-            WITH entrytype, blank
-            MATCH (phenotype)<-[:${target_predicate}]-(blank)
-            // WHERE NOT (phenotype.iri =~ ".*_:.*")
-            RETURN phenotype
+      MATCH (blank)-
+      [entrytype:ilxtr:hasSomaLocatedIn|ilxtr:hasAxonLocatedIn|ilxtr:hasDendriteLocatedIn|ilxtr:hasPresynapticTerminalsIn]
+      ->(location:Class{iri: '${start_id}'})
+      WITH entrytype, blank
+      MATCH (phenotype)<-[:${target_predicate}]-(blank)
+      // WHERE NOT (phenotype.iri =~ ".*_:.*")
+      RETURN phenotype
     operations:
       - summary: Get connected anatomical regions by starting location and target relationship
         parameters:
@@ -465,9 +465,9 @@ cypherResources:
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
       -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
       RETURN path1, path2
-      
+
       UNION
-      
+
       MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
       -[:apinatomy:annotates]->(soma:NamedIndividual)  // soma lyph
       -[:apinatomy:conveys]->(somaLink)                // link connecting soma to axon and dendrite
@@ -566,9 +566,9 @@ cypherResources:
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
       RETURN path1, path2, path3
-      
+
       UNION
-      
+
       MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
       -[:apinatomy:annotates]->(soma:NamedIndividual)    // soma lyph
       -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
@@ -589,14 +589,14 @@ cypherResources:
       RETURN path1, path2, path3
 
   - path: /dynamic/demos/apinat/neru-1/{neupop-id}
-    operations:
+    operations: &neru-ops
       - summary: Return the housing regions and publications for neurulated groups.
         parameters:
          - name: neupop-id
            description: neuron population identifier
            paramType: path
     query: |
-      MATCH (neupop:Class{iri: "http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"})
+      MATCH (neupop:Class{iri: $neupop_id})
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 
       // publications
@@ -620,7 +620,7 @@ cypherResources:
       UNION
 
       // this part usually only returns the soma housing lyph
-      MATCH (neupop:Class{iri: "http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-2"})
+      MATCH (neupop:Class{iri: $neupop_id})
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
       -[b:apinatomy:lyphs]->(lyph)
       -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
@@ -631,12 +631,7 @@ cypherResources:
       return a, b, c, d, null AS e, null AS path
 
   - path: /dynamic/demos/apinat/neru-2/{neupop_id}
-    operations:
-      - summary: Return the housing regions and publications for neurulated groups.
-        parameters:
-         - name: neupop_id
-           description: neuron population identifier
-           paramType: path
+    operations: *neru-ops
     query: |
       MATCH (neupop:Class{iri: $neupop_id})
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
@@ -673,8 +668,6 @@ cypherResources:
 
       UNION
 
-      // use :apinatomy:next to provider ordering for the links
-
       // this part usually only returns the soma housing lyph
       MATCH (neupop:Class{iri: $neupop_id})
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
@@ -685,3 +678,61 @@ cypherResources:
       //-[c:apinatomy:internalIn*0..1]->(e)
       //-[d:apinatomy:external*0..1]->(region)
       RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path
+
+  - path: /dynamic/demos/apinat/neru-3/{neupop_id}
+    operations: *neru-ops
+    query: |
+      MATCH (neupop:Class{iri: $neupop_id})
+      -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+      // publications
+      WITH neugrp, a
+      MATCH path = (neugrp)
+      -[:apinatomy:publications]->(pub)
+      -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+
+      WITH neugrp, a, path
+      MATCH (neugrp)
+      -[b:apinatomy:links]->(link)
+      -[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+      -[d:apinatomy:layerIn*0..1]->(lyph)
+      -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+      WITH neugrp, link, lyph, a, b, c, d, path
+      MATCH (lyph)
+      -[e:apinatomy:external]->(region)
+
+      // use apinatomy:next to extract ordering information
+      WITH neugrp, link, a, b, c, d, e, path
+      MATCH p2 = (link)
+      -[:apinatomy:conveyingLyph]->(cl)
+      -[:apinatomy:topology]->()
+
+      WITH neugrp, link, a, b, c, d, e, path, p2, cl
+      MATCH (cl)
+      -[x:apinatomy:inheritedExternal*0..1]->()
+
+      WITH neugrp, link, a, b, c, d, e, path, p2, x
+      MATCH (link)
+      -[f:apinatomy:next*0..]->()
+      //-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+      // FIXME these should be collapsing into a single relationship
+      -[g:apinatomy:target*0..1]->()
+      -[h:apinatomy:rootOf*0..1]->()
+      -[i:apinatomy:levels*0..1]->()
+      <-[:apinatomy:links]-(neugrp)
+
+      RETURN a, b, c, d, e, f, g,h,i, path, p2, x
+
+      UNION
+
+      // this part usually only returns the soma housing lyph
+      MATCH (neupop:Class{iri: $neupop_id})
+      -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+      -[b:apinatomy:lyphs]->(lyph)
+      -[c:apinatomy:internalIn]->()
+      -[d:apinatomy:external*0..1]->(region)
+      // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+      //-[c:apinatomy:internalIn*0..1]->()
+      //-[d:apinatomy:external*0..1]->(region)
+      RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, null as p2, null as x
