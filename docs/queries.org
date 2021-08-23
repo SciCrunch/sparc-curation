@@ -3149,6 +3149,68 @@ cypherResources:
 
 #+end_src
 * ApiNATOMY competency queries
+** glossary
+*** Neurulated groups
+Neurulated groups are used to ensure that the individual segments and
+parts of neurons modeled in ApiNATOMY can be recognized as single
+cellular entities. By default ApiNATOMY treats parts of neurons
+individually so that it is possible to talk about the specific
+location of a neurite and give it an exact anatomical location.
+
+Note however that sometimes when we talk about neurons in ApiNATOMY we
+implictly mean neuron populations, so a neurite or cell part is not an
+individual neurite of a single cell, but rather a population level
+representation. Cell parts here include axons, dendrites, and somas.
+
+#+begin_src comment
+These population level representations are more similar to the old
+reticular hypothesis about the structure of the nervous system in that
+they also allow multi-nucleated populations, which can be confusing if
+one is expecting the model to be of individual neurons. They can also
+allow axon trees that are not trees but instead are graphs.
+#+end_src
+
+Population level representations can be used to generate models of
+individual neurons that are consistent with the population as a whole
+but do not differentiate between certain scenarios such as individual
+neurons branching vs sub-populations with distinct projection
+patterns.
+
+Neurulating over the parts of populations makes it possible to recover
+a representation that is more familiar to those who are used to
+working with and thinking about whole cells.
+
+This is useful for querying connectivity defined by neuron populations.
+*** Neuron populations
+Neuron populations correspond sets of neurons that share defining
+properties the distinguish them from other similar populations.  For
+example, there may be many populations that have their somas located
+in the Superior Cervical Ganglion, however they can be differentiated
+by considering their projection targets, both anatomically and based
+on their target populations.
+
+In this knowledge base neuron populations are distinct from neurulated
+groups in that they are identified by the ontology representation in
+addition to the ApiNATOMY anatomical representation.
+
+For the parts of the NPO that are related to SPARC, the major defining
+properties for the populations are the locations of their somas,
+axons, and dendrites. The intersection between neurite type and
+anatomical region is usually sufficient to uniquely identify the
+populations in ApiNATOMY models.
+*** Neurites and somas
+Axons and dendrites in the ApiNATOMY representation are collective
+unions of all the individual members of a population. This means that
+we do not distinguish between cases where a single neuron branches
+into multiple collaterals that project to different location and
+multiple neurons that each project to a different location and all
+combinations inbetween.
+
+The micro-anatomy of dendrite and axonal morphology is not considered
+in these population level models, so any branching that is seen is
+representative of the macro-scale branching or differential projection
+patterns of whole populations.
+
 ** expected counts per model
 Expected number of somas and neupops.
 | model-id      | somas | neupops |
