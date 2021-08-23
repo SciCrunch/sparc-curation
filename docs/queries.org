@@ -1,9 +1,6 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: c19e53db0641a181f656073f2016f76552335fc264c1252d842fae5448bd6d09; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 8a64eb66e90691eef1e192aab3e86f3437f32f285b68190868b98f2fa7c28283; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
-
-# [[file:queries.pdf]]
-# [[file:queries.html]]
-
+# [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
 #+begin_src bash :eval never :results none :exports none
 { __p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > ${null="/dev/null"}
@@ -19,14 +16,10 @@ exit
 #+end_src
 
 #+title: SPARC queries
-
-#+options: ^:nil
-
 #+startup: showall
 #+category: sparc
-
+#+options: ^:nil
 #+latex_header: \usepackage[inkscapelatex=false]{svg}
-
 #+begin: properties
 #+property: header-args :eval no-export
 
@@ -2014,25 +2007,6 @@ pprint(dend_terminal_regions)
            'types': ['Class']}}]
 #+end_example
 
-# FIXME move this to orgstrap
-#+begin_src elisp :results none :exports none
-(defun-local json->svg-file (json-string path)
-  (let* ((tmp (org-babel-temp-file "cypher-dot-"))
-         (dot (ob-cypher/scigraph/json-to-dot json-string))
-         (cmd (format
-               (concat
-                "dot "
-                "-Efontname='Dejavu Sans Mono' "
-                "-Nfontname='Dejavu Sans Mono' "
-                "-Grankdir=LR "
-                "-T%s -o %s %s")
-               (file-name-extension path) path tmp)))
-    (with-temp-file tmp
-      (insert dot))
-    (org-babel-eval cmd "")
-    path))
-#+end_src
-
 # Use this block to run the next block an all dependencies without being asked again.
 #+begin_src elisp :results none :exports none
 (ow-babel-eval "neru-simplified")
@@ -2754,6 +2728,8 @@ MATCH path2 = (root)
 RETURN path1, path2
 #+end_src
 **** soma-processes
+# #+header: :results table :limit 1
+#+header: :file ./images/soma-processes.svg :results file :limit 99999
 #+name: cyres-apinat-soma-processes
 #+begin_src cypher
 MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
@@ -2774,6 +2750,44 @@ WITH path1, path2, nodeRoot
 MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
 -[:apinatomy:rootOf]->(chain)
 RETURN path1, path2, path3
+#+end_src
+
+A sparql version of the query (work in progress).
+#+name: sparql-soma-processes
+#+begin_src sparql :var limit="99"
+SELECT DISTINCT
+?c
+?soma
+?linkSoma
+?nodeRoot
+?link
+?layer_or_end
+?cloned
+?supertype
+?external_st
+?external_loe
+?external_end_housing
+WHERE
+{
+  VALUES ?c { NLX:154731 }
+  ?c rdf:type owl:Class .
+  ?c apinatomy:annotates ?soma .
+  ?soma rdf:type owl:NamedIndividual .
+  ?soma apinatomy:conveys ?linkSoma .
+  ?linkSoma apinatomy:target | apinatomy:source ?nodeRoot .
+  ?nodeRoot apinatomy:rootOf ?chain .
+  ?nodeRoot apinatomy:sourceOf | apinatomy:nextChainStartLevels | apinatomy:next+ ?link .
+  ?link apinatomy:fasciculatesIn ?layer_or_end .
+  optional { ?layer_or_end apinatomy:cloneOf* ?cloned . } # optional
+  optional { ?cloned apinatomy:supertype* ?supertype . } # optional
+
+  ?supertype apinatomy:external ?external_st .
+  ?layer_or_end apinatomy:external ?external_loe .
+
+  optional { ?layer_or_end apinatomy:layerIn ?end_housing . } # optional
+  optional { ?end_housing apinatomy:external ?external_end_housing . } # optional
+}
+limit ?limit
 #+end_src
 **** soma-processes/{start-id}
 #+header: :var start-id=(identity nil)
@@ -3557,7 +3571,7 @@ LIMIT ?limit
 |         761 |
 
 ****** publications referenced
-apinaomty:publications
+apinatomy:publications
 average number of publications per unit? (for now no)
 will also want the full listing of publications
 select count distinct o?
@@ -3740,10 +3754,12 @@ WHERE {
 :END:
 
 #+name: orgstrap
-#+begin_src elisp :results none :lexical yes
+#+begin_src elisp :results none :exports none :lexical yes
 (defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
+(defvar orgstrap-do-config-emacs t "Run code that modifies the Emacs configuration.")
 
-;; somehow this gets around lexical scope FIXME no not really
+;; somehow this gets around lexical scope FIXME no not really have to
+;; modify the elvs
 (setq-local
  org-confirm-babel-evaluate
  (lambda (lang _body)
@@ -3787,14 +3803,14 @@ WHERE {
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
-  (reval 'sha256 '880e91f8e9137c7fb7a14e2c6e68fc28d141a70bf9d9395f6dbacac5e0f296d6
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/b7618727eee4c0d74c0e7271e3b8d36f3432a247/reval.el"))
+  (reval 'sha256 '1eb9c155d89e5d1f14b3f62f6acdeb6ab03647662ff9473ad211c9e4e5e297ef
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/2ee5438e6382786d1269310cef0315eca0d227be/reval.el"))
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '9683db93bf95cf2c82e7788e9cf26a594e76b19399d7f3d5524900aed5738471
+    (reval 'sha256 '67fd0794e6d19f7f7f615a2928698a7b8df20cb969be256d63e5cd1d51cd4b7f
            ;; "~/git/orgstrap/ow.el"
-           (concat ghost "a2451655831f09f28301b1e9b4bc74eec5be2d28" "/ow.el")))
+           (concat ghost "8f34f9f8b85d32c3212006f5fbf3e86186f27387" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
            ;;"~/git/orgstrap/services/blazegraph.el"
@@ -3802,25 +3818,46 @@ WHERE {
 
 (when orgstrap-do-packages-emacs
   (ow-enable-use-package)
-  (ow-use-packages
-   orgstrap
-   jupyter
-   (cypher-mode :init (require 'cypher-mode) (set-face-attribute 'cypher-pattern-face nil :background nil))
-   sparql-mode
-   ob-cypher
-   (org-plus-contrib
-    :mode ("\\.org\\'" . org-mode)
-    :init
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '((cypher . t)
-       (sparql . t)
-       (python . t)
-       (jupyter . t))))))
+  (let ((gt26 (>= emacs-major-version 26)))
+    (ow-use-packages
+     orgstrap
+     (when gt26 jupyter)
+     (cypher-mode
+      :init
+      (defface cypher-pattern-face
+        '((t :foreground "DeepPink" :background unspecified :bold t))
+        "Face for pattern struct." :group 'cypher-faces))
+     sparql-mode
+     ob-cypher
+     (org-plus-contrib
+      :mode ("\\.org\\'" . org-mode)
+      :init
+      (org-babel-do-load-languages
+       'org-babel-load-languages
+       `((cypher . t)
+         (sparql . t)
+         (python . t)
+         ,(when gt26 '(jupyter . t))))))))
+
 
 (unless (fboundp #'ob-cypher/scigraph/query)
-  (reval 'sha256 'e630298fa637caff064f500d7c6de7e0a98263796c79cb171f10754d531c3eef
-         "https://raw.githubusercontent.com/tgbugs/ob-cypher/9d80fcb193819a6ce7307bb92369b269b4176d43/ob-cypher.el"))
+  (reval 'sha256 '44408196e3569691fa08c01fc28a767759cd4f95310f7844dbc1fe024b1cf7d3 "https://raw.githubusercontent.com/tgbugs/ob-cypher/2a33ae888a0e1d36c57aa41568061315fc7268e3/ob-cypher.el"))
+
+(defun-local json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
+  (let* ((tmp (org-babel-temp-file "cypher-dot-"))
+         (dot (ob-cypher/scigraph/json-to-dot json-string))
+         (cmd (format
+               (concat
+                "dot "
+                "-Efontname='Dejavu Sans Mono' "
+                "-Nfontname='Dejavu Sans Mono' "
+                "-Grankdir=LR "
+                "-T%s -o %s %s")
+               (file-name-extension path) path tmp)))
+    (with-temp-file tmp
+      (insert dot))
+    (org-babel-eval cmd "")
+    path))
 
 ;; see orgware.org for a longer note on noweb and empty lines
 (defun ow---strip-empty-lines ()
@@ -3843,13 +3880,11 @@ WHERE {
 ;; from the elvs in order to get this to work
 (when enable-local-eval ; FIXME HACK how to know when this was called
   ;; by the elvs? we don't want this running on a manual trigger
-  (mapcar (lambda (dblock-name)
-            (save-excursion (org-find-dblock dblock-name) (org-cycle)))
-          '("properties" "prefixes"))
-  (save-excursion
-    (goto-char (org-babel-find-named-block "orgstrap-shebang"))
-    (org-cycle))
-  (goto-char (point-min)))
+  (ow-hide-section-0-blocks)
+  (when orgstrap-do-config-emacs
+    (ow--rainy-day)
+    (add-hook 'emacs-lisp-mode-hook #'rainbow-delimiters-mode)
+    (ow-enable-config-familiar-1)))
 
 ;; if we make it all the way through the block make sure that we don't
 ;; run the orgstrap elvs again so that that ocbe doesn't get klobbered
@@ -3858,7 +3893,7 @@ WHERE {
 
 Tangle helper for bare paragraphs.
 #+name: nonl
-#+begin_src elisp :var paragraph=""
+#+begin_src elisp :exports none :results none :var paragraph=""
 (string-trim (replace-regexp-in-string "\n" " " paragraph))
 #+end_src
 

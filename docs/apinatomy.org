@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: cbf50ae5be0ecc8a1f980756ecde8143f1d509a9912997f7f1aef27c88a4e193; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: d5a47215c1609bce89fe00d933c97cfc8eeecf82bbae89b4ad911fa4eb57f671; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -651,8 +651,8 @@ obj:   {n_pair}''')
   (defun reval-minimal (cypher checksum path-or-url &rest alternates)
     "Simplified and compact implementation of reval."
     (let* (done (o url-handler-mode) (csn (symbol-name checksum))
-                (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
-                                    "-" (file-name-nondirectory path-or-url))))
+           (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
+                               "-" (file-name-nondirectory path-or-url))))
       (url-handler-mode)
       (unwind-protect
           (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
@@ -676,13 +676,13 @@ obj:   {n_pair}''')
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
-  (reval 'sha256 '880e91f8e9137c7fb7a14e2c6e68fc28d141a70bf9d9395f6dbacac5e0f296d6
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/b7618727eee4c0d74c0e7271e3b8d36f3432a247/reval.el"))
+  (reval 'sha256 '1eb9c155d89e5d1f14b3f62f6acdeb6ab03647662ff9473ad211c9e4e5e297ef
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/2ee5438e6382786d1269310cef0315eca0d227be/reval.el"))
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '9683db93bf95cf2c82e7788e9cf26a594e76b19399d7f3d5524900aed5738471
-           (concat ghost "a2451655831f09f28301b1e9b4bc74eec5be2d28" "/ow.el"))))
+    (reval 'sha256 'f918c7d0a40da313fa36157a0cb386a2e89f71199a22d1e7b3be43c000cfbbe5
+           (concat ghost "70f599bea56f41d7da69ad4aa2b5e1fc30d5b81a" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package
@@ -707,19 +707,29 @@ obj:   {n_pair}''')
 
 ;; entry point for batch command line
 
-(ow-cli-gen
-    ((:install)
-     (:all)
-     (:model-id nil) ; the id of the model to build
-     ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
-     ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
-     ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
-     ((:debug) apinat-converter-debug)) ; enable debug mode
-  (when (or all model-id)
-    (message "updating %s" (or model-id "all"))
-    (if all
-        (update-all-models-async)
-      (update-models (list (intern model-id))))))
+(when noninteractive
+  (unless user-init-file
+    ;; FIXME I can't decide whether this approach or the
+    ;; ~/.config/app-name/init.el approach is better and whether I
+    ;; should use "~/.orgstrap/init.el" or something ... but I think
+    ;; the point here is that we just want to provide a place for a
+    ;; stripped down init file that will load as fast as the user
+    ;; wants and can hold pointers to things like oa-secrets
+    (setq user-init-file (expand-file-name "orgstrap-init.el" user-emacs-directory))
+    (load user-init-file))
+  (ow-cli-gen
+      ((:install)
+       (:all)
+       (:model-id nil) ; the id of the model to build
+       ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
+       ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
+       ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
+       ((:debug) apinat-converter-debug)) ; enable debug mode
+    (when (or all model-id)
+      (message "updating %s" (or model-id "all"))
+      (if all
+          (update-all-models-async)
+        (update-models (list (intern model-id)))))))
 #+end_src
 
 [[(sure)]] Ensure that the
