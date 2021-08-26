@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 8a64eb66e90691eef1e192aab3e86f3437f32f285b68190868b98f2fa7c28283; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 4052d735d06d74770fb81e77946cd848a50cdf5f4977c18cb9b1aa66a032191b; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -49,6 +49,7 @@ exit
 #+link: awards http://uri.interlex.org/temp/uris/awards/
 #+link: rdf http://www.w3.org/1999/02/22-rdf-syntax-ns#
 #+link: FMA http://purl.org/sig/ont/fma/fma
+#+link: obo http://purl.obolibrary.org/obo/
 #+link: IAO http://purl.obolibrary.org/obo/IAO_
 #+link: UBERON http://purl.obolibrary.org/obo/UBERON_
 #+link: NCBITaxon http://purl.obolibrary.org/obo/NCBITaxon_
@@ -112,7 +113,6 @@ exit
 #+link: doap http://usefulinc.com/ns/doap#
 #+link: xsd http://www.w3.org/2001/XMLSchema#
 #+link: skos http://www.w3.org/2004/02/skos/core#
-#+link: obo http://purl.obolibrary.org/obo/
 #+end:
 
 * Tutorial :noexport:
@@ -3213,22 +3213,33 @@ patterns of whole populations.
 
 ** expected counts per model
 Expected number of somas and neupops.
-| model-id      | somas | neupops |
-|---------------+-------+---------|
-| keast-bladder |    30 |      20 |
-| bolew         |       |         |
+
+| model-id          | somas | neupops |
+|-------------------+-------+---------|
+| keast-bladder     |    34 |      20 |
+| bolser-lewis      |    29 |      29 |
+| sawg-stomach      |    14 |      14 |
+| sawg-distal-colon |    23 |      17 |
+| ard-arm-cardiac   |    41 |      12 |
+| bronchomotor      |    19 |       6 |
 
 *** somas
 somas >= neupops
 
+The number of somas for distinct populations in a given model.
+
 *** populations
+the number of neuron populations as defined by the neurulator that have an ontology identifier
 
 *** neuron part per region per model
-| model-id      | diag abbrev | external | somas | axons | axon term | dend | dend term |
-|---------------+-------------+----------+-------+-------+-----------+------+-----------|
-| bolser-lewis  | SCG         |          |    17 |       |           |      |           |
-| keast-bladder |             |          |       |       |           |      |           |
-|               |             |          |       |       |           |      |           |
+| model-id          | diag abbrev | external | somas | axons | axon term | dend | dend term |
+|-------------------+-------------+----------+-------+-------+-----------+------+-----------|
+| bolser-lewis      | SCG         |          |    17 |       |           |      |           |
+| keast-bladder     |             |          |       |       |           |      |           |
+| bronchomotor      |             |          |       |       |           |      |           |
+| ard-arm-cardiac   |             |          |       |       |           |      |           |
+| sawg-distal-colon |             |          |       |       |           |      |           |
+| sawg-stomach      |             |          |       |       |           |      |           |
 
 ** expected locations
 use NPO as a top down constraint on the locations of somas etc.
@@ -3252,16 +3263,60 @@ NPO here as well
 
 ** cross model
 *** expect populations from models to have processes in common location
-| external | diag abbrev  | model-id          | neupop      |
-|----------+--------------+-------------------+-------------|
-|          | T1           | bolser-lewis      | x y         |
-|          | T1           | keast-bladder     | 20          |
-|          | DIENC        | bolser-lewis      | z           |
-|          | Diencephalon | keast-bladder     | 15 16 17 18 |
-|          | IMG          | keast-bladder     | 3 6 7 11    |
-|          | IMG          | sawg-distal-colon | D H G F B Q |
-|          | LumSplN      | keast-bladder     | 6 7 11      |
-|          | LumSplN      | sawg-distal-colon | B           |
+#+begin_src sparql
+select distinct
+?external
+(str(?el) as ?label)
+#?p
+?model
+?region
+#?link
+?neru
+?seed
+?neupop
+?dyn
+where {
+  values ?external { UBERON:0006457 UBERON:0001894 UBERON:0005453 UBERON:0018683 }
+
+  ?external a owl:Class ;
+    apinatomy:annotates ?region ;
+    rdfs:label ?el .
+
+  ?region a elements:Lyph .
+
+  ?model a elements:Graph ;
+    apinatomy:lyphs ?region .
+
+  ?link apinatomy:fasciculatesIn ?region .
+
+  ?neru apinatomy:links ?link ;
+    apinatomy:description ?dyn ;
+    a elements:Group .
+  filter contains(str(?dyn), "dynamic")
+  optional { ?neru apinatomy:external ?neupop . }
+
+  optional { ?seed apinatomy:seedIn ?neru . } # this sort of works but misses cases where a dynamic group was created and there is no matching seed
+
+}
+order by str(?external)
+#+end_src
+
+Expected.
+# FIXME the hline breaks with uberon somehow or for some reason? was
+# doing (- 8 14) and getting -6 somehow the width was too narrow and
+# broke `org-table--align-field'
+| external       | diag abbrev  | model-id          | neupop      |
+|----------------+--------------+-------------------+-------------|
+| UBERON:0006457 | T1           | bolser-lewis      | 1 2 3 6 7   |
+| UBERON:0006457 | T1           | keast-bladder     | 20          |
+| UBERON:0001894 | DIENC        | bolser-lewis      | 1 26        |
+| UBERON:0001894 | Diencephalon | keast-bladder     | 15 16 17 18 |
+| UBERON:0005453 | IMG          | keast-bladder     | 3 6 7 11    |
+| UBERON:0005453 | IMG          | sawg-distal-colon | B D F G H Q |
+| UBERON:0018683 | LumSplN      | keast-bladder     | 6 7 11      |
+| UBERON:0018683 | LumSplN      | sawg-distal-colon | B           |
+
+
 *** visualize all populations that have some process in the IMG
 Images of nerus that have some process in the IMG, from =keast-bladder= and =sawg-distal-colon=.
 
@@ -3870,9 +3925,9 @@ WHERE {
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '67fd0794e6d19f7f7f615a2928698a7b8df20cb969be256d63e5cd1d51cd4b7f
+    (reval 'sha256 'f918c7d0a40da313fa36157a0cb386a2e89f71199a22d1e7b3be43c000cfbbe5
            ;; "~/git/orgstrap/ow.el"
-           (concat ghost "8f34f9f8b85d32c3212006f5fbf3e86186f27387" "/ow.el")))
+           (concat ghost "70f599bea56f41d7da69ad4aa2b5e1fc30d5b81a" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
            ;;"~/git/orgstrap/services/blazegraph.el"
@@ -3932,6 +3987,7 @@ WHERE {
 ;; command line interface
 (ow-cli-gen
     ((:tangle)
+     (:visit) ; FIXME better name
      (:report-apinat)
      (:report-organs))
   (when tangle (org-babel-tangle))
