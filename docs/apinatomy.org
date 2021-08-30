@@ -91,9 +91,17 @@ function apinat-build-all () {
         bash -c 'apinat-build --repo $(pwd) --model-id ${@}'" ${@}" _ {}
 
     # only add models where the json has changed since the xlsx is opaque
-    git add -u $(git status --porcelain | grep json | grep M | cut -d' ' -f3 | cut -d'/' -f1)
+    git add -u $(git status --porcelain | grep json | grep M | cut -d' ' -f3 | cut -d'/' -f1-2)
     popd
 }
+#+end_src
+
+#+begin_src elisp
+(let ((default-directory apinat-model-repo))
+  (cl-remove-if-not
+   (lambda (s) (string-match ".json$" s))
+   (split-string
+    (run-command "git" "diff" "--name-only" "HEAD" "HEAD~1" "--" "models"))))
 #+end_src
 
 ** Export to ttl
@@ -418,7 +426,7 @@ for f in $(ls */derived/*.ttl); do apinat-deploy-from-ttl $f; done
 
 Alternately use the following to deploy specific models.
 #+begin_src bash
-apinat-deploy-ttls $(git diff --name-only HEAD~1..HEAD | cut -d'/' -f 1 | sort -u)
+apinat-deploy-ttls $(git diff --name-only HEAD~1..HEAD | cut -d'/' -f 2 | sort -u)
 #+end_src
 
 If you add a new model you will need to update the imports in
@@ -450,6 +458,7 @@ function apinat-remote-operations () {
     mkdir -p "$(dirname "${PATH_TARGET}")"
     chown nginx:nginx "${PATH_SOURCE}"
     mv "${PATH_SOURCE}" "${PATH_TARGET}"
+    # FIXME we need to fail if the source path does not exist otherwise we end in broken state
     unlink "${PATH_LINK}"
     ln -s "${LINK_TARGET}" "${PATH_LINK}"
 }
@@ -481,7 +490,7 @@ function apinat-deploy-from-ttl () {
 function apinat-deploy-ttls () {
     # TODO do it in batch, derive the timesamps correctly etc.
     for id in $@; do
-        apinat-deploy-from-ttl "${id}/derived/${id}.ttl"
+        apinat-deploy-from-ttl "models/${id}/derived/${id}.ttl"
     done
 }
 #+end_src

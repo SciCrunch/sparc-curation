@@ -88,6 +88,8 @@ exit
 #+link: scaft https://apinatomy.org/uris/models/scaffold-test/ids/
 #+link: vagnr https://apinatomy.org/uris/models/vagus-nerve/ids/
 #+link: sdcol https://apinatomy.org/uris/models/sawg-distal-colon/ids/
+#+link: sstom https://apinatomy.org/uris/models/sawg-stomach/ids/
+#+link: dlcon https://apinatomy.org/uris/models/dev-layout-conn/ids/
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
@@ -3263,18 +3265,20 @@ NPO here as well
 
 ** cross model
 *** expect populations from models to have processes in common location
+#+name: region-populations
 #+begin_src sparql
 select distinct
 ?external
 (str(?el) as ?label)
 #?p
 ?model
-?region
+#?region
 #?link
-?neru
-?seed
+#?neru
+# ?seed
+(replace(str(?neru), "^.+-([A-Za-z0-9]+)$", "$1") as ?neuron_number)
+#?dyn
 ?neupop
-?dyn
 where {
   values ?external { UBERON:0006457 UBERON:0001894 UBERON:0005453 UBERON:0018683 }
 
@@ -3287,38 +3291,46 @@ where {
   ?model a elements:Graph ;
     apinatomy:lyphs ?region .
 
-  ?link apinatomy:fasciculatesIn ?region .
+  ?link ( apinatomy:fasciculatesIn | apinatomy:layerIn | apinatomy:internalIn )+ ?region .
 
   ?neru apinatomy:links ?link ;
     apinatomy:description ?dyn ;
     a elements:Group .
   filter contains(str(?dyn), "dynamic")
   optional { ?neru apinatomy:external ?neupop . }
-
-  optional { ?seed apinatomy:seedIn ?neru . } # this sort of works but misses cases where a dynamic group was created and there is no matching seed
-
+  optional { ?seed apinatomy:seedIn ?neru . } # seedIn sort of works but misses cases where a dynamic group was created with a seed
 }
-order by str(?external)
+order by str(?external) str(?model) xsd:integer(?neuron_number)
 #+end_src
 
 Expected.
 # FIXME the hline breaks with uberon somehow or for some reason? was
 # doing (- 8 14) and getting -6 somehow the width was too narrow and
 # broke `org-table--align-field'
-| external       | diag abbrev  | model-id          | neupop      |
-|----------------+--------------+-------------------+-------------|
-| UBERON:0006457 | T1           | bolser-lewis      | 1 2 3 6 7   |
-| UBERON:0006457 | T1           | keast-bladder     | 20          |
-| UBERON:0001894 | DIENC        | bolser-lewis      | 1 26        |
-| UBERON:0001894 | Diencephalon | keast-bladder     | 15 16 17 18 |
-| UBERON:0005453 | IMG          | keast-bladder     | 3 6 7 11    |
-| UBERON:0005453 | IMG          | sawg-distal-colon | B D F G H Q |
-| UBERON:0018683 | LumSplN      | keast-bladder     | 6 7 11      |
-| UBERON:0018683 | LumSplN      | sawg-distal-colon | B           |
-
+| external       | diag abbrev  | model-id          | neupop            |
+|----------------+--------------+-------------------+-------------------|
+| UBERON:0006457 | T1           | bolser-lewis      | 1 2 3 6 7         |
+| UBERON:0006457 | T1           | keast-bladder     | 20                |
+| UBERON:0001894 | DIENC        | bolser-lewis      | 1 26              |
+| UBERON:0001894 | Diencephalon | keast-bladder     | 13 14 15 16 17 18 |
+| UBERON:0005453 | IMG          | keast-bladder     | 3 6 7 11          |
+| UBERON:0005453 | IMG          | sawg-distal-colon | B D F G H Q       |
+| UBERON:0018683 | LumSplN      | keast-bladder     | 6 7 11            |
+| UBERON:0018683 | LumSplN      | sawg-distal-colon | B                 |
 
 *** visualize all populations that have some process in the IMG
 Images of nerus that have some process in the IMG, from =keast-bladder= and =sawg-distal-colon=.
+
+** kg queries
+#+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-11") :file ./images/neru-3-ntk-11.svg
+
+#+RESULTS:
+[[file:./images/neru-3-ntk-11.svg]]
+
+#+call: neru-simplified(path="./images/neru-simplified-ntk-11.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-11")))
+
+#+RESULTS:
+[[file:./images/neru-simplified-ntk-11.svg]]
 
 * Sanity checks
 Other queries run against various representations of the data.
@@ -3375,6 +3387,26 @@ select ?s ?tes ?vi where {
 # reval maybe? nope `url-unhex-string-at-point' `evil-inner-double-quote'
 # "with escape \" yeah? "
 # org doesn't have strings but evil works
+#+begin_src elisp :results none :exports none
+(defun org-babel-execute:ttl (body params)
+  "Return the verbatim BODY of the ttl.
+
+We can probably cook up an alternate version of this which would
+expand into triples using arrays or something like that."
+  body)
+#+end_src
+
+#+name: py-ttl-subjects
+#+begin_src python :noweb yes :var input=ttl-organs() :results code :wrap src ttl
+from pyontutils.core import OntGraph
+
+g = OntGraph().parse(data=input, format='ttl')
+
+#return [[g.namespace_manager._qhrm(_)] for _ in sorted(set(g.subjects()))]
+return ' '.join([g.namespace_manager._qhrm(_) for _ in sorted(set(g.subjects()))])
+#+end_src
+
+#+name: ttl-organs
 #+begin_src ttl
 @prefix l: <http://www.w3.org/2000/01/rdf-schema#label> .
 @prefix e: <http://uri.interlex.org/tgbugs/uris/readable/hasExistingId> .
@@ -3383,28 +3415,6 @@ select ?s ?tes ?vi where {
 
 # tissue
 UBERON:0001013 l: "adipose tissue"; e: FMA:20110 .
-
-# nerves
-# cranial (strict)
-UBERON:0001646 l: "abducens nerve"; e: FMA:50867 .
-UBERON:0001647 l: "facial nerve"; e: FMA:50868 .
-UBERON:0001649 l: "glossopharyngeal nerve"; e: FMA:50870 .
-UBERON:0001650 l: "hypoglossal nerve"; e: FMA:50871 .
-UBERON:0001643 l: "oculomotor nerve"; e: FMA:50864 .
-UBERON:0001579 l: "olfactory nerve"; e: FMA:46787 .
-UBERON:0001645 l: "trigeminal nerve"; e: FMA:50866 .
-UBERON:0001644 l: "trochlear nerve"; e: FMA:50865 .
-UBERON:0001759 l: "vagus nerve"; e: FMA:5731 .
-UBERON:0003723 l: "vestibulocochlear nerve"; e: FMA:50869 .
-
-# other
-"pudendal nerve"
-"thoracic splanchnic nerve"
-"sciatic nerve"
-UBERON:0002019 l: "accessory XI nerve"; e: FMA:6720 .
-
-# ganglia
-UBERON:0001805 l: "autonomic ganglion"; e: FMA:5889 .
 
 # regions
 UBERON:0002298 l: "brainstem"; e: FMA:79876 .
@@ -3423,7 +3433,7 @@ UBERON:0000059 l: "large intestine"; e: FMA:7201 .
 UBERON:0002107 l: "liver"; e: FMA:7197 .
 UBERON:0001556 l: "lower urinary tract"; e: FMA:45659 .
 UBERON:0002048 l: "lung"; e: FMA:68877 .
-UBERON:0001630 l: "muscle organ"; FMA:5022 .
+UBERON:0001630 l: "muscle organ"; e: FMA:5022 .
 UBERON:0001264 l: "pancreas"; e: FMA:7198 .
 UBERON:0002097 l: "skin of body"; e: FMA:7163 .
 UBERON:0002108 l: "small intestine"; e: FMA:7200 .
@@ -3432,10 +3442,338 @@ UBERON:0002106 l: "spleen"; e: FMA:7196 .
 UBERON:0000945 l: "stomach"; e: FMA:7148 .
 UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
 #+end_src
+
 *** nerves
+#+name: ttl-nerves
+#+begin_src ttl
+@prefix l: <http://www.w3.org/2000/01/rdf-schema#label> .
+@prefix e: <http://uri.interlex.org/tgbugs/uris/readable/hasExistingId> .
+@prefix FMA: <http://purl.org/sig/ont/fma/fma> .
+@prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
+
+# XXX sciatic nerve is missing from this list
+
+# not actually cranial
+UBERON:0002019 l: "accessory XI nerve"; e: FMA:6720 . # missing from the larger list
+
+# nerves missing from the larger list
+UBERON:0001646 l: "abducens nerve"; e: FMA:50867 .
+UBERON:0001650 l: "hypoglossal nerve"; e: FMA:50871 .
+UBERON:0001579 l: "olfactory nerve"; e: FMA:46787 .
+UBERON:0001644 l: "trochlear nerve"; e: FMA:50865 .
+UBERON:0003723 l: "vestibulocochlear nerve"; e: FMA:50869 .
+
+# the larger list
+UBERON:0034728 l: "autonomic nerve" .
+UBERON:0009009 l: "carotid sinus nerve" .
+UBERON:0009675 l: "chorda tympani branch of facial nerve" .
+UBERON:0019198 l: "dorsal nerve of clitoris" .
+UBERON:0019197 l: "dorsal nerve of penis" .
+UBERON:0010380 l: "enteric nerve" .
+UBERON:0010406 l: "cholinergic enteric nerve" .
+UBERON:0001647 l: "facial nerve"; e: FMA:50868 .
+UBERON:0001649 l: "glossopharyngeal nerve"; e: FMA:50870 .
+UBERON:0001643 l: "oculomotor nerve"; e: FMA:50864 .
+UBERON:0002924 l: "terminal nerve" .
+UBERON:0001645 l: "trigeminal nerve"; e: FMA:50866 .
+UBERON:0001759 l: "vagus nerve"; e: FMA:5731 .
+UBERON:0018680 l: "greater splanchnic nerve" .
+UBERON:0003438 l: "iris nerve" .
+UBERON:0011096 l: "lacrimal nerve" .
+UBERON:0035642 l: "laryngeal nerve" .
+UBERON:0011766 l: "left recurrent laryngeal nerve" .
+UBERON:0011767 l: "right recurrent laryngeal nerve" .
+UBERON:0003716 l: "recurrent laryngeal nerve" .
+UBERON:0011326 l: "superior laryngeal nerve" .
+UBERON:3010764 l: "laryngeus ventralis" .
+UBERON:0001964 l: "least splanchnic nerve" .
+UBERON:0018681 l: "lesser splanchnic nerve" .
+UBERON:0003721 l: "lingual nerve" .
+UBERON:0022301 l: "long ciliary nerve" .
+UBERON:0018683 l: "lumbar splanchnic nerve" .
+UBERON:0000377 l: "maxillary nerve" .
+UBERON:0036143 l: "meningeal branch of mandibular nerve" .
+UBERON:0017641 l: "meningeal branch of spinal nerve" .
+UBERON:0022300 l: "nasociliary nerve" .
+UBERON:0008810 l: "nasopalatine nerve" .
+UBERON:0035650 l: "nerve of clitoris" .
+UBERON:0035649 l: "nerve of penis" .
+UBERON:0015162 l: "superior branch of oculomotor nerve" .
+UBERON:0018675 l: "pelvic splanchnic nerve" .
+UBERON:0011391 l: "perineal nerve" .
+UBERON:0001884 l: "phrenic nerve" .
+UBERON:0034725 l: "pterygopalatine nerve" .
+UBERON:0011390 l: "pudendal nerve" .
+UBERON:0009625 l: "sacral nerve" .
+UBERON:0018684 l: "sacral splanchnic nerve" .
+UBERON:0022302 l: "short ciliary nerve" .
+UBERON:0003715 l: "splanchnic nerve" .
+UBERON:0018679 l: "thoracic splanchnic nerve" .
+UBERON:0001323 l: "tibial nerve" .
+UBERON:0036216 l: "tympanic nerve" .
+UBERON:0018412 l: "vidian nerve" .
+#+end_src
+
+*** ganglia
+#+name: ttl-ganglia
+#+begin_src ttl
+@prefix l: <http://www.w3.org/2000/01/rdf-schema#label> .
+@prefix e: <http://uri.interlex.org/tgbugs/uris/readable/hasExistingId> .
+@prefix FMA: <http://purl.org/sig/ont/fma/fma> .
+@prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
+
+UBERON:0001808 l: "parasympathetic ganglion" .
+UBERON:0035776 l: "accessory ciliary ganglion" .
+UBERON:0001805 l: "autonomic ganglion"; e: FMA:5889 .
+UBERON:0014463 l: "cardiac ganglion" .
+UBERON:0002262 l: "celiac ganglion" .
+UBERON:0035783 l: "ganglion of ciliary nerve" .
+UBERON:0001701 l: "glossopharyngeal ganglion" .
+UBERON:0005360 l: "inferior glossopharyngeal IX ganglion" .
+UBERON:0013500 l: "glossopharyngeal-vagus IX-X ganglion complex" .
+UBERON:0035769 l: "mesenteric ganglion" .
+UBERON:0005479 l: "superior mesenteric ganglion" .
+UBERON:0005453 l: "inferior mesenteric ganglion" .
+UBERON:0001989 l: "superior cervical ganglion" .
+UBERON:0001990 l: "middle cervical ganglion" .
+UBERON:0002440 l: "inferior cervical ganglion" .
+UBERON:0003963 l: "otic ganglion" .
+UBERON:0001807 l: "paravertebral ganglion" .
+UBERON:0016508 l: "pelvic ganglion" .
+UBERON:0003964 l: "prevertebral ganglion" .
+UBERON:0003962 l: "pterygopalatine ganglion" .
+UBERON:0005407 l: "sublingual ganglion" .
+UBERON:0002059 l: "submandibular ganglion" .
+UBERON:0001806 l: "sympathetic ganglion" .
+UBERON:0005362 l: "vagus X ganglion" .
+UBERON:0005364 l: "superior vagus X ganglion" .
+UBERON:0005363 l: "inferior vagus X ganglion" .
+UBERON:0000408 l: "vertebral ganglion" .
+#+end_src
 
 *** neuron population by organ
+
+#+name: organ-subjects
+#+call: py-ttl-subjects(input=ttl-organs())
+
+#+name: ganglia-subjects
+#+call: py-ttl-subjects(input=ttl-ganglia())
+
+#+name: nerve-subjects
+#+call: py-ttl-subjects(input=ttl-nerves())
+
+# FIXME somehow selecting only predicates here produces numerical results only !?
+#+name: thing
+#+begin_src sparql :noweb yes :var limit="99" :file ./reports/organ-nerve-ganglia.csv :results file
+select distinct
+?organ_start
+?label
+(count(distinct(?ele)) as ?elements)
+#?elements
+?model
+#?ele
+#?type
+# ?sp
+#?s
+#?op_wat
+#?p
+#?o
+where {
+  values ?organ_start {
+  <<organ-subjects()>>
+  <<ganglia-subjects()>>
+  <<nerve-subjects()>>
+  }
+  ?organ_start rdfs:label ?sl .
+  bind(str(?sl) as ?label)
+  # FIXME TODO traverse partonomy
+  optional {
+  values ?type { elements:Lyph elements:Group elements:Material elements:Chain }
+  ?organ ( partOf: | rdfs:subClassOf )* ?organ_start .
+  #?organ apinatomy:annotates ?ele .
+  ?ele apinatomy:external ?organ .
+  ?ele a ?type .
+  ?model ( apinatomy:lyphs | apinatomy:chains | apinatomy:groups | apinatomy:materials ) ?ele .
+  ?model a elements:Graph .
+  #?ele apinatomy:inheritedExternal ?organ .
+  #?o ?p ?q .
+  }
+}
+group by ?organ_start ?label ?model
+order by ?organ_start
+#order by ?type ?organ ?model
+#limit ?limit
+#+end_src
+
+#+begin_src elisp :results none :exports none
+(ow-babel-eval "thing")
+#+end_src
+
+#+RESULTS: thing
+[[file:./reports/organ-nerve-ganglia.csv]]
+https://docs.google.com/spreadsheets/d/1pgprwTr4bvAaex8cNLeoRLUgt0VU5tilbWi4BCWF1JE/edit#gid=219324374
+=organ-nerve-ganglia=
+# TODO auto populate results
+#+begin_src sparql
+select distinct
+?part_start
+(str(?sl) as ?start_label)
+where {
+  ?part_start rdfs:subClassOf+/owl:someValuesFrom+ UBERON:0001255 .
+  ?part_start rdfs:label ?sl .
+}
+#+end_src
+
+the nested version here is massively slow
+#+begin_src sparql :var limit="200"
+select distinct
+?part
+(str(?l) as ?label)
+where {
+
+  values ?part_0 { UBERON:0001255 }
+
+  #?part_1 rdfs:label ?l1 .
+  ?part_1 rdfs:subClassOf ?bn0 .
+                          ?bn0 a owl:Restriction .
+                          ?bn0 owl:onProperty partOf: .
+                          ?bn0 owl:someValuesFrom ?part_0 .
+
+
+  optional {
+  #?part_2 rdfs:label ?l2 .
+  ?part_2 rdfs:subClassOf ?bn1 .
+                          ?bn1 a owl:Restriction .
+                          ?bn1 owl:onProperty partOf: .
+                          ?bn1 owl:someValuesFrom ?part_1 .
+
+    optional {
+    #?part_3 rdfs:label ?l3 .
+    ?part_3 rdfs:subClassOf ?bn2 .
+                            ?bn2 a owl:Restriction .
+                            ?bn2 owl:onProperty partOf: .
+                            ?bn2 owl:someValuesFrom ?part_2 .
+    }
+
+  }
+
+  #optional {
+  #?part_4 rdfs:label ?l4 .
+  #?part_4 rdfs:subClassOf ?bn3 .
+                          #?bn3 a owl:Restriction .
+                          #?bn3 owl:onProperty partOf: .
+                          #?bn3 owl:someValuesFrom ?part_3 .
+  #}
+
+  ?part a owl:Class .
+  ?part rdfs:label ?l .
+  filter ( ?part = ?part_0 || ?part = ?part_1 || ?part = ?part_2 || ?part = ?part_3 ) #( || ?part = ?part_4 )
+
+}
+limit ?limit
+#+end_src
+
+#+begin_src sparql
+select distinct
+?part_1
+where {
+values ?part_0 { UBERON:0009958 }
+
+?part_1 rdfs:label ?l .
+?part_1 rdfs:subClassOf ?bn0 .
+                        ?bn0 a owl:Restriction .
+                        ?bn0 owl:onProperty partOf: .
+                        ?bn0 owl:someValuesFrom ?part_0 .
+}
+#+end_src
+
+#+begin_src sparql
+select distinct
+?sigh
+(str(?l) as ?label)
+#?sigx
+#(str(?lx) as ?labx)
+where {
+?sigh rdfs:subClassOf+/owl:someValuesFrom+ UBERON:0001255 . # consider also RO:0002433 usually go together
+?sigh rdfs:label ?l .
+# FIXME somehow male and female urethra are still being pulled in :/
+#filter ( ?sigh != UBERON:0000057 )
+#filter not exists { ?sigh rdfs:subClassOf/owl:someValuesFrom UBERON:0000057 . }
+?sigh rdfs:subClassOf/owl:onProperty partOf: .
+#?sigx rdfs:subClassOf ?bn .
+                      #?bn a owl:Restriction .
+                      #?bn owl:onProperty partOf: .
+                      #?bn owl:someValuesFrom ?sigh .
+#?sigx rdfs:label ?lx .
+
+filter not exists { ?sigh rdfs:subClassOf/owl:onProperty <http://purl.obolibrary.org/obo/uberon/core#channels_into> . }
+filter not exists { ?sigh rdfs:subClassOf/owl:onProperty <http://purl.obolibrary.org/obo/uberon/core#channels_from> . }
+filter not exists { ?sigh rdfs:subClassOf/owl:onProperty BFO:0000051 . }
+filter not exists { ?sigh rdfs:subClassOf/owl:onProperty RO:0002150 . }
+filter not exists { ?sigh rdfs:subClassOf/owl:onProperty RO:0002221 . }
+filter not exists { ?sigh rdfs:subClassOf/owl:onProperty RO:0002178 . }
+}
+order by ?label
+
+#+end_src
+
+#+begin_src sparql
+select distinct
+?part
+?prop
+(str(?l) as ?label)
+?part_start
+(str(?sl) as ?start_label)
+where {
+  values ?wat { UBERON:0001255 }
+  # FIXME this is still completely broken because sparql and
+  # transitive queries over over owl restrictions are ... problematic
+  ?part_start rdfs:subClassOf+/owl:someValuesFrom+ ?wat .
+  filter ( ?prop = partOf: )
+  ?part_start rdfs:label ?sl .
+  ?part_start rdfs:subClassOf ?bny .
+                              ?bny owl:onProperty ?prop .
+  ?part rdfs:label ?l .
+  ?part rdfs:subClassOf ?bn0 .
+                        ?bn0 a owl:Restriction .
+                        ?bn0 owl:onProperty partOf: .
+                        ?bn0 owl:someValuesFrom ?part_start .
+
+}
+order by ?start_label
+#+end_src
+
+#+name: thing-table
+#+call: thing() :results table
+
+#+name: thing-push
+#+begin_src python :var data=thing-table() :results drawer
+from sparcur.sheets import Reports
+
+class Thing:
+
+    _data = data
+
+    class options:
+        preview = False
+        to_sheets = True
+
+    @Reports.makeReportSheet('organ_start', sheet_name='organ-nerve-ganglia')
+    def populate(self, ext=None):
+        return self._data, 'organ-nerve-ganglia coverage report'
+
+
+t = Thing()
+#t.populate()
+return t._data
+#+end_src
+
+#+begin_src elisp :results none :exports none
+(ow-babel-eval "thing-push")
+#+end_src
+
 *** neuron population by nerve
+*** neuron population by ganglion
 ** ApiNATOMY
 *** Summary statistics
 **** Dashboard
@@ -3528,9 +3866,9 @@ UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
 
 #+name: apinat-dashboard-model-summary
 #+begin_src sparql :noweb no-export
-select
-?label
+select distinct
 ?graph
+#?g
 ?lyphs
 ?lyphs_input
 #?links
@@ -3542,6 +3880,9 @@ select
 #?groups
 ?nerus
 ?neupops
+?neupops_pat
+?somas
+?label
 <<apinat-model-summary-where>>
 #+end_src
 
@@ -3564,7 +3905,8 @@ WHERE {
   # into this form when querying multiple predicates in the same expression
   {
     ?graph a elements:Graph ;
-           rdfs:label ?label .
+           rdfs:label ?l .
+    bind(str(?l) as ?label)  # avoid issues with graphs loaded multiple times
     { select ?graph (count(distinct(?o)) as ?lyphs       ) where { ?graph apinatomy:lyphs        ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?lyphs_input ) where
       { ?graph apinatomy:lyphs ?o .
@@ -3575,8 +3917,10 @@ WHERE {
     { select ?graph (count(distinct(?o)) as ?chains      ) where { ?graph apinatomy:chains       ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?coalescences) where { ?graph apinatomy:coalescences ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?externals   ) where { ?graph apinatomy:external     ?o . } group by ?graph }
+    optional
     { select ?graph (count(distinct(?o)) as ?publications) where { ?graph apinatomy:publications ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?groups      ) where { ?graph apinatomy:groups       ?o . } group by ?graph }
+    optional
     { select ?graph (count(distinct(?o)) as ?nerus       ) where
       { ?graph apinatomy:groups ?o .
                                 ?o apinatomy:description ?d .
@@ -3585,6 +3929,14 @@ WHERE {
     { select ?graph (count(distinct(?o)) as ?neupops     ) where
       { ?graph apinatomy:external ?o .
                                   ?o rdfs:subClassOf+ ilxtr:NeuronEBM . }                               group by ?graph }
+    optional
+    { select ?graph (count(distinct(?o)) as ?neupops_pat ) where
+      { ?graph apinatomy:external ?o .
+              filter contains(str(?o), "/neuron-type-") }                                               group by ?graph }
+    optional
+    { select ?graph (count(distinct(?o)) as ?somas       ) where
+      { ?graph apinatomy:lyphs ?o .
+                               ?o apinatomy:external NLX:154731 . }                                     group by ?graph }
   }
   union
   {
@@ -3610,6 +3962,14 @@ WHERE {
     { select (count(distinct(?o)) as ?neupops     ) where
       { ?graph_ apinatomy:external ?o .
                                    ?o rdfs:subClassOf+ ilxtr:NeuronEBM . } }
+    optional
+    { select (count(distinct(?o)) as ?neupops_pat ) where
+      { ?graph_ apinatomy:external ?o .
+               filter contains(str(?o), "/neuron-type-") } }
+    optional
+    { select (count(distinct(?o)) as ?somas       ) where
+      { ?graph_ apinatomy:lyphs ?o .
+                                ?o apinatomy:external NLX:154731 . } }
   }
 }
 #+end_src
@@ -3839,7 +4199,6 @@ SELECT DISTINCT
 (str(?l) as ?label)
 WHERE {
   ?neupop a elements:External .
-  ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
   FILTER CONTAINS(str(?neupop), "/neuron-type-")
   OPTIONAL { ?neupop skos:prefLabel ?pl . }
   OPTIONAL { ?neupop rdfs:label ?l . }
