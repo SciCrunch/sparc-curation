@@ -124,89 +124,6 @@ Copy from the protc tutorial.
 #+begin_src bash
 emacs -eval '(progn (url-copy-file "https://raw.githubusercontent.com/SciCrunch/sparc-curation/master/docs/queries.org" "~/queries.org" t) (find-file "~/queries.org"))'
 #+end_src
-* Introduction
-:PROPERTIES:
-:CUSTOM_ID:  introduction
-:END:
-The SPARC Knowledge Graph ...
-** SPARC Content
-1. SPARC dataset metadata graph
-   1. Datasets
-      1. Publicly released datasets, including those under embargo.
-         (doi must resolve).
-   2. Protocols
-      1. Hypothesis Annotations
-      2. Processed Hypothesis annotations
-      3. SPARC Protocols on Protocols.io
-2. connectivity knowledge base
-   1. ApiNATOMY
-      1. Introduction
-      2. models
-         1. bolser-lewis
-         2. keast-bladder
-         3. bronchomotor
-         4. ard-arm-cardiac
-         5. sawg-distal-colon
-         6. +sawg-stomach+
-   2. NPO
-      1. Introduction
-      2. evidence based modesl
-         1. nerves.ttl
-      3. NPO stubs
-3. ontology (SciGraph can have everything, blazegraph may be not the whole ontolgy)
-   1. NIF-Ontology+
-
-collateral versus difference populations
-** Ontology content
-What ontologies are part of this release?
-NIF-Ontology @@comment: link to a more detailed description@@
-The NIF-Ontology imports Uberon, Human Disease Ontology DOID, PR, and subsets of ChEBI, NCBITaxon, NCBIGene
-In addition we import. The MONDO Disease Ontology, the Human Phenotype Ontology, Foundationaly Model of Anatomy, and CL.
-
-The two releases have slightly different ontology content due to their
-different use cases.
-
-1. SciGraph
-   Everything.
-2. Blazegraph
-   Not quite everything. TODO
-   Only the subset that is used in the SPARC content or connectivity portions of the Knowledge Base.
-
-** Compiled content
-In order to create an accessible version of the Knowledge Base that
-can be queried we convert and enrich the SPARC Content by loading it
-into both a property graph (Neo4j) and also into an triple store
-(Blazegraph), and by augmenting it with the NIF-Ontology which pulls
-in a number of community ontologies.
-
-SPARC Content + NIF-Ontology + Community ontologies
-
-Why do we have two representations?
-
-There are two representations becuase we have found that they serve
-different use case.  The triplestore is useful for executing basic
-comptency queries over the dataset releases, but there are not
-existing APIs that are straight forward for devopers to consume. On
-the other hand, SciGraph provides a developer friendly REST API that
-is much easier to use in production systems.
-
-Both of these databases are available in the docker image we provide
-since they are needed to run the queries in this file.  You can
-download the compiled versions of each database seprately as well.
-*** SciGraph zipped Neo4j database.
-*** Blazegraph journal file.
-** How run and query the database
-*** Here's what you can do
-In addition to the underlying raw data, we also provide two
-representations of the knowldge base that can be queried directly
-using the SPARQL or Cypher query languages.
-
-RDF / Blazegraph / SPARQL
-Property Graph / SciGraph / Cypher
-*** Here's what you have to do first
-We provide these as docker images ...
-*** Here are the compiled files
-
 * for kg release :noexport:
 ** TODO instructions for kg
 need to include instructions for increasing the limit and return a csv
@@ -2196,12 +2113,9 @@ WITH neugrp, lyph, a,b,c,t,x
 MATCH (lyph)
 -[e:apinatomy:external]->(region)
 RETURN e, a,b,c,t,x
-
 #+end_src
 
-#+RESULTS:
-[[file:./images/neru-projects.svg]]
-
+*** neru population projects to
 *** neru populations projecting to
 Given an anatomical region return a list of neuron types that project to that region.
 
@@ -2213,9 +2127,6 @@ Given an anatomical region return a list of neuron types that project to that re
 #+begin_src cypher :noweb yes
 <<cypher-neru-terminal-type>>
 #+end_src
-
-#+RESULTS: cypher-neru-axons-bag
-[[file:./images/neru-axons-bag.svg]]
 
 *** neru populations with axons in
 Given an anatomical region return a list of neuron types with axons that are located in that region.
@@ -2264,23 +2175,44 @@ RETURN e, neupop, neugrp
 #+RESULTS: cypher-neru-dendrites
 [[file:./images/neru-dendrites.svg]]
 
+*** TODO neru populations with neurites in
 *** neru populations with processes in
 Given an anatomical region return a list of neuron types with processes that are located in that region.
 
+# NOTE have to include :Class otherwise neupop-[annoates*0..1]->neugrp
+# will match neugrp which we do not want
+# FIXME still not quite right because now we neupop is no longer optional
 #+name: cypher-neru-processes-base
 #+begin_src cypher :eval never
-MATCH (neupop)
--[e:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+MATCH
+(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
 -[:apinatomy:links]->(link)
 -[:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer)
 -[:apinatomy:layerIn*0..1]->(lyph)
 -[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+WITH neugrp
+OPTIONAL MATCH (neupop:Class)
+-[e:apinatomy:annotates*0..1]->(neugrp)
+#+end_src
+
+#+name: cypher-neru-processes-somas
+#+begin_src cypher :eval never
+// somas
+MATCH
+(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:lyphs]->(lyph)
+-[:apinatomy:internalIn]->()
+-[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+WITH neugrp
+OPTIONAL MATCH (neupop:Class)
+-[e:apinatomy:annotates*0..1]->(neugrp)
 #+end_src
 
 TODO Need to expand =region_id= using the Uberon partonomy to answer more generic queries.
 # #+header: :var region_id="UBERON:0018683" :note splanchnic nerve
 # #+header: :var region_id="UBERON:0035769" :note mesenteric ganglion
 # #+header: :results drawer :limit 10
+# #+header: :results table :limit 10
 #+header: :limit 999999 :file ./images/neru-processes.svg :results file :exports both
 #+header: :var region_id="UBERON:0001759" :note vagus nerve
 #+name: cypher-neru-processes
@@ -2291,20 +2223,35 @@ RETURN e, neupop, neugrp
 
 UNION
 
-// somas
-MATCH (neupop)
--[e:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
--[:apinatomy:lyphs]->(lyph)
--[:apinatomy:internalIn]->()
--[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+<<cypher-neru-processes-somas>>
 RETURN e, neupop, neugrp
-
 #+end_src
 
 #+RESULTS: cypher-neru-processes
 [[file:./images/neru-processes.svg]]
 
+#+call: cypher-neru-processes(region_id="UBERON:0005453") :results table
+#+call: cypher-neru-processes(region_id="UBERON:0006490") :results table
+
+#+name: cypher-neru-processes-pop-only
+#+begin_src cypher :noweb yes
+<<cypher-neru-processes-base>>
+RETURN neupop
+
+UNION
+
+<<cypher-neru-processes-somas>>
+RETURN neupop
+#+end_src
+
+#+call: cypher-neru-processes-pop-only(region_id="UBERON:0005453") :results table
+#+call: cypher-neru-processes-pop-only(region_id="UBERON:0006490") :results table
+
 Helper blocks for more specialized queries.
+
+Filter by process =type_id=, where =type_id= could be the ontology
+identifier for axon or dendrite.  The =type_id= has to match the
+conventions used in ApiNATOMY models.
 #+caption: process type helper
 #+name: cypher-neru-process-type
 #+begin_src cypher :noweb yes :eval never
@@ -2315,6 +2262,9 @@ MATCH (link)
 -[:apinatomy:inheritedExternal]->(:Class {iri: $type_id})
 #+end_src
 
+Filter processes based on their topology. For example, this is used to
+select processes with bag topology that correspond to axon and
+dendrite terminals.
 #+caption: terminal type helper
 #+name: cypher-neru-terminal-type
 #+begin_src cypher :noweb yes :eval never
@@ -3151,68 +3101,6 @@ cypherResources:
 
 #+end_src
 * ApiNATOMY competency queries
-** glossary
-*** Neurulated groups
-Neurulated groups are used to ensure that the individual segments and
-parts of neurons modeled in ApiNATOMY can be recognized as single
-cellular entities. By default ApiNATOMY treats parts of neurons
-individually so that it is possible to talk about the specific
-location of a neurite and give it an exact anatomical location.
-
-Note however that sometimes when we talk about neurons in ApiNATOMY we
-implictly mean neuron populations, so a neurite or cell part is not an
-individual neurite of a single cell, but rather a population level
-representation. Cell parts here include axons, dendrites, and somas.
-
-#+begin_src comment
-These population level representations are more similar to the old
-reticular hypothesis about the structure of the nervous system in that
-they also allow multi-nucleated populations, which can be confusing if
-one is expecting the model to be of individual neurons. They can also
-allow axon trees that are not trees but instead are graphs.
-#+end_src
-
-Population level representations can be used to generate models of
-individual neurons that are consistent with the population as a whole
-but do not differentiate between certain scenarios such as individual
-neurons branching vs sub-populations with distinct projection
-patterns.
-
-Neurulating over the parts of populations makes it possible to recover
-a representation that is more familiar to those who are used to
-working with and thinking about whole cells.
-
-This is useful for querying connectivity defined by neuron populations.
-*** Neuron populations
-Neuron populations correspond sets of neurons that share defining
-properties the distinguish them from other similar populations.  For
-example, there may be many populations that have their somas located
-in the Superior Cervical Ganglion, however they can be differentiated
-by considering their projection targets, both anatomically and based
-on their target populations.
-
-In this knowledge base neuron populations are distinct from neurulated
-groups in that they are identified by the ontology representation in
-addition to the ApiNATOMY anatomical representation.
-
-For the parts of the NPO that are related to SPARC, the major defining
-properties for the populations are the locations of their somas,
-axons, and dendrites. The intersection between neurite type and
-anatomical region is usually sufficient to uniquely identify the
-populations in ApiNATOMY models.
-*** Neurites and somas
-Axons and dendrites in the ApiNATOMY representation are collective
-unions of all the individual members of a population. This means that
-we do not distinguish between cases where a single neuron branches
-into multiple collaterals that project to different location and
-multiple neurons that each project to a different location and all
-combinations inbetween.
-
-The micro-anatomy of dendrite and axonal morphology is not considered
-in these population level models, so any branching that is seen is
-representative of the macro-scale branching or differential projection
-patterns of whole populations.
-
 ** expected counts per model
 Expected number of somas and neupops.
 
@@ -3317,6 +3205,13 @@ Expected.
 | UBERON:0005453 | IMG          | sawg-distal-colon | B D F G H Q       |
 | UBERON:0018683 | LumSplN      | keast-bladder     | 6 7 11            |
 | UBERON:0018683 | LumSplN      | sawg-distal-colon | B                 |
+*** vagus
+#+begin_src cypher
+// filter out things that project to the vagus nerve not that start in the vagus nerve or something like that
+(neupop)-[:ilxtr:hasLocationPhenotype]->(:Class{iri: UBERON:0001759})
+(neupop)-[:ilxtr:hasAxonPresynapticElementIn]->(axon_locations)
+(neupop)-[:ilxtr:hasSensorySubcellularElementIn]->(dendrite_locations)
+#+end_src
 
 *** visualize all populations that have some process in the IMG
 Images of nerus that have some process in the IMG, from =keast-bladder= and =sawg-distal-colon=.
@@ -3331,6 +3226,78 @@ Images of nerus that have some process in the IMG, from =keast-bladder= and =saw
 
 #+RESULTS:
 [[file:./images/neru-simplified-ntk-11.svg]]
+
+
+TODO point people to the query that returns a list of all neuron populations and all populations + papers per model
+#+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-9") :file ./images/neru-3-ntk-9.svg
+
+#+RESULTS:
+[[file:./images/neru-3-ntk-9.svg]]
+
+#+call: neru-simplified(path="./images/neru-simplified-ntk-9.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-9")))
+
+#+RESULTS:
+[[file:./images/neru-simplified-ntk-9.svg]]
+
+#+call: cypher-neru-debug(neupop_id="ilxtr:neuron-type-keast-2") :file ./images/debug-2.svg
+
+#+RESULTS:
+[[file:./images/debug-2.svg]]
+
+#+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-2") :file ./images/neru-3-ntk-2.svg
+
+#+RESULTS:
+[[file:./images/neru-3-ntk-2.svg]]
+
+#+call: neru-simplified(path="./images/neru-simplified-ntk-2.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-2")))
+
+#+RESULTS:
+[[file:./images/neru-simplified-ntk-2.svg]]
+
+
+5 is going to be the easiest
+#+call: cypher-neru-debug(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/debug-5.svg
+
+#+RESULTS:
+[[file:./images/debug-5.svg]]
+
+#+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/neru-3-ntk-5.svg
+
+#+RESULTS:
+[[file:./images/neru-3-ntk-5.svg]]
+
+#+call: neru-simplified(path="./images/neru-simplified-ntk-5.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-5")))
+
+#+RESULTS:
+[[file:./images/neru-simplified-ntk-5.svg]]
+
+*** neuron type keast 5 projects to
+#+begin_src cypher
+RETURN region
+#+end_src
+
+Expected.
+| external       | label           |
+|----------------+-----------------|
+| UBERON:0016508 | pelvic ganglion |
+
+*** img processes query
+Input
+| UBERON:0005453 | inferior mesenteric ganglion |
+
+Expect
+| ilxtr:neuron-type-keast-3  |
+| ilxtr:neuron-type-keast-6  |
+| ilxtr:neuron-type-keast-7  |
+| ilxtr:neuron-type-keast-11 |
+| ilxtr:neuron-type-sdcol-b  |
+| ilxtr:neuron-type-sdcol-d  |
+| ilxtr:neuron-type-sdcol-f  |
+| ilxtr:neuron-type-sdcol-g  |
+| ilxtr:neuron-type-sdcol-h  |
+| ilxtr:neuron-type-sdcol-q  |
+
+#+call: cypher-neru-processes-pop-only(region_id="UBERON:0005453") :results table :note inferior mesenteric ganglion
 
 * Sanity checks
 Other queries run against various representations of the data.

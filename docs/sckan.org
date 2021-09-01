@@ -1,0 +1,188 @@
+
+* Introduction
+:PROPERTIES:
+:CUSTOM_ID:  introduction
+:END:
+The SPARC Knowledge Graph ...
+** SPARC Content
+1. SPARC dataset metadata graph
+   1. Datasets
+      1. Publicly released datasets, including those under embargo.
+         (doi must resolve).
+   2. Protocols
+      1. Hypothesis Annotations
+      2. Processed Hypothesis annotations
+      3. SPARC Protocols on Protocols.io
+2. connectivity knowledge base
+   1. ApiNATOMY
+      1. Introduction
+      2. models
+         1. bolser-lewis
+         2. keast-bladder
+         3. bronchomotor
+         4. ard-arm-cardiac
+         5. sawg-distal-colon
+         6. +sawg-stomach+
+   2. NPO
+      1. Introduction
+      2. evidence based modesl
+         1. nerves.ttl
+      3. NPO stubs
+3. ontology (SciGraph can have everything, blazegraph may be not the whole ontolgy)
+   1. NIF-Ontology+
+
+collateral versus difference populations
+** Ontology content
+What ontologies are part of this release?
+NIF-Ontology @@comment: link to a more detailed description@@
+The NIF-Ontology imports Uberon, Human Disease Ontology DOID, PR, and subsets of ChEBI, NCBITaxon, NCBIGene
+In addition we import. The MONDO Disease Ontology, the Human Phenotype Ontology, Foundationaly Model of Anatomy, and CL.
+
+The two releases have slightly different ontology content due to their
+different use cases.
+
+1. SciGraph
+   Everything.
+2. Blazegraph
+   Not quite everything. TODO
+   Only the subset that is used in the SPARC content or connectivity portions of the Knowledge Base.
+
+** Compiled content
+In order to create an accessible version of the Knowledge Base that
+can be queried we convert and enrich the SPARC Content by loading it
+into both a property graph (Neo4j) and also into an triple store
+(Blazegraph), and by augmenting it with the NIF-Ontology which pulls
+in a number of community ontologies.
+
+SPARC Content + NIF-Ontology + Community ontologies
+
+Why do we have two representations?
+
+There are two representations becuase we have found that they serve
+different use case.  The triplestore is useful for executing basic
+comptency queries over the dataset releases, but there are not
+existing APIs that are straight forward for devopers to consume. On
+the other hand, SciGraph provides a developer friendly REST API that
+is much easier to use in production systems.
+
+Both of these databases are available in the docker image we provide
+since they are needed to run the queries in this file.  You can
+download the compiled versions of each database seprately as well.
+*** SciGraph zipped Neo4j database.
+*** Blazegraph journal file.
+** How run and query the database
+*** Here's what you can do
+In addition to the underlying raw data, we also provide two
+representations of the knowldge base that can be queried directly
+using the SPARQL or Cypher query languages.
+
+RDF / Blazegraph / SPARQL
+Property Graph / SciGraph / Cypher
+*** Here's what you have to do first
+We provide these as docker images ...
+*** Here are the compiled files
+* Getting started
+** Docker
+The best way to use this file to explore the SCKAN is to download
+the fully configured docker image that uses this file as an interface.
+
+https://doi.org/10.5281/zenodo.5337442
+
+https://hub.docker.com/r/tgbugs/musl/tags?name=kg-release-user
+
+#+begin_src bash
+docker pull tgbugs/musl:kg-release-user
+#+end_src
+
+Once you have installed docker and downloaded the image you can run
+the follow command and it will open an interactive query interface.
+*** Tutorial
+For a tutorial on how to use the query functional run the following.
+Tutorial culminates in the 3 or 4 example queries.
+#+begin_src bash
+docker run -it ... TODO
+#+end_src
+https://github.com/SciCrunch/sparc-curation/blob/master/docs/tutorial.org
+*** Scratch
+https://github.com/SciCrunch/sparc-curation/blob/master/docs/scratch.org
+For an empty file that is set up for you to write you own queries
+please run ...
+#+begin_src bash
+docker run -it ... TODO
+#+end_src
+*** Everything
+https://github.com/SciCrunch/sparc-curation/blob/master/docs/queries.org
+To run the queries.org file where we maintain all of the queries
+that have been written by K-CORE for a variety of use cases please
+run
+#+begin_src bash
+docker run -it tgbugs/musl:kg-release-user
+#+end_src
+
+when using this file there are no Run Query buttons so you will
+need to use =C-c C-c= to execute queries.
+
+The docker file that specifies the image is available at
+https://github.com/tgbugs/dockerfiles/blob/master/source.org#kg-release-user
+
+* glossary
+*** Neurulated groups
+Neurulated groups are used to ensure that the individual segments and
+parts of neurons modeled in ApiNATOMY can be recognized as single
+cellular entities. By default ApiNATOMY treats parts of neurons
+individually so that it is possible to talk about the specific
+location of a neurite and give it an exact anatomical location.
+
+Note however that sometimes when we talk about neurons in ApiNATOMY we
+implictly mean neuron populations, so a neurite or cell part is not an
+individual neurite of a single cell, but rather a population level
+representation. Cell parts here include axons, dendrites, and somas.
+
+#+begin_src comment
+These population level representations are more similar to the old
+reticular hypothesis about the structure of the nervous system in that
+they also allow multi-nucleated populations, which can be confusing if
+one is expecting the model to be of individual neurons. They can also
+allow axon trees that are not trees but instead are graphs.
+#+end_src
+
+Population level representations can be used to generate models of
+individual neurons that are consistent with the population as a whole
+but do not differentiate between certain scenarios such as individual
+neurons branching vs sub-populations with distinct projection
+patterns.
+
+Neurulating over the parts of populations makes it possible to recover
+a representation that is more familiar to those who are used to
+working with and thinking about whole cells.
+
+This is useful for querying connectivity defined by neuron populations.
+*** Neuron populations
+Neuron populations correspond sets of neurons that share defining
+properties the distinguish them from other similar populations.  For
+example, there may be many populations that have their somas located
+in the Superior Cervical Ganglion, however they can be differentiated
+by considering their projection targets, both anatomically and based
+on their target populations.
+
+In this knowledge base neuron populations are distinct from neurulated
+groups in that they are identified by the ontology representation in
+addition to the ApiNATOMY anatomical representation.
+
+For the parts of the NPO that are related to SPARC, the major defining
+properties for the populations are the locations of their somas,
+axons, and dendrites. The intersection between neurite type and
+anatomical region is usually sufficient to uniquely identify the
+populations in ApiNATOMY models.
+*** Neurites and somas
+Axons and dendrites in the ApiNATOMY representation are collective
+unions of all the individual members of a population. This means that
+we do not distinguish between cases where a single neuron branches
+into multiple collaterals that project to different location and
+multiple neurons that each project to a different location and all
+combinations inbetween.
+
+The micro-anatomy of dendrite and axonal morphology is not considered
+in these population level models, so any branching that is seen is
+representative of the macro-scale branching or differential projection
+patterns of whole populations.
