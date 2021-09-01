@@ -1,0 +1,6 @@
+ontologies:
+  - url: /tmp/scigraph-build/sparc-sckan/sparc-sckan.ttl
+    reasonerConfiguration:
+      factory: org.semanticweb.elk.owlapi.ElkReasonerFactory
+      addDirectInferredEdges: true
+      removeUnsatisfiableClasses: true
