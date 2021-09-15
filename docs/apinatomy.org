@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: d5a47215c1609bce89fe00d933c97cfc8eeecf82bbae89b4ad911fa4eb57f671; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 23dde3adfeeba0e9fca53e99474b40f59072a9477398518ebd19a266baabe5c4; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -233,13 +233,14 @@ gsx:google-sheet-id
         (let* ((default-directory path-temp)
                (google-sheet-id (symbol-name (-ms-> model-id)))
                (path-internal (concat path-temp "/build")) ; should not exist to avoid date suffix
-               (_ (run-command apinat-converter-command
-                               "-f" "id"
-                               "-t" "xlsx"
-                               "-t" "json"
-                               "-t" "json-flattened"
-                               "-i" google-sheet-id
-                               "-o" path-internal)))
+               (_ (let (backtrace-on-error-noninteractive) ; we know where the error happens
+                    (run-command apinat-converter-command
+                                 "-f" "id"
+                                 "-t" "xlsx"
+                                 "-t" "json"
+                                 "-t" "json-flattened"
+                                 "-i" google-sheet-id
+                                 "-o" path-internal))))
           (cl-loop for path in (list path-xlsx path-json path-jsonld) do
                    (let ((parent (file-name-directory path)))
                      (unless (file-directory-p parent)
@@ -367,19 +368,24 @@ gsx:google-sheet-id
 
 (defun sentinel (process message)
   (when (memq (process-status process) '(exit signal))
-    (message "completed: %S" process)
-    (setq apinat-process-results
-          (cons (list (process-exit-status process)
-                      (with-current-buffer (process-buffer process)
-                        (buffer-string)))
-                apinat-process-results))))
+    (let ((ex (process-exit-status process))
+          (buf (process-buffer process))
+          (cmd (process-command process)))
+      (setq apinat-process-results
+            (cons (list ex (with-current-buffer buf (buffer-string)))
+                  apinat-process-results))
+      (if (= ex 0)
+        (message "completed: %S" process)
+        (warn "command failed with %s: %s" ex (string-join cmd " "))
+        (warn "%s" (with-current-buffer buf (buffer-string)))))))
 
 (defun-local update-all-models-async ()
   (let ((model-ids (all-models)))
     (message "updating all models %s" model-ids)
-    (dolist (model-id model-ids)
-      ;; FIXME TODO wait for all processes to finish or something
-      (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets))
+    (cl-loop
+     for model-id in model-ids
+     collect
+     (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets))
     (while (< (length apinat-process-results) (length model-ids))
       (sleep-for 5)
       (message "complete: %s/%s" (length apinat-process-results) (length model-ids)))))
@@ -685,13 +691,13 @@ obj:   {n_pair}''')
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
-  (reval 'sha256 '1eb9c155d89e5d1f14b3f62f6acdeb6ab03647662ff9473ad211c9e4e5e297ef
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/2ee5438e6382786d1269310cef0315eca0d227be/reval.el"))
+  (reval 'sha256 '3620321396c967395913ff19ce507555acb92335b0545e4bd05ec0e673a0b33b 
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/300b1d5518af53d76d950097bcbcd7046cfa2285/reval.el"))
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'f918c7d0a40da313fa36157a0cb386a2e89f71199a22d1e7b3be43c000cfbbe5
-           (concat ghost "70f599bea56f41d7da69ad4aa2b5e1fc30d5b81a" "/ow.el"))))
+    (reval 'sha256 'd2c7da56f5d59450cbba8fedc71874e2619214a8a4ad78bdee6451e9b6854baa
+           (concat ghost "744bc09e19b34b68e458a48beefe61cedba4563c" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package
@@ -724,8 +730,10 @@ obj:   {n_pair}''')
     ;; the point here is that we just want to provide a place for a
     ;; stripped down init file that will load as fast as the user
     ;; wants and can hold pointers to things like oa-secrets
-    (setq user-init-file (expand-file-name "orgstrap-init.el" user-emacs-directory))
-    (load user-init-file))
+    (let ((orgstrap-init-file (expand-file-name "orgstrap-init.el" user-emacs-directory)))
+      (when (file-exists-p orgstrap-init-file)
+        (setq user-init-file orgstrap-init-file)
+        (load user-init-file))))
   (ow-cli-gen
       ((:install)
        (:all)
