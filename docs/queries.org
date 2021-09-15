@@ -17,7 +17,7 @@ exit
 
 #+title: SPARC queries
 #+startup: showall
-#+category: sparc
+#+category: SPARC
 #+options: ^:nil
 #+latex_header: \usepackage[inkscapelatex=false]{svg}
 #+begin: properties
@@ -1709,9 +1709,9 @@ MATCH (neupop:Class{iri: $neupop_id})
 
 // publications
 WITH neugrp, a
-MATCH path = (neugrp)
+OPTIONAL MATCH path = (neugrp)
 -[:apinatomy:publications]->(pub)
--[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 WITH neugrp, a, path
 MATCH (neugrp)
@@ -1951,9 +1951,9 @@ MATCH (neupop:Class{iri: $neupop_id})
 
 // publications
 WITH neugrp, a
-MATCH path = (neugrp)
+OPTIONAL MATCH path = (neugrp)
 -[:apinatomy:publications]->(pub)
--[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 WITH neugrp, a, path
 MATCH (neugrp)
@@ -2023,9 +2023,9 @@ MATCH (neupop:Class{iri: $neupop_id})
 
 // publications
 WITH neugrp, a
-MATCH path = (neugrp)
+OPTIONAL MATCH path = (neugrp)
 -[:apinatomy:publications]->(pub)
--[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/External"}) // cannot be curied, dynamic endpoints will not expand it
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 WITH neugrp, a, path
 MATCH (neugrp)
@@ -4246,14 +4246,14 @@ WHERE {
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
-  (reval 'sha256 '1eb9c155d89e5d1f14b3f62f6acdeb6ab03647662ff9473ad211c9e4e5e297ef
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/2ee5438e6382786d1269310cef0315eca0d227be/reval.el"))
+  (reval 'sha256 '3620321396c967395913ff19ce507555acb92335b0545e4bd05ec0e673a0b33b
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/300b1d5518af53d76d950097bcbcd7046cfa2285/reval.el"))
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'f918c7d0a40da313fa36157a0cb386a2e89f71199a22d1e7b3be43c000cfbbe5
+    (reval 'sha256 'a0c21b230565758c0e246c87a2c73289904490aae9c790d209324dd690dcf466
            ;; "~/git/orgstrap/ow.el"
-           (concat ghost "70f599bea56f41d7da69ad4aa2b5e1fc30d5b81a" "/ow.el")))
+           (concat ghost "efd9ffcdc2bdc91162b307ff261858f60180e638" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '4308dd550f65843d461bbd86aad2588fc7d19c2bd8ba6757bfbd80f107eaaa31
            ;;"~/git/orgstrap/services/blazegraph.el"
