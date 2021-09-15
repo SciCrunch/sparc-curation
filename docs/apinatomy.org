@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 23dde3adfeeba0e9fca53e99474b40f59072a9477398518ebd19a266baabe5c4; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 61100f961a715149202dd37587f63a55d7df5d539ddc7929a439ca51811f6ff7; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
