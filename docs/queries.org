@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 4052d735d06d74770fb81e77946cd848a50cdf5f4977c18cb9b1aa66a032191b; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: c179c12833eda90dbe26a791b64adeb7b3ed14744f12b8414ff28ea232e9d3dd; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -4263,6 +4263,7 @@ WHERE {
   (ow-enable-use-package)
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
+     rainbow-delimiters-mode
      orgstrap
      (when gt26 jupyter)
      (cypher-mode
