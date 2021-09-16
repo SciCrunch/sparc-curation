@@ -431,6 +431,22 @@ for f in $(ls */derived/*.ttl); do apinat-deploy-from-ttl $f; done
 #+end_src
 
 Alternately use the following to deploy specific models.
+
+# on deployment server
+#+name: apinat-last-deploy-date
+#+begin_src bash :dir /ssh:cassava:/var/www/sparc/ApiNATOMY/ontologies :cache yes
+date -Is -d "@$(find | awk -F'/' '{ print $3 }' | sort | tail -n 1)"
+#+end_src
+
+# on devel
+#+header: :var LAST_DEPLOY=apinat-last-deploy-date() REPO=(expand-file-name apinat-model-repo)
+#+name: apinat-json-changed-since-last-deploy
+#+begin_src bash :results drawer
+pushd "${REPO}" 2>&1 > /dev/null
+git log --name-only --since "${LAST_DEPLOY}" --pretty="format:" | grep json | cut -d'/' -f2 | sort -u
+#+end_src
+
+Always run =apinat-deploy-ttls= from inside =apinat-model-repo=
 #+begin_src bash
 apinat-deploy-ttls $(git diff --name-only HEAD~1..HEAD | cut -d'/' -f 2 | sort -u)
 #+end_src
