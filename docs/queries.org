@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: c179c12833eda90dbe26a791b64adeb7b3ed14744f12b8414ff28ea232e9d3dd; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: d9ef4409a7098bfb37291b412ec0f7a29b249b02b83bdf044521fa1f2a10355d; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -2283,7 +2283,7 @@ RETURN e, neupop, neugrp
 :END:
 **** organParts
 #+name: desc-organ-parts
-Get the parts list for an organ including nerves and blood vessles
+Get the parts list for an organ including nerves and blood vessels
 #+header: :var id=(identity nil)
 #+name: cyres-organ-parts
 #+begin_src cypher
@@ -4201,6 +4201,8 @@ WHERE {
 (defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
 (defvar orgstrap-do-config-emacs t "Run code that modifies the Emacs configuration.")
 
+(setq inhibit-startup-screen t)
+
 ;; somehow this gets around lexical scope FIXME no not really have to
 ;; modify the elvs
 (setq-local
@@ -4208,7 +4210,7 @@ WHERE {
  (lambda (lang _body)
    (not (or (member lang '("cypher" "sparql"))
             (eq (intern (orgstrap-get-named-src-block-checksum "nonl"))
-                '6f941ab9e081045c990e9ae4d7dee4604b20724db41883e137ff925f6a9a7875)))))
+                '93e2534fba4f80f1de745861b30480f15913fa9d9d6c40fa5b9ed84d1e642806)))))
 
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)
@@ -4263,7 +4265,7 @@ WHERE {
   (ow-enable-use-package)
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
-     rainbow-delimiters-mode
+     rainbow-delimiters
      orgstrap
      (when gt26 jupyter)
      (cypher-mode
@@ -4338,8 +4340,8 @@ WHERE {
 
 Tangle helper for bare paragraphs.
 #+name: nonl
-#+begin_src elisp :exports none :results none :var paragraph=""
-(string-trim (replace-regexp-in-string "\n" " " paragraph))
+#+begin_src elisp :exports none :results value :var paragraph=""
+(string-trim (replace-regexp-in-string "\n" "" paragraph))
 #+end_src
 
 ** Local Variables :ARCHIVE:
