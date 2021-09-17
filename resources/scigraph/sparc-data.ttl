@@ -26,6 +26,7 @@
 @prefix sdcol: <https://apinatomy.org/uris/models/sawg-distal-colon/ids/> .
 @prefix sstom: <https://apinatomy.org/uris/models/sawg-stomach/ids/> .
 @prefix splen: <https://apinatomy.org/uris/models/spleen/ids/> .
+@prefix dlcon: <https://apinatomy.org/uris/models/dev-layout-conn/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
     owl:imports <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl>,
@@ -44,7 +45,7 @@
         # <https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl> ,
         <file:///tmp/scigraph-build/sparc-data/curation-export.owl> ;
     ilxtr:imports-dev <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
-        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/dev-layout-con.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/dev-layout-conn.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/vagus-nerve.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl> .
