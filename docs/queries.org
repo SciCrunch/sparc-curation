@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: b5e736ee382638d25aa7c1267c1d63d17b1fe37ef21fdf4ebeacb6112756b293; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 66ef4cbe7b86df938b8ffae44e454798cdddfe7410ff324ca315f25026a71a5b; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -4253,9 +4253,9 @@ WHERE {
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'f6781f2175f506283d3bea8673b60071a5dd2c01d68e8b33e5a15e20600f02f8
+    (reval 'sha256 '9598b71a4b1d997d74e1945de71ebb672749b0f7f05f763ade49bb9ac7f9ae17
            ;; "~/git/orgstrap/ow.el"
-           (concat ghost "16f96cdeb74391ca3eaa0f6f48e21aefb10764d1" "/ow.el")))
+           (concat ghost "651bb04a1ccf1103c4eddc1f92dcc8ad46d5a9f2" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
@@ -4284,7 +4284,6 @@ WHERE {
          (sparql . t)
          (python . t)
          ,(when gt26 '(jupyter . t))))))))
-
 
 (unless (fboundp #'ob-cypher/scigraph/query)
   (reval 'sha256 '44408196e3569691fa08c01fc28a767759cd4f95310f7844dbc1fe024b1cf7d3 "https://raw.githubusercontent.com/tgbugs/ob-cypher/2a33ae888a0e1d36c57aa41568061315fc7268e3/ob-cypher.el"))
@@ -4331,7 +4330,7 @@ WHERE {
   (when orgstrap-do-config-emacs
     (ow--rainy-day)
     (add-hook 'emacs-lisp-mode-hook #'rainbow-delimiters-mode)
-    (ow-enable-config-familiar-1)))
+    (ow-enable-config-familiar-1 'global)))
 
 ;; if we make it all the way through the block make sure that we don't
 ;; run the orgstrap elvs again so that that ocbe doesn't get klobbered
@@ -4347,5 +4346,8 @@ Tangle helper for bare paragraphs.
 ** Local Variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
+# org-adapt-indentation: nil
+# org-edit-src-content-indentation: 0
+# org-hide-emphasis-markers: t
 # eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block))) (warn "No orgstrap block."))))
 # End:

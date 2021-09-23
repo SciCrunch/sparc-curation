@@ -1,8 +1,44 @@
-#+title: SCKAN Tutorial
+#+title: Tutorial
+# inherit configuration from queries.org
+#+setupfile: ./queries.org
 
+Welcome to the SCKAN tutorial!
 
-* Tutorial
+This tutorial will walk you through how to query SCKAN using the SPARQL and Cypher query languages.
+
+* Navigation
+You can open and close headings (lines that start with =*=) by
+clicking on them with the mouse or by hitting =tab= when the cursor is
+on the heading line. This also works for numbered and dotted lists
+which usually won't be needed but might happen by accident.
+
+You can also open and close source blocks by clicking on the
+=#+begin_src= line, =#+end_src= line, or any of the =#+header:=,
+=#+caption:=, or =#+name:= lines associated with the block. =tab=
+works in this case as well.
+
+* Running queries
+
+# TODO bind F5 to run the query closest to the point.
+
+#+begin_src sparql
+#+end_src
 
 * First query
 what is in the database ???
 model id, name, abbreviation etc.
+
+* Parameterizing queries
+
+* Reference
+** Keybinds
+| =C-c=     | copy              |
+| =C-v=     | paste             |
+| =C-z=     | undo              |
+| =C-y=     | redo              |
+| =C-s=     | save              |
+| =C-f=     | find              |
+| =C-c C-c= | run block or call |
+
+TODO
+| =f5=      | run nearest block |

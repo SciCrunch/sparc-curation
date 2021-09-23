@@ -86,8 +86,6 @@ We provide these as docker images ...
 The best way to use this file to explore the SCKAN is to download
 the fully configured docker image that uses this file as an interface.
 
-https://doi.org/10.5281/zenodo.5337442
-
 https://hub.docker.com/r/tgbugs/musl/tags?name=kg-release-user
 
 #+begin_src bash
@@ -96,20 +94,6 @@ docker pull tgbugs/musl:kg-release-user
 
 Once you have installed docker and downloaded the image you can run
 the follow command and it will open an interactive query interface.
-*** Tutorial
-For a tutorial on how to use the query functional run the following.
-Tutorial culminates in the 3 or 4 example queries.
-#+begin_src bash
-docker run -it ... TODO
-#+end_src
-https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/tutorial.org
-*** Scratch
-https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/scratch.org
-For an empty file that is set up for you to write you own queries
-please run ...
-#+begin_src bash
-docker run -it ... TODO
-#+end_src
 *** Everything
 https://github.com/SciCrunch/sparc-curation/blob/master/docs/queries.org
 To run the queries.org file where we maintain all of the queries

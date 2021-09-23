@@ -2,18 +2,22 @@
 
 Instructions for getting SCKAN up and running.
 
+The successful completion of the steps in this file should result in a
+window with [[./welcome.org][welcome.org]] greeting you and giving you quick access to an
+interactive query interface.
+
 SCKAN is distributed as two docker images.
-1. An image configured to run the software needed
-2. An image containing only the loaded databases.
+1. An image with the software needed to run queries [[https://hub.docker.com/r/tgbugs/musl/tags?name=kg-release-user][tgbugs/musl:kg-release-user]]
+2. An image containing only the loaded databases [[https://hub.docker.com/r/tgbugs/sckan/tags?name=latest][tgbugs/sckan:latest]]
 
-Additional data related to SCKAN can also be obtained ...
+These images, and the underlying data they are generated from
+can also be retrieved from Zenodo.
+# TODO collection doi
+https://doi.org/10.5281/zenodo.5337442
 
-* Setup the environment
-The general steps are provided here. For full workflows for specific
-operating systems see the [[#examples][Examples]] section below.
-
+* Download Docker and X11
 1. Download and install docker for your platform.
-   - linux: consult your local package manager
+   - linux: [[https://repology.org/project/docker/packages][consult]] your local package manager
    - [[https://docs.docker.com/desktop/mac/install/][macos]]
    - [[https://docs.docker.com/desktop/windows/install/][windows]]
 
@@ -22,6 +26,7 @@ operating systems see the [[#examples][Examples]] section below.
    - macos: [[https://www.xquartz.org/][XQuartz]]
    - windows: [[https://sourceforge.net/projects/vcxsrv/][VcXsrv]]
 
+Commands for specific operating systems are in the [[#examples][Examples]] section below.
 * X11 configuration
 ** linux
 #+begin_src bash
@@ -69,6 +74,13 @@ docker run --volumes-from sckan-data -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY
 
 docker run --volumes-from sckan-data -e DISPLAY=host.docker.internal:0 -it tgbugs/musl:kg-release-user
 
+#+end_src
+
+If you update to a new version of =tgbugs/sckan= you will want to run
+the following to update the =sckan-data= container.
+#+begin_src bash
+docker rm sckan-data
+docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
 #+end_src
 
 * Examples
@@ -142,3 +154,10 @@ docker run `
 
 If you try to launch =vcxsrv.exe= more than once with the same display
 number set you will encounter a fatal error.
+
+* Other ways to use the docker images
+Beyond the interactive query interface, these docker images can be run
+as standalone SciGraph and Blazegraph instances of SCKAN for use in a
+variety of applications.
+
+# TODO examples of how to modify the entrypoint
