@@ -1,0 +1,71 @@
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: fe03422b2e76383ba0ce089db59c0cd43e46c2eefa411ea0c8b00107a2b72069; -*-
+#+title: Welcome
+
+* Welcome to SCKAN!
+
+SCKAN is the *SPARC Connectivity Knowledge base for the Autonomic Nervous system*.
+
+This docker image contains everything you need to query SCKAN.
+
+Get started with the [[./tutorial.org][Tutorial]].
+
+Write your own queries in [[./scratch.org][Scratch]].
+
+Review [[./examples.org][Examples]].
+
+Browse the full [[./queries.org][Catalog]].
+
+** Additional documentation
+- [[./overview.org][Overview, background, and glossary]]
+
+** Web links
+- [[https://scicrunch.org/sawg/about/SCKAN][About SCKAN]]
+- [[https://commonfund.nih.gov/sparc][About SPARC]]
+- [[https://doi.org/???][Latest SCKAN data release]]
+- [[https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/welcome.org][GitHub source for this file]]
+
+* Bootstrap :noexport:
+#+name: orgstrap
+#+begin_src elisp :results none :exports none :lexical yes
+(defvar orgstrap-do-devel nil)
+
+(defun switch-to-or-find-file-other-tab (name &optional noselect)
+  (let* ((buffer (find-file-noselect name))
+         (buffer-name (buffer-name buffer)))
+    (if (tab-bar--tab-index-by-name buffer-name)
+        (tab-bar-switch-to-tab buffer-name)
+      ;; FIXME `find-file-other-tab' breaks narrowing this is the workaround
+      (tab-bar-new-tab 1)
+      (switch-to-buffer buffer)
+      (when noselect (tab-bar-switch-to-prev-tab)))))
+
+(unless orgstrap-do-devel
+  (find-file-noselect "./queries.org")
+  (setq org-link-frame-setup
+        '((vm . vm-visit-folder-other-frame)
+          (vm-imap . vm-visit-imap-folder-other-frame)
+          (gnus . org-gnus-no-new-news)
+          (file . switch-to-or-find-file-other-tab)
+          (wl . wl-other-frame)))
+  (font-lock-add-keywords
+   nil
+   '(("^\\*+ "
+      (0
+       (prog1 nil
+         (put-text-property
+          (match-beginning 0)
+          (match-end 0)
+          'invisible t))))))
+  (goto-char 0)
+  (org-next-visible-heading 1)
+  (org-narrow-to-subtree)
+  (read-only-mode))
+#+end_src
+
+** Local Variables :ARCHIVE:
+# Local Variables:
+# org-adapt-indentation: nil
+# org-edit-src-content-indentation: 0
+# org-hide-emphasis-markers: t
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility)) (warn "No orgstrap block."))))
+# End:

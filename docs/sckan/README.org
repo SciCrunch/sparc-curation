@@ -1,0 +1,144 @@
+#+title: Getting started
+
+Instructions for getting SCKAN up and running.
+
+SCKAN is distributed as two docker images.
+1. An image configured to run the software needed
+2. An image containing only the loaded databases.
+
+Additional data related to SCKAN can also be obtained ...
+
+* Setup the environment
+The general steps are provided here. For full workflows for specific
+operating systems see the [[#examples][Examples]] section below.
+
+1. Download and install docker for your platform.
+   - linux: consult your local package manager
+   - [[https://docs.docker.com/desktop/mac/install/][macos]]
+   - [[https://docs.docker.com/desktop/windows/install/][windows]]
+
+2. Download and install X11 for your platform.
+   - linux: you are already done
+   - macos: [[https://www.xquartz.org/][XQuartz]]
+   - windows: [[https://sourceforge.net/projects/vcxsrv/][VcXsrv]]
+
+* X11 configuration
+** linux
+#+begin_src bash
+xhost local:docker
+#+end_src
+
+** macos
+#+begin_src bash
+open -a XQuartz
+
+# XXX Go to XQuartz > Preferences > Security
+# and enable Allow connections from network clients
+# you may need to restart XQuartz after this
+
+xhost +localhost
+#+end_src
+
+** windows
+#+begin_src powershell
+& 'C:\Program Files\VcXsrv\vcxsrv.exe' -multiwindow -clipboard -wgl :0
+#+end_src
+
+* Running
+#+begin_src bash
+# obtain the latest release images from dockerhub
+
+docker pull tgbugs/musl:kg-release-user
+docker pull tgbugs/sckan:latest
+
+# create a container that can be used to mount the SCKAN data release as a volume
+
+docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
+
+# run the image
+
+## linux
+
+docker run --volumes-from sckan-data -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY -it tgbugs/musl:kg-release-user
+
+## macos
+
+docker run --volumes-from sckan-data -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=host.docker.internal:0 -it tgbugs/musl:kg-release-user
+
+## windows
+
+docker run --volumes-from sckan-data -e DISPLAY=host.docker.internal:0 -it tgbugs/musl:kg-release-user
+
+#+end_src
+
+* Examples
+Full workflows for various operating systems.
+** linux
+#+begin_src bash
+sudo apt install docker docker.io  # ubuntu
+sudo usermod -a -G docker ${USER}
+
+# you may need to get a new login shell at this point
+
+xhost local:docker
+
+docker pull tgbugs/musl:kg-release-user
+docker pull tgbugs/sckan:latest
+
+docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
+
+docker run \
+--volumes-from sckan-data \
+-v /tmp/.X11-unix:/tmp/.X11-unix \
+-e DISPLAY=$DISPLAY \
+-it tgbugs/musl:kg-release-user
+#+end_src
+
+** macos
+Using https://brew.sh/.
+#+begin_src bash
+brew install virtualbox xquartz
+brew install --cask docker
+
+# there are some system level persmissions that you will need to set for virtualbox
+
+open -a XQuartz
+
+# XXX Go to XQuartz > Preferences > Security
+# and enable Allow connections from network clients
+# you may need to restart XQuartz after this
+
+xhost +localhost
+
+docker pull tgbugs/musl:kg-release-user
+docker pull tgbugs/sckan:latest
+
+docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
+
+docker run \
+--volumes-from sckan-data \
+-v /tmp/.X11-unix:/tmp/.X11-unix \
+-e DISPLAY=host.docker.internal:0 \
+-it tgbugs/musl:kg-release-user
+#+end_src
+
+** windows
+Using https://chocolatey.org/.
+#+begin_src powershell
+choco install wsl2 wsl-ubuntu-2004 vcxsrv docker-desktop docker
+
+& 'C:\Program Files\VcXsrv\vcxsrv.exe' -multiwindow -clipboard -wgl :0
+
+docker pull tgbugs/musl:kg-release-user
+docker pull tgbugs/sckan:latest
+
+docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
+
+docker run `
+--volumes-from sckan-data `
+-e DISPLAY=host.docker.internal:0 `
+-it tgbugs/musl:kg-release-user
+#+end_src
+
+If you try to launch =vcxsrv.exe= more than once with the same display
+number set you will encounter a fatal error.

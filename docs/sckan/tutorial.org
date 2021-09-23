@@ -1,0 +1,8 @@
+#+title: SCKAN Tutorial
+
+
+* Tutorial
+
+* First query
+what is in the database ???
+model id, name, abbreviation etc.

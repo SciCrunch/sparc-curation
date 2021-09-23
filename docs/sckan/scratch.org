@@ -1,0 +1,42 @@
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 567f6497bea56135b6736d8a65855e3a164ea11ea6de030532705c04907f3f9e; -*-
+#+title: Query scratchpad
+# inherit configuration from queries.org
+#+setupfile: ./queries.org
+
+* sparql
+
+#+name: sparql-scratch
+#+begin_src sparql
+# write your sparql query here and run with C-c C-c
+# example: SELECT * WHERE { ?s ?p ?o } LIMIT 10
+
+#+end_src
+
+* cypher
+
+#+name: cypher-scratch
+#+begin_src cypher
+// write your cypher query here and run with C-c C-c
+// example: MATCH (g)-[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"}) RETURN g
+
+#+end_src
+
+* Bootstrap :ARCHIVE:
+#+name: orgstrap
+#+begin_src elisp :results none :exports none :lexical yes
+(defvar orgstrap-do-devel nil)
+
+(setq-local
+ org-confirm-babel-evaluate
+ (lambda (lang _body)
+   (not (or (member lang '("cypher" "sparql"))))))
+
+(unless orgstrap-do-devel
+  (find-file-noselect "./queries.org"))
+#+end_src
+
+** Local Variables :ARCHIVE:
+
+# Local Variables:
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (org-set-startup-visibility)) (warn "No orgstrap block."))))
+# End:

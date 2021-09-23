@@ -102,9 +102,9 @@ Tutorial culminates in the 3 or 4 example queries.
 #+begin_src bash
 docker run -it ... TODO
 #+end_src
-https://github.com/SciCrunch/sparc-curation/blob/master/docs/tutorial.org
+https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/tutorial.org
 *** Scratch
-https://github.com/SciCrunch/sparc-curation/blob/master/docs/scratch.org
+https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/scratch.org
 For an empty file that is set up for you to write you own queries
 please run ...
 #+begin_src bash
