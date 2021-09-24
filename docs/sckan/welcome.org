@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: fe03422b2e76383ba0ce089db59c0cd43e46c2eefa411ea0c8b00107a2b72069; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 5fd3ac6093d2c120d212a7cb8e858b9e8da3c1e6a99d7d392d52518b82382dbd; -*-
 #+title: Welcome
 
 * Welcome to SCKAN!
@@ -41,6 +41,12 @@ Browse the full [[./queries.org][Catalog]].
 
 (unless orgstrap-do-devel
   (find-file-noselect "./queries.org")
+  (with-temp-buffer
+    (let ((vb (vterm)))
+      (tab-bar-new-tab 1)
+      (switch-to-buffer vb)
+      (tab-bar-switch-to-prev-tab)))
+  (set-process-query-on-exit-flag (get-process "vterm") nil)
   (setq org-link-frame-setup
         '((vm . vm-visit-folder-other-frame)
           (vm-imap . vm-visit-imap-folder-other-frame)
