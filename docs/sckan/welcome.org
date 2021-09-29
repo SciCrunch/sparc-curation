@@ -1,4 +1,5 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 5fd3ac6093d2c120d212a7cb8e858b9e8da3c1e6a99d7d392d52518b82382dbd; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 51cc694dc77e33eaa14c28d14788f1768486bc1267bd4e1f30c759ad5dd79467; -*-
+# [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Welcome
 
 * Welcome to SCKAN!
@@ -15,6 +16,13 @@ Review [[./examples.org][Examples]].
 
 Browse the full [[./queries.org][Catalog]].
 
+** Saving your work
+You can quit at any time and your work will be saved.
+
+You can continue your previous session by running =docker start -ai $(docker ps -lq)=.
+
+For more details see the [[./tutorial.org::#saving-and-restoring][reference section of the Tutorial]].
+
 ** Additional documentation
 - [[./overview.org][Overview, background, and glossary]]
 
@@ -25,9 +33,15 @@ Browse the full [[./queries.org][Catalog]].
 - [[https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/welcome.org][GitHub source for this file]]
 
 * Bootstrap :noexport:
+
+To get the correct behavior for restoring desktops when using this file as an entrypoint use the following command.
+#+begin_src bash
+emacs -eval "(find-file-noselect (pop argv))" welcome.org
+#+end_src
+
 #+name: orgstrap
 #+begin_src elisp :results none :exports none :lexical yes
-(defvar orgstrap-do-devel nil)
+(defvar ow-do-devel nil)
 
 (defun switch-to-or-find-file-other-tab (name &optional noselect)
   (let* ((buffer (find-file-noselect name))
@@ -39,14 +53,15 @@ Browse the full [[./queries.org][Catalog]].
       (switch-to-buffer buffer)
       (when noselect (tab-bar-switch-to-prev-tab)))))
 
-(unless orgstrap-do-devel
+(defun advise--sbkt (fun &rest args)
+  "Invert C-u C-x C-c behavior so that quit saves all visited files silently."
+  (apply fun (mapcar #'not args)))
+
+(unless ow-do-devel
   (find-file-noselect "./queries.org")
-  (with-temp-buffer
-    (let ((vb (vterm)))
-      (tab-bar-new-tab 1)
-      (switch-to-buffer vb)
-      (tab-bar-switch-to-prev-tab)))
-  (set-process-query-on-exit-flag (get-process "vterm") nil)
+  (global-set-key (kbd "C-q") #'save-buffers-kill-terminal)
+  (global-unset-key (kbd "C-w")) ; cut is too dangerous, a user wouldn't know what they have done
+  (advice-add #'save-buffers-kill-terminal :around #'advise--sbkt)
   (setq org-link-frame-setup
         '((vm . vm-visit-folder-other-frame)
           (vm-imap . vm-visit-imap-folder-other-frame)
@@ -55,7 +70,7 @@ Browse the full [[./queries.org][Catalog]].
           (wl . wl-other-frame)))
   (font-lock-add-keywords
    nil
-   '(("^\\*+ "
+   '(("^\\*+ " ; hide the stars in headlines
       (0
        (prog1 nil
          (put-text-property
@@ -65,7 +80,29 @@ Browse the full [[./queries.org][Catalog]].
   (goto-char 0)
   (org-next-visible-heading 1)
   (org-narrow-to-subtree)
-  (read-only-mode))
+  (read-only-mode)
+
+  (setq desktop-path (list user-emacs-directory))
+  (setq desktop-dirname user-emacs-directory)
+  (setq desktop-save t)
+  (desktop-save-mode 1)
+  (let ((buffer (current-buffer)))
+    (desktop-read)
+    (let ((have-vterm-tab
+           (cl-loop for tab in (tab-bar-tabs) when (string= (cdr (assq 'name tab)) "*vterm*") return t)))
+      (if have-vterm-tab (tab-bar-switch-to-tab "*vterm*") (tab-bar-new-tab 1))
+      (let ((vb (vterm))) ; `desktop-save-mode' does not restore the process, only the tab
+        (switch-to-buffer vb)
+        (tab-bar-switch-to-recent-tab)))
+    (set-process-query-on-exit-flag (get-process "vterm") nil)
+    (unless (and (desktop-owner) (= (desktop-owner) (emacs-pid)))
+      ;; XXX this is a bit evil if you were to try to naievely `find-file-noselect' this file
+      (pop-to-buffer-same-window buffer))))
+#+end_src
+
+To test save and restore for this file use the following command.
+#+begin_src bash
+emacs -Q -eval "(progn (setq user-init-file (concat default-directory (pop argv)) _ (load user-init-file) user-emacs-directory (file-name-directory user-init-file)) (find-file-noselect (pop argv)))" test-sandbox/.emacs.d/init.el welcome.org
 #+end_src
 
 ** Local Variables :ARCHIVE:
@@ -73,5 +110,5 @@ Browse the full [[./queries.org][Catalog]].
 # org-adapt-indentation: nil
 # org-edit-src-content-indentation: 0
 # org-hide-emphasis-markers: t
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--dprp-1\.0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
 # End:

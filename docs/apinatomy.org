@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 61100f961a715149202dd37587f63a55d7df5d539ddc7929a439ca51811f6ff7; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 0acd9b514c3e04cd01af834d80753fd1598d0fd449095caa0768f8a7478b026d; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -366,7 +366,7 @@ gsx:google-sheet-id
 
 (defvar-local apinat-process-results nil)
 
-(defun sentinel (process message)
+(defun sentinel (process message &optional stderr-process)
   (when (memq (process-status process) '(exit signal))
     (let ((ex (process-exit-status process))
           (buf (process-buffer process))
@@ -377,7 +377,11 @@ gsx:google-sheet-id
       (if (= ex 0)
         (message "completed: %S" process)
         (warn "command failed with %s: %s" ex (string-join cmd " "))
-        (warn "%s" (with-current-buffer buf (buffer-string)))))))
+        (warn "stdout: %S stderr: %S"
+              (with-current-buffer buf (buffer-string))
+              (and stderr-process
+                   (with-current-buffer (process-buffer stderr-process)
+                     (buffer-string))))))))
 
 (defun-local update-all-models-async ()
   (let ((model-ids (all-models)))
@@ -385,6 +389,8 @@ gsx:google-sheet-id
     (cl-loop
      for model-id in model-ids
      collect
+     ;; TODO consider whether we can somehow use invocation-name invocation-directory so that
+     ;; specific versions of emacs are used to run the block instead of always the system version
      (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets))
     (while (< (length apinat-process-results) (length model-ids))
       (sleep-for 5)
@@ -427,7 +433,7 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
 
 The current command to deploy all is.
 #+begin_src bash
-for f in $(ls */derived/*.ttl); do apinat-deploy-from-ttl $f; done
+for f in $(ls models/*/derived/*.ttl); do echo apinat-deploy-from-ttl $f; done
 #+end_src
 
 Alternately use the following to deploy specific models.
@@ -542,6 +548,43 @@ An example run is
 [[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/somas][All somas]]
 [[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/soma-processes][Soma processes]]
 [[http://ontology.neuinfo.org/trees/sparc/simple/dynamic/demos/apinat/soma-processes][Soma processes simple]]
+* NPO identifiers
+
+#+begin_src elisp :exports none
+(jupyter-repl-restart-kernel) ; an this is why we don't use python kids
+#+end_src
+
+Run this and commit the output to the neurons branch of the ontology.
+
+#+begin_src jupyter-python :session pys
+import rdflib
+import augpathlib as aug
+from pyontutils.core import OntGraph, OntResPath
+from pyontutils.config import auth
+from pyontutils.namespaces import *
+repo_relative_path = 'ttl/generated/neurons/apinatomy-neuron-populations.ttl'
+uri_base = 'https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/'
+oid = rdflib.URIRef(uri_base + repo_relative_path)
+
+g = OntGraph()
+g.populate_from_triples(
+    ((oid, p, o) for p, o in
+     ((rdf.type, owl.Ontology),
+)))
+
+amr = aug.LocalPath("~/git/apinatomy-models").expanduser()
+models = list((amr / 'models').children)
+mgraphs = [OntResPath(p).graph for m in models for p in (m / 'derived' / (m.name + '.ttl'),) if p.exists()]
+for mg in mgraphs:
+    mg.namespace_manager.populate(g)
+    for s in mg[:rdf.type:elements.External]:
+        if 'readable/neuron-type' in s:  # FIXME haaaack
+            g.add((s, rdfs.subClassOf, ilxtr.NeuronEBM))
+
+olr = aug.LocalPath(auth.get('ontology-local-repo')).expanduser()
+g.write(olr / repo_relative_path)
+#+end_src
+
 * Dynamic cypher queries
 :PROPERTIES:
 :visibility: folded
@@ -712,8 +755,8 @@ obj:   {n_pair}''')
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'd2c7da56f5d59450cbba8fedc71874e2619214a8a4ad78bdee6451e9b6854baa
-           (concat ghost "744bc09e19b34b68e458a48beefe61cedba4563c" "/ow.el"))))
+    (reval 'sha256 '542400910cb9946e13f4d0ee4fae18837e0c9cb81af39a8272b6770ea9453de0
+           (concat ghost "01ed4fd9ce3ca0ea344ba33292c044d5ce1f43a2" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package
@@ -735,6 +778,10 @@ obj:   {n_pair}''')
     (org-babel-lob-ingest "~/git/pyontutils/nifstd/scigraph/README.org")))
 
 (add-hook 'org-babel-pre-tangle-hook #'apinat---pre-tangle nil t)
+
+(unless (or noninteractive (and (boundp 'ow-nth-time) ow-nth-time))
+  (setq-local ow-nth-time t)
+  (ow-hide-section-0-blocks))
 
 ;; entry point for batch command line
 
@@ -772,5 +819,5 @@ block can be nowebbed for tangling.
 ** Local Variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (setq-local org-confirm-babel-evaluate ocbe) (org-set-startup-visibility)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--dprp-1\.0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
 # End:

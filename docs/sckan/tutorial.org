@@ -1,44 +1,128 @@
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 32b4c6dcae4b740062e4d4005c6dcec47c4bf1706b9fe2c46193167966b09430; -*-
 #+title: Tutorial
 # inherit configuration from queries.org
 #+setupfile: ./queries.org
 
 Welcome to the SCKAN tutorial!
 
-This tutorial will walk you through how to query SCKAN using the SPARQL and Cypher query languages.
+This tutorial will walk you through how to use this interface to query
+SCKAN via the SPARQL and Cypher query languages.
+
+* Structure
+The query interface for SCKAN is implemented in [[info:org][Org mode]].
+In short, we are using Org like a Jupyter or RStudio notebook.
+
+Some terminology that will be useful for the rest of the tutorial.
+
+The line =* Structure= above is called a heading.
+
+The next 3 lines below this one make up a source block.
+#+begin_src emacs-lisp
+"Source blocks are delimited by a #+begin_src line and an #+end_src line."
+#+end_src
+See [[info:org#Working with Source Code][Working with Source Code]] for more.
+
+* Running queries
+
+There are two ways to run queries.
+1. Hit =C-c C-c= to run the source block under the cursor.
+   =C-c C-c= is done by holding =Ctrl= and then hitting the =c= key twice.
+2. Hit the =F5= key to run the block that is closest to the cursor.
+# TODO bind F5 to run the query closest to the point.
+
+You can try out both methods on the blocks below.
+
+#+begin_src sparql
+SELECT ?x WHERE { VALUES ?x {"hello world"} }
+#+end_src
+
+#+begin_src cypher
+RETURN "hello world"
+#+end_src
+
+The SCKAN query interface is [[(ocbe)][configured]] to run sparql and
+cypher queries without prompting.  However you might encounter a block
+in another language that will not run automatically, such this one.
+#+begin_src elisp
+"hello world"
+#+end_src
+
+The cypher SciGraph endpoint is slightly different.
+https://github.com/SciGraph/SciGraph/wiki/Cypher-language-extension
+#+begin_src cypher
+RETURN "hello world"
+#+end_src
+
+#+begin_src sparql
+SELECT DISTINCT ?s (str(?l) as ?label) WHERE { ?s rdf:type elements:Graph; rdfs:label ?l } LIMIT 99
+#+end_src
 
 * Navigation
-You can open and close headings (lines that start with =*=) by
-clicking on them with the mouse or by hitting =tab= when the cursor is
-on the heading line. This also works for numbered and dotted lists
-which usually won't be needed but might happen by accident.
+You can open and close headings (lines that start with =*= that use a
+larger font) by clicking on them with the mouse or by hitting =tab= when
+the cursor is on the heading line.
 
 You can also open and close source blocks by clicking on the
 =#+begin_src= line, =#+end_src= line, or any of the =#+header:=,
 =#+caption:=, or =#+name:= lines associated with the block. =tab=
 works in this case as well.
 
-* Running queries
-
-# TODO bind F5 to run the query closest to the point.
-
-#+begin_src sparql
-#+end_src
+* Naming blocks
+not sure if want
 
 * First query
 what is in the database ???
 model id, name, abbreviation etc.
 
 * Parameterizing queries
-
 * Reference
+:PROPERTIES:
+:CUSTOM_ID: reference
+:END:
+** Saving and Restoring
+:PROPERTIES:
+:CUSTOM_ID: saving-and-restoring
+:END:
+
+#+begin_src bash
+docker container start --attach --interactive \
+$(docker ps --latest --quiet --filter ancestor=tgbugs/musl:kg-release-user)
+#+end_src
+
 ** Keybinds
 | =C-c=     | copy              |
 | =C-v=     | paste             |
 | =C-z=     | undo              |
-| =C-y=     | redo              |
+| =C-y= =C-Z= | redo              |
 | =C-s=     | save              |
 | =C-f=     | find              |
+| =C-q=     | save and quit     |
+| =f5=      | run nearest block |
 | =C-c C-c= | run block or call |
 
-TODO
-| =f5=      | run nearest block |
+* Bootstrap :ARCHIVE:
+:properties:
+:visibility: folded
+:end:
+
+#+name: orgstrap
+#+begin_src elisp :results none :exports none :lexical yes
+(defvar ow-do-devel nil)
+
+(setq-local
+ org-confirm-babel-evaluate
+ (lambda (lang _body)
+   (not (or (member lang '("cypher" "sparql")))))) ; (ref:ocbe)
+
+(unless ow-do-devel
+  (find-file-noselect "./queries.org"))
+#+end_src
+
+** Local Variables :ARCHIVE:
+
+# Local Variables:
+# org-adapt-indentation: nil
+# org-edit-src-content-indentation: 0
+# org-hide-emphasis-markers: t
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--dprp-1\.0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# End:

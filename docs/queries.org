@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.1; orgstrap-block-checksum: 66ef4cbe7b86df938b8ffae44e454798cdddfe7410ff324ca315f25026a71a5b; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 579aa38aa11f31ae6dbe9bdc2db9dda8a094aac256ebb287adf58374106439e0; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -2076,22 +2076,29 @@ references that provide supporting evidence.
 MATCH (start:Ontology {iri: $model_id})
 <-[:isDefinedBy]-(external:Class)
 -[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"}) // FIXME
-WITH external
-MATCH (external)
+,
+(external)
 -[e:type]->()
 RETURN e
 UNION
-MATCH (start:Ontology {iri: $model_id})
+OPTIONAL MATCH (start:Ontology {iri: $model_id})
 <-[:isDefinedBy]-(graph:NamedIndividual)
 -[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"}) // elements don't have a superclass right now
-WITH graph
-MATCH (graph)
+,
+(graph)
 -[:apinatomy:publications]->(pub)
--[e:type]-()
+-[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"})
 RETURN e
 #+end_src
 
+*** TODO neru regions projected to
+#+begin_src cypher
+#+end_src
+*** TODO neru regions dendrited to
+*** TODO neru regions with process in
 *** neru projects to
+*** neru neurites to
+# FIXME this seems not quite right?
 # TODO dot ignore directionality in layout for certain edges e.g. apinat:topology
 # #+header: :results drawer :limit 1
 #+header: :limit 999999 :file ./images/neru-projects.svg :results file :exports both
@@ -2377,20 +2384,16 @@ RETURN path
 #+header: :var species-id=(identity nil)
 #+name: cyres-parcellation-roots-species-id
 #+begin_src cypher
-MATCH (parent)
--[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
-WITH parent
 MATCH path = (artifact)
 -[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
 WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
 return path
 UNION
-MATCH (parent)
--[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
-WITH parent
 MATCH path = (root)
 -[:ilxtr:isDefinedBy]->(artifact)
 -[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
 RETURN path
 #+end_src
 **** parcellationRoots/{species-id}/{region-id}
@@ -3388,6 +3391,9 @@ UBERON:0002298 l: "brainstem"; e: FMA:79876 .
 UBERON:0001016 l: "nervous system"; e: FMA:7157 .
 UBERON:0000010 l: "peripheral nervous system"; e: FMA:9903 .
 UBERON:0000013 l: "sympathetic nervous system"; e: FMA:9906 .
+UBERON:0002005 l: "enteric nervous system"; e: FMA:66070 .
+# TODO cardiovascular system # e.g. for blood pressure
+# TODO cardiopulmonary system
 
 # organs
 UBERON:0000955 l: "brain"; e: FMA:50801 .
@@ -3444,6 +3450,7 @@ UBERON:0001643 l: "oculomotor nerve"; e: FMA:50864 .
 UBERON:0002924 l: "terminal nerve" .
 UBERON:0001645 l: "trigeminal nerve"; e: FMA:50866 .
 UBERON:0001759 l: "vagus nerve"; e: FMA:5731 .
+# TODO vagus nerve branches
 UBERON:0018680 l: "greater splanchnic nerve" .
 UBERON:0003438 l: "iris nerve" .
 UBERON:0011096 l: "lacrimal nerve" .
@@ -3479,13 +3486,31 @@ UBERON:0018679 l: "thoracic splanchnic nerve" .
 UBERON:0001323 l: "tibial nerve" .
 UBERON:0036216 l: "tympanic nerve" .
 UBERON:0018412 l: "vidian nerve" .
+
+# cervical nerve
+UBERON:0000962 l: "nerve of cervical vertebra"; e: FMA:5859 .
+
 #+end_src
 
+*** plexi
+#+begin_src ttl
+UBERON:0002439 l: "myenteric nerve plexus"; e: FMA:63252 .
+#+end_src
+
+**** TODO consult with SAWG about these
+:PROPERTIES:
+:CREATED:  [2021-09-17 Fri 14:33]
+:END:
+
 *** ganglia
+:PROPERTIES:
+:CREATED:  [2021-09-17 Fri 14:29]
+:END:
 #+name: ttl-ganglia
 #+begin_src ttl
 @prefix l: <http://www.w3.org/2000/01/rdf-schema#label> .
 @prefix e: <http://uri.interlex.org/tgbugs/uris/readable/hasExistingId> .
+@prefix syn: <http://uri.neuinfo.org/nif/nifstd/readable/synonym> .
 @prefix FMA: <http://purl.org/sig/ont/fma/fma> .
 @prefix UBERON: <http://purl.obolibrary.org/obo/UBERON_> .
 
@@ -3514,9 +3539,16 @@ UBERON:0002059 l: "submandibular ganglion" .
 UBERON:0001806 l: "sympathetic ganglion" .
 UBERON:0005362 l: "vagus X ganglion" .
 UBERON:0005364 l: "superior vagus X ganglion" .
-UBERON:0005363 l: "inferior vagus X ganglion" .
+UBERON:0005363 l: "inferior vagus X ganglion"; syn: "nodose ganglion" .
 UBERON:0000408 l: "vertebral ganglion" .
+UBERON:0002441 l: "cervicothoracic ganglion"; e: FMA:6469; syn: "stellate ganglion" .
 #+end_src
+
+**** TODO add synonyms
+:PROPERTIES:
+:CREATED:  [2021-09-17 Fri 14:33]
+:END:
+
 
 *** neuron population by organ
 
@@ -3945,7 +3977,7 @@ WHERE {
 # aka dashboard queries
 ***** ApiNATOMY sourced
 ****** models
-#+name: n-sparql-apinat-models
+#+name: n-sparql-apinat-graphs
 #+begin_src sparql :noweb no-export
 SELECT (COUNT(*) as ?count) {
   <<sparql-apinat-models>>
@@ -3953,7 +3985,7 @@ SELECT (COUNT(*) as ?count) {
 #+end_src
 
 # FIXME owl:Ontology vs elements:Graph
-#+name: sparql-apinat-models
+#+name: sparql-apinat-graphs
 #+begin_src sparql
 # SELECT (COUNT(DISTINCT ?s) as ?total_models)
 SELECT DISTINCT
@@ -3969,11 +4001,14 @@ WHERE {
 # something other than the graph results so that we can match
 # sparql unfortunately that is a larger engineering undertaking the
 # requires modifying scigraph again
+#+name: cypher-apinat-graphs
+#+begin_src cypher
+MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g) RETURN g
+#+end_src
+
 #+name: cypher-apinat-models
 #+begin_src cypher
-MATCH (g)
--[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"})
-RETURN g
+MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)-[:isDefinedBy]->(o:Ontology) RETURN o
 #+end_src
 
 ****** number of lyphs
@@ -4198,8 +4233,8 @@ WHERE {
 
 #+name: orgstrap
 #+begin_src elisp :results none :exports none :lexical yes
-(defvar orgstrap-do-packages-emacs t "Install Emacs packages.")
-(defvar orgstrap-do-config-emacs t "Run code that modifies the Emacs configuration.")
+(defvar ow-do-packages-emacs t "Install Emacs packages.")
+(defvar ow-do-config-emacs t "Run code that modifies the Emacs configuration.")
 
 (setq inhibit-startup-screen t)
 
@@ -4207,10 +4242,14 @@ WHERE {
 ;; modify the elvs
 (setq-local
  org-confirm-babel-evaluate
- (lambda (lang _body)
-   (not (or (member lang '("cypher" "sparql"))
-            (eq (intern (orgstrap-get-named-src-block-checksum "nonl"))
-                '93e2534fba4f80f1de745861b30480f15913fa9d9d6c40fa5b9ed84d1e642806)))))
+ (lambda (lang body)
+   (message "%S" body)
+   (not
+    (or
+     (member lang '("cypher" "sparql"))
+     (and
+      (string= lang "elisp")
+      (string= body "(string-trim (replace-regexp-in-string \"\\n\" \"\" paragraph))"))))))
 
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)
@@ -4261,7 +4300,7 @@ WHERE {
            ;;"~/git/orgstrap/services/blazegraph.el"
            (concat ghost "abb93f698d3cfeeea607856bec98ae1d6cfe39c9" "/services/blazegraph.el"))))
 
-(when orgstrap-do-packages-emacs
+(when ow-do-packages-emacs
   (ow-enable-use-package)
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
@@ -4275,8 +4314,9 @@ WHERE {
         "Face for pattern struct." :group 'cypher-faces))
      sparql-mode
      ob-cypher
-     (org-plus-contrib
+     (org
       :mode ("\\.org\\'" . org-mode)
+      :bind ("<f5>" . ow-babel-eval-closest-block)
       :init
       (org-babel-do-load-languages
        'org-babel-load-languages
@@ -4313,21 +4353,22 @@ WHERE {
 (add-hook 'org-babel-tangle-body-hook #'ow---strip-empty-lines)
 
 ;; command line interface
-(ow-cli-gen
-    ((:tangle)
-     (:visit) ; FIXME better name
-     (:report-apinat)
-     (:report-organs))
-  (when tangle (org-babel-tangle))
-  (when report-apinat)
-  (when report-organs))
+(when noninteractive
+  (ow-cli-gen
+      ((:tangle)
+       (:visit) ; FIXME better name
+       (:report-apinat)
+       (:report-organs))
+    (when tangle (org-babel-tangle))
+    (when report-apinat)
+    (when report-organs)))
 
 ;; note that we had to remove the call to `org-set-startup-visibility'
 ;; from the elvs in order to get this to work
 (when enable-local-eval ; FIXME HACK how to know when this was called
   ;; by the elvs? we don't want this running on a manual trigger
   (ow-hide-section-0-blocks)
-  (when orgstrap-do-config-emacs
+  (when ow-do-config-emacs
     (ow--rainy-day)
     (add-hook 'emacs-lisp-mode-hook #'rainbow-delimiters-mode)
     (ow-enable-config-familiar-1 'global)))
@@ -4349,5 +4390,5 @@ Tangle helper for bare paragraphs.
 # org-adapt-indentation: nil
 # org-edit-src-content-indentation: 0
 # org-hide-emphasis-markers: t
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--prp-1\.1 (body) (let (print-quoted print-length print-level) (prin1-to-string (read (concat "(progn\n" body "\n)"))))) (unless (boundp 'orgstrap-norm-func) (defvar orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block))) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--dprp-1\.0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
 # End:
