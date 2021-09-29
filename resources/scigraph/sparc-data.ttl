@@ -29,8 +29,7 @@
 @prefix dlcon: <https://apinatomy.org/uris/models/dev-layout-conn/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
-    owl:imports <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl>,
-        <https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl> ;
+    owl:imports <https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl> ;
     owl:imports <https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
@@ -40,8 +39,9 @@
     ilxtr:imports-big <http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl>,
         <http://ontology.neuinfo.org/NIF/extra.ttl>,
         <http://ontology.neuinfo.org/NIF/ttl/nif.ttl> ;
-    ilxtr:imports-rel <file:///tmp/scigraph-build/sparc-data/curation-export.owl> ;
+    ilxtr:imports-rel <file:///tmp/scigraph-build/sparc-data/curation-export-published.owl> ;
     ilxtr:imports-dev
+        <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl>,
         # <https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl> ,
         <file:///tmp/scigraph-build/sparc-data/curation-export.owl> ;
     ilxtr:imports-dev <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
@@ -50,4 +50,5 @@
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl> .
 
+###
 ## Serialized using the ttlser deterministic serializer v1.2.0
