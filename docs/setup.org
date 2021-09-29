@@ -892,6 +892,7 @@ pushd "${PARENT_PATH}/SPARC Consortium"
 spc export
 find -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -print0 | \
      xargs -0 -I{} -P8 -r -n 1 python -m sparcur.simple.path_metadata_validate --export-path ../exports/ {}
+pushd ~/.local/share/sparcur/export/618*/integrated/LATEST/; python -m sparcur.export.published; popd
 echo "${PARENT_PATH}"
 unset PARENT_PATH
 #+end_src
@@ -904,6 +905,18 @@ Export time is usually later than parent time.
 preview-sparc-export-to-server
 preview-export-rest ${EXPORT_PATH_TIME} ${PARENT_PATH_TIME}
 #+end_src
+
+*** Export published
+Generate =curation-export-published.ttl= for existing exports.
+
+#+begin_src bash
+pushd /var/www/sparc/sparc/preview/archive/exports
+find -maxdepth 1 -type d -exec sudo chown $UID:$UID {} \;
+find -name curation-export.ttl -execdir python -m sparcur.export.published \;
+find -maxdepth 1 -type d -exec sudo chown -R nginx:nginx {} \;
+popd
+#+end_src
+
 *** Reporting
 :PROPERTIES:
 :VISIBILITY: folded
@@ -1132,6 +1145,16 @@ accidentally encounter and error along the lines of
 #+begin_src bash
 jq -C '.. | .units? // empty' /tmp/curation-export-*.json | sort -u
 #+end_src
+**** protocols cache
+#+begin_src bash
+pushd ~/.cache/idlib
+mv protocol_json protocol_json-old
+# run export
+find protocol_json -size -2 -exec cat {} \+
+# check to make sure that there weren't any manually provided caches
+find protocol_json -size -2 -execdir cat ../protocol_json-old/{} \;
+#+end_src
+
 ** SODA
 Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
 #+header: :var parent_folder="~/files/blackfynn_local/"
