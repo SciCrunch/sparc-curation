@@ -3984,16 +3984,26 @@ SELECT (COUNT(*) as ?count) {
 }
 #+end_src
 
-# FIXME owl:Ontology vs elements:Graph
 #+name: sparql-apinat-graphs
 #+begin_src sparql
-# SELECT (COUNT(DISTINCT ?s) as ?total_models)
 SELECT DISTINCT
 (?s as ?id)
 (str(?l) as ?label)
 WHERE {
   ?s a elements:Graph .
   ?s rdfs:label ?l.
+}
+#+end_src
+
+#+name: sparql-apinat-models
+#+begin_src sparql
+SELECT DISTINCT
+?o (str(?l) as ?label)
+WHERE {
+?o a owl:Ontology ;
+   rdfs:label ?l ;
+   apinatomy:hasGraph ?g .
+?g a elements:Graph .
 }
 #+end_src
 
