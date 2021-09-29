@@ -8,22 +8,9 @@ Welcome to the SCKAN tutorial!
 This tutorial will walk you through how to use this interface to query
 SCKAN via the SPARQL and Cypher query languages.
 
-* Structure
-The query interface for SCKAN is implemented in [[info:org][Org mode]].
-In short, we are using Org like a Jupyter or RStudio notebook.
-
-Some terminology that will be useful for the rest of the tutorial.
-
-The line =* Structure= above is called a heading.
-
-The next 3 lines below this one make up a source block.
-#+begin_src emacs-lisp
-"Source blocks are delimited by a #+begin_src line and an #+end_src line."
-#+end_src
-See [[info:org#Working with Source Code][Working with Source Code]] for more.
-
-* Running queries
-
+* Queries
+For a written introduction see the manual on [[info:org#Working with Source Code][Working with Source Code]].
+** Running queries
 There are two ways to run queries.
 1. Hit =C-c C-c= to run the source block under the cursor.
    =C-c C-c= is done by holding =Ctrl= and then hitting the =c= key twice.
@@ -31,6 +18,7 @@ There are two ways to run queries.
 # TODO bind F5 to run the query closest to the point.
 
 You can try out both methods on the blocks below.
+If everything is working you will see =#+RESULTS:=
 
 #+begin_src sparql
 SELECT ?x WHERE { VALUES ?x {"hello world"} }
@@ -40,23 +28,43 @@ SELECT ?x WHERE { VALUES ?x {"hello world"} }
 RETURN "hello world"
 #+end_src
 
-The SCKAN query interface is [[(ocbe)][configured]] to run sparql and
-cypher queries without prompting.  However you might encounter a block
-in another language that will not run automatically, such this one.
+The SCKAN query interface is configured to run sparql and cypher
+queries without prompting.  However you might encounter a block in
+another language that will not run automatically, such this one.
+
 #+begin_src elisp
 "hello world"
 #+end_src
 
-The cypher SciGraph endpoint is slightly different.
-https://github.com/SciGraph/SciGraph/wiki/Cypher-language-extension
-#+begin_src cypher
-RETURN "hello world"
-#+end_src
+** Modifying queries
+You can edit any source block as plain text.
+
+Try editing ="hello world"= to read ="foo bar"= and then run the block.
 
 #+begin_src sparql
-SELECT DISTINCT ?s (str(?l) as ?label) WHERE { ?s rdf:type elements:Graph; rdfs:label ?l } LIMIT 99
+SELECT ?x WHERE { VALUES ?x {"hello world"} }
 #+end_src
 
+* Setting limits
+
+Sometimes it is useful to be able to limit the number of results.
+
+Try increasing the limit beyond 1000 and then try removing the limit statement from the query.
+#+header: :var limit="1"
+#+begin_src sparql
+SELECT * WHERE { ?s ?p ?o }
+LIMIT ?limit
+#+end_src
+
+The Cypher endpoint that is used for SCKAN does not allow the LIMIT keyword.
+Thus there is a slight difference in how you set the limit for a Cypher query.
+#+header: :limit 1
+#+begin_src cypher
+MATCH (g:Class) RETURN g
+#+end_src
+
+* Parameterizing queries
+* Naming blocks
 * Navigation
 You can open and close headings (lines that start with =*= that use a
 larger font) by clicking on them with the mouse or by hitting =tab= when
@@ -67,14 +75,6 @@ You can also open and close source blocks by clicking on the
 =#+caption:=, or =#+name:= lines associated with the block. =tab=
 works in this case as well.
 
-* Naming blocks
-not sure if want
-
-* First query
-what is in the database ???
-model id, name, abbreviation etc.
-
-* Parameterizing queries
 * Reference
 :PROPERTIES:
 :CUSTOM_ID: reference
@@ -88,7 +88,6 @@ model id, name, abbreviation etc.
 docker container start --attach --interactive \
 $(docker ps --latest --quiet --filter ancestor=tgbugs/musl:kg-release-user)
 #+end_src
-
 ** Keybinds
 | =C-c=     | copy              |
 | =C-v=     | paste             |
@@ -99,6 +98,37 @@ $(docker ps --latest --quiet --filter ancestor=tgbugs/musl:kg-release-user)
 | =C-q=     | save and quit     |
 | =f5=      | run nearest block |
 | =C-c C-c= | run block or call |
+
+** Org mode
+The query interface for SCKAN is a computational notebook written in Org mode.
+Any extensive [[info:Org][manual]] is built in.
+
+* Extras :ARCHIVE:
+** intro
+The query interface for SCKAN is a computational notebook written in [[info:org][Org mode]].
+
+In short, we are using Org like a Jupyter or RStudio notebook.
+
+Some terminology that will be useful for the rest of the tutorial.
+
+The line =* Structure= above is called a heading.
+
+The next 3 lines below this one make up a source block.
+#+begin_src emacs-lisp
+"Source blocks are delimited by a #+begin_src line and an #+end_src line."
+#+end_src
+See [[info:org#Working with Source Code][Working with Source Code]] for more.
+
+** running
+The cypher SciGraph endpoint is slightly different.
+https://github.com/SciGraph/SciGraph/wiki/Cypher-language-extension
+#+begin_src cypher
+RETURN "hello world"
+#+end_src
+
+#+begin_src sparql
+SELECT DISTINCT ?s (str(?l) as ?label) WHERE { ?s rdf:type elements:Graph; rdfs:label ?l } LIMIT 99
+#+end_src
 
 * Bootstrap :ARCHIVE:
 :properties:
