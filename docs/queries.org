@@ -1694,14 +1694,299 @@ result = func(data)
 #+end_src
 
 #+RESULTS: process-duplicate-subjects
+* Python helper
+** call
+
+# Use this block to run the next block an all dependencies without being asked again.
+#+begin_src elisp :results none :exports none
+(ow-babel-eval "neru-simplified")
+#+end_src
+
+#+header: :var json-string=python-neru-helper(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-5"))
+#+header: :var path="./images/neru-simplified.svg" :results file
+#+name: neru-simplified
+#+begin_src elisp :exports none
+(json->svg-file json-string path)
+#+end_src
+
+[[file:./images/neru-simplified.svg]]
+
+** simple
+Python code to simplify =neru-3= and supporting functions to extract terminal regions.
+# FIXME this doesn't highlight correctly in init-simple.el
+# FIXME the python will run the epilogue for in a babel call but jupyter-python will not, fun times
+# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nprint(json.dumps(b, indent=1, sort_keys=False))"
+#+header: :results drawer
+#+header: :var result=(identity nil)
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
+#+name: python-process-neru
+#+begin_src jupyter-python :session pys
+from nifstd_tools.simplify import simplify
+
+
+axon = 'SAO:280355188'
+dend = 'SAO:420754792'
+bag = 'apinatomy:BAG'
+top = 'apinatomy:topology*'
+ie = 'apinatomy:inheritedExternal*'
+ext = 'apinatomy:external'
+fasIn = 'apinatomy:fasciculatesIn'
+endIn = 'apinatomy:endsIn'
+layerIn = 'apinatomy:layerIn'
+
+
+def query(neupop_id):
+    import requests
+    url = ('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
+           f'demos/apinat/neru-3/{neupop_id}?limit=9999999')
+    resp = requests.get(url, headers={'Accept': 'application/json'})
+    blob = resp.json()
+    return blob
+
+
+def deblob(blob):
+    blob = simplify([['apinatomy:target', 'apinatomy:rootOf', 'apinatomy:levels'],
+                     ['apinatomy:conveyingLyph', 'apinatomy:topology'],
+                     ['apinatomy:conveys', 'apinatomy:source', 'apinatomy:sourceOf'],
+                     ['apinatomy:conveys', 'apinatomy:target', 'apinatomy:sourceOf'],
+                     ['apinatomy:cloneOf', 'apinatomy:inheritedExternal'],
+                     ['apinatomy:conveyingLyph', 'apinatomy:inheritedExternal'],], blob)
+    edges = blob['edges']
+    nindex = {n['id']:n for n in blob['nodes']}  # FIXME silent errors ;_;
+    for e in edges:
+        if e['pred'] in (
+                'apinatomy:target-apinatomy:rootOf-apinatomy:levels',
+                'apinatomy:conveys-apinatomy:source-apinatomy:sourceOf',
+                'apinatomy:conveys-apinatomy:target-apinatomy:sourceOf',):
+            e['pred'] = 'apinatomy:next*'
+        if e['pred'] == 'apinatomy:conveyingLyph-apinatomy:topology':
+            e['pred'] = 'apinatomy:topology*'
+        if e['pred'] in (
+                'apinatomy:conveyingLyph-apinatomy:inheritedExternal',
+                'apinatomy:cloneOf-apinatomy:inheritedExternal',):
+            e['pred'] = 'apinatomy:inheritedExternal*'
+        if pred(e, top):
+            # move topology to be a property not a node to make the layout cleaner
+            nindex[sub(e)]['topology'] = obj(e)
+
+    # remove topology edges
+    edges = blob['edges'] = [e for e in edges if not pred(e, top)]
+    # remove process type edges
+    edges = blob['edges'] = [e for e in edges if not (obj(e, axon) or obj(e, dend))]
+
+    blob['edges'] = [dict(s) for s in set(frozenset({k:v for k, v in d.items()
+                                                     if k != 'meta'}.items()) for d in blob['edges'])]
+    sos = set(sov for e in blob['edges'] for sov in (e['sub'], e['obj']))
+    blob['nodes'] = [n for n in blob['nodes'] if n['id'] in sos]
+    somas = [e for e in edges if e['pred'] == 'apinatomy:internalIn']
+    externals = [e for e in edges if e['pred'] == 'apinatomy:external']
+    ordering_edges = [e for e in edges if e['pred'] == 'apinatomy:next']
+    return blob, edges, somas, externals, ordering_edges
+
+
+def sub(e, match=None):
+    return e['sub'] == match if match is not None else e['sub']
+
+
+def pred(e, match=None):
+    return e['pred'] == match if match is not None else e['pred']
+
+
+def obj(e, match=None):
+    return e['obj'] == match if match is not None else e['obj']
+
+
+def ematch(blob, select, match, *matches, matchf=lambda ms: True):
+    return [e for e in blob['edges'] if select(e, match) and matchf(matches)]
+
+
+def find_terminals(blob, type):
+    return [es for es in blob['edges']
+            if
+            pred(es, ie) and
+            obj(es, type) and
+            ematch(blob,
+                   (lambda e, m:
+                    sub(e, m) and
+                    pred(e, top) and
+                    obj(e, bag)),
+                   sub(es))]
+
+
+def find_region(blob, edge):
+    collect = []
+    def select(e, m, collect=collect):
+        if sub(e, m):
+            #print(e)
+            if pred(e, layerIn) or pred(e, fasIn) or pred(e, endIn):
+                return ematch(blob, select, obj(e))
+            elif pred(e, ext):
+                region = obj(e)
+                collect.extend([b for b in blob['nodes'] if b['id'] == region])
+                return region
+
+    ematch(blob, select, sub(edge))
+    return collect
+
+
+def find_terminal_regions(blob, type):
+    return [region for es in find_terminals(blob, type) for region in find_region(blob, es)]
+
+
+def main(blob=None, blob_string=None, neupop_id=None):
+    if blob_string is not None:
+        import json
+        blob = json.loads(result)
+
+    if blob is None:
+        blob = query('ilxtr:neuron-type-keast-6')
+
+
+    blob, edges, somas, externals, ordering_edges = v = deblob(blob)
+    return v
+
+#+end_src
+
+#+call: python-process-neru(result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-5"))
+
+# we need this block because jupyter-python doesn't include the epilogue when being called by another block wew
+# #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
+# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nreturn json.dumps(b, indent=1, sort_keys=False)"
+# #+header: :var result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-6")
+#+header: :results drawer
+#+header: :var result=(identity nil)
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
+#+name: python-neru-helper
+#+begin_src python :noweb yes :exports none
+<<python-process-neru>>
+#+end_src
+
+** terminal regions
+Find the ontology identifiers for terminal regions.
+#+name: neru-find-terminal-regions
+#+begin_src jupyter-python :session pys :exports both :var neupop_id=""
+from pprint import pprint
+
+blob, *_ = main(neupop_id='ilxtr:neuron-type-keast-6')
+
+# find terminal regions
+axon_terminal_regions = find_terminal_regions(blob, axon)
+dend_terminal_regions = find_terminal_regions(blob, dend)
+pprint(axon_terminal_regions)
+pprint(dend_terminal_regions)
+#+end_src
+
+#+RESULTS: neru-find-terminal-regions
+#+begin_example
+[{'id': 'UBERON:0016508',
+  'lbl': 'pelvic ganglion',
+  'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['pelvic ganglion'],
+           'https://apinatomy.org/uris/readable/generated': [True],
+           'types': ['Class']}}]
+[{'id': 'UBERON:0006448',
+  'lbl': None,
+  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
+           'types': ['Class']}},
+ {'id': 'UBERON:0006450',
+  'lbl': None,
+  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
+           'types': ['Class']}}]
+#+end_example
+
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru
+*** neru-4
+#+name: cypher-neru-4-helper
+#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
+<<cypher-neru-4>>
+#+end_src
+
+#+header: :limit 999999 :file ./images/neru-4.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-5"
+#+name: cypher-neru-4
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+, (neugrp)
+-[:apinatomy:links]->(link)
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+WITH neugrp, link, lyph, a, c, d
+OPTIONAL MATCH layer_ext = (lyph)
+<-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedExternal]->()
+
+//WITH neugrp, link, lyph, a, c, d, layer_ext
+//OPTIONAL MATCH (neugrp)
+//-[b:apinatomy:links]->(link)
+//-[:apinatomy:endsIn]->()
+
+WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
+MATCH (lyph)
+-[e:apinatomy:external]->(region)
+
+, p2 = (link)
+-[:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:topology]->()
+
+, (cl)
+-[x:apinatomy:inheritedExternal*0..1]->()
+
+// use apinatomy:next to extract ordering information
+, (link)
+-[f:apinatomy:next*0..]->()
+//-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+// FIXME these should be collapsing into a single relationship
+-[g:apinatomy:target*0..1]->()
+-[h:apinatomy:rootOf*0..1]->()
+-[i:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+
+// publications
+WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext
+OPTIONAL MATCH path = (neugrp)
+-[:apinatomy:publications]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
+
+RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext
+
+UNION
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+-[c:apinatomy:internalIn]->()
+-[d:apinatomy:external*0..1]->(region)
+, p2 = (lyph)
+-[:apinatomy:conveys]->(soma_link)
+-[:apinatomy:source|apinatomy:target]->(soma_node)
+-[:apinatomy:sourceOf]->(chain_link)
+, (chain_link)
+-[:apinatomy:levelIn]->(chain)
+, (soma_node)
+-[:apinatomy:rootOf]->(chain)
+
+// this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+//-[c:apinatomy:internalIn*0..1]->()
+//-[d:apinatomy:external*0..1]->(region)
+RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext
+#+end_src
+
 *** neru-3
-# #+header: :results drawer :limit 1
+
+#+name: cypher-neru-3-helper
+#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
+<<cypher-neru-3>>
+#+end_src
+
+# #+header: :results table :limit 1
 #+header: :limit 999999 :file ./images/neru-3.svg :results file :exports both
-#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+header: :var neupop_id="ilxtr:neuron-type-keast-5"
 #+name: cypher-neru-3
 #+begin_src cypher
 MATCH (neupop:Class{iri: $neupop_id})
@@ -1716,11 +2001,11 @@ OPTIONAL MATCH path = (neugrp)
 WITH neugrp, a, path
 MATCH (neugrp)
 -[b:apinatomy:links]->(link)
--[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
 -[d:apinatomy:layerIn*0..1]->(lyph)
 -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
 
-WITH neugrp, link, lyph, a, b, c, d, path
+WITH neugrp, link, lyph, a, b, c, d, path // MATCH vs , not all things that match as lyphs have externals
 MATCH (lyph)
 -[e:apinatomy:external]->(region)
 
@@ -1762,184 +2047,6 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 
 [[file:./images/neru-3.svg]]
 
-#+name: cypher-neru-helper
-#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
-<<cypher-neru-3>>
-#+end_src
-
-Python code to simplify =neru-3= and supporting functions to extract terminal regions.
-# FIXME the python will run the epilogue for in a babel call but jupyter-python will not, fun times
-# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nprint(json.dumps(b, indent=1, sort_keys=False))"
-#+header: :results drawer
-#+header: :var result=(identity nil)
-#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
-#+name: python-process-neru
-#+begin_src jupyter-python :session pys
-from nifstd_tools.simplify import simplify
-
-
-axon = 'SAO:280355188'
-dend = 'SAO:420754792'
-bag = 'apinatomy:BAG'
-top = 'apinatomy:topology*'
-ie = 'apinatomy:inheritedExternal*'
-ext = 'apinatomy:external'
-fasIn = 'apinatomy:fasciculatesIn'
-layerIn = 'apinatomy:layerIn'
-
-
-def query(neupop_id):
-    import requests
-    url = ('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
-           f'demos/apinat/neru-3/{neupop_id}?limit=9999999')
-    resp = requests.get(url, headers={'Accept': 'application/json'})
-    blob = resp.json()
-    return blob
-
-
-def deblob(blob):
-    blob = simplify([['apinatomy:target', 'apinatomy:rootOf', 'apinatomy:levels'],
-                     ['apinatomy:conveyingLyph', 'apinatomy:topology'],
-                     ['apinatomy:conveyingLyph', 'apinatomy:inheritedExternal'],], blob)
-    edges = blob['edges']
-    for e in edges:
-        if e['pred'] == 'apinatomy:target-apinatomy:rootOf-apinatomy:levels':
-            e['pred'] = 'apinatomy:next*'
-        if e['pred'] == 'apinatomy:conveyingLyph-apinatomy:topology':
-            e['pred'] = 'apinatomy:topology*'
-        if e['pred'] == 'apinatomy:conveyingLyph-apinatomy:inheritedExternal':
-            e['pred'] = 'apinatomy:inheritedExternal*'
-
-    blob['edges'] = [dict(s) for s in set(frozenset({k:v for k, v in d.items()
-                                                     if k != 'meta'}.items()) for d in blob['edges'])]
-    sos = set(sov for e in blob['edges'] for sov in (e['sub'], e['obj']))
-    blob['nodes'] = [n for n in blob['nodes'] if n['id'] in sos]
-    somas = [e for e in edges if e['pred'] == 'apinatomy:internalIn']
-    externals = [e for e in edges if e['pred'] == 'apinatomy:external']
-    ordering_edges = [e for e in edges if e['pred'] == 'apinatomy:next']
-    return blob, edges, somas, externals, ordering_edges
-
-
-
-def sub(e, match=None):
-    return e['sub'] == match if match is not None else e['sub']
-
-
-def pred(e, match=None):
-    return e['pred'] == match if match is not None else e['pred']
-
-
-def obj(e, match=None):
-    return e['obj'] == match if match is not None else e['obj']
-
-
-def ematch(blob, select, match, *matches, matchf=lambda ms: True):
-    return [e for e in blob['edges'] if select(e, match) and matchf(matches)]
-
-
-def find_terminals(blob, type):
-    return [es for es in blob['edges']
-            if
-            pred(es, ie) and
-            obj(es, type) and
-            ematch(blob,
-                   (lambda e, m:
-                    sub(e, m) and
-                    pred(e, top) and
-                    obj(e, bag)),
-                   sub(es))]
-
-def find_region(blob, edge):
-    collect = []
-    def select(e, m, collect=collect):
-        if sub(e, m):
-            #print(e)
-            if pred(e, layerIn) or pred(e, fasIn):
-                return ematch(blob, select, obj(e))
-            elif pred(e, ext):
-                region = obj(e)
-                collect.extend([b for b in blob['nodes'] if b['id'] == region])
-                return region
-
-    ematch(blob, select, sub(edge))
-    return collect
-
-
-def find_terminal_regions(blob, type):
-    return [region for es in find_terminals(blob, type) for region in find_region(blob, es)]
-
-
-def main(blob=None, blob_string=None, neupop_id=None):
-    if blob_string is not None:
-        import json
-        blob = json.loads(result)
-
-    if blob is None:
-        blob = query('ilxtr:neuron-type-keast-6')
-
-
-    blob, edges, somas, externals, ordering_edges = v = deblob(blob)
-    return v
-
-#+end_src
-
-# we need this block because jupyter-python doesn't include the epilogue when being called by another block wew
-# #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
-# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nreturn json.dumps(b, indent=1, sort_keys=False)"
-# #+header: :var result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6")
-#+header: :results drawer
-#+header: :var result=(identity nil)
-#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
-#+name: python-neru-helper
-#+begin_src python :noweb yes :exports none
-<<python-process-neru>>
-#+end_src
-
-Find the ontology identifiers for terminal regions.
-#+name: neru-find-terminal-regions
-#+begin_src jupyter-python :session pys :exports both
-from pprint import pprint
-
-blob, *_ = main(neupop_id='ilxtr:neuron-type-keast-6')
-
-# find terminal regions
-axon_terminal_regions = find_terminal_regions(blob, axon)
-dend_terminal_regions = find_terminal_regions(blob, dend)
-pprint(axon_terminal_regions)
-pprint(dend_terminal_regions)
-#+end_src
-
-#+RESULTS: neru-find-terminal-regions
-#+begin_example
-[{'id': 'UBERON:0016508',
-  'lbl': 'pelvic ganglion',
-  'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['pelvic ganglion'],
-           'https://apinatomy.org/uris/readable/generated': [True],
-           'types': ['Class']}}]
-[{'id': 'UBERON:0006448',
-  'lbl': None,
-  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
-           'types': ['Class']}},
- {'id': 'UBERON:0006450',
-  'lbl': None,
-  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
-           'types': ['Class']}}]
-#+end_example
-
-# Use this block to run the next block an all dependencies without being asked again.
-#+begin_src elisp :results none :exports none
-(ow-babel-eval "neru-simplified")
-#+end_src
-
-#+header: :var json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-6"))
-#+header: :var path="./images/neru-simplified.svg" :results file
-#+name: neru-simplified
-#+begin_src elisp :exports none
-(json->svg-file json-string path)
-#+end_src
-
-[[file:./images/neru-simplified.svg]]
-
 *** neru-2
 # #+header: :results drawer :limit 1
 #+header: :limit 999999 :file ./images/neru-2.svg :results file :exports both
@@ -1958,7 +2065,7 @@ OPTIONAL MATCH path = (neugrp)
 WITH neugrp, a, path
 MATCH (neugrp)
 -[b:apinatomy:links]->(link)
--[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
 -[d:apinatomy:layerIn*0..1]->(lyph)
 -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
 
@@ -1996,8 +2103,11 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 #+RESULTS: cypher-neru-2
 [[file:./images/neru-2.svg]]
 
+# #+header: :limit 999 :results drawer
+# #+header: :limit 9999 :results table
 #+header: :limit 999999 :file ./images/neru-debug.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+name: cypher-neru-debug
 #+begin_src cypher
 MATCH path = (neupop:Class{iri: $neupop_id})
 -[:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
@@ -2009,7 +2119,7 @@ MATCH path = (neupop:Class{iri: $neupop_id})
 RETURN path
 #+end_src
 
-#+RESULTS:
+#+RESULTS: cypher-neru-debug
 [[file:./images/neru-debug.svg]]
 
 *** neru-1
@@ -2030,7 +2140,7 @@ OPTIONAL MATCH path = (neugrp)
 WITH neugrp, a, path
 MATCH (neugrp)
 -[b:apinatomy:links]->(link)
--[c:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
 -[d:apinatomy:layerIn*0..1]->(lyph)
 -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
 
@@ -2113,7 +2223,7 @@ WITH neugrp, end_lyph, t
 MATCH (type) // FIXME we need more information in the models
 <-[x:apinatomy:inheritedExternal*0..1]-(end_lyph)
 -[a:apinatomy:conveys]->(link)
--[b:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[b:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
 -[c:apinatomy:layerIn*0..1]->(lyph)
 -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
 WITH neugrp, lyph, a,b,c,t,x
@@ -2194,7 +2304,7 @@ Given an anatomical region return a list of neuron types with processes that are
 MATCH
 (neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
 -[:apinatomy:links]->(link)
--[:apinatomy:fasciculatesIn*0..1]->(lyph_or_layer)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer)
 -[:apinatomy:layerIn*0..1]->(lyph)
 -[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
 WITH neugrp
@@ -2592,7 +2702,7 @@ MATCH path1 = (start:Class{iri: "${start-id}"})
 -[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 WITH path1, link
 OPTIONAL MATCH path2 = (link)
--[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:layerIn*0..1]->(end)
 -[:apinatomy:external]->(external)
 RETURN path1, path2
@@ -2692,7 +2802,7 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
 -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
 -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
--[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
 -[:apinatomy:external]->(external)
@@ -2732,7 +2842,7 @@ WHERE
   ?linkSoma apinatomy:target | apinatomy:source ?nodeRoot .
   ?nodeRoot apinatomy:rootOf ?chain .
   ?nodeRoot apinatomy:sourceOf | apinatomy:nextChainStartLevels | apinatomy:next+ ?link .
-  ?link apinatomy:fasciculatesIn ?layer_or_end .
+  ?link apinatomy:fasciculatesIn | apinatomy:endsIn ?layer_or_end .
   optional { ?layer_or_end apinatomy:cloneOf* ?cloned . } # optional
   optional { ?cloned apinatomy:supertype* ?supertype . } # optional
 
@@ -2762,7 +2872,7 @@ WITH path1, nodeRoot
 MATCH path3 = (chain)
 <-[:apinatomy:rootOf]-(nodeRoot)
 -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)
--[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
 -[:apinatomy:external]->(external)
@@ -2781,7 +2891,7 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
 -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
 -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
--[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
 -[:apinatomy:external]->(external:Class{iri: '${process-id}'})
@@ -2802,7 +2912,7 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:conveys]->(linkSoma)                  // link connecting soma to axon and dendrite
 -[:apinatomy:target|apinatomy:source]->(nodeRoot)  // axon or dendrite root
 -[:apinatomy:sourceOf|apinatomy:nextChainStartLevels|apinatomy:next*1..]->(link)  // sourceOf is first and only once
--[:apinatomy:fasciculatesIn]->(layer_or_end)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
 -[:apinatomy:external]->(external)
@@ -3182,7 +3292,7 @@ where {
   ?model a elements:Graph ;
     apinatomy:lyphs ?region .
 
-  ?link ( apinatomy:fasciculatesIn | apinatomy:layerIn | apinatomy:internalIn )+ ?region .
+  ?link ( apinatomy:fasciculatesIn | apinatomy:endsIn | apinatomy:layerIn | apinatomy:internalIn )+ ?region .
 
   ?neru apinatomy:links ?link ;
     apinatomy:description ?dyn ;
