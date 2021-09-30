@@ -793,64 +793,9 @@ cypherResources:
     operations:
       - summary: Return the list of all ApiNATOMY models in the database.
     query: |
-      MATCH (neupop:Class{iri: $neupop_id})
-      -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
-
-      , (neugrp)
-      -[:apinatomy:links]->(link)
-      -[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
-      -[d:apinatomy:layerIn*0..1]->(lyph)
-      -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
-
-      WITH neugrp, link, lyph, a, c, d
-      OPTIONAL MATCH layer_ext = (lyph)
-      <-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedExternal]->()
-
-      WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
-      MATCH (lyph)
-      -[e:apinatomy:external]->(region)
-
-      , p2 = (link)
-      -[:apinatomy:conveyingLyph]->(cl)
-      -[:apinatomy:topology]->()
-
-      , (cl)
-      -[x:apinatomy:inheritedExternal*0..1]->()
-
-      // use apinatomy:next to extract ordering information
-      , (link)
-      -[f:apinatomy:next*0..]->()
-      -[g:apinatomy:target*0..1]->()
-      -[h:apinatomy:rootOf*0..1]->()
-      -[i:apinatomy:levels*0..1]->()
-      <-[:apinatomy:links]-(neugrp)
-
-      // publications
-      WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext
-      OPTIONAL MATCH path = (neugrp)
-      -[:apinatomy:publications]->(pub)
-      -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
-
-      RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext
-
-      UNION
-
-      // this part usually only returns the soma housing lyph
-      MATCH (neupop:Class{iri: $neupop_id})
-      -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
-      -[b:apinatomy:lyphs]->(lyph)
-      -[c:apinatomy:internalIn]->()
-      -[d:apinatomy:external*0..1]->(region)
-      , p2 = (lyph)
-      -[:apinatomy:conveys]->(soma_link)
-      -[:apinatomy:source|apinatomy:target]->(soma_node)
-      -[:apinatomy:sourceOf]->(chain_link)
-      , (chain_link)
-      -[:apinatomy:levelIn]->(chain)
-      , (soma_node)
-      -[:apinatomy:rootOf]->(chain)
-
-      RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext
+      MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})
+      <-[:type]-(g)-[:isDefinedBy]->(o:Ontology)
+      RETURN o
 
   - path: /dynamic/demos/apinat/modelPopulationsReferences/{model_id}
     operations:

@@ -3299,7 +3299,7 @@ cypherResources:
     operations:
       - summary: <<nonl(desc-cypher-apinat-models())>>
     query: |
-      <<cypher-neru-4>>
+      <<cypher-apinat-models>>
 
   - path: /dynamic/demos/apinat/modelPopulationsReferences/{model_id}
     operations:
