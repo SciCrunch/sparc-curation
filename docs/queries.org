@@ -579,7 +579,7 @@ ORDER BY ASC(?group) LIMIT ?limit
 |     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
 
 *** Techniques
-# #+header: :var dataset=(identity nil)
+# #+header: :var dataset=(or)
 #+begin_src sparql
 SELECT DISTINCT
 ?dataset
@@ -1559,7 +1559,7 @@ ORDER BY ?id
 
 # #+header: :results drawer output
 #+header: :epilogue "return table" :results value table
-#+header: :var by_id=(identity t)
+#+header: :var by_id=(and)
 #+name: pds-v2-python
 #+begin_src python :var data=pds-v2(limit="99999") :exports results
 import sys
@@ -1712,92 +1712,27 @@ result = func(data)
 [[file:./images/neru-simplified.svg]]
 
 ** simple
-Python code to simplify =neru-3= and supporting functions to extract terminal regions.
+Python code to simplify =neru= and supporting functions to extract terminal regions.
+# FIXME emacs-jupyter doesn't convert t -> True !??!
 # FIXME this doesn't highlight correctly in init-simple.el
 # FIXME the python will run the epilogue for in a babel call but jupyter-python will not, fun times
 # #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nprint(json.dumps(b, indent=1, sort_keys=False))"
 #+header: :results drawer
-#+header: :var result=(identity nil)
-#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
+#+header: :var result=(or) remove=(or)
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\n#return json.dumps(b, indent=1, sort_keys=False)"
 #+name: python-process-neru
 #+begin_src jupyter-python :session pys
-from nifstd_tools.simplify import simplify
-
-
-axon = 'SAO:280355188'
-dend = 'SAO:420754792'
-bag = 'apinatomy:BAG'
-top = 'apinatomy:topology*'
-ie = 'apinatomy:inheritedExternal*'
-ext = 'apinatomy:external'
-fasIn = 'apinatomy:fasciculatesIn'
-endIn = 'apinatomy:endsIn'
-layerIn = 'apinatomy:layerIn'
+from nifstd_tools.simplify import apinat_deblob, sub, pred, obj, ematch
+from nifstd_tools.simplify import axon, dend, bag, top, ie, ext, fasIn, endIn, layerIn
 
 
 def query(neupop_id):
     import requests
     url = ('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
-           f'demos/apinat/neru-3/{neupop_id}?limit=9999999')
+           f'demos/apinat/neru-4/{neupop_id}?limit=9999999')
     resp = requests.get(url, headers={'Accept': 'application/json'})
     blob = resp.json()
     return blob
-
-
-def deblob(blob):
-    blob = simplify([['apinatomy:target', 'apinatomy:rootOf', 'apinatomy:levels'],
-                     ['apinatomy:conveyingLyph', 'apinatomy:topology'],
-                     ['apinatomy:conveys', 'apinatomy:source', 'apinatomy:sourceOf'],
-                     ['apinatomy:conveys', 'apinatomy:target', 'apinatomy:sourceOf'],
-                     ['apinatomy:cloneOf', 'apinatomy:inheritedExternal'],
-                     ['apinatomy:conveyingLyph', 'apinatomy:inheritedExternal'],], blob)
-    edges = blob['edges']
-    nindex = {n['id']:n for n in blob['nodes']}  # FIXME silent errors ;_;
-    for e in edges:
-        if e['pred'] in (
-                'apinatomy:target-apinatomy:rootOf-apinatomy:levels',
-                'apinatomy:conveys-apinatomy:source-apinatomy:sourceOf',
-                'apinatomy:conveys-apinatomy:target-apinatomy:sourceOf',):
-            e['pred'] = 'apinatomy:next*'
-        if e['pred'] == 'apinatomy:conveyingLyph-apinatomy:topology':
-            e['pred'] = 'apinatomy:topology*'
-        if e['pred'] in (
-                'apinatomy:conveyingLyph-apinatomy:inheritedExternal',
-                'apinatomy:cloneOf-apinatomy:inheritedExternal',):
-            e['pred'] = 'apinatomy:inheritedExternal*'
-        if pred(e, top):
-            # move topology to be a property not a node to make the layout cleaner
-            nindex[sub(e)]['topology'] = obj(e)
-
-    # remove topology edges
-    edges = blob['edges'] = [e for e in edges if not pred(e, top)]
-    # remove process type edges
-    edges = blob['edges'] = [e for e in edges if not (obj(e, axon) or obj(e, dend))]
-
-    blob['edges'] = [dict(s) for s in set(frozenset({k:v for k, v in d.items()
-                                                     if k != 'meta'}.items()) for d in blob['edges'])]
-    sos = set(sov for e in blob['edges'] for sov in (e['sub'], e['obj']))
-    blob['nodes'] = [n for n in blob['nodes'] if n['id'] in sos]
-    somas = [e for e in edges if e['pred'] == 'apinatomy:internalIn']
-    externals = [e for e in edges if e['pred'] == 'apinatomy:external']
-    ordering_edges = [e for e in edges if e['pred'] == 'apinatomy:next']
-    return blob, edges, somas, externals, ordering_edges
-
-
-def sub(e, match=None):
-    return e['sub'] == match if match is not None else e['sub']
-
-
-def pred(e, match=None):
-    return e['pred'] == match if match is not None else e['pred']
-
-
-def obj(e, match=None):
-    return e['obj'] == match if match is not None else e['obj']
-
-
-def ematch(blob, select, match, *matches, matchf=lambda ms: True):
-    return [e for e in blob['edges'] if select(e, match) and matchf(matches)]
 
 
 def find_terminals(blob, type):
@@ -1833,28 +1768,31 @@ def find_terminal_regions(blob, type):
     return [region for es in find_terminals(blob, type) for region in find_region(blob, es)]
 
 
-def main(blob=None, blob_string=None, neupop_id=None):
-    if blob_string is not None:
+def main(blob=None, blob_string=None, neupop_id=None, remove_converge=remove):
+    # do not call this function unless it is from an org babel block, there are free variables
+    if blob is None and blob_string is not None:
         import json
-        blob = json.loads(result)
+        blob = json.loads(blob_string)
+
+    neupop_id = neupop_id if neupop_id else 'ilxtr:neuron-type-keast-6'
 
     if blob is None:
-        blob = query('ilxtr:neuron-type-keast-6')
+        blob = query(neupop_id)
 
+    blob, edges, somas, externals, ordering_edges = v = apinat_deblob(
+        blob, remove_converge=remove_converge)
 
-    blob, edges, somas, externals, ordering_edges = v = deblob(blob)
     return v
-
 #+end_src
 
-#+call: python-process-neru(result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-5"))
+#+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-5"))
 
 # we need this block because jupyter-python doesn't include the epilogue when being called by another block wew
 # #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
 # #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nreturn json.dumps(b, indent=1, sort_keys=False)"
 # #+header: :var result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-6")
 #+header: :results drawer
-#+header: :var result=(identity nil)
+#+header: :var result=(or) remove=(and "sigh")
 #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\nreturn json.dumps(b, indent=1, sort_keys=False)"
 #+name: python-neru-helper
 #+begin_src python :noweb yes :exports none
@@ -1863,11 +1801,15 @@ def main(blob=None, blob_string=None, neupop_id=None):
 
 ** terminal regions
 Find the ontology identifiers for terminal regions.
+
+# run this to populate/update the kernel (sigh)
+#+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-5"))
+
 #+name: neru-find-terminal-regions
 #+begin_src jupyter-python :session pys :exports both :var neupop_id=""
 from pprint import pprint
 
-blob, *_ = main(neupop_id='ilxtr:neuron-type-keast-6')
+blob, *_ = main(blob_string=result)
 
 # find terminal regions
 axon_terminal_regions = find_terminal_regions(blob, axon)
@@ -1883,13 +1825,15 @@ pprint(dend_terminal_regions)
   'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['pelvic ganglion'],
            'https://apinatomy.org/uris/readable/generated': [True],
            'types': ['Class']}}]
-[{'id': 'UBERON:0006448',
+[{'id': 'UBERON:0006460',
   'lbl': None,
   'meta': {'https://apinatomy.org/uris/readable/generated': [True],
            'types': ['Class']}},
- {'id': 'UBERON:0006450',
-  'lbl': None,
-  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
+ {'id': 'EMAPA:19574',
+  'lbl': 'Sixth lumbar spinal cord segment',
+  'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['Sixth lumbar spinal '
+                                                          'cord segment'],
+           'https://apinatomy.org/uris/readable/generated': [True],
            'types': ['Class']}}]
 #+end_example
 
@@ -1898,6 +1842,9 @@ These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru
 *** neru-4
+:PROPERTIES:
+:CUSTOM_ID:  neru-4
+:END:
 #+name: cypher-neru-4-helper
 #+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
 <<cypher-neru-4>>
@@ -1920,11 +1867,6 @@ WITH neugrp, link, lyph, a, c, d
 OPTIONAL MATCH layer_ext = (lyph)
 <-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedExternal]->()
 
-//WITH neugrp, link, lyph, a, c, d, layer_ext
-//OPTIONAL MATCH (neugrp)
-//-[b:apinatomy:links]->(link)
-//-[:apinatomy:endsIn]->()
-
 WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
 MATCH (lyph)
 -[e:apinatomy:external]->(region)
@@ -1939,8 +1881,6 @@ MATCH (lyph)
 // use apinatomy:next to extract ordering information
 , (link)
 -[f:apinatomy:next*0..]->()
-//-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
-// FIXME these should be collapsing into a single relationship
 -[g:apinatomy:target*0..1]->()
 -[h:apinatomy:rootOf*0..1]->()
 -[i:apinatomy:levels*0..1]->()
@@ -1971,11 +1911,10 @@ MATCH (neupop:Class{iri: $neupop_id})
 , (soma_node)
 -[:apinatomy:rootOf]->(chain)
 
-// this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
-//-[c:apinatomy:internalIn*0..1]->()
-//-[d:apinatomy:external*0..1]->(region)
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext
 #+end_src
+
+[[file:./images/neru-4.svg]]
 
 *** neru-3
 
@@ -2178,10 +2117,16 @@ RETURN external
 #+end_src
 
 *** neru model populations and references
+#+name: desc-cypher-apinat-model-pops-and-refs
 Given an ApiNATOMY model id return the identifiers for the neuron
 populations that are present in the model and the identifiers for
-references that provide supporting evidence.
+references that provide supporting evidence. Publications and
+populations can be distingished by checking whether their meta type
+field is NamedIndividual or Class.
+
+# #+header: :results drawer
 #+header: :var model_id="https://apinatomy.org/uris/models/keast-bladder" :limit 99
+#+name: cypher-apinat-model-pops-and-refs
 #+begin_src cypher
 MATCH (start:Ontology {iri: $model_id})
 <-[:isDefinedBy]-(external:Class)
@@ -2396,12 +2341,12 @@ RETURN e, neupop, neugrp
 ** existing
 *** sparc
 :PROPERTIES:
-:header-args:cypher: :scigraph http://localhost:9000/scigraph
+:header-args:cypher: :scigraph http://selene:9000/scigraph
 :END:
 **** organParts
 #+name: desc-organ-parts
 Get the parts list for an organ including nerves and blood vessels
-#+header: :var id=(identity nil)
+#+header: :var id=(or)
 #+name: cyres-organ-parts
 #+begin_src cypher
 // depth of 6 captures everything, 5 is too shallow, 40 is WAY too deep
@@ -2432,19 +2377,20 @@ WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
 RETURN path
 #+end_src
 **** parcellationArtifacts/{species-id}
-#+header: :var species-id=(identity nil)
+#+header: :var species-id=(or)
 #+name: cyres-parcellation-artifacts-species-id
 #+begin_src cypher
-MATCH (parent)
--[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
-WITH parent
 MATCH path = (artifact)
 -[:subClassOf*0..2]->(parent)
+-[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
 WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
 RETURN path
 #+end_src
+
+#+call: cyres-parcellation-artifacts-species-id(species-id="NCBITaxon:9606")
+
 **** artifactRoots/{artifact-id}
-#+header: :var artifact-id=(identity nil)
+#+header: :var artifact-id=(or)
 #+name: cyres-artifact-roots-artifact-id
 #+begin_src cypher
 MATCH path = (root)
@@ -2453,7 +2399,7 @@ MATCH path = (root)
 RETURN path
 #+end_src
 **** artifactLabels/{artifact-id}
-#+header: :var artifact-id=(identity nil)
+#+header: :var artifact-id=(or)
 #+name: cyres-artifact-labels-artifact-id
 #+begin_src cypher
 MATCH path = (label)
@@ -2464,12 +2410,11 @@ WHERE label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
 RETURN path
 #+end_src
 **** rootLabels/{root-id}
-#+header: :var root-id=(identity nil)
+#+header: :var root-id=(or)
 #+name: cyres-root-labels-root-id
 #+begin_src cypher
 MATCH (label)-[:subClassOf]->(root:Class{iri: "${root-id}"})
-WITH label
-MATCH path = (label)-[relation*0..1]-(maybe)
+, path = (label)-[relation*0..1]-(maybe)
 WHERE NONE (r in relation WHERE type(r) IN ["isDefinedBy", "subClassOf", "filler"])
       AND NOT (label.iri =~ ".*_:.*") AND NOT (maybe.iri =~ ".*_:.*")
       AND label.iri <> "http://www.w3.org/2002/07/owl#Nothing"
@@ -2482,7 +2427,7 @@ MATCH path = (artifact)
 -[:subClassOf*0..2]->(parent)
 -[:ilxtr:isDefinedInTaxon]->(species)
 WHERE artifact.iri <> "http://www.w3.org/2002/07/owl#Nothing"
-return path
+RETURN path
 UNION
 MATCH path = (root)
 -[:ilxtr:isDefinedBy]->(artifact)
@@ -2491,7 +2436,7 @@ MATCH path = (root)
 RETURN path
 #+end_src
 **** parcellationRoots/{species-id}
-#+header: :var species-id=(identity nil)
+#+header: :var species-id=(or)
 #+name: cyres-parcellation-roots-species-id
 #+begin_src cypher
 MATCH path = (artifact)
@@ -2506,9 +2451,12 @@ MATCH path = (root)
 -[:ilxtr:isDefinedInTaxon]->(species:Class{iri: "${species-id}"})
 RETURN path
 #+end_src
+
+#+call: cyres-parcellation-roots-species-id(species-id="NCBITaxon:9606")
+
 **** parcellationRoots/{species-id}/{region-id}
-#+header: :var species-id=(identity nil)
-#+header: :var region-id=(identity nil)
+#+header: :var species-id=(or)
+#+header: :var region-id=(or)
 #+name: cyres-parcellation-roots-species-id-region-id
 #+begin_src cypher
 MATCH
@@ -2536,8 +2484,8 @@ MATCH path = (root)
 RETURN path
 #+end_src
 **** parcellationRootsFMA/{species-id}/{fma-id}
-#+header: :var species-id=(identity nil)
-#+header: :var region-id=(identity nil)
+#+header: :var species-id=(or)
+#+header: :var region-id=(or)
 #+name: cyres-parcellation-roots-fma-species-id-region-id
 #+begin_src cypher
 MATCH (fma:Class{iri: "${fma-id}"})
@@ -2644,10 +2592,10 @@ RETURN n
 #+end_src
 *** shortestSimple
 # FIXME TODO make sure this actuall works as expected, I think it will?
-#+header: :var start_id=(identity nil)
-#+header: :var end_id=(identity nil)
-#+header: :var max_depth=(identity nil)
-#+header: :var relationship=(identity nil)
+#+header: :var start_id=(or)
+#+header: :var end_id=(or)
+#+header: :var max_depth=(or)
+#+header: :var relationship=(or)
 #+name: cyres-shortest-simple
 #+begin_src cypher
 MATCH (start:Class{iri: '${start_id}'})
@@ -2659,7 +2607,7 @@ RETURN path
 #+end_src
 *** neurons
 **** connectivity
-#+header: :var start_id=(identity nil)
+#+header: :var start_id=(or)
 #+name: cyres-neurons-connectivity
 #+begin_src cypher
 MATCH (blank)-
@@ -2673,7 +2621,7 @@ WHERE NOT (phenotype.iri =~ ".*_:.*")
 RETURN location, entrytype, neuron, predicate, phenotype
 #+end_src
 **** connectedRegions
-#+header: :var start_id=(identity nil)
+#+header: :var start_id=(or)
 #+name: cyres-neurons-connected-regions
 #+begin_src cypher
 MATCH (blank)-
@@ -2686,7 +2634,7 @@ RETURN phenotype
 #+end_src
 *** apinat
 **** bundles/{start-id}
-#+header: :var start-id=(identity nil)
+#+header: :var start-id=(or)
 #+name: cyres-apinat-bundles-start-id
 #+begin_src cypher
 MATCH path1 = (start:Class{iri: "${start-id}"})
@@ -2708,7 +2656,7 @@ OPTIONAL MATCH path2 = (link)
 RETURN path1, path2
 #+end_src
 **** old-bundles/{start-id}
-#+header: :var start-id=(identity nil)
+#+header: :var start-id=(or)
 #+name: cyres-apinat-old-bundles-start-id
 #+begin_src cypher
 MATCH path1 = (start:Class{iri: '${start-id}'})
@@ -2754,7 +2702,7 @@ WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 RETURN path
 #+end_src
 **** housing-lyphs/{start-id}
-#+header: :var start-id=(identity nil)
+#+header: :var start-id=(or)
 #+name: cyres-apinat-housing-lyphs-start-id
 #+begin_src cypher
 MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
@@ -2855,7 +2803,7 @@ WHERE
 limit ?limit
 #+end_src
 **** soma-processes/{start-id}
-#+header: :var start-id=(identity nil)
+#+header: :var start-id=(or)
 #+name: cyres-apinat-soma-processes-start-id
 #+begin_src cypher
 MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
@@ -2883,7 +2831,7 @@ OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyp
 RETURN path1, path2, path3
 #+end_src
 **** weird-soma-processes/{process-id}
-#+header: :var process-id=(identity nil)
+#+header: :var process-id=(or)
 #+name: cyres-apinat-weird-soma-processes-process-id
 #+begin_src cypher
 MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
@@ -3212,6 +3160,27 @@ cypherResources:
     query: |
       <<cypher-neru-3>>
 
+  - path: /dynamic/demos/apinat/neru-4/{neupop_id}
+    operations: *neru-ops
+    query: |
+      <<cypher-neru-4>>
+
+  - path: /dynamic/demos/apinat/modelList
+    operations:
+      - summary: <<nonl(desc-cypher-apinat-models())>>
+    query: |
+      <<cypher-neru-4>>
+
+  - path: /dynamic/demos/apinat/modelPopulationsReferences/{model_id}
+    operations:
+      - summary: <<nonl(desc-cypher-apinat-model-pops-and-refs())>>
+        parameters:
+         - name: model_id
+           description: the identifier for an ApiNATOMY model
+           paramType: path
+    query: |
+      <<cypher-apinat-model-pops-and-refs>>
+
 #+end_src
 * ApiNATOMY competency queries
 ** expected counts per model
@@ -3362,7 +3331,7 @@ TODO point people to the query that returns a list of all neuron populations and
 #+RESULTS:
 [[file:./images/neru-3-ntk-2.svg]]
 
-#+call: neru-simplified(path="./images/neru-simplified-ntk-2.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-2")))
+#+call: neru-simplified(path="./images/neru-simplified-ntk-2.svg", json-string=python-neru-helper(result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-2")))
 
 #+RESULTS:
 [[file:./images/neru-simplified-ntk-2.svg]]
@@ -3379,7 +3348,7 @@ TODO point people to the query that returns a list of all neuron populations and
 #+RESULTS:
 [[file:./images/neru-3-ntk-5.svg]]
 
-#+call: neru-simplified(path="./images/neru-simplified-ntk-5.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-5")))
+#+call: neru-simplified(path="./images/neru-simplified-ntk-5.svg", json-string=python-neru-helper(result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-5")))
 
 #+RESULTS:
 [[file:./images/neru-simplified-ntk-5.svg]]
@@ -3938,7 +3907,7 @@ return t._data
 | :SUM:     |   459 |
 | :TOTAL:   |   459 |
 
-#+header: :var n-sparql-apinat-models=n-sparql-apinat-models()
+#+header: :var n-sparql-apinat-graphs=n-sparql-apinat-graphs()
 #+header: :var cypher-apinat-models=cypher-apinat-models()
 #+header: :var n-sparql-apinat-lyphs=n-sparql-apinat-lyphs()
 #+header: :var n-sparql-apinat-lyphs-input=n-sparql-apinat-lyphs-input()
@@ -3949,7 +3918,7 @@ return t._data
 #+header: :var n-apinat-neupops-pat=n-apinat-neupops-pat()
 #+name: apinat-dashboard-overview
 #+begin_src elisp :exports results
-(let ((models (caar n-sparql-apinat-models))
+(let ((models (caar n-sparql-apinat-graphs))
       (models-cypher (length cypher-apinat-models))
       (lyphs (caar n-sparql-apinat-lyphs))
       (lyphs-input (caar n-sparql-apinat-lyphs-input))
@@ -4126,9 +4095,14 @@ WHERE {
 MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g) RETURN g
 #+end_src
 
+#+name: desc-cypher-apinat-models
+Return the list of all ApiNATOMY models in the database.
+
 #+name: cypher-apinat-models
 #+begin_src cypher
-MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)-[:isDefinedBy]->(o:Ontology) RETURN o
+MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})
+<-[:type]-(g)-[:isDefinedBy]->(o:Ontology)
+RETURN o
 #+end_src
 
 ****** number of lyphs
