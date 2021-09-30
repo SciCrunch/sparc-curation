@@ -117,23 +117,6 @@ exit
 #+link: skos http://www.w3.org/2004/02/skos/core#
 #+end:
 
-* Tutorial :noexport:
-For an overview of the SPARC Knowledge Graph see the [[#introduction][Introduction]].
-Copy from the protc tutorial.
-
-#+begin_src bash
-emacs -eval '(progn (url-copy-file "https://raw.githubusercontent.com/SciCrunch/sparc-curation/master/docs/queries.org" "~/queries.org" t) (find-file "~/queries.org"))'
-#+end_src
-* for kg release :noexport:
-** TODO instructions for kg
-need to include instructions for increasing the limit and return a csv
-tsv result to a file, include button to call the previous block
-without a limit and save results to a file
-** TODO pick which of the various versions of this document we are going to link
-github
-ontology.neuinfo.org/docs/
-etc.
-** TODO button to start, stop, reset services in case a bad query is run
 * Data queries
 ** Datasets
 *** Dataset Predicates
@@ -3530,6 +3513,14 @@ function path-metadata-coverage () {
 #+end_src
 * General queries
 General metadata and housekeeping queries.
+** List all loaded ontologies
+#+begin_src sparql
+SELECT ?s WHERE { ?s a owl:Ontology }
+#+end_src
+
+#+begin_src cypher :limit 9999
+MATCH (o:Ontology) RETURN o
+#+end_src
 ** predicates
 #+name: predicates-all
 #+begin_src sparql
