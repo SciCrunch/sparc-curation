@@ -1837,6 +1837,136 @@ pprint(dend_terminal_regions)
            'types': ['Class']}}]
 #+end_example
 
+** connectivity pairs
+
+This code produces the basic connectivity of a neuron population.
+The result is a list of pairs, the pairs are the subject and object
+of the triple =subject (or apinatomy:next apinatomy:next*) object=.
+Thus they represent the full connectivity of the population.
+
+The contents of each element of the pair tuples with three elements.
+1. The id for the neuronal process involved in the connection.
+2. The ontology id for the layer in which the neuronal process is
+   located. This may be None if no layer is specified in the model.
+3. The ontology id for the region in which the neuronal process is located.
+
+In the example presented here for keast neuron 5 the final entries all
+have the same start and end location because they are the soma, and
+the roots of the axon and the dendrite.
+
+#+name: py-conn-pairs
+#+begin_src jupyter-python :session pys
+def isLayer(s):
+    return ematch(blob, (lambda e, m: sub(e, m) and pred(e, layerIn)), s)
+
+def lay_reg(start):
+    direct = [obj(t) for t in
+              ematch(blob, (lambda e, m: sub(e, m)
+                            and (pred(e, intIn) or
+                                 pred(e, endIn) or
+                                 pred(e, fasIn))),
+                     start)]
+
+    layers = [obj(t) for d in direct for t in
+              ematch(blob, (lambda e, m: sub(e, m)
+                            and isLayer(m)
+                            and (pred(e, ie) or
+                                 pred(e, ext))),
+                     d)]
+
+    lregs = []
+    if layers:
+        ldir = [obj(t) for d in direct for t in
+                ematch(blob, (lambda e, m: sub(e, m)
+                              and pred(e, layerIn)),
+                       d)]
+
+        lregs = [obj(t) for d in ldir for t in
+                 ematch(blob, (lambda e, m: sub(e, m)
+                               and not isLayer(m)
+                               and (pred(e, ie) or
+                                    pred(e, ext))),
+                        d)]
+
+    regions = [obj(t) for d in direct for t in
+               ematch(blob, (lambda e, m: sub(e, m)
+                             and not isLayer(m)
+                             and (pred(e, ie) or
+                                  pred(e, ext))),
+                      d)]
+
+    assert not (lregs and regions), (lregs, regions)  # not both
+    regions = lregs if lregs else regions
+    out = start, layers[0] if layers else None, regions[0] if regions else None
+    if out:
+      return out
+
+starts = [obj(e) for e in blob['edges'] if pred(e, 'apinatomy:lyphs')]
+
+nxt = 'apinatomy:next'
+nxts = 'apinatomy:next*'
+intIn = 'apinatomy:internalIn'
+
+nexts = [(sub(t), obj(t)) for start in starts for t in
+         ematch(blob, (lambda e, m: pred(e, nxt) or pred(e, nxts)), None)]
+
+
+connected_pairs = sorted(set([tuple([lay_reg(e) for e in p]) for p in nexts]))
+pprint(connected_pairs)
+connected_pairs
+#+end_src
+
+#+RESULTS: py-conn-pairs
+:RESULTS:
+#+begin_example
+[(('kblad:ac-snl65_lnk_1', 'UBERON:0016578', 'EMAPA:19574'),
+  ('kblad:ac-snl65_lnk_2', 'UBERON:0016549', 'EMAPA:19574')),
+ (('kblad:ac-snl65_lnk_2', 'UBERON:0016549', 'EMAPA:19574'),
+  ('kblad:ac-snl65_lnk_3', None, 'EMAPA:25279')),
+ (('kblad:ac-snl65_lnk_3', None, 'EMAPA:25279'),
+  ('kblad:ac-snl65_lnk_4', None, 'UBERON:0018675')),
+ (('kblad:ac-snl65_lnk_4', None, 'UBERON:0018675'),
+  ('kblad:ac-snl6s1_lnk_1', None, 'UBERON:0018675')),
+ (('kblad:ac-snl65_lnk_4', None, 'UBERON:0018675'),
+  ('kblad:ac-snl6s1_lnk_2', None, 'UBERON:0016508')),
+ (('kblad:ac-snl6s1_lnk_1', None, 'UBERON:0018675'),
+  ('kblad:ac-snl6s1_lnk_2', None, 'UBERON:0016508')),
+ (('kblad:ac-sns15_lnk_1', 'UBERON:0016578', 'UBERON:0006460'),
+  ('kblad:ac-sns15_lnk_2', 'UBERON:0016549', 'UBERON:0006460')),
+ (('kblad:ac-sns15_lnk_2', 'UBERON:0016549', 'UBERON:0006460'),
+  ('kblad:ac-sns15_lnk_3', None, 'EMAPA:25281')),
+ (('kblad:ac-sns15_lnk_3', None, 'EMAPA:25281'),
+  ('kblad:ac-sns15_lnk_4', None, 'UBERON:0018675')),
+ (('kblad:ac-sns15_lnk_4', None, 'UBERON:0018675'),
+  ('kblad:ac-snl6s1_lnk_1', None, 'UBERON:0018675')),
+ (('kblad:ac-sns15_lnk_4', None, 'UBERON:0018675'),
+  ('kblad:ac-snl6s1_lnk_2', None, 'UBERON:0016508')),
+ (('kblad:snl65', 'UBERON:0016578', 'EMAPA:19574'),
+  ('kblad:ac-snl65_lnk_1', 'UBERON:0016578', 'EMAPA:19574')),
+ (('kblad:snl65', 'UBERON:0016578', 'EMAPA:19574'),
+  ('kblad:dc-snl65_lnk_1', 'UBERON:0016578', 'EMAPA:19574')),
+ (('kblad:sns15', 'UBERON:0016578', 'UBERON:0006460'),
+  ('kblad:ac-sns15_lnk_1', 'UBERON:0016578', 'UBERON:0006460')),
+ (('kblad:sns15', 'UBERON:0016578', 'UBERON:0006460'),
+  ('kblad:dc-sns15_lnk_1', 'UBERON:0016578', 'UBERON:0006460'))]
+#+end_example
+| (kblad:ac-snl65_lnk_1 UBERON:0016578 EMAPA:19574)    | (kblad:ac-snl65_lnk_2 UBERON:0016549 EMAPA:19574)    |
+| (kblad:ac-snl65_lnk_2 UBERON:0016549 EMAPA:19574)    | (kblad:ac-snl65_lnk_3 None EMAPA:25279)              |
+| (kblad:ac-snl65_lnk_3 None EMAPA:25279)              | (kblad:ac-snl65_lnk_4 None UBERON:0018675)           |
+| (kblad:ac-snl65_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_1 None UBERON:0018675)          |
+| (kblad:ac-snl65_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_2 None UBERON:0016508)          |
+| (kblad:ac-snl6s1_lnk_1 None UBERON:0018675)          | (kblad:ac-snl6s1_lnk_2 None UBERON:0016508)          |
+| (kblad:ac-sns15_lnk_1 UBERON:0016578 UBERON:0006460) | (kblad:ac-sns15_lnk_2 UBERON:0016549 UBERON:0006460) |
+| (kblad:ac-sns15_lnk_2 UBERON:0016549 UBERON:0006460) | (kblad:ac-sns15_lnk_3 None EMAPA:25281)              |
+| (kblad:ac-sns15_lnk_3 None EMAPA:25281)              | (kblad:ac-sns15_lnk_4 None UBERON:0018675)           |
+| (kblad:ac-sns15_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_1 None UBERON:0018675)          |
+| (kblad:ac-sns15_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_2 None UBERON:0016508)          |
+| (kblad:snl65 UBERON:0016578 EMAPA:19574)             | (kblad:ac-snl65_lnk_1 UBERON:0016578 EMAPA:19574)    |
+| (kblad:snl65 UBERON:0016578 EMAPA:19574)             | (kblad:dc-snl65_lnk_1 UBERON:0016578 EMAPA:19574)    |
+| (kblad:sns15 UBERON:0016578 UBERON:0006460)          | (kblad:ac-sns15_lnk_1 UBERON:0016578 UBERON:0006460) |
+| (kblad:sns15 UBERON:0016578 UBERON:0006460)          | (kblad:dc-sns15_lnk_1 UBERON:0016578 UBERON:0006460) |
+:END:
+
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
