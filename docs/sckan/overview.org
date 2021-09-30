@@ -1,6 +1,7 @@
 #+title: Overview
-[[#introduction][Introduction]]
-[[#glossary][Glossary]]
+Contents
+- [[#introduction][Introduction]]
+- [[#glossary][Glossary]]
 * Introduction
 :PROPERTIES:
 :CUSTOM_ID:  introduction
