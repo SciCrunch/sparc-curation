@@ -1,0 +1,624 @@
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 46e9ba16f6e3dda982c100a032d00f6bea256476d2c808bd077e5423079b771c; -*-
+# [[orgstrap][jump to the orgstrap block for this file]]
+#+title: Knowledge base release
+#+property: header-args :eval no-export
+#+property: header-args:elisp :lexical yes
+
+#+name: orgstrap-shebang
+#+begin_src bash :eval never :results none :exports none
+{ __p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > ${null="/dev/null"}
+$file= $MyInvocation.MyCommand.Source
+$ErrorActionPreference= "silentlycontinue"
+file=$0
+args=$@
+$ErrorActionPreference= "Continue"
+{ PATH=$__op;rm ${__p}/=;rmdir ${__p};} > $null
+emacs -batch -no-site-file -eval "(let (vc-follow-symlinks) (defun orgstrap--confirm-eval (l _) (not (memq (intern l) '(elisp emacs-lisp)))) (let ((file (pop argv)) enable-local-variables) (find-file-literally file) (end-of-line) (when (eq (char-before) ?\^m) (let ((coding-system-for-read 'utf-8)) (revert-buffer nil t t)))) (let ((enable-local-eval t) (enable-local-variables :all) (major-mode 'org-mode)) (require 'org) (org-set-regexps-and-options) (hack-local-variables)))" "${file}" -- $args
+exit
+<# powershell open
+#+end_src
+
+* Release workflow
+For a development release run
+#+begin_src bash
+./release.org --build
+#+end_src
+
+For a SCKAN release run
+#+begin_src bash
+./release.org --build --sckan --no-blaze
+#+end_src
+
+If something breaks part way through the pipeline and you need to
+rerun you can use the =--resume= option. For example:
+#+begin_src bash
+./release.org --build --sckan --no-blaze --resume
+#+end_src
+
+To build the SciGraph portion of the release you need to have
+the =pyontutils= repo on your system and installed then run
+#+begin_src bash
+~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-sckan
+#+end_src
+
+** Building a release
+obtain this file
+run this block
+
+what should happen
+1. retrieve the latest version of this file
+2. retrieve blazegraph.jar
+3. retrieve blazegraph-runner.jar
+4. retrieve (and possibly first build) the latest version of curation-export.ttl and protcur.ttl
+5. retrieve (possibly from the build cache for the ttl files) the hypothesis annotations from group
+6. export the =#lang protc/ur= representation for inclusion
+   this might require a python setup to be fully reproducible
+   but we're going to skip that for now
+7. load the ttl files into blazesgraph.jnl
+8. +set the properties files for blazegraph+
+9. +put everything in a release hierarchy+
+10. run test queries
+11. package everything together in a single archive including queries.org and maybe this file for prov
+
+#+name: release-defuns
+#+begin_src elisp :results none
+;; helpers
+
+(defvar-local release-dir nil)
+(defvar-local prefixes-path nil)
+
+(defvar-local curies
+  '((owl . "http://www.w3.org/2002/07/owl#")
+    (ilxtr . "http://uri.interlex.org/tgbugs/uris/readable/")))
+
+(defmacro unless-file-exists-p (file &rest body)
+  (declare (indent 1))
+  `(unless (file-exists-p ,file)
+     ,@body))
+
+(defun build-dir ()
+  "rule for where to put the build directory"
+  ;; (make-temp-file )  ;; FIXME TODO sigh
+  (file-name-as-directory (concat (temporary-file-directory) "build")))
+
+(defun find-resume-dir (&optional build-dir)
+  "Find the latest release directory in BUILD-DIR that has not been packaged.
+
+This uses the file system state to track incomplete builds. It
+seems to be a better approach than trying to store some state
+somewhere else that could get out of sync, just like we check
+for individual step completion by checking if the file exist.
+Yes this is make."
+  (let* ((default-directory (or build-dir (build-dir)))
+         (latest-release-dir
+          (and
+           (file-directory-p build-dir)
+           (car
+            (sort
+             (cl-remove-if-not
+              #'file-directory-p
+              (directory-files
+               default-directory 'full
+               (concat "^release-.+" (if sckan-release "-sckan$" "Z$"))
+               'nosort))
+             #'string>))))
+         (to-resume
+          (and latest-release-dir ; XXX and0 would be fun wouldn't it?
+               (not (file-exists-p (concat latest-release-dir ".zip")))
+               latest-release-dir)))
+         to-resume))
+
+(defun get-ontology (iri merged-path)
+  (run-command ;; FIXME not clear that this is the best approach here
+   "robot" "merge"
+   "--input-iri" iri
+   "--output" merged-path)
+  (run-command
+   (or (executable-find "pypy3") (executable-find "python"))
+   "-m"
+   (if sckan-release "pyontutils.qnamefix" "ttlser.ttlfmt")
+   merged-path))
+
+(defun reason-ontology (ontology-path reasoned-path)
+  (run-command
+   "robot" "reason"
+   ;; "--catalog"                  catalog-path ; use robot merge instead?
+   "--reasoner"                 "ELK"
+   "--create-new-ontology"      "true"
+   "--axiom-generators"         "SubClass EquivalentClass DisjointClasses"
+   "--exclude-duplicate-axioms" "true"
+   "--exclude-tautologies"      "structural"
+   "--input"                    ontology-path
+   "reduce"
+   "--output"                   reasoned-path)
+  (run-command
+   (or (executable-find "pypy3") (executable-find "python"))
+   "-m"
+   (if sckan-release "pyontutils.qnamefix" "ttlser.ttlfmt")
+   reasoned-path))
+
+(defun read-ttl-file (path)
+  "Convert path to ttl file into a list of triples. Extremely inefficient."
+  (let ((bstr (run-command
+               (or (executable-find "pypy3") (executable-find "python"))
+               "-m" "ttlser.ttlfmt" path "-t" "nt" "-o" "/dev/stdout")))
+    ;; FIXME run-command has a buffer like this internally, a variant
+    ;; that would allow us to return a buffer output instead of a string might be nice
+    (with-temp-buffer
+      (insert bstr)
+      (let ((mi (point-min))
+            (ma (point-max)))
+        (replace-regexp "^Process.+$" "" nil mi ma)
+        (replace-regexp "<" "" nil mi ma)
+        (replace-regexp ">" "" nil mi ma)
+        (replace-regexp "\n\n" "" nil mi ma)
+        (replace-regexp "^" "(" nil mi ma)
+        (replace-regexp "\\.$" ")" nil mi ma)
+        (replace-regexp "#" "\\\\#" nil mi ma) ; apparently sharps are special, I think I missed that in reader tests
+        (goto-char (point-min))
+        (insert "(")
+        (goto-char (point-max))
+        (insert ")")
+        (read (buffer-string))))))
+
+(defun get-apinat-paths (triples)
+  (mapcar
+   (lambda (uri) (file-name-nondirectory uri))
+   (cl-remove-if-not
+    (lambda (uri) (string-search "ApiNATOMY" uri)) ; FIXME hack
+    (if sckan-release
+        (select-predicate
+         triples
+         (intern (expand-curie 'owl:imports)))
+      (select-predicate
+       triples
+       (intern (expand-curie 'owl:imports))
+       ;;(intern (expand-curie 'ilxtr:imports-big))
+       (intern (expand-curie 'ilxtr:imports-dev))
+       ;;(intern (expand-curie 'ilxtr:imports-rel))
+       )))))
+
+(defun sub (tr &optional match)  (if match (or (and (symbolp tr) (eq (car tr)   match)) (equal (car tr)   match)) (car tr)))
+
+(defun pred (tr &optional match) (if match (or (and (symbolp tr) (eq (cadr tr)  match)) (equal (cadr tr)  match)) (cadr tr)))
+
+(defun obj (tr &optional match)  (if match (or (and (symbolp tr) (eq (caddr tr) match)) (equal (caddr tr) match)) (caddr tr)))
+
+(defun ematch (triples select match matchf &rest matches)
+  (cl-loop
+   for tr in triples
+   when (and (select tr match) (or (not matchf) (matchf matches)))
+   collect tr))
+
+(defun expand-curie (curie &optional local-curies)
+  (let* ((local-curies (or local-curies curies))
+         (curie (or (and (symbolp curie) (symbol-name curie)) curie))
+         (p-s (split-string curie ":"))
+         (prefix (intern (car p-s)))
+         (suffix (cadr p-s)))
+    (concat (alist-get prefix local-curies) suffix)))
+
+(defun select-predicate (triples &rest predicates)
+  (cl-loop
+   for tr in triples
+   when (cl-loop for p in predicates when (pred tr p) return t)
+   collect (symbol-name (obj tr))))
+
+;; 0 ensure commands
+(defun step-ensure-commands ()
+  "make sure all the commands we need are present on the system"
+  (dolist (command '("python" "zip" "tar" "rsync" "protcur" "ttlfmt"))
+    (unless (executable-find command)
+      (error "Cannot continue. No executable found for %s" command))))
+
+;; 0.5 ensure services
+(defun step-ensure-services ()
+  "Make sure that all required services are accessible"
+  ;; protcur needs scigraph queries to be working
+  (run-command "scig" "t" "brain"))
+
+;; 1
+;; a slight chicken and egg problem
+
+;; 2
+(defun step-fetch-blazegraph ()
+  "retrieve the blazegraph jar file"
+  (let* ((url-template "https://github.com/blazegraph/database/releases/download/%s/blazegraph.jar")
+         (version "BLAZEGRAPH_2_1_6_RC")
+         (url (format url-template version))
+         (cypher 'sha256)
+         (checksum "930c38b5bce7c0ae99701c1f6ef3057c52f3f385d938e1397a3e05561c7df5de")
+         (path-jar "blazegraph.jar"))
+    (securl cypher checksum url path-jar)
+    path-jar))
+
+(defun step-arrange-blazegraph (build-dir path-jar)
+  "put the blazegraph jar in the right location"
+  (let* ((name (file-name-nondirectory path-jar))
+         (target-path (concat "opt/" name)))
+    (unless-file-exists-p target-path
+      (copy-file (concat build-dir path-jar) target-path))
+    target-path))
+
+;; 3
+(defun step-fetch-blazegraph-runner ()
+  "fetch and arrange blazegraph-runner"
+  (let* ((url-template "https://github.com/balhoff/blazegraph-runner/releases/download/%s/%s.tgz")
+         (version "v1.6")
+         (path "blazegraph-runner-1.6")
+         (url (format url-template version path))
+         (cypher 'sha256)
+         (checksum "4f2c01d6d75093361f75d8671c6d426fea3273a04168bcd0beea880527111271")
+         (path-tar (concat path ".tgz")))
+    (securl cypher checksum url path-tar) ;; FIXME should this error on mismatch?
+    ;; FIXME test untar from different folder will put it in that folder not the location of the tar
+    (unless (file-directory-p path)
+      (run-command "tar" "xvzf" path-tar))
+    (file-name-as-directory (concat default-directory path))))
+
+(defun step-annotations ()
+  "fetch annotations and render in #lang protc/ur"
+  (let ((hypothesis-annos "data/annotations.json")
+        (protcur-path "data/protcur-sparc.rkt"))
+    (unless (and (file-exists-p hypothesis-annos)
+                 (file-exists-p protcur-path))
+      (unless-file-exists-p hypothesis-annos
+        ;; 5
+        (run-command "rsync" "--rsh" "ssh" "cassava-sparc:.cache/hyputils/annos-*.json" hypothesis-annos)
+        (when sckan-release
+          (ow-babel-eval "clean-annotations-group") ; FIXME org babel doesn't specify a way to pass an error!?
+          (let* ((large-file-warning-threshold)
+                 (anno-buffer (find-file-noselect hypothesis-annos)))
+            (with-current-buffer anno-buffer
+              (goto-char 0)
+              (re-search-forward "group:sparc-curation"))
+            (kill-buffer anno-buffer))
+          (message
+           "%S" ; TODO check if we can safely strip out the group at this stage
+           '(FIXME TODO replace the group id with some garbage so that it doesn't leak))))
+      ;; 6 FIXME TODO this requires scigraph to be running FIXME this is a very slow step
+      (run-command "protcur" "convert" hypothesis-annos protcur-path))))
+
+(defun step-load-store (path-br-bin)
+  "download latest ttl files and load into blazegraph"
+  (let ((exec-path (cons path-br-bin exec-path))
+        (journal-path "data/blazegraph.jnl")
+        (p-path "data/protcur.ttl")
+        (ce-path (concat "data/curation-export" (and sckan-release "-published") ".ttl"))
+        (mis-path "data/sparc-methods.ttl")
+        (mis-r-path "data/sparc-methods-reasoned.ttl")
+        (sct-path "data/sparc-community-terms.ttl")
+
+        (ub-path "data/uberon.ttl")
+        (em-path "data/emapa.ttl")
+        (me-path "data/methods.ttl")
+        (npo-path "data/npo.ttl")
+
+        (em-r-path "data/emapa-reasoned.ttl")
+        (ub-r-path "data/uberon-reasoned.ttl")
+        (me-r-path "data/methods-reasoned.ttl")
+        (npo-r-path "data/npo-reasoned.ttl")
+
+        (rguc "https://raw.githubusercontent.com/")
+        (cass-px "https://cassava.ucsd.edu/sparc/preview/exports/")
+
+        (apinat-base-url "https://cassava.ucsd.edu/ApiNATOMY/ontologies/")
+
+        (sparc-data-path "data/sparc-data.ttl")
+        (sparc-data-source "resources/scigraph/sparc-data.ttl")
+        (apinat-sentinel-path "data/keast-bladder.ttl")
+        apinat-paths)
+    ;; 4
+    (unless-file-exists-p p-path
+      ;; FIXME decouple this location
+      (url-copy-file (concat cass-px "protcur.ttl")
+                     p-path))
+    (unless-file-exists-p ce-path
+      (url-copy-file (concat cass-px (file-name-nondirectory ce-path))
+                     ce-path))
+    (unless-file-exists-p mis-path
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-methods.ttl")
+                     mis-path))
+    (unless-file-exists-p mis-r-path
+      (reason-ontology mis-path mis-r-path))
+    (unless-file-exists-p sct-path
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-community-terms.ttl")
+                     sct-path))
+    ;; load apinatomy files
+    (unless-file-exists-p sparc-data-path
+      (url-copy-file (concat rguc "SciCrunch/sparc-curation/master/" sparc-data-source)
+                     sparc-data-path))
+
+    (unless (and (file-exists-p apinat-sentinel-path)
+                 (file-exists-p journal-path))
+      (setq apinat-paths (get-apinat-paths (read-ttl-file sparc-data-path)))
+      (mapcar
+       (lambda (a-path)
+         (let ((dapath (concat "data/" a-path)))
+           (unless-file-exists-p dapath
+             ;; FIXME fail on 404 ??!
+             (url-copy-file (concat apinat-base-url a-path)
+                            dapath))))
+       apinat-paths))
+
+    ;; retrieve, reason, and load various ontologies
+    ;; FIXME when to patch
+    ;; uberon
+    (unless-file-exists-p ub-path
+      (get-ontology "http://purl.obolibrary.org/obo/uberon.owl" ub-path))
+    (unless-file-exists-p ub-r-path
+      (reason-ontology ub-path ub-r-path))
+    ;; emapa
+    (unless-file-exists-p em-path
+      (get-ontology "http://purl.obolibrary.org/obo/emapa.owl" em-path))
+    (unless-file-exists-p em-r-path
+      (reason-ontology em-path em-r-path))
+    ;; methods
+    (unless-file-exists-p me-path
+      ;; FIXME this pulls in a staggering amount of the nif ontology and is quite large
+      ;; FIXME reasoner errors between methods-helper, ro, and pato prevent this
+      ;;(get-ontology (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/methods.ttl") me-path)
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/methods.ttl") me-path))
+    (unless-file-exists-p me-r-path
+      (reason-ontology me-path me-r-path))
+    ;; npo
+    (unless-file-exists-p npo-path
+      (get-ontology (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/npo.ttl") npo-path))
+    (unless-file-exists-p npo-r-path ; FIXME (npo-path npo-r-path) ?? npo newer than npo-r issues sigh make
+      (reason-ontology npo-path npo-r-path))
+
+    ;; 7
+    (unless-file-exists-p journal-path
+      ;; FIXME if this ever runs as an update instead of load it might be tricky
+      ;; FIXME remove the path if we fail on this step?
+      (let (backtrace-on-error-noninteractive)
+        (apply
+         #'run-command
+         `("blazegraph-runner" ,(concat "--journal=" journal-path)
+           "load" "--use-ontology-graph" ,p-path ,ce-path
+           ;;"http://purl.obolibrary.org/obo/uberon.owl"
+           ,em-path
+           ,ub-path
+           ,me-path
+           ,npo-path
+           ,mis-path
+           ,sct-path
+
+           ,em-r-path
+           ,ub-r-path
+           ,me-r-path
+           ,npo-r-path
+           ,mis-r-path
+
+           ,@(mapcar (lambda (p) (concat "data/" p)) apinat-paths)))))))
+
+(defun step-add-prefixes-file ()
+  "Get or create the latest prefix specification file."
+  ;; NOTE generation of the sparql-prefixes block from source ontologies
+  ;; is done asynchronously in python and is a bit out of date
+  (let ((prefixes-path "data/prefixes.conf"))
+    (unless-file-exists-p prefixes-path
+      ;; TODO mark generate prefixes as safe as we do
+      ;; for nonl in sparc-curation/docs/queries.org
+      (ow-babel-eval "generate-prefixes"))))
+
+(defun step-add-query-org (path-queries)
+  "copy the file that contains the queries into the release"
+  (let ((target-path (concat default-directory (file-name-nondirectory path-queries))))
+    (unless-file-exists-p target-path
+      (let ((buffer (magit-find-file-noselect "HEAD" path-queries)))
+        (with-current-buffer buffer
+          (write-region (point-min) (point-max) target-path))))))
+
+;; 10
+
+(defun step-test ()
+  "run test"
+  ' ; TODO
+  (run-command "emacs" "-Q" "--batch" TODO)
+  )
+
+(defun step-package (release-dir)
+  "run from build-dir to compress the release dir for distribution"
+  (let* ((release-dir-name (file-name-base (directory-file-name release-dir)))
+         (path-zip (concat release-dir-name ".zip")))
+    (unless-file-exists-p path-zip
+      (run-command "zip" "-r" path-zip release-dir-name))))
+
+;; N release
+
+(defun step-release (build-dir &optional this-release-dir release-time no-blaze)
+  (step-ensure-commands)
+  (step-ensure-services)
+  ;; FIXME something about the resume process is still broken
+  (unless (file-directory-p build-dir)
+    (mkdir build-dir))
+  (let* ((path-queries (concat default-directory "queries.org"))
+         (release-dir ; have to use this-release-dir so that lexical binding works
+          (or (and this-release-dir (file-name-as-directory this-release-dir))
+              (file-name-as-directory
+               (concat build-dir
+                       "release-"
+                       (format-time-string "%Y-%m-%dT%H%M%SZ"
+                                           (or release-time (current-time)) t)
+                       ;; XXX we put the type of release after the date to preserve sort order
+                       ;; a dirty hack but simpler than the alternative
+                       (and sckan-release "-sckan"))))))
+    (unless (file-directory-p release-dir)
+      (mkdir release-dir))
+    (let* ((default-directory build-dir)
+           (path-jar (step-fetch-blazegraph))
+           (path (step-fetch-blazegraph-runner)))
+      (let ((default-directory release-dir))
+        (unless (file-directory-p "data")
+          (mkdir "data"))
+        (unless no-blaze
+          (unless (file-directory-p "opt")
+            (mkdir "opt"))
+          (step-arrange-blazegraph build-dir path-jar))
+        (step-annotations)
+        (step-load-store (concat path "bin"))
+        (step-add-prefixes-file)
+        (unless no-blaze
+          (step-add-query-org path-queries))
+        (step-test))
+      (step-package release-dir))))
+
+#+end_src
+** Clean annotations
+
+#+header: :var rel_path=(or release-dir)
+#+name: clean-annotations-group
+#+begin_src python :exports code :results none
+import json
+from pathlib import Path
+
+rel_path = Path(rel_path) if rel_path else Path.cwd()
+ap = rel_path / 'data/annotations.json'
+
+with open(ap, 'rt') as f:
+    aj = json.load(f)
+
+for a in aj[0]:
+    a['permissions']['read'] = ['group:sparc-curation']
+    a['group'] = 'sparc-curation'
+
+with open(ap, 'wt') as f:
+    json.dump(aj, f)
+#+end_src
+
+** Generate sparql prefixes
+:PROPERTIES:
+:CREATED:  [2020-08-09 Sun 03:18]
+:END:
+
+#+header: :var rel_path=(or release-dir) prefixes_path=(or prefixes-path)
+#+name: generate-prefixes
+#+begin_src python :noweb yes :exports none :results none
+<<generate-prefixes-jupyter>>
+#+end_src
+
+#+header: :var rel_path=(or release-dir) prefixes_path=(or prefixes-path)
+#+name: generate-prefixes-jupyter
+#+begin_src jupyter-python :session pys :exports code :results value file
+import augpathlib as aug
+from pyontutils.core import OntGraph, OntResPath
+from pyontutils.namespaces import OntCuries
+g = OntGraph()
+OntCuries.populate(g)
+bpath = aug.LocalPath('/tmp/build/')  # FIXME abstract
+rel_path = (aug.LocalPath(rel_path) if rel_path else
+            sorted(c for c in bpath.children
+                   if c.is_dir() and c.name[-1] == 'Z')[-1])
+data_path = rel_path / 'data'
+_ = [OntResPath(t).metadata().graph.namespace_manager.populate(g)
+     for t in data_path.rglob('*.ttl')]
+prefixes = '\n'.join(
+    sorted([f'PREFIX {k}: <{v}>' for k, v in dict(g.namespace_manager).items()
+            if not (k.startswith('ns') or
+                    k.startswith('default') or
+                    k.startswith('local'))],
+           key=lambda s: list(reversed(s.rsplit("<", 1)))))
+prefixes_path = (rel_path / prefixes_path if prefixes_path else
+                 data_path / 'prefixes.conf')
+prefixes_path.data = (_ for _ in (prefixes.encode(),))
+str(prefixes_path)
+#+end_src
+
+* Bootstrap :noexport:
+#+name: orgstrap
+#+begin_src elisp :results none :lexical yes :noweb yes
+;; batch
+
+(defvar ow-do-packages-emacs t "Install Emacs packages.")
+(defvar ow-do-build nil "Override this for emacs --batch")
+(defvar ow-do-devel nil "Override this for emacs --batch")
+(defvar sckan-release nil)
+
+(when ow-do-devel
+  ;; assumes that you are running this file using the orgware command
+  ;; or equivalent
+  (use-package ow :load-path "~/git/orgstrap/"))
+
+;; minimal reval
+
+(unless (featurep 'reval)
+  (defvar reval-cache-directory (concat user-emacs-directory "reval/cache/"))
+  (defun reval-minimal (cypher checksum path-or-url &rest alternates)
+    "Simplified and compact implementation of reval."
+    (let* (done (o url-handler-mode) (csn (symbol-name checksum))
+           (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
+                               "-" (file-name-nondirectory path-or-url))))
+      (url-handler-mode)
+      (unwind-protect
+          (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
+                   do (when (file-exists-p path-or-url)
+                        (let* ((buffer (find-file-noselect path-or-url))
+                               (buffer-checksum (intern (secure-hash cypher buffer))))
+                          (if (eq buffer-checksum checksum)
+                              (progn
+                                (unless (string= path-or-url cache-path)
+                                  (let ((parent-path (file-name-directory cache-path))
+                                        make-backup-files)
+                                    (unless (file-directory-p parent-path)
+                                      (make-directory parent-path t))
+                                    (with-current-buffer buffer
+                                      (write-file cache-path))))
+                                (eval-buffer buffer)
+                                (setq done t))
+                            (kill-buffer buffer) ; kill so cannot accidentally evaled
+                            (error "reval: checksum mismatch! %s" path-or-url))))
+                   until done)
+        (unless o
+          (url-handler-mode 0)))))
+  (defalias 'reval #'reval-minimal)
+  (reval 'sha256 '3620321396c967395913ff19ce507555acb92335b0545e4bd05ec0e673a0b33b 
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/300b1d5518af53d76d950097bcbcd7046cfa2285/reval.el"))
+
+(let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
+  (unless (featurep 'ow)
+    (reval 'sha256 'f6781f2175f506283d3bea8673b60071a5dd2c01d68e8b33e5a15e20600f02f8
+           (concat ghost "16f96cdeb74391ca3eaa0f6f48e21aefb10764d1" "/ow.el"))))
+
+(unless (fboundp #'run-command)
+  (defalias 'run-command #'ow-run-command))
+
+(when ow-do-packages-emacs
+  (ow-enable-use-package)
+  (ow-use-packages
+   magit))
+
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ `((python . t)
+   (shell . t)
+   ,@org-babel-load-languages))
+
+<<release-defuns>>
+
+;; entry point
+
+(when noninteractive
+  (ow-cli-gen
+      ((:install) ; install this command
+       (:build)
+       (:resume)
+       ((:sckan) sckan-release)
+       (:no-blaze)
+       ((:path-release nil) release-dir))
+    (message "%S" sckan-release)
+    (when build
+      (let ((build-dir (build-dir)))
+        (if resume
+            (let ((resume-dir (find-resume-dir build-dir)))
+              (if resume-dir
+                  (step-release build-dir resume-dir nil no-blaze)
+                (message "No build to resume.")))
+          (step-release build-dir release-dir nil no-blaze))))))
+#+end_src
+
+** Local variables :ARCHIVE:
+# close powershell comment #>
+# Local Variables:
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--dprp-1\.0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# End:
