@@ -4,7 +4,7 @@
 
 * Welcome to SCKAN!
 
-SCKAN is the *SPARC Connectivity Knowledge base for the Autonomic Nervous system*.
+SCKAN is the *SPARC Connectivity Knowledge base of the Autonomic Nervous system*.
 
 This docker image contains everything you need to query SCKAN.
 

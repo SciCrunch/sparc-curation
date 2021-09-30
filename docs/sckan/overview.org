@@ -1,42 +1,47 @@
-
+#+title: Overview
+[[#introduction][Introduction]]
+[[#glossary][Glossary]]
 * Introduction
 :PROPERTIES:
 :CUSTOM_ID:  introduction
 :END:
-The SPARC Knowledge Graph ...
+The SPARC Knowledge base of the Automatic Nervous System is an
+integrated graph database composed of three parts: the SPARC dataset
+metadata graph, ApiNATOMY and NPO models of connectivity, and the
+larger ontology used by SPARC which is a combination of the
+NIF-Ontology and community ontologies.
+
 ** SPARC Content
+The SPARC content is as follows.
 1. SPARC dataset metadata graph
    1. Datasets
       1. Publicly released datasets, including those under embargo.
-         (doi must resolve).
    2. Protocols
       1. Hypothesis Annotations
       2. Processed Hypothesis annotations
-      3. SPARC Protocols on Protocols.io
-2. connectivity knowledge base
-   1. ApiNATOMY
-      1. Introduction
-      2. models
-         1. bolser-lewis
-         2. keast-bladder
+2. SPARC Connectivity
+   1. ApiNATOMY models
+      1. models
+         1. ard-arm-cardiac
+         2. bolser-lewis
          3. bronchomotor
-         4. ard-arm-cardiac
+         4. keast-bladder
          5. sawg-distal-colon
-         6. +sawg-stomach+
-   2. NPO
-      1. Introduction
-      2. evidence based modesl
+         6. sawg-stomach
+   2. Neuron Phenotype Ontology
+      1. Evidence Based Types
          1. nerves.ttl
-      3. NPO stubs
-3. ontology (SciGraph can have everything, blazegraph may be not the whole ontolgy)
-   1. NIF-Ontology+
+      2. NPO stubs
+3. Ontology
+   1. sparc-methods.ttl
+   2. sparc-community-terms.ttl
+   3. NIF-Ontology+
 
-collateral versus difference populations
 ** Ontology content
 What ontologies are part of this release?
-NIF-Ontology @@comment: link to a more detailed description@@
-The NIF-Ontology imports Uberon, Human Disease Ontology DOID, PR, and subsets of ChEBI, NCBITaxon, NCBIGene
-In addition we import. The MONDO Disease Ontology, the Human Phenotype Ontology, Foundationaly Model of Anatomy, and CL.
+The [[https://github.com/SciCrunch/NIF-Ontology][NIF-Ontology]] provides the foundation of the ontology used for SCKAN.
+The NIF-Ontology imports Uberon, Human Disease Ontology DOID, PR, and subsets of ChEBI, NCBITaxon, and NCBIGene.
+In addition we import the MONDO Disease Ontology, the Human Phenotype Ontology, Foundationaly Model of Anatomy, and CL.
 
 The two releases have slightly different ontology content due to their
 different use cases.
@@ -44,72 +49,50 @@ different use cases.
 1. SciGraph
    Everything.
 2. Blazegraph
-   Not quite everything. TODO
-   Only the subset that is used in the SPARC content or connectivity portions of the Knowledge Base.
+   Not quite everything.
+   Only the subset that is used in the SPARC content or connectivity portions of SCKAN.
 
 ** Compiled content
 In order to create an accessible version of the Knowledge Base that
-can be queried we convert and enrich the SPARC Content by loading it
-into both a property graph (Neo4j) and also into an triple store
-(Blazegraph), and by augmenting it with the NIF-Ontology which pulls
-in a number of community ontologies.
+can be queried we convert and enrich the SPARC content by loading it
+into a property graph (Neo4j) and into an triple store (Blazegraph),
+and by augmenting it with the NIF-Ontology which pulls in a number of
+community ontologies.
 
-SPARC Content + NIF-Ontology + Community ontologies
+SCKAN = SPARC Content + NIF-Ontology + Community ontologies
 
 Why do we have two representations?
 
 There are two representations becuase we have found that they serve
-different use case.  The triplestore is useful for executing basic
-comptency queries over the dataset releases, but there are not
+complementary use case.  The triplestore is useful for executing basic
+competency queries over the dataset releases, but there are not
 existing APIs that are straight forward for devopers to consume. On
 the other hand, SciGraph provides a developer friendly REST API that
 is much easier to use in production systems.
 
 Both of these databases are available in the docker image we provide
-since they are needed to run the queries in this file.  You can
-download the compiled versions of each database seprately as well.
-*** SciGraph zipped Neo4j database.
-*** Blazegraph journal file.
-** How run and query the database
-*** Here's what you can do
+since they are needed to run the queries.  You can download the
+compiled versions of each database separately as well.
+
+The SciGraph release comes as a zipped Neo4j database.
+The Blazegraph release comes as a journal file.
+** How to query the database
 In addition to the underlying raw data, we also provide two
-representations of the knowldge base that can be queried directly
-using the SPARQL or Cypher query languages.
+representations of the knowledge base that can be queried directly
+using the SPARQL or Cypher query languages. These are available as
+docker images and as standalone releases.
 
-RDF / Blazegraph / SPARQL
-Property Graph / SciGraph / Cypher
-*** Here's what you have to do first
-We provide these as docker images ...
-*** Here are the compiled files
-* Getting started
-** Docker
-The best way to use this file to explore the SCKAN is to download
-the fully configured docker image that uses this file as an interface.
+See the [[./README.org][README]] to get started querying.
 
-https://hub.docker.com/r/tgbugs/musl/tags?name=kg-release-user
+| Representation | Database         | Language |
+|----------------+------------------+----------|
+| RDF            | Blazegraph       | SPARQL   |
+| Property Graph | SciGraph (Neo4j) | Cypher   |
 
-#+begin_src bash
-docker pull tgbugs/musl:kg-release-user
-#+end_src
-
-Once you have installed docker and downloaded the image you can run
-the follow command and it will open an interactive query interface.
-*** Everything
-https://github.com/SciCrunch/sparc-curation/blob/master/docs/queries.org
-To run the queries.org file where we maintain all of the queries
-that have been written by K-CORE for a variety of use cases please
-run
-#+begin_src bash
-docker run -it tgbugs/musl:kg-release-user
-#+end_src
-
-when using this file there are no Run Query buttons so you will
-need to use =C-c C-c= to execute queries.
-
-The docker file that specifies the image is available at
-https://github.com/tgbugs/dockerfiles/blob/master/source.org#kg-release-user
-
-* glossary
+* Glossary
+:PROPERTIES:
+:CUSTOM_ID:  glossary
+:END:
 *** Neurulated groups
 Neurulated groups are used to ensure that the individual segments and
 parts of neurons modeled in ApiNATOMY can be recognized as single
@@ -122,13 +105,13 @@ implictly mean neuron populations, so a neurite or cell part is not an
 individual neurite of a single cell, but rather a population level
 representation. Cell parts here include axons, dendrites, and somas.
 
-#+begin_src comment
+#+begin_comment
 These population level representations are more similar to the old
 reticular hypothesis about the structure of the nervous system in that
 they also allow multi-nucleated populations, which can be confusing if
 one is expecting the model to be of individual neurons. They can also
 allow axon trees that are not trees but instead are graphs.
-#+end_src
+#+end_comment
 
 Population level representations can be used to generate models of
 individual neurons that are consistent with the population as a whole
@@ -164,7 +147,7 @@ unions of all the individual members of a population. This means that
 we do not distinguish between cases where a single neuron branches
 into multiple collaterals that project to different location and
 multiple neurons that each project to a different location and all
-combinations inbetween.
+combinations in between.
 
 The micro-anatomy of dendrite and axonal morphology is not considered
 in these population level models, so any branching that is seen is
