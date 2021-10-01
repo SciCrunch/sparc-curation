@@ -10,10 +10,8 @@ SCKAN is distributed as two docker images.
 1. An image with the software needed to run queries [[https://hub.docker.com/r/tgbugs/musl/tags?name=kg-release-user][tgbugs/musl:kg-release-user]]
 2. An image containing only the loaded databases [[https://hub.docker.com/r/tgbugs/sckan/tags?name=latest][tgbugs/sckan:latest]]
 
-These images, and the underlying data they are generated from
-can also be retrieved from Zenodo.
-# TODO collection doi
-https://doi.org/10.5281/zenodo.5337442
+The underlying data and the =tgbugs/sckan:latest= image are also archived on Zenodo.
+The latest data release can be obtained from https://doi.org/10.5281/zenodo.5337441.
 
 * Download Docker and X11
 1. Download and install docker for your platform.
