@@ -97,6 +97,7 @@ xhost local:docker
 docker pull tgbugs/musl:kg-release-user
 docker pull tgbugs/sckan:latest
 
+docker rm sckan-data
 docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
 
 docker run \
@@ -125,6 +126,7 @@ xhost +localhost
 docker pull tgbugs/musl:kg-release-user
 docker pull tgbugs/sckan:latest
 
+docker rm sckan-data
 docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
 
 docker run \
@@ -144,6 +146,7 @@ choco install wsl2 wsl-ubuntu-2004 vcxsrv docker-desktop docker
 docker pull tgbugs/musl:kg-release-user
 docker pull tgbugs/sckan:latest
 
+docker rm sckan-data
 docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbugs/sckan:latest /bin/true
 
 docker run `
