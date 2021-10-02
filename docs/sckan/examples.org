@@ -1,11 +1,154 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: e18ca3fe10ad5e609d84e14362971fe30a1db8acceb0d959f7b2aa07e063a5c5; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 32b4c6dcae4b740062e4d4005c6dcec47c4bf1706b9fe2c46193167966b09430; -*-
 #+title: Examples
 # inherit configuration from queries.org
 #+setupfile: ./queries.org
 
-* asdf
+* Regions with processes from neuron population
+Show all regions that contain some part of a given neuron population.
+In this case, [[ilxtr:neuron-type-keast-5][Neuron type keast 5]]
+
+#+name: cypher-query-1
 #+begin_src cypher
+// neurites
+MATCH (neupop:Class{iri: "http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-5"})
+-[:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:links]->(link)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer)
+-[:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:external]->(region)
+RETURN region
+
+UNION
+
+// somas
+MATCH (neupop:Class{iri: "http://uri.interlex.org/tgbugs/uris/readable/neuron-type-keast-5"})
+-[:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:lyphs]->(lyph)
+-[:apinatomy:internalIn]->()
+-[:apinatomy:external]->(region)
+RETURN region
 #+end_src
+
+#+RESULTS: cypher-query-1
+| id             | label                            |
+|----------------+----------------------------------|
+| UBERON:0016508 | pelvic ganglion                  |
+| EMAPA:25279    | L6 ventral root                  |
+| EMAPA:19574    | Sixth lumbar spinal cord segment |
+| UBERON:0018675 | pelvic splanchnic nerve          |
+| UBERON:0006460 | first sacral spinal cord segment |
+| EMAPA:25281    | S1 ventral root                  |
+
+#+name: sparql-query-1
+#+begin_src sparql
+SELECT DISTINCT
+?region
+(str(?l) as ?label)
+WHERE {
+  VALUES ?neupop { ilxtr:neuron-type-keast-5 }
+  ?neupop apinatomy:annotates ?neugrp .
+  ?neugrp a elements:Group .  # externals annotate the whole model
+  {
+    ?neugrp apinatomy:links / ( apinatomy:fasciculatesIn | apinatomy:endsIn ) ?rlyph .
+    ?rlyph apinatomy:external ?region .
+    filter not exists { ?rlyph apinatomy:layer ?_ }  # require if ?region where not specified
+  } UNION {
+    ?neugrp apinatomy:links / ( apinatomy:fasciculatesIn | apinatomy:endsIn ) /
+            apinatomy:layerIn / apinatomy:external ?region .
+  }
+  OPTIONAL { ?region rdfs:label ?l }
+}
+ORDER BY ?region
+#+end_src
+
+#+RESULTS: sparql-query-1
+| region         | label                            |
+|----------------+----------------------------------|
+| EMAPA:19574    | Sixth lumbar spinal cord segment |
+| EMAPA:19574    | L6 vertebra                      |
+| EMAPA:25279    | L6 ventral root                  |
+| EMAPA:25281    | S1 ventral root                  |
+| UBERON:0006460 | first sacral spinal cord segment |
+| UBERON:0016508 | pelvic ganglion                  |
+| UBERON:0018675 | pelvic splanchnic nerve          |
+
+* Neuron populations with processes in region
+Show all neuron populations that have some part in a given region.
+In this case the [[UBERON:0005453][inferior mesenteric ganglion]].
+See this [[./queries.org::#neru-populations-with-processes-in][catalog entry]] for the generalized form of this query.
+
+#+name: cypher-query-2
+#+begin_src cypher :limit 999 :label skos:prefLabel
+// neurites
+MATCH (neupop:Class)
+-[:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:links]->(link)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer)
+-[:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:external*0..1]->(region:Class{iri: "UBERON:0005453"})
+RETURN neupop
+
+UNION
+
+// somas
+MATCH (neupop:Class)
+-[:apinatomy:annotates*0..1]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+-[:apinatomy:lyphs]->(lyph)
+-[:apinatomy:internalIn]->()
+-[:apinatomy:external*0..1]->(region:Class{iri: "UBERON:0005453"})
+RETURN neupop
+#+end_src
+
+#+RESULTS: cypher-query-2
+| id                         | label                                                                                               |
+|----------------------------+-----------------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-sdcol-b  |                                                                                                     |
+| ilxtr:neuron-type-sdcol-d  |                                                                                                     |
+| ilxtr:neuron-type-sdcol-f  |                                                                                                     |
+| ilxtr:neuron-type-sdcol-g  |                                                                                                     |
+| ilxtr:neuron-type-sdcol-h  |                                                                                                     |
+| ilxtr:neuron-type-sdcol-q  |                                                                                                     |
+| ilxtr:neuron-type-keast-11 | ilxtr:neuron-phenotype-keast-11 neuron                                                              |
+| ilxtr:neuron-type-keast-7  | ilxtr:neuron-phenotype-keast-7 neuron                                                               |
+| ilxtr:neuron-type-keast-3  | ilxtr:IMG (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) neuron |
+| ilxtr:neuron-type-keast-6  | ilxtr:neuron-phenotype-keast-6 neuron                                                               |
+
+#+name: sparql-query-2
+#+begin_src sparql
+SELECT DISTINCT
+?neupop
+(str(?pl) as ?prefLabel)
+WHERE {
+  VALUES (?region ?neuron) { (UBERON:0005453 SAO:1417703748) }
+  ?neupop rdfs:subClassOf+ ?neuron ;
+          apinatomy:annotates ?neugrp .
+  OPTIONAL { ?neupop skos:prefLabel ?pl }
+  ?neugrp a elements:Group .  # externals annotate the whole model
+  {
+    ?neugrp apinatomy:links / ( apinatomy:fasciculatesIn | apinatomy:endsIn ) ?rlyph .
+    ?rlyph apinatomy:external ?region .
+    filter not exists { ?rlyph apinatomy:layer ?_ }  # require if ?region where not specified
+  } UNION {
+    ?neugrp apinatomy:links / ( apinatomy:fasciculatesIn | apinatomy:endsIn ) /
+            apinatomy:layerIn / apinatomy:external ?region .
+  }
+}
+ORDER BY ?neupop
+#+end_src
+
+#+RESULTS: sparql-query-2
+| neupop                     | prefLabel                    |
+|----------------------------+------------------------------|
+| ilxtr:neuron-type-keast-11 | Keast bladder neuron type 11 |
+| ilxtr:neuron-type-keast-3  | Keast bladder neuron type 3  |
+| ilxtr:neuron-type-keast-6  | Keast bladder neuron type 6  |
+| ilxtr:neuron-type-keast-7  | Keast bladder neuron type 7  |
+| ilxtr:neuron-type-sdcol-b  |                              |
+| ilxtr:neuron-type-sdcol-d  |                              |
+| ilxtr:neuron-type-sdcol-f  |                              |
+| ilxtr:neuron-type-sdcol-g  |                              |
+| ilxtr:neuron-type-sdcol-h  |                              |
+| ilxtr:neuron-type-sdcol-q  |                              |
 
 * Bootstrap :ARCHIVE:
 :properties:
@@ -14,6 +157,15 @@
 
 #+name: orgstrap
 #+begin_src elisp :results none :exports none :lexical yes
+(defvar ow-do-devel nil)
+
+(setq-local
+ org-confirm-babel-evaluate
+ (lambda (lang _body)
+   (not (or (member lang '("cypher" "sparql"))))))
+
+(unless ow-do-devel
+  (find-file-noselect "./queries.org"))
 #+end_src
 
 ** Local Variables :ARCHIVE:
