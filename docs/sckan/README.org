@@ -161,4 +161,12 @@ Beyond the interactive query interface, these docker images can be run
 as standalone SciGraph and Blazegraph instances of SCKAN for use in a
 variety of applications.
 
+#+begin_src bash
+docker run \
+--volumes-from sckan-data \
+-p 9000:9000 \
+-p 9999:9999 \
+--entrypoint /etc/services.sh \
+tgbugs/musl:kg-release-user
+#+end_src
 # TODO examples of how to modify the entrypoint

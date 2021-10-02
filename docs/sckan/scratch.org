@@ -1,6 +1,6 @@
 # -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 32b4c6dcae4b740062e4d4005c6dcec47c4bf1706b9fe2c46193167966b09430; -*-
 #+title: Query scratchpad
-# inherit configuration from queries.org
+# inherit configuration from [[./queries.org][queries.org]]
 #+setupfile: ./queries.org
 
 * sparql

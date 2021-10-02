@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 579aa38aa11f31ae6dbe9bdc2db9dda8a094aac256ebb287adf58374106439e0; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 2f5a7753772745172583c3d866930dc6ed4a610061d30bbc5cf46d240b921bc0; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -24,6 +24,7 @@ exit
 #+property: header-args :eval no-export
 
 # header-args:sparql :url http://localhost:10035/repositories/test
+<<sparql-settings>>
 #+property: header-args:sparql :url http://localhost:9999/blazegraph/sparql
 #+property: header-args:sparql+ :format text/csv
 #+property: header-args:sparql+ :results table
@@ -33,9 +34,10 @@ exit
 # XXX of course that would require epilogue to actually be implemented :/
 # #+property: header-args:sparql+ :epilogue "LIMIT ?limit"
 
+<<cypher-settings>>
 #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
+#+property: header-args:cypher+ :limit 10
 #+end:
-
 #+begin: prefixes
 # TODO consider a setup file for these maybe?
 # or populate additional local curies via orgstrap
@@ -173,7 +175,25 @@ WHERE {
 | TEMP:wasUpdatedAtTime                    |
 | rdf:type                                 |
 | rdfs:label                               |
+*** Electrophysiology datasets
+#+begin_src sparql
+SELECT DISTINCT
+?d
+?label
+?approach
+WHERE {
+  VALUES ?match { "electrophysiology" }
+  ?d a sparc:Dataset ;
+  rdfs:label ?l ;
+  TEMP:hasExperimentalApproach ?approach .
+  FILTER (str(?approach) = str(?match))
+  BIND(substr(str(?l), 0, 40) AS ?label)
+  # TODO lift and pull filetypes
+}
+#+end_src
+
 *** Test
+Originally from =sparcur.reports.SparqlQueries=.
 **** Dataset about
 #+begin_src sparql
 SELECT DISTINCT
@@ -598,6 +618,7 @@ LIMIT ?limit
 | dataset:30237b91-610d-4d73-944b-5d7687508743 | tech:statistics  |
 
 *** Test
+Originally from =sparcur.reports.SparqlQueries=.
 **** Protocol techniques
 #+begin_src sparql
 SELECT DISTINCT
@@ -2352,6 +2373,10 @@ RETURN e, neupop, neugrp
 
 *** TODO neru populations with neurites in
 *** neru populations with processes in
+:PROPERTIES:
+:CUSTOM_ID:  neru-populations-with-processes-in
+:END:
+
 Given an anatomical region return a list of neuron types with processes that are located in that region.
 
 # NOTE have to include :Class otherwise neupop-[annoates*0..1]->neugrp
@@ -3401,6 +3426,14 @@ Expected.
 | UBERON:0018683 | LumSplN      | keast-bladder     | 6 7 11            |
 | UBERON:0018683 | LumSplN      | sawg-distal-colon | B                 |
 *** vagus
+OWL DL query
+
+#+begin_src owldl
+hasLocationPhenotype some ('part of' some 'vagus nerve')
+hasLocationPhenotype some ('part of' some 'vagus nerve nucleus')
+hasLocationPhenotype some ('part of' some 'vagus nerve' or 'part of' some 'vagus nerve nucleus')
+#+end_src
+
 #+begin_src cypher
 // filter out things that project to the vagus nerve not that start in the vagus nerve or something like that
 (neupop)-[:ilxtr:hasLocationPhenotype]->(:Class{iri: UBERON:0001759})
@@ -4558,6 +4591,10 @@ WHERE {
       (insert dot))
     (org-babel-eval cmd "")
     path))
+
+(defun literal (string) ; can't use `defun-local' due to loading via `find-file-noselect'
+  "Utility function for sparql :vars that need to be escaped."
+  (prin1-to-string string))
 
 ;; see orgware.org for a longer note on noweb and empty lines
 (defun ow---strip-empty-lines ()

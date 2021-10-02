@@ -1,6 +1,6 @@
 # -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 32b4c6dcae4b740062e4d4005c6dcec47c4bf1706b9fe2c46193167966b09430; -*-
 #+title: Tutorial
-# inherit configuration from queries.org
+# inherit configuration from [[./queries.org][queries.org]]
 #+setupfile: ./queries.org
 
 Welcome to the SCKAN tutorial!
@@ -8,8 +8,20 @@ Welcome to the SCKAN tutorial!
 This tutorial will walk you through how to use this interface to query
 SCKAN via the SPARQL and Cypher query languages.
 
+* Navigation
+You can open and close headings (lines that start with =*= that use a
+larger font) by clicking on them with the mouse or by hitting =tab= when
+the cursor is on the heading line. This also works for ordered and
+descriptive lists which you might toggle by accident.
+
+You can also open and close source blocks by clicking on the
+=#+begin_src= line, =#+end_src= line, or any of the =#+header:=,
+=#+caption:=, or =#+name:= lines associated with the block. =tab=
+works in this case as well.
+
 * Queries
 For a written introduction see the manual on [[info:org#Working with Source Code][Working with Source Code]].
+
 ** Running queries
 There are two ways to run queries.
 1. Hit =C-c C-c= to run the source block under the cursor.
@@ -36,7 +48,10 @@ another language that will not run automatically, such this one.
 "hello world"
 #+end_src
 
+See the manual section on [[info:org#Evaluating Code Blocks][Evaluating Code Blocks]] for more details.
+
 ** Modifying queries
+
 You can edit any source block as plain text.
 
 Try editing ="hello world"= to read ="foo bar"= and then run the block.
@@ -49,6 +64,8 @@ SELECT ?x WHERE { VALUES ?x {"hello world"} }
 
 Sometimes it is useful to be able to limit the number of results.
 
+** SPARQL
+
 Try increasing the limit beyond 1000 and then try removing the limit statement from the query.
 #+header: :var limit="1"
 #+begin_src sparql
@@ -56,38 +73,135 @@ SELECT * WHERE { ?s ?p ?o }
 LIMIT ?limit
 #+end_src
 
+** Cypher
+
 The Cypher endpoint that is used for SCKAN does not allow the LIMIT keyword.
 Thus there is a slight difference in how you set the limit for a Cypher query.
+
 #+header: :limit 1
 #+begin_src cypher
 MATCH (g:Class) RETURN g
 #+end_src
 
 * Parameterizing queries
-* Naming blocks
-* Navigation
-You can open and close headings (lines that start with =*= that use a
-larger font) by clicking on them with the mouse or by hitting =tab= when
-the cursor is on the heading line.
 
-You can also open and close source blocks by clicking on the
-=#+begin_src= line, =#+end_src= line, or any of the =#+header:=,
-=#+caption:=, or =#+name:= lines associated with the block. =tab=
-works in this case as well.
+Sometimes you want pass input variables to a query so that it can be
+called as a function without having to change the text of the query.
+
+You can assign values to variables using the =:var= header.
+
+For more details see the manual on [[info:org#Using Header Arguments][Using Header Arguments]].
+
+** SPARQL
+
+You have already worked with variables in the previous section to set
+=LIMIT= for the SPARQL query via the variable =?limit=. Any variable
+in a SPARQL block (name starting with =?=) can be parameterized to
+have a specific value. You should not parameterize variables used in
+the =SELECT= statement as it will break the query.
+
+Try running the block and then changing the value to another curie,
+such as =TEMP:there=.
+
+#+header: :var myvar=":hello"
+#+begin_src sparql
+SELECT ?x WHERE { VALUES ?x { ?myvar } }
+#+end_src
+
+By default variables are interpreted literally as IRIs, CURIES, or
+numbers. If you want to pass a string you can use the ~literal~ function
+or include the escaped quotes explicitly.
+
+#+begin_src sparql :var myvar=(literal "my string variable")
+SELECT ?x WHERE { VALUES ?x { ?myvar } }
+#+end_src
+
+See the reference section on [[#sparql-variables][SPARQL variables]] for more details.
+
+** Cypher
+
+Here is an example of using a variable in a Cypher block to query for
+all the parts of a given anatomical entity. The default is the
+peripheral nervous system.
+
+#+header: :var region_id="UBERON:0000010"
+#+begin_src cypher :limit 20
+MATCH path = (region:Class{iri: $region_id})<-[:BFO:0000050*1..]-(:Class)
+RETURN path
+#+end_src
+
+* Naming blocks
+
+Queries can be called with different parameters you need to name them.
+
+You can name any source block by adding a =#+name:= line directly above
+the =#+begin_src= line.
+
+#+name: sparql-named-block-example
+#+begin_src sparql
+SELECT ?x WHERE { VALUES ?x { "This string is inside a named block!" } }
+#+end_src
+
+Try creating a new block (=C-c C-, s= for the adventurous) and giving it a name.
+
+* Calling blocks
+
+It is possible to run a query with different parameters without
+changing the original query.
+
+Try running =C-c C-c= on the =#+call:= line here.
+
+#+name: sparql-call-source
+#+call: sparql-call-target(myvar=(literal "new value"))
+
+Here is the block that we just ran. We changed the assignment of
+=?myvar= from ="default value"= to ="new value"= when we ran it via =#+call:=.
+
+#+name: sparql-call-target
+#+begin_src sparql :var myvar=(literal "default value")
+SELECT ?x WHERE { VALUES ?x { ?myvar } }
+#+end_src
+
+You can also try writing and running a new =#+call:= line for the block
+that you renamed in the previous section.
 
 * Reference
 :PROPERTIES:
 :CUSTOM_ID: reference
 :END:
-** Saving and Restoring
+** Saving and restoring
 :PROPERTIES:
 :CUSTOM_ID: saving-and-restoring
 :END:
+
+By default docker containers are not deleted on exit.  This means that
+if you accidentally exit the SCKAN interface your work will still be
+saved. If you force quit the image or if Emacs does not have a chance
+to shut down properly some work might be lost.
+
+The full command to restart the most recent container that was run
+from the =kg-release-user= image is as follows.
 
 #+begin_src bash
 docker container start --attach --interactive \
 $(docker ps --latest --quiet --filter ancestor=tgbugs/musl:kg-release-user)
 #+end_src
+
+When restarting a container it should take you back to the exact state
+where you left off. If you want a clean slate you can run a new image
+from scratch by calling =docker run= as you did the first time you
+started the SCKAN image.
+
+** Transferring work
+
+If you have queries that you have saved inside a SCKAN docker
+container it is possible to copy those files to the host system.
+
+For example, to copy =scratch.org= to the host you can run the following.
+#+begin_src bash
+docker cp $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user):/home/user/scratch.org scratch-backup.org
+#+end_src
+
 ** Keybinds
 | =C-c=     | copy              |
 | =C-v=     | paste             |
@@ -101,34 +215,114 @@ $(docker ps --latest --quiet --filter ancestor=tgbugs/musl:kg-release-user)
 
 ** Org mode
 The query interface for SCKAN is a computational notebook written in Org mode.
-Any extensive [[info:Org][manual]] is built in.
+An extensive [[info:Org][manual]] is built in.
 
-* Extras :ARCHIVE:
-** intro
-The query interface for SCKAN is a computational notebook written in [[info:org][Org mode]].
+For general help you can type =F1 F1= or =C-h C-h=.
 
-In short, we are using Org like a Jupyter or RStudio notebook.
+** Variables
+The =:var= header can be provided on the =#+begin_src= line, or it can
+provided on a separate =#+header:= line. The last assignment of the
+variable on the first line on which it appears (be it header or begin_src)
+takes priority. You could think of this as a top-right rule for priority.
 
-Some terminology that will be useful for the rest of the tutorial.
+Said another way, if a variable is defined multiple times on the same
+line the last instance takes priority. This makes it possible to
+temporarily shadow variable bindings without having to reorder the
+contents of the line. Similarly new header lines can be added above
+other lines and will shadow bindings without having to reorder lines.
 
-The line =* Structure= above is called a heading.
+*** SPARQL
+:PROPERTIES:
+:CUSTOM_ID: sparql-variables
+:END:
 
-The next 3 lines below this one make up a source block.
-#+begin_src emacs-lisp
-"Source blocks are delimited by a #+begin_src line and an #+end_src line."
-#+end_src
-See [[info:org#Working with Source Code][Working with Source Code]] for more.
+In some cases it is possible to parameterize a variable in a query
+without using =VALUES= but in other cases =VALUES= is require, in which
+case the variable must always be supplied.
 
-** running
-The cypher SciGraph endpoint is slightly different.
-https://github.com/SciGraph/SciGraph/wiki/Cypher-language-extension
-#+begin_src cypher
-RETURN "hello world"
-#+end_src
+For example, sometimes you only need to constrain one node in a
+subgraph and don't need to ensure exact equality of e.g. all objects,
+then you can assign the constraining variable and move on.
 
+#+header: :var constraint="UBERON:0000955"
 #+begin_src sparql
-SELECT DISTINCT ?s (str(?l) as ?label) WHERE { ?s rdf:type elements:Graph; rdfs:label ?l } LIMIT 99
+SELECT DISTINCT ?s ?p ?o WHERE {
+  ?s ?p ?constraint .
+  ?s ?p ?o .
+  ?o rdfs:subClassOf+ UBERON:0001062 .
+  FILTER (!isBlank(?s) && !isBlank(?o))
+} LIMIT 5
 #+end_src
+
+If you need exact equality, then you should use =VALUES= and
+must always pass a value for the variable.
+
+#+begin_src sparql :var constraint="UBERON:0000955"
+SELECT DISTINCT ?s ?p ?o WHERE {
+  VALUES ?s { ?constraint }
+  ?s ?p ?o .
+} LIMIT 5
+#+end_src
+
+*** Cypher
+There are some suspected bugs/irregularities in some part of handling of
+variables in Cypher blocks. If one way of writing a variable does not
+work try one of the other variants.
+
+For example, some curied forms such as ="ilxtr:neuron-type-keast-5"=
+will not be expanded correctly, in which case you should use the fully
+expanded form and then it will work. In the example above
+="http://uri.interlex.org/tgbugs/readable/neuron-type-keast-5"=.
+
+In other places, such as for specifying keys to look up properties you
+must use =`${var}`= instead of =$var=. In short, one variant doesn't work
+then try another, and if the curie doesn't work, try the expanded iri.
+
+#+begin_src cypher :var key_id="apinatomy:description"
+MATCH
+(neugrp:NamedIndividual{`${key_id}`: "dynamic"})
+RETURN neugrp
+#+end_src
+
+** Environment
+*** Default settings
+By default the query settings for the files in this docker image come
+from =queries.org= and are set via the =#+setupfile: ./queries.org= line
+near the start of each file.
+
+You can override those settings locally or change them in =queries.org=.
+- [[file:./queries.org::sparql-settings][SPARQL settings]]
+- [[file:./queries.org::cypher-settings][Cypher settings]]
+
+If you make a change a =#+property:= line in =queries.org= you will need
+to run =C-c C-c= on the =#+setupfile: ./queries.org= line of other files
+in order for the changes to propagate.
+
+*** Query endpoints
+By default this docker image is configured to work with instances of
+Blazegraph and SciGraph running inside the image on localhost.
+
+The endpoints can be changed to query other endpoints by modifying
+either of these lines in =queries.org= or by setting them locally.
+
+=#+property: header-args:sparql :url http://localhost:9999/blazegraph/sparql=
+=#+property: header-args:cypher :scigraph http://localhost:9000/scigraph=
+
+In this way it is possible to use this =kg-release-user= image without
+the =sckan:latest= image.  It is also possible to use the Org files
+directly if you have Emacs installed on your local system.
+
+** SciGraph Cypher
+The SciGraph cypher endpoint uses a dialect of cypher that is slightly
+different than Neo4j. The additions are documented in the wiki at
+https://github.com/SciGraph/SciGraph/wiki/Cypher-language-extension.
+
+In addition, the cypher =execute= endpoint has been modified to return
+json structured as if it came from the SciGraph =/dynamic/= cypher
+endpoints to make it easier to develop new dynamic queries. This means
+that at the moment =RETURN "hello world"= returns no values since
+SciGraph will not find graph elements in the query result. This will
+be fixed in some future release.
 
 * Bootstrap :ARCHIVE:
 :properties:
