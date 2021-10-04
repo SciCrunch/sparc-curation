@@ -860,10 +860,42 @@ class DatasetStructureSchema(JSONSchema):
 
 class FutureValidPaths:
     # maybe we use these in the future?
+
+    folder_patterns_full = (
+        '^('
+        'part(icipant)?|'
+        'pop(ulation)?|'
+        'spec(imen)?|'
+        'sub(j|ject)?|'
+        'sam(p|ple)?|'
+        'pool|'
+        'perf(ormance)?'
+        ')-([0-9A-Za-z][0-9A-Za-z-]*)$'
+    )
+
+    folder_patterns = '^(part|pop|spec|subj?|samp?|pool|perf)-([0-9A-Za-z][0-9A-Za-z-]*)$'
+    folder_patterns_strict = '^(pop|sub|sam|pool|perf)-([0-9A-Za-z][0-9A-Za-z-]*)$'
+
+    participant_patterns = '^(part|pop|spec|subj?|samp?|pool)-([0-9A-Za-z][0-9A-Za-z-]*)$'
+    participant_patterns_strict = '^(pop|sub|sam|pool)-([0-9A-Za-z][0-9A-Za-z-]*)$'
+
+    ['0-9A-Za-z-']
+    ['^pool-']
+    ['^subj?-']
+    ['^samp?-']
+    ['^perf-']  # ^ses- ^scan- ^run- roll up here
+    ['^spec-']
+    ['^pop-']
+    ['^part-']
+
+
     ['code', '*']
     ['docs', '*']
     ['source', '*']  # but will check for matches and warn on extra
     ['derivative', '*']  # but will check for matches and warn on extra
+
+    # paths
+    ['primary', '^pop-']
     ['primary', '^pool-']
     ['primary', '^pool-', '^perf-']
     ['primary', '^subj?-']
@@ -871,7 +903,20 @@ class FutureValidPaths:
     ['primary', '^subj?-', '^samp?-']
     ['primary', '^samp?-']
     ['primary', '^samp?-', '^perf-']
-    ['primary', '^perf-']
+    # ['primary', '^perf-']  # these would be perf types which are metadata so we don't allow this pattern
+
+    # data modalities ^mod- in bids
+    '^phys(iology)?$'
+    '^seq(uencing)?$'
+    '^rad(iology)?$'
+    '^mic(roscopy)?$'
+    '^morph(ology)?$'  # swc
+
+    # XXX we might try to avoid using modalities
+    # we are going to use ^perf-type-sub-1 instead or something like that
+    # then the protocol should give us the data type, keep the data types out of this
+    # OR do we need that information to statically validate allowed file types?
+
     # the more likely approach is as follows
     # all some-* indicates that the id MUST be a known
     # identifier whose type matches the expected slot
@@ -880,7 +925,7 @@ class FutureValidPaths:
     # this is broken unless the manifest can save us (which it must)
     # otherwise we have to warn on all folders that do not match
     # a known entity
-    # a perf- folder may appear once per non-perf node
+    # a perf- folder may appear once per non-perf node XXX this might be incorrect?
     # some-subject (or some-sample some-perf-no-subject some-manifest-folder)
     # some-sample (or some-sample some-perf-end some-manifest-folder)
     # some-perf-no-subject (or some-sample some-manifest-folder)
