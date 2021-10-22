@@ -586,7 +586,8 @@ class Organs(FieldAlignment):
             try:
                 m1 = self.byCol.header.index('modality1')
                 m2 = self.byCol.header.index('modality2')
-                return tuple(_ for _ in (row[m1], row[m2]) if _)
+                m3 = self.byCol.header.index('modality3')
+                return tuple(_ for _ in (row[m1], row[m2], row[m3]) if _)
             except AttributeError as e:
                 raise ValueError(f'issue in {self.name} {self.sheet_name}') from e
 
