@@ -646,12 +646,47 @@ Legend.
 ** https by default
 ** url structure
 *** apinatomy.org
+**** /
+existing index page
+links to the various git repositories
+youtube introduction
+wikipedia page and similar
+funding
+papers
+use cases
+**** /viewer
+the open-physiology-viewer
+a search entry point could also appear here
+**** /dashboard
+list of anatomical entities that have been used to annotate
+number of models etc. from the queries.org file
+somehow link this into search?
+**** /docs/{page}
+***** /docs/source.html
+move under /docs
+***** /docs/identifiers.html
+generated via esdoc, issues with angular components
+**** /docs/manual
+currently at /manual
+out of date
+coming from open-physiology-viewer/manual markdown files
+**** /uris
 alternately https://uri.apinatomy.org
-**** /uris/models/{model-id}.{ext}
+***** /uris/models/{model-id}
+need a landing page that has all the model metadata and would allow
+users to open the model in the viewer with a single click, maybe even
+have a static image of the model rendered on the page
+***** /uris/models/{model-id}.{ext}
 how to deal with json/ttl and model, generated, map
-**** /uris/models/{model-id}/ids/{local-id}
-**** /uris/readable/{string}
-**** /uris/elements/{string}
+***** /uris/models/{model-id}/ids/{local-id}
+***** /uris/models/{model-id}/snapshot/{snapshot-id}
+Implies that snapshots are always associated with a single model, so
+that if there are multiple models they should be imported into a
+single top level file.
+
+need some way to resolve snapshot files
+***** /uris/readable/{string}
+***** /uris/elements/{string}
 ** transformed models/copies need to be able to point back to the exact commit
 for deposition on blackfynn, export to scigraph, etc.
 the source model hash needs to be separat
