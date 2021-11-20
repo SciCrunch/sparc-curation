@@ -80,6 +80,8 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
 
     'label': 'rdfs:label',
 
+    'spjl': {'@id': 'https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/', '@prefix': True},
+
     #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
 
     #'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},

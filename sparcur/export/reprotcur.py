@@ -4,6 +4,7 @@
 import tempfile
 import idlib
 import rdflib
+import htmlfn as hfn
 from pyontutils.core import OntResIri, OntGraph
 from pyontutils.namespaces import sparc, rdf, owl, ilxtr, TEMP
 from sparcur.core import OntId
@@ -69,9 +70,21 @@ def make_graphs(g, pids, published):
     for i in pids:
         ng = OntGraph()
         ng.namespace_manager.populate_from(g)
+        ng.namespace_manager.bind(
+            'spjl', 'https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/')
         ng.populate_from_triples(tobn(g.subjectGraphClosure(i), published))
         sgs.append(ng)
     return sgs
+
+
+def write_html(graph, path):
+    body = graph.asMimetype('text/turtle+html').decode()
+    html = hfn.htmldoc(
+        body,
+        styles=(hfn.ttl_html_style,),
+        title=f'Protocol {path.name}',)
+    with open(path, 'wt') as f:
+        f.write(html)
 
 
 def write_graphs(sgs, path=None):
@@ -84,6 +97,14 @@ def write_graphs(sgs, path=None):
     pp = path / 'published'
     if not pp.exists():
         pp.mkdir()
+
+    hpath = path / 'html'
+    if not hpath.exists():
+        hpath.mkdir()
+
+    hpp = hpath / 'published'
+    if not hpp.exists():
+        hpp.mkdir()
 
     for wg in sgs:
         u = next(wg[:rdf.type:sparc.Protocol])
@@ -99,10 +120,13 @@ def write_graphs(sgs, path=None):
                     .replace('.', '_'))
 
         name = base + '.ttl'
+        hname = base + '.html'
         if published:
             wg.write(pp / name)
+            write_html(wg, hpp / hname)
         else:
             wg.write(path / name)
+            write_html(wg, hpath / hname)
 
 
 def main(g=None, ce_g=None, protcur_export_path=None, curation_export_path=None):
