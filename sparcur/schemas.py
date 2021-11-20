@@ -99,6 +99,7 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'raw_value': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
 
     'protcur_anno_count': {'@id': 'TEMP:hasNumberOfProtcurAnnotations'},
+    'datasets': {'@id': 'TEMP:priorInformationalConstraintOnProcessThatGenerated', '@type': '@id'},
 
     'ilxtr_technique': {'@id': 'TEMPRAW:protocolEmploysTechnique'},
     'protocolEmploysTechnique': {'@id': 'TEMP:protocolEmploysTechnique', '@type': '@id'},

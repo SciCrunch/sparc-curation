@@ -2119,6 +2119,9 @@ class ProtcurPipeline(Pipeline):
                 # TODO embed error status
                 pass
 
+            data['datasets'] = sorted(set([t for p in pannos if p._anno.is_page_note
+                                           for t in p.tags if 'dataset:' in t]))
+
             from pysercomb.pyr.units import Term
             extras = list(self._annos_to_json(data, pannos, sheets_lookup, Term))
             #log.debug(data)
