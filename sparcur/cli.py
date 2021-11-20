@@ -224,6 +224,7 @@ Options:
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
     -D --diff               diff local vs cache
+    --force                 force the regeneration of a cached file
 
     --port=PORT             server port [default: 7250]
 
@@ -242,6 +243,7 @@ Options:
     --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
 
     --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: sparc-curation]
+    --i-know-what-i-am-doing      don't use this unless you already know what it does
 """
 
 from time import time
@@ -512,28 +514,31 @@ class Main(Dispatcher):
         RemotePath._debug = self.options.debug
 
         # FIXME populate this via decorator
-        if (self.options.clone or
-            self.options.meta or
-            (self.options.show and not self.options.export) or
-            self.options.sheets or
-            self.options.goto or
-            self.options.server or
-            self.options.apinat or
-            self.options.tofetch or  # size does need a remote but could do it lazily
-            self.options.filetypes or
-            self.options.anno_tags or
-            self.options.status or  # eventually this should be able to query whether there is new data since the last check
-            self.options.pretend or
-            self.options.annos or
-            self.options.fab or
-            (self.options.fix and self.options.cache) or
-            (self.options.report and not self.options.raw) or
-            (self.options.report and self.options.size) or
-            (self.options.report and self.options.export_file) or
-            (self.options.report and self.options.protocols) or
-            (self.options.export and self.options.schemas) or
-            (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
-            (self.options.find and not (self.options.fetch or self.options.refresh))):
+        if (self.options.export and not
+            (self.options.schemas or self.options.protcur)):
+            pass  # simplify setup for consumers beyond this file
+        elif (self.options.clone or
+              self.options.meta or
+              (self.options.show and not self.options.export) or
+              self.options.sheets or
+              self.options.goto or
+              self.options.server or
+              self.options.apinat or
+              self.options.tofetch or  # size does need a remote but could do it lazily
+              self.options.filetypes or
+              self.options.anno_tags or
+              self.options.status or  # eventually this should be able to query whether there is new data since the last check
+              self.options.pretend or
+              self.options.annos or
+              self.options.fab or
+              (self.options.fix and self.options.cache) or
+              (self.options.report and not self.options.raw) or
+              (self.options.report and self.options.size) or
+              (self.options.report and self.options.export_file) or
+              (self.options.report and self.options.protocols) or
+              (self.options.export and self.options.schemas) or
+              (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
+              (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
             self.Integrator.no_google = True
             return
@@ -596,7 +601,10 @@ class Main(Dispatcher):
                 sys.exit(111)
 
         # replace a bottom up anchoring rule with top down
-        self.anchor.anchorClassHere(remote_init=False)
+        if self.options.i_know_what_i_am_doing:
+            pass
+        else:
+            self.anchor.anchorClassHere(remote_init=False)
 
         self.project_path = self.anchor.local
         from sparcur.curation import Summary
@@ -606,8 +614,9 @@ class Main(Dispatcher):
             Summary._debug = True
 
     def _setup_bfl(self):
-        self.Remote._setup()
-        self.Remote.init(self.anchor.id)
+        if not self.options.i_know_what_i_am_doing:
+            self.Remote._setup()
+            self.Remote.init(self.anchor.id)
 
         self.bfl = self.Remote._api
         State.bind_blackfynn(self.bfl)
@@ -1064,6 +1073,7 @@ done"""
             hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
             blob_protcur = export.export_protcur(dump_path,
                                                  hgn,
+                                                 rerun_protcur_export=self.options.force,
                                                  no_network=self.options.no_google,
                                                  direct=True)
             # NOTE --latest will also pull from latest protcur export
@@ -1104,7 +1114,8 @@ done"""
 
         elif self.cwd.cache.is_dataset():
             export = self._export(ex.Export)
-            blob_ir, intr = export.export_single_dataset()
+            blob_ir, intr, dump_path, latest_path = export.export_single_dataset()
+            return blob_ir, intr, dump_path, latest_path
 
         else:
             export = self._export(ex.Export)

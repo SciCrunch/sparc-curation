@@ -379,7 +379,7 @@ class Export(ExportBase):
                 out.xopen(self.open_when_done)
 
         symlink_latest(dump_path, latest_path)
-        return blob_data, intr
+        return blob_data, intr, dump_path, latest_path
 
     def export_rdf(self, dump_path, latest_path, dataset_blobs):
         dataset_dump_path = dump_path / 'datasets'
@@ -454,6 +454,7 @@ class Export(ExportBase):
     def export_protcur(self,
                        dump_path,
                        *hypothesis_groups,
+                       rerun_protcur_export=False,
                        # FIXME no_network passed in here is dumb
                        no_network=False,
                        # FIXME direct= is a hack
@@ -470,6 +471,11 @@ class Export(ExportBase):
         pipeline = pipes.ProtcurPipeline(*hypothesis_groups,
                                          no_network=no_network)
         annos = pipeline.load()
+        if not annos:
+            msg = ('No annos. Did you remember to run\n'
+                   'python -m sparcur.simple.fetch_annotations')
+            raise ValueError(msg)
+
         if self.latest_export_path.exists():
             # FIXME this only points to the latest integrated release
             # which is not what we want, we need the latest protcur to be independent
@@ -478,7 +484,6 @@ class Export(ExportBase):
             t_lex = blob_protcur['prov']['timestamp_export_start']
             t_lup = max(a.updated for a in annos).replace('+00:00', 'Z')
             new_annos_here = t_lex < t_lup  # <= is pretty much impossible
-            rerun_protcur_export = False  # TODO wire this up to cli
             if not (new_annos_here or rerun_protcur_export):
                 return blob_protcur
 
