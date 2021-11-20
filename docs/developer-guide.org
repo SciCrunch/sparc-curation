@@ -187,6 +187,53 @@ def main():
 if __name__ == '__main__':
     return main()
 #+end_src
+
+** Retrieve protocols
+Create a protocols.io account and get API keys.
+
+Then run the following to register with protocols.io.
+NOTE this is broken at the moment. Manual steps can be
+found in [[./setup.org::#config-templates]]
+#+begin_src bash
+python -c "import idlib; idlib.Pio._setup()"
+#+end_src
+
+You can then run the following to retrieve protocol data.
+#+begin_src python
+import idlib
+from pyontutils.core import OntResIri
+from pyontutils.namespaces import sparc, rdf
+
+
+def getpio(i):
+    try:
+        return idlib.Pio(i)
+    except idlib.exc.IdlibError as e:
+        pass
+
+
+def getdata(s):
+    try:
+        return s.data()
+    except (idlib.exc.NotAuthorizedError) as e:
+        print(e)
+    except (idlib.exc.IdDoesNotExistError) as e:
+        print(e)
+
+
+def main():
+    ori = OntResIri("https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl")
+    g = ori.graph
+    pids = list(g[:rdf.type:sparc.Protocol])
+    streams = [s for i in pids for s in (getpio(i),) if s]
+    datas = [getdata(s) for s in streams]
+    return datas
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+
 * Extending implementation
 ** Adding a new xml type
 #+begin_src python
