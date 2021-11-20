@@ -26,7 +26,8 @@ def fix(e):
     else:
         return e
 
-def tobn(gen):
+
+def tobn(gen, published):
     """convert hypothesis ids to blank nodes so that values serialize locally"""
     for s, p, o in gen:
         ns = fix(s)
@@ -48,6 +49,11 @@ def tobn(gen):
                 yield os, TEMP.hasUriApi, s
                 for _s in (s, os):
                     yield _s, TEMP.hasUriHuman, pid.uri_human.asType(rdflib.URIRef)
+                    doi = pid.doi
+                    if doi is not None:
+                        yield _s, TEMP.hasDoi, pid.doi.asType(rdflib.URIRef)
+                    if s in published:
+                        yield _s, TEMP.datasetPublishedDoi, published[s]
             except (idlib.exc.NotAuthorizedError) as e:
                 tn = GetTimeNow()
                 yield s, errorns.NotAuthorized, rdflib.Literal(tn._start_time_local)
@@ -58,24 +64,30 @@ def tobn(gen):
                 pass
 
 
-def make_graphs(pids):
+def make_graphs(g, pids, published):
     sgs = []
     for i in pids:
         ng = OntGraph()
         ng.namespace_manager.populate_from(g)
-        ng.populate_from_triples(tobn(g.subjectGraphClosure(i)))
+        ng.populate_from_triples(tobn(g.subjectGraphClosure(i), published))
         sgs.append(ng)
+    return sgs
 
 
-def write_graphs(sgs, path=None)
+def write_graphs(sgs, path=None):
     if path is None:
         path = Path(tempfile.tempdir) / 'protcur-individual'
 
     if not path.exists():
         path.mkdir()
 
+    pp = path / 'published'
+    if not pp.exists():
+        pp.mkdir()
+
     for wg in sgs:
         u = next(wg[:rdf.type:sparc.Protocol])
+        published = bool(list(wg[u:TEMP.datasetPublishedDoi:]))
         try:
             pid = idlib.Pio(u)
             base = 'pio-' + pid.identifier.suffix
@@ -87,15 +99,36 @@ def write_graphs(sgs, path=None)
                     .replace('.', '_'))
 
         name = base + '.ttl'
-        wg.write(path / name)
+        if published:
+            wg.write(pp / name)
+        else:
+            wg.write(path / name)
 
 
-def main():
-    # FIXME TODO generalize
-    ori = OntResIri("https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl")
-    g = ori.graph
+def main(g=None, ce_g=None, protcur_export_path=None, curation_export_path=None):
+
+    if g is None:
+        if not protcur_export_path:
+            ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl')
+            g = ori.graph
+        else:
+            g = OntGraph().parse(protcur_export_path)
+
     pids = list(g[:rdf.type:sparc.Protocol])
-    graphs = make_graphs(pids)
+
+    if ce_g is None:
+        if not curation_export_path:
+            ce_ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl')
+            ce_g = ce_ori.graph
+        else:
+            ce_g = OntGraph().parse(curation_export_path)
+
+    ce_pids = list(ce_g[:rdf.type:sparc.Protocol])
+    ap = [(p, d, list(ce_g[d:TEMP.hasDoi:]))
+          for p in ce_pids for d in ce_g[:TEMP.hasProtocol:p]
+          if list(ce_g[d:TEMP.hasDoi:])]
+    with_published_dataset = {p:dois[0] for p, d, dois in ap}
+    graphs = make_graphs(g, pids, with_published_dataset)
     write_graphs(graphs, path=None)
 
 
