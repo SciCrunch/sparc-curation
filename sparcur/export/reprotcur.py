@@ -106,6 +106,14 @@ def write_graphs(sgs, path=None):
     if not hpp.exists():
         hpp.mkdir()
 
+    opath = path / 'org'
+    if not opath.exists():
+        opath.mkdir()
+
+    opp = opath / 'published'
+    if not opp.exists():
+        opp.mkdir()
+
     for wg in sgs:
         u = next(wg[:rdf.type:sparc.Protocol])
         published = bool(list(wg[u:TEMP.datasetPublishedDoi:]))
@@ -113,6 +121,7 @@ def write_graphs(sgs, path=None):
             pid = idlib.Pio(u)
             base = 'pio-' + pid.identifier.suffix
         except idlib.exc.IdlibError as e:
+            pid = None
             base = (u
                     .replace('http://', '')
                     .replace('https://', '')
@@ -121,12 +130,32 @@ def write_graphs(sgs, path=None):
 
         name = base + '.ttl'
         hname = base + '.html'
+        oname = base + '.org'
+
         if published:
-            wg.write(pp / name)
-            write_html(wg, hpp / hname)
+            wt_path = pp / name
+            wh_path = hpp / hname
+            wo_path = opp / oname
         else:
-            wg.write(path / name)
-            write_html(wg, hpath / hname)
+            wt_path = path / name
+            wh_path = hpath / hname
+            wo_path = opath / oname
+
+        wg.write(wt_path)
+        write_html(wg, wh_path)
+
+        if pid is None:
+            org = None
+        else:
+            #if wo_path.exists(): continue  # XXX remove after testing complete
+            try:
+                org = pid.asOrg()
+            except idlib.exc.IdlibError as e:
+                org = None
+
+        if org is not None:
+            with open(wo_path, 'wt') as f:
+                f.write(org)
 
 
 def main(g=None, ce_g=None, protcur_export_path=None, curation_export_path=None):
