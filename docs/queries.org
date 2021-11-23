@@ -1727,7 +1727,7 @@ Python code to simplify =neru= and supporting functions to extract terminal regi
 #+name: python-process-neru
 #+begin_src jupyter-python :session pys
 from nifstd_tools.simplify import apinat_deblob, sub, pred, obj, ematch
-from nifstd_tools.simplify import axon, dend, bag, top, ie, ext, fasIn, endIn, layerIn
+from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, ext, fasIn, endIn, layerIn
 
 
 def query(neupop_id):
@@ -1860,21 +1860,67 @@ the roots of the axon and the dendrite.
 
 #+name: py-conn-pairs
 #+begin_src jupyter-python :session pys
-def isLayer(s):
+intIn = 'apinatomy:internalIn'
+
+def isLayer(blob, s):
     return ematch(blob, (lambda e, m: sub(e, m) and pred(e, layerIn)), s)
 
-def lay_reg(start):
+def reclr(blob, start_link):
+    # recurse up the hierarchy until fasIn endIn intIn terminates
+    #print('starting reclr')
+    collect = []
+    layer = []
+    col = True
+    def select_ext(e, m, collect=collect):
+        nonlocal col
+        if sub(e, m):
+            if pred(e, 'apinatomy:cloneOf'):  # should be zapped during simplify
+                return ematch(blob, select_ext, obj(e))
+            if pred(e, ext) or pred(e, ie) or pred(e, ies):
+                #print('select_ext', e)
+                external = obj(e)
+                #print('se', col, layer)
+                if col:
+                    if layer:
+                        l = layer.pop()
+                    else:
+                        l = None
+                    r = [b for b in blob['nodes'] if b['id'] == external][0]['id']  # if this is empty we are in big trouble
+                    collect.append((l, r))
+                else:
+                    l = [b for b in blob['nodes'] if b['id'] == external][0]['id']
+                    layer.append(l)
+                #print(layer)
+                return external
+
+    def select(e, m):
+        nonlocal col
+        if sub(e, m):
+            #print(e)
+            if pred(e, layerIn) or pred(e, fasIn) or pred(e, endIn) or pred(e, intIn):
+                #print('select', e)
+                col = not isLayer(blob, obj(e))
+                #print('s', col)
+                ematch(blob, select_ext, obj(e))
+                ematch(blob, select, obj(e))
+
+    ematch(blob, select, start_link)
+
+    return collect
+
+def lay_reg(blob, start):
     direct = [obj(t) for t in
               ematch(blob, (lambda e, m: sub(e, m)
-                            and (pred(e, intIn) or
+                            and (pred(e, intIn) or  # XXX why isn't this getting pulled in correctly for somas? answer: missing somas in starts? surely not, ARGH a lyph internalIn a layer
                                  pred(e, endIn) or
                                  pred(e, fasIn))),
                      start)]
 
     layers = [obj(t) for d in direct for t in
               ematch(blob, (lambda e, m: sub(e, m)
-                            and isLayer(m)
+                            and isLayer(blob, m)
                             and (pred(e, ie) or
+                                 pred(e, ies) or
                                  pred(e, ext))),
                      d)]
 
@@ -1887,94 +1933,213 @@ def lay_reg(start):
 
         lregs = [obj(t) for d in ldir for t in
                  ematch(blob, (lambda e, m: sub(e, m)
-                               and not isLayer(m)
+                               and not isLayer(blob, m)
                                and (pred(e, ie) or
                                     pred(e, ext))),
                         d)]
 
     regions = [obj(t) for d in direct for t in
                ematch(blob, (lambda e, m: sub(e, m)
-                             and not isLayer(m)
+                             and not isLayer(blob, m)
                              and (pred(e, ie) or
+                                  pred(e, ies) or
                                   pred(e, ext))),
                       d)]
 
+    #if start == 'kblad:snl16':
+        #print(start, direct, layers, regions)
+
+    # FIXME TODO nested regions and layers
+    lrs = reclr(blob, start)  # FIXME doesn't pair regions and layers
+    # FIXME SIGH SIGH SIGH start can be either part of a next >_<
+    #print(lrs)
+
     assert not (lregs and regions), (lregs, regions)  # not both
     regions = lregs if lregs else regions
-    out = start, layers[0] if layers else None, regions[0] if regions else None
+    #out = start, layers[0] if layers else None, regions[0] if regions else None, tuple([l for l in lrs])
+    out = start, tuple(lrs)
     if out:
       return out
 
-starts = [obj(e) for e in blob['edges'] if pred(e, 'apinatomy:lyphs')]
+def render_blob(blob):
+    starts = [obj(e) for e in blob['edges'] if pred(e, 'apinatomy:lyphs')]
 
-nxt = 'apinatomy:next'
-nxts = 'apinatomy:next*'
-intIn = 'apinatomy:internalIn'
+    nxt = 'apinatomy:next'
+    nxts = 'apinatomy:next*'
 
-nexts = [(sub(t), obj(t)) for start in starts for t in
-         ematch(blob, (lambda e, m: pred(e, nxt) or pred(e, nxts)), None)]
+    nexts = [(sub(t), obj(t)) for start in starts for t in
+             ematch(blob, (lambda e, m: pred(e, nxt) or pred(e, nxts)), None)]
 
+    #pprint(nexts)
 
-connected_pairs = sorted(set([tuple([lay_reg(e) for e in p]) for p in nexts]))
-pprint(connected_pairs)
-connected_pairs
+    connected_pairs = sorted(set([tuple([lay_reg(blob, e) for e in p]) for p in nexts]))
+    #pprint(connected_pairs)
+    return connected_pairs
 #+end_src
 
 #+RESULTS: py-conn-pairs
-:RESULTS:
-#+begin_example
-[(('kblad:ac-snl65_lnk_1', 'UBERON:0016578', 'EMAPA:19574'),
-  ('kblad:ac-snl65_lnk_2', 'UBERON:0016549', 'EMAPA:19574')),
- (('kblad:ac-snl65_lnk_2', 'UBERON:0016549', 'EMAPA:19574'),
-  ('kblad:ac-snl65_lnk_3', None, 'EMAPA:25279')),
- (('kblad:ac-snl65_lnk_3', None, 'EMAPA:25279'),
-  ('kblad:ac-snl65_lnk_4', None, 'UBERON:0018675')),
- (('kblad:ac-snl65_lnk_4', None, 'UBERON:0018675'),
-  ('kblad:ac-snl6s1_lnk_1', None, 'UBERON:0018675')),
- (('kblad:ac-snl65_lnk_4', None, 'UBERON:0018675'),
-  ('kblad:ac-snl6s1_lnk_2', None, 'UBERON:0016508')),
- (('kblad:ac-snl6s1_lnk_1', None, 'UBERON:0018675'),
-  ('kblad:ac-snl6s1_lnk_2', None, 'UBERON:0016508')),
- (('kblad:ac-sns15_lnk_1', 'UBERON:0016578', 'UBERON:0006460'),
-  ('kblad:ac-sns15_lnk_2', 'UBERON:0016549', 'UBERON:0006460')),
- (('kblad:ac-sns15_lnk_2', 'UBERON:0016549', 'UBERON:0006460'),
-  ('kblad:ac-sns15_lnk_3', None, 'EMAPA:25281')),
- (('kblad:ac-sns15_lnk_3', None, 'EMAPA:25281'),
-  ('kblad:ac-sns15_lnk_4', None, 'UBERON:0018675')),
- (('kblad:ac-sns15_lnk_4', None, 'UBERON:0018675'),
-  ('kblad:ac-snl6s1_lnk_1', None, 'UBERON:0018675')),
- (('kblad:ac-sns15_lnk_4', None, 'UBERON:0018675'),
-  ('kblad:ac-snl6s1_lnk_2', None, 'UBERON:0016508')),
- (('kblad:snl65', 'UBERON:0016578', 'EMAPA:19574'),
-  ('kblad:ac-snl65_lnk_1', 'UBERON:0016578', 'EMAPA:19574')),
- (('kblad:snl65', 'UBERON:0016578', 'EMAPA:19574'),
-  ('kblad:dc-snl65_lnk_1', 'UBERON:0016578', 'EMAPA:19574')),
- (('kblad:sns15', 'UBERON:0016578', 'UBERON:0006460'),
-  ('kblad:ac-sns15_lnk_1', 'UBERON:0016578', 'UBERON:0006460')),
- (('kblad:sns15', 'UBERON:0016578', 'UBERON:0006460'),
-  ('kblad:dc-sns15_lnk_1', 'UBERON:0016578', 'UBERON:0006460'))]
-#+end_example
-| (kblad:ac-snl65_lnk_1 UBERON:0016578 EMAPA:19574)    | (kblad:ac-snl65_lnk_2 UBERON:0016549 EMAPA:19574)    |
-| (kblad:ac-snl65_lnk_2 UBERON:0016549 EMAPA:19574)    | (kblad:ac-snl65_lnk_3 None EMAPA:25279)              |
-| (kblad:ac-snl65_lnk_3 None EMAPA:25279)              | (kblad:ac-snl65_lnk_4 None UBERON:0018675)           |
-| (kblad:ac-snl65_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_1 None UBERON:0018675)          |
-| (kblad:ac-snl65_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_2 None UBERON:0016508)          |
-| (kblad:ac-snl6s1_lnk_1 None UBERON:0018675)          | (kblad:ac-snl6s1_lnk_2 None UBERON:0016508)          |
-| (kblad:ac-sns15_lnk_1 UBERON:0016578 UBERON:0006460) | (kblad:ac-sns15_lnk_2 UBERON:0016549 UBERON:0006460) |
-| (kblad:ac-sns15_lnk_2 UBERON:0016549 UBERON:0006460) | (kblad:ac-sns15_lnk_3 None EMAPA:25281)              |
-| (kblad:ac-sns15_lnk_3 None EMAPA:25281)              | (kblad:ac-sns15_lnk_4 None UBERON:0018675)           |
-| (kblad:ac-sns15_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_1 None UBERON:0018675)          |
-| (kblad:ac-sns15_lnk_4 None UBERON:0018675)           | (kblad:ac-snl6s1_lnk_2 None UBERON:0016508)          |
-| (kblad:snl65 UBERON:0016578 EMAPA:19574)             | (kblad:ac-snl65_lnk_1 UBERON:0016578 EMAPA:19574)    |
-| (kblad:snl65 UBERON:0016578 EMAPA:19574)             | (kblad:dc-snl65_lnk_1 UBERON:0016578 EMAPA:19574)    |
-| (kblad:sns15 UBERON:0016578 UBERON:0006460)          | (kblad:ac-sns15_lnk_1 UBERON:0016578 UBERON:0006460) |
-| (kblad:sns15 UBERON:0016578 UBERON:0006460)          | (kblad:dc-sns15_lnk_1 UBERON:0016578 UBERON:0006460) |
-:END:
+
+#+call: python-process-neru(result=cypher-neru-5-helper(neupop_id="ilxtr:neuron-type-keast-1"))
+
+#+begin_src jupyter-python :session pys
+blob, *_ = main(blob_string=result)
+render_blob(blob)
+#+end_src
+
+** neru
+#+begin_src jupyter-python :noweb yes :session pys :var remove=(and "sigh") :results none
+from pprint import pprint
+from pyontutils.scigraph import Cypher, Vocabulary
+<<python-process-neru>>
+<<py-conn-pairs>>
+sgv = Vocabulary()
+sgc = Cypher()
+q_neru_5 = """
+<<cypher-neru-5>>
+"""
+def neupop_blob(neupop_id):
+    # XXX requires a patch to Cypher and CypherBase to support arbitrary kwargs
+    blob = sgc.execute(query=q_neru_5, limit=None, neupop_id=neupop_id, output='application/json')
+    return blob
+
+def sigh():
+    blobs = [neupop_blob(f"ilxtr:neuron-type-keast-{npid}") for npid in range(1, 21)]
+    debs = [main(blob=blob)[0] for blob in blobs]
+    simples = [render_blob(deb) for deb in debs]
+    #[pprint(simple) for simple in simples[:1]]
+
+def fbid(id):
+    if id:
+        result = sgv.findById(id)
+        if result['labels']:
+            return result['labels'][0]
+
+def fbids(ids):
+    return [(id, fbid(id)) for id in ids]
+
+def rendlab(pairs):
+    for pair in pairs:
+        yield tuple((start, *(tuple(fbids(hp)) for hp in housings)) for start, housings in pair)
+    #for (*tstart, sid, sasdf), (*tend, eid, easdf) in pairs:
+        #yield ((*tstart, sid, fbid(sid), fbids(sasdf)) if sid else (*tstart, sid, fbids(sasdf)),
+               #(*tend, eid, fbid(eid), fbids(easdf)) if eid else (*tend, eid, fbids(easdf)))
+#+end_src
+
+#+begin_src jupyter-python :session pys
+from copy import deepcopy
+
+blobs = [neupop_blob(f"ilxtr:neuron-type-keast-{npid}") for npid in range(1, 21)]
+
+debs = [main(blob=deepcopy(blob))[0] for blob in blobs]
+
+simples = [render_blob(deb) for deb in debs]
+
+sigh = [s for n, si in enumerate(simples)  for s in ((f'--------- {n + 1}','---------'), *sorted(rendlab(si)))]
+
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session pys
+#sigh
+#pprint(blobs[0])
+#pprint(debs[0])
+#pprint(simples[0])
+#sigh[:200]
+sigh
+#+end_src
 
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru
+*** neru-5
+nesting
+
+#+name: cypher-neru-5-helper
+#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
+<<cypher-neru-5>>
+#+end_src
+
+# #+header: :results drawer :limit 99999999 :exports none
+#+header: :limit 999999 :file ./images/neru-5.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+name: cypher-neru-5
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+, (neugrp)
+-[:apinatomy:links]->(link)
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+WITH neugrp, link, lyph, a, c, d
+OPTIONAL MATCH layer_ext = (lyph)
+<-[d*1]-(layer)-[:apinatomy:cloneOf*0..1]->()-[:apinatomy:inheritedExternal]->()
+
+WITH neugrp, link, lyph, a, c, d, layer_ext
+OPTIONAL MATCH more = (lyph)
+-[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
+-[:apinatomy:external|apinatomy:inheritedExternal]->()
+
+WITH neugrp, link, lyph, a, c, d, layer_ext, more // there is a difference here because the previous match does not require lyphs to have external ids
+MATCH (lyph)
+-[e:apinatomy:external]->(region)
+
+, p2 = (link)
+-[:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:topology]->()
+
+, (cl)
+-[x:apinatomy:inheritedExternal*0..1]->()
+
+// use apinatomy:next to extract ordering information
+, (link)
+-[f:apinatomy:next*0..]->()
+-[g:apinatomy:target*0..1]->()
+-[h:apinatomy:rootOf*0..1]->()
+-[i:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+
+// publications
+WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext, more
+OPTIONAL MATCH path = (neugrp)
+-[:apinatomy:publications]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
+
+RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext, more
+
+UNION
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+-[c:apinatomy:internalIn]->()
+-[d:apinatomy:external*0..1]->(region)
+, p2 = (lyph)
+-[:apinatomy:conveys]->(soma_link)
+-[:apinatomy:source|apinatomy:target]->(soma_node)
+-[:apinatomy:sourceOf]->(chain_link)
+, (chain_link)
+-[:apinatomy:levelIn]->(chain)
+, (soma_node)
+-[:apinatomy:rootOf]->(chain)
+
+WITH lyph, a, b, c, d, p2
+OPTIONAL MATCH more = (lyph)
+-[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
+-[:apinatomy:external|apinatomy:inheritedExternal]->()
+
+RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext, more
+#+end_src
+
+#+RESULTS: cypher-neru-5
+[[file:./images/neru-5.svg]]
+
+
 *** neru-4
 :PROPERTIES:
 :CUSTOM_ID:  neru-4
