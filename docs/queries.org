@@ -3468,6 +3468,11 @@ cypherResources:
     query: |
       <<cypher-neru-4>>
 
+  - path: /dynamic/demos/apinat/neru-5/{neupop_id}
+    operations: *neru-ops
+    query: |
+      <<cypher-neru-5>>
+
   - path: /dynamic/demos/apinat/modelList
     operations:
       - summary: <<nonl(desc-cypher-apinat-models())>>
