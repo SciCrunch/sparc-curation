@@ -647,6 +647,8 @@ Legend.
 ** url structure
 *** apinatomy.org
 **** /
+landing page to maximize engagement
+
 existing index page
 links to the various git repositories
 youtube introduction
@@ -687,6 +689,18 @@ single top level file.
 need some way to resolve snapshot files
 ***** /uris/readable/{string}
 ***** /uris/elements/{string}
+**** TODO json-ld context
+*** tests
+http://apinatomy.org/docs
+http://apinatomy.org/docs/
+http://apinatomy.org/docs/manual/usage.html
+http://apinatomy.org/viewer
+http://apinatomy.org/uris/models/keast-bladder
+http://apinatomy.org/uris/ontologies/keast-bladder.ttl
+http://apinatomy.org/uris/models/keast-bladder/source/keast-bladder.json
+http://apinatomy.org/uris/models/keast-bladder/ref/master/source/keast-bladder.json
+http://apinatomy.org/uris/models/keast-bladder/ref/df0dc5f9e96620c8f4deef3727a81868a6606eea/source/keast-bladder.json
+http://apinatomy.org/uris/models/keast-bladder/version/1627520229
 ** transformed models/copies need to be able to point back to the exact commit
 for deposition on blackfynn, export to scigraph, etc.
 the source model hash needs to be separat
