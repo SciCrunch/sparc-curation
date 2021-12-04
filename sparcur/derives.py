@@ -313,12 +313,31 @@ class Derives:
         union_sam = set(dirs) | set(samps)
         inter_sam = set(dirs) & set(samps)
 
+        template_version_less_than_2 = True  # FIXME TODO
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
-        if inter_sam == samps:
-            pass
+        if inter_sam == set(samps):
+            for sample_id, blob in samps.items():
+                if len(blob) > 1:
+                    # FIXME TODO this means that we need to fail over to the primary keys
+                    msg = f'sample_id is not unique! {sample_id}\n{blob}'
+                    if he.addError(msg, blame='submission', path=path):
+                        logd.error(msg)
+                    continue
+
+                if template_version_less_than_2:  # FIXME this is sure the cause an error at some point
+                    done_dirs.add((blob[0]['subject_id'], sample_id))
+                    done_specs.add(blob[0]['primary_key'])
+                else:
+                    done_dirs.add(sample_id)
+                    done_specs.add(sample_id)
+                records.append({'type': 'SampleDirs',
+                                # have to split the type because we can't recover
+                                # the type using just the specimen id (sigh)
+                                # and we need it to set the correct prefix (sigh)
+                                'specimen_id': sample_id,
+                                'dirs': [d[1] for d in dirs[sample_id]]})
         else:
             logd.warning('miscount sample dirs, TODO')
-            template_version_less_than_2 = True  # FIXME TODO
             bad_dirs = []
             if template_version_less_than_2:
                 # handle old aweful nonsense
@@ -362,15 +381,17 @@ class Derives:
                                     'dirs': actual,
                                     })
                     else:
-                        logd.error(f'No folder for sample {sample_id}')
+                        msg = f'No folder for sample {sample_id}'
+                        if he.addError(msg, blame='submission', path=path):
+                            logd.error(msg)
             else:
                 pass  # TODO that's an error!
 
         usamps = set(v['primary_key'] for vs in samps.values() for v in vs)
-        udirs = set(nv for k, vs in dirs.items()
-                    for nv in (((v[-1][1], k) for v in vs) # -1 rpaths 1 parent
-                               if k in samps else
-                               (k,)))
+        udirs = set(nv for path_name, subpaths in dirs.items()
+                    for nv in (((subpath[-1][1], path_name) for subpath in subpaths) # -1 rpaths 1 parent  # XXX FIXME clearly wrong ???
+                               if path_name in samps else
+                               (path_name,)))
         not_done_specs = (set(subs) | usamps) - set(done_specs)
         not_done_dirs = set(udirs) - set(done_dirs)
 
