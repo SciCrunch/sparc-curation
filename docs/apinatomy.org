@@ -164,6 +164,7 @@ gsx:google-sheet-id
                              (expand-file-name "models" apinat-model-repo)))
          (xlsx    (format "source/%s.xlsx"    model-id))
          (json    (format "source/%s.json"    model-id))
+         (jsong   (format "derived/%s.json"   model-id))
          (jsonld  (format "derived/%s.jsonld" model-id))
          (ttl     (format "derived/%s.ttl"    model-id)))
      ,@body))
@@ -190,7 +191,7 @@ gsx:google-sheet-id
     )
 
   (apinat--with-model model-id
-    (-mxjl-> model-id xlsx json jsonld)
+    (-mxjjl-> model-id xlsx json jsong jsonld)
     (-lt-> jsonld ttl)))
 
 (defun-local checksum-or (fun)
@@ -223,10 +224,11 @@ gsx:google-sheet-id
 
 (defun-local -mt-> (model-id path-ttl) "`model-id' to `path-ttl'")
 (defun-local -ml-> (model-id path-jsonld) "`model-id' to `path-jsonld'")
-(defun-local -mxjl-> (model-id path-xlsx path-json path-jsonld)
+(defun-local -mxjjl-> (model-id path-xlsx path-json path-jsong path-jsonld)
   "`model-id' to everything except the ttl"
   (let ((path-xlsx (concat default-directory "/" path-xlsx))
         (path-json (concat default-directory "/" path-json))
+        (path-jsong (concat default-directory "/" path-jsong))
         (path-jsonld (concat default-directory "/" path-jsonld))
         (path-temp (make-temp-file "apinat-conversion" 'directory)))
     (unwind-protect
@@ -238,6 +240,7 @@ gsx:google-sheet-id
                                  "-f" "id"
                                  "-t" "xlsx"
                                  "-t" "json"
+                                 "-t" "json-resources"
                                  "-t" "json-flattened"
                                  "-i" google-sheet-id
                                  "-o" path-internal))))
@@ -247,6 +250,7 @@ gsx:google-sheet-id
                        (make-directory parent t))))
           (rename-file (concat path-internal "/" "model.xlsx") path-xlsx t)
           (rename-file (concat path-internal "/" "model.json") path-json t)
+          (rename-file (concat path-internal "/" "model-generated.json") path-jsong t)
           (rename-file (concat path-internal "/" "model-flattened.jsonld") path-jsonld t))
       (unless apinat-converter-debug
         (delete-directory path-temp 'recursive)))))
