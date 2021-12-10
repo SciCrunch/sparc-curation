@@ -597,7 +597,7 @@ class JSONPipeline(Pipeline):
 
     @classmethod
     def check(cls):
-        assert not [d for d in cls.derives if len(d) != 3]
+        assert not [d for d in cls.derives if len(d) not in (3, 4)]
 
     def __init__(self, previous_pipeline, lifters=None, runtime_context=None):
         """ sources stay, helpers are tracked for prov and then disappear """
@@ -783,6 +783,30 @@ class JSONPipeline(Pipeline):
         finally:
             if _THIS_PATH_KEY in data:
                 data.pop(_THIS_PATH_KEY)
+
+        if 'path_metadata' in repr(self.derives) and 'path_metadata' not in data:
+            _gets = [jpath for ins, f, outs, *off in self.derives
+                     if [o for o in outs if 'path_metadata' in o]
+                     for jpath in ins]
+            # check to see if there are no legitmate input values in which
+            # case we do not expect there to be any path_metadata
+            matches = {tuple(g):m for g in _gets
+                       for m in DictTransformer.get(
+                               data, [g], source_key_optional=True)
+                       if m and
+                       (('type' in m and
+                         (m['type'] == 'all-xml-files' and m['xml']
+                          or 'xml' not in m)) or
+                        (isinstance(m, list)
+                         and [d for d in m
+                              if 'errors' not in d or
+                              # missing manifest_records is handled elsewhere
+                              'errors' in d
+                              and 'manifest_records' in d
+                              and d['manifest_records']]))}
+
+            if matches:
+                breakpoint()
 
         return data
 
@@ -1275,8 +1299,9 @@ class PipelineExtras(JSONPipeline):
          [['meta', 'doi']]],
 
         [[THIS_PATH, ['inputs', 'manifest_file'], ['inputs', 'xml']],  # TODO
-        De.path_metadata,  # XXX WARNING this goes back and hits the file system
-         [['path_metadata'], ['scaffolds']]],
+         De.path_metadata,  # XXX WARNING this goes back and hits the file system
+         [['path_metadata'], ['scaffolds']],
+         lambda sp: []],
 
         [[['samples']],
          De.samples_to_subjects,

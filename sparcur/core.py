@@ -768,7 +768,7 @@ class AtomicDictOperations:
         cls.add(data, target_path, value, update=True)
 
     @classmethod
-    def get(cls, data, source_path, on_failure=None):
+    def get(cls, data, source_path, on_failure=None, on_failure_func=None):
         """ get stops at lists because the number of possible issues explodes
             and we don't hand those here, if you encounter that, use this
             primitive to get the list, then use it again on the members in
@@ -778,8 +778,10 @@ class AtomicDictOperations:
         try:
             source_key, node_key, source = cls._get_source(data, source_path)
             return source[source_key]
-        except BaseException as e:
-            if on_failure is not None:
+        except Exception as e:
+            if on_failure_func is not None:
+                return on_failure_func(source_path)
+            elif on_failure is not None:
                 return on_failure
             else:
                 raise e
@@ -976,12 +978,13 @@ class _DictTransformer:
             adops.update(data, path, new)  # this will fail if data is immutable
 
     @staticmethod
-    def get(data, gets, source_key_optional=False):
+    def get(data, gets, source_key_optional=False, on_failure_func=None):
         """ gets is a list with the following structure
             [source-path ...] """
+        # FIXME we need a way to pass on_failure
 
         for source_path in gets:
-            yield adops.apply(adops.get, data, source_path,
+            yield adops.apply(adops.get, data, source_path, None, on_failure_func,
                               source_key_optional=source_key_optional)
 
     @staticmethod
@@ -1130,7 +1133,7 @@ class _DictTransformer:
 
     @classmethod
     def derive(cls, data, derives, source_key_optional=True, empty='CULL'):
-        """ [[[source-path, ...], function, [target-path, ...]], ...] """
+        """ [[[source-path, ...], function, [target-path, ...], on_failure_func], ...] """
         # if you have source key option True and empty='OK' you will get loads of junk
         allow_empty = empty == 'OK' and not empty == 'CULL'
         error_empty = empty == 'ERROR'
@@ -1143,13 +1146,37 @@ class _DictTransformer:
             return empty or allow_empty and not empty
 
         failure_value = tuple()
-        for source_paths, derive_function, target_paths in derives:
+        class Sigh(Exception): """ SIGH """
+        for source_paths, derive_function, target_paths, *on_failure_func in derives:
             # FIXME zipeq may cause adds to modify in place in error?
             # except that this is really a type checking thing on the function
+            if on_failure_func:
+                off, = on_failure_func
+            else:
+                def off(sp): raise Sigh(sp)
+
             def defer_get(*get_args):
                 """ if we fail to get args then we can't gurantee that
                     derive_function will work at all so we wrap the lot """
-                args = cls.get(*get_args)
+                # we have to pass source_key_optional explicitly here because apply
+                # used below captures source_key_optional and can't pass it along
+                # because there is no way to tell that the callee function also wants it
+                # however we know that we do want it here, on_failure_func allows us to
+                # control cases where we want multi-arity functions to not fail immeidately
+                try:
+                    args = tuple(cls.get(
+                        *get_args,
+                        source_key_optional=source_key_optional,
+                        on_failure_func=off))
+                except Sigh as e:
+                    # we log here because the default is to fail silently
+                    # and continue of a source path is missing which we
+                    # may not want for nairy function
+                    if len(get_args[1]) > 1:
+                        msg = f'nairy function get failed! {e} {derive_function}'
+                        logd.critical(msg)
+                    raise exc.NoSourcePathError(source_paths) from e
+
                 return derive_function(*args)
 
             def express_zip(*zip_args):

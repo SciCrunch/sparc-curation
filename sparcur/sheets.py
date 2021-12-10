@@ -13,7 +13,11 @@ from sparcur.config import auth
 
 class Sheet(SheetBase):
 
+    _do_cache = True
+    _re_cache = False
+
     def __init__(self, *args, **kwargs):
+        self._cache_path = auth.get_path('cache-path') / 'google_sheets'
         try:
             if 'readonly' not in kwargs or kwargs['readonly']:
                 # readonly=True is default so we take this branch if not set
@@ -22,6 +26,8 @@ class Sheet(SheetBase):
             else:
                 self._saf = auth.get_path(
                     'google-api-service-account-file-rw')
+        except KeyError as e:
+            log.warn(e)
         except Exception as e:
             log.exception(e)
 
@@ -29,6 +35,32 @@ class Sheet(SheetBase):
             super().__init__(*args, **kwargs)
         finally:
             self._saf = None
+
+    def fetch(self, _refresh_cache=False, **kwargs):
+        if self._do_cache:
+            cache = idlib.cache.cache(self._cache_path, create=True, return_path=True)
+            @cache
+            def cache_wrap_fetch(name, sheet_name, __f=super().fetch):
+                return __f(**kwargs)
+
+            cache_wrapper = cache_wrap_fetch
+            data, path = cache_wrapper(self.name, self.sheet_name, _refresh_cache=_refresh_cache)
+            return data
+
+        return super().fetch(**kwargs)
+
+    def metadata(self, _refresh_cache=False):
+        if self._do_cache:
+            cache = idlib.cache.cache(self._cache_path, create=True, return_path=True)
+            @cache
+            def cache_wrap_meta(name, sheet_name, __f=super().metadata):
+                return __f()
+
+            cache_wrapper = cache_wrap_meta
+            data, path = cache_wrapper(self.name, self.sheet_name, _refresh_cache=_refresh_cache)
+            return data
+
+        return super().metadata()
 
 
 # master
