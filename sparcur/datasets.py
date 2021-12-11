@@ -1373,11 +1373,18 @@ _nddfes = sorted(set(_nddfes))
 class DatasetDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     renames_alt = {'contributors': 'contributor_name',  # watch out for name collisions (heu heu heu)
+                   'type': 'dataset_type',  # type by itself is used internally
                    'metadata_version_do_not_change': 'template_schema_version',
                    'contributor_orcid_id': 'contributor_orcid',  # <= 1.2.3
                    'metadata_version': 'template_schema_version',  # 2.0
                    'acknowledgements': 'acknowledgments',  # <= 1.2.3
-                   'relation_to_related_identifier': 'relation_type', # 2.0
+                   #'relation_type': 'relation_type', # 2.0
+                   'identifier': 'related_identifier',
+                   'identifier_description': 'related_identifier_description',
+                   'identifier_type': 'related_identifier_type',
+                   'study_organ_system': 'organ',
+                   'study_approach': 'approach',
+                   'study_technique': 'technique',
                    }
     renames_header = {'description': 'description_header'}
     missing_add = {'template_schema_version': ('1.0', 1)}
@@ -1394,13 +1401,16 @@ class DatasetDescriptionFile(MetadataFile):
                                           'related_identifier_description',),
                   'study': ('study_purpose',
                             'study_data_collection',
-                            'study_primary_conclusion',),
+                            'study_primary_conclusion',
+                            'study_collection_title',),
                   'links': ('additional_links', 'link_description'),
                   'examples': ('example_image_filename',
                                'example_image_locator',
                                'example_image_description'),}
 
     ignore_header = 'metadata_element', 'example', 'description_header'
+    ignore_alt = ('basic_information', 'study_information', 'contributor_information',
+                  'related_protocol__paper__dataset__etc_', 'participant_information',)
     raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
     _expect_single = _nddfes

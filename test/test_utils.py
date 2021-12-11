@@ -74,6 +74,10 @@ class TestBlackfynnId(unittest.TestCase):
         thing_prime = copy.deepcopy(thing)
         assert thing_prime == thing
 
+    def test_asCell(self):
+        thing = self._id_class(self.cases[0])
+        ac = thing.asCell()
+
 
 class TestPennsieveId(TestBlackfynnId):
 

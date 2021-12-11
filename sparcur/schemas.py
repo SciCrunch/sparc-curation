@@ -1119,6 +1119,9 @@ class DatasetDescriptionExportSchema(JSONSchema):
                      'number_of_samples',],
         # TODO dependency to have title for complete if completeness is is not complete?
         'properties': {
+            # 2.x helpers
+            'dataset_type': {'type': 'string'},
+            # 1.x
             'errors': ErrorSchema.schema,
             'template_schema_version': {'type': 'string'},
             'name': string_noltws,

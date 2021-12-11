@@ -1,10 +1,11 @@
+import itertools
 from functools import wraps
 from collections import defaultdict
 from urllib.parse import quote
 from datetime import datetime, date
 import idlib
 from pyontutils.utils import isoformat
-from pyontutils.sheets import Sheet as SheetBase
+from pyontutils.sheets import Sheet as SheetBase, get_cells_from_grid
 from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
 from sparcur.config import auth
@@ -13,28 +14,34 @@ from sparcur.config import auth
 
 class Sheet(SheetBase):
 
-    _do_cache = True
-    _re_cache = False
+    _do_cache = False  # retrieve to cache
+    _re_cache = False  # refresh the cache
+    _only_cache = False  # cache only aka no network
 
     def __init__(self, *args, **kwargs):
         self._cache_path = auth.get_path('cache-path') / 'google_sheets'
-        try:
-            if 'readonly' not in kwargs or kwargs['readonly']:
-                # readonly=True is default so we take this branch if not set
-                self._saf = auth.get_path(
-                    'google-api-service-account-file-readonly')
-            else:
-                self._saf = auth.get_path(
-                    'google-api-service-account-file-rw')
-        except KeyError as e:
-            log.warn(e)
-        except Exception as e:
-            log.exception(e)
+        if not self._only_cache:
+            try:
+                if 'readonly' not in kwargs or kwargs['readonly']:
+                    # readonly=True is default so we take this branch if not set
+                    self._saf = auth.get_path(
+                        'google-api-service-account-file-readonly')
+                else:
+                    self._saf = auth.get_path(
+                        'google-api-service-account-file-rw')
+            except KeyError as e:
+                log.warn(e)
+            except Exception as e:
+                log.exception(e)
 
         try:
             super().__init__(*args, **kwargs)
         finally:
             self._saf = None
+
+    def _setup(self):
+        if not self._only_cache:
+            super()._setup()
 
     def fetch(self, _refresh_cache=False, **kwargs):
         if self._do_cache:
@@ -44,8 +51,26 @@ class Sheet(SheetBase):
                 return __f(**kwargs)
 
             cache_wrapper = cache_wrap_fetch
-            data, path = cache_wrapper(self.name, self.sheet_name, _refresh_cache=_refresh_cache)
-            return data
+            (meta, raw_values, grid), path = cache_wrapper(
+                self.name, self.sheet_name,
+                _refresh_cache=_refresh_cache or self._re_cache)
+            values = [list(r) for r in  # XXX FIXME code duplication
+                      zip(*itertools.zip_longest(*raw_values,
+                                                 fillvalue=''))]
+            if grid:
+                # XXX FIXME duplicated code from pyontutils sheets
+                filter_cell = None
+                cells = get_cells_from_grid(grid, self.sheet_name, filter_cell)
+                cells_index = {(i, j):v for i, j, v in cells}
+            else:
+                cells_index = {}
+
+            self._meta = meta
+            self.raw_values = raw_values
+            self._values = values
+            self.grid = grid
+            self.cells_index = cells_index
+            return raw_values, values, grid, cells_index
 
         return super().fetch(**kwargs)
 
@@ -57,8 +82,11 @@ class Sheet(SheetBase):
                 return __f()
 
             cache_wrapper = cache_wrap_meta
-            data, path = cache_wrapper(self.name, self.sheet_name, _refresh_cache=_refresh_cache)
-            return data
+            meta, path = cache_wrapper(
+                self.name, self.sheet_name,
+                _refresh_cache=_refresh_cache or self._re_cache)
+            self._meta = meta
+            return meta
 
         return super().metadata()
 

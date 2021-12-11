@@ -71,6 +71,13 @@ class IdentityJsonType:
 
 
 def fromJson(blob):
+    def nitr(value):
+        try:
+            return value not in __type_registry
+        except TypeError as e:
+            log.critical(e)
+            return False
+
     if isinstance(blob, dict):
         if 'type' in blob:
             t = blob['type']
@@ -79,7 +86,7 @@ def fromJson(blob):
                 type_name = blob['system']
             elif t in ('quantity', 'range'):
                 type_name = t
-            elif t not in __type_registry:
+            elif nitr(t):
                 breakpoint()
                 raise NotImplementedError(f'TODO fromJson for type {t} '
                                           f'currently not implemented\n{blob}')
@@ -696,6 +703,10 @@ class BlackfynnId(idlib.Identifier):
         return (type(self) == type(other) and
                 self.id == other.id and
                 self.file_id == other.file_id)  # works because None == None
+
+    @property
+    def label(self):
+        return self.curie
 
     @property
     def curie(self):

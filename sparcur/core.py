@@ -1173,7 +1173,8 @@ class _DictTransformer:
                     # and continue of a source path is missing which we
                     # may not want for nairy function
                     if len(get_args[1]) > 1:
-                        msg = f'nairy function get failed! {e} {derive_function}'
+                        msg = ('nairy function failed to get source path! '
+                               f'{e} {derive_function}')
                         logd.critical(msg)
                     raise exc.NoSourcePathError(source_paths) from e
 

@@ -689,13 +689,12 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
         if project_path is None:
             # FIXME TODO I think we used dataset_description as a hint?
-            project_path = Path('/')  # FIXME FIXME
+            project_path = self.__class__('/')  # FIXME FIXME
             log.critical(f'No dataset path found for {self}!')
             #raise NotImplementedError('current implementation cant anchor with current info')
 
         dataset_path = [p for p in chain((self,), self.parents) if p.parent == project_path][0]
         drp = self.relative_path_from(dataset_path)  # FIXME ...
-
 
         dsid = dataset_path.cache_identifier
 
@@ -1076,7 +1075,7 @@ class RemoteL:
     _cache_anchor = None
 
     def __new__(cls, id, *args, **kwargs):
-        return PathL(id.split(':', 1)[1])
+        return cls._local_class(id.split(':', 1)[1])
 
     @classmethod
     def anchorToCache(cls, cache, *args, **kwargs):
@@ -1164,6 +1163,12 @@ class PathL(Path):
     # only way to be sure, clunky and aweful, but unavoidable
 
     _cache_class = CacheL
+    # setting remote class is required to avoid issue with
+    # PennsieveRemote -> Cache/Path instead of to CacheL/PathL
+
+    def find_cache_root(self):
+        # straight forward when the anchor is asserted
+        return self.cache.anchor
 
     @property
     def cache_identifier(self):
@@ -1172,6 +1177,7 @@ class PathL(Path):
 
 PathL._bind_flavours()
 CacheL._local_class = PathL
+RemoteL._local_class = PathL
 
 
 class StashCache(BlackfynnCache):
