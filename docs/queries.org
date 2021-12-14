@@ -2049,6 +2049,201 @@ sigh = [s for n, si in enumerate(simples)  for s in ((f'--------- {n + 1}','----
 sigh
 #+end_src
 
+** heatmaps
+*** neupop by region
+# FIXME if missing :session breaks on evil =o=
+#+begin_src jupyter-python :session pys :noweb yes :results none :var remove=(and "sigh")
+<<py-neupop-helper>>
+import seaborn
+from collections import defaultdict
+q_cnap = """
+<<cy-neru-all-pop>>
+"""
+
+def get_label(region):
+    return id_label[region]
+
+def get_labels(regions):
+    return [get_label(region) for region in regions]
+
+d = sgc.execute(query=q_cnap, limit=99999, output='application/json')
+ids = [n['id'] for n in d['nodes']]
+blobs = [neupop_blob(id) for id in ids]
+id_label = {n['id']:n['lbl'] if 'lbl' in n and n['lbl'] else n['id'] for blob in blobs for n in blob['nodes']}
+#+end_src
+
+#+begin_src jupyter-python :session pys
+_ext_all = sorted(set([obj(e) for b in blobs for e in b['edges'] if pred(e, 'apinatomy:external')]))
+ext_pop = {i:set([obj(e) for e in blob['edges'] if pred(e, 'apinatomy:external')]) for i, blob in zip(ids, blobs)}
+
+pop_by_reg = defaultdict(list)
+for i, regs in ext_pop.items():
+    for reg in regs:
+        pop_by_reg[reg].append(i)
+
+def key_allc(region):
+    count = 0
+    for i, id in enumerate(ids):
+        if region in ext_pop[id]:
+            count += 1
+    return count
+
+_ext_allc = sorted(_ext_all, key=key_allc)
+
+def key_pop(pop):
+    return -len(ext_pop[pop])
+
+ids_ord = sorted(ids, key=key_pop)
+
+def key_all(region):
+    first = None
+    count = 0
+    regs = []
+    iths = []
+    for i, id in enumerate(ids_ord):
+        if region in ext_pop[id]:
+            regs.append(region)
+            iths.append(i)
+            #count += 1  # wow =+ 1 no error wat
+            #if first is None:
+            #first = i
+
+    return iths[0], *[-i for i in iths[1:]]
+
+ext_all = sorted(_ext_all, key=key_all)
+n_region = len(ext_all)
+n_pop = len(ext_pop)
+header = [['neupop', *ext_all]]  # TODO -> label
+xl = get_labels(header[0][1:])
+rows = header + [[id, *[region in ext_pop[id] for region in ext_all]] for id in ids_ord]
+
+def jac(a, b):
+    anb, aub = zip(*[(ar and br, ar or br) for ar, br in zip(a, b)])
+    return sum(anb) / sum(aub)
+
+def sumjac(rows, norm=False):
+    # actually want distance from .5 ?
+    mat = jac_mat(rows, switch=True)
+    #pprint(mat)
+    return [(sum(r[:-1]) * sum(rows[r[-1] + 1][1:]) if norm else 1, r[-1]) for i, r in enumerate(mat)]
+
+def sumjac_norm(rows):
+    return sumjac(rows, norm=True)
+
+def jac_mat(rows, switch=False, reverse=False):
+    asdf = []
+    for i, (_, *rowa) in enumerate(rows[1:]):
+        jacr = []
+        for j, (_, *rowb) in enumerate(rows[1:]):
+            jci = jac(rowa, rowb)
+            if switch:
+                jacr.append(jci)
+            else:
+                jacr.append((jci, j))
+        if switch:
+            jacr.append(i)
+            asdf.append(jacr)
+        else:
+            minimized = [i for j, i in sorted(jacr)][1:]  # 1: to skip self
+            minimized.append(i)
+            asdf.append(minimized)
+
+    return asdf
+
+def jmc(rows):
+    return jac_mat(rows, switch=True)
+
+def jmcr(rows):  # XXX broken
+    return jac_mat(rows, switch=True, reverse=True)
+
+def jac_sigh(rows):
+    sigh = jmc(rows)
+    return [(np.std(s[:-1]), np.mean(s[:-1]), s[-1]) for s in sigh]
+
+def jac_sigh(rows):
+    sigh = jmc(rows)
+    #return [(np.std(s[:-1]), np.mean(s[:-1]), s[-1]) for s in sigh]
+    return [(*[((x - .5) ** 2) ** .5 for x in s[:-1]], s[-1]) for s in sigh]
+
+def resort(rows, sortf, reverse=False):
+    asdf_ord = sorted(sortf(rows), reverse=not reverse) # don't think too hard about it
+    ind_rank = {j:i for i, (*_, j) in enumerate(asdf_ord)}
+
+    def srt(row):
+        ind = rows.index(row)
+        if ind == 0:
+            return 0
+        else:
+            return ind_rank[ind - 1]
+
+    return sorted(rows, key=srt)
+
+def sumthm(rows):
+    return [[-sum(row[1:]), i] for i, row in enumerate(rows[1:])]
+
+def sumth(rows):
+    return [[sum(row[1:]), i] for i, row in enumerate(rows[1:])]
+
+def blank(rows):
+    return [[*row[1:], i] for i, row in enumerate(rows[1:])]
+
+def sumoth(rows):
+    crank = [sum(col) for col in list(zip(*rows[1:]))[1:]]
+    return [[*
+             #[crank[j] if c and crank[j] == max([crank[x] for x, v in enumerate(row[1:]) if v]) else 0
+             [crank[j] if c else 0
+             for j, c in enumerate(row[1:])], i] for i, row in enumerate(rows[1:])]
+
+def sumothm(rows):
+    crank = [sum(col) for col in list(zip(*rows[1:]))[1:]]
+    return [[*
+             #[crank[j] if c and crank[j] == max([crank[x] for x, v in enumerate(row[1:]) if v]) else 0
+             [-crank[j] if c else 0
+             for j, c in enumerate(row[1:])], i] for i, row in enumerate(rows[1:])]
+
+def maxp(rows):
+    crank = [sum(col) for col in list(zip(*rows[1:]))[1:]]
+    return [[
+             sorted([crank[j] if c else 0 for j, c in enumerate(row[1:])])[0],
+             ,*[-_ for _ in sorted([crank[j] if c else 0 for j, c in enumerate(row[1:])])[1:]]
+        , i]
+            for i, row in enumerate(rows[1:])]
+
+def jacb(rows):
+    a = [row[1:] for row in rows[1:]]
+    aT = list(zip(*a))
+    # FIXME symmetry
+    rd = [[jac(r1, r2) for r2 in a] for r1 in a]
+    cd = [[jac(c1, c2) for c2 in aT] for c1 in aT]
+    #pprint(rd)
+    #pprint(cd)
+    # output is a 4d matrix, from rc -> to rc
+    dist = np.zeros((len(rd), len(cd), len(rd), len(cd)))
+    for i, row_dists in enumerate(rd):
+        for k, row_dist in enumerate(row_dists):
+            for j, col_dists in enumerate(cd):
+                for l, col_dist in enumerate(col_dists):
+                    dist[i, j, k, l] = (row_dist ** 2 + col_dist ** 2) ** .5
+    #pprint(dist)
+    return dist
+
+rows = resort(rows, sumth)
+rows = list(zip(*resort(list(zip(*rows)), blank, reverse=True)))
+rows = resort(rows, jmc)
+
+seaborn.set(rc={'figure.figsize':(50, 50)})
+#seaborn.set(rc={'figure.figsize':(5, 5)})
+axes = seaborn.heatmap(
+    [r[1:] for r in rows[1:]],
+    xticklabels=xl,
+    yticklabels=[r[0] for r in rows[1:]],
+    cbar=False,
+    square=True,
+)
+# axes.get_figure().savefig('heatmap-pop-reg-test.svg')
+#+end_src
+
+*** region by region
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
