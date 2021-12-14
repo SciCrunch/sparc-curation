@@ -180,11 +180,17 @@ class NormSpecies(NormSimple):
         'rat':'Rattus norvegicus',
         'mouse':'Mus musculus',
         'sus scrofa domestica': 'Sus scrofa domesticus',
+        'ferret': 'Mustela putorius furo',
 
         # spelling errors
         'mus muscus': 'Mus musculus',
         'sus scofa': 'Sus scrofa',
+
         'rattus noervegicus domestica': 'Rattus norvegicus domestica',
+        'rattus norvegicus domestica': 'Rattus norvegicus domestica',
+        'ratus norvegicus': 'Rattus norvegicus',
+        'norway rat': 'Rattus norvegicus',
+        'norway rats': 'Rattus norvegicus',
     }
 
 class NormSex(NormSimple):
