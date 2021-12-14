@@ -425,14 +425,26 @@ class ExporterSummarizer:
         if isinstance(organ, list) or isinstance(organ, tuple):
             if len(organ) == 1:
                 organ, = organ
-                organ = OntTerm(organ)
+                try:
+                    organ = OntTerm(organ)
+                except Exception as e:
+                    log.exception(e)
+                    organ = ['GARBAGE', organ]
             else:
-                organ = [OntTerm(o) for o in organ]
+                try:
+                    organ = [OntTerm(o) for o in organ]
+                except Exception as e:
+                    log.exception(e)
+                    organ = ['GARBAGE', *organ, 'GARBAGE']
 
         elif organ == 'othertargets':
             pass
         elif organ:
-            organ = OntTerm(organ)
+            try:
+                organ = OntTerm(organ)
+            except Exception as e:
+                log.exception(e)
+                organ = ['GARBAGE', organ]
 
         return (accessor.status.submission_index,
                 accessor.status.curation_index,
