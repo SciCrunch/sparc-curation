@@ -1382,9 +1382,9 @@ class DatasetDescriptionFile(MetadataFile):
                    'identifier': 'related_identifier',
                    'identifier_description': 'related_identifier_description',
                    'identifier_type': 'related_identifier_type',
-                   'study_organ_system': 'organ',
-                   'study_approach': 'approach',
-                   'study_technique': 'technique',
+                   #'study_organ_system': 'organ',  # XXX do not convert, requires normalization
+                   #'study_approach': 'approach',  # XXX do not convert, requires normalization
+                   #'study_technique': 'technique',  # XXX do not convert, requires normalization
                    }
     renames_header = {'description': 'description_header'}
     missing_add = {'template_schema_version': ('1.0', 1)}
