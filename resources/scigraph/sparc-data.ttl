@@ -34,6 +34,7 @@
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/ard-arm-cardiac.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl> ;
     ilxtr:imports-big <http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl>,
@@ -47,7 +48,6 @@
     ilxtr:imports-dev <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/dev-layout-conn.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/vagus-nerve.ttl>,
-        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/urinary-omega-tree-test.ttl> .
 
 ###
