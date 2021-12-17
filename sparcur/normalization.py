@@ -23,6 +23,7 @@ def protocol_url_or_doi(value):
     # up with a None in a list, that is really really bad
     # and we need to figure out why/how, I may have fixed
     # it with an update to idlib, but I'm not sure
+    # XXX this is happening due to handling and logging errors and then returning
     if not is_list_or_tuple(value):
         value = value,
         out = None
@@ -33,7 +34,19 @@ def protocol_url_or_doi(value):
         if not isinstance(v, idlib.Stream):
             raise TypeError(f'should already be in stream form {v}')
 
-        normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
+        try:
+            normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
+        except idlib.exc.MalformedIdentifierError as e:
+            logd.error(e)
+            # XXX WARNING returning value here might cause unexpcted errors
+            # however, normalization should never fail, if it does it should
+            # return the value that could not be normalized and then validation
+            # will catch the error at a later stage
+            return value
+        except Exception as e:
+            logd.error(e)
+            return value
+
         if isinstance(normed, idlib.Pio):
             try:
                 normed = normed.uri_api_int  # integer id preferred if available
@@ -712,7 +725,7 @@ class NormDatasetDescriptionFile(NormValues):
             if v:
                 try:
                     yield self._protocol_url_or_doi(v)
-                except BaseException as e:
+                except Exception as e:
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...
                     _ps = f'{self.__class__.__name__}.protocol_url_or_doi'
@@ -736,7 +749,7 @@ class NormDatasetDescriptionFile(NormValues):
             if v:
                 try:
                     yield idlib.Doi(v)  # XXX possible encapsulation issue
-                except idlib.exceptions.MalformedIdentifierError as e:
+                except idlib.exc.MalformedIdentifierError as e:
                     logd.exception(e)
                 #doi = idlib.Doi(v)
                 #if doi.valid:
