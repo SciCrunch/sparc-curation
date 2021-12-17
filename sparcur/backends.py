@@ -140,7 +140,7 @@ class BlackfynnRemote(aug.RemotePath):
         resp = cls._requests.get(url, stream=True, **kwargs)
         headers = resp.headers
         yield headers
-        log.debug(f'reading from {url}')
+        log.log(9, f'reading from {url}')  # too much for debug
         for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
             if chunk:
                 yield chunk
@@ -448,7 +448,7 @@ class BlackfynnRemote(aug.RemotePath):
             #elif sf == sn and len(pf.suffixes) > 1:
                 #return n
             else:
-                log.debug('New /packages schema detected')
+                log.log(9, 'New /packages schema detected')  # too verbose for debug
                 return n
         else:
             return self.stem + self.suffix
@@ -797,7 +797,8 @@ class BlackfynnRemote(aug.RemotePath):
                     yield child
                 else:
                     # probably a package that has files
-                    log.debug(f'skipping {child} becuase it is neither a directory nor a file')
+                    # this log message is too noisey for regular use, even at the debug level 10
+                    log.log(9, f'skipping {child} becuase it is neither a directory nor a file')
 
             else:  # for loop else
                 self._deleted = deleted

@@ -347,7 +347,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             log.error(f'{self} {e}')
             raise exc.CacheNotFoundError(f'{self}') from e  # have to raise so that we don't overwrite the file
 
-        log.debug(self.data_headers)
+        log.log(9, self.data_headers)
         if self.local_object_cache_path.exists():
             yield from gen
             if rgen is None:
@@ -863,8 +863,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                         log.info(f'unclassified mimetype {mimetype}')
             else:
                 status = 'unknown'
-                msg = f'unknown mimetype {path_meta["basename"]}'
                 dsrp = path_meta['dataset_relative_path']
+                msg = f'unknown mimetype {"".join(dsrp.suffixes)}'
                 cls._unknown_suffixes.add(tuple(dsrp.suffixes))
                 if he.addError(msg, path=dsrp, json_path=('data', i)):
                     logd.warning(msg)

@@ -430,7 +430,7 @@ class ApiWrapper:
         return self.bf._api.packages.create(pkg)
 
     def get(self, id, attempt=1, retry_limit=3):
-        log.debug('We have gone to the network!')
+        log.log(9, 'We have gone to the network!')  # too verbose for debug
         if isinstance(id, self._id_class):
             # FIXME inver this so the id form is internal or implement
             # __str__ differently from __repr__

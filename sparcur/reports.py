@@ -293,11 +293,12 @@ class TtlFile:
                  o.toPython()]
                 for s, o in g[:ns.ilxtr.numberOfOccurrences:]]
 
+        g = OntGraph(namespace_manager=ontres.graph.namespace_manager)  # don't include counts in export
         m = sheets.Mis()
         g.populate_from_triples(m.triples())
         olr = pauth.get_path('ontology-local-repo')
         if olr.exists():
-            g.write(path=olr / 'ttl/sparc-mis-helper.ttl')  # FIXME hardcoded and non-obvious
+            g.write(path=olr / 'ttl/sparc-mis-helper-gen.ttl')  # FIXME hardcoded and non-obvious
 
         header = [['curie', 'type', 'count']]
         return header + sorted(rows, key=lambda r:-r[-1])  # FIXME only Report has access to -C :/
