@@ -864,8 +864,14 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             else:
                 status = 'unknown'
                 dsrp = path_meta['dataset_relative_path']
-                msg = f'unknown mimetype {"".join(dsrp.suffixes)}'
-                cls._unknown_suffixes.add(tuple(dsrp.suffixes))
+                if isinstance(dsrp, str):
+                    if not dsrp:
+                        msg = f'FIXME top level folder needs a mimetype!'
+                    else:
+                        msg = f'unknown mimetype {path_meta["basename"]}'
+                else:
+                    msg = f'unknown mimetype {"".join(dsrp.suffixes)}'
+                    cls._unknown_suffixes.add(tuple(dsrp.suffixes))
                 if he.addError(msg, path=dsrp, json_path=('data', i)):
                     logd.warning(msg)
 
