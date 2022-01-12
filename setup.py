@@ -38,8 +38,8 @@ with open('README.md', 'rt') as f:
     long_description = f.read()
 
 RELEASE = '--release' in sys.argv
-PIPGIT = 'egg_info' in sys.argv and not Path('sparcur', 'simple').exists()
-if RELEASE or PIPGIT:
+NEED_SIMPLE = not Path('sparcur', 'simple').exists()
+if RELEASE or NEED_SIMPLE:
     if RELEASE:
         sys.argv.remove('--release')
 
