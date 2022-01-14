@@ -420,11 +420,18 @@ class ConvertingChecker(jsonschema.FormatChecker):
         return super().check(converted, format)
 
 
+def _make_st_checker(st):
+    def inn(c, i):
+        for t in st:
+            if isinstance(i, t):
+                return True
+
+    return inn
+
+
 class JSONSchema(object):
 
     schema = {}
-
-    validator_class = jsonschema.Draft6Validator
 
     string_types = [  # add more types here
         str,
@@ -437,14 +444,21 @@ class JSONSchema(object):
         ProtcurExpression,
     ]
 
+    type_checker = jsonschema.Draft6Validator.TYPE_CHECKER.redefine_many(
+        dict(array=(lambda c, i: isinstance(i, list) or isinstance(i, tuple)),
+             string=_make_st_checker(string_types)))
+
+    validator_class = jsonschema.validators.extend(
+        jsonschema.Draft6Validator,
+        type_checker=type_checker)
+
     def __init__(self):
         format_checker = jsonschema.FormatChecker()
         #format_checker = ConvertingChecker()
         types = dict(array=(list, tuple),
                      string=tuple(self.string_types))
         self.validator = self.validator_class(self.schema,
-                                              format_checker=format_checker,
-                                              types=types)
+                                              format_checker=format_checker)
 
     @classmethod
     def _add_meta(cls, blob):
