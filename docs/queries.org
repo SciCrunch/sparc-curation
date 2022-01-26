@@ -473,6 +473,7 @@ deleted or that something else has gone wrong. If dataset is null and =hasUri= i
 that the protocol is present only in =protcur.ttl= and the additional identifiers have not been
 processed.
 
+# FIXME mkdir reports somehow
 #+header: :results file :file ./reports/protocol-report.csv
 #+begin_src sparql
 select distinct
@@ -481,12 +482,15 @@ select distinct
 (sample(?dataset) AS ?datasetx)
 ?doi_protocol
 (sample(bound(?urih_protocol)) as ?hasUri)
+(sample(bound(?some_child)) as ?hasComplexAnnos)
 where {
   ?protocol a sparc:Protocol .
-  optional { ?protocol TEMP:hasNumberOfProtcurAnnotations ?n . }
-  optional { ?dataset TEMP:hasProtocol ?protocol . }
-  optional { ?protocol TEMP:hasDoi ?doi_protocol .}
-  optional { ?protocol TEMP:hasUriHuman ?urih_protocol .}
+  optional { ?protocol TEMP:hasNumberOfProtcurAnnotations ?n }
+  optional { ?dataset TEMP:hasProtocol ?protocol }
+  optional { ?protocol TEMP:hasDoi ?doi_protocol }
+  optional { ?protocol TEMP:hasUriHuman ?urih_protocol }
+  optional { ?protocol ?some_predicate ?annotation .
+             ?annotation TEMP:protcurChildren ?some_child }
 }
 group by ?protocol ?n ?doi_protocol ?hasUri
 order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
@@ -494,6 +498,72 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 
 #+RESULTS:
 [[file:./reports/protocol-report.csv]]
+*** Published protocols with complex protcur annotations
+#+begin_src sparql
+select distinct
+?protocol ?anno_count
+#(count(distinct ?protocol) as ?pc)
+where {
+    ?protocol a sparc:Protocol .
+    ?protocol TEMP:hasDoi ?doi .
+    ?protocol ?some_predicate ?annotation .
+    ?annotation TEMP:protcurChildren ?some_child .
+    ?protocol TEMP:hasNumberOfProtcurAnnotations ?anno_count .
+} order by desc(?anno_count)
+#+end_src
+
+#+RESULTS:
+| protocol      | anno_count |
+|---------------+------------|
+| pio.api:19220 |        413 |
+| pio.api:26704 |        386 |
+| pio.api:22831 |        370 |
+| pio.api:18925 |        285 |
+| pio.api:26886 |        284 |
+| pio.api:26887 |        278 |
+| pio.api:22832 |        277 |
+| pio.api:24077 |        277 |
+| pio.api:19095 |        259 |
+| pio.api:18994 |        251 |
+| pio.api:22863 |        233 |
+| pio.api:19253 |        221 |
+| pio.api:19107 |        197 |
+| pio.api:20306 |        166 |
+| pio.api:22900 |        165 |
+| pio.api:19174 |        157 |
+| pio.api:22833 |        151 |
+| pio.api:19342 |        138 |
+| pio.api:20256 |        126 |
+| pio.api:19283 |        117 |
+| pio.api:19927 |        113 |
+| pio.api:22887 |        113 |
+| pio.api:29990 |        112 |
+| pio.api:26688 |        105 |
+| pio.api:22888 |        101 |
+| pio.api:22891 |        100 |
+| pio.api:25122 |         94 |
+| pio.api:18769 |         88 |
+| pio.api:22875 |         88 |
+| pio.api:22890 |         87 |
+| pio.api:22948 |         87 |
+| pio.api:20025 |         82 |
+| pio.api:22889 |         80 |
+| pio.api:29396 |         69 |
+| pio.api:22868 |         64 |
+| pio.api:18394 |         63 |
+| pio.api:22844 |         63 |
+| pio.api:19640 |         61 |
+| pio.api:22894 |         61 |
+| pio.api:19135 |         51 |
+| pio.api:19227 |         51 |
+| pio.api:19798 |         49 |
+| pio.api:22895 |         40 |
+| pio.api:20254 |         34 |
+| pio.api:21417 |         33 |
+| pio.api:19206 |         29 |
+| pio.api:26709 |         13 |
+| pio.api:34589 |          9 |
+| pio.api:30122 |          5 |
 
 *** Conditions studied
 *** Experimental groups

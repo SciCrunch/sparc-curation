@@ -203,15 +203,15 @@ docker cp $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user):/home/user/scra
 #+end_src
 
 ** Keybinds
-| =C-c=     | copy              |
-| =C-v=     | paste             |
-| =C-z=     | undo              |
+| =C-c=       | copy              |
+| =C-v=       | paste             |
+| =C-z=       | undo              |
 | =C-y= =C-Z= | redo              |
-| =C-s=     | save              |
-| =C-f=     | find              |
-| =C-q=     | save and quit     |
-| =f5=      | run nearest block |
-| =C-c C-c= | run block or call |
+| =C-s=       | save              |
+| =C-f=       | find              |
+| =C-q=       | save and quit     |
+| =f5=        | run nearest block |
+| =C-c C-c=   | run block or call |
 
 ** Org mode
 The query interface for SCKAN is a computational notebook written in Org mode.

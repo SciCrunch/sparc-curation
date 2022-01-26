@@ -467,7 +467,7 @@ Yes this is make."
 #+end_src
 ** Clean annotations
 
-#+header: :var rel_path=(or release-dir)
+#+header: :var rel_path=(and (boundp 'release-dir) release-dir)
 #+name: clean-annotations-group
 #+begin_src python :exports code :results none
 import json
@@ -492,13 +492,13 @@ with open(ap, 'wt') as f:
 :CREATED:  [2020-08-09 Sun 03:18]
 :END:
 
-#+header: :var rel_path=(or release-dir) prefixes_path=(or prefixes-path)
+#+header: :var rel_path=(and (boundp 'release-dir) release-dir) prefixes_path=(and (boundp 'prefixes-path) prefixes-path)
 #+name: generate-prefixes
 #+begin_src python :noweb yes :exports none :results none
 <<generate-prefixes-jupyter>>
 #+end_src
 
-#+header: :var rel_path=(or release-dir) prefixes_path=(or prefixes-path)
+#+header: :var rel_path=(and (boundp 'release-dir) release-dir) prefixes_path=(and (boundp 'prefixes-path) prefixes-path)
 #+name: generate-prefixes-jupyter
 #+begin_src jupyter-python :session pys :exports code :results value file
 import augpathlib as aug
