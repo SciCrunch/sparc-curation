@@ -498,6 +498,7 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 
 #+RESULTS:
 [[file:./reports/protocol-report.csv]]
+
 *** Published protocols with complex protcur annotations
 #+begin_src sparql
 select distinct
