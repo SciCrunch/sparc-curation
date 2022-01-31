@@ -326,9 +326,10 @@ gsx:google-sheet-id
 
 (defun-local -lt-> (path-jsonld path-ttl)
   ;; automated
-  (run-command (or (executable-find "pypy3")
-                   (executable-find "python"))
-               "-m" "sparcur.cli" "apinat" path-jsonld path-ttl))
+  (let (backtrace-on-error-noninteractive)
+    (run-command (or (executable-find "pypy3") ; beware missing libs
+                     (executable-find "python"))
+                 "-m" "sparcur.cli" "apinat" path-jsonld path-ttl)))
 #+end_src
 
 #+name: all-ttl-models
@@ -344,7 +345,10 @@ gsx:google-sheet-id
     ;; you could use something like model-repository but then you have to make
     ;; a bunch of concatentations, better just to switch the default directory
     ;; so that the context deals with alignment between name and local referent
-    (cl-remove-if (lambda (p) (or (not (file-directory-p p)) (string-prefix-p "." p)))
+    (cl-remove-if (lambda (p)
+                    (or (not (file-directory-p p))
+                        (string-prefix-p "." p)
+                        (not (file-exists-p (concat p "/source/" p ".json")))))
                   (directory-files default-directory))))
 
 (defun apinat--ttl-newer (model-id)
