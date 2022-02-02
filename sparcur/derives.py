@@ -175,7 +175,9 @@ class Derives:
         # handle the xml extraction
 
         expected = 'organ', 'species'
-        if 'mimetype' in lifted and lifted['mimetype'] == 'inode/vnd.abi.scaffold+directory':
+        if ('mimetype' in lifted and
+            lifted['mimetype'] in ('inode/vnd.abi.scaffold+directory',
+                                   'inode/x.vnd.abi.scaffold+directory',)):
             # TODO type -> scaffold
             # TODO look for additional metadata from interior manifest
             scaf = copy.deepcopy(lifted)

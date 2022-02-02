@@ -26,28 +26,28 @@ suffix_mimetypes = {
     # sequencing
     ('.fq',):           'application/fastq',  # wolfram lists chemical/seq-na-fastq which is overly semantic
     ('.fq', '.gz'):     'application/x-gz-compressed-fastq',
-    ('.fastq',):        'application/fastq',
+    ('.fastq',):        'application/fastq',  # XXX not official
     ('.fastq', '.gz'):  'application/x-gz-compressed-fastq',
     ('.fastq', '.bz2'): 'application/x-bzip-compressed-fastq',
-    ('.bam',):          'application/vnd.hts.bam',
+    ('.bam',):          'application/x.vnd.hts.bam',
 
     ('.mat',):          'application/x-matlab-data',  # XXX ambiguous, depending on the matlab version
     ('.m',):            'application/x-matlab',
 
-    ('.nii',):       'image/nii',
-    ('.nii', '.gz'): 'image/gznii',  # I'm not sure that I believe this
+    ('.nii',):       'image/nii',  # XXX not official
+    ('.nii', '.gz'): 'image/gznii',  # I'm not sure that I believe this # XXX not official
 
     # http://ced.co.uk/img/TrainDay.pdf page 7
-    ('.smr',):       'application/vnd.cambridge-electronic-designced.spike2.32.data',
-    ('.smrx',):      'application/vnd.cambridge-electronic-designced.spike2.64.data',
+    ('.smr',):       'application/x.vnd.cambridge-electronic-designced.spike2.32.data',
+    ('.smrx',):      'application/x.vnd.cambridge-electronic-designced.spike2.64.data',
 
-    ('.s2r',):       'application/vnd.cambridge-electronic-designced.spike2.resource',
-    ('.s2rx',):      'application/vnd.cambridge-electronic-designced.spike2.resource+xml',
+    ('.s2r',):       'application/x.vnd.cambridge-electronic-designced.spike2.resource',
+    ('.s2rx',):      'application/x.vnd.cambridge-electronic-designced.spike2.resource+xml',
 
-    ('.abf',):       'application/vnd.axon-instruments.abf',
+    ('.abf',):       'application/x.vnd.axon-instruments.abf',
 
-    ('.nd2',):       'image/vnd.nikon.nd2',
-    ('.czi',):       'image/vnd.zeiss.czi',
+    ('.nd2',):       'image/x.vnd.nikon.nd2',
+    ('.czi',):       'image/x.vnd.zeiss.czi',
 }
 
 banned_basenames = (

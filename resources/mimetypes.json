@@ -9,7 +9,8 @@
          "mimetype": "application/rtf"},
 
         {"suffix": ".cdr",
-         "mimetype": "application/vnd.corel-draw"},
+         "mimetype": "application/vnd.corel-draw",
+         "notes": "application/vnd.corel-draw is not registered"},
 
         {"suffix": ".sws",
          "mimetype": "application/vnd.objective-imaging-ltd.surveyor-workspace"},
@@ -64,7 +65,8 @@
         {"suffix": ".pdf",
          "mimetype": "application/pdf"},
         {"suffix": ".org",
-         "mimetype": "text/org"},
+         "mimetype": "text/org",
+         "notes": "text/org is not registered"},
         {"suffix": ".tex",
          "mimetype": "text/x-tex"},
         {"suffix": ".rst",
@@ -78,10 +80,10 @@
     ],
     "undecided": [
         {"suffix":".nd2",
-         "mimetype": "image/vnd.nikon.nd2",
+         "mimetype": "image/x.vnd.nikon.nd2",
          "comment": "many incompatible internal formats https://rbnvrw.github.io/nd2reader/"},
         {"suffix":".s2rx",
-         "mimetype": "application/vnd.cambridge-electronic-designced.spike2.resource+xml"}
+         "mimetype": "application/x.vnd.cambridge-electronic-designced.spike2.resource+xml"}
     ],
     "utility": [
         {"suffix": null,

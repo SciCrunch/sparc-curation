@@ -214,7 +214,7 @@ hasSchema = sc.HasSchema()
 class ExtractMBF(XmlSource):
 
     top_tag = '{http://www.mbfbioscience.com}mbf'
-    mimetype = 'application/vnd.mbfbioscience.metadata+xml'
+    mimetype = 'application/x.vnd.mbfbioscience.metadata+xml'
 
     @hasSchema.f(sc.MbfTracingSchema)
     def asDict(self, unique=True, guid=False):
@@ -288,7 +288,7 @@ hasSchema = sc.HasSchema()
 class ExtractNeurolucida(ExtractMBF):
 
     top_tag = '{http://www.mbfbioscience.com/2007/neurolucida}mbf'
-    mimetype = 'application/vnd.mbfbioscience.neurolucida+xml'
+    mimetype = 'application/x.vnd.mbfbioscience.neurolucida+xml'
 
     @hasSchema.f(sc.NeurolucidaSchema)
     def asDict(self, unique=True, guid=False):
@@ -302,7 +302,7 @@ class ExtractNeurolucida(ExtractMBF):
 class ExtractVesselucida(ExtractMBF):
 
     top_tag = 'mbf'
-    mimetype = 'application/vnd.mbfbioscience.vesselucida+xml'
+    mimetype = 'application/x.vnd.mbfbioscience.vesselucida+xml'
 
     def typeMatches(self):
         return (super().typeMatches() and
@@ -315,7 +315,7 @@ class ExtractVesselucida(ExtractMBF):
 class ExtractZen(XmlSource):
 
     top_tag = 'CellCounter_Marker_File'
-    mimetype = 'application/vnd.unknown.zen+xml'  # TODO
+    mimetype = 'application/x.vnd.unknown.zen+xml'  # TODO
 
     def _extract(self):
         images = [{'path_zen':
@@ -330,7 +330,7 @@ class ExtractLAS(XmlSource):
         probably internal given lack of xmlns """
 
     top_tag = 'Data'  # very helpful thanks guys >_<
-    mimetype = 'application/vnd.leica.las+xml'  # TODO
+    mimetype = 'application/x.vnd.leica.las+xml'  # TODO
 
     def typeMatches(self):
         return (super().typeMatches() and
@@ -355,7 +355,7 @@ class ExtractPVScan(XmlSource):
         microscopy."""
 
     top_tag = 'PVScan'  # probably not sufficient ...
-    mimetype = 'application/vnd.bruker.pvscan+xml'  # TODO
+    mimetype = 'application/x.vnd.bruker.pvscan+xml'  # TODO
 
     def _extract(self):
         # TODO nothing of obvious relevance for metadata
@@ -366,7 +366,7 @@ class ExtractPVVrecSE(XmlSource):
         record in the VoltageRecording section """
 
     top_tag = 'VRecSessionEntry'
-    mimetype = 'application/vnd.bruker.vrecsessionentry+xml'  # TODO
+    mimetype = 'application/x.vnd.bruker.vrecsessionentry+xml'  # TODO
 
     def _extract(self):
         # TODO nothing of obvious relevance for metadata
@@ -382,7 +382,7 @@ class ExtractPVExperiment(XmlSource):
     # bad (solipsistic) data management practices
 
     top_tag = 'Experiment'  # very helpful xml schema creator guy >_<
-    mimetype = 'application/vnd.bruker.experiment+xml'  # TODO
+    mimetype = 'application/x.vnd.bruker.experiment+xml'  # TODO
 
     def _extract(self):
         # TODO nothing of obvious relevance for metadata
@@ -395,7 +395,7 @@ class ExtractZISRAWSUBBLOCK_METADATA(XmlSource):
 
     top_tag = 'METADATA'  # LOL OH WOW >_< this just keeps getting better
     
-    mimetype = 'application/vnd.zeiss.czi.ZISRAWSUBBLOCK.METADATA+xml'  # TODO
+    mimetype = 'application/x.vnd.zeiss.czi.ZISRAWSUBBLOCK.METADATA+xml'  # TODO
 
     def _extract(self):
         # TODO has time information and stage and focus
