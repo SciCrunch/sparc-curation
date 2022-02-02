@@ -989,6 +989,7 @@ switch to that"
       ; I think it is ok because everything runs in the dataset-id
       (when running?
         (dataset-jview! dataset #:background #t)
+        #; ; debug
         (when running?
           (println (format "dataset view expanded for ~a" (dataset-id dataset))))))
     (when running?
