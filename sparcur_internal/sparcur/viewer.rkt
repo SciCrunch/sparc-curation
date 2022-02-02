@@ -8,6 +8,8 @@
          json
          json-view)
 
+(define running? #t) ; don't use parameter, this needs to be accessible across threads
+
 ;; parameters (yay dynamic variables)
 (define path-cache-dir (make-parameter #f))
 (define path-cache-datasets (make-parameter #f))
@@ -750,6 +752,7 @@ switch to that"
            (super-on-subwindow-char receiver event)
            (send keymap handle-key-event receiver event))
          (define/augment (on-close)
+           (set! running? #f)
            (send frame-preferences show #f)
            (displayln "see ya later")))
        [label "sparcur control panel"]
@@ -975,6 +978,21 @@ switch to that"
        ;[callback cb-toggle-expand]
        [parent panel-prefs-paths]))
 
+(define (render-datasets)
+  ; run hierlist open in the background since I can't figure out how to construct them open by default
+  ; not perfect, but better than havin ui lag, don't try to spin up a thread per dataset
+  (thread
+   (thunk
+    (println "starting to expand dataset views")
+    (for [(dataset (current-datasets))]
+      ; FIXME check on interactions with cb-refresh-dataset-metadata
+      ; I think it is ok because everything runs in the dataset-id
+      (when running?
+        (dataset-jview! dataset #:background #t)
+        (when running?
+          (println (format "dataset view expanded for ~a" (dataset-id dataset))))))
+    (when running?
+      (println "finished expanding dataset views")))))
 
 (module+ main
   (init-paths!)
@@ -984,13 +1002,4 @@ switch to that"
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (cb-dataset-selection lview #f)
-  ; run hierlist open in the background since I can't figure out how to construct them open by default
-  ; not perfect, but better than havin ui lag, don't try to spin up a thread per dataset
-  (thread
-   (thunk
-    (println "starting to expand dataset views")
-    (for [(dataset (current-datasets))]
-      (dataset-jview! dataset #:background #t)
-      #; ; debug
-      (println (format "dataset view expanded for ~a" (dataset-id dataset))))
-    (println "finished expanding dataset views"))))
+  (render-datasets))
