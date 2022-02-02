@@ -188,6 +188,28 @@
 
 (define-syntax when-not (make-rename-transformer #'unless))
 
+(define (apply-items-rec function item)
+  ;(pretty-print item)
+  (when (function item)
+    (let* ([sub-items (send item get-items)])
+      (for [(sub-item sub-items)] (apply-items-rec function sub-item)))))
+
+(define (do-open item)
+  ; FIXME still slow
+  (let*-values ([(ud) (send item user-data)]
+                [(type name) (values (node-data-type ud) (node-data-name ud))])
+    #;
+    (pretty-print (list (node-data-type ud) (node-data-name ud) (node-data-value ud)))
+    (and (or (eq? type 'hash)
+             (and
+              (eq? type 'list)
+              (not (memq name ; filter cases that are v slow to open
+                         '(; FIXME hardcoded
+                           curation_errors
+                           unclassified_errors
+                           submission_errors)))))
+     (send item open))))
+
 (define (set-jview! jview json)
   "set the default state for jview"
   (define jhl (get-field json-hierlist jview))
@@ -199,7 +221,13 @@
   (send jview set-json! json)
   (define root (get-field root jhl))
   (send jhl sort json-list-item< #t)
+  #;
   (send root open)
+  ; can't thread this because some part of it is not thread safe
+  (apply-items-rec do-open root)
+  (send jhl scroll-to 0 0 0 0 #t)
+
+  #;
   (define (by-name name items)
     (let ([v (for/list ([i items]
                         #:when (let ([ud (send i user-data)])
@@ -207,12 +235,13 @@
                                       (eq? (node-data-name ud) name))))
                i)])
       (and (not (null? v)) (car v))))
+  #;
   (let ([ritems (send root get-items)])
     (when (> (length ritems) 1) ; id alone is length 1
       (map (λ (x)
              (let ([ud (send x user-data)])
                (when (and (eq? (node-data-type ud) 'hash)
-                          (memq (node-data-name ud) '(meta submission status)))
+                          (memq (node-data-name ud) '(meta submission status))) ; FIXME hardcoded
                  (when-not (null? (send x get-items)) ; compound item
                            (send x open))
                  (when (eq? (node-data-name ud) 'status)
@@ -223,13 +252,15 @@
 
 (define jviews (make-hash))
 
-(define (dataset-jview! dataset #:update [update #f])
+(define (dataset-jview! dataset #:update [update #f] #:background [background #f])
+  ; FIXME #:background is bad design forced by having (current-blob) decoupled
   (let* ([uuid (id-uuid dataset)]
          [hr-jview (hash-ref jviews uuid #f)]
          [jview
           (if (and hr-jview (not update))
               hr-jview
-              (letrec ([hier-class
+              (letrec ([hier-class json-hierlist%
+                        #; ; too slow when doing recursive opens
                         (class json-hierlist% (super-new)
                           (rename-super [super-on-item-opened on-item-opened])
                           (define/override (on-item-opened item)
@@ -262,7 +293,8 @@
                                          ; XXX false, there are still performance issues
                                          #:when (member k include-keys))
                                 (values k v))])
-                  (current-blob json) ; FIXME this will go stale
+                  (when-not background
+                    (current-blob json)) ; FIXME this will go stale
                   (set-jview! jview-inner jhash)
                   (hash-set! jviews uuid jview-inner)
                   jview-inner)))])
@@ -353,7 +385,7 @@
                ))
            (if status-3
                (begin
-                 (dataset-jview! ds #:update #t)
+                 (dataset-jview! ds #:update #t #:background #t)
                  (println (format "dataset export completed for ~a" (dataset-id ds))))
                (println (format "dataset export FAILED for ~a" (dataset-id ds)))))))))
    (define (fetch-export-dataset ds)
@@ -391,7 +423,7 @@
                      (begin
                        ; now that we have 1:1 jview:json we can automatically update the jview for
                        ; this dataset in the background thread and it shouldn't block the ui
-                       (dataset-jview! ds #:update #t)
+                       (dataset-jview! ds #:update #t #:background #t)
                        (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
                      (format "dataset ~a FAILED for ~a"
                              (cond ((nor status-2 status-3) "fetch and export")
@@ -951,4 +983,14 @@ switch to that"
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
-  (cb-dataset-selection lview #f))
+  (cb-dataset-selection lview #f)
+  ; run hierlist open in the background since I can't figure out how to construct them open by default
+  ; not perfect, but better than havin ui lag, don't try to spin up a thread per dataset
+  (thread
+   (thunk
+    (println "starting to expand dataset views")
+    (for [(dataset (current-datasets))]
+      (dataset-jview! dataset #:background #t)
+      #; ; debug
+      (println (format "dataset view expanded for ~a" (dataset-id dataset))))
+    (println "finished expanding dataset views"))))
