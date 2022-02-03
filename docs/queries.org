@@ -2670,6 +2670,21 @@ return a, b, c, d, null AS e, null AS path
 #+RESULTS: cypher-neru-1
 [[file:./images/neru-1.svg]]
 
+*** neru populations
+#+name: desc-cypher-apinat-model-populations
+List all neuron populations that appear in some ApiNATOMY model.
+
+#+header: :limit 99999
+#+name: cypher-apinat-model-populations
+#+begin_src cypher
+MATCH (start:Ontology)
+<-[:isDefinedBy]-(external:Class)
+-[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"}) // FIXME
+, (start:Ontology)
+<-[:apinat:hasGraph]-(graph:Class {iri: ""})
+RETURN external
+#+end_src
+
 *** neru model populations
 Given an ApiNATOMY model id return the identifiers for the neuron
 populations that are present in the model.
