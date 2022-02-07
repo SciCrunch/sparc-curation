@@ -44,7 +44,7 @@ class Sheet(SheetBase):
             super()._setup()
 
     def fetch(self, _refresh_cache=False, **kwargs):
-        if self._do_cache:
+        if self._do_cache or self._only_cache:
             cache = idlib.cache.cache(self._cache_path, create=True, return_path=True)
             @cache
             def cache_wrap_fetch(name, sheet_name, __f=super().fetch):
@@ -75,7 +75,7 @@ class Sheet(SheetBase):
         return super().fetch(**kwargs)
 
     def metadata(self, _refresh_cache=False):
-        if self._do_cache:
+        if self._do_cache or self._only_cache:
             cache = idlib.cache.cache(self._cache_path, create=True, return_path=True)
             @cache
             def cache_wrap_meta(name, sheet_name, __f=super().metadata):
@@ -153,9 +153,11 @@ class Affiliations(Sheet):
 
     @property
     def mapping(self):
-        return {a:idlib.Ror(r) if r else None
-                for a, r in zip(self.byCol.affiliation_string,
-                                self.byCol.ror_id)}
+        def ror_id(row):
+            r = row.ror_id().value
+            return idlib.Ror(r) if r else None
+
+        return {row.affiliation_string().value:ror_id(row) for row in self.rows()[1:]}
 
 
 # class sparc reports
@@ -546,14 +548,14 @@ class _Organs(FieldAlignment):
 class Organs(FieldAlignment):
     sheet_name = 'Organs'
     index_columns = 'id',
-    fetch_grid = True
-    #fetch_grid = False
+    fetch_grid = False  # only need hyperlinks, now via FORMULA so no grid
+    #fetch_grid = True
 
     def _lookup(self, dataset_id, fail=False, raw=True):
         try:
-            row = self.byCol.searchIndex('id', dataset_id, raw=raw)
+            row, iv = self._row_from_index('id', dataset_id)
             return row
-        except KeyError as e:
+        except AttributeError as e:
             # TODO update the sheet automatically
             log.critical(f'New dataset! {dataset_id}')
             if fail:
@@ -644,18 +646,19 @@ class Organs(FieldAlignment):
         row = self._lookup(dataset_id)
         if row:
             try:
-                m1 = self.byCol.header.index('modality1')
-                m2 = self.byCol.header.index('modality2')
-                m3 = self.byCol.header.index('modality3')
-                return tuple(_ for _ in (row[m1], row[m2], row[m3]) if _)
+                m1 = row.modality1()
+                m2 = row.modality2()
+                m3 = row.modality3()
+                return tuple(_.value for _ in (m1, m2, m3) if _.value)
             except AttributeError as e:
                 raise ValueError(f'issue in {self.name} {self.sheet_name}') from e
 
     def organ_term(self, dataset_id):
         row = self._lookup(dataset_id)
-        organ_term = self.byCol.header.index('organ_term')
+        organ_term = row.organ_term()
+        otv = organ_term.value
         if row:
-            ot = row[organ_term] if row[organ_term] else None
+            ot = otv if otv else None
             if ot:
                 try:
                     ts = tuple(OntId(t) for t in ot.split(' ') if t and t.lower() != 'na')
@@ -665,22 +668,26 @@ class Organs(FieldAlignment):
 
     def award(self, dataset_id):
         row = self._lookup(dataset_id)
-        award = self.byCol.header.index('award')
-        award_manual = self.byCol.header.index('award_manual')
+        award = row.award()
+        av = award.value
+        award_manual = row.award_manual()
+        amv = award_manual.value
         if row:
-            return row[award] if row[award] else (row[award_manual] if row[award_manual] else None)
+            return av if av else (amv if amv else None)
         
     def award_machine(self, dataset_id):
         row = self._lookup(dataset_id)
-        award = self.byCol.header.index('award')
+        award = row.award()
+        av = award.value
         if row:
-            return row[award] if row[award] else None
+            return av if av else None
 
     def award_manual(self, dataset_id):
         row = self._lookup(dataset_id)
-        award_manual = self.byCol.header.index('award_manual')
+        award_manual = row.award_manual()
+        amv = award_manual.value
         if row:
-            return row[award_manual] if row[award_manual] else None
+            return amv if amv else None
 
     def techniques(self, dataset_id):
         row = self._lookup(dataset_id)
@@ -701,13 +708,10 @@ class Organs(FieldAlignment):
                 return cell.value
 
         if row:
-            row_index = self._dataset_row_index(dataset_id)
-            return [mkval(self.cell_object(row_index, column_index))
-                    for column_index, (field, value)
-                    in enumerate(zip(self.byCol.header, row))
-                    if field.startswith('technique') and
-                    value and
-                    value.lower() != 'na']
+            return [mkval(c) for d in dir(row)
+                    if d.startswith('technique')
+                    for c in (getattr(row, d)(),)
+                    if c.value and c.value.lower() != 'na']
         else:
             return []
 
@@ -716,20 +720,28 @@ class Organs(FieldAlignment):
 
         def mkval(cell):
             hl = cell.hyperlink
-            if hl is not None:
-                return AutoId(hl)
+            cv = cell.value
+            if hl is None:
+                hl = cv if cv else None
 
-            else:
-                logd.warning(f'unhandled value {cell.value}')
-                return cell.value
+            if hl is not None:
+                try:
+                    return idlib.Pio(hl)
+                except idlib.exc.IdlibError as e:
+                    try:
+                        return idlib.Doi(hl)
+                    except idlib.exc.IdlibError as e:
+                        pass
+
+            logd.warning(f'unhandled value {cell.value}')
+            return cv
 
         if row:
-            skip = '"none"', 'NA', 'no protocols', 'take protocol from other spreadsheet, '
-            row_index = self._dataset_row_index(dataset_id)
-            return [mkval(self.cell_object(row_index, column_index))
-                    for column_index, (field, value)
-                    in enumerate(zip(self.byCol.header, row))
-                    if field.startswith('Protocol') and value and value not in skip]
+            skip = '"none"', 'NA', 'na', 'no protocols', 'take protocol from other spreadsheet, '
+            return [mkval(c) for d in dir(row)
+                    if d.startswith('protocol')
+                    for c in (getattr(row, d)(),)
+                    if c.value and c.value not in skip]
         else:
             return []
 
@@ -747,16 +759,6 @@ def mkval_tech(cell):
 
     else:
         logd.warning(f'unhandled technique {cell.value}')
-        return cell.value
-
-
-def mkval_pu(cell):
-    hl = cell.hyperlink
-    if hl is not None:
-        return AutoId(hl)
-
-    else:
-        logd.warning(f'unhandled value {cell.value}')
         return cell.value
 
 

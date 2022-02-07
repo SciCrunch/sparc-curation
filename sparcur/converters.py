@@ -280,7 +280,7 @@ class MetaConverter(TripleConverter):
         o = self.l(id)
         return TEMP.hasResponsiblePrincipalInvestigator, o  # FIXME reload -> ir
 
-    def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']
+    def award_number(self, value): return TEMP.hasAwardNumber, TEMP[f'awards/{value}']  # FIXME must escape all values !!!!!!!!
     class Extra:
         def __init__(self, converter):
             self.c = converter

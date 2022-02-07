@@ -100,7 +100,8 @@ class OrganData:
         if organs_sheet is not None:
             self._org = organs_sheet
             bc = self._org.byCol
-            self.manual  = {award if award else (award_manual if award_manual else None):[OntId(t) for t in organ_term.split(' ') if t]
+            self.manual  = {award if award else (award_manual if award_manual else None):
+                            [OntId(t) for t in organ_term.split(' ') if t]
                             for award, award_manual, organ_term
                             in zip(bc.award, bc.award_manual, bc.organ_term)
                             if organ_term}

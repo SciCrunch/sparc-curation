@@ -40,7 +40,7 @@ Usage:
     spc make-url [options] [<id-or-path>...]
     spc show     [schemas rmeta (export [json ttl])]  [options] [<project-id>]
     spc show     protcur  [json ttl]                  [options]
-    spc sheets   [update] [options] <sheet-name>
+    spc sheets   [update cache] [options] <sheet-name>
     spc fab      [meta] [options]
 
 Commands:
@@ -233,6 +233,7 @@ Options:
     -v --verbose            print extra information
     --profile               profile startup performance
     --local                 ignore network issues
+    --no-network            do not make any network requests (incomplete impl)
     --mbf                   fetch/export mbf related metadata
     --unique                return a unique set of values without additional info
 
@@ -1053,6 +1054,7 @@ done"""
             raise FileNotFoundError(f'The following do not exist!\n{bads}')
 
     def export(self):
+        # FIXME no_google couples network and behavior, we need a decoupled version now that we have caching
         from sparcur import export as ex  # FIXME very slow to import
         from sparcur import schemas as sc
 
@@ -1607,6 +1609,19 @@ done"""
         from pyontutils import sheets as ps
         #from sparcur import sheets as ss
 
+        if self.options.no_network:
+            from sparcur.sheets import Sheet
+            Sheet._only_cache = True
+
+        if self.options.cache:
+            from sparcur.sheets import Sheet, Organs, Affiliations
+            Sheet._do_cache = True
+            Sheet._re_cache = True
+            for sh in (Organs, Affiliations):
+                s = sh()
+                s.fetch()
+            return
+
         data = self._data_ir(self.options.project_id)
 
         # check that the ir is sane
@@ -1634,7 +1649,7 @@ done"""
                 cell
                 for hcell in h.cells if 'technique' in hcell.value
                 for cell in hcell.column.cells[1:] if cell.value]
-            sheet.fetch_grid = True
+            #sheet.fetch_grid = True
             sheet.fetch()
 
         if self.options.debug:

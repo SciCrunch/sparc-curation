@@ -4,7 +4,7 @@ import tempfile
 from socket import gethostname
 from functools import wraps
 import idlib
-from pyontutils.utils import byCol as _byCol, Async, deferred, makeSimpleLogger
+from pyontutils.utils import Async, deferred, makeSimpleLogger # byCol as _byCol
 from sparcur import exceptions as exc
 from sparcur import datasets as dat
 from sparcur.core import JT
@@ -113,7 +113,7 @@ class Integrator(PathData, OntologyData):
             modality = lambda v: None
             organ_term = lambda v: None
             award_manual = lambda v: None
-            byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
+            #byCol = _byCol([['award', 'award_manual', 'organ_term'], []])
             techniques = lambda v: []
             protocol_uris = lambda v: []
 
