@@ -48,6 +48,7 @@ rabbitmqctl delete_queue default
 import sys
 import json
 import pprint
+import subprocess
 
 from docopt import parse_defaults
 
@@ -198,7 +199,8 @@ def populate_existing_redis(conn):
             conn.set(fid, '')
 
     log.info(pprint.pformat({k:conn.get(k) for k in
-                             sorted(conn.keys()) if b'N:dataset' in k}))
+                             sorted(conn.keys()) if b'N:dataset' in k},
+                            width=120))
 
 
 iscron = (
@@ -257,6 +259,44 @@ def heartbeat():  # FIXME this has to run in a separate priority queue with its 
         f.write(f':t {time_now.START_TIMESTAMP_LOCAL} :n {ln} :f {lf} :q {lq} :r {lr} :qr {lqr}\n')
 
 
+def argv_simple_retrieve(dataset_id):
+    return [
+        sys.executable,
+        '-m',
+        'sparcur.simple.retrieve',
+        '--sparse-limit',
+        '-1',
+        '--dataset-id',
+        dataset_id,
+        '--parent-parent-path',
+        path_source_dir]
+
+argv_spc_find_meta = [
+    sys.executable,
+    '-m',
+    'sparcur.cli',
+    "find",
+    "--name", "*.xlsx",
+    "--name", "*.xml",
+    "--name", "submission*",
+    "--name", "code_description*",
+    "--name", "dataset_description*",
+    "--name", "subjects*",
+    "--name", "samples*",
+    "--name", "manifest*",
+    "--name", "resources*",
+    "--name", "README*",
+    '--no-network',
+    "--limit", "-1",
+    "--fetch"]
+
+argv_spc_export = [
+    sys.executable,
+    '-m',
+    'sparcur.cli',
+    'export',
+    '--no-network']
+
 pid = PennsieveId(project_id)
 def ret_val_exp(dataset_id, updated, time_now):
     log.info(f'START {dataset_id}')
@@ -267,11 +307,12 @@ def ret_val_exp(dataset_id, updated, time_now):
     # FIXME TODO smart retrieve so we don't pull if we failed during
     # export instead of pull, should be able to get it from the
     # cached metadata on the dataset
-    dataset_path = retrieve(
-        id=did, dataset_id=did, project_id=pid,
-        sparse_limit=-1, parent_parent_path=path_source_dir,
-        #extensions=('xml',),
-    )
+    if False:
+        dataset_path = retrieve(
+            id=did, dataset_id=did, project_id=pid,
+            sparse_limit=-1, parent_parent_path=path_source_dir,
+            #extensions=('xml',),
+        )
     # FIXME getting file exists errors for pull in here
     # in upstream.mkdir()
 
@@ -279,7 +320,36 @@ def ret_val_exp(dataset_id, updated, time_now):
     # that retrieve succeeds but validate or export fails
     # FIXME getting no paths to fetch errors
 
+    try:
+        p1 = subprocess.Popen(argv_simple_retrieve(dataset_id))
+        out1 = p1.communicate()
+        if p1.returncode != 0:
+            raise Exception(f'oops return code was {p1.returncode}')
+        dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
+
+        p2 = subprocess.Popen(argv_spc_find_meta,
+                              cwd=dataset_path)
+        out2 = p2.communicate()
+        if p2.returncode != 0:
+            raise Exception(f'oops return code was {p2.returncode}')
+
+        p3 = subprocess.Popen(argv_spc_export,
+                              cwd=dataset_path)
+        out3 = p3.communicate()
+        if p2.returncode != 0:
+            raise Exception(f'oops return code was {p2.returncode}')
+
+        conn.set(uid, updated)
+        conn.set(fid, '')
+        log.info(f'DONE: u: {uid} {updated}')
+    except Exception as e:
+        log.critical(f'FAIL: {fid} {updated}')
+        conn.set(fid, updated)
+        log.exception(e)
+
+    return
     with dataset_path:
+
         # FIXME it is so utterly sad and absurd that in order to
         # control memory usage it probably makes more sense to
         # run this in a synchronous subprocess so that when it exits
