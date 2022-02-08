@@ -510,7 +510,18 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def updated(self):
         if not isinstance(self.bfobject, self._Organization):
-            return self.bfobject.updated_at
+            if not hasattr(self, '_cache_updated'):
+                # string comparison of dates fails if the padding
+                # is different, how extremely unfortunate :/
+                dt, sZ = self.bfobject.updated_at.rsplit('.', 1)
+                if len(sZ) < 7:
+                    self._cache_updated = f'{dt},{sZ[:-1]:0<6}Z'
+                else:
+                    # and don't forget that even if it is correctly
+                    # padded we have to switch to use , instead of .
+                    self._cache_updated = f'{dt},{sZ}'
+
+            return self._cache_updated
 
     @property
     def file_id(self):

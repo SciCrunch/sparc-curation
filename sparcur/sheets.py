@@ -51,12 +51,16 @@ class Sheet(SheetBase):
                 return __f(**kwargs)
 
             cache_wrapper = cache_wrap_fetch
-            (meta, raw_values, grid), path = cache_wrapper(
+            (meta, raw_values, raw_values_formula, grid), path = cache_wrapper(
                 self.name, self.sheet_name,
                 _refresh_cache=_refresh_cache or self._re_cache)
             values = [list(r) for r in  # XXX FIXME code duplication
                       zip(*itertools.zip_longest(*raw_values,
                                                  fillvalue=''))]
+            values_formula = [list(r) for r in
+                              zip(*itertools.zip_longest(*raw_values_formula,
+                                                         fillvalue=''))]
+
             if grid:
                 # XXX FIXME duplicated code from pyontutils sheets
                 filter_cell = None
@@ -68,6 +72,8 @@ class Sheet(SheetBase):
             self._meta = meta
             self.raw_values = raw_values
             self._values = values
+            self.raw_values_formula = raw_values_formula
+            self._values_formula = values_formula
             self.grid = grid
             self.cells_index = cells_index
             return raw_values, values, grid, cells_index
@@ -655,9 +661,9 @@ class Organs(FieldAlignment):
 
     def organ_term(self, dataset_id):
         row = self._lookup(dataset_id)
-        organ_term = row.organ_term()
-        otv = organ_term.value
         if row:
+            organ_term = row.organ_term()
+            otv = organ_term.value
             ot = otv if otv else None
             if ot:
                 try:
@@ -668,25 +674,25 @@ class Organs(FieldAlignment):
 
     def award(self, dataset_id):
         row = self._lookup(dataset_id)
-        award = row.award()
-        av = award.value
-        award_manual = row.award_manual()
-        amv = award_manual.value
         if row:
+            award = row.award()
+            av = award.value
+            award_manual = row.award_manual()
+            amv = award_manual.value
             return av if av else (amv if amv else None)
         
     def award_machine(self, dataset_id):
         row = self._lookup(dataset_id)
-        award = row.award()
-        av = award.value
         if row:
+            award = row.award()
+            av = award.value
             return av if av else None
 
     def award_manual(self, dataset_id):
         row = self._lookup(dataset_id)
-        award_manual = row.award_manual()
-        amv = award_manual.value
         if row:
+            award_manual = row.award_manual()
+            amv = award_manual.value
             return amv if amv else None
 
     def techniques(self, dataset_id):
