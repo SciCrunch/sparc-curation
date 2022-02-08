@@ -1511,7 +1511,7 @@ if __name__ == '__main__':
 
 def main(path=None, **kwargs):
     if path is not None:
-        # FIXME this will fail if the remote for the file is not in in
+        # FIXME this will fail if the remote for the file is not in
         # the current project, or if the cachedir is not a child of
         # the top level project directory e.g. in .operations/objects
         cache = path.cache
@@ -1796,7 +1796,7 @@ from sparcur.simple.clone import main as clone
 from sparcur.simple.fetch_remote_metadata_all import main as remote_metadata
 from sparcur.simple.pull import main as pull
 from sparcur.simple.fetch_metadata_files import main as fetch_metadata_files
-
+from sparcur.simple.fetch_files import main as fetch_files
 
 def main(id=None,
          dataset_id=tuple(),
@@ -1804,6 +1804,7 @@ def main(id=None,
          parent_parent_path=Path.cwd(),
          path=None,  # keep path out of kwargs
          invariant_local_path='dataset',
+         #extensions=('xml',),  # not needed right now
          ,**kwargs):
     # FIXME parent_path and project_id seem like they probably need to
     # be passed here, it would be nice if project_path could just be
@@ -1845,6 +1846,9 @@ def main(id=None,
     pull(path=path, **kwargs)
     # fetch metadata files
     fetch_metadata_files(path=path, **kwargs)  # FIXME symlink_to
+    # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX fetch_metadata_files does NOT USE the extensions kwarg!
+    # fetch additional files
+    fetch_files(path=path)
 
     return path
 
