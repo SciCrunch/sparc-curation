@@ -4,28 +4,35 @@ services
 /etc/init.d/redis start
 
 test with
-python cron.py
+python sparcron.py
 
-run with
+# run with
+PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
 
-in one process
-celery --app sparcron worker --beat --queues cron --schedule-filename ./sparcur-cron-schedule --concurency=2
+# --queues cron:2,export:4,default:1  # SIGH https://github.com/celery/celery/issues/1599
+#celery multi start cron export default -c:cron 2 -c:export 5 -c:default 1
 
-in another process
-PYTHONBREAKPOINT=0 celery --app sparcron worker --queues export,default --loglevel=INFO
+# old run
+## in one process
+celery --app sparcron worker --beat --queues cron --schedule-filename ./sparcur-cron-schedule
+#--concurrency=2
+
+## in another process
+PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --queues export,default --loglevel=INFO
 
 #                   celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule
 #PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
 
 
 # to clean up
-celery -A cron purge
+celery -A sparcron purge
 
 rabbitmqctl list_queues
 rabbitmqctl purge_queue celery
 rabbitmqctl delete_queue cron
 rabbitmqctl delete_queue export
 rabbitmqctl delete_queue default
+
 """
 
 # FIXME need a way to separate the periodic tasks and avoid double setup
@@ -90,6 +97,7 @@ if not path_source_dir.exists():
 cel = Celery('sparcur-cron',)
 
 cel.conf.worker_hijack_root_logger = False
+cel.conf.worker_prefetch_multiplier = 1
 
 log.info(f'STATUS sparcur :id {project_id} :path {path_source_dir}')
 
@@ -97,11 +105,11 @@ log.info(f'STATUS sparcur :id {project_id} :path {path_source_dir}')
 cel.conf.task_queues = (
     Queue('cron', Exchange('cron'), routing_key='task.cron',
           #max_priority=100,
-          queue_arguments={'x-max-priority': 4},
+          queue_arguments={'x-max-priority': 10},
           ),
     Queue('export', Exchange('export'), routing_key='task.export',
           #max_priority=5,
-          queue_arguments={'x-max-priority': 3},
+          queue_arguments={'x-max-priority': 1},
           ),
     Queue('default', Exchange('default'), routing_key='task.default',
           #max_priority=1,
@@ -114,10 +122,14 @@ cel.conf.task_default_exchange = 'default'
 cel.conf.task_default_routing_key = 'task.default'
 
 def route(name, args, kwargs, options, task=None, **kw):
-    if name in ('cron.check_for_updates', 'cron.heartbeat'):
-        out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 3}
-    elif name == 'cron.export_single_dataset':
-        out = {'exchange': 'export', 'routing_key': 'task.export', 'priority': 2}
+    if name == 'sparcron.check_for_updates':
+        out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
+    elif name == 'sparcron.heartbeat':
+        out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 3, 'queue': 'cron'}
+    elif name == 'sparcron.export_single_dataset':
+        out = {'exchange': 'export', 'routing_key': 'task.export', 'priority': 1, 'queue': 'export'}
+    else:
+        log.error((name, args, kwargs, options, task, kw))
 
     #print('wat', out)
     return out
@@ -192,8 +204,10 @@ def populate_existing_redis(conn):
 iscron = (
     '--queues' in sys.argv and 'cron' in sys.argv and
     sys.argv.index('--queues') == sys.argv.index('cron') - 1)
+# FIXME this still isn't doing what we want, worker queue affinity
+# is being troublesome, will have to read up more on it
 
-if iscron:
+if True:# iscron:
     # some time between 5.0.2 and 5.2.3 on_after_connect stopped working for this, so have to use finalize?
     #@cel.on_after_configure.connect
     @cel.on_after_finalize.connect
@@ -215,7 +229,7 @@ if iscron:
     def setup_periodic_tasks(sender, **kwargs):
         log.info('setting up periodic tasks ...')
         sender.add_periodic_task(sync_interval, check_for_updates.s(project_id), name='check for updates')
-        sender.add_periodic_task(heartbeat_interval, heartbeat.s(), name='heartbeat')
+        sender.add_periodic_task(heartbeat_interval, heartbeat.s(), name='heartbeat', expires=heartbeat_interval)
 
 
 _none = 0
@@ -237,16 +251,10 @@ def heartbeat():  # FIXME this has to run in a separate priority queue with its 
     lq = len([1 for n in vals if n == _qed])
     lr = len([1 for n in vals if n == _run])
     lqr = len([1 for n in vals if n == _qed_run])
+    time_now = GetTimeNow()
     log.info(f'HEARTBEAT :n {ln} :f {lf} :q {lq} :r {lr} :qr {lqr}')
     with open('/tmp/cron-log', 'at') as f:
-        f.write(f':n {ln} :f {lf} :q {lq} :r {lr} :qr {lqr}\n')
-
-    #i = cel.control.inspect()
-    #log.info(i.scheduled())
-    #log.info(i.active())
-    #log.info(i.reserved())
-    #eff = f''
-    #log.info(eff)
+        f.write(f':t {time_now.START_TIMESTAMP_LOCAL} :n {ln} :f {lf} :q {lq} :r {lr} :qr {lqr}\n')
 
 
 pid = PennsieveId(project_id)
@@ -256,6 +264,9 @@ def ret_val_exp(dataset_id, updated, time_now):
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
 
+    # FIXME TODO smart retrieve so we don't pull if we failed during
+    # export instead of pull, should be able to get it from the
+    # cached metadata on the dataset
     dataset_path = retrieve(
         id=did, dataset_id=did, project_id=pid,
         sparse_limit=-1, parent_parent_path=path_source_dir,
@@ -269,6 +280,11 @@ def ret_val_exp(dataset_id, updated, time_now):
     # FIXME getting no paths to fetch errors
 
     with dataset_path:
+        # FIXME it is so utterly sad and absurd that in order to
+        # control memory usage it probably makes more sense to
+        # run this in a synchronous subprocess so that when it exits
+        # it cleans up after itself properly because somehow the wokers
+        # will grow to use 1.5 gigs each and sometimes much more ?!?!?!
         main = Main(options, time_now)
         try:
             blob_ir, intr, dump_path, latest_path = main.export()
@@ -317,8 +333,10 @@ def check_for_updates(project_id):
 
         _failed = conn.get(fid)
         failed = _failed.decode() if _failed is not None else _failed
+
         _state = conn.get(sid)
         state = int(_state) if _state is not None else _state
+
         rq = state == _qed_run
         running = state == _run or rq
         queued = state == _qed or rq
@@ -342,7 +360,7 @@ def check_for_updates(project_id):
                 conn.incr(sid)
             else:
                 conn.incr(sid)
-                conn.set(qid)
+                conn.set(qid, dataset.updated)
                 export_single_dataset.delay(dataset_id, dataset.updated)
 
 
@@ -354,7 +372,24 @@ def datasets_remote_from_project_id(project_id):
     return datasets
 
 
+def todo_report():
+    datasets = datasets_remote_from_project_id(project_id)
+
+    todo = []
+    for dataset in datasets:
+        dataset_id = dataset.id
+        uid = 'updated-' + dataset_id
+        _updated = conn.get(uid)
+        updated = _updated.decode() if _updated is not None else _updated
+        if not updated or dataset.updated > updated:
+            todo.append(dataset)
+
+    log.info('TODO:\n' + pprint.pformat(todo))
+
+
 def test():
+    breakpoint()
+    return
     reset_redis_keys(conn)
     populate_existing_redis(conn)
 
