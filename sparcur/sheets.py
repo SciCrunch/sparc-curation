@@ -51,7 +51,7 @@ class Sheet(SheetBase):
                 return __f(**kwargs)
 
             cache_wrapper = cache_wrap_fetch
-            (meta, raw_values, raw_values_formula, grid), path = cache_wrapper(
+            (meta, meta_file, raw_values, raw_values_formula, grid), path = cache_wrapper(
                 self.name, self.sheet_name,
                 _refresh_cache=_refresh_cache or self._re_cache)
             values = [list(r) for r in  # XXX FIXME code duplication
@@ -70,6 +70,7 @@ class Sheet(SheetBase):
                 cells_index = {}
 
             self._meta = meta
+            self._meta_file = meta_file
             self.raw_values = raw_values
             self._values = values
             self.raw_values_formula = raw_values_formula
@@ -95,6 +96,22 @@ class Sheet(SheetBase):
             return meta
 
         return super().metadata()
+
+    def metadata_file(self, _refresh_cache=False):
+        if self._do_cache or self._only_cache:
+            cache = idlib.cache.cache(self._cache_path, create=True, return_path=True)
+            @cache
+            def cache_wrap_meta_file(name, sheet_name, __f=super().metadata_file):
+                return __f()
+
+            cache_wrapper = cache_wrap_meta_file
+            meta_file, path = cache_wrapper(
+                self.name, self.sheet_name,
+                _refresh_cache=_refresh_cache or self._re_cache)
+            self._meta_file = meta_file
+            return meta_file
+
+        return super().metadata_file()
 
 
 # master

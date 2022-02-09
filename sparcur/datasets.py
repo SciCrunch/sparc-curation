@@ -750,7 +750,7 @@ class Tabular(HasErrors):
                              blame='submission',
                              path=self.path):
                 #log.exception(e)
-                logd.critical(message)
+                logd.warning(message)
 
     def _bad_filetype(self, type_):
         message = f'bad filetype {type_}\n{self.path.as_posix()!r}'

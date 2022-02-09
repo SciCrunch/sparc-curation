@@ -63,7 +63,7 @@ from sparcur.paths import Path
 from sparcur.config import auth
 from sparcur.simple.utils import backend_pennsieve
 from sparcur.simple.retrieve import main as retrieve
-from sparcur.sheets import Sheet
+from sparcur.sheets import Sheet, Organs, Affiliations
 
 
 # we set only cache here to avoid hitting rate limits the cache should
@@ -203,35 +203,39 @@ def populate_existing_redis(conn):
                             width=120))
 
 
-iscron = (
-    '--queues' in sys.argv and 'cron' in sys.argv and
-    sys.argv.index('--queues') == sys.argv.index('cron') - 1)
-# FIXME this still isn't doing what we want, worker queue affinity
-# is being troublesome, will have to read up more on it
-
-if True:# iscron:
-    # some time between 5.0.2 and 5.2.3 on_after_connect stopped working for this, so have to use finalize?
-    #@cel.on_after_configure.connect
-    @cel.on_after_finalize.connect
-    def cleanup_redis(sender, **kwargs):
-        """ For the time being ensure that any old data about process
-            state is wiped when we restart. """
-        log.info('cleaning up old redis connection ...')
-        reset_redis_keys(conn)
-        populate_existing_redis(conn)
+@cel.on_after_finalize.connect
+def cleanup_redis(sender, **kwargs):
+    """ For the time being ensure that any old data about process
+        state is wiped when we restart. """
+    log.info('cleaning up old redis connection ...')
+    reset_redis_keys(conn)
+    populate_existing_redis(conn)
 
 
-    sync_interval = 60.0 * .25  # seconds
-    heartbeat_interval = 2.0  # seconds
+sync_interval = 60.0 * 0.25  # seconds
+heartbeat_interval = 5.0  # seconds
 
 
-    # some time between 5.0.2 and 5.2.3 on_after_connect stopped working for this, so have to use finalize?
-    #@cel.on_after_configure.connect
-    @cel.on_after_finalize.connect
-    def setup_periodic_tasks(sender, **kwargs):
-        log.info('setting up periodic tasks ...')
-        sender.add_periodic_task(sync_interval, check_for_updates.s(project_id), name='check for updates')
-        sender.add_periodic_task(heartbeat_interval, heartbeat.s(), name='heartbeat', expires=heartbeat_interval)
+@cel.on_after_finalize.connect
+def setup_periodic_tasks(sender, **kwargs):
+    log.info('setting up periodic tasks ...')
+    sender.add_periodic_task(sync_interval,
+                             check_for_updates.s(project_id),
+                             name='check for updates',
+                             expires=0.55)
+
+    #sender.add_periodic_task(sync_sheet_interval,
+                             #check_sheet_updates.s(),
+                             #name='check sheet for updates',
+                             #expires=0.55)
+
+    if False:
+        # FIXME remove the heartbeat and dump a log status line after
+        # begin/end of every dataset export
+        sender.add_periodic_task(heartbeat_interval,
+                                    heartbeat.s(),
+                                    name='heartbeat',
+                                    expires=0.2)
 
 
 _none = 0
@@ -304,15 +308,11 @@ def ret_val_exp(dataset_id, updated, time_now):
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
 
+    # FIXME detect cases where we have already pulled the latest and don't pull again
     # FIXME TODO smart retrieve so we don't pull if we failed during
     # export instead of pull, should be able to get it from the
     # cached metadata on the dataset
-    if False:
-        dataset_path = retrieve(
-            id=did, dataset_id=did, project_id=pid,
-            sparse_limit=-1, parent_parent_path=path_source_dir,
-            #extensions=('xml',),
-        )
+
     # FIXME getting file exists errors for pull in here
     # in upstream.mkdir()
 
@@ -320,6 +320,8 @@ def ret_val_exp(dataset_id, updated, time_now):
     # that retrieve succeeds but validate or export fails
     # FIXME getting no paths to fetch errors
 
+    # FIXME detect cases where it appears that a new dataset is in the process of being
+    # uploaded and don't run for a while if it is being continually modified
     try:
         p1 = subprocess.Popen(argv_simple_retrieve(dataset_id))
         out1 = p1.communicate()
@@ -340,34 +342,12 @@ def ret_val_exp(dataset_id, updated, time_now):
             raise Exception(f'oops return code was {p2.returncode}')
 
         conn.set(uid, updated)
-        conn.set(fid, '')
+        conn.delete(fid)
         log.info(f'DONE: u: {uid} {updated}')
     except Exception as e:
         log.critical(f'FAIL: {fid} {updated}')
         conn.set(fid, updated)
         log.exception(e)
-
-    return
-    with dataset_path:
-
-        # FIXME it is so utterly sad and absurd that in order to
-        # control memory usage it probably makes more sense to
-        # run this in a synchronous subprocess so that when it exits
-        # it cleans up after itself properly because somehow the wokers
-        # will grow to use 1.5 gigs each and sometimes much more ?!?!?!
-        main = Main(options, time_now)
-        try:
-            blob_ir, intr, dump_path, latest_path = main.export()
-            conn.set(uid, updated)
-            conn.set(fid, '')
-            log.info(f'DONE: u: {uid} {updated}')
-        except Exception as e:
-            log.critical(f'FAIL: {fid} {updated}')
-            # retain old updated, I think? failed should mask correctly
-            #old_updated = conn.get(uid)
-            conn.set(fid, updated)
-            # TODO log the error
-            log.exception(e)
 
 
 @cel.task
@@ -378,10 +358,31 @@ def export_single_dataset(dataset_id, updated):  # FIXME this is being called wa
     ret_val_exp(dataset_id, updated, time_now)
     state = conn.get(sid)
     # FIXME I'm seeing -1 and -2 in here somehow
-    conn.decr(sid)  # we always go back 2 either to none or quened
+    conn.decr(sid)  # we always go back 2 either to none or queued
     conn.decr(sid)
     if state == _qed_run:
         export_single_dataset.delay(dataset_id)
+
+    status_report()
+
+
+@cel.task
+def check_sheet_updates():
+    # FIXME requires drive api
+    for sheetcls in (Organs, Affiliations):
+        old = sheetcls().metadata_file()['modifiedTime']
+        s = sheetcls()
+        s._only_cache = False
+        s._setup()
+        new = s.metadata_file()['modifiedTime']
+        #log.info(f':old {old} :new {new}')
+        if new != old:
+            # something has changed
+            s._do_cache = True
+            s._re_cache = True
+            s._setup()
+            s.fetch()
+            log.info(f'spreadsheet cache updated for {s.name}')
 
 
 @cel.task
@@ -411,7 +412,7 @@ def check_for_updates(project_id):
         running = state == _run or rq
         queued = state == _qed or rq
             
-        log.info(f'STATUS :id {dataset_id} :u {updated} :f {failed} :q {queued} :r {running}')
+        #log.debug(f'STATUS :id {dataset_id} :u {updated} :f {failed} :q {queued} :r {running}')
         # All the logic for whether to run a particular dataset
         # timestamp_updated or timestamp_updated_contents whichever is greater
         # NOTE we populate updated values into redis at startup from
@@ -420,9 +421,7 @@ def check_for_updates(project_id):
         if (not (updated or failed) or
             failed and dataset.updated > failed or
             not failed and updated and dataset.updated > updated):
-            # FIXME export code change also needs to factor in here
-            # FIXME the logic here is bad and is resulting in way too many jobs being enqueued
-            log.info((f'LOGIC SAYS DO SOMETHING :id {dataset_id} du: '
+            log.debug((f'MAYBE ENQUEUE :id {dataset_id} du: '
                       f'{dataset.updated} u: {updated} f: {failed}'))
             if queued:
                 pass
@@ -437,35 +436,76 @@ def check_for_updates(project_id):
 PennsieveRemote = backend_pennsieve(project_id)
 root = PennsieveRemote(project_id)
 def datasets_remote_from_project_id(project_id):
-    datasets_no = auth.get('datasets-no')
+    datasets_no = auth.get_list('datasets-no')
     datasets = [c for c in root.children if c.id not in datasets_no]
     return datasets
 
 
-def todo_report():
+def status_report():
     datasets = datasets_remote_from_project_id(project_id)
 
     todo = []
+    fail = []
+    run = 0
+    que = 0
     for dataset in datasets:
         dataset_id = dataset.id
+        sid = 'state-' + dataset_id
         uid = 'updated-' + dataset_id
+        fid = 'failed-' + dataset_id
+
         _updated = conn.get(uid)
         updated = _updated.decode() if _updated is not None else _updated
+
+        _failed = conn.get(fid)
+        failed = _failed.decode() if _failed is not None else _failed
+
+        _state = conn.get(sid)
+        state = int(_state) if _state is not None else _state
+
+        rq = state == _qed_run
+        running = state == _run or rq
+        queued = state == _qed or rq
+
         if not updated or dataset.updated > updated:
             todo.append(dataset)
+        if failed:
+            fail.append(dataset)
+        if running:
+            run += 1
+        if queued:
+            que += 1
 
-    log.info('TODO:\n' + pprint.pformat(todo))
+    fails = '\n  '.join(sorted([f.id for f in fail]))
+    todos = '\n  '.join(sorted([f.id for f in todo]))
+    report = (
+        '\nStatus Report\n'
+        f'Datasets: {len(datasets)}\n'
+        f'Failed:   {len(fail)}\n'
+        f'Todo:     {len(todo)}\n'
+        #f'Done:     {}\n'
+        f'Running:  {run}\n'
+        f'Queued:   {que}\n'
+        '\n'
+        f'Failed:\n  {fails}\n'
+        f'Todo:\n  {todos}\n'
+    )
+    log.info(report)
+    #log.info('TODO:\n' + pprint.pformat(todo))
 
 
 def test():
-    breakpoint()
+    check_sheet_updates()
+    return
+    status_report()
+    #breakpoint()
     return
     reset_redis_keys(conn)
     populate_existing_redis(conn)
 
     datasets = datasets_remote_from_project_id(project_id)
     datasets = sorted(datasets, key=lambda r:r.id)[:3]
-    dataset = datasets[1] # 0, 1, 2 # ok, unfetched xml children, ok
+    dataset = datasets[0] # 0, 1, 2 # ok, unfetched xml children, ok
     dataset_id = dataset.id
     updated = dataset.updated
     time_now = GetTimeNow()
