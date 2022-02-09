@@ -48,6 +48,7 @@ rabbitmqctl delete_queue default
 import sys
 import json
 import pprint
+import signal
 import subprocess
 
 from docopt import parse_defaults
@@ -125,12 +126,16 @@ cel.conf.task_default_routing_key = 'task.default'
 def route(name, args, kwargs, options, task=None, **kw):
     if name == 'sparcron.check_for_updates':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
+    elif name == 'sparcron.check_sheet_updates':
+        out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
     elif name == 'sparcron.heartbeat':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 3, 'queue': 'cron'}
     elif name == 'sparcron.export_single_dataset':
         out = {'exchange': 'export', 'routing_key': 'task.export', 'priority': 1, 'queue': 'export'}
     else:
-        log.error((name, args, kwargs, options, task, kw))
+        oops = (name, args, kwargs, options, task, kw)
+        log.error(oops)
+        raise NotImplementedError(oops)
 
     #print('wat', out)
     return out
@@ -212,8 +217,9 @@ def cleanup_redis(sender, **kwargs):
     populate_existing_redis(conn)
 
 
-sync_interval = 60.0 * 0.25  # seconds
-heartbeat_interval = 5.0  # seconds
+sync_interval = 17  # seconds
+sync_sheet_interval = 23  # seconds
+heartbeat_interval = 5  # seconds
 
 
 @cel.on_after_finalize.connect
@@ -222,12 +228,12 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(sync_interval,
                              check_for_updates.s(project_id),
                              name='check for updates',
-                             expires=0.55)
+                             expires=0.68333)
 
-    #sender.add_periodic_task(sync_sheet_interval,
-                             #check_sheet_updates.s(),
-                             #name='check sheet for updates',
-                             #expires=0.55)
+    sender.add_periodic_task(sync_sheet_interval,
+                             check_sheet_updates.s(),
+                             name='check sheet for updates',
+                             expires=0.88333)
 
     if False:
         # FIXME remove the heartbeat and dump a log status line after
@@ -323,23 +329,33 @@ def ret_val_exp(dataset_id, updated, time_now):
     # FIXME detect cases where it appears that a new dataset is in the process of being
     # uploaded and don't run for a while if it is being continually modified
     try:
-        p1 = subprocess.Popen(argv_simple_retrieve(dataset_id))
-        out1 = p1.communicate()
-        if p1.returncode != 0:
-            raise Exception(f'oops return code was {p1.returncode}')
+        try:
+            p1 = subprocess.Popen(argv_simple_retrieve(dataset_id))
+            out1 = p1.communicate()
+            if p1.returncode != 0:
+                raise Exception(f'oops return code was {p1.returncode}')
+        except KeyboardInterrupt as e:
+            p1.send_signal(signal.SIGINT)
+            raise e
+
         dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
+        try:
+            p2 = subprocess.Popen(argv_spc_find_meta, cwd=dataset_path)
+            out2 = p2.communicate()
+            if p2.returncode != 0:
+                raise Exception(f'oops return code was {p2.returncode}')
+        except KeyboardInterrupt as e:
+            p2.send_signal(signal.SIGINT)
+            raise e
 
-        p2 = subprocess.Popen(argv_spc_find_meta,
-                              cwd=dataset_path)
-        out2 = p2.communicate()
-        if p2.returncode != 0:
-            raise Exception(f'oops return code was {p2.returncode}')
-
-        p3 = subprocess.Popen(argv_spc_export,
-                              cwd=dataset_path)
-        out3 = p3.communicate()
-        if p2.returncode != 0:
-            raise Exception(f'oops return code was {p2.returncode}')
+        try:
+            p3 = subprocess.Popen(argv_spc_export, cwd=dataset_path)
+            out3 = p3.communicate()
+            if p3.returncode != 0:
+                raise Exception(f'oops return code was {p3.returncode}')
+        except KeyboardInterrupt as e:
+            p3.send_signal(signal.SIGINT)
+            raise e
 
         conn.set(uid, updated)
         conn.delete(fid)
@@ -368,9 +384,10 @@ def export_single_dataset(dataset_id, updated):  # FIXME this is being called wa
 
 @cel.task
 def check_sheet_updates():
-    # FIXME requires drive api
+    # TODO see if we need locking
     for sheetcls in (Organs, Affiliations):
-        old = sheetcls().metadata_file()['modifiedTime']
+        old_s = sheetcls()
+        old = old_s.metadata_file()['modifiedTime']
         s = sheetcls()
         s._only_cache = False
         s._setup()
@@ -383,6 +400,8 @@ def check_sheet_updates():
             s._setup()
             s.fetch()
             log.info(f'spreadsheet cache updated for {s.name}')
+            # TODO check which datasets (if any) changed
+            # and put them in the queue to rerun
 
 
 @cel.task
