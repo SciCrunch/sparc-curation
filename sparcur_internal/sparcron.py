@@ -132,6 +132,8 @@ def route(name, args, kwargs, options, task=None, **kw):
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 3, 'queue': 'cron'}
     elif name == 'sparcron.export_single_dataset':
         out = {'exchange': 'export', 'routing_key': 'task.export', 'priority': 1, 'queue': 'export'}
+    elif 'celery' in name:
+        out = options
     else:
         oops = (name, args, kwargs, options, task, kw)
         log.error(oops)

@@ -1945,7 +1945,8 @@ def main():
     except BaseException as e:
         log.exception(e)
         print()
-        raise e
+        msg = f'Command failed!\n{main.cwd}\n{options!r}'
+        raise exc.SparCurError(msg) from e
     finally:
         if logfile.size == 0:
             # close log handlers to safely unlink on windows

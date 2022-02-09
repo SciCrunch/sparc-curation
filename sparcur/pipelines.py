@@ -1428,8 +1428,6 @@ class PipelineExtras(JSONPipeline):
                 if not [e for e in data['errors']
                         if 'path' in e and e['path'] == _test_path]:
                     raise exc.ShouldNotHappenError('urg')
-                    #breakpoint()
-
             else:
                 data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
                 key = lambda i: i.asStr() if hasattr(i, 'asStr') else i
@@ -1528,12 +1526,14 @@ class PipelineEnd(JSONPipeline):
     ]
 
     _blame_stage = object()
+    _blame_remote = object()
     _blame_curation = object()
     _blame_submission = object()
     _blame_everyone = object()
     _blame_export = object()
     _blame = {
         'submission': _blame_submission,
+        'remote': _blame_remote,
         'pipeline': _blame_curation,
         'debug': _blame_curation,
         'stage': _blame_stage,
@@ -1593,6 +1593,10 @@ class PipelineEnd(JSONPipeline):
                     blame_target = cls._blame[blame]
                     if blame_target == cls._blame_stage:
                         pass
+                    elif blame_target == cls._blame_remote:
+                        # FIXME this is technically classified
+                        unclassified_errors.append(error)
+                        blamed = True
                     elif blame_target == cls._blame_everyone:
                         submission_errors.append(error)
                         curation_errors.append(error)

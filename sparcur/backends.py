@@ -1397,6 +1397,9 @@ class BlackfynnRemote(aug.RemotePath):
                         gid=None,  # needed to determine local writability
                         user_id=self.owner_id,
                         mode=None,
+                        # XXX WARNING these errors can leak out and can break
+                        # get_errors via extract_errors, see DatasetStructure.data_dir_structure
+                        # for the fix
                         errors=self.errors)
 
     def __eq__(self, other):

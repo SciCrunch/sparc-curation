@@ -58,6 +58,10 @@ def normtext(t, *, lower=False):
 class SparqlQueries:
     """ Creates SPARQL query templates. """
 
+    # XXX These queries now live in docs/queries.org and are maintained there
+    # This class is deprecated and will be removed at some point in the future
+    # it should not be updated
+
     def __init__(self, nsm=None):
         from rdflib.plugins import sparql
         self.sparql = sparql

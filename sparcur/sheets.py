@@ -573,6 +573,7 @@ class Organs(FieldAlignment):
     index_columns = 'id',
     fetch_grid = False  # only need hyperlinks, now via FORMULA so no grid
     #fetch_grid = True
+    _news = []
 
     def _lookup(self, dataset_id, fail=False, raw=True):
         try:
@@ -580,14 +581,17 @@ class Organs(FieldAlignment):
             return row
         except AttributeError as e:
             # TODO update the sheet automatically
-            log.critical(f'New dataset! {dataset_id}')
+            if dataset_id not in self._news:
+                log.critical(f'New dataset! {dataset_id}')
+                self._news.append(dataset_id)
+
             if fail:
                 raise e
 
     def _dataset_row_index(self, dataset_id):
         # FIXME dict or cache this for performance
         row = self._lookup(dataset_id, fail=True)
-        return self.values.index(row)
+        return self.values.index(row.values)
 
     def _update_technique(self, cell):
         # NOTE some rows won't update if the dataset no longer exists
@@ -623,7 +627,7 @@ class Organs(FieldAlignment):
             if cell_species.value != species:
                 cell_species.value = species
 
-        except KeyError as e:
+        except AttributeError as e:
             row = ['', '', name, id, award, species]  # XXX this was causing index errors
             # because the columns were not being padded by appendRow
             self._appendRow(row)

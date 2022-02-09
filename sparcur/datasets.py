@@ -465,6 +465,10 @@ class DatasetStructure:
         def jmc(d): return d.cache._jsonMetadata()
         def jml(d): return d._jsonMetadata()  # XXX TODO FIXME for local validation w/o cache
 
+        def wrap_pathmeta_error(e):
+            return {'message': e,
+                    'blame': 'remote',
+                    'pipeline_stage': 'DatasetStructure.data_dir_structure',}
         # FIXME this is just the directories so it is probably ok to
         # resolve the cache for now so we can get the nice json
         # metadata but ultimately we will need _caceh_jsonMetadata or similar
@@ -473,7 +477,10 @@ class DatasetStructure:
         jsonMeta = jmc if self.cache is not None else jml
         instpath = self._cache_class._local_class  # XXXXXXXXXXX FIXME oof inheritance :/
         return {d.dataset_relative_path:{**jsonMeta(d),
-                                         'path_meta': {k:v for k, v in self.__class__(d).cache_meta.items()
+                                         'path_meta': {k:wrap_pathmeta_error(v) if k == 'errors' else v
+                                                       for k, v in self.__class__(d).cache_meta.items()
+                                                       # errors can be strings in here! they come from
+                                                       # backends.BlackfynnRemote.meta (for example)
                                                        if v is not None}}
                 for d in (instpath(d) for d in self.rchildren_dirs)}
 

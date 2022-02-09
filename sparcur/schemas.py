@@ -662,7 +662,7 @@ ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = r'(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 
-award_pattern = '^(OT2OD|OT3OD|U18|TR|U01)'
+award_pattern = '^(OT2OD|OT3OD|U18|TR|U01)'  # really just no whitespace or / ?
 
 
 class NoLTWhitespaceSchema(JSONSchema):
