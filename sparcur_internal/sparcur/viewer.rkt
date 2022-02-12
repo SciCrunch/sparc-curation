@@ -24,14 +24,15 @@
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
 (define python-interpreter (make-parameter
-                            (find-executable-path
-                             (case (system-type)
-                               ((windows) "python.exe")
-                               ; osx is still stuck on 2.7 by default so need brew
-                               ; but for whatever reason find-executable-path is not brew aware
-                               ((macosx) "/usr/local/bin/python3")
-                               ((unix) "python") ; all of these should be >= 3.7 by this point
-                               (else (error "uhhhhh? beos is this you?"))))))
+                            (path->string
+                             (find-executable-path
+                              (case (system-type)
+                                ((windows) "python.exe")
+                                ; osx is still stuck on 2.7 by default so need brew
+                                ; but for whatever reason find-executable-path is not brew aware
+                                ((macosx) "/usr/local/bin/python3")
+                                ((unix) "python") ; all of these should be >= 3.7 by this point
+                                (else (error "uhhhhh? beos is this you?")))))))
 
 ;; other variables
 
@@ -207,9 +208,12 @@
               (eq? type 'list)
               (not (memq name ; filter cases that are v slow to open
                          '(; FIXME hardcoded
+                           synonyms
                            curation_errors
                            unclassified_errors
-                           submission_errors)))))
+                           submission_errors
+                           unclassified_stages
+                           )))))
      (send item open))))
 
 (define (set-jview! jview json)
@@ -327,6 +331,13 @@
   (fetch-dataset ds)
   (export-dataset ds))
 
+(define (make-input-port-noop)
+  "If the primary input port is inherited by windows for a gui application
+   then when system* finishes it will try to close the primary input port,
+   and in the process also kill the whole program, which is ... undesireable."
+  ; see https://github.com/racket/racket/issues/4026
+  (make-input-port "noopport" (λ (_) eof) #f (λ () 'done)))
+
 (struct dataset (id title pi-last-name)
   #:methods gen:ds
   [(define (populate-list ds list-box)
@@ -368,9 +379,11 @@
         (thunk
          (let ([status-1 #f]
                [status-2 #f])
-           (parameterize ([current-directory cwd-1])
+           (parameterize ([current-directory cwd-1]
+                          [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
-           (parameterize ([current-directory (resolve-relative-path cwd-2)])
+           (parameterize ([current-directory (resolve-relative-path cwd-2)]
+                          [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t)))))
            (println (format "dataset fetch completed for ~a" (dataset-id ds))))))))
    (define (export-dataset ds)
@@ -382,7 +395,8 @@
        (thread
         (thunk
          (let ([status-3 #f])
-           (parameterize ([current-directory (resolve-relative-path cwd-2)])
+           (parameterize ([current-directory (resolve-relative-path cwd-2)]
+                          [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))
                ))
            (if status-3
@@ -410,13 +424,15 @@
            ; logging output into the racket comint window in emacs on
            ; the other hand it is not amazing because system* is
            ; blocking, so probably switch to user subprocess?
-           (parameterize ([current-directory cwd-1])
+           (parameterize ([current-directory cwd-1]
+                          [current-input-port (make-input-port-noop)])
              #;
              (println (string-join argv-1 " "))
              (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
            (if status-1
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
-                 (parameterize ([current-directory cwd-2-resolved])
+                 (parameterize ([current-directory cwd-2-resolved]
+                                [current-input-port (make-input-port-noop)])
                    (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
                    ; TODO figure out if we need to condition this run on status-2 #t
                    (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
@@ -625,8 +641,9 @@
         (let ([path (resolve-relative-path symlink)])
           (case (system-type)
             ((windows)
-             ; FIXME this crashes/closes the gui (on windows obviously) !??!?
-             (subprocess #f #f #f (find-executable-path "explorer.exe") path))
+             (thread ; if this is not in a thread then for some reason it
+              (thunk ; will crash the whole program ?? weird stuff going on here
+               (subprocess #f #f #f (find-executable-path "explorer.exe") path))))
             (else (xopen-path path))))
         ; TODO gui visible logging
         (println "Dataset has not been fetched yet!"))))
