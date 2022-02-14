@@ -7,10 +7,13 @@ from setuptools import setup
 
 def find_version(filename):
     _version_re = re.compile(r"__version__ = ['\"](.*)['\"]")
+    last = None  # match python semantics
     for line in open(filename):
         version_match = _version_re.match(line)
         if version_match:
-            return version_match.group(1)
+            last = version_match.group(1)
+
+    return last
 
 
 __version__ = find_version('sparcur/__init__.py')

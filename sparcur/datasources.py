@@ -13,7 +13,6 @@ from sparcur.core import log, logd, JEncode
 from sparcur.paths import Path
 #from sparcur.utils import cache
 from sparcur.config import config, auth
-from bs4 import BeautifulSoup
 
 # ontology files
 class OntologyData:
@@ -82,6 +81,8 @@ class OrganData:
     old_cache = auth.get_path('cache-path') / 'award-mappings-old-to-new.json'
 
     def __init__(self, path=config.organ_html_path, organs_sheet=None):  # FIXME bad passing in organs
+        from bs4 import BeautifulSoup
+        self._BeautifulSoup = BeautifulSoup
         self.path = path
         if not self.cache.exists():
             self.overview()
@@ -114,10 +115,10 @@ class OrganData:
     def overview(self):
         if self.path.exists():
             with open(self.path, 'rb') as f:
-                soup = BeautifulSoup(f.read(), 'lxml')
+                soup = self._BeautifulSoup(f.read(), 'lxml')
         else:
             resp = requests.get(self.url)
-            soup = BeautifulSoup(resp.content, 'lxml')
+            soup = self._BeautifulSoup(resp.content, 'lxml')
 
         self.raw = {}
         self.former_to_current = {}
@@ -165,7 +166,7 @@ class OrganData:
 
     def reporter(self, href):
         resp = requests.get(href)
-        soup = BeautifulSoup(resp.content, 'lxml')
+        soup = self._BeautifulSoup(resp.content, 'lxml')
         #id = soup.find_all('span', {'id': 'spnPNUMB'})
         table = soup.find_all('table', {'summary': 'Details'})
         if table:
