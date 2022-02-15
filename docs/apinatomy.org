@@ -77,7 +77,7 @@ function apinat-full-to-dev () {
 ** Parallel build
 For the time being (until a bit more machinery is in place for
 orthauth style configuration in elisp) you can put the path to
-=secrets.sxpr= in =orgstrap-batch-helper.el= with the following
+=secrets.sxpr= in =~/.emacs.d/orgstrap-init.el= with the following
 expression =(setq oa-secrets "/path/to/secrets.sxpr")=.
 #+name: &aba
 #+begin_src bash :noweb no :tangle ../bin/apinat-functions.sh :mkdirp yes
@@ -557,9 +557,9 @@ An example run is
 [[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/soma-processes][Soma processes]]
 [[http://ontology.neuinfo.org/trees/sparc/simple/dynamic/demos/apinat/soma-processes][Soma processes simple]]
 * NPO identifiers
-
+** minimal listing
 #+begin_src elisp :exports none
-(jupyter-repl-restart-kernel) ; an this is why we don't use python kids
+(jupyter-repl-restart-kernel) ; and this is why we don't use python kids
 #+end_src
 
 Run this and commit the output to the neurons branch of the ontology.
@@ -591,6 +591,129 @@ for mg in mgraphs:
 
 olr = aug.LocalPath(auth.get('ontology-local-repo')).expanduser()
 g.write(olr / repo_relative_path)
+#+end_src
+
+** minimal modelling
+run this block
+#+begin_src jupyter-python :session pys
+from neurondm.lang import Phenotype, Neuron, Config, OntId
+from pprint import pprint
+from pyontutils.sheets import Sheet
+amr = aug.LocalPath("~/git/apinatomy-models").expanduser()
+skip = 'too-map', 'dev-layout-conn', 'scaffold-test', 'vagus-nerve', 'pancreas'
+models = [_.name for _ in (amr / 'models').children if _.name not in skip and (_ / f'source/{_.name}.xlsx').exists()]
+classes = []
+for model in models:
+    c = type(f'{model.replace("-", "_")}groups', (Sheet,), {'name': f'{model}', 'sheet_name': 'groups'})
+    classes.append(c)
+
+insts = [c() for c in classes]
+#+end_src
+
+then run this block and after that clean up the output to remove stuff we don't need
+~g/Label/d~ and friends then ~%s/owl:equiv.+\(\n.+\)+\]\ ;//~ then ~%!ttlfmt -f ttl~
+
+# #+header: :var block_lines=(let ((e (cadr (org-element-at-point)))) (list (1- (count-lines 1 (plist-get e :begin))) (1- (count-lines 1 (plist-get e :end)))))
+# #+header: :var __file__=(buffer-file-name)
+#+name: some-block
+#+begin_src jupyter-python :session pys
+#print(block_lines)
+from neurondm.lang import Phenotype, Neuron, Config, OntId
+#i = insts[0]
+#pprint(dir(i.row_object(0)))
+
+#pprint([i.values for i in insts])
+
+#para_pre =  'ilxtr:neuron-phenotype-para-pre'
+#para_post = 'ilxtr:neuron-phenotype-para-post'
+#sym_pre =   'ilxtr:neuron-phenotype-sym-pre'
+#sym_post =  'ilxtr:neuron-phenotype-sym-post'
+
+para = Phenotype('ilxtr:ParasympatheticPhenotype')
+sym = Phenotype('ilxtr:SympatheticPhenotype')
+pre = Phenotype('ilxtr:PreGanglionicPhenotype')
+post = Phenotype('ilxtr:PostGanglionicPhenotype')
+
+sens = Phenotype('ilxtr:SensoryPhenotype', 'ilxtr:hasCircuitRolePhenotype')
+motor = Phenotype('ilxtr:MotorPhenotype', 'ilxtr:hasCircuitRolePhenotype')
+intrin = Phenotype('ilxtr:IntrinsicPhenotype', 'ilxtr:hasCircuitRolePhenotype')
+
+mapping = {
+    'sympathetic': sym,
+    'parasympathetic': para,
+    'pre-ganglionic': pre,
+    'post-ganglionic': post,
+    'sensory': sens,
+    'motor': motor,
+    'local': intrin,
+    'interneuron': intrin,
+}
+
+bad_bits = {'neuron', '', 'first', 'order', 'circuit', 'lower', 'somatic'}
+bad_sets = (  # from the school of maximum wat
+    {'inhibitor', 'motor'},
+    # inhibitory motor in the context of the stomach means nitric
+    # oxide releaseing, motor usually implies actuating ach, we need
+    # to clarify the definition because neuro/myo/modulatory release
+    # is usually not what we mean in other systems
+    {'primary', 'afferent', 'intrinsic'},
+)
+
+def normalize_type(string):
+    raw_bits = set(string.split(' '))
+    bits = raw_bits - bad_bits
+    if bits in bad_sets:
+        return set()
+    id_bits = set([mapping[b] if b in mapping else b for b in bits
+                   if b in mapping])
+    return id_bits
+
+_id_oid_type = [
+    (r.id().value,
+     r.ontologyterms().value if hasattr(r, 'ontologyterms') else f'ERROR {inst}',
+     r.neurontypes().value if hasattr(r, 'neurontypes') else f'ERROR {inst}')
+    for inst in insts for r in inst.rows()[1:]]
+id_oid_type = [(i, o, t) for i, o, t in _id_oid_type if o]
+#pprint(id_oid_type)
+raw_types = sorted(set([t for i, o, t in id_oid_type]))
+#pprint(raw_types)
+#pprint([(t, normalize_type(t)) for t in raw_types])
+bagged = [(normalize_type(t), t, o) for i, o, t in id_oid_type]
+#pprint(bagged, width=240)
+neuron_classes = {
+sn: type(f'Neuron{sn.capitalize()}', (Neuron,), {'owlClass': f'ilxtr:Neuron{sn.capitalize()}'})
+for sn in set(oid.rsplit("-", 3)[-3]
+              if oid.endswith('-prime')
+              else oid.rsplit("-", 2)[-2]
+              for _, oid, _ in id_oid_type)
+}
+def dophen(oid, bag):
+    x = (oid.rsplit("-", 3)[-3]
+         if oid.endswith('-prime')
+         else oid.rsplit("-", 2)[-2])
+    t = (oid.rsplit("-", 2)[-2]
+         if oid.endswith('-prime')
+         else oid.rsplit("-", 1)[-1])
+
+    neuron_class = neuron_classes[x]
+    # FIXME this doesn't work because entailed phenotypes don't work
+    # with the correct logic because they are still acting like ec
+    # phenotypes which replace eachother, ent neurons should stack
+    # so for now we just stick the neuron id itself in and don't worry about it
+    u = OntId(oid).u
+    up = OntId(oid).u.replace('neuron-type', 'neuron-phenotype')
+    return neuron_class(Phenotype(up), *(p.asEntailed() for p in bag),
+                        label=f'neuron type {x} {t}',
+                        id_=u)
+
+config = Config('apinat-pops-more')
+neus = [dophen(oid, bag) for bag, _, oid in bagged if bag]
+pprint(neus)
+#sys.modules['__main__'].__file__ = __file__
+#import linecache
+#linecache.cache[__file__] = size, mtime, lines, fullname
+config.write()
+config.write_python()
 #+end_src
 
 * Dynamic cypher queries
