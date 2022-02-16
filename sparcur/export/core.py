@@ -554,7 +554,7 @@ class Export(ExportBase):
                 try:
                     return idlib.Auto(id)
                 except idlib.exc.MalformedIdentifierError as e:
-                    f'{blob["id"]} bad id: {id}'
+                    msg = f'{blob["id"]} bad id: {id}'
                     logd.error(msg)
                     return None
 
