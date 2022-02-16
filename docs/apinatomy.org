@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: dd9ae81761763c74c37fe482b66402895c464ae40b1810f035de2acd01621e14; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 81d2dedddbbff001a25a77237e9bb185daa0b41dd73537c00578aeb26e637721; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -980,11 +980,18 @@ obj:   {n_pair}''')
   (ow-cli-gen
       ((:install)
        (:all)
+       (:tangle)
        (:model-id nil) ; the id of the model to build
        ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
        ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
        ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
        ((:debug) apinat-converter-debug)) ; enable debug mode
+    (when tangle
+      (let (enable-local-eval)
+        ;; this pattern is required when tangling to avoid infinite loops
+        (revert-buffer nil t nil)
+        (setq-local find-file-literally nil))
+      (org-babel-tangle))
     (when (or all model-id)
       (message "updating %s" (or model-id "all"))
       (if all
