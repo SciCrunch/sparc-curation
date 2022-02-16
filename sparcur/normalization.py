@@ -321,7 +321,7 @@ class NormValues(HasErrors):
         """ N/A -> raise for cases where it should just be removed """
         if isinstance(value, str):
             v = value.strip()
-            if v in ('NA', 'n/a', 'N/A',):
+            if v in ('NA', 'n/a', 'N/A', 'none', 'None', 'no protocols', 'na'):
                 # TODO consider double checking these cases ?
                 raise exc.NotApplicableError(key)
 
