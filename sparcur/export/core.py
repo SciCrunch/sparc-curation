@@ -550,10 +550,18 @@ class Export(ExportBase):
                 except (requests.exceptions.ConnectionError, requests.exceptions.SSLError, idlib.exc.ResolutionError) as e:
                     log.error(e)
 
+            def autoid_report_error(id, blob):
+                try:
+                    return idlib.Auto(id)
+                except idlib.exc.MalformedIdentifierError as e:
+                    f'{blob["id"]} bad id: {id}'
+                    logd.error(msg)
+                    return None
+
             # retrieve doi metadata and materialize it in the dataset
             _dois = set([id
                          if isinstance(id, idlib.Stream) else
-                         (fromJson(id) if isinstance(id, dict) else idlib.Auto(id))
+                         (fromJson(id) if isinstance(id, dict) else autoid_report_error(id, blob))
                          for blob in dataset_blobs for id in
                          chain(adops.get(blob, ['meta', 'protocol_url_or_doi'], on_failure=[]),
                                adops.get(blob, ['meta', 'originating_article_doi'], on_failure=[]),
