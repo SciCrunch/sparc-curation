@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 46e9ba16f6e3dda982c100a032d00f6bea256476d2c808bd077e5423079b771c; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: caaf433951802f0f7f4776f04f43a97f57d9141a15990ebe310f8a47cbebd90d; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -108,13 +108,17 @@ Yes this is make."
                latest-release-dir)))
          to-resume))
 
+(defun py-x ()
+  (or (executable-find "pypy3")
+      (executable-find "python")))
+
 (defun get-ontology (iri merged-path)
   (run-command ;; FIXME not clear that this is the best approach here
    "robot" "merge"
    "--input-iri" iri
    "--output" merged-path)
   (run-command
-   (or (executable-find "pypy3") (executable-find "python"))
+   (py-x)
    "-m"
    (if sckan-release "pyontutils.qnamefix" "ttlser.ttlfmt")
    merged-path))
@@ -132,7 +136,7 @@ Yes this is make."
    "reduce"
    "--output"                   reasoned-path)
   (run-command
-   (or (executable-find "pypy3") (executable-find "python"))
+   (py-x)
    "-m"
    (if sckan-release "pyontutils.qnamefix" "ttlser.ttlfmt")
    reasoned-path))
@@ -140,7 +144,7 @@ Yes this is make."
 (defun read-ttl-file (path)
   "Convert path to ttl file into a list of triples. Extremely inefficient."
   (let ((bstr (run-command
-               (or (executable-find "pypy3") (executable-find "python"))
+               (py-x)
                "-m" "ttlser.ttlfmt" path "-t" "nt" "-o" "/dev/stdout")))
     ;; FIXME run-command has a buffer like this internally, a variant
     ;; that would allow us to return a buffer output instead of a string might be nice
