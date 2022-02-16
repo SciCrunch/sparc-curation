@@ -330,11 +330,11 @@ class MetaConverter(TripleConverter):
                         log.warning(e)
                         return
                 else:
-                    #try:  # was related to bug where value could be None when loading back to ir
-                    pioid = idlib.Pio(value)  # FIXME :/ should be handled in Pio directly probably?
-                    #except TypeError as e:
-                        #breakpoint()
-                        #raise e
+                    try:
+                        pioid = idlib.Pio(value)  # FIXME :/ should be handled in Pio directly probably?
+                    except idlib.exc.MalformedIdentifierError as e:
+                        logd.warning(e)
+                        return
             else:
                 pioid = value
 
@@ -345,7 +345,7 @@ class MetaConverter(TripleConverter):
                 # FIXME needs to be a pipeline so that we can export errors
                 try:
                     data = pioid.data()
-                except OntId.BadCurieError as e:
+                except (OntId.BadCurieError, idlib.exc.MalformedIdentifierError) as e:
                     loge.error(e)  # FIXME export errors ...
                     data = None
             except idlib.exc.RemoteError as e:  # FIXME sandbox violation
