@@ -789,10 +789,12 @@ function sparc-export-all () {
 
 (graphviz-2 g #:clusters
             (list
-             (cluster "retrieve.py" 'green '(fetch-remote-metadata clone
-                                             sparse-materialize pull
-                                             fetch-metadata-files))
-             (cluster "path_metadata_validate.py" 'purple '(path-metadata-validate path-metadata))))
+             (new-cluster "retrieve.py" 'green
+                          '(fetch-remote-metadata clone
+                            sparse-materialize pull
+                            fetch-metadata-files))
+             (new-cluster "path_metadata_validate.py" 'purple
+                          '(path-metadata-validate path-metadata))))
 #+end_src
 
 #+RESULTS[0a6edf0f4a2695740e58f78d9a31e1c88fb4ba3e]: graph-retrieve-single
@@ -1075,6 +1077,191 @@ process is decouple, and mediated via git:36a749b5c321cdb81ba81f9d35e050ceb84799
 **** Data
 *** Reporting
 After a release
+** SCKAN
+*** Overview
+#+name: sckan-ideal-run
+#+header: :wrap "src dot :file ./images/sckan-ideal-run.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g
+  (dag-notation
+   sckan-release-docker-image -> sckan-scigraph
+   :       sckan-scigraph-zip -> sckan-scigraph
+   sckan-release-docker-image -> sckan-blazegraph
+   :            sckan-raw-zip -> sckan-blazegraph
+
+   ; scigraph
+   sckan-scigraph -> apinat-ttl ; FIXME this is bad due to sync issues
+   sckan-scigraph -> nifstd
+   sckan-scigraph -> mkdir   ->                  sys-apps/coreutils    -> gentoo
+   sckan-scigraph -> ontload -> scigraph-load -> dev-java/scigraph-bin -> tgbugs-overlay
+   :                 ontload ->                  dev-python/pyontutils -> tgbugs-overlay
+   sckan-scigraph -> ontologies-sparc-sckan.yaml -> |git clone sparc-curation| -> git -> dev-vcs/git -> gentoo
+   sckan-scigraph -> sparc-sckan.ttl -> sparc-data.ttl -> |git clone sparc-curation|
+   :                 sparc-sckan.ttl -> sed -> sys-apps/sed -> gentoo
+   :                 sparc-sckan.ttl -> cat -> sys-apps/coreutils -> gentoo
+   :                 sparc-sckan.ttl -> cassava-protcur.ttl -> remote
+   :                 sparc-sckan.ttl -> nif.ttl -> nifstd ; TODO derive the owl import chains by actually reading the file
+   :                                    nif.ttl -> anatomy-bridge.ttl -> uberon-bridge.ttl -> uberon.owl
+   :                                    nif.ttl -> methods-bridge.ttl -> methods.ttl -> approach.ttl
+   :                                    nif.ttl -> neuron-bridge.ttl
+   :                 sparc-sckan.ttl -> extra.ttl -> nifstd
+   :                                    extra.ttl -> emapa.owl
+   :                 sparc-sckan.ttl -> scicrunch-registry.ttl -> nifstd
+   :                 sparc-sckan.ttl -> curation-export-published.owl -> cassava-curation-export-published.ttl
+   :                                    curation-export-published.owl -> ttlfmt -> dev-python/ttlser -> tgbugs-overlay
+   ; blazegraph
+   sckan-blazegraph -> blazegraph-runner -> remote
+   :                   blazegraph-runner -> dev-java/icedtea-bin
+   sckan-blazegraph -> prefixes.conf
+   sckan-blazegraph -> queries.org -> |git clone sparc-curation| -> remote
+   sckan-blazegraph -> approach.ttl -> nifstd
+   :                   approach.ttl -> |BLAZEGRAPH MISSING| ; FIXME missing approach.ttl in release.org
+   sckan-blazegraph -> protcur.ttl -> cassava-protcur.ttl
+   sckan-blazegraph -> hypothesis-protcur
+   sckan-blazegraph -> sparc-community-terms.ttl -> nifstd
+   sckan-blazegraph -> cassava-apinatomy-*.ttl
+   sckan-blazegraph -> cassava-curation-export-published.ttl
+   sckan-blazegraph -> res-uberon -> uberon.owl -> remote
+   :                   res-uberon -> robot -> dev-java/robot-bin -> gentoo -> repos -> remote
+   sckan-blazegraph -> res-emapa -> emapa.owl -> remote
+   :                   res-emapa -> robot
+   sckan-blazegraph -> res-methods -> methods.ttl -> nifstd
+   :                   res-methods -> robot
+   sckan-blazegraph -> res-npo -> npo.ttl -> nifstd
+   :                              npo.ttl -> neuron-bridge.ttl
+   :                   res-npo -> robot
+   sckan-blazegraph -> res-mis -> sparc-methods.ttl -> nifstd ; XXX not quite acurate since unres is direct
+   :                   res-mis -> robot
+   sckan-blazegraph -> res ; phony for organization purposes only
+   :                   res -> res-uberon
+   :                   res -> res-emapa
+   :                   res -> res-methods
+   :                   res -> res-npo
+   :                   res -> res-mis
+   :                   res -> robot
+   ; ontology
+   nifstd -> |git clone NIF-Ontology| -> git
+   :         |git clone NIF-Ontology| -> remote
+   ; apinat
+   :                                                                |git clone apinatomy-models| -> remote
+   cassava-apinatomy-*.ttl -> apinat-ttl -> |apinat-build --all| -> |git clone apinatomy-models| -> git
+   :                                        |apinat-build --all| -> emacs
+   :                                        |apinat-build --all| -> apinat-converter -> dev-node/apinat-converter -> tgbugs-overlay -> repos
+   cassava-apinatomy-*.ttl -> remote
+   ; protcur
+   cassava-protcur.ttl -> remote
+   cassava-protcur.ttl -> curation-export -> python -> dev-lang/python -> gentoo ; XXX not entirely accurate
+   :                      curation-export -> bash -> app-shells/bash -> gentoo
+   :                      curation-export -> emacs -> app-editors/emacs -> gentoo
+   :                      curation-export -> |python -m sparcur.cli| -> dev-python/sparcur -> gentoo ; alt dep
+   ; curation-export
+   cassava-curation-export-published.ttl -> curation-export -> |git clone sparc-curation|
+   cassava-curation-export-published.ttl -> remote
+
+   ))
+
+(graphviz-2
+ g
+ #:clusters
+ (map (λ (ncl) (apply new-cluster ncl))
+      '(("packages"
+         yellow
+         (
+gentoo
+tgbugs-overlay
+repos
+          app-editors/emacs
+          app-shells/bash
+          dev-java/icedtea-bin
+          dev-java/robot-bin
+          dev-java/scigraph-bin
+          dev-lang/python
+          dev-python/pyontutils
+          dev-python/sparcur
+          dev-python/ttlser
+          dev-vcs/git
+          sys-apps/coreutils
+          sys-apps/sed
+          ))
+        ("build-graph-sckan"
+         cyan
+         (
+          sckan-scigraph-zip
+          sckan-scigraph
+          ontologies-sparc-sckan.yaml
+          sparc-sckan.ttl
+          ontload
+          scigraph-load
+          ))
+        ("release"
+         cyan
+         (
+          sckan-blazegraph
+          sckan-raw-zip
+          prefixes.conf
+          queries.org
+          blazegraph-runner
+          ))
+        ("ont"
+         green
+         (
+          anatomy-bridge.ttl
+          approach.ttl
+          emapa.owl
+          extra.ttl
+          methods-bridge.ttl
+          methods.ttl
+          methods.ttl
+          neuron-bridge.ttl
+          npo.ttl
+          scicrunch-registry.ttl
+          sparc-community-terms.ttl
+          sparc-methods.ttl
+          uberon.owl
+          uberon-bridge.ttl
+          nif.ttl
+          #; ; renders better without
+          nifstd
+          ))
+        ("apinat"
+         red
+         (
+          cassava-apinatomy-*.ttl
+          apinat-ttl
+          |apinat-build --all|
+          apinat-converter
+          dev-node/apinat-converter
+          |git clone apinatomy-models|
+          ))
+        ("protcur"
+         magenta
+         (
+          hypothesis-protcur
+          cassava-protcur.ttl
+          protcur.ttl
+          ))
+        ("curation-export"
+         blue
+         (
+          curation-export
+          cassava-curation-export-published.ttl
+          curation-export-published.owl
+          ))
+        ("res"
+         purple
+         (
+          res-emapa
+          res-methods
+          res-mis
+          res-npo
+          res-uberon
+          )))))
+#+end_src
+
+#+RESULTS[52b162604dfc475d3f664c6d68b4b125978871ed]:
+[[file:./images/sckan-ideal-run.png]]
+
 * Internal Structure
 :PROPERTIES:
 :header-args:python: :comments link :exports code :mkdirp yes
@@ -2906,6 +3093,9 @@ for more direct mapping of graphviz functionality but one that is also way more 
 (define-syntax (dag-notation stx)
   "Write out directed graphs using a -> b -> c syntax.
 You can use a colon : at the start of a line to preserve spacing."
+  ; TODO <- ??
+  ; TODO (-> edge-type) syntax
+  ; TODO a -> (b c d e) syntax for multiple terminal deps
   (syntax-parse stx
     #:datum-literals (-> :)
     [(_ (~seq (~optional :) left (~seq -> right) ...) ...)
@@ -2964,7 +3154,7 @@ subgraphs should be specified using vertext properties or edge properties"
     (parameterize ([current-output-port (or port (current-output-port))])
       (define weighted? (weighted-graph? g))
       (define cluster-count 0)
-      (define (new-cluster)
+      (define (make-new-cluster)
         (begin0 (format "cluster_~a" cluster-count)
           (set! cluster-count (add1 cluster-count))))
       (define node-count 0)
@@ -3011,7 +3201,7 @@ subgraphs should be specified using vertext properties or edge properties"
         (for/fold ([added (set)])
                   ([cluster clusters])
           (printf "\tsubgraph ~a {\n\t\tlabel=\"~a\";\n\t\tlabeljust=\"~a\";\n"
-                  (new-cluster)
+                  (make-new-cluster)
                   (cluster-label cluster)
                   (cluster-labeljust cluster))
           (when (cluster-color cluster)
@@ -3056,7 +3246,7 @@ subgraphs should be specified using vertext properties or edge properties"
                           b -> d -> e -> f))
   #;
   (pretty-print g)
-  (define gg (graphviz-2 g #:clusters (list (cluster "test" #f '(b c d)))))
+  (define gg (graphviz-2 g #:clusters (list (new-cluster "test" #f '(b c d)))))
   (display gg)
 
   )
