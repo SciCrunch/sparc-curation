@@ -375,12 +375,12 @@ cypherResources:
       -[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
       -[:apinatomy:conveyingLyph]->()
       -[:apinatomy:supertype*0..1]->(soma:NamedIndividual)
-      -[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+      -[:apinatomy:ontologyTerms]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
       WITH path1, link
       OPTIONAL MATCH path2 = (link)
       -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
       -[:apinatomy:layerIn*0..1]->(end)
-      -[:apinatomy:external]->(external)
+      -[:apinatomy:ontologyTerms]->(external)
       RETURN path1, path2
 
   - path: /dynamic/demos/apinat/old-bundles/{start-id}
@@ -398,11 +398,11 @@ cypherResources:
       -[:apinatomy:internalIn]->(layer_or_end)  # this hits a cycle back to start_housing
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
-      -[:apinatomy:external]->(layer_or_end_external)
+      -[:apinatomy:ontologyTerms]->(layer_or_end_external)
       WITH path1, root, layer_or_end AS layer
       OPTIONAL MATCH path2 = (layer)
       -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external)
+      -[:apinatomy:ontologyTerms]->(end_housing_external)
       WITH path1, path2, root
       MATCH path3 = (root) // in the layer case this hits an additional lyph
       <-[:apinatomy:target|apinatomy:source]-(link)
@@ -428,7 +428,7 @@ cypherResources:
       -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
       -[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
-      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      -[:apinatomy:ontologyTerms*0..1]->(external)          // external ids for the housing lyphs
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       RETURN path
 
@@ -447,13 +447,13 @@ cypherResources:
       -[:apinatomy:internalIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
-      -[:apinatomy:external]->(layer_or_end_external:Class{iri: '${start-id}'})
+      -[:apinatomy:ontologyTerms]->(layer_or_end_external:Class{iri: '${start-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, root
       MATCH path2 = (root)
       -[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
-      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      -[:apinatomy:ontologyTerms*0..1]->(external)          // external ids for the housing lyphs
       RETURN path1, path2
 
       UNION
@@ -466,13 +466,13 @@ cypherResources:
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external:Class{iri: '${start-id}'})
+      -[:apinatomy:ontologyTerms]->(end_housing_external:Class{iri: '${start-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, root
       MATCH path2 = (root)
       -[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
       -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
-      -[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+      -[:apinatomy:ontologyTerms*0..1]->(external)          // external ids for the housing lyphs
       RETURN path1, path2
 
   - path: /dynamic/demos/apinat/soma-processes
@@ -487,12 +487,12 @@ cypherResources:
       -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
-      -[:apinatomy:external]->(external)
+      -[:apinatomy:ontologyTerms]->(external)
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, nodeRoot, layer_or_end AS layer
       OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
       -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external)
+      -[:apinatomy:ontologyTerms]->(end_housing_external)
       WITH path1, path2, nodeRoot
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
@@ -514,7 +514,7 @@ cypherResources:
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
       -[:apinatomy:layerIn*0..1]->(layerSoma)  // don't need to see both layer and housing for soma
-      -[:apinatomy:external]->(externalEndSoma:Class{iri: '${start-id}'})
+      -[:apinatomy:ontologyTerms]->(externalEndSoma:Class{iri: '${start-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, nodeRoot
       MATCH path3 = (chain)
@@ -523,11 +523,11 @@ cypherResources:
       -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
-      -[:apinatomy:external]->(external)
+      -[:apinatomy:ontologyTerms]->(external)
       WITH path1, path3, nodeRoot, layer_or_end AS layer
       OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
       -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external)
+      -[:apinatomy:ontologyTerms]->(end_housing_external)
       RETURN path1, path2, path3
 
   - path: /dynamic/demos/apinat/weird-soma-processes/{process-id}
@@ -546,12 +546,12 @@ cypherResources:
       -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
-      -[:apinatomy:external]->(external:Class{iri: '${process-id}'})
+      -[:apinatomy:ontologyTerms]->(external:Class{iri: '${process-id}'})
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, nodeRoot, layer_or_end AS layer
       OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
       -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external)
+      -[:apinatomy:ontologyTerms]->(end_housing_external)
       WITH path1, path2, nodeRoot
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
@@ -567,12 +567,12 @@ cypherResources:
       -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
       -[:apinatomy:cloneOf*0..1]->()
       -[:apinatomy:supertype*0..1]->()
-      -[:apinatomy:external]->(external)
+      -[:apinatomy:ontologyTerms]->(external)
       WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
       WITH path1, nodeRoot, layer_or_end AS layer
       MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
       -[:apinatomy:layerIn]->(end_housing)
-      -[:apinatomy:external]->(end_housing_external:Class{iri: '${process-id}'})
+      -[:apinatomy:ontologyTerms]->(end_housing_external:Class{iri: '${process-id}'})
       WITH path1, path2, nodeRoot
       MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
       -[:apinatomy:rootOf]->(chain)
@@ -592,7 +592,7 @@ cypherResources:
       // publications
       WITH neugrp, a
       OPTIONAL MATCH path = (neugrp)
-      -[:apinatomy:publications]->(pub)
+      -[:apinatomy:references]->(pub)
       -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
       WITH neugrp, a, path
@@ -604,7 +604,7 @@ cypherResources:
 
       WITH lyph, a, b, c, d, path
       MATCH (lyph)
-      -[e:apinatomy:external]->(region)
+      -[e:apinatomy:ontologyTerms]->(region)
       RETURN a, b, c, d, e, path
 
       UNION
@@ -614,10 +614,10 @@ cypherResources:
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
       -[b:apinatomy:lyphs]->(lyph)
       -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
-      -[d:apinatomy:external*0..1]->(region)
+      -[d:apinatomy:ontologyTerms*0..1]->(region)
       // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
       //-[c:apinatomy:internalIn*0..1]->(e)
-      //-[d:apinatomy:external*0..1]->(region)
+      //-[d:apinatomy:ontologyTerms*0..1]->(region)
       return a, b, c, d, null AS e, null AS path
 
   - path: /dynamic/demos/apinat/neru-2/{neupop_id}
@@ -629,7 +629,7 @@ cypherResources:
       // publications
       WITH neugrp, a
       OPTIONAL MATCH path = (neugrp)
-      -[:apinatomy:publications]->(pub)
+      -[:apinatomy:references]->(pub)
       -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
       WITH neugrp, a, path
@@ -641,7 +641,7 @@ cypherResources:
 
       WITH neugrp, link, lyph, a, b, c, d, path
       MATCH (lyph)
-      -[e:apinatomy:external]->(region)
+      -[e:apinatomy:ontologyTerms]->(region)
 
       // use apinatomy:next to extract ordering information
       WITH neugrp, link, a, b, c, d, e, path
@@ -663,10 +663,10 @@ cypherResources:
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
       -[b:apinatomy:lyphs]->(lyph)
       -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
-      -[d:apinatomy:external*0..1]->(region)
+      -[d:apinatomy:ontologyTerms*0..1]->(region)
       // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
       //-[c:apinatomy:internalIn*0..1]->(e)
-      //-[d:apinatomy:external*0..1]->(region)
+      //-[d:apinatomy:ontologyTerms*0..1]->(region)
       RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path
 
   - path: /dynamic/demos/apinat/neru-3/{neupop_id}
@@ -678,7 +678,7 @@ cypherResources:
       // publications
       WITH neugrp, a
       OPTIONAL MATCH path = (neugrp)
-      -[:apinatomy:publications]->(pub)
+      -[:apinatomy:references]->(pub)
       -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
       WITH neugrp, a, path
@@ -690,7 +690,7 @@ cypherResources:
 
       WITH neugrp, link, lyph, a, b, c, d, path // MATCH vs , not all things that match as lyphs have externals
       MATCH (lyph)
-      -[e:apinatomy:external]->(region)
+      -[e:apinatomy:ontologyTerms]->(region)
 
       // use apinatomy:next to extract ordering information
       WITH neugrp, link, a, b, c, d, e, path
@@ -721,10 +721,10 @@ cypherResources:
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
       -[b:apinatomy:lyphs]->(lyph)
       -[c:apinatomy:internalIn]->()
-      -[d:apinatomy:external*0..1]->(region)
+      -[d:apinatomy:ontologyTerms*0..1]->(region)
       // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
       //-[c:apinatomy:internalIn*0..1]->()
-      //-[d:apinatomy:external*0..1]->(region)
+      //-[d:apinatomy:ontologyTerms*0..1]->(region)
       RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, null as p2, null as x
 
   - path: /dynamic/demos/apinat/neru-4/{neupop_id}
@@ -745,7 +745,7 @@ cypherResources:
 
       WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
       MATCH (lyph)
-      -[e:apinatomy:external]->(region)
+      -[e:apinatomy:ontologyTerms]->(region)
 
       , p2 = (link)
       -[:apinatomy:conveyingLyph]->(cl)
@@ -765,7 +765,7 @@ cypherResources:
       // publications
       WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext
       OPTIONAL MATCH path = (neugrp)
-      -[:apinatomy:publications]->(pub)
+      -[:apinatomy:references]->(pub)
       -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
       RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext
@@ -777,7 +777,7 @@ cypherResources:
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
       -[b:apinatomy:lyphs]->(lyph)
       -[c:apinatomy:internalIn]->()
-      -[d:apinatomy:external*0..1]->(region)
+      -[d:apinatomy:ontologyTerms*0..1]->(region)
       , p2 = (lyph)
       -[:apinatomy:conveys]->(soma_link)
       -[:apinatomy:source|apinatomy:target]->(soma_node)
@@ -808,11 +808,11 @@ cypherResources:
       WITH neugrp, link, lyph, a, c, d, layer_ext
       OPTIONAL MATCH more = (lyph)
       -[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
-      -[:apinatomy:external|apinatomy:inheritedExternal]->()
+      -[:apinatomy:ontologyTerms|apinatomy:inheritedExternal]->()
 
       WITH neugrp, link, lyph, a, c, d, layer_ext, more // there is a difference here because the previous match does not require lyphs to have external ids
       MATCH (lyph)
-      -[e:apinatomy:external]->(region)
+      -[e:apinatomy:ontologyTerms]->(region)
 
       , p2 = (link)
       -[:apinatomy:conveyingLyph]->(cl)
@@ -832,8 +832,8 @@ cypherResources:
       // publications
       WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext, more
       OPTIONAL MATCH path = (neugrp)
-      -[:apinatomy:publications]->(pub)
-      -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
+      -[:apinatomy:references]->(pub)
+      -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Reference"}) // cannot be curied, dynamic endpoints will not expand it
 
       RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext, more
 
@@ -844,7 +844,7 @@ cypherResources:
       -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
       -[b:apinatomy:lyphs]->(lyph)
       -[c:apinatomy:internalIn]->()
-      -[d:apinatomy:external*0..1]->(region)
+      -[d:apinatomy:ontologyTerms*0..1]->(region)
       , p2 = (lyph)
       -[:apinatomy:conveys]->(soma_link)
       -[:apinatomy:source|apinatomy:target]->(soma_node)
@@ -857,7 +857,7 @@ cypherResources:
       WITH lyph, a, b, c, d, p2
       OPTIONAL MATCH more = (lyph)
       -[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
-      -[:apinatomy:external|apinatomy:inheritedExternal]->()
+      -[:apinatomy:ontologyTerms|apinatomy:inheritedExternal]->()
 
       RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext, more
 
@@ -890,6 +890,6 @@ cypherResources:
       -[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"}) // elements don't have a superclass right now
       ,
       (graph)
-      -[:apinatomy:publications]->(pub)
+      -[:apinatomy:references]->(pub)
       -[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"})
       RETURN e
