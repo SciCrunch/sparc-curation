@@ -4919,6 +4919,87 @@ WHERE {
     ?s rdfs:subClassOf+ SAO:1813327414 . # NOTE this counts cells
 }
 #+end_src
+****** basic connectivity
+******* python
+#+begin_src jupyter-python :session pys
+from collections import defaultdict
+from pprint import pprint
+from neurondm.compiled.common_usage_types import *
+neurons = config.neurons()
+#pprint(neurons)
+#pprint(dir(neurons[0]))
+# pprint(neurons[0].edges)
+#pprint([n for n in neurons if ilxtr.hasSomaLocatedIn in n.edges][0])
+#pprint([n for n in neurons if ilxtr.hasAxonLocatedIn in n.edges][0])
+#pprint([n for n in neurons if ilxtr.hasAxonPresynapticElementIn in n.edges][0])
+#pprint([n for n in neurons if ilxtr.hasDendriteLocatedIn in n.edges][0])
+
+x = defaultdict(list)
+for n in neurons:
+    for somar in [pe.p for pe in n.pes if pe.e == ilxtr.hasSomaLocatedIn]:
+        for axonr in [pe.p for pe in n.pes if pe.e in (ilxtr.hasAxonPresynapticElementIn, ilxtr.hasProjectionPhenotype)]:
+            # via may be incorrect here if an axon location applies only to one collateral for a terminal
+            # this is why we need the partial order
+            x[somar].append(axonr)
+
+pprint(dict(x))
+
+# via axon
+pprint([n for n in neurons if ilxtr.hasAxonLocatedIn in n.edges][:1])
+
+# axon terminal in apinatomy
+# region A is axonally forward connect to B forward here means soma -> axon terminal
+pprint([n for n in neurons if ilxtr.hasProjectionPhenotype in n.edges][:1])
+pprint([n for n in neurons if ilxtr.hasAxonPresynapticElementIn in n.edges][:1])
+
+# soma
+pprint([n for n in neurons if ilxtr.hasSomaLocatedIn in n.edges][:1])
+pprint([n for n in neurons if ilxtr.hasSomaLocatedInLayer in n.edges][:1])
+
+# via dendrite
+pprint([n for n in neurons if ilxtr.hasDendriteLocatedIn in n.edges][:1])
+
+# dendrite terminal for sensory neurons in apinatomy
+# region A is dendritically forward connect to B forward here means dendrite terminal -> soma
+pprint([n for n in neurons if ilxtr.hasSensorySubcellularElementIn in n.edges][:1])
+
+pprint([n for n in neurons if ilxtr.hasForwardConnectionPhenotype in n.edges][:1])
+pprint([n for n in neurons if ilxtr.hasReverseConnectionPhenotype in n.edges][:1])
+
+#pprint([n for n in neurons if EntailedPhenotype('UBERON:0002790', 'ilxtr:hasAxonLocatedIn') in n.pes ])
+#pprint([n for n in neurons if ilxtr.hasSomaLocatedIn in n.edges])
+#pprint([n for n in neurons if Phenotype('UBERON:0002610', 'ilxtr:hasSomaLocatedIn') in n.pes ])
+#+end_src
+
+******* cypher
+#+begin_src ttl
+:x a owl:Class ;
+owl:equivalentClass [ a owl:Restriction ;
+owl:intersectionOf (
+[ a owl:Restriction  ;
+owl:onProperty ilxtr:hasSomaLocatedIn ;
+owl:someValuesFrom [ a owl:Restriction ;
+               owl:onProperty :partOf ;
+               owl:someValuesFrom ?my-region ;
+
+] ;
+] ;
+)
+]
+#+end_src
+#+begin_src cypher :limit 10 :results drawer
+MATCH (neuron)-[e]->
+// (blank)-[:ilxtr:hasPhenotype]->(phenotype)
+(blanka)-[:ilxtr:hasAxonLocatedIn]->(blankb)-[edge]->(region_or_blank)
+//(blanka)-[:ilxtr:hasSomaLocatedIn]->(blankb)-[:BFO:0000050]->(region_or_blank)
+// or_blank happens if it is a union of regions i.e. a population with somas in more than one region
+
+//,(region_or_blank: Class{iri: "UBERON:0001950"})
+//RETURN region_or_blank
+//RETURN neuron
+RETURN edge
+#+end_src
+
 ****** number of distinct phenotypes
 ****** number of dimensions
 ****** number of phenotype values per phenotype dimension
