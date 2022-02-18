@@ -92,6 +92,7 @@ exit
 #+link: sdcol https://apinatomy.org/uris/models/sawg-distal-colon/ids/
 #+link: sstom https://apinatomy.org/uris/models/sawg-stomach/ids/
 #+link: dlcon https://apinatomy.org/uris/models/dev-layout-conn/ids/
+#+link: splen https://apinatomy.org/uris/models/spleen/ids/
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
@@ -2144,8 +2145,8 @@ id_label = {n['id']:n['lbl'] if 'lbl' in n and n['lbl'] else n['id'] for blob in
 #+end_src
 
 #+begin_src jupyter-python :session pys
-_ext_all = sorted(set([obj(e) for b in blobs for e in b['edges'] if pred(e, 'apinatomy:external')]))
-ext_pop = {i:set([obj(e) for e in blob['edges'] if pred(e, 'apinatomy:external')]) for i, blob in zip(ids, blobs)}
+_ext_all = sorted(set([obj(e) for b in blobs for e in b['edges'] if pred(e, 'apinatomy:ontologyTerms')]))
+ext_pop = {i:set([obj(e) for e in blob['edges'] if pred(e, 'apinatomy:ontologyTerms')]) for i, blob in zip(ids, blobs)}
 
 pop_by_reg = defaultdict(list)
 for i, regs in ext_pop.items():
@@ -2348,11 +2349,11 @@ OPTIONAL MATCH layer_ext = (lyph)
 WITH neugrp, link, lyph, a, c, d, layer_ext
 OPTIONAL MATCH more = (lyph)
 -[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
--[:apinatomy:external|apinatomy:inheritedExternal]->()
+-[:apinatomy:ontologyTerms|apinatomy:inheritedExternal]->()
 
 WITH neugrp, link, lyph, a, c, d, layer_ext, more // there is a difference here because the previous match does not require lyphs to have external ids
 MATCH (lyph)
--[e:apinatomy:external]->(region)
+-[e:apinatomy:ontologyTerms]->(region)
 
 , p2 = (link)
 -[:apinatomy:conveyingLyph]->(cl)
@@ -2372,8 +2373,8 @@ MATCH (lyph)
 // publications
 WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext, more
 OPTIONAL MATCH path = (neugrp)
--[:apinatomy:publications]->(pub)
--[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
+-[:apinatomy:references]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Reference"}) // cannot be curied, dynamic endpoints will not expand it
 
 RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext, more
 
@@ -2384,7 +2385,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 -[b:apinatomy:lyphs]->(lyph)
 -[c:apinatomy:internalIn]->()
--[d:apinatomy:external*0..1]->(region)
+-[d:apinatomy:ontologyTerms*0..1]->(region)
 , p2 = (lyph)
 -[:apinatomy:conveys]->(soma_link)
 -[:apinatomy:source|apinatomy:target]->(soma_node)
@@ -2397,7 +2398,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 WITH lyph, a, b, c, d, p2
 OPTIONAL MATCH more = (lyph)
 -[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
--[:apinatomy:external|apinatomy:inheritedExternal]->()
+-[:apinatomy:ontologyTerms|apinatomy:inheritedExternal]->()
 
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext, more
 #+end_src
@@ -2434,7 +2435,7 @@ OPTIONAL MATCH layer_ext = (lyph)
 
 WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
 MATCH (lyph)
--[e:apinatomy:external]->(region)
+-[e:apinatomy:ontologyTerms]->(region)
 
 , p2 = (link)
 -[:apinatomy:conveyingLyph]->(cl)
@@ -2454,7 +2455,7 @@ MATCH (lyph)
 // publications
 WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext
 OPTIONAL MATCH path = (neugrp)
--[:apinatomy:publications]->(pub)
+-[:apinatomy:references]->(pub)
 -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext
@@ -2466,7 +2467,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 -[b:apinatomy:lyphs]->(lyph)
 -[c:apinatomy:internalIn]->()
--[d:apinatomy:external*0..1]->(region)
+-[d:apinatomy:ontologyTerms*0..1]->(region)
 , p2 = (lyph)
 -[:apinatomy:conveys]->(soma_link)
 -[:apinatomy:source|apinatomy:target]->(soma_node)
@@ -2499,7 +2500,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 // publications
 WITH neugrp, a
 OPTIONAL MATCH path = (neugrp)
--[:apinatomy:publications]->(pub)
+-[:apinatomy:references]->(pub)
 -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 WITH neugrp, a, path
@@ -2511,7 +2512,7 @@ MATCH (neugrp)
 
 WITH neugrp, link, lyph, a, b, c, d, path // MATCH vs , not all things that match as lyphs have externals
 MATCH (lyph)
--[e:apinatomy:external]->(region)
+-[e:apinatomy:ontologyTerms]->(region)
 
 // use apinatomy:next to extract ordering information
 WITH neugrp, link, a, b, c, d, e, path
@@ -2542,10 +2543,10 @@ MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 -[b:apinatomy:lyphs]->(lyph)
 -[c:apinatomy:internalIn]->()
--[d:apinatomy:external*0..1]->(region)
+-[d:apinatomy:ontologyTerms*0..1]->(region)
 // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
 //-[c:apinatomy:internalIn*0..1]->()
-//-[d:apinatomy:external*0..1]->(region)
+//-[d:apinatomy:ontologyTerms*0..1]->(region)
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, null as p2, null as x
 #+end_src
 
@@ -2563,7 +2564,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 // publications
 WITH neugrp, a
 OPTIONAL MATCH path = (neugrp)
--[:apinatomy:publications]->(pub)
+-[:apinatomy:references]->(pub)
 -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 WITH neugrp, a, path
@@ -2575,7 +2576,7 @@ MATCH (neugrp)
 
 WITH neugrp, link, lyph, a, b, c, d, path
 MATCH (lyph)
--[e:apinatomy:external]->(region)
+-[e:apinatomy:ontologyTerms]->(region)
 
 // use apinatomy:next to extract ordering information
 WITH neugrp, link, a, b, c, d, e, path
@@ -2597,10 +2598,10 @@ MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 -[b:apinatomy:lyphs]->(lyph)
 -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
--[d:apinatomy:external*0..1]->(region)
+-[d:apinatomy:ontologyTerms*0..1]->(region)
 // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
 //-[c:apinatomy:internalIn*0..1]->(e)
-//-[d:apinatomy:external*0..1]->(region)
+//-[d:apinatomy:ontologyTerms*0..1]->(region)
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path
 #+end_src
 
@@ -2638,7 +2639,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 // publications
 WITH neugrp, a
 OPTIONAL MATCH path = (neugrp)
--[:apinatomy:publications]->(pub)
+-[:apinatomy:references]->(pub)
 -[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
 
 WITH neugrp, a, path
@@ -2650,7 +2651,7 @@ MATCH (neugrp)
 
 WITH lyph, a, b, c, d, path
 MATCH (lyph)
--[e:apinatomy:external]->(region)
+-[e:apinatomy:ontologyTerms]->(region)
 RETURN a, b, c, d, e, path
 
 UNION
@@ -2660,10 +2661,10 @@ MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
 -[b:apinatomy:lyphs]->(lyph)
 -[c:apinatomy:internalIn]->(e) // e is a hack to get columns to match
--[d:apinatomy:external*0..1]->(region)
+-[d:apinatomy:ontologyTerms*0..1]->(region)
 // this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
 //-[c:apinatomy:internalIn*0..1]->(e)
-//-[d:apinatomy:external*0..1]->(region)
+//-[d:apinatomy:ontologyTerms*0..1]->(region)
 return a, b, c, d, null AS e, null AS path
 #+end_src
 
@@ -2721,7 +2722,7 @@ OPTIONAL MATCH (start:Ontology {iri: $model_id})
 -[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"}) // elements don't have a superclass right now
 ,
 (graph)
--[:apinatomy:publications]->(pub)
+-[:apinatomy:references]->(pub)
 -[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"})
 RETURN e
 #+end_src
@@ -2753,7 +2754,7 @@ MATCH (type) // FIXME we need more information in the models
 -[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
 WITH neugrp, lyph, a,b,c,t,x
 MATCH (lyph)
--[e:apinatomy:external]->(region)
+-[e:apinatomy:ontologyTerms]->(region)
 RETURN e, a,b,c,t,x
 #+end_src
 
@@ -2835,7 +2836,7 @@ MATCH
 -[:apinatomy:links]->(link)
 -[:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer)
 -[:apinatomy:layerIn*0..1]->(lyph)
--[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+-[:apinatomy:ontologyTerms*0..1]->(region:Class{iri: $region_id})
 WITH neugrp
 OPTIONAL MATCH (neupop:Class)
 -[e:apinatomy:annotates*0..1]->(neugrp)
@@ -2848,7 +2849,7 @@ MATCH
 (neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
 -[:apinatomy:lyphs]->(lyph)
 -[:apinatomy:internalIn]->()
--[:apinatomy:external*0..1]->(region:Class{iri: $region_id})
+-[:apinatomy:ontologyTerms*0..1]->(region:Class{iri: $region_id})
 WITH neugrp
 OPTIONAL MATCH (neupop:Class)
 -[e:apinatomy:annotates*0..1]->(neugrp)
@@ -3231,12 +3232,12 @@ MATCH path1 = (start:Class{iri: "${start-id}"})
 -[:apinatomy:targetOf|apinatomy:sourceOf]->(linkSoma)  // axon or dendrite root
 -[:apinatomy:conveyingLyph]->()
 -[:apinatomy:supertype*0..1]->(soma:NamedIndividual)
--[:apinatomy:external]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
+-[:apinatomy:ontologyTerms]->(c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 WITH path1, link
 OPTIONAL MATCH path2 = (link)
 -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:layerIn*0..1]->(end)
--[:apinatomy:external]->(external)
+-[:apinatomy:ontologyTerms]->(external)
 RETURN path1, path2
 #+end_src
 **** old-bundles/{start-id}
@@ -3250,11 +3251,11 @@ MATCH path1 = (start:Class{iri: '${start-id}'})
 -[:apinatomy:internalIn]->(layer_or_end)  # this hits a cycle back to start_housing
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
--[:apinatomy:external]->(layer_or_end_external)
+-[:apinatomy:ontologyTerms]->(layer_or_end_external)
 WITH path1, root, layer_or_end AS layer
 OPTIONAL MATCH path2 = (layer)
 -[:apinatomy:layerIn]->(end_housing)
--[:apinatomy:external]->(end_housing_external)
+-[:apinatomy:ontologyTerms]->(end_housing_external)
 WITH path1, path2, root
 MATCH path3 = (root) // in the layer case this hits an additional lyph
 <-[:apinatomy:target|apinatomy:source]-(link)
@@ -3281,7 +3282,7 @@ MATCH path = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:target|apinatomy:source]->(root)    // axon or dendrite root
 -[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
 -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
--[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+-[:apinatomy:ontologyTerms*0..1]->(external)          // external ids for the housing lyphs
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 RETURN path
 #+end_src
@@ -3296,13 +3297,13 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:internalIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
--[:apinatomy:external]->(layer_or_end_external:Class{iri: '${start-id}'})
+-[:apinatomy:ontologyTerms]->(layer_or_end_external:Class{iri: '${start-id}'})
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 WITH path1, root
 MATCH path2 = (root)
 -[:apinatomy:controlNodes|apinatomy:rootOf*1..2]->(chain)                    // axon or dendrite tree
 -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
--[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+-[:apinatomy:ontologyTerms*0..1]->(external)          // external ids for the housing lyphs
 RETURN path1, path2
 
 UNION
@@ -3315,13 +3316,13 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
 -[:apinatomy:layerIn]->(end_housing)
--[:apinatomy:external]->(end_housing_external:Class{iri: '${start-id}'})
+-[:apinatomy:ontologyTerms]->(end_housing_external:Class{iri: '${start-id}'})
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 WITH path1, root
 MATCH path2 = (root)
 -[:apinatomy:rootOf]->(chain)                    // axon or dendrite tree
 -[:apinatomy:housingLyphs]->(housing)            // list of lyphs housing the trees
--[:apinatomy:external*0..1]->(external)          // external ids for the housing lyphs
+-[:apinatomy:ontologyTerms*0..1]->(external)          // external ids for the housing lyphs
 RETURN path1, path2
 #+end_src
 **** soma-processes
@@ -3337,12 +3338,12 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
--[:apinatomy:external]->(external)
+-[:apinatomy:ontologyTerms]->(external)
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 WITH path1, nodeRoot, layer_or_end AS layer
 OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
 -[:apinatomy:layerIn]->(end_housing)
--[:apinatomy:external]->(end_housing_external)
+-[:apinatomy:ontologyTerms]->(end_housing_external)
 WITH path1, path2, nodeRoot
 MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
 -[:apinatomy:rootOf]->(chain)
@@ -3378,11 +3379,11 @@ WHERE
   optional { ?layer_or_end apinatomy:cloneOf* ?cloned . } # optional
   optional { ?cloned apinatomy:supertype* ?supertype . } # optional
 
-  ?supertype apinatomy:external ?external_st .
-  ?layer_or_end apinatomy:external ?external_loe .
+  ?supertype apinatomy:ontologyTerms ?external_st .
+  ?layer_or_end apinatomy:ontologyTerms ?external_loe .
 
   optional { ?layer_or_end apinatomy:layerIn ?end_housing . } # optional
-  optional { ?end_housing apinatomy:external ?external_end_housing . } # optional
+  optional { ?end_housing apinatomy:ontologyTerms ?external_end_housing . } # optional
 }
 limit ?limit
 #+end_src
@@ -3398,7 +3399,7 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
 -[:apinatomy:layerIn*0..1]->(layerSoma)  // don't need to see both layer and housing for soma
--[:apinatomy:external]->(externalEndSoma:Class{iri: '${start-id}'})
+-[:apinatomy:ontologyTerms]->(externalEndSoma:Class{iri: '${start-id}'})
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 WITH path1, nodeRoot
 MATCH path3 = (chain)
@@ -3407,11 +3408,11 @@ MATCH path3 = (chain)
 -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
--[:apinatomy:external]->(external)
+-[:apinatomy:ontologyTerms]->(external)
 WITH path1, path3, nodeRoot, layer_or_end AS layer
 OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
 -[:apinatomy:layerIn]->(end_housing)
--[:apinatomy:external]->(end_housing_external)
+-[:apinatomy:ontologyTerms]->(end_housing_external)
 RETURN path1, path2, path3
 #+end_src
 **** weird-soma-processes/{process-id}
@@ -3426,12 +3427,12 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
--[:apinatomy:external]->(external:Class{iri: '${process-id}'})
+-[:apinatomy:ontologyTerms]->(external:Class{iri: '${process-id}'})
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 WITH path1, nodeRoot, layer_or_end AS layer
 OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
 -[:apinatomy:layerIn]->(end_housing)
--[:apinatomy:external]->(end_housing_external)
+-[:apinatomy:ontologyTerms]->(end_housing_external)
 WITH path1, path2, nodeRoot
 MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
 -[:apinatomy:rootOf]->(chain)
@@ -3447,12 +3448,12 @@ MATCH path1 = (c:Class{iri: "http://uri.neuinfo.org/nif/nifstd/nlx_154731"})
 -[:apinatomy:fasciculatesIn|apinatomy:endsIn]->(layer_or_end)
 -[:apinatomy:cloneOf*0..1]->()
 -[:apinatomy:supertype*0..1]->()
--[:apinatomy:external]->(external)
+-[:apinatomy:ontologyTerms]->(external)
 WHERE soma.`https://apinatomy.org/uris/readable/generated` IS NULL
 WITH path1, nodeRoot, layer_or_end AS layer
 MATCH path2 = (layer)  // if we were in a layer, get the containing lyph as well
 -[:apinatomy:layerIn]->(end_housing)
--[:apinatomy:external]->(end_housing_external:Class{iri: '${process-id}'})
+-[:apinatomy:ontologyTerms]->(end_housing_external:Class{iri: '${process-id}'})
 WITH path1, path2, nodeRoot
 MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
 -[:apinatomy:rootOf]->(chain)
@@ -3856,7 +3857,7 @@ where {
     apinatomy:description ?dyn ;
     a elements:Group .
   filter contains(str(?dyn), "dynamic")
-  optional { ?neru apinatomy:external ?neupop . }
+  optional { ?neru apinatomy:ontologyTerms ?neupop . }
   optional { ?seed apinatomy:seedIn ?neru . } # seedIn sort of works but misses cases where a dynamic group was created with a seed
 }
 order by str(?external) str(?model) xsd:integer(?neuron_number)
@@ -4274,7 +4275,7 @@ where {
   values ?type { elements:Lyph elements:Group elements:Material elements:Chain }
   ?organ ( partOf: | rdfs:subClassOf )* ?organ_start .
   #?organ apinatomy:annotates ?ele .
-  ?ele apinatomy:external ?organ .
+  ?ele apinatomy:ontologyTerms ?organ .
   ?ele a ?type .
   ?model ( apinatomy:lyphs | apinatomy:chains | apinatomy:groups | apinatomy:materials ) ?ele .
   ?model a elements:Graph .
@@ -4599,9 +4600,9 @@ WHERE {
     { select ?graph (count(distinct(?o)) as ?nodes       ) where { ?graph apinatomy:nodes        ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?chains      ) where { ?graph apinatomy:chains       ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?coalescences) where { ?graph apinatomy:coalescences ?o . } group by ?graph }
-    { select ?graph (count(distinct(?o)) as ?externals   ) where { ?graph apinatomy:external     ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?externals   ) where { ?graph apinatomy:ontologyTerms     ?o . } group by ?graph }
     optional
-    { select ?graph (count(distinct(?o)) as ?publications) where { ?graph apinatomy:publications ?o . } group by ?graph }
+    { select ?graph (count(distinct(?o)) as ?publications) where { ?graph apinatomy:references ?o . } group by ?graph }
     { select ?graph (count(distinct(?o)) as ?groups      ) where { ?graph apinatomy:groups       ?o . } group by ?graph }
     optional
     { select ?graph (count(distinct(?o)) as ?nerus       ) where
@@ -4610,16 +4611,16 @@ WHERE {
                                      filter(contains(str(?d), "dynamic")) }                             group by ?graph }
     optional
     { select ?graph (count(distinct(?o)) as ?neupops     ) where
-      { ?graph apinatomy:external ?o .
+      { ?graph apinatomy:ontologyTerms ?o .
                                   ?o rdfs:subClassOf+ ilxtr:NeuronEBM . }                               group by ?graph }
     optional
     { select ?graph (count(distinct(?o)) as ?neupops_pat ) where
-      { ?graph apinatomy:external ?o .
+      { ?graph apinatomy:ontologyTerms ?o .
               filter contains(str(?o), "/neuron-type-") }                                               group by ?graph }
     optional
     { select ?graph (count(distinct(?o)) as ?somas       ) where
       { ?graph apinatomy:lyphs ?o .
-                               ?o apinatomy:external NLX:154731 . }                                     group by ?graph }
+                               ?o apinatomy:ontologyTerms NLX:154731 . }                                     group by ?graph }
   }
   union
   {
@@ -4634,8 +4635,8 @@ WHERE {
     { select (count(distinct(?o)) as ?nodes       ) where { ?graph_ apinatomy:nodes        ?o . } }
     { select (count(distinct(?o)) as ?chains      ) where { ?graph_ apinatomy:chains       ?o . } }
     { select (count(distinct(?o)) as ?coalescences) where { ?graph_ apinatomy:coalescences ?o . } }
-    { select (count(distinct(?o)) as ?externals   ) where { ?graph_ apinatomy:external     ?o . } }
-    { select (count(distinct(?o)) as ?publications) where { ?graph_ apinatomy:publications ?o . } }
+    { select (count(distinct(?o)) as ?externals   ) where { ?graph_ apinatomy:ontologyTerms     ?o . } }
+    { select (count(distinct(?o)) as ?publications) where { ?graph_ apinatomy:references ?o . } }
     { select (count(distinct(?o)) as ?groups      ) where { ?graph_ apinatomy:groups       ?o . } }
     { select (count(distinct(?o)) as ?nerus       ) where
       { ?graph_ apinatomy:groups ?o .
@@ -4643,16 +4644,16 @@ WHERE {
                                       filter(contains(str(?d), "dynamic")) } }
     optional
     { select (count(distinct(?o)) as ?neupops     ) where
-      { ?graph_ apinatomy:external ?o .
+      { ?graph_ apinatomy:ontologyTerms ?o .
                                    ?o rdfs:subClassOf+ ilxtr:NeuronEBM . } }
     optional
     { select (count(distinct(?o)) as ?neupops_pat ) where
-      { ?graph_ apinatomy:external ?o .
+      { ?graph_ apinatomy:ontologyTerms ?o .
                filter contains(str(?o), "/neuron-type-") } }
     optional
     { select (count(distinct(?o)) as ?somas       ) where
       { ?graph_ apinatomy:lyphs ?o .
-                                ?o apinatomy:external NLX:154731 . } }
+                                ?o apinatomy:ontologyTerms NLX:154731 . } }
   }
 }
 #+end_src
@@ -4749,7 +4750,7 @@ LIMIT ?limit
 |         761 |
 
 ****** publications referenced
-apinatomy:publications
+apinatomy:references
 average number of publications per unit? (for now no)
 will also want the full listing of publications
 select count distinct o?
@@ -4759,7 +4760,7 @@ s? apinat:publication o?
 #+begin_src sparql
 SELECT DISTINCT
 (COUNT(DISTINCT ?pub) as ?publications)
-WHERE { ?s apinatomy:publications ?pub . }
+WHERE { ?s apinatomy:references ?pub . }
 #+end_src
 
 #+RESULTS: n-sparql-apinat-publications
@@ -4770,7 +4771,7 @@ WHERE { ?s apinatomy:publications ?pub . }
 ****** TODO species
 both model level and lyph level
 ****** terms employed in annotation
-count of apinatomy:external by prefix UBERON, GO, CHEBI, etc.
+count of apinatomy:ontologyTerms by prefix UBERON, GO, CHEBI, etc.
 full listing of terms as well
 
 # sadly noweb is way faster for solving this problem than trying to do the right thing >_<
@@ -4785,18 +4786,18 @@ SELECT
 WHERE {
   {
     VALUES ?prefix { <<apinat-search-prefixes()>> }
-    ?s a elements:External .
+    ?s a elements:OntologyTerm .
     FILTER CONTAINS(str(?s), ?prefix)
   } UNION {
     SELECT (":SUM:" AS ?prefix) ?s
     {
       VALUES ?pre { <<apinat-search-prefixes()>> }
-      ?s a elements:External .
+      ?s a elements:OntologyTerm .
       FILTER CONTAINS(str(?s), ?pre)
     }
   } UNION {
     BIND(":TOTAL:" AS ?prefix)
-    { SELECT ?s WHERE { ?s a elements:External . } }
+    { SELECT ?s WHERE { ?s a elements:OntologyTerm . } }
   }
 }
 GROUP BY ?prefix
@@ -4805,7 +4806,7 @@ ORDER BY ?count
 
 #+name: n-sparql-apinat-external
 #+begin_src sparql
-SELECT (COUNT(DISTINCT(?s)) as ?count) WHERE { ?s a elements:External . }
+SELECT (COUNT(DISTINCT(?s)) as ?count) WHERE { ?s a elements:OntologyTerm . }
 #+end_src
 
 ******* external issues
@@ -4815,7 +4816,7 @@ FIXME where are these coming from?
 SELECT DISTINCT
 ?l ?s
 WHERE {
-    ?s a elements:External .
+    ?s a elements:OntologyTerm .
     ?l ?p ?s .
     FILTER(CONTAINS(str(?s), "doi") || CONTAINS(str(?s), "pubmed") || CONTAINS(str(?s), "ncit"))
 }
@@ -4872,7 +4873,7 @@ SELECT DISTINCT
 (str(?pl) as ?preferred_label)
 (str(?l) as ?label)
 WHERE {
-  ?neupop a elements:External .
+  ?neupop a elements:OntologyTerm .
   ?neupop rdfs:subClassOf+ ilxtr:NeuronEBM .
   OPTIONAL { ?neupop skos:prefLabel ?pl . }
   OPTIONAL { ?neupop rdfs:label ?l . }
@@ -4899,7 +4900,7 @@ SELECT DISTINCT
 (str(?pl) as ?preferred_label)
 (str(?l) as ?label)
 WHERE {
-  ?neupop a elements:External .
+  ?neupop a elements:OntologyTerm .
   FILTER CONTAINS(str(?neupop), "/neuron-type-")
   OPTIONAL { ?neupop skos:prefLabel ?pl . }
   OPTIONAL { ?neupop rdfs:label ?l . }
