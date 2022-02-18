@@ -4469,49 +4469,48 @@ return t._data
 #+end_src
 
 #+RESULTS: apinat-dashboard-model-summary
-| label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops |
-|------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------|
-| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   498 |         107 |       169 |          238 |    29 |      29 |
-| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  1281 |         139 |       175 |           25 |    23 |      20 |
-| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1127 |         127 |       127 |            1 |    23 |         |
-| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   868 |         143 |       127 |            6 |    19 |         |
-| SAWG_colon-all                                                         | sdcol:sawg-distal-colon |   406 |          78 |        99 |            4 |     1 |         |
-| Keast Bladder Model Scaffold Test                                      | scaft:scaffold-test     |  1290 |         145 |       162 |            4 |     2 |         |
-| TOTAL                                                                  | 7                       |  5520 |         761 |       454 |          275 |    97 |      49 |
+| label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops | neupops_pat | somas |
+|------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------+-------------+-------|
+| ApiNATOMY model of the stomach                                         | sstom:sawg-stomach      |   751 |          38 |        75 |            8 |    14 |      14 |          14 |    14 |
+| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  2586 |         139 |       175 |           30 |    22 |      20 |          20 |    34 |
+| SAWG ApiNATOMY model of the distal colon                               | sdcol:sawg-distal-colon |   962 |          85 |       118 |            4 |    17 |      17 |          17 |    23 |
+| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   499 |         107 |       168 |          238 |    29 |      29 |          29 |    29 |
+| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1977 |         136 |       146 |            1 |    17 |      17 |          17 |    41 |
+| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   556 |         143 |       135 |            6 |     6 |       6 |           6 |    19 |
+| spleen model                                                           | splen:spleen            |   474 |          43 |        93 |            4 |     5 |         |           5 |     8 |
+| Total unique                                                           | 7                       |  7806 |         691 |       538 |          292 |   110 |     103 |         108 |   168 |
 
 #+RESULTS: apinat-dashboard-overview
 | element         | count |
 |-----------------+-------|
 | models          |     7 |
-| models scigraph |     8 |
-| lyphs           |  5525 |
-| lyphs input     |   761 |
-| externals       |   459 |
-| publications    |   275 |
-| nerus           |    97 |
-| neupops         |    49 |
-| neupops pattern |    49 |
+| models scigraph |     7 |
+| lyphs           |  7810 |
+| lyphs input     |   691 |
+| externals       |   538 |
+| publications    |   292 |
+| nerus           |   110 |
+| neupops         |   115 |
+| neupops pattern |   120 |
 
 # TODO links to a way to view the terms per ontology if possible
 #+RESULTS: sparql-apinat-prefixes
-| prefix    | count |
-|-----------+-------|
-| CL        |     1 |
-| nlx       |     1 |
-| NCBITaxon |     2 |
-| ncit      |     2 |
-| NCIT      |     4 |
-| sao       |     4 |
-| GO        |     5 |
-| CHEBI     |    11 |
-| pubmed    |    14 |
-| EMAPA     |    17 |
-| tgbugs    |    49 |
-| ilx       |    76 |
-| fma       |    91 |
-| UBERON    |   182 |
-| :SUM:     |   459 |
-| :TOTAL:   |   459 |
+| prefix  | count |
+|---------+-------|
+| nlx     |     1 |
+| pubmed  |     1 |
+| CL      |     3 |
+| GO      |     4 |
+| sao     |     4 |
+| NCIT    |     8 |
+| CHEBI   |    11 |
+| EMAPA   |    16 |
+| ilx     |    78 |
+| fma     |    88 |
+| tgbugs  |   108 |
+| UBERON  |   215 |
+| :SUM:   |   537 |
+| :TOTAL: |   538 |
 
 #+header: :var n-sparql-apinat-graphs=n-sparql-apinat-graphs()
 #+header: :var cypher-apinat-models=cypher-apinat-models()
