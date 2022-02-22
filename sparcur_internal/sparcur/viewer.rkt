@@ -4,11 +4,15 @@
          racket/generic
          racket/pretty
          framework
+         compiler/compilation-path
          gui-widget-mixins
          json
          json-view)
 
+(define this-file (path->string (syntax-source #'here)))
+
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
+(define update-running? #f)
 
 ;; parameters (yay dynamic variables)
 (define path-cache-dir (make-parameter #f))
@@ -78,6 +82,7 @@
   (cons (python-interpreter) (cons "-m" (cons module-name args))))
 
 (define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "for-racket"))
+(define argv-simple-git-repos-update (python-mod-args "sparcur.simple.utils" "git-repos" "update"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
 (define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1" "--dataset-id" (dataset-id ds)))
 (define argv-spc-find-meta
@@ -186,6 +191,43 @@
                                           'path_error_report)
                                 '|#/path_metadata/-1|)
                       'messages)))
+
+;; update viewer
+
+(define (update-viewer)
+  "stash and pull all git repos, rebuild the viewer"
+  ; find the git repos
+  (if update-running?
+      (println "Update is already running!")
+      (begin
+        (set! update-running? #t)
+        (thread
+         (thunk
+          (dynamic-wind
+            (λ () #t)
+            (thunk
+             (println "Update starting ...")
+             (let ([exec-file (path->string (find-system-path 'exec-file))]
+                   [this-file-compiled (get-compilation-bytecode-file this-file)]
+                   [status (apply system* argv-simple-git-repos-update)])
+                  ; TODO pull changes for racket dependent repos as well
+                  (println (format "running raco make --vv ~a" this-file))
+                  (let ([mtime-before (file-or-directory-modify-seconds this-file-compiled)])
+                    (parameterize ([current-command-line-arguments
+                                    (vector "--vv" this-file)])
+                      (dynamic-require 'compiler/commands/make #f))
+                    #;
+                    (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" this-file)
+                    (let ([mtime-after (file-or-directory-modify-seconds this-file-compiled)])
+                      (when (not (= mtime-before mtime-after))
+                        (println (format "running raco exe --vv ~a" this-file))
+                        (parameterize ([current-command-line-arguments
+                                        (vector "--vv" this-file)])
+                          (dynamic-require 'compiler/commands/exe #f))
+                        #;
+                        (system* exec-file "-l-" "raco/main.rkt" "exe" "--vv" this-file)))))
+             (println "Update complete!"))
+            (λ () (set! update-running? #f))))))))
 
 ;; json view
 
@@ -580,6 +622,9 @@
       #:exists 'replace ; yes if you run multiple of these you could have a data race
       (λ () (pretty-write result)))))
 
+(define (cb-update-viewer obj event)
+  (update-viewer))
+
 (define (cb-toggle-expand obj event)
   (displayln (list obj event (send event get-event-type)))
   ; TODO recursively open/close and possibly restore default view
@@ -789,6 +834,10 @@ switch to that"
                             [shortcut-prefix '(ctl)]
                             [callback k-quit]
                             [parent menu-file]))
+(define menu-item-update-viewer (new menu-item%
+                                     [label "Update Viewer"]
+                                     [callback cb-update-viewer]
+                                     [parent menu-file]))
 (define menu-edit (new menu% [label "Edit"] [parent menu-bar-main]))
 (define menu-item-preferences (new menu-item%
                                    [label "Preferences..."]
@@ -824,6 +873,12 @@ switch to that"
                                      [label lbt-refresh-datasets]
                                      [callback cb-refresh-dataset-metadata]
                                      [parent panel-org-actions]))
+
+#; ; prefer file menu to avoid accidental clicks
+(define button-update-viewer (new button%
+                                  [label "Update Viewer"]
+                                  [callback cb-update-viewer]
+                                  [parent panel-org-actions]))
 
 (define lview (new list-box%
                    [label ""]
