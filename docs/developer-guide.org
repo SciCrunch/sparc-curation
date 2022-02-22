@@ -3069,12 +3069,12 @@ def main(id=None, **kwargs):
             from importlib import util as imu
             oldargv = sys.argv
             try:
-                sys.argv = ['setup.py', '--release']
                 for s in setups:
                     if pretend:
                         print(f'pushd {s.parent.as_posix()}; python setup.py --release; popd')
                         continue
-                    print(f'Maybe tangling {s.as_posix()}')
+                    sys.argv = ['setup.py', '--release']  # reset every time since most will mutate
+                    print(f'Maybe tangling via {s.as_posix()}')
                     spec = imu.spec_from_file_location(f'setup_{s.parent.name}', s)
                     mod = imu.module_from_spec(spec)
                     try:
