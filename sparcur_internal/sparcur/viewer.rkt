@@ -3,13 +3,15 @@
 (require racket/gui
          racket/generic
          racket/pretty
+         racket/runtime-path
          framework
          compiler/compilation-path
          gui-widget-mixins
          json
          json-view)
 
-(define this-file (path->string (syntax-source #'here)))
+(define-runtime-path asdf "viewer.rkt")
+(define this-file (path->string asdf))
 
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
 (define update-running? #f)
@@ -208,24 +210,33 @@
             (thunk
              (println "Update starting ...")
              (let ([exec-file (path->string (find-system-path 'exec-file))]
+                   [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [this-file-compiled (get-compilation-bytecode-file this-file)]
                    [status (apply system* argv-simple-git-repos-update)])
                   ; TODO pull changes for racket dependent repos as well
                   (println (format "running raco make --vv ~a" this-file))
                   (let ([mtime-before (file-or-directory-modify-seconds this-file-compiled)])
+                    (system* raco-exe "make" "--vv" this-file)
+                    #; ; raco exe issues ... i love it when abstractions break :/
                     (parameterize ([current-command-line-arguments
                                     (vector "--vv" this-file)])
                       (dynamic-require 'compiler/commands/make #f))
                     #;
-                    (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" this-file)
+                    (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" "--" this-file)
                     (let ([mtime-after (file-or-directory-modify-seconds this-file-compiled)])
                       (when (not (= mtime-before mtime-after))
                         (println (format "running raco exe --vv ~a" this-file))
+                        (system* raco-exe "exe" "--vv" this-file)
+                        #; ; this is super cool but an eternal pain for raco exe
                         (parameterize ([current-command-line-arguments
-                                        (vector "--vv" this-file)])
+                                        (vector
+                                         "++lib" "compiler/commands/make"
+                                         "++lib" "compiler/commands/exe"
+                                         "++lib" "racket/lang/reader"
+                                         "--vv" this-file)])
                           (dynamic-require 'compiler/commands/exe #f))
                         #;
-                        (system* exec-file "-l-" "raco/main.rkt" "exe" "--vv" this-file)))))
+                        (system* exec-file "-l-" "raco/main.rkt" "exe" "--vv" "--" this-file)))))
              (println "Update complete!"))
             (λ () (set! update-running? #f))))))))
 
