@@ -3058,9 +3058,10 @@ def main(id=None, **kwargs):
                 print(f'git -C {rp.as_posix()} stash')
                 print(f'git -C {rp.as_posix()} pull')
                 return
-            rp.repo.git.stash()
+            print(f'Pulling {rp.as_posix()}')
+            print(rp.repo.git.stash())
             # TODO checkout to a safety branch and tag for rollback
-            rp.repo.git.pull()
+            print(rp.repo.git.pull())
         if 'update' in kwargs and kwargs['update']:
             for wd in wds:
                 doupdate(wd)
