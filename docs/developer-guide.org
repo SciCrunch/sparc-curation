@@ -3074,6 +3074,7 @@ def main(id=None, **kwargs):
                     if pretend:
                         print(f'pushd {s.parent.as_posix()}; python setup.py --release; popd')
                         continue
+                    print(f'Maybe tangling {s.as_posix()}')
                     spec = imu.spec_from_file_location(f'setup_{s.parent.name}', s)
                     mod = imu.module_from_spec(spec)
                     try:

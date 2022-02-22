@@ -214,9 +214,9 @@
                    [this-file-compiled (get-compilation-bytecode-file this-file)]
                    [status (apply system* argv-simple-git-repos-update)])
                   ; TODO pull changes for racket dependent repos as well
-                  (println (format "running raco make --vv ~a" this-file))
+                  (println (format "running raco make -v ~a" this-file))
                   (let ([mtime-before (file-or-directory-modify-seconds this-file-compiled)])
-                    (system* raco-exe "make" "--vv" this-file)
+                    (system* raco-exe "make" "-v" this-file)
                     #; ; raco exe issues ... i love it when abstractions break :/
                     (parameterize ([current-command-line-arguments
                                     (vector "--vv" this-file)])
@@ -225,8 +225,8 @@
                     (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" "--" this-file)
                     (let ([mtime-after (file-or-directory-modify-seconds this-file-compiled)])
                       (when (not (= mtime-before mtime-after))
-                        (println (format "running raco exe --vv ~a" this-file))
-                        (system* raco-exe "exe" "--vv" this-file)
+                        (println (format "running raco exe -v ~a" this-file))
+                        (system* raco-exe "exe" "-v" this-file)
                         #; ; this is super cool but an eternal pain for raco exe
                         (parameterize ([current-command-line-arguments
                                         (vector
