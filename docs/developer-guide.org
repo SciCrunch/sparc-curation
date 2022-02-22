@@ -1168,9 +1168,9 @@ After a release
       '(("packages"
          yellow
          (
-gentoo
-tgbugs-overlay
-repos
+          gentoo
+          tgbugs-overlay
+          repos
           app-editors/emacs
           app-shells/bash
           dev-java/icedtea-bin
@@ -2657,6 +2657,7 @@ Usage:
     sparcur-simple get-uuid  <remote-id>...
     sparcur-simple datasets
     sparcur-simple for-racket
+    sparcur-simple git-repos [update] [options]
     sparcur-simple [options] [<path>...]
     sparcur-simple [options] [--dataset-id=<ID>...]
     sparcur-simple [options] [--extension=<EXT>...] [<path>...]
@@ -2691,9 +2692,11 @@ Options:
     --log-level=LEVEL               log level info [default: INFO]
     --open=PROGRAM                  show file with PROGRAM
     --show                          show file with xopen
+    --pretend                       show what would be done for update
 """
 
 import os
+import sys
 from types import GeneratorType
 from pyontutils import clifun as clif
 from sparcur import exceptions as exc
@@ -3034,6 +3037,51 @@ def main(id=None, **kwargs):
         dsmeta = f"({_dsmeta})"
         # lab pi last name should be cached in some other way
         print(dsmeta)
+
+    if 'git_repos' in kwargs and kwargs['git_repos']:
+        import augpathlib as aug
+        from sparcur import cli
+        from sparcur.config import auth
+        from importlib import metadata
+        d = metadata.distribution(cli.__package__)
+        rps = [p for p in [aug.RepoPath(d._path) for d in d.discover()] if p.working_dir]
+        setups = [p for p in [p.parent / 'setup.py' for p in rps] if p.exists()]
+        wds = sorted(set([p.working_dir for p in rps]))
+        never_update = auth.get('never-update')
+        pretend='pretend' in kwargs and kwargs['pretend'] or never_update
+        if pretend:
+            if never_update:
+                print(f'never-update: true is set in {auth.user_config._path}')
+            print('These are the commands that would be run.')
+        def doupdate(rp):
+            if pretend:
+                print(f'git -C {rp.as_posix()} stash')
+                print(f'git -C {rp.as_posix()} pull')
+                return
+            rp.repo.git.stash()
+            # TODO checkout to a safety branch and tag for rollback
+            rp.repo.git.pull()
+        if 'update' in kwargs and kwargs['update']:
+            for wd in wds:
+                doupdate(wd)
+            # indescriminately run setup.py with --release set to tangle
+            from importlib import util as imu
+            oldargv = sys.argv
+            try:
+                sys.argv = ['setup.py', '--release']
+                for s in setups:
+                    if pretend:
+                        print(f'pushd {s.parent.as_posix()}; python setup.py --release; popd')
+                        continue
+                    spec = imu.spec_from_file_location(f'setup_{s.parent.name}', s)
+                    mod = imu.module_from_spec(spec)
+                    try:
+                        with s.parent:  # ah relative paths
+                            spec.loader.exec_module(mod)
+                    except SystemExit:
+                        pass
+            finally:
+                sys.argv = oldargv
 
     if 'manifest' in kwargs and kwargs['manifest']:
         from sparcur.utils import write_manifests

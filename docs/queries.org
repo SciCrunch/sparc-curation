@@ -34,8 +34,10 @@ exit
 # XXX of course that would require epilogue to actually be implemented :/
 # #+property: header-args:sparql+ :epilogue "LIMIT ?limit"
 
+# #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
+# #+property: header-args:cypher :scigraph http://sparc-data.scicrunch.io:9000/scigraph
 <<cypher-settings>>
-#+property: header-args:cypher :scigraph http://localhost:9000/scigraph
+#+property: header-args:cypher :scigraph http://selene:9000/scigraph
 #+property: header-args:cypher+ :limit 10
 #+end:
 #+begin: prefixes
@@ -388,6 +390,40 @@ LIMIT ?limit
 | dataset:a698310c-6310-4de4-83be-39e2f539581c | NCBITaxon:9606      |
 | dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | NCBITaxon:9606      |
 | dataset:c34c5b05-4934-4a17-953c-069adf3aec46 | NCBITaxon:9606      |
+
+**** Dataset human subjects and samples
+#+begin_src sparql :var limit="10"
+SELECT DISTINCT
+?dataset
+?subject
+?subject_meta
+?sample
+?sample_meta
+?species
+WHERE {
+    ?dataset TEMP:isAboutParticipant ?subject .
+    ?subject sparc:animalSubjectIsOfSpecies ?species .
+    ?subject ?sup ?subject_meta .
+    FILTER ( CONTAINS(str(?species), "human") || CONTAINS(str(?species), "homo sapiens") || ?species = NCBITaxon:9606 )
+    ?sample TEMP:wasDerivedFromSubject ?subject .
+    ?sample ?sap ?sample_meta .
+}
+LIMIT ?limit
+#+end_src
+
+#+RESULTS:
+| dataset                                      | subject                                                       | subject_meta                                                                                     | sample                                                                      | sample_meta | species             |
+|----------------------------------------------+---------------------------------------------------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------|
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | _:t64799                                                                                         | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | control                                                                                          | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec                                                     | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | sub_258                                                                                          | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | cold fixative (2 % formaldehyde plus 0.2 % picric acid in 0.1 M sodium phosphate buffer, pH 7.0) | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | UNKNOWN                                                                                          | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | homo sapien (human)                                                                              | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | obo:PATO_0000384                                                                                 | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | owl:NamedIndividual                                                                              | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
+| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | sparc:Subject                                                                                    | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
 
 **** Dataset milestone completion date
 #+begin_src sparql
@@ -1020,6 +1056,16 @@ WHERE {
 | sub-RZ9-L10EGFP-AAV-cre-mcherry-BAT1  | AAV6-hSyn-mCherry-cre injected in iBAT bilaterally, followed by about 4 week incubation and then 7-day 28°C treatment | Mus musculus | EGFP-L10a |       |                   |        21 | unit:postnatal_day |            |           |
 | sub-RZ9-L10EGFP-AAV-cre-mcherry-BAT10 | AAV6-hSyn-mCherry-cre injected in iBAT bilaterally, followed by about 4 week incubation and then 7-day 28°C treatment | Mus musculus | EGFP-L10a |       |                   |        17 | unit:postnatal_day |            |           |
 
+*** TODO By sex
+#+begin_src sparql
+SELECT DISTINCT
+(COUNT(DISTINCT ?subject) as ?count_subject)
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:isAboutParticipant ?subject .
+  ?subject a sparc:Subject .
+}
+#+end_src
 ** Samples
 *** Members
 Show me all of the experimental samples that a dataset contains information about.
@@ -1118,6 +1164,7 @@ WHERE {
 
   OPTIONAL { ?sample TEMP:hasAssignedGroup ?assigned_group . }
   OPTIONAL { ?sample TEMPRAW:wasExtractedFromAnatomicalRegion ?anat_ent_src . }
+  # OPTIONAL { ?sample TEMP:hasAge ?abe . }
   # OPTIONAL { ?sample TEMP:participantInPerformanceOf ?protocol . }
 }
 LIMIT ?limit
@@ -1126,16 +1173,16 @@ LIMIT ?limit
 #+RESULTS: sample-metadata
 | subject_lid     | local_id        | assigned_group | aess                           |
 |-----------------+-----------------+----------------+--------------------------------|
-| 62_F_14121963   | 62_F_14121963   |                | descending colon               |
-| 63_F_30051973   | 63_F_30051973   |                | sigmoid colon                  |
-| sub-20180809_G5 | sam-20180809_G5 | compression    | Colon, inner submucosal plexus |
-| sub-20180813_G5 | sam-20180813_G5 | compression    | Colon, inner submucosal plexus |
-| sub-20180821_G5 | sam-20180821_G5 | compression    | Colon, inner submucosal plexus |
-| sub-20180827_G3 | sam-20180827_G3 | compression    | Colon, inner submucosal plexus |
-| sub-20180828_G2 | sam-20180828_G2 | compression    | Colon, inner submucosal plexus |
-| sub-20180905_G1 | sam-20180905_G1 | compression    | Colon, inner submucosal plexus |
-| sub-20180906_G3 | sam-20180906_G3 | compression    | Colon, inner submucosal plexus |
-| sub-20180911_G5 | sam-20180911_G5 | compression    | Colon, inner submucosal plexus |
+| sub-20181127_G3 | sam-20181127_G3 | stretch        | Colon, inner submucosal plexus |
+| sub-20190212_G1 | sam-20190212_G1 | compression    | Colon, inner submucosal plexus |
+| sub-20190214_G1 | sam-20190214_G1 | compression    | Colon, inner submucosal plexus |
+| sub-20190220_G3 | sam-20190220_G3 | compression    | Colon, inner submucosal plexus |
+| sub-20190220_G5 | sam-20190220_G5 | compression    | Colon, inner submucosal plexus |
+| sub-20190226_G2 | sam-20190226_G2 | stretch        | Colon, inner submucosal plexus |
+| sub-20190228_G4 | sam-20190228_G4 | stretch        | Colon, inner submucosal plexus |
+| sub-20190306_G1 | sam-20190306_G1 | stretch        | Colon, inner submucosal plexus |
+| sub-20190306_G2 | sam-20190306_G2 | stretch        | Colon, inner submucosal plexus |
+| sub-20190306_G3 | sam-20190306_G3 | stretch        | Colon, inner submucosal plexus |
 
 ** Anatomical entities
 *** Dataset
@@ -1542,6 +1589,18 @@ WHERE {
 }
 LIMIT ?limit
 #+end_src
+
+In the =path-metadata= folder of =curation-export=.
+
+#+begin_src bash
+grep -rh 'mimetype":' | sort | uniq -c | sort -h
+#+end_src
+
+This doesn't get coverage for file extensions so in addition we run the following.
+#+begin_src bash
+grep -rh 'basename":.\+\.\([a-z]\+\)' | grep -o '\.[a-z]\+"' | sort | uniq -c | sort -h
+#+end_src
+
 *** Has Raw Data
 #+begin_src sparql
 SELECT DISTINCT
@@ -1778,12 +1837,19 @@ result = func(data)
 (ow-babel-eval "neru-simplified")
 #+end_src
 
-#+header: :var json-string=python-neru-helper(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-5"))
-#+header: :var path="./images/neru-simplified.svg" :results file
+#+header: :var json-string=python-neru-helper(result=cypher-neru-5-helper(neupop_id="ilxtr:neuron-type-keast-10"))
+#+header: :var path="./images/neru-simplified-10.svg" :results file
 #+name: neru-simplified
 #+begin_src elisp :exports none
 (json->svg-file json-string path)
 #+end_src
+
+#+RESULTS: neru-simplified
+[[file:./images/neru-simplified-6.svg]]
+
+[[file:./images/neru-simplified-11.svg]]
+
+[[file:./images/neru-simplified-5.svg]]
 
 [[file:./images/neru-simplified.svg]]
 
@@ -1792,10 +1858,10 @@ Python code to simplify =neru= and supporting functions to extract terminal regi
 # FIXME emacs-jupyter doesn't convert t -> True !??!
 # FIXME this doesn't highlight correctly in init-simple.el
 # FIXME the python will run the epilogue for in a babel call but jupyter-python will not, fun times
-# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nprint(json.dumps(b, indent=1, sort_keys=False))"
+# #+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\n#return json.dumps(b, indent=1, sort_keys=False)"
+#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(neupop_id=\"ilxtr:neuron-type-keast-6\")\nprint(json.dumps(b, indent=1, sort_keys=False))"
 #+header: :results drawer
 #+header: :var result=(or) remove=(or)
-#+header: :epilogue "\nimport json\nb, ed, s, ex, o = main(blob_string=result)\n#return json.dumps(b, indent=1, sort_keys=False)"
 #+name: python-process-neru
 #+begin_src jupyter-python :session pys
 from nifstd_tools.simplify import apinat_deblob, sub, pred, obj, ematch
@@ -1805,7 +1871,7 @@ from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, ext, fasIn, end
 def query(neupop_id):
     import requests
     url = ('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
-           f'demos/apinat/neru-4/{neupop_id}?limit=9999999')
+           f'demos/apinat/neru-5/{neupop_id}?limit=9999999')
     resp = requests.get(url, headers={'Accept': 'application/json'})
     blob = resp.json()
     return blob
@@ -1861,7 +1927,11 @@ def main(blob=None, blob_string=None, neupop_id=None, remove_converge=remove):
     return v
 #+end_src
 
-#+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-5"))
+#+call: python-process-neru(result=cypher-neru-5-helper(neupop_id="ilxtr:neuron-type-keast-6"))
+
+#+begin_src jupyter-python :session pys
+pprint(blob)
+#+end_src
 
 # we need this block because jupyter-python doesn't include the epilogue when being called by another block wew
 # #+header: :epilogue "\nimport pprint\nreturn pprint.pformat(ed)"
@@ -1875,11 +1945,17 @@ def main(blob=None, blob_string=None, neupop_id=None, remove_converge=remove):
 <<python-process-neru>>
 #+end_src
 
+#+RESULTS: python-neru-helper
+:results:
+:end:
+
 ** terminal regions
 Find the ontology identifiers for terminal regions.
 
 # run this to populate/update the kernel (sigh)
-#+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-5"))
+#+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-1"))
+
+#+RESULTS:
 
 #+name: neru-find-terminal-regions
 #+begin_src jupyter-python :session pys :exports both :var neupop_id=""
@@ -2059,6 +2135,7 @@ render_blob(blob)
 #+end_src
 
 ** neru
+#+name: py-neupop-helper
 #+begin_src jupyter-python :noweb yes :session pys :var remove=(and "sigh") :results none
 from pprint import pprint
 from pyontutils.scigraph import Cypher, Vocabulary
@@ -2121,7 +2198,146 @@ sigh = [s for n, si in enumerate(simples)  for s in ((f'--------- {n + 1}','----
 sigh
 #+end_src
 
+** asdf
+#+begin_src sparql
+select distinct ?s ?p where {
+  ?s ?p ilxtr:NeuronCUT . }
+#+end_src
+
+#+RESULTS:
+| s                                            | p               |
+|----------------------------------------------+-----------------|
+| NLX:cell_100311                              | rdfs:subClassOf |
+| NLX:cell_20081201                            | rdfs:subClassOf |
+| NLX:cell_20081202                            | rdfs:subClassOf |
+| NLX:cell_20090304                            | rdfs:subClassOf |
+| NLX:cell_20090305                            | rdfs:subClassOf |
+| NLX:cell_20090311                            | rdfs:subClassOf |
+| NLX:cell_20090401                            | rdfs:subClassOf |
+| SAO:1103104164                               | rdfs:subClassOf |
+| SAO:1154704263                               | rdfs:subClassOf |
+| SAO:1415726815                               | rdfs:subClassOf |
+| SAO:1438006234                               | rdfs:subClassOf |
+| SAO:1582628662                               | rdfs:subClassOf |
+| SAO:383526650                                | rdfs:subClassOf |
+| SAO:471801888                                | rdfs:subClassOf |
+| SAO:666951243                                | rdfs:subClassOf |
+| SAO:830368389                                | rdfs:subClassOf |
+| NLX:cell_100212                              | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/1   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/10  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/11  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/12  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/13  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/14  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/15  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/16  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/17  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/18  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/19  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/2   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/20  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/21  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/22  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/23  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/24  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/25  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/26  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/27  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/28  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/29  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/3   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/30  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/31  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/32  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/33  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/34  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/35  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/36  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/37  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/38  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/39  | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/4   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/5   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/6   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/7   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/8   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/9   | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/913 | rdfs:subClassOf |
+| http://uri.interlex.org/npo/uris/neurons/914 | rdfs:subClassOf |
+| NLX:cell_1003113                             | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/BAMSC1125  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_106 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_109 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_113 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_116 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_118 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_119 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_120 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_121 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_122 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_123 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_124 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_128 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_130 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_132 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_133 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_135 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_136 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_144 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_153 | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_17  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_31  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_36  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_40  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_49  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_53  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_55  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_56  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_57  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_66  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_68  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_69  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_70  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_72  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_73  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_74  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_75  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_76  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_81  | rdfs:subClassOf |
+| http://uri.neuinfo.org/nif/nifstd/nifext_84  | rdfs:subClassOf |
+| NLX:144252                                   | rdfs:subClassOf |
+| NLX:153867                                   | rdfs:subClassOf |
+| NLX:153868                                   | rdfs:subClassOf |
+| NLX:16848                                    | rdfs:subClassOf |
+| NLX:268                                      | rdfs:subClassOf |
+| NLX:38713                                    | rdfs:subClassOf |
+| NLX:50129                                    | rdfs:subClassOf |
+| NLX:70345                                    | rdfs:subClassOf |
+| NLX:82555                                    | rdfs:subClassOf |
+| NLX:cell_091001                              | rdfs:subClassOf |
+| NLX:cell_091002                              | rdfs:subClassOf |
+| NLX:cell_091005                              | rdfs:subClassOf |
+| NLX:cell_091202                              | rdfs:subClassOf |
+| NLX:cell_091205                              | rdfs:subClassOf |
+| NLX:cell_091207                              | rdfs:subClassOf |
+| NLX:cell_091213                              | rdfs:subClassOf |
+| NLX:cell_100201                              | rdfs:subClassOf |
+
+#+begin_src cypher :limit 10
+// MATCH path = (a)-[t]-(:Class) RETURN a
+//MATCH path = ()-[:apinatomy:conveyingLyph]-() RETURN path
+// MATCH path = ()-[:TEMPRAW:protocolInvolvesInputInstance]-() RETURN path
+#+end_src
+
+#+RESULTS:
+| id | label |
+|----+-------|
+
 ** heatmaps
+*** TODO get the numbers along the axis, so n populations
+*** TODO color code by process type
+*** TODO costimulation by location
 *** neupop by region
 # FIXME if missing :session breaks on evil =o=
 #+begin_src jupyter-python :session pys :noweb yes :results none :var remove=(and "sigh")
@@ -2147,6 +2363,9 @@ id_label = {n['id']:n['lbl'] if 'lbl' in n and n['lbl'] else n['id'] for blob in
 #+begin_src jupyter-python :session pys
 _ext_all = sorted(set([obj(e) for b in blobs for e in b['edges'] if pred(e, 'apinatomy:ontologyTerms')]))
 ext_pop = {i:set([obj(e) for e in blob['edges'] if pred(e, 'apinatomy:ontologyTerms')]) for i, blob in zip(ids, blobs)}
+
+# TODO popuation, region, process type, terminal
+pop_by_reg_ads_trm = []
 
 pop_by_reg = defaultdict(list)
 for i, regs in ext_pop.items():
@@ -2315,6 +2534,16 @@ axes = seaborn.heatmap(
 # axes.get_figure().savefig('heatmap-pop-reg-test.svg')
 #+end_src
 
+#+begin_src jupyter-python :session pys
+import csv
+csv_path = 'heatmap-pop-reg.csv'
+with open(csv_path, 'wt') as f:
+    csv.writer(f).writerows(rows)
+#+end_src
+
+#+RESULTS:
+: heatmap-pop-reg.csv
+
 *** region by region
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
@@ -2406,7 +2635,6 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 #+RESULTS: cypher-neru-5
 [[file:./images/neru-5.svg]]
 
-
 *** neru-4
 :PROPERTIES:
 :CUSTOM_ID:  neru-4
@@ -2416,8 +2644,9 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 <<cypher-neru-4>>
 #+end_src
 
-#+header: :limit 999999 :file ./images/neru-4.svg :results file :exports both
-#+header: :var neupop_id="ilxtr:neuron-type-keast-5"
+# #+header: :results drawer :limit 99999999 :exports none
+#+header: :limit 999999 :file ./images/neru-4-k11.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-11"
 #+name: cypher-neru-4
 #+begin_src cypher
 MATCH (neupop:Class{iri: $neupop_id})
@@ -2479,6 +2708,10 @@ MATCH (neupop:Class{iri: $neupop_id})
 
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext
 #+end_src
+
+[[file:./images/neru-4-k11.svg]]
+
+[[file:./images/neru-4-k5.svg]]
 
 [[file:./images/neru-4.svg]]
 
@@ -2629,7 +2862,7 @@ RETURN path
 
 *** neru-1
 # #+header: :results drawer :limit 1
-#+header: :limit 999999 :file ./images/neru-1.svg :results file :exports both
+#+header: :limit 999999 :file ./images/neru-1-hrm.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-1
 #+begin_src cypher
@@ -2669,7 +2902,20 @@ return a, b, c, d, null AS e, null AS path
 #+end_src
 
 #+RESULTS: cypher-neru-1
-[[file:./images/neru-1.svg]]
+[[file:./images/neru-1-hrm.svg]]
+
+*** all populations
+#+name: cy-neru-all-pop
+#+header: :limit 9999
+#+begin_src cypher
+OPTIONAL MATCH (start:Ontology)
+<-[:isDefinedBy]-(graph:NamedIndividual)
+-[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"})
+, (start)
+<-[:isDefinedBy]-(external:Class)
+-[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"})
+return external
+#+end_src
 
 *** neru populations
 #+name: desc-cypher-apinat-model-populations
@@ -2697,6 +2943,30 @@ MATCH (start:Ontology {iri: $model_id})
 RETURN external
 #+end_src
 
+#+RESULTS:
+| id                         | label                                                                                                                                                                  |
+|----------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-keast-1  | ilxtr:PG (with-axon-in ilxtr:nerve-bladder) (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) ilxtr:neuron-phenotype-para-post neuron |
+| ilxtr:neuron-type-keast-10 | ilxtr:neuron-phenotype-keast-10 neuron                                                                                                                                 |
+| ilxtr:neuron-type-keast-11 | ilxtr:neuron-phenotype-keast-11 neuron                                                                                                                                 |
+| ilxtr:neuron-type-keast-12 | ilxtr:neuron-phenotype-keast-12 neuron                                                                                                                                 |
+| ilxtr:neuron-type-keast-13 | BST (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                             |
+| ilxtr:neuron-type-keast-14 | central amygdaloid nucleus (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                      |
+| ilxtr:neuron-type-keast-15 | medial preoptic region (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                      |
+| ilxtr:neuron-type-keast-16 | MnPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                        |
+| ilxtr:neuron-type-keast-17 | LPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                         |
+| ilxtr:neuron-type-keast-18 | LH (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                          |
+| ilxtr:neuron-type-keast-19 | pAG (with-axons-in MB) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                             |
+| ilxtr:neuron-type-keast-2  | ilxtr:neuron-phenotype-keast-2 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-20 | Barrington's nucleus (with-axon-in pons) neuron                                                                                                                        |
+| ilxtr:neuron-type-keast-3  | ilxtr:IMG (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) neuron                                                                    |
+| ilxtr:neuron-type-keast-4  | ilxtr:neuron-phenotype-keast-4 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-5  | ilxtr:neuron-phenotype-keast-5 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-6  | ilxtr:neuron-phenotype-keast-6 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-7  | ilxtr:neuron-phenotype-keast-7 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-8  | ilxtr:neuron-phenotype-keast-8 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-9  | ilxtr:neuron-phenotype-keast-9 neuron                                                                                                                                  |
+
 *** neru model populations and references
 #+name: desc-cypher-apinat-model-pops-and-refs
 Given an ApiNATOMY model id return the identifiers for the neuron
@@ -2706,7 +2976,7 @@ populations can be distingished by checking whether their meta type
 field is NamedIndividual or Class.
 
 # #+header: :results drawer
-#+header: :var model_id="https://apinatomy.org/uris/models/keast-bladder" :limit 99
+#+header: :var model_id="https://apinatomy.org/uris/models/keast-bladder" :limit 99 :results drawer
 #+name: cypher-apinat-model-pops-and-refs
 #+begin_src cypher
 MATCH (start:Ontology {iri: $model_id})
@@ -2727,11 +2997,70 @@ OPTIONAL MATCH (start:Ontology {iri: $model_id})
 RETURN e
 #+end_src
 
+#+RESULTS: cypher-apinat-model-pops-and-refs
+| id                         | label                                                                                                                                                                  |
+|----------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-keast-5  | ilxtr:neuron-phenotype-keast-5 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-16 | MnPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                        |
+| PMID:7636036               |                                                                                                                                                                        |
+| ilxtr:neuron-type-keast-6  | ilxtr:neuron-phenotype-keast-6 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-17 | LPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                         |
+| ilxtr:neuron-type-keast-3  | ilxtr:IMG (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) neuron                                                                    |
+| ilxtr:neuron-type-keast-4  | ilxtr:neuron-phenotype-keast-4 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-15 | medial preoptic region (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                      |
+| ilxtr:neuron-type-keast-9  | ilxtr:neuron-phenotype-keast-9 neuron                                                                                                                                  |
+| elements:Publication       |                                                                                                                                                                        |
+| ilxtr:neuron-type-keast-7  | ilxtr:neuron-phenotype-keast-7 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-18 | LH (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                          |
+| ilxtr:neuron-type-keast-8  | ilxtr:neuron-phenotype-keast-8 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-19 | pAG (with-axons-in MB) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                             |
+| PMID:2713886               |                                                                                                                                                                        |
+| PMID:3722467               |                                                                                                                                                                        |
+| PMID:7644029               |                                                                                                                                                                        |
+| elements:External          |                                                                                                                                                                        |
+| PMID:9442414               |                                                                                                                                                                        |
+| PMID:30704972              |                                                                                                                                                                        |
+| PMID:9421141               |                                                                                                                                                                        |
+| PMID:10494620              |                                                                                                                                                                        |
+| PMID:1358408               |                                                                                                                                                                        |
+| PMID:1726105               |                                                                                                                                                                        |
+| PMID:4700666               |                                                                                                                                                                        |
+| PMID:3558884               |                                                                                                                                                                        |
+| PMID:2891149               |                                                                                                                                                                        |
+| ilxtr:neuron-type-keast-2  | ilxtr:neuron-phenotype-keast-2 neuron                                                                                                                                  |
+| ilxtr:neuron-type-keast-20 | Barrington's nucleus (with-axon-in pons) neuron                                                                                                                        |
+| ilxtr:neuron-type-keast-14 | central amygdaloid nucleus (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                      |
+| PMID:7174880               |                                                                                                                                                                        |
+| PMID:1619047               |                                                                                                                                                                        |
+| PMID:135840                |                                                                                                                                                                        |
+| ilxtr:neuron-type-keast-1  | ilxtr:PG (with-axon-in ilxtr:nerve-bladder) (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) ilxtr:neuron-phenotype-para-post neuron |
+| ilxtr:neuron-type-keast-10 | ilxtr:neuron-phenotype-keast-10 neuron                                                                                                                                 |
+| ilxtr:neuron-type-keast-13 | BST (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                             |
+| PMID:8786273               |                                                                                                                                                                        |
+| PMID:11382385              |                                                                                                                                                                        |
+| ilxtr:neuron-type-keast-11 | ilxtr:neuron-phenotype-keast-11 neuron                                                                                                                                 |
+| ilxtr:neuron-type-keast-12 | ilxtr:neuron-phenotype-keast-12 neuron                                                                                                                                 |
+| PMID:12811806              |                                                                                                                                                                        |
+| PMID:3225349               |                                                                                                                                                                        |
+| PMID:11748568              |                                                                                                                                                                        |
+| PMID:6736301               |                                                                                                                                                                        |
+| PMID:8923445               |                                                                                                                                                                        |
+| PMID:1765622               |                                                                                                                                                                        |
+| PMID:20484700              |                                                                                                                                                                        |
+
 *** TODO neru regions projected to
 #+begin_src cypher
 #+end_src
 *** TODO neru regions dendrited to
-*** TODO neru regions with process in
+*** TODO neru regions with processes from
+region contains some process part of some neuron population
+#+begin_src cypher
+MATCH (region)
+-[:apinatomy:annotates]->(lyph)
+<-[:apinatomy:lyphs]-
+(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"})
+RETURN region
+#+end_src
 *** neru projects to
 *** neru neurites to
 # FIXME this seems not quite right?
@@ -2922,7 +3251,8 @@ MATCH (cl)
 WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.org/uris/readable/BAG2"]
 RETURN e, neupop, neugrp
 #+end_src
-
+*** TODO neru populations by phenotype
+*** TODO neru phenotype by population
 ** existing
 *** sparc
 :PROPERTIES:
@@ -3175,6 +3505,14 @@ WHERE n.iri IN [
         ]
 RETURN n
 #+end_src
+**** sparc community terms
+#+name: cyres-sparc-community-terms
+#+begin_src cypher :limit 10
+MATCH
+(t)-[:isDefinedBy]->(graph:Ontology{iri: "http://uri.interlex.org/sparc/ontologies/community-terms"})
+RETURN t
+#+end_src
+
 *** shortestSimple
 # FIXME TODO make sure this actuall works as expected, I think it will?
 #+header: :var start_id=(or)
@@ -3350,6 +3688,9 @@ MATCH path3 = (nodeRoot)        // extract chain for axon vs dendrite
 RETURN path1, path2, path3
 #+end_src
 
+#+RESULTS: cyres-apinat-soma-processes
+[[file:./images/soma-processes.svg]]
+
 A sparql version of the query (work in progress).
 #+name: sparql-soma-processes
 #+begin_src sparql :var limit="99"
@@ -3388,6 +3729,7 @@ WHERE
 limit ?limit
 #+end_src
 **** soma-processes/{start-id}
+#+header: :file ./images/soma-processes-id.svg :results file :limit 99999
 #+header: :var start-id=(or)
 #+name: cyres-apinat-soma-processes-start-id
 #+begin_src cypher
@@ -3415,6 +3757,12 @@ OPTIONAL MATCH path2 = (layer)  // if we were in a layer, get the containing lyp
 -[:apinatomy:ontologyTerms]->(end_housing_external)
 RETURN path1, path2, path3
 #+end_src
+
+#+call: cyres-apinat-soma-processes-start-id(start-id="UBERON:0006448")
+
+#+RESULTS:
+[[file:./images/soma-processes-id.svg]]
+
 **** weird-soma-processes/{process-id}
 #+header: :var process-id=(or)
 #+name: cyres-apinat-weird-soma-processes-process-id
@@ -3776,14 +4124,14 @@ cypherResources:
 ** expected counts per model
 Expected number of somas and neupops.
 
-| model-id          | somas | neupops |
-|-------------------+-------+---------|
-| keast-bladder     |    34 |      20 |
-| bolser-lewis      |    29 |      29 |
-| sawg-stomach      |    14 |      14 |
-| sawg-distal-colon |    23 |      17 |
-| ard-arm-cardiac   |    41 |      12 |
-| bronchomotor      |    19 |       6 |
+| model-id          | neupops | somas |
+|-------------------+---------+-------|
+| ard-arm-cardiac   |      12 |    41 |
+| bolser-lewis      |      29 |    29 |
+| bronchomotor      |       6 |    19 |
+| keast-bladder     |      20 |    34 |
+| sawg-distal-colon |      17 |    23 |
+| sawg-stomach      |      14 |    14 |
 
 *** somas
 somas >= neupops
@@ -3897,6 +4245,89 @@ hasLocationPhenotype some ('part of' some 'vagus nerve' or 'part of' some 'vagus
 Images of nerus that have some process in the IMG, from =keast-bladder= and =sawg-distal-colon=.
 
 ** kg queries
+#+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :results table drawer
+
+#+RESULTS:
+:results:
+{
+  "nodes": [
+  ],
+  "edges": [
+    {
+      "sub": "kblad:snl65",
+      "obj": "kblad:ref_mat_K_83_K_129_K27_7",
+      "pred": "apinatomy:internalIn",
+      "meta": {
+        "owlType": [
+          "Annotation"
+        ],
+        "isDefinedBy": [
+          "https://apinatomy.org/uris/models/keast-bladder"
+        ]
+      }
+    },
+    {
+      "sub": "kblad:neuron-5",
+      "obj": "kblad:sns15",
+      "pred": "apinatomy:lyphs",
+      "meta": {
+        "owlType": [
+          "Annotation"
+        ],
+        "isDefinedBy": [
+          "https://apinatomy.org/uris/models/keast-bladder"
+        ]
+      }
+    },
+    {
+      "sub": "kblad:sns15",
+      "obj": "kblad:ref_mat_K_83_K_129_K28_7",
+      "pred": "apinatomy:internalIn",
+      "meta": {
+        "owlType": [
+          "Annotation"
+        ],
+        "isDefinedBy": [
+          "https://apinatomy.org/uris/models/keast-bladder"
+        ]
+      }
+    },
+    {
+      "sub": "ilxtr:neuron-type-keast-5",
+      "obj": "kblad:neuron-5",
+      "pred": "apinatomy:annotates",
+      "meta": {
+        "owlType": [
+          "Annotation"
+        ],
+        "isDefinedBy": [
+          "https://apinatomy.org/uris/models/keast-bladder"
+        ]
+      }
+    },
+    {
+      "sub": "kblad:neuron-5",
+      "obj": "kblad:snl65",
+      "pred": "apinatomy:lyphs",
+      "meta": {
+        "owlType": [
+          "Annotation"
+        ],
+        "isDefinedBy": [
+          "https://apinatomy.org/uris/models/keast-bladder"
+        ]
+      }
+    }
+  ],
+  "meta": {}
+}
+:end:
+
+#+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/neru-3-ntk-5-wat.svg
+
+#+RESULTS:
+[[file:./images/neru-3-ntk-5-wat.svg]]
+
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-11") :file ./images/neru-3-ntk-11.svg
 
 #+RESULTS:
@@ -4018,7 +4449,6 @@ select ?s ?p ?o where {
 values ?p { prov:startedAtTime prov:wasGeneratedBy dc:date owl:versionInfo TEMP:TimestampExportStart }
 ?s ?p ?o . } order by desc(str(?o))
 #+end_src
-
 ** TODO versions
 Useful version information is not present in all ontology files at the moment.
 
@@ -4181,6 +4611,16 @@ UBERON:0000962 l: "nerve of cervical vertebra"; e: FMA:5859 .
 #+begin_src ttl
 UBERON:0002439 l: "myenteric nerve plexus"; e: FMA:63252 .
 #+end_src
+
+distributed ganglion that has not ensheathed
+there may be significant variablity between individuals in whether
+a plexius is fully ganglionated/ensheathed
+
+the issue is that from the perspective the cell populations, they are
+actually the same population regardless of whether they are plexi or ganglia
+
+maybe need to get these to converge onto the neuron populations so that
+we can merge the two
 
 **** TODO consult with SAWG about these
 :PROPERTIES:
@@ -4458,8 +4898,238 @@ return t._data
 
 *** neuron population by nerve
 *** neuron population by ganglion
+*** devel
+#+begin_src jupyter-python :session pys3
+1 + 2
+#+end_src
+
+#+RESULTS:
+: 3
+
+# @prefix ILX: <http://uri.interlex.org/base/ilx_> .
+#+begin_src jupyter-python :session pys2
+from pyontutils.core import OntTerm
+
+asdf = ['ILX:0727875',
+'ILX:0727396',
+'ILX:0727235',
+'ILX:0736783',
+'ILX:0725331',
+'ILX:0724284',
+'ILX:0732483',
+'ILX:0725803',
+'ILX:0723837',
+'ILX:0737036',
+'ILX:0725086',
+'ILX:0736097',
+'ILX:0733375',
+'ILX:0730739',
+'ILX:0734588',
+'ILX:0728741',
+'ILX:0728157',
+'ILX:0724431',
+'ILX:0728322',
+'ILX:0486534',
+'ILX:0731053',
+'ILX:0734339',
+'ILX:0731969',
+'ILX:0726449',
+'ILX:0734582',
+'ILX:0731914',
+'ILX:0729870',
+'ILX:0728987',
+'ILX:0736712',
+'ILX:0735649',
+'ILX:0730231',
+'ILX:0725969',
+'ILX:0725552',
+'ILX:0729045',
+'ILX:0732611',
+'ILX:0724152',
+'ILX:0724140',
+'ILX:0736057',
+'ILX:0726733',
+'ILX:0735212',
+'ILX:0726145',
+'ILX:0736880',
+'ILX:0732740',
+'ILX:0730942',
+'ILX:0736020',
+'ILX:0733193',
+'ILX:0733995',
+'ILX:0503992',
+'ILX:0734328',
+'ILX:0724764',
+'ILX:0729794',
+'ILX:0734607',
+'ILX:0727602',
+'ILX:0735024',
+'ILX:0725520',
+'ILX:0728778',
+'ILX:0726312',
+'ILX:0733021',
+'ILX:0732970',
+'ILX:0725326',
+'ILX:0725956',
+'ILX:0726454',
+'ILX:0734766',
+'ILX:0733700',
+'ILX:0733004',
+'ILX:0732328',
+'ILX:0735011',
+'ILX:0734057',
+'ILX:0730509',
+'ILX:0727725',
+'ILX:0730966',
+'ILX:0729052',
+'ILX:0736358',
+'ILX:0727970',
+'ILX:0736369']
+
+qq = [OntTerm(a) for a in asdf]
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session pys2
+[(repr(_), _('ilxtr:hasIlxPreferredId')[0].curie) for _ in qq]
+#+end_src
+
+#+RESULTS:
+| OntTerm('ILX:0727875', label='autonomic nerve')                              | UBERON:0034728 |
+| OntTerm('ILX:0727396', label='carotid sinus nerve')                          | UBERON:0009009 |
+| OntTerm('ILX:0727235', label='chorda tympani branch of facial nerve')        | UBERON:0009675 |
+| OntTerm('ILX:0736783', label='dorsal nerve of clitoris')                     | UBERON:0019198 |
+| OntTerm('ILX:0725331', label='dorsal nerve of penis')                        | UBERON:0019197 |
+| OntTerm('ILX:0724284', label='enteric nerve')                                | UBERON:0010380 |
+| OntTerm('ILX:0732483', label='cholinergic enteric nerve')                    | UBERON:0010406 |
+| OntTerm('ILX:0725803', label='facial nerve')                                 | UBERON:0001647 |
+| OntTerm('ILX:0723837', label='glossopharyngeal nerve')                       | UBERON:0001649 |
+| OntTerm('ILX:0737036', label='oculomotor nerve')                             | UBERON:0001643 |
+| OntTerm('ILX:0725086', label='terminal nerve')                               | UBERON:0002924 |
+| OntTerm('ILX:0736097', label='trigeminal nerve')                             | UBERON:0001645 |
+| OntTerm('ILX:0733375', label='vagus nerve')                                  | UBERON:0001759 |
+| OntTerm('ILX:0730739', label='greater splanchnic nerve')                     | UBERON:0018680 |
+| OntTerm('ILX:0734588', label='iris nerve')                                   | UBERON:0003438 |
+| OntTerm('ILX:0728741', label='lacrimal nerve')                               | UBERON:0011096 |
+| OntTerm('ILX:0728157', label='laryngeal nerve')                              | UBERON:0035642 |
+| OntTerm('ILX:0724431', label='left recurrent laryngeal nerve')               | UBERON:0011766 |
+| OntTerm('ILX:0728322', label='right recurrent laryngeal nerve')              | UBERON:0011767 |
+| OntTerm('ILX:0486534', label='Recurrent Laryngeal Nerve')                    | UBERON:0003716 |
+| OntTerm('ILX:0731053', label='superior laryngeal nerve')                     | UBERON:0011326 |
+| OntTerm('ILX:0734339', label='laryngeus ventralis')                          | UBERON:3010764 |
+| OntTerm('ILX:0731969', label='least splanchnic nerve')                       | UBERON:0001964 |
+| OntTerm('ILX:0726449', label='lesser splanchnic nerve')                      | UBERON:0018681 |
+| OntTerm('ILX:0734582', label='lingual nerve')                                | UBERON:0003721 |
+| OntTerm('ILX:0731914', label='long ciliary nerve')                           | UBERON:0022301 |
+| OntTerm('ILX:0729870', label='lumbar splanchnic nerve')                      | UBERON:0018683 |
+| OntTerm('ILX:0728987', label='maxillary nerve')                              | UBERON:0000377 |
+| OntTerm('ILX:0736712', label='meningeal branch of mandibular nerve')         | UBERON:0036143 |
+| OntTerm('ILX:0735649', label='meningeal branch of spinal nerve')             | UBERON:0017641 |
+| OntTerm('ILX:0730231', label='nasociliary nerve')                            | UBERON:0022300 |
+| OntTerm('ILX:0725969', label='nasopalatine nerve')                           | UBERON:0008810 |
+| OntTerm('ILX:0725552', label='nerve of clitoris')                            | UBERON:0035650 |
+| OntTerm('ILX:0729045', label='nerve of penis')                               | UBERON:0035649 |
+| OntTerm('ILX:0732611', label='superior branch of oculomotor nerve')          | UBERON:0015162 |
+| OntTerm('ILX:0724152', label='pelvic splanchnic nerve')                      | UBERON:0018675 |
+| OntTerm('ILX:0724140', label='perineal nerve')                               | UBERON:0011391 |
+| OntTerm('ILX:0736057', label='phrenic nerve')                                | UBERON:0001884 |
+| OntTerm('ILX:0726733', label='pterygopalatine nerve')                        | UBERON:0034725 |
+| OntTerm('ILX:0735212', label='pudendal nerve')                               | UBERON:0011390 |
+| OntTerm('ILX:0726145', label='sacral nerve')                                 | UBERON:0009625 |
+| OntTerm('ILX:0736880', label='sacral splanchnic nerve')                      | UBERON:0018684 |
+| OntTerm('ILX:0732740', label='short ciliary nerve')                          | UBERON:0022302 |
+| OntTerm('ILX:0730942', label='splanchnic nerve')                             | UBERON:0003715 |
+| OntTerm('ILX:0736020', label='thoracic splanchnic nerve')                    | UBERON:0018679 |
+| OntTerm('ILX:0733193', label='tibial nerve')                                 | UBERON:0001323 |
+| OntTerm('ILX:0733995', label='tympanic nerve')                               | UBERON:0036216 |
+| OntTerm('ILX:0503992', label='Vidian Nerve')                                 | UBERON:0018412 |
+| OntTerm('ILX:0734328', label='parasympathetic ganglion')                     | UBERON:0001808 |
+| OntTerm('ILX:0724764', label='accessory ciliary ganglion')                   | UBERON:0035776 |
+| OntTerm('ILX:0729794', label='autonomic ganglion')                           | UBERON:0001805 |
+| OntTerm('ILX:0734607', label='cardiac ganglion')                             | UBERON:0014463 |
+| OntTerm('ILX:0727602', label='celiac ganglion')                              | UBERON:0002262 |
+| OntTerm('ILX:0735024', label='ganglion of ciliary nerve')                    | UBERON:0035783 |
+| OntTerm('ILX:0725520', label='glossopharyngeal ganglion')                    | UBERON:0001701 |
+| OntTerm('ILX:0728778', label='inferior glossopharyngeal IX ganglion')        | UBERON:0005360 |
+| OntTerm('ILX:0726312', label='glossopharyngeal-vagus IX-X ganglion complex') | UBERON:0013500 |
+| OntTerm('ILX:0733021', label='mesenteric ganglion')                          | UBERON:0035769 |
+| OntTerm('ILX:0732970', label='superior mesenteric ganglion')                 | UBERON:0005479 |
+| OntTerm('ILX:0725326', label='inferior mesenteric ganglion')                 | UBERON:0005453 |
+| OntTerm('ILX:0725956', label='superior cervical ganglion')                   | UBERON:0001989 |
+| OntTerm('ILX:0726454', label='middle cervical ganglion')                     | UBERON:0001990 |
+| OntTerm('ILX:0734766', label='inferior cervical ganglion')                   | UBERON:0002440 |
+| OntTerm('ILX:0733700', label='otic ganglion')                                | UBERON:0003963 |
+| OntTerm('ILX:0733004', label='paravertebral ganglion')                       | UBERON:0001807 |
+| OntTerm('ILX:0732328', label='pelvic ganglion')                              | UBERON:0016508 |
+| OntTerm('ILX:0735011', label='prevertebral ganglion')                        | UBERON:0003964 |
+| OntTerm('ILX:0734057', label='pterygopalatine ganglion')                     | UBERON:0003962 |
+| OntTerm('ILX:0730509', label='sublingual ganglion')                          | UBERON:0005407 |
+| OntTerm('ILX:0727725', label='submandibular ganglion')                       | UBERON:0002059 |
+| OntTerm('ILX:0730966', label='sympathetic ganglion')                         | UBERON:0001806 |
+| OntTerm('ILX:0729052', label='vagus X ganglion')                             | UBERON:0005362 |
+| OntTerm('ILX:0736358', label='superior vagus X ganglion')                    | UBERON:0005364 |
+| OntTerm('ILX:0727970', label='inferior vagus X ganglion')                    | UBERON:0005363 |
+| OntTerm('ILX:0736369', label='vertebral ganglion')                           | UBERON:0000408 |
+
 ** ApiNATOMY
+*** Coverage of FMA by the TOO map.
+Unclaimed regions from FMA/UBERON in the TOO map
+
+Define the TOO map as the covering set of terms.
+It might not actually be, but that is how we will treat it.
+Probably want to avoid the immaterial entities.
+
+Try to come up with a basis set from FMA as well.
+
+If there are regional hierarchies that have been missed we will see them.
 *** Summary statistics
+**** debug
+fuck everything about this
+#+begin_src sparql
+SELECT distinct ?o
+WHERE {
+  ?o a elements:Graph .
+} order by str(?o)
+#+end_src
+
+#+RESULTS:
+| o                       |
+|-------------------------|
+| aacar:ard-arm-cardiac   |
+| bolew:bolser-lewis      |
+| bromo:bronchomotor      |
+| dlcon:dev-layout-conn   |
+| kblad:keast-bladder     |
+| sdcol:sawg-distal-colon |
+| sstom:sawg-stomach      |
+| scaft:scaffold-test     |
+| vagnr:vagus-nerve       |
+
+#+begin_src sparql
+select distinct
+?graph
+?lyphs
+?label
+WHERE {
+  # ?model apinatomy:hasGraph ?graph  # TODO broken conversion to literal instead of uri at the moment
+
+  # sadly it seems that no one has managed to write an optimization that converts
+  # into this form when querying multiple predicates in the same expression
+  {
+    ?graph a elements:Graph ;
+           rdfs:label ?label .
+    { select ?graph (count(distinct(?o)) as ?lyphs       ) where { ?graph apinatomy:lyphs        ?o . } group by ?graph }
+  }
+  union
+  {
+    { select (count(distinct(?graph_)) as ?graph  ) where { ?graph_ a elements:Graph } }
+    bind("Total unique" as ?label)
+    { select (count(distinct(?o)) as ?lyphs       ) where { ?graph_ apinatomy:lyphs        ?o . } }
+} }
+#+end_src
+
+
 **** Dashboard
 # TODO configure header args for development vs production
 #+begin_src elisp :results none :exports none
@@ -5006,10 +5676,135 @@ RETURN edge
 ******* number of anatomical regions
 ******* number of species
 ******* number of x
+* Extras :noexport:
+** neru
+#+begin_src sparql
+select * where { ?s rdfs:subClassOf ilxtr:NeuronNerves }
+#+end_src
+*** neru-reduced for monqiue
+
+#+header: :limit 999999 :file ./images/neru-fm.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-5"
+#+name: neru-fm
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+,
+(neugrp)
+-[:apinatomy:links]->(link_start)
+-[b:apinatomy:endsIn*0..1]->(lyph_or_layer)
+//-[:apinatomy:topology*0..1]->(top)
+,
+(neugrp)
+-[:apinatomy:links]->(link)
+//<-[c:apinatomy:bundles|apinatomy:endBundles]-
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->
+(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+,
+(lyph_or_layer) // FIXME WHERE ARE MY DENDRITES MOTHER FUCKER
+-[z:apinatomy:cloneOf*0..1]->()
+-[y:apinatomy:external|apinatomy:inheritedExternal*0..1]->(layer)
+,
+(lyph)
+-[e:apinatomy:external]->(region)
+,
+(link) // use apinatomy:next to extract ordering information
+-[f:apinatomy:next*0..]->()
+//-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+// FIXME these should be collapsing into a single relationship
+-[g:apinatomy:target*0..1]->()
+-[h:apinatomy:rootOf*0..1]->()
+-[i:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+,
+p2 = (link)
+-[cle:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:topology]->()
+,
+(cl)
+-[x:apinatomy:inheritedExternal*0..1]->()
+
+//WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.org/uris/readable/BAG2"]
+
+// publications
+WITH neugrp, a, b, c, d, e, f, g, h, i, x, y, z // p2 //, b 
+OPTIONAL MATCH path = (neugrp)
+-[:apinatomy:publications]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"}) // cannot be curied, dynamic endpoints will not expand it
+
+RETURN a, b, c, d, e, f, g, h, i, path, x, y, z //, p2 
+
+UNION
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+//<-[c:apinatomy:internalLyphs]-()
+-[c:apinatomy:internalIn]->()
+-[d:apinatomy:external*0..1]->(region)
+// this variant shows the dead end lyphs that correspond to the fasciculatesIn links above
+//-[c:apinatomy:internalIn*0..1]->()
+//-[d:apinatomy:external*0..1]->(region)
+RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, null as x, null as y, null as z//, null as p2
+#+end_src
+
+*** neru-explore
+# #+header: :results table :limit 1
+#+header: :limit 999999 :file ./images/neru-4.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-5"
+#+name: cypher-neru-exp
+#+begin_src cypher
+MATCH p1 = (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+,
+p2 = (neugrp)
+-[:apinatomy:links]->(link)
+-[:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+,
+p3 = (lyph)
+-[e:apinatomy:external]->(region)
+,
+p4 = (link) // use apinatomy:next to extract ordering information
+-[:apinatomy:next*0..]->()
+//-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+// FIXME these should be collapsing into a single relationship
+-[:apinatomy:target*0..1]->()
+-[:apinatomy:rootOf*0..1]->()
+-[:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+,
+p5 = (link)
+-[:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:topology]->()
+,
+p6 = (cl)
+-[:apinatomy:inheritedExternal*0..1]->()
+//,
+//p7 = (layer)
+//-[:apinatomy:layerIn:*0..1]->(lyph) // FIXME this is wrong it will bull in unrelated layers
+//,
+//p8 = (link)
+// TODO need a layer for th elinks too I think
+
+// XXX it turns out that neru-3 already has all the information we need?????
+
+RETURN p1, p2, p3, p4, p5, p6
+#+end_src
+
 * Bootstrap :noexport:
 :PROPERTIES:
 :visibility:  folded
 :END:
+
+# TODO consider automatically displaying the edit src buffer
+# in another window when the cursor is present and switching ?????
+# TODO need to extract my rdf related stuff out of init.el so that the uris compact
+# TODO use the context menus branch to make right click context sensitive in buffer
 
 #+name: orgstrap
 #+begin_src elisp :results none :exports none :lexical yes

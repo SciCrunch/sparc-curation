@@ -32,6 +32,7 @@
   'preview': {
       'default': False,
       'environment-variables': 'SPARCUR_PREVIEW'},
+  'never-update': False,
   'datasets-noexport': None,
   'datasets-sparse': None,
   'datasets-no': None,
