@@ -289,6 +289,13 @@ like you did for the google json file.
 # FIXME tell users to run spc shell I think? idlib.Pio._setup()
 You will be prompted for your protocols.io email and password the first
 time you run.
+***** Refresh
+If you hit a refresh error because something expired, move or delete the pickle file and then run
+#+begin_src bash
+spc report protocols
+#+end_src
+and you should be prompted to renew the token
+you will have to install and manually fix robobrowser at the moment
 **** Hypothes.is
 As your user Install the hypothesis client in chrome.
 #+CAPTION: open chrome to hypothesis extension install page
@@ -648,7 +655,8 @@ sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 
 #+begin_src bash :exports code :eval never
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/5ecca39372cffdc4c9fbacee6e22328a0dc61eac/install)"
-brew cask install \
+brew install --cask \
+docker \
 emacs \
 firefox \
 gimp \
@@ -867,6 +875,7 @@ function preview-sparc-export-to-server () {
 
 The shared information on the file system is evil because there may be multiple processes.
 The way to mitigate the issue is to run everything locally with a read only local cache for certain files.
+# FIXME this can fail if files aren't quite where we expect them
 #+begin_src bash :eval never
 function preview-export-rest () {
     local DATE1=${1} # 2021-03-09T17\:26\:54\,980772-08\:00  # from spc export
@@ -1390,7 +1399,7 @@ Repository local roots. The ordering of the entries matters.
 #+NAME: py-roots
 | augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
 #+NAME: rkt-roots
-| qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid NIF-Ontology/ |
+| qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid sparc-curation/sparcur_internal/sparcur NIF-Ontology/ |
 # note that breadcrumb and json-view are not in this list due to the need to use raco pkg install --name
 
 ** Make repos
@@ -1824,12 +1833,13 @@ popd
 #+HEADER: :var RKTROOTS=rkt-roots
 #+BEGIN_SRC bash :results output :eval no-export
 pushd ~/git
-raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
 # XXX note the special cases
 raco pkg install --name breadcrumb racket-breadcrumb/
 raco pkg install --name json-view racket-json-view/
+raco pkg install --skip-installed --auto --batch ${RKTROOTS} 2>&1
 popd
 #+END_SRC
+
 *** Remote exports
 :PROPERTIES:
 :CUSTOM_ID: appendix-remote-exports
