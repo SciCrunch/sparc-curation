@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.0; orgstrap-block-checksum: 7a2a2df9ff417697fb9d4a5593abf0ebf92eafbe69350b8ec92b570ade84ae3e; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--prp-1\.0; orgstrap-block-checksum: ad1829da16c9f21b0e737a48e60bf6ae781c0840cd34e647ebabc7fbbb3dd247; -*-
 #+TITLE: Developer and curator setup guide
 #+AUTHOR: Tom Gillespie
 # [[./setup.pdf]]
@@ -1513,6 +1513,13 @@ NIF-Ontology/
 :CUSTOM_ID: config-templates
 :VISIBILITY: folded
 :END:
+To get up-to-date versions of these run
+#+begin_src bash
+mkdir /tmp/fakehome
+HOME=/tmp/fakehome python -m sparcur.cli
+less /tmp/fakehome/.config/*/*.yaml
+#+end_src
+
 =~/.config/idlib/config.yaml=
 #+name: idlib-config-defaults
 #+caption: [[file:${HOME}/.config/idlib/config.yaml][~/.config/idlib/config.yaml]]
@@ -1580,6 +1587,7 @@ auth-variables:
   hypothesis-group: hypothesis group sparc-curation
   hypothesis-user:
   log-path:
+  never-update:
   preview:
   remote-backoff-factor:
   remote-cli-path:
@@ -1668,11 +1676,41 @@ Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into
 ;; THIS CAN CAUSE RUNTIME ERRORS
 (setq ob-ipython-html-to-image-program "/dev/null")
 #+end_src
+
+#+name: user-config
+#+begin_src elisp
+(defun config-paths (&optional os)
+  (cl-case (or os system-type)
+    ;; ucp udp uchp ulp
+    (gnu/linux '("~/.config"
+                 "~/.local/share"
+                 "~/.cache"
+                 "~/.cache/log"))
+    (darwin '("~/Library/Application Support"
+              "~/Library/Application Support"
+              "~/Library/Caches"
+              "~/Library/Logs"))
+    (windows-nt (let ((ucp "~/AppData/Local"))
+                  (list ucp ucp ucp (concat ucp "/Logs"))))
+    (otherwise (error (format "Unknown OS %s" (or os system-type))))))
+
+(eval-when-compile (defvar *config-paths* (config-paths)))
+
+(defun fcp (position &optional suffix)
+  (let ((base-path (funcall position *config-paths*)))
+    (if suffix
+        (format "%s/%s" base-path suffix)
+      base-path)))
+
+(defun user-config-path (&optional suffix) (fcp #'cl-first  suffix))
+(defun user-data-path   (&optional suffix) (fcp #'cl-second suffix))
+(defun user-cache-path  (&optional suffix) (fcp #'cl-third  suffix))
+(defun user-log-path    (&optional suffix) (fcp #'cl-fourth suffix))
+#+end_src
+
 #+NAME: scimax-user-config
 #+CAPTION: Needed to get sane behavior for executing this file out of the box.
 #+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
-;; requires
-(require 'cl)  ;; needed for case
 
 ;; org goto heading
 (defun org-goto-section (heading)
@@ -1730,33 +1768,7 @@ Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into
 
 ;; config paths
 
-(defun config-paths (&optional os)
-  (case (or os system-type)
-    ;; ucp udp uchp ulp
-    (gnu/linux '("~/.config"
-                 "~/.local/share"
-                 "~/.cache"
-                 "~/.cache/log"))
-    (darwin '("~/Library/Application Support"
-              "~/Library/Application Support"
-              "~/Library/Caches"
-              "~/Library/Logs"))
-    (windows-nt (let ((ucp "~/AppData/Local"))
-                  (list ucp ucp ucp (concat ucp "/Logs"))))
-    (otherwise (error (format "Unknown OS %s" (or os system-type))))))
-
-(eval-when-compile (defvar *config-paths* (config-paths)))
-
-(defun fcp (position &optional suffix)
-  (let ((base-path (funcall position *config-paths*)))
-    (if suffix
-        (format "%s/%s" base-path suffix)
-      base-path)))
-
-(defun user-config-path (&optional suffix) (fcp #'first  suffix))
-(defun user-data-path   (&optional suffix) (fcp #'second suffix))
-(defun user-cache-path  (&optional suffix) (fcp #'third  suffix))
-(defun user-log-path    (&optional suffix) (fcp #'fourth suffix))
+<<user-config>>
 
 ;; vim bindings if you need them
 ;; if undo-tree fails to install for strange reasons M-x list-packages C-s undo-tree
@@ -1908,7 +1920,7 @@ racket-json-view/
 #+end_src
 * Bootstrap :noexport:
 #+name: orgstrap
-#+begin_src elisp :results none
+#+begin_src elisp :noweb yes :results none
 (defun orgstrap---advise-ob-scor-windows (command &rest args)
   (let ((exec-path (cons "C:/Program Files/Git/bin/" exec-path)))
     (when (string= (downcase (executable-find "bash"))
@@ -1918,6 +1930,8 @@ racket-json-view/
       ;; from running with bad semantics since wsl bash could damage the system
       (error "WSL bash detected! Not running bash block since WSL bash is completely broken and will skip whole commands and/or drop their output."))
     (apply command args)))
+
+<<user-config>>
 
 (when (eq system-type 'windows-nt)
   (advice-add #'org-babel--shell-command-on-region :around #'orgstrap---advise-ob-scor-windows))
