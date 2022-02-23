@@ -159,7 +159,8 @@
                      (begin
                        (let ([pc-dir (path-cache-dir)])
                          (unless (directory-exists? pc-dir)
-                           ; TODO make-parent-directory* ?
+                           ; `make-directory*' will make parents but
+                           ; only if pc-dir is not a relative path
                            (make-directory* pc-dir)))
                        (let ([result (get-dataset-list)])
                          (with-output-to-file pcd
@@ -173,9 +174,15 @@
     (set-datasets-view! lview (current-datasets)) ; FIXME TODO have to store elsewhere for search so we
     result))
 
+(define (ensure-directory! path-dir)
+  (unless (directory-exists? path-dir)
+    (make-directory* path-dir)))
+
 (define (init-paths!)
   "initialize or reset the file system paths to cache, export, and source directories"
-  ;; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
+  ; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
+  ; FIXME more cryptic errors if sparcur.simple isn't tangled
+  ; FIXME it should be possible for the user to configure path-source-dir
   (path-source-dir (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))
   (path-cache-dir (expand-user-path (user-cache-path "sparcur/racket")))
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
@@ -432,6 +439,7 @@
         (thunk
          (let ([status-1 #f]
                [status-2 #f])
+           (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
@@ -477,6 +485,7 @@
            ; logging output into the racket comint window in emacs on
            ; the other hand it is not amazing because system* is
            ; blocking, so probably switch to user subprocess?
+           (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1]
                           [current-input-port (make-input-port-noop)])
              #;
