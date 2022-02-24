@@ -1622,11 +1622,6 @@ done"""
                 s.fetch()
             return
 
-        data = self._data_ir(self.options.project_id)
-
-        # check that the ir is sane
-        self._check_duplicates(data['datasets'])
-
         # get sheets
         sheets = {(s.name, s.sheet_name):s for s in subclasses(ps.Sheet)
                   if not s.__name__.startswith('_')}
@@ -1637,6 +1632,9 @@ done"""
 
         if self.options.update:
             sheet = Sheet(readonly=False)
+            data = self._data_ir(self.options.project_id)
+            # check that the ir is sane
+            self._check_duplicates(data['datasets'])
             sheet.update_from_ir(data)
         else:
             sheet = Sheet()
