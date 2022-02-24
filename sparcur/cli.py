@@ -3,6 +3,7 @@ from sparcur.config import auth
 __doc__ = f"""
 SPARC curation cli for fetching, validating datasets, and reporting.
 Usage:
+    spc configure
     spc clone    [options] <project-id>
     spc pull     [options] [<directory>...]
     spc refresh  [options] [<path>...]
@@ -44,6 +45,7 @@ Usage:
     spc fab      [meta] [options]
 
 Commands:
+    configure   run commands to check and get auth creditials
     clone       clone a remote project (creates a new folder in the current directory)
 
     pull        retrieve remote file structure
@@ -490,6 +492,9 @@ class Main(Dispatcher):
             logd.setLevel('INFO')
             loge.setLevel('INFO')
 
+        if self.options.configure:
+            return
+
         if self.options.project_path:
             self.cwd = Path(self.options.project_path).resolve()
         else:
@@ -828,6 +833,57 @@ class Main(Dispatcher):
         for p in self._paths:
             if not p.is_dir():
                 yield p
+
+    def configure(self):
+        # the order here is very precise so that the absolutely
+        # required and easiest to get right creds go first
+
+        # protocols io
+        print('protocols io starting')
+        idlib.Pio._setup()
+        print('protocols io ok')
+
+        # google sheets readonly
+        print('google sheets readonly starting')
+        from sparcur.sheets import Organs
+        oro = Organs(readonly=True)
+        oro.fetch()
+        # FIXME googapis I think
+        print('google sheets readonly ok')
+
+        # scigraph
+        print('scigraph starting')
+        next(OntTerm.query(label='brain', prefix='UBERON'))
+        print('scigraph api', pauth.get('scigraph-api'))
+        print('scigraph ok')
+
+        # pennsieve
+        print('pennsieve starting')
+        from sparcur.simple.utils import backend_pennsieve
+        project_id = auth.get('remote-organization')
+        print('pennsieve project_id', project_id)
+        PennsieveRemote = backend_pennsieve(project_id)
+        root = PennsieveRemote(project_id)
+        datasets = list(root.children)
+        print('pennsieve ok')
+
+        # google sheets readwrite
+        print('google sheets readwrite starting')
+        orw = Organs(readonly=False)
+        orw.fetch()
+        print('google sheets readwrite ok')
+
+        # hypothesis
+        print('hypothes.is starting')
+        from hyputils import hypothesis as hyp
+        group_name = self.options.hypothesis_group_name
+        print('hypothesis group_name', group_name)
+        group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
+        get_annos = hyp.Memoizer(group=group_id)
+        get_annos.api_token = auth.get('hypothesis-api-key')
+        values = get_annos.get_annos_from_api(max_results=1)
+        assert values, 'no values means api_token or group_id are wrong'
+        print('hypothes.is ok')
 
     def clone(self):
         project_id = self.options.project_id
@@ -1943,7 +1999,8 @@ def main():
     except BaseException as e:
         log.exception(e)
         print()
-        msg = f'Command failed!\n{main.cwd}\n{options!r}'
+        cwd = main.cwd if hasattr(main, 'cwd') else Path.cwd()
+        msg = f'Command failed!\n{cwd}\n{options!r}'
         raise exc.SparCurError(msg) from e
     finally:
         if logfile.size == 0:
