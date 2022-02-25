@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 2f5a7753772745172583c3d866930dc6ed4a610061d30bbc5cf46d240b921bc0; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 755d0ec51df53b134b2fc34e3a2e6215253456775336b08906567a86234b0890; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -34,10 +34,8 @@ exit
 # XXX of course that would require epilogue to actually be implemented :/
 # #+property: header-args:sparql+ :epilogue "LIMIT ?limit"
 
-# #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
-# #+property: header-args:cypher :scigraph http://sparc-data.scicrunch.io:9000/scigraph
 <<cypher-settings>>
-#+property: header-args:cypher :scigraph http://selene:9000/scigraph
+#+property: header-args:cypher :scigraph http://localhost:9000/scigraph
 #+property: header-args:cypher+ :limit 10
 #+end:
 #+begin: prefixes
@@ -120,6 +118,9 @@ exit
 #+link: doap http://usefulinc.com/ns/doap#
 #+link: xsd http://www.w3.org/2001/XMLSchema#
 #+link: skos http://www.w3.org/2004/02/skos/core#
+#+link: mba http://api.brain-map.org/api/v2/data/Structure/
+#+link: jax http://jaxmice.jax.org/strain/
+#+link: npokb http://uri.interlex.org/npo/uris/neurons/
 #+end:
 
 * Data queries
@@ -1865,7 +1866,9 @@ Python code to simplify =neru= and supporting functions to extract terminal regi
 #+name: python-process-neru
 #+begin_src jupyter-python :session pys
 from nifstd_tools.simplify import apinat_deblob, sub, pred, obj, ematch
-from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, ext, fasIn, endIn, layerIn
+from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, ext, fasIn, endIn, layerIn, onts
+
+ext = onts  # XXX schema change
 
 
 def query(neupop_id):
@@ -5818,7 +5821,7 @@ RETURN p1, p2, p3, p4, p5, p6
 (setq-local
  org-confirm-babel-evaluate
  (lambda (lang body)
-   (message "%S" body)
+   ;;(message "%S" body)
    (not
     (or
      (member lang '("cypher" "sparql"))
