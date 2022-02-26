@@ -364,6 +364,11 @@ gsx:google-sheet-id
       (and (file-exists-p ttl)
            (apply #'> mtimes)))))
 
+;; TODO apinat--remote-older or something
+
+(defun apinat--all-except (except)
+  (cl-remove-if (lambda (id) (memq id except)) (mapcar #'intern (all-models))))
+
 (defun-local filter-recent-models (model-ids)
   (cl-remove-if #'apinat--ttl-newer model-ids))
 
@@ -438,6 +443,51 @@ find -maxdepth 1 -type d -not -path '*.git*' -not -path '.' -exec mkdir {}/deriv
 After running the ttl export define the functions in
 ref:deploy-ontology-file and then run ~apinat-deploy-from-ttl
 bronchomotor.ttl~. NOTE Both functions need to be defined.
+
+#+name: deploy-ttls
+#+begin_src elisp
+(defvar apinat--remote-onts-path ; TODO source from config
+  "/ssh:cassava|sudo:nginx@cassava:/var/www/sparc/ApiNATOMY/ontologies/")
+
+(defun apinat--write-to-remote (model-id)
+  "Deploy a single apinatomy model MODEL-ID to `apinat--remote-onts-path'."
+  (apinat--with-model model-id
+    (with-current-buffer (create-file-buffer ttl)
+      ;; FIXME this has inverted nesting if we want to start depositing
+      ;; multiple different models
+      (unwind-protect
+          (let* (;(version "TODO datetime etc, or better, read it from the ttl file")
+                 (version (int-to-string (time-convert nil 'integer)))
+                 ;; system users have no home, tramp will error without override t
+                 (tramp-histfile-override t)
+                 (version-path
+                  ;; FIXME version-path is missing the /versions/ element
+                  ;; but is the convention that is used on cassava at the moment
+                  (expand-file-name
+                   version
+                   (expand-file-name
+                    (symbol-name model-id)
+                    apinat--remote-onts-path))))
+            ;; if the version already exists, error
+            ;; otherwise make it via tramp
+            (if (file-directory-p version-path)
+                (error "Version exists!")
+              (make-directory version-path 'parents)
+              (write-file
+               (expand-file-name
+                (file-name-nondirectory ttl)
+                version-path))))
+        (kill-buffer (current-buffer))))))
+
+(defun apinat-deploy-models (model-ids)
+  ;; FIXME check already deployed
+  (let (fails)
+    (cl-loop for model-id in model-ids
+             do (condition-case nil
+                    (apinat--write-to-remote model-id)
+                  (error (push model-id fails))))
+    fails))
+#+end_src
 
 The current command to deploy all is.
 #+begin_src bash
@@ -952,6 +1002,8 @@ obj:   {n_pair}''')
 
 <<all-ttl-models>>
 
+<<deploy-ttls>>
+
 (defun apinat---pre-tangle () ; (ref:sure)
   ;; FIXME hardcoded paths issues
   (unless (assq '&are-you-sure org-babel-library-of-babel)
@@ -979,8 +1031,9 @@ obj:   {n_pair}''')
         (load user-init-file))))
   (ow-cli-gen
       ((:install)
-       (:all)
        (:tangle)
+       (:deploy) ; FIXME decouple from build
+       (:all)
        (:model-id nil) ; the id of the model to build
        ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
        ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
