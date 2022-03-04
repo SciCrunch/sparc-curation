@@ -192,14 +192,17 @@
 (define (manifest-report)
   ; FIXME this will fail if one of the keys isn't quite right
   ; TODO displayln this into a text% I think?
-  (for-each (λ (m) (displayln m) (newline))
+  (for-each (λ (m) (displayln (regexp-replace #rx"SPARC Consortium/[^/]+/" m "\\0\n")) (newline))
             ; FIXME use my hr function from elsewhere
-            (hash-ref (hash-ref (hash-ref (hash-ref
-                                           (current-blob)
-                                           'status)
-                                          'path_error_report)
-                                '|#/path_metadata/-1|)
-                      'messages)))
+            (let ([ihr (hash-ref
+                        (hash-ref
+                         (current-blob)
+                         'status)
+                        'path_error_report
+                        #f)])
+              (if ihr
+                  (hash-ref (hash-ref ihr '|#/path_metadata/-1| #hash((messages . ()))) 'messages)
+                  '()))))
 
 ;; update viewer
 
@@ -353,7 +356,10 @@
                                  ;;[font (make-object font% 10 'modern)]
                                  [parent frame-helper]))])
                 (let* ([lp (dataset-export-latest-path dataset)]
-                       [json (if lp (path->json lp) (hash 'id (dataset-id dataset)))]
+                       [json (if lp (path->json lp)
+                                 (hash
+                                  'id (dataset-id dataset)
+                                  'meta (hash 'folder_name (dataset-title dataset))))]
                        [jhash (for/hash ([(k v) (in-hash json)]
                                          ; FIXME I think we don't need include keys anymore
                                          ; XXX false, there are still performance issues
@@ -685,7 +691,18 @@
 (define (cb-open-dataset-remote obj event)
   (println "TODO open uri_human in browser"))
 
-(define (cb-manifest-report obj event)
+(define (cb-manifest-report obj event #:show [show #t])
+  (let ([lp (dataset-export-latest-path (current-dataset))])
+    ; this was moved from the fast branch of dataset-jview!
+    ; to avoid calls to disk for current-blob
+    (when lp ; FIXME performance is BAD when going rapidly through list
+      ; maybe wait for a short time and if the current jview is this
+      ; jview then do the set? pretty sure we don't want to add a cache
+      ; to path->json at all, we would want a managed hash table
+      (current-blob (path->json lp))
+      #;
+      (when (send frame-manifest-report is-shown?)
+        (cb-manifest-report 'dataset-jview! 'called #:show #f))))
   ; TODO populate the editor
   ; TODO implement this as a method on edcanv-man-rep ?
   (let ((ed (send edcanv-man-rep get-editor)))
@@ -693,7 +710,8 @@
     (send ed clear)
     (send ed insert (with-output-to-string (λ () (manifest-report))))
     (send ed scroll-to-position 0))
-  (send frame-manifest-report show #t))
+  (when show
+    (send frame-manifest-report show #t)))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
