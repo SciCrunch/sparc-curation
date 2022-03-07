@@ -460,23 +460,27 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
                  (version (int-to-string (time-convert nil 'integer)))
                  ;; system users have no home, tramp will error without override t
                  (tramp-histfile-override t)
+                 (version-path-local
+                  (concat (symbol-name model-id) "/" version "/" (file-name-nondirectory ttl)))
                  (version-path
-                  ;; FIXME version-path is missing the /versions/ element
-                  ;; but is the convention that is used on cassava at the moment
                   (expand-file-name
-                   version
-                   (expand-file-name
-                    (symbol-name model-id)
-                    apinat--remote-onts-path))))
+                   version-path-local
+                   apinat--remote-onts-path))
+                 (latest-path
+                  (expand-file-name
+                   (file-name-nondirectory ttl)
+                   apinat--remote-onts-path)))
             ;; if the version already exists, error
             ;; otherwise make it via tramp
             (if (file-directory-p version-path)
                 (error "Version exists!")
-              (make-directory version-path 'parents)
-              (write-file
-               (expand-file-name
-                (file-name-nondirectory ttl)
-                version-path))))
+              (make-directory (file-name-directory version-path) 'parents)
+              (write-file version-path)
+                                        ;(message "%S %S" version-path-local latest-path)
+              (make-symbolic-link
+               version-path-local
+               latest-path
+               'ok-if-already-exists)))
         (kill-buffer (current-buffer))))))
 
 (defun apinat-deploy-models (model-ids)
@@ -664,8 +668,8 @@ then run this block and after that clean up the output to remove stuff we don't 
 ~g/Label/d~ and friends then ~%s/owl:equiv.+\(\n.+\)+\]\ ;//~ then ~%!ttlfmt -f ttl~
 
 # #+header: :var block_lines=(let ((e (cadr (org-element-at-point)))) (list (1- (count-lines 1 (plist-get e :begin))) (1- (count-lines 1 (plist-get e :end)))))
-# #+header: :var __file__=(buffer-file-name)
-#+name: some-block
+# #+header: :var __file__=(concat (buffer-file-name) "/#/" (plist-get (cadr (org-element-at-point)) :name))
+#+name: apinat-pops-more.py
 #+begin_src jupyter-python :session pys
 #print(block_lines)
 from neurondm.lang import Phenotype, Neuron, Config, OntId
@@ -1049,7 +1053,22 @@ obj:   {n_pair}''')
       (message "updating %s" (or model-id "all"))
       (if all
           (update-all-models-async)
-        (update-models (list (intern model-id)))))))
+        (update-models (list (intern model-id)))))
+    (when deploy
+      "TODO")))
+#+end_src
+
+#+begin_src elisp
+' ; slow but works
+(apinat-deploy-models (apinat--all-except '(keast-bladder bolser-lewis fcomp too-map)))
+;; (apinat-deploy-models '(keast-bladder too-map))
+
+(let (password-cache) ; password-data
+  ;; (apinat-deploy-models '(too-map))
+  (apinat-deploy-models (apinat--all-except '(too-map))))
+
+;; tramp-cleanup-all-buffers ; FIXME nginx sudo password issues
+;; (tramp-list-remote-buffers)
 #+end_src
 
 [[(sure)]] Ensure that the
