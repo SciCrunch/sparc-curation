@@ -29,6 +29,7 @@
 @prefix dlcon: <https://apinatomy.org/uris/models/dev-layout-conn/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
+    owl:imports-todo <file:///tmp/scigraph-build/sparc-data/build-prov.ttl> ;
     owl:imports <https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl> ;
     owl:imports <https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
