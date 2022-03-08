@@ -1,6 +1,7 @@
 """ string normalizers, strings that change their content to match a standard """
 
 import numbers
+from ast import literal_eval
 from types import GeneratorType
 from html.parser import HTMLParser
 import idlib
@@ -13,6 +14,22 @@ from .utils import is_list_or_tuple, levenshteinDistance
 
 BLANK_VALUE = object()
 NOT_APPLICABLE = object()
+
+
+def description(value):
+    # handle incorrectly doubly quoted descriptions
+    # FIXME TODO issue an error/warning for this
+    if value.startswith('"') and value.endswith('"'):
+        if '\n' in value:
+            _value = '""' + value + '""'
+        else:
+            _value = value
+        try:
+            return literal_eval(_value)
+        except Exception as e:
+            pass
+
+    return value
 
 
 def protocol_url_or_doi(value):

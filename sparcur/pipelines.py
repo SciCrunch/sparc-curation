@@ -1274,6 +1274,7 @@ class PipelineExtras(JSONPipeline):
         # FIXME this is a nasty network step
         # maybe move these to a PipelineNormalization class? that would simplify
         # the madness that is the current normalization implementation ...
+        [['meta', 'description'], norm.description],
         [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
