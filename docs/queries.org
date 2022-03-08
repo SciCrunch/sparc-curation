@@ -5583,6 +5583,42 @@ WHERE {
 Keast
 Bolser Lewis
 First pass NLP output
+****** phenotypes for neuron
+#+name: npo-basic-phenotypes
+#+begin_src cypher :limit 99 :results drawer :wrap src json :var neupop_id="ilxtr:neuron-type-keast-2"
+MATCH (neupop:Class{iri: $neupop_id})-[e:ilxtr:hasPhenotype!]->(phenotype) RETURN e
+#+end_src
+
+#+begin_src jupyter-python :session pys :noweb yes
+from pprint import pprint
+from pyontutils.scigraph import Cypher, Vocabulary
+
+sgc = Cypher()
+query = """
+<<npo-basic-phenotypes>>
+"""
+
+
+def get_phenotypes(neupop_id):
+    d = sgc.execute(query=query, limit=99999, output='application/json', neupop_id=neupop_id)
+    good = [e for e in d['edges'] if 'meta' in e and e['meta']['owlType'] == ['subClassOf']
+            and not e['obj'].startswith('_:')]
+    return good
+
+
+pprint(get_phenotypes('ilxtr:neuron-type-keast-1'))
+#+end_src
+
+#+RESULTS:
+: [{'meta': {'convenience': [True], 'owlType': ['subClassOf']},
+:   'obj': 'ilxtr:PostGanglionicPhenotype',
+:   'pred': 'ilxtr:hasPhenotype',
+:   'sub': 'ilxtr:neuron-type-keast-1'},
+:  {'meta': {'convenience': [True], 'owlType': ['subClassOf']},
+:   'obj': 'ilxtr:ParasympatheticPhenotype',
+:   'pred': 'ilxtr:hasPhenotype',
+:   'sub': 'ilxtr:neuron-type-keast-1'}]
+
 ****** number of neuron populations aka neuron types
 # TODO load NPO, and we have to use robot to reason the NPO graph
 #+begin_src sparql
