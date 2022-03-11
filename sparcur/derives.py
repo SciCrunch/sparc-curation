@@ -382,10 +382,10 @@ class Derives:
                                     'specimen_id': id,
                                     'dirs': actual,
                                     })
-                    else:
-                        msg = f'No folder for sample {sample_id}'
-                        if he.addError(msg, blame='submission', path=path):
-                            logd.error(msg)
+                        else:
+                            msg = f'No folder for sample {sample_id}'
+                            if he.addError(msg, blame='submission', path=path):
+                                logd.error(msg)
             else:
                 pass  # TODO that's an error!
 
