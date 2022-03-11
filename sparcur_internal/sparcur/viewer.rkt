@@ -391,6 +391,7 @@
   (lb-data ds)
   (id-short ds)
   (id-uuid ds)
+  (uri-human ds)
   (dataset-src-path ds)
   (dataset-export-latest-path ds)
   (fetch-export-dataset ds)
@@ -545,7 +546,12 @@
        ; XXX NOTE for some reason racket decided that multiple values
        ; must always be bound together so you can't just ignore later
        ; values if you want like in elisp or common lisp
-       uuid))])
+       uuid))
+   (define (id-project ds)
+     ; FIXME derive from file system
+     "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0")
+   (define (uri-human ds)
+     (string-append "https://app.pennsieve.io/" (id-project ds) "/datasets/N:" (id-short ds)))])
 
 (define (set-datasets-view! list-box datasets)
   (send/apply list-box set (apply map list (map lb-cols datasets)))
@@ -689,7 +695,7 @@
     (thread (thunk (apply system* argv)))))
 
 (define (cb-open-dataset-remote obj event)
-  (println "TODO open uri_human in browser"))
+  (xopen-path (uri-human (current-dataset))))
 
 (define (cb-manifest-report obj event #:show [show #t])
   (let ([lp (dataset-export-latest-path (current-dataset))])
