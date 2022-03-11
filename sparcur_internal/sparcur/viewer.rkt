@@ -551,7 +551,7 @@
      ; FIXME derive from file system
      "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0")
    (define (uri-human ds)
-     (string-append "https://app.pennsieve.io/" (id-project ds) "/datasets/N:" (id-short ds)))])
+     (string-append "https://app.pennsieve.io/" (id-project ds) "/datasets/N:dataset:" (id-uuid ds)))])
 
 (define (set-datasets-view! list-box datasets)
   (send/apply list-box set (apply map list (map lb-cols datasets)))
