@@ -656,7 +656,9 @@ doi_pattern = idlib.Doi._id_class.canonical_regex
 
 orcid_pattern = idlib.Orcid._id_class.canonical_regex
 
-contributor_name_pattern = r'^[^, ]+,\ [^,]+$'
+# for a fun (?) time
+# https://en.wikipedia.org/wiki/List_of_family_name_affixes
+contributor_name_pattern = r'^((([Vv](an|on))|[Dd][ia]|([Dd]e( [Ll]os)?)) )?[^, ]+, [^,]+$'
 
 ror_pattern = idlib.Ror._id_class.canonical_regex
 
