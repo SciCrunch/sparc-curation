@@ -714,7 +714,8 @@ class NormDatasetDescriptionFile(NormValues):
         # no truthy values only True itself
         yield value is True or isinstance(value, str) and value.lower() == 'yes'
 
-    def _protocol_url_or_doi(self, value):
+    @staticmethod
+    def _protocol_url_or_doi(value):
         doi = False
         if 'doi' in value:
             doi = True
@@ -741,7 +742,8 @@ class NormDatasetDescriptionFile(NormValues):
             v = val.strip()
             if v:
                 try:
-                    yield self._protocol_url_or_doi(v)
+                    # XXX SIGH staticmethod and inheritance :/
+                    yield NormDatasetDescriptionFile._protocol_url_or_doi(v)
                 except Exception as e:
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...

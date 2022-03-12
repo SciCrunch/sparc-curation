@@ -529,7 +529,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
     @property
     def dataset_relative_path(self):
         # FIXME broken for local validation
-        return self.relative_path_from(self.cache.dataset.local)
+        try:
+            return self.relative_path_from(self.cache.dataset.local)
+        except AttributeError as e:
+            raise exc.NoCachedMetadataError(self) from e
 
     @property
     def cache_id(self):
@@ -726,6 +729,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             # path, but the caller should, maybe a case for
             # inversion of control here
             blob['errors'] = [{'message': msg,
+                               'blame': 'submissions',  # FIXME maybe should be pipeline?
+                               'pipeline_stage': 'sparcur.path._jm_common',
                                'candidates': cands,}]
 
         return blob, project_path, dsid

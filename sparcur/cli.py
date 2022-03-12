@@ -853,8 +853,8 @@ class Main(Dispatcher):
 
         # scigraph
         print('scigraph starting')
-        next(OntTerm.query(label='brain', prefix='UBERON'))
         print('scigraph api', pauth.get('scigraph-api'))
+        next(OntTerm.query(label='brain', prefix='UBERON'))
         print('scigraph ok')
 
         # pennsieve

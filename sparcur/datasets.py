@@ -697,9 +697,10 @@ class Tabular(HasErrors):
                 # representation of dates and midnight indistinguishable !?!?
                 if cell.value and cell.is_date and
                 cell.number_format in ('yyyy\\-mm\\-dd;@', 'YYYY\\-MM\\-DD')
-                else cell.value
+                else (cell.hyperlink.target if cell.hyperlink else cell.value)
                 for cell in row]
-
+            # NOTE '@' != 'General' but apparently openpyxl converts @ to number incorrectly
+            #breakpoint()
             if not [v for v in fixed_row if v]:
                 emptyrs += 1
                 continue

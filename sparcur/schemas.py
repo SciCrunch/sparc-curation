@@ -978,7 +978,7 @@ class DatasetPathSchema(JSONSchema):
 class ContributorExportSchema(JSONSchema):
     schema = {
         'type': 'object',
-        'jsonld_include': {'@type': ['sparc:Person', 'owl:NamedIndividual']},
+        #'jsonld_include': {'@type': ['sparc:Person', 'owl:NamedIndividual']},  # FIXME being included THREE times due to references in nested schema # XXX THIS HAS BEEN MOVED AFTER ALL DEEPCOPY OPERATIONS SIGH
         'properties': {
             'id': {'type': 'string',  # FIXME TODO
                    },
@@ -1053,17 +1053,36 @@ class ContributorSchema(JSONSchema):
 
 
 class ContributorsExportSchema(JSONSchema):
-    schema = {'type': 'array',
-              #'context_runtime': lambda base: {'@id': f'{base}contributors',},
-              'contains': {
-                  'type': 'object',
-                  'required': ['is_contact_person'],
-                  'properties': {
-                      'is_contact_person': {'type': 'boolean', 'enum': [True]},
-                  },
-              },
-              'items': ContributorExportSchema.schema,
-            }
+    schema = {'oneOf':
+              [{'type': 'array',
+                #'context_runtime': lambda base: {'@id': f'{base}contributors',},
+                'contains': {
+                    'type': 'object',
+                    'required': ['is_contact_person'],
+                    'properties': {
+                        'is_contact_person': {'type': 'boolean', 'enum': [True]},
+                    },
+                },
+                'items': ContributorExportSchema.schema,
+                },
+               # 2.0.0
+               {'type': 'array',
+                'contains': {
+                    'type': 'object',
+                    'required': ['contributor_role'],
+                    'properties': {
+                        'contributor_role': {
+                            'type': 'array',
+                            'contains': {
+                                'type': 'string',
+                                'enum': ['CorrespondingAuthor', 'ContactPerson']
+                            },
+                        },
+                    },
+                },
+                'items': ContributorExportSchema.schema,},
+               ],
+              }
 
 
 class ContributorsSchema(JSONSchema):
@@ -1090,7 +1109,6 @@ class ContributorsOutExportSchema(JSONSchema):
 
 class CreatorExportSchema(JSONSchema):
     schema = copy.deepcopy(ContributorExportSchema.schema)
-    schema.pop('jsonld_include')
     schema['properties'].pop('contributor_role')
     schema['properties'].pop('is_contact_person')
 
@@ -1118,6 +1136,10 @@ _protocol_url_or_doi_schema = {'anyOf':[EIS._allOf(DoiSchema),
                                         EIS._allOf(PioSchema),
                                         {'type': 'string',
                                          'pattern': simple_url_pattern,}]}
+
+
+ContributorExportSchema.schema['jsonld_include'] = {
+    '@type': ['sparc:Person', 'owl:NamedIndividual']}
 
 
 class DatasetDescriptionExportSchema(JSONSchema):
@@ -1248,6 +1270,48 @@ class DatasetDescriptionExportSchema(JSONSchema):
             'contributors': ContributorsExportSchema.schema,
         }
     }
+
+
+class DatasetDescription2Schema(JSONSchema):
+    # XXX not clear that we need a separate schema for this
+    # or whether we handle it in the ingestion side, having
+    # a single internal schema should be possible
+    schema = {
+        'errors': ErrorSchema.schema,
+        'template_schema_version': {'type': 'string'},
+        # 2.0
+        # 'required': []
+        'properties': {
+            'dataset_type': {
+                'type': 'string',
+                'enum': ['experimental', 'computational', 'abi-scaffold', 'o2s-simulation'],
+            },
+            'title': {'type': 'string',},
+            'subtitle': {'type': 'string',},
+            'keywords': {'type': 'array',},
+            'funding': {'type': 'array',},
+            'acknowledgements': {'type': 'string',},
+
+            'study': {
+                'type': 'object',
+                'properties': {
+                    'study_purpose': {'type': 'string',},
+                    'study_data_collection': {'type': 'string',},
+                    'study_conclusion': {'type': 'string',},
+                    'study_collection_title': {'type': 'string',},
+                },},
+            'study_organ_system': {'type': 'array',},
+            'study_approach': {'type': 'array',},
+            'study_technique': {'type': 'array',},
+
+            'number_of_subjects': {'type': 'integer'},
+            'number_of_samples': {'type': 'integer'},
+        }
+    }
+
+
+DatasetDescriptionExportSchema.schema['properties'].update(
+    DatasetDescription2Schema.schema['properties'])
 
 
 class DatasetDescriptionSchema(JSONSchema):

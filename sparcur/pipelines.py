@@ -1017,6 +1017,9 @@ class SDSPipeline(JSONPipeline):
               [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['dataset_description_file', 'name'], ['meta', 'title']],
               [['dataset_description_file', 'links'], ['meta', 'additional_links']],
+              # 2.0.0
+              [['dataset_description_file', 'study', 'study_collection_title'], ['meta', 'title_for_complete_data_set']],  # XXX 2
+              # shared
               *copy_all(['dataset_description_file'], ['meta'],
                         'template_schema_version',
                         'species',  # TODO validate all source paths against schema
@@ -1035,6 +1038,11 @@ class SDSPipeline(JSONPipeline):
 
                         'number_of_subjects',
                         'number_of_samples',
+
+                        # 2.0.0
+                        'title',  # XXX 2
+                        'subtitle',  # XXX 2
+                        'related_identifiers',  # XXX 2
               ))
 
     moves = (
@@ -1103,6 +1111,14 @@ class SDSPipeline(JSONPipeline):
                [[['samples']],
                 DT.BOX(len),
                 [['meta', 'sample_count']]],
+
+               # 2.0.0
+               [[['meta', 'related_identifiers']],
+                # FIXME need to process and resolve all related identifiers
+                (lambda l: ([norm.NormDatasetDescriptionFile._protocol_url_or_doi(rid['related_identifier']) for rid in l if
+                             'relation_type' in rid and rid['relation_type'] == 'HasProtocol'
+                             and 'related_identifier' in rid],)),
+                [['meta', 'protocol_url_or_doi']]],
     )
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
@@ -1263,6 +1279,10 @@ class PipelineExtras(JSONPipeline):
 
         [['inputs', 'remote_dataset_metadata', 'readme', 'readme'],
          ['rmeta', 'readme']],
+
+        # 2.0.0 -> 1.2.3 ir compat # FIXME technically should be conditional
+
+        [['meta', 'subtitle'], ['meta', 'description']],
     )
 
     __mr_path = ['metadata_file', int, 'contents', 'manifest_records', int]
