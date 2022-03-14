@@ -16,6 +16,66 @@ BLANK_VALUE = object()
 NOT_APPLICABLE = object()
 
 
+def related_identifiers(rids):
+    for rid in rids:
+        try:
+            out = related_identifier_record(rid)
+            yield out
+        except Exception as e:
+            breakpoint()
+            log.exception(e)
+            pass
+
+
+def related_identifier_record(rid):
+    #types = sc.DatasetDescriptionExportSchema.schema[
+        #'properties']['related_identifiers']['relation_type']['enum']
+        #'properties']['related_identifiers']['relation_type']['enum']
+    he = HasErrors(pipeline_stage='sparcur.normalization.related_identifier_record')
+    for key in ('relation_type', 'related_identifier_type', 'related_identifier'):
+        # FIXME this is a case where we we clearly need to have split schema validation
+        # where we need to filter failures first and only then normalize and the filtering
+        # should be based on the fields that must be present to normalize correctly or
+        # something ... unfortunately there isn't a simple way to couple these things
+        # declaratively :/
+        if key not in rid:
+            return rid
+
+    rel = rid['relation_type']
+    type = rid['related_identifier_type']
+    id = rid['related_identifier']
+    desc = (rid['related_identifier_description']
+            if 'related_identifier_description' in rid else None)
+
+    if rel == 'HasProtocol':
+        try:
+            nid = NormDatasetDescriptionFile._protocol_url_or_doi(id)
+            id, = protocol_url_or_doi((nid,))
+        except Exception as e:
+            # XXX we are missing the required context to produce an
+            # understanable error here however the result will filter
+            # fail later on pointing to the correct file
+            if he.addError(str(e)):
+                log.exception(e)
+            id = None
+    else:
+        pass
+
+    out = dict(
+        relation_type=rel,
+        related_identifier_type=type,
+    )
+
+    if id is not None and id:
+        out['related_identifier'] = id
+
+    if desc is not None and desc:
+        out['related_identifier_description'] = desc
+
+    he.embedErrors(out)
+    return out
+
+
 def description(value):
     # handle incorrectly doubly quoted descriptions
     # FIXME TODO issue an error/warning for this
@@ -714,6 +774,10 @@ class NormDatasetDescriptionFile(NormValues):
         # no truthy values only True itself
         yield value is True or isinstance(value, str) and value.lower() == 'yes'
 
+    def title_for_complete_data_set(self, value):
+        self._error_on_na(value)
+        return value
+
     @staticmethod
     def _protocol_url_or_doi(value):
         doi = False
@@ -728,10 +792,6 @@ class NormDatasetDescriptionFile(NormValues):
         else:
             value = idlib.Pio(value)  # XXX possible encapsulation issue
 
-        return value
-
-    def title_for_complete_data_set(self, value):
-        self._error_on_na(value)
         return value
 
     def protocol_url_or_doi(self, value):

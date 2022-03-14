@@ -920,7 +920,7 @@ class MetadataFile(HasErrors):
     ignore_header = tuple()
     ignore_match = tuple()
     raw_json_class = rj.RawJson
-    normalization_class = nml.NormValues
+    normalization_class = nml.NormValues  # FIXME normalize SHOULD NOT BE DONE AT THIS STAGE
     normalize_alt = True
     normalize_header = True
     _expect_single = tuple()
