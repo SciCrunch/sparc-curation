@@ -3490,7 +3490,8 @@ WHERE n.iri IN [
         "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
         "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
         "http://purl.org/sig/ont/fma/fma50801", // brain
-        "http://purl.org/sig/ont/fma/fma5889"   // autonomic ganglion
+        "http://purl.org/sig/ont/fma/fma5889",  // autonomic ganglion
+        "http://purl.org/sig/ont/fma/fma19667"  // urethra
         ]
 RETURN n
 #+end_src
@@ -4532,6 +4533,9 @@ UBERON:0002240 l: "spinal cord"; e: FMA:7647 .
 UBERON:0002106 l: "spleen"; e: FMA:7196 .
 UBERON:0000945 l: "stomach"; e: FMA:7148 .
 UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
+
+# granular
+UBERON:0000057 l: "urethra"; e: FMA:19667 .
 #+end_src
 
 *** nerves
