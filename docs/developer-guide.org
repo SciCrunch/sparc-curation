@@ -954,6 +954,113 @@ for d in $(ls *-* -d); do
 done
 #+end_src
 *** _*Validate*_
+**** Overview :ignore:
+See ref:graph-validate-all for all the related bits.
+#+name: graph-validate-single
+#+header: :wrap "src dot :file ./images/graph-validate-single.png :cmdline -Kdot -Tpng :exports results :cache yes"
+#+begin_src racket :lang racket/base :exports none :noweb no-export :cache yes
+<<racket-graph-helper>>
+(define g
+  (dag-notation
+   ; inside tabular -> json-ir ... it goes ...
+   data-0 -> condense -> cull-rtk -> normalize-values -> clean -> expand-string-lists -> filter -> cull -> transformed -> keyed -> add_missing -> sanity-check -> objectify -> norm_alt_headers -> headers -> tabular
+   ; VERY large number of steps, and I am 99% sure that we need to take normalize-values out of there, but there was a good reason to include them,
+   ; namely that it is way easier to run everything backward from normalize-values to the spreadsheets than it is to go from json-ir all the way back
+   ; to the original sheets, however we need to rearchitect to get there
+
+   ; another VERY long pipeline that does the json processing, and which desparately needs to be simplified and made properly composable
+   ; (as we are trying to do in this dev guide)
+   data-n -> added -> pipeline-end -> augmented -> updated -> cleaned -> moved -> copied -> subpipelined -> ffail -> previous-pipeline -> data-0
+
+   json-ir -> data-n
+   json-ir -> json-raw
+   ttl -> json-ld -> json-ir
+   ttl -> json-ir
+   json-export -> json-ir
+   ))
+
+(graphviz-2 g #:clusters '(
+            ))
+#+end_src
+
+#+RESULTS[54c9e97e880b92a4c88f7e34a20be8a06198c76c]: graph-validate-single
+#+begin_src dot :file ./images/graph-validate-single.png :cmdline -Kdot -Tpng :exports results :cache yes
+digraph G {
+	node0 [label="cull-rtk"];
+	node1 [label="tabular"];
+	node2 [label="subpipelined"];
+	node3 [label="pipeline-end"];
+	node4 [label="clean"];
+	node5 [label="copied"];
+	node6 [label="moved"];
+	node7 [label="updated"];
+	node8 [label="sanity-check"];
+	node9 [label="objectify"];
+	node10 [label="keyed"];
+	node11 [label="ffail"];
+	node12 [label="cleaned"];
+	node13 [label="cull"];
+	node14 [label="normalize-values"];
+	node15 [label="data-n"];
+	node16 [label="expand-string-lists"];
+	node17 [label="previous-pipeline"];
+	node18 [label="transformed"];
+	node19 [label="filter"];
+	node20 [label="data-0"];
+	node21 [label="json-export"];
+	node22 [label="ttl"];
+	node23 [label="augmented"];
+	node24 [label="condense"];
+	node25 [label="add_missing"];
+	node26 [label="headers"];
+	node27 [label="json-ir"];
+	node28 [label="json-ld"];
+	node29 [label="json-raw"];
+	node30 [label="added"];
+	node31 [label="norm_alt_headers"];
+	subgraph U {
+		edge [dir=none];
+	}
+	subgraph D {
+		node0 -> node14;
+		node2 -> node11;
+		node3 -> node23;
+		node4 -> node16;
+		node5 -> node2;
+		node6 -> node5;
+		node7 -> node12;
+		node8 -> node9;
+		node9 -> node31;
+		node10 -> node25;
+		node11 -> node17;
+		node12 -> node6;
+		node13 -> node18;
+		node14 -> node4;
+		node15 -> node30;
+		node16 -> node19;
+		node17 -> node20;
+		node18 -> node10;
+		node19 -> node13;
+		node20 -> node24;
+		node21 -> node27;
+		node22 -> node28;
+		node22 -> node27;
+		node23 -> node7;
+		node24 -> node0;
+		node25 -> node8;
+		node26 -> node1;
+		node27 -> node29;
+		node27 -> node15;
+		node28 -> node27;
+		node30 -> node3;
+		node31 -> node26;
+	}
+}
+#+end_src
+
+#+RESULTS[e46fa5a6ebbfedba0f31b96f7f5a9a31a179b71f]:
+[[file:./images/graph-validate-single.png]]
+
 **** Extract
 #+begin_src bash
 python -m sparcur.simple.extract "${DATASET_PATH}"
