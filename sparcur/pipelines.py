@@ -1115,10 +1115,18 @@ class SDSPipeline(JSONPipeline):
                # 2.0.0
                [[['meta', 'related_identifiers']],
                 # FIXME need to process and resolve all related identifiers
-                (lambda l: ([norm.NormDatasetDescriptionFile._protocol_url_or_doi(rid['related_identifier']) for rid in l if
-                             'relation_type' in rid and rid['relation_type'] == 'HasProtocol'
-                             and 'related_identifier' in rid],)),
+                (lambda l: (
+                    tuple([norm.NormDatasetDescriptionFile._protocol_url_or_doi(
+                        rid['related_identifier'])
+                           for rid in l if 'relation_type' in rid
+                           and rid['relation_type'] == 'HasProtocol'
+                           and 'related_identifier' in rid]),)),
                 [['meta', 'protocol_url_or_doi']]],
+
+               [[['inputs', 'dataset_description_file', 'study']],
+                De.study_description,  # FIXME probably temporary and may klobber/conflict
+                [['meta', 'description']]],
+
     )
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
@@ -1282,7 +1290,11 @@ class PipelineExtras(JSONPipeline):
 
         # 2.0.0 -> 1.2.3 ir compat # FIXME technically should be conditional
 
-        [['meta', 'subtitle'], ['meta', 'description']],
+        # FIXME we cannot include this because subtitle has specific semanitcs on
+        # pennsieve (e.g. length) and description was removed because it was
+        # redundant with study, so I'm going to create a dervies over the study
+        # object instead
+        #[['meta', 'subtitle'], ['meta', 'description']],
     )
 
     __mr_path = ['metadata_file', int, 'contents', 'manifest_records', int]
@@ -1336,6 +1348,7 @@ class PipelineExtras(JSONPipeline):
          # to move away from using derives entirely, too limited in expressivity
          De.validate_structure,
          [['specimen_dirs']]],
+
     )
 
     adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]

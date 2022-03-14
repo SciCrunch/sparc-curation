@@ -422,3 +422,12 @@ class Derives:
 
         he.embedErrors(obj)
         return obj,
+
+    @staticmethod
+    def study_description(study):
+        contents = []
+        for key in ('study_purpose', 'study_data_collection', 'study_primary_conclusion'):
+            if key in study:
+                contents.append(study[key])
+        out = ' '.join(contents)
+        return out,
