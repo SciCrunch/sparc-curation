@@ -1115,12 +1115,11 @@ class SDSPipeline(JSONPipeline):
                # 2.0.0
                [[['meta', 'related_identifiers']],
                 # FIXME need to process and resolve all related identifiers
-                (lambda l: (
-                    tuple([norm.NormDatasetDescriptionFile._protocol_url_or_doi(
-                        rid['related_identifier'])
-                           for rid in l if 'relation_type' in rid
-                           and rid['relation_type'] == 'HasProtocol'
-                           and 'related_identifier' in rid]),)),
+                # FIXME this needs a filter failures in front of it for structure
+                DT.BOX(lambda rids: tuple(
+                    rid['related_identifier'] for rid in norm.related_identifiers(rids)
+                    if 'relation_type' in rid and rid['relation_type'] == 'HasProtocol'
+                    and 'related_identifier' in rid)),
                 [['meta', 'protocol_url_or_doi']]],
 
                [[['inputs', 'dataset_description_file', 'study']],
@@ -1357,7 +1356,19 @@ class PipelineExtras(JSONPipeline):
         # FIXME this is silly, there only needs to be a single lambda for this DUH
         # and thus no need for a list of lambda
         lambda e, p: ('inputs' not in p and 'contributor_role' in p or
-                      'inputs' not in p and 'contributor_orcid' in p or
+                      'inputs' not in p and 'contributor_orcid' in p or  # XXX FIXME AAAAAAAAAAAAAA
+                      'inputs' not in p and 'protocol_url_or_doi' in p or  # FIXME resolution conflated
+                      #'inputs' not in p and 'award_number' in p or  # my award number is norwar rat ...
+
+                      # FIXME this needs to be in a first pass schema
+                      # which means that we probably need/want to split these
+                      # schemas into two phases ... sigh
+                      'inputs' not in p and 'related_identifier_type' in p or
+                      'inputs' not in p and 'related_identifier' in p or
+                      'inputs' not in p and 'relation_type' in p or
+
+                      'inputs' not in p and 'related_identifiers' in p and 'message' in e
+                      and 'is a required property' in e['message'] or
 
                       'inputs' not in p and 'samples' in p and 'message' in e
                       and e['message'] == "'sample_id' is a required property" or

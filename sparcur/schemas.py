@@ -1199,9 +1199,36 @@ class DatasetDescriptionExportSchema(JSONSchema):
                 'type': 'array',
                 'items': {
                     'type': 'object',
+                    'required': [
+                        'relation_type',
+                        'related_identifier_type',
+                        'related_identifier'],
                     'properties': {
                         'related_identifier': {'type': 'string'},
-                        'related_identifier_type': {'type': 'string'},
+                        'related_identifier_type': {
+                            'type': 'string',
+                            'enum': [
+                                # datacite types
+                                'ARK',
+                                'arXiv',
+                                'bibcode',
+                                'DOI',
+                                'EAN13',
+                                'EISSN',
+                                'Handle',
+                                'IGSN',
+                                'ISBN',
+                                'ISSN',
+                                'ISTC',
+                                'LISSN',
+                                'LSID',
+                                'PMID',
+                                'PURL',
+                                'UPC',
+                                'URL',
+                                'URN',
+                                'w3id',
+                            ],},
                         'relation_type': {
                             'type': 'string',
                             'enum':
