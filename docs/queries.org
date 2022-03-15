@@ -3491,7 +3491,8 @@ WHERE n.iri IN [
         "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
         "http://purl.org/sig/ont/fma/fma50801", // brain
         "http://purl.org/sig/ont/fma/fma5889",  // autonomic ganglion
-        "http://purl.org/sig/ont/fma/fma19667"  // urethra
+        "http://purl.org/sig/ont/fma/fma19667", // urethra
+        "http://purl.org/sig/ont/fma/fma7131"   // esophagus
         ]
 RETURN n
 #+end_src
@@ -4536,6 +4537,7 @@ UBERON:0001255 l: "urinary bladder"; e: FMA:15900 .
 
 # granular
 UBERON:0000057 l: "urethra"; e: FMA:19667 .
+UBERON:0001043 l: "esophagus"; e: FMA:7131 .
 #+end_src
 
 *** nerves
