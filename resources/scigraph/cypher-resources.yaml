@@ -267,7 +267,9 @@ cypherResources:
               "http://purl.org/sig/ont/fma/fma9906",  // sympathetic nervous system
               "http://purl.org/sig/ont/fma/fma7647",  // spinal cord
               "http://purl.org/sig/ont/fma/fma50801", // brain
-              "http://purl.org/sig/ont/fma/fma5889"   // autonomic ganglion
+              "http://purl.org/sig/ont/fma/fma5889",  // autonomic ganglion
+              "http://purl.org/sig/ont/fma/fma19667", // urethra
+              "http://purl.org/sig/ont/fma/fma7131"   // esophagus
               ]
       RETURN n
 
