@@ -1200,9 +1200,13 @@ After a release
    ; scigraph
    sckan-scigraph -> apinat-ttl ; FIXME this is bad due to sync issues
    sckan-scigraph -> nifstd
-   sckan-scigraph -> mkdir   ->                  sys-apps/coreutils    -> gentoo
-   sckan-scigraph -> ontload -> scigraph-load -> dev-java/scigraph-bin -> tgbugs-overlay
-   :                 ontload ->                  dev-python/pyontutils -> tgbugs-overlay
+   sckan-scigraph -> mkdir                      -> sys-apps/coreutils -> gentoo
+   :                                                                  |git clone pyontutils| -> git
+   sckan-scigraph -> run-load-graph-sparc-sckan -> scigraph-readme -> |git clone pyontutils| -> remote
+   :                                               scigraph-readme -> emacs
+   :                                               scigraph-readme -> bash
+   : run-load-graph-sparc-sckan -> ontload -> scigraph-load -> dev-java/scigraph-bin -> tgbugs-overlay
+   :                               ontload ->                  dev-python/pyontutils -> tgbugs-overlay
    sckan-scigraph -> ontologies-sparc-sckan.yaml -> |git clone sparc-curation| -> git -> dev-vcs/git -> gentoo
    sckan-scigraph -> sparc-sckan.ttl -> sparc-data.ttl -> |git clone sparc-curation|
    :                 sparc-sckan.ttl -> sed -> sys-apps/sed -> gentoo
@@ -1227,6 +1231,13 @@ After a release
    sckan-blazegraph -> protcur.ttl -> cassava-protcur.ttl
    sckan-blazegraph -> hypothesis-protcur
    sckan-blazegraph -> sparc-community-terms.ttl -> nifstd
+   :                -> sparc-community-terms.ttl -> sparc-community-terms-update -> scigraph-readme
+   :                                                sparc-community-terms-update -> nifstd
+   :                                                sparc-community-terms-update -> |interlex server alt| -> interlex -> dev-python/interlex -> tgbugs-overlay
+   :                                                sparc-community-terms-update -> git
+   :                                                sparc-community-terms-update -> bash
+   :                                                sparc-community-terms-update -> emacs
+   :                                                sparc-community-terms-update -> curl -> net-misc/curl -> gentoo
    sckan-blazegraph -> cassava-apinatomy-*.ttl
    sckan-blazegraph -> cassava-curation-export-published.ttl
    sckan-blazegraph -> res-uberon -> uberon.owl -> remote
@@ -1237,6 +1248,10 @@ After a release
    :                   res-methods -> robot
    sckan-blazegraph -> res-npo -> npo.ttl -> nifstd
    :                              npo.ttl -> neuron-bridge.ttl
+   :                              npo.ttl -> |python -m neurondm.build release| -> |interlex server alt|
+   :                                         |python -m neurondm.build release| -> python
+   :                                         |python -m neurondm.build release| -> dev-python/neurondm
+   :                                         |python -m neurondm.build release| -> |git clone pyontutils|
    :                   res-npo -> robot
    sckan-blazegraph -> res-mis -> sparc-methods.ttl -> nifstd ; XXX not quite acurate since unres is direct
    :                   res-mis -> robot
@@ -1290,6 +1305,10 @@ After a release
           dev-vcs/git
           sys-apps/coreutils
           sys-apps/sed
+          net-misc/curl
+          dev-python/interlex
+          dev-node/apinat-converter
+          dev-python/neurondm
           ))
         ("build-graph-sckan"
          cyan
@@ -1300,6 +1319,7 @@ After a release
           sparc-sckan.ttl
           ontload
           scigraph-load
+          run-load-graph-sparc-sckan
           ))
         ("release"
          cyan
@@ -1338,7 +1358,6 @@ After a release
           apinat-ttl
           |apinat-build --all|
           apinat-converter
-          dev-node/apinat-converter
           |git clone apinatomy-models|
           ))
         ("protcur"
