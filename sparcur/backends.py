@@ -1498,6 +1498,7 @@ class RemoteDatasetData:
         package_counts = self.bfobject.packageTypeCounts
         cont = meta['content']
         blob = {'id': self.remote.id,
+                'id_int': cont['intId'],
                 'type': self.__class__.__name__,  # registered as IdentityJsonType in core
                 'name': cont['name'],  # title
                 'description': cont['description'],  # subtitle
