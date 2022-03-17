@@ -1388,6 +1388,57 @@ After a release
 #+RESULTS[52b162604dfc475d3f664c6d68b4b125978871ed]:
 [[file:./images/sckan-ideal-run.png]]
 
+*** Bash implementation
+#+begin_src bash
+### data synchronization
+
+# curation export
+# XXX see setup.org for most recent workflow for batch
+
+# NPO
+python -m neurondm.build release
+# super manual curation, identifier sync, review, merge, commit, push, etc.
+# TODO there are also two other sets of blocks in apinatomy.org
+# apinatomy-neuron-populations.py and apinat-pops-more.py that
+# require manual sync right now
+
+# apinatomy.org
+~/git/sparc-curation/docs/apinatomy.org --all
+# deploy to remote
+# apinat-build --deploy  # XXX manual
+# apinat-build --tangle  # XXX OLD
+# source ~/git/sparc-curation/bin/apinat-functions.sh  # XXX OLD
+
+# scigraph/README.org
+sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
+# maybe update sparc community terms
+# sh ~/git/pyontutils/nifstd/scigraph/README.org --sct  # XXX manual
+# currently run sparc-community-terms-update, review, merge, and push to NIF-Ontology
+
+### release artifacts
+
+# we have a circular dependency issue here, which is that
+# we want to use the apinatomy models from blazegraph for scigraph
+# but we also want to use the configured NIF-Ontology repo from
+# scigraph for blazegraph, too many layers ...
+~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-sckan
+
+# release.org
+~/git/sparc-curation/docs/release.org --build --sckan --no-blaze  # --resume
+
+### docker image build
+
+# run the docker build blocks in source.org for the sckan release that
+# do all the copying of the build state to the requisite locations
+# dump the docker image for the zenodo release
+
+### publication
+
+# prepare the new zenodo release
+
+# push docker images
+
+#+end_src
 * Internal Structure
 :PROPERTIES:
 :header-args:python: :comments link :exports code :mkdirp yes
