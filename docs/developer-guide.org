@@ -1417,6 +1417,11 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 
 ### release artifacts
 
+# TODO prepare all ontology files first up here
+
+# release.org to retrieve
+~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --no-load
+
 # we have a circular dependency issue here, which is that
 # we want to use the apinatomy models from blazegraph for scigraph
 # but we also want to use the configured NIF-Ontology repo from
@@ -1424,20 +1429,49 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-sckan
 
 # release.org
-~/git/sparc-curation/docs/release.org --build --sckan --no-blaze  # --resume
+~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --resume
 
 ### docker image build
 
 # run the docker build blocks in source.org for the sckan release that
 # do all the copying of the build state to the requisite locations
-# dump the docker image for the zenodo release
+# order is bottom to top (maybe us ob-lob)
+# &musl-build-sckan-base
+# &musl-build-sckan-services
+
+### testing
+
+# TODO automate
+# create the new docker container volume for sckan data
+# run it with the latest version of tgbugs/musl:kg-release-user
+# run all the examples etc.
 
 ### publication
+
+# dump the docker image for the zenodo release
+# &sckan-save-image
+
+# archive all publication artifacts at one of the usual locations e.g. ~/nas/data
+# FIXME hardcoded paths
+_archive=~/"nas/data/"
+_sckanrz="$(ls -d /tmp/build/release-*-sckan.zip | sort -u | tail -n 1)"
+_sckansz=/tmp/scigraph-build/sparc-sckan/$(readlink /tmp/scigraph-build/sparc-sckan/LATEST)
+_sckandz="$(ls -d /tmp/docker-sckan-data-*Z.tar.gz | sort -u | tail -n 1)"
+declare -a _arts=(${_sckanrz} ${_sckansz} ${_sckandz})
+for _art in "${_arts[@]}"; do
+echo $(basename ${_art})
+rsync -a ${_art} ${_archive}
+done
 
 # prepare the new zenodo release
 
 # push docker images
+tgbugs/sckan:base-${date_tag_version_for_latest}
+tgbugs/sckan:base-latest
+tgbugs/sckan:data-${date_tag_version_for_latest}
+tgbugs/sckan:latest
 
+# deploy scigraph image to production
 #+end_src
 * Internal Structure
 :PROPERTIES:
