@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 81d2dedddbbff001a25a77237e9bb185daa0b41dd73537c00578aeb26e637721; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 3ed9a00b795c37db8be6c0f126f9bb93e6fc9d211ea2e97204244e7735cf8a29; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -452,7 +452,7 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
 (defun apinat--write-to-remote (model-id)
   "Deploy a single apinatomy model MODEL-ID to `apinat--remote-onts-path'."
   (apinat--with-model model-id
-    (with-current-buffer (create-file-buffer ttl)
+    (with-current-buffer (find-file-noselect ttl 'no-warn 'rawfile)
       ;; FIXME this has inverted nesting if we want to start depositing
       ;; multiple different models
       (unwind-protect
