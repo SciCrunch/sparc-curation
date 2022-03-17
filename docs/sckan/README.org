@@ -84,8 +84,11 @@ docker create -v /var/lib/blazegraph -v /var/lib/scigraph --name sckan-data tgbu
 * Examples
 Full workflows for various operating systems.
 ** linux
+Note that these commands assume =>=docker-20= so make sure your
+package index is up to date.
+
 #+begin_src bash
-sudo apt install docker docker.io  # ubuntu
+sudo apt install docker docker.io  # ubuntu mint etc.
 sudo usermod -a -G docker ${USER}
 
 # you may need to get a new login shell at this point
