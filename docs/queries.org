@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 755d0ec51df53b134b2fc34e3a2e6215253456775336b08906567a86234b0890; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: dc91084bb8e5e04840c8fc04f6c75d71a111a0fac3f0a12642da1317a1e0c6b8; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -3258,9 +3258,6 @@ RETURN e, neupop, neugrp
 *** TODO neru phenotype by population
 ** existing
 *** sparc
-:PROPERTIES:
-:header-args:cypher: :scigraph http://selene:9000/scigraph
-:END:
 **** organParts
 #+name: desc-organ-parts
 Get the parts list for an organ including nerves and blood vessels
@@ -5858,6 +5855,9 @@ RETURN p1, p2, p3, p4, p5, p6
 
 (setq inhibit-startup-screen t)
 
+;; FIXME somehow need to mkdir images, unfortunately mkdirp doesn't work for files
+;; only for tangling ... maybe we should add it so that it works for :file results as well?
+
 ;; somehow this gets around lexical scope FIXME no not really have to
 ;; modify the elvs
 (setq-local
@@ -5946,7 +5946,8 @@ RETURN p1, p2, p3, p4, p5, p6
          ,(when gt26 '(jupyter . t))))))))
 
 (unless (fboundp #'ob-cypher/scigraph/query)
-  (reval 'sha256 '44408196e3569691fa08c01fc28a767759cd4f95310f7844dbc1fe024b1cf7d3 "https://raw.githubusercontent.com/tgbugs/ob-cypher/2a33ae888a0e1d36c57aa41568061315fc7268e3/ob-cypher.el"))
+  (reval 'sha256 'c2122c94c3bbf19999ddc857ace64e7746b7bca65dbf1453caaff1605f1bb4ad
+         "https://raw.githubusercontent.com/tgbugs/ob-cypher/db6947729564ca8bcc29b31b62b26c60d4f5856d/ob-cypher.el"))
 
 (defun-local json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
