@@ -1540,6 +1540,11 @@ class RemoteDatasetData:
             # call and the second call
             blob['doi'] = doi
 
+        pm = self.bfobject.publishedMetadata
+        if pm is not None:
+            blob['id_published'] = pm['id']
+            # TODO identify the additional information that we want to embed
+
         with open(self.cache, 'wt') as f:
             json.dump(blob, f, indent=2, sort_keys=True, cls=self._JEncode)
 

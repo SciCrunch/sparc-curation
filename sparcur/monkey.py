@@ -385,6 +385,32 @@ def packageTypeCounts(self):
 
 
 @property
+def publishedMetadata(self):
+    session = self._api.session
+    resp = session.get(
+        f'{self._api._host}/discover/search/datasets?query={self.int_id}')
+    if resp.ok:
+        j = resp.json()
+        if j['totalCount'] == 1:
+            return j['datasets'][0]
+        elif j['totalCount'] == 0:
+            return
+        else:
+            cands = [d for d in j['datasets'] if d['sourceDatasetId'] == self.int_id]
+            lc = len(cands)
+            if lc == 1:
+                return cands[0]
+            elif lc == 0:
+                return
+            else:
+                return sorted(cands, key=lambda d:d['version'], reverse=True)[0]
+
+        return j
+    else:
+        resp.raise_for_status()
+
+
+@property
 def Dataset_users(self):
     session = self._api.session
     resp = session.get(

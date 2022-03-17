@@ -58,6 +58,7 @@ Dataset.delete = monkey.Dataset_delete
 Dataset.meta = monkey.Dataset_meta
 Dataset.packagesByName = monkey.packagesByName
 Dataset.packageTypeCounts = monkey.packageTypeCounts
+Dataset.publishedMetadata = monkey.publishedMetadata
 Dataset.readme = monkey.Dataset_readme
 Dataset.contributors = monkey.Dataset_contributors
 Dataset.doi = monkey.Dataset_doi
