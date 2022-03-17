@@ -19,7 +19,7 @@ Browse the full [[./queries.org][Catalog]].
 ** Saving your work
 You can quit at any time and your work will be saved.
 
-You can continue your previous session by running =docker start -ai $(docker ps -lq)=.
+You can continue your previous session by running =docker start -ai $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user)=.
 
 For more details see the [[./tutorial.org::#saving-and-restoring][reference section of the Tutorial]].
 
@@ -29,7 +29,7 @@ For more details see the [[./tutorial.org::#saving-and-restoring][reference sect
 ** Web links
 - [[https://scicrunch.org/sawg/about/SCKAN][About SCKAN]]
 - [[https://commonfund.nih.gov/sparc][About SPARC]]
-- [[https://doi.org/???][Latest SCKAN data release]]
+- [[https://doi.org/10.5281/zenodo.5337441][Latest SCKAN data release]]
 - [[https://github.com/SciCrunch/sparc-curation/blob/master/docs/sckan/welcome.org][GitHub source for this file]]
 
 * Bootstrap :noexport:
