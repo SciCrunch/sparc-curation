@@ -388,9 +388,16 @@ def export_single_dataset(dataset_id, updated):  # FIXME this is being called wa
 def check_sheet_updates():
     # TODO see if we need locking
     for sheetcls in (Organs, Affiliations):
-        old_s = sheetcls()
-        old = old_s.metadata_file()['modifiedTime']
-        s = sheetcls()
+        old_s = sheetcls(fetch=False)
+        try:
+            old = old_s.metadata_file()['modifiedTime']
+        except AttributeError as e:
+            # FIXME risk of some other source of AttributeError
+            # triggering this which this is specifically trying to
+            # handle the case where the cache does not exist
+            old = None
+
+        s = sheetcls(fetch=False)
         s._only_cache = False
         s._setup()
         new = s.metadata_file()['modifiedTime']
