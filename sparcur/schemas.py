@@ -1053,7 +1053,7 @@ class ContributorSchema(JSONSchema):
 
 
 class ContributorsExportSchema(JSONSchema):
-    schema = {'oneOf':
+    schema = {'anyOf':
               [{'type': 'array',
                 #'context_runtime': lambda base: {'@id': f'{base}contributors',},
                 'contains': {
