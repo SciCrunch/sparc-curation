@@ -618,6 +618,7 @@ An example run is
 
 Run this and commit the output to the neurons branch of the ontology.
 
+#+name: apinatomy-neuron-populations.py
 #+begin_src jupyter-python :session pys
 import rdflib
 import augpathlib as aug
@@ -628,6 +629,29 @@ repo_relative_path = 'ttl/generated/neurons/apinatomy-neuron-populations.ttl'
 uri_base = 'https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/'
 oid = rdflib.URIRef(uri_base + repo_relative_path)
 
+def _genlabel(oid):
+    x = (oid.rsplit("-", 3)[-3]
+         if oid.endswith('-prime')
+         else (oid.rsplit("-", 3)[-3] if 'unbranched' in oid else oid.rsplit("-", 2)[-2]))
+    l = (oid.rsplit("-", 3)[-3]
+         if oid.endswith('-prime')
+         else (' '.join(oid.rsplit("-", 3)[-3:-1]) if 'unbranched' in oid else oid.rsplit("-", 2)[-2]))
+    t = (oid.rsplit("-", 2)[-2] + "'"
+         if oid.endswith('-prime')
+         else (oid.rsplit("-", 1)[-1] if 'unbranched' in oid else oid.rsplit("-", 1)[-1]))
+
+    # XXX manual fix for consistency
+    if x == 'keast':
+        x = 'kblad'
+    if l == 'keast':
+        l = 'kblad'
+
+    label = f'neuron type {l} {t}'
+    return label, x
+
+def genlabel(oid):
+    return _genlabel(oid)[0]
+
 g = OntGraph()
 g.populate_from_triples(
     ((oid, p, o) for p, o in
@@ -635,13 +659,14 @@ g.populate_from_triples(
 )))
 
 amr = aug.LocalPath("~/git/apinatomy-models").expanduser()
-models = list((amr / 'models').children)
+models = [c for c in (amr / 'models').children if c.name != 'too-map']
 mgraphs = [OntResPath(p).graph for m in models for p in (m / 'derived' / (m.name + '.ttl'),) if p.exists()]
 for mg in mgraphs:
     mg.namespace_manager.populate(g)
-    for s in mg[:rdf.type:elements.External]:
+    for s in mg[:rdf.type:elements.OntologyTerm]:
         if 'readable/neuron-type' in s:  # FIXME haaaack
             g.add((s, rdfs.subClassOf, ilxtr.NeuronEBM))
+            g.add((s, rdfs.label, rdflib.Literal(genlabel(s))))
 
 olr = aug.LocalPath(auth.get('ontology-local-repo')).expanduser()
 g.write(olr / repo_relative_path)
@@ -735,20 +760,16 @@ raw_types = sorted(set([t for i, o, t in id_oid_type]))
 bagged = [(normalize_type(t), t, o) for i, o, t in id_oid_type]
 #pprint(bagged, width=240)
 neuron_classes = {
-sn: type(f'Neuron{sn.capitalize()}', (Neuron,), {'owlClass': f'ilxtr:Neuron{sn.capitalize()}'})
-for sn in set(oid.rsplit("-", 3)[-3]
-              if oid.endswith('-prime')
-              else oid.rsplit("-", 2)[-2]
-              for _, oid, _ in id_oid_type)
+    sn: type(f'Neuron{sn.capitalize()}', (Neuron,), {'owlClass': f'ilxtr:Neuron{sn.capitalize()}'})
+    for sn in ['kblad' if _ == 'keast' else _ for _ in
+               set(oid.rsplit("-", 3)[-3]
+                   if oid.endswith('-prime')
+                   else oid.rsplit("-", 2)[-2]
+                   for _, oid, _ in id_oid_type)]
 }
-def dophen(oid, bag):
-    x = (oid.rsplit("-", 3)[-3]
-         if oid.endswith('-prime')
-         else oid.rsplit("-", 2)[-2])
-    t = (oid.rsplit("-", 2)[-2]
-         if oid.endswith('-prime')
-         else oid.rsplit("-", 1)[-1])
 
+def dophen(oid, bag):
+    label, x = _genlabel(oid)
     neuron_class = neuron_classes[x]
     # FIXME this doesn't work because entailed phenotypes don't work
     # with the correct logic because they are still acting like ec
@@ -757,7 +778,7 @@ def dophen(oid, bag):
     u = OntId(oid).u
     up = OntId(oid).u.replace('neuron-type', 'neuron-phenotype')
     return neuron_class(Phenotype(up), *(p.asEntailed() for p in bag),
-                        label=f'neuron type {x} {t}',
+                        #label=label,
                         id_=u)
 
 config = Config('apinat-pops-more')
@@ -768,6 +789,15 @@ pprint(neus)
 #linecache.cache[__file__] = size, mtime, lines, fullname
 config.write()
 config.write_python()
+
+# cleanup
+repo_relative_path = 'ttl/generated/neurons/apinat-pops-more.ttl'
+olr = aug.LocalPath(auth.get('ontology-local-repo')).expanduser()
+og = OntGraph(path=olr / repo_relative_path)
+og.parse()
+ng = OntGraph().populate_from_triples((t for t in og if 'able' not in t[1] and 'abel' not in t[1]))
+ng.namespace_manager.populate_from(og)
+ng.write(olr / repo_relative_path)
 #+end_src
 
 * Dynamic cypher queries
