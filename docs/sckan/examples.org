@@ -36,8 +36,8 @@ RETURN region
 | UBERON:0006460 | first sacral spinal cord segment |
 | UBERON:0018675 | pelvic splanchnic nerve          |
 | UBERON:0016508 | pelvic ganglion                  |
-| ILX:0738432    | Sixth lumbar spinal cord segment |
 | EMAPA:25279    | L6 ventral root                  |
+| ILX:0738432    | Sixth lumbar spinal cord segment |
 
 #+name: sparql-query-1
 #+begin_src sparql
@@ -66,10 +66,10 @@ ORDER BY ?region
 |----------------+----------------------------------|
 | EMAPA:25279    | L6 ventral root                  |
 | EMAPA:25281    | S1 ventral root                  |
+| ILX:0738432    | Sixth lumbar spinal cord segment |
 | UBERON:0006460 | first sacral spinal cord segment |
 | UBERON:0016508 | pelvic ganglion                  |
 | UBERON:0018675 | pelvic splanchnic nerve          |
-| ILX:0738432    | Sixth lumbar spinal cord segment |
 
 * Neuron populations with processes in region
 Show all neuron populations that have some part in a given region.
@@ -100,27 +100,29 @@ RETURN neupop
 #+end_src
 
 #+RESULTS: cypher-query-2
-| id                         | label                |
-|----------------------------+----------------------|
-| ilxtr:neuron-type-keast-11 | neuron type keast 11 |
-| ilxtr:neuron-type-keast-3  | neuron type keast 3  |
-| ilxtr:neuron-type-keast-6  | neuron type keast 6  |
-| ilxtr:neuron-type-keast-7  | neuron type keast 7  |
-| ilxtr:neuron-type-sdcol-b  | neuron type sdcol b  |
-| ilxtr:neuron-type-sdcol-d  | neuron type sdcol d  |
-| ilxtr:neuron-type-sdcol-f  | neuron type sdcol f  |
-| ilxtr:neuron-type-sdcol-g  | neuron type sdcol g  |
-| ilxtr:neuron-type-sdcol-h  | neuron type sdcol h  |
-| ilxtr:neuron-type-sdcol-q  |                      |
+| id                         | label                                                                                    |
+|----------------------------+------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-keast-11 | L1-L2 sensory neuron innervating bladder                                                 |
+| ilxtr:neuron-type-keast-3  | inferior mesenteric ganglion neuron (kblad)                                              |
+| ilxtr:neuron-type-keast-6  | sympathetic preganglionic neuron innervating pelvic ganglion neuron (kblad)              |
+| ilxtr:neuron-type-keast-7  | sympathetic preganglionic neuron innervating inferior mesenteric ganglion neuron (kblad) |
+| ilxtr:neuron-type-sdcol-b  | neuron type sdcol b                                                                      |
+| ilxtr:neuron-type-sdcol-d  | neuron type sdcol d                                                                      |
+| ilxtr:neuron-type-sdcol-f  | neuron type sdcol f                                                                      |
+| ilxtr:neuron-type-sdcol-g  | neuron type sdcol g                                                                      |
+| ilxtr:neuron-type-sdcol-h  | neuron type sdcol h                                                                      |
+| ilxtr:neuron-type-sdcol-q  | neuron type sdcol q                                                                      |
 
 #+name: sparql-query-2
 #+begin_src sparql
 SELECT DISTINCT
 ?neupop
+(str(?l) as ?label)
 (str(?pl) as ?prefLabel)
 WHERE {
   VALUES (?region ?neuron) { (UBERON:0005453 SAO:1417703748) }
   ?neupop rdfs:subClassOf+ ?neuron ;
+          rdfs:label ?l ;
           apinatomy:annotates ?neugrp .
   OPTIONAL { ?neupop skos:prefLabel ?pl }
   ?neugrp a elements:Group .  # externals annotate the whole model
@@ -137,18 +139,18 @@ ORDER BY ?neupop
 #+end_src
 
 #+RESULTS: sparql-query-2
-| neupop                     | prefLabel            |
-|----------------------------+----------------------|
-| ilxtr:neuron-type-keast-11 | neuron type keast 11 |
-| ilxtr:neuron-type-keast-3  | neuron type keast 3  |
-| ilxtr:neuron-type-keast-6  | neuron type keast 6  |
-| ilxtr:neuron-type-keast-7  | neuron type keast 7  |
-| ilxtr:neuron-type-sdcol-b  | neuron type sdcol b  |
-| ilxtr:neuron-type-sdcol-d  | neuron type sdcol d  |
-| ilxtr:neuron-type-sdcol-f  | neuron type sdcol f  |
-| ilxtr:neuron-type-sdcol-g  | neuron type sdcol g  |
-| ilxtr:neuron-type-sdcol-h  | neuron type sdcol h  |
-| ilxtr:neuron-type-sdcol-q  |                      |
+| neupop                     | label                | prefLabel                                                                                |
+|----------------------------+----------------------+------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-keast-11 | neuron type kblad 11 | L1-L2 sensory neuron innervating bladder                                                 |
+| ilxtr:neuron-type-keast-3  | neuron type kblad 3  | inferior mesenteric ganglion neuron (kblad)                                              |
+| ilxtr:neuron-type-keast-6  | neuron type kblad 6  | sympathetic preganglionic neuron innervating pelvic ganglion neuron (kblad)              |
+| ilxtr:neuron-type-keast-7  | neuron type kblad 7  | sympathetic preganglionic neuron innervating inferior mesenteric ganglion neuron (kblad) |
+| ilxtr:neuron-type-sdcol-b  | neuron type sdcol b  |                                                                                          |
+| ilxtr:neuron-type-sdcol-d  | neuron type sdcol d  |                                                                                          |
+| ilxtr:neuron-type-sdcol-f  | neuron type sdcol f  |                                                                                          |
+| ilxtr:neuron-type-sdcol-g  | neuron type sdcol g  |                                                                                          |
+| ilxtr:neuron-type-sdcol-h  | neuron type sdcol h  |                                                                                          |
+| ilxtr:neuron-type-sdcol-q  | neuron type sdcol q  |                                                                                          |
 
 * Bootstrap :ARCHIVE:
 :properties:
@@ -171,5 +173,7 @@ ORDER BY ?neupop
 ** Local Variables :ARCHIVE:
 
 # Local Variables:
+# org-adapt-indentation: nil
+# org-edit-src-content-indentation: 0
 # eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((actual (org-version)) (need orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not need) (string< need actual) (string= need actual) (error "Your Org is too old! %s < %s" actual need))) (defun orgstrap-norm-func--dprp-1\.0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
 # End:
