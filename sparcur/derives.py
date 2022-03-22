@@ -283,42 +283,82 @@ class Derives:
         # subject_id could be missing, but we filter failures on all of
         # those so in theory we shouldn't need to handle it as this stage
         subs = {s['subject_id']:s for s in subjects}
+
         dd = defaultdict(list)
         for s in samples:
             dd[s['sample_id']].append(s)
         samps = dict(dd)
 
-        union_sub = set(dirs) | set(subs)
-        inter_sub = set(dirs) & set(subs)
+        dd = defaultdict(list)
+        for s, d in subs.items():
+            if 'pool_id' in d:
+                dd[d['pool_id']].append(s)
+        sub_pools = dict(dd)
+        pool_subs = {v:k for k, vs in sub_pools.items() for v in vs}
+
+        dd = defaultdict(list)
+        for s, d in samps.items():
+            if d and 'pool_id' in d[0]:
+                dd[d[0]['pool_id']].append(s)
+        sam_pools = dict(dd)
+        # XXX we can check for multiple pools per sample at various
+        # stages including here, but technically a single specimen
+        # being in multiple pools definitely happens
+        pool_sams = {v:k for k, vs in sam_pools.items() for v in vs}
 
         records = []
         done_dirs = set()
         done_specs = set()
-        if inter_sub == set(subs):
-            for subject_id, blob in subs.items():
-                done_dirs.add(subject_id)
-                done_specs.add(subject_id)
-                records.append({'type': 'SubjectDirs',
-                                # have to split the type because we can't recover
-                                # the type using just the specimen id (sigh)
-                                # and we need it to set the correct prefix (sigh)
-                                'specimen_id': subject_id,
-                                'dirs': [d[1] for d in dirs[subject_id]]})
+
+        inter_sub_pool = set(dirs) & set(sub_pools)
+        pooled_subjects = set(s for p, ss in sub_pools.items() if p in inter_sub_pool for s in ss)
+        done_dirs.update(inter_sub_pool)
+        union_sub = set(dirs) | set(subs)
+        inter_sub = set(dirs) & set(subs)
+
+        if inter_sub | pooled_subjects == set(subs):
+            ok_subs = subs
         else:
+            ok_ids = inter_sub | pooled_subjects
+            ok_subs = {k:v  for k, v  in subs.items() if k in ok_ids}
             # FIXME not all subjects have folders there may be samples
             # that have folders but not subjects ??? don't wan't to force
             # metadata structure onto folder structure but it complicates
             # the implementation again ... probably worth it in this case
             logd.warning('miscount subject dirs, TODO')
-            pass
+
+        for subject_id, blob in ok_subs.items():
+            if subject_id in pool_subs:  # FIXME assumes 1:1 which is incorrect
+                pool_id = pool_subs[subject_id]
+            else:
+                pool_id = None
+            done_dirs.add(subject_id)
+            done_specs.add(subject_id)
+            records.append({'type': 'SubjectDirs',
+                            # have to split the type because we can't recover
+                            # the type using just the specimen id (sigh)
+                            # and we need it to set the correct prefix (sigh)
+                            'specimen_id': subject_id,
+                            'dirs': [d[1] for d in dirs[subject_id]]
+                            if subject_id in dirs else
+                            [d[1] for d in dirs[pool_id]]})
+
+        inter_sam_pool = set(dirs) & set(sam_pools)
+        pooled_samples = set(s for p, ss in sam_pools.items() if p in inter_sam_pool for s in ss)
+        done_dirs.update(inter_sam_pool)
 
         union_sam = set(dirs) | set(samps)
         inter_sam = set(dirs) & set(samps)
 
         template_version_less_than_2 = True  # FIXME TODO
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
-        if inter_sam == set(samps):
+        if inter_sam | pooled_samples == set(samps):
             for sample_id, blob in samps.items():
+                if sample_id in pool_sams:  # FIXME assumes 1:1 which is incorrect
+                    pool_id = pool_sams[sample_id]
+                else:
+                    pool_id = None
+
                 if len(blob) > 1:
                     # FIXME TODO this means that we need to fail over to the primary keys
                     msg = f'sample_id is not unique! {sample_id}\n{blob}'
@@ -332,12 +372,15 @@ class Derives:
                 else:
                     done_dirs.add(sample_id)
                     done_specs.add(sample_id)
+
                 records.append({'type': 'SampleDirs',
                                 # have to split the type because we can't recover
                                 # the type using just the specimen id (sigh)
                                 # and we need it to set the correct prefix (sigh)
                                 'specimen_id': sample_id,
-                                'dirs': [d[1] for d in dirs[sample_id]]})
+                                'dirs': [d[1] for d in dirs[sample_id]]
+                                if sample_id in dirs else
+                                [d[1] for d in dirs[pool_id]]})
         else:
             logd.warning('miscount sample dirs, TODO')
             bad_dirs = []
@@ -405,6 +448,8 @@ class Derives:
             pass # TODO embed an error
 
         if not_done_specs:
+            # TODO separate out cases where a child specimen does have
+            # folders and report those at warning/info
             msg = ('There are specimens that have no corresponding '
                    f'directory!\n{not_done_specs}')
             if he.addError(msg,
