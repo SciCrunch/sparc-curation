@@ -399,7 +399,9 @@ def check_sheet_updates():
 
         s = sheetcls(fetch=False)
         s._only_cache = False
+        s._setup_saf()
         s._setup()
+        s._saf = None
         new = s.metadata_file()['modifiedTime']
         #log.info(f':old {old} :new {new}')
         if new != old:

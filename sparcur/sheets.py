@@ -21,23 +21,26 @@ class Sheet(SheetBase):
     def __init__(self, *args, **kwargs):
         self._cache_path = auth.get_path('cache-path') / 'google_sheets'
         if not self._only_cache:
-            try:
-                if 'readonly' not in kwargs or kwargs['readonly']:
-                    # readonly=True is default so we take this branch if not set
-                    self._saf = auth.get_path(
-                        'google-api-service-account-file-readonly')
-                else:
-                    self._saf = auth.get_path(
-                        'google-api-service-account-file-rw')
-            except KeyError as e:
-                log.warn(e)
-            except Exception as e:
-                log.exception(e)
+            self._setup_saf(**kwargs)
 
         try:
             super().__init__(*args, **kwargs)
         finally:
             self._saf = None
+
+    def _setup_saf(self, **kwargs):
+        try:
+            if 'readonly' not in kwargs or kwargs['readonly']:
+                # readonly=True is default so we take this branch if not set
+                self._saf = auth.get_path(
+                    'google-api-service-account-file-readonly')
+            else:
+                self._saf = auth.get_path(
+                    'google-api-service-account-file-rw')
+        except KeyError as e:
+            log.warn(e)
+        except Exception as e:
+            log.exception(e)
 
     def _setup(self):
         if not self._only_cache:
