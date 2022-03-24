@@ -369,15 +369,17 @@ class Derives:
                 if template_version_less_than_2:  # FIXME this is sure the cause an error at some point
                     done_dirs.add((blob[0]['subject_id'], sample_id))
                     done_specs.add(blob[0]['primary_key'])
+                    id = blob[0]['primary_key']
                 else:
                     done_dirs.add(sample_id)
                     done_specs.add(sample_id)
+                    id = sample_id  # FIXME need ttl export suport for this
 
                 records.append({'type': 'SampleDirs',
                                 # have to split the type because we can't recover
                                 # the type using just the specimen id (sigh)
                                 # and we need it to set the correct prefix (sigh)
-                                'specimen_id': sample_id,
+                                'specimen_id': id,
                                 'dirs': [d[1] for d in dirs[sample_id]]
                                 if sample_id in dirs else
                                 [d[1] for d in dirs[pool_id]]})
