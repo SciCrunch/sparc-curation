@@ -6,6 +6,7 @@
          racket/runtime-path
          framework
          compiler/compilation-path
+         compiler/embed
          gui-widget-mixins
          json
          json-view)
@@ -222,6 +223,7 @@
              (let ([exec-file (path->string (find-system-path 'exec-file))]
                    [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [this-file-compiled (get-compilation-bytecode-file this-file)]
+                   [this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file ""))]
                    [status
                     (parameterize ([current-output-port (make-output-port-noop)]
                                    [current-input-port (make-input-port-noop)])
@@ -244,12 +246,18 @@
                     (let ([mtime-after (file-or-directory-modify-seconds
                                         this-file-compiled
                                         #f
-                                        (λ () -2))])
+                                        (λ () -2))]
+                          [this-file-exe-tmp (path-add-extension this-file-exe "tmp")])
                       (when (not (= mtime-before mtime-after))
-                        (println (format "running raco exe -v ~a" this-file))
+                        (println (format "running raco exe -v ~a -o ~a" this-file this-file-exe))
                         (parameterize ([current-output-port (make-output-port-noop)]
                                        [current-input-port (make-input-port-noop)])
-                          (system* raco-exe "exe" "-v" this-file))
+                          ; windows can't remove a running exe ... but can rename it ...
+                          (rename-file-or-directory this-file-exe this-file-exe-tmp)
+                          (system* raco-exe "exe" "-v" this-file "-o" this-file-exe)
+                          (if (file-exists? this-file-exe) ; delete or restore the old version on failure
+                              (delete-file this-file-exe-tmp)
+                              (rename-file-or-directory this-file-exe-tmp this-file-exe)))
                         #; ; this is super cool but an eternal pain for raco exe
                         (parameterize ([current-command-line-arguments
                                         (vector
