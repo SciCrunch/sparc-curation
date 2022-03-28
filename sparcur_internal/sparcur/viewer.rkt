@@ -222,11 +222,16 @@
              (let ([exec-file (path->string (find-system-path 'exec-file))]
                    [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [this-file-compiled (get-compilation-bytecode-file this-file)]
-                   [status (apply system* argv-simple-git-repos-update)])
+                   [status
+                    (parameterize ([current-output-port (make-output-port-noop)]
+                                   [current-input-port (make-input-port-noop)])
+                      (apply system* argv-simple-git-repos-update))])
                   ; TODO pull changes for racket dependent repos as well
                   (println (format "running raco make -v ~a" this-file))
                   (let ([mtime-before (file-or-directory-modify-seconds this-file-compiled)])
-                    (system* raco-exe "make" "-v" this-file)
+                    (parameterize ([current-output-port (make-output-port-noop)]
+                                   [current-input-port (make-input-port-noop)])
+                      (system* raco-exe "make" "-v" this-file))
                     #; ; raco exe issues ... i love it when abstractions break :/
                     (parameterize ([current-command-line-arguments
                                     (vector "--vv" this-file)])
@@ -236,7 +241,9 @@
                     (let ([mtime-after (file-or-directory-modify-seconds this-file-compiled)])
                       (when (not (= mtime-before mtime-after))
                         (println (format "running raco exe -v ~a" this-file))
-                        (system* raco-exe "exe" "-v" this-file)
+                        (parameterize ([current-output-port (make-output-port-noop)]
+                                       [current-input-port (make-input-port-noop)])
+                          (system* raco-exe "exe" "-v" this-file))
                         #; ; this is super cool but an eternal pain for raco exe
                         (parameterize ([current-command-line-arguments
                                         (vector
@@ -327,7 +334,9 @@
          [hr-jview (hash-ref jviews uuid #f)]
          [jview
           (if (and hr-jview (not update))
-              hr-jview
+              (begin
+                (current-blob #f)
+                hr-jview)
               (letrec ([hier-class json-hierlist%
                         #; ; too slow when doing recursive opens
                         (class json-hierlist% (super-new)
@@ -405,6 +414,9 @@
   ; see https://github.com/racket/racket/issues/4026
   (make-input-port "noopport" (λ (_) eof) #f (λ () 'done)))
 
+(define (make-output-port-noop)
+  (dup-output-port (current-output-port)))
+
 (struct dataset (id title pi-last-name)
   #:methods gen:ds
   [(define (populate-list ds list-box)
@@ -448,9 +460,11 @@
                [status-2 #f])
            (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1]
+                          [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
            (parameterize ([current-directory (resolve-relative-path cwd-2)]
+                          [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t)))))
            (println (format "dataset fetch completed for ~a" (dataset-id ds))))))))
@@ -464,6 +478,7 @@
         (thunk
          (let ([status-3 #f])
            (parameterize ([current-directory (resolve-relative-path cwd-2)]
+                          [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))
                ))
@@ -494,6 +509,7 @@
            ; blocking, so probably switch to user subprocess?
            (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1]
+                          [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
              #;
              (println (string-join argv-1 " "))
@@ -501,6 +517,7 @@
            (if status-1
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
                  (parameterize ([current-directory cwd-2-resolved]
+                                [current-output-port (make-output-port-noop)]
                                 [current-input-port (make-input-port-noop)])
                    (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
                    ; TODO figure out if we need to condition this run on status-2 #t
@@ -637,7 +654,10 @@
 (define (get-dataset-list)
   (let* ([argv argv-simple-for-racket]
          [status #f]
-         [result-string (with-output-to-string (λ () (set! status (apply system* argv))))]
+         [result-string
+          (parameterize ([current-output-port (make-output-port-noop)]
+                         [current-input-port (make-input-port-noop)])
+            (with-output-to-string (λ () (set! status (apply system* argv)))))]
          [result (read (open-input-string result-string))])
     (unless status
       (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
