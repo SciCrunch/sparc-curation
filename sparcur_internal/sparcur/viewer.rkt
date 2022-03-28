@@ -249,12 +249,13 @@
                                         (λ () -2))]
                           [this-file-exe-tmp (path-add-extension this-file-exe "tmp")])
                       (when (not (= mtime-before mtime-after))
-                        (println (format "running raco exe -v ~a -o ~a" this-file this-file-exe))
+                        (println (format "running raco exe -v -o ~a ~a "
+                                         this-file-exe this-file))
                         (parameterize ([current-output-port (make-output-port-noop)]
                                        [current-input-port (make-input-port-noop)])
                           ; windows can't remove a running exe ... but can rename it ...
                           (rename-file-or-directory this-file-exe this-file-exe-tmp)
-                          (system* raco-exe "exe" "-v" this-file "-o" this-file-exe)
+                          (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
                           (if (file-exists? this-file-exe) ; delete or restore the old version on failure
                               (delete-file this-file-exe-tmp)
                               (rename-file-or-directory this-file-exe-tmp this-file-exe)))
