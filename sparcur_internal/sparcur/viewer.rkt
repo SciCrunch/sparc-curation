@@ -223,7 +223,7 @@
              (let ([exec-file (path->string (find-system-path 'exec-file))]
                    [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [this-file-compiled (get-compilation-bytecode-file this-file)]
-                   [this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file ""))]
+                   [this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file "") #f)]
                    [status
                     (parameterize ([current-output-port (make-output-port-noop)]
                                    [current-input-port (make-input-port-noop)])
