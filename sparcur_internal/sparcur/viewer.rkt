@@ -228,7 +228,10 @@
                       (apply system* argv-simple-git-repos-update))])
                   ; TODO pull changes for racket dependent repos as well
                   (println (format "running raco make -v ~a" this-file))
-                  (let ([mtime-before (file-or-directory-modify-seconds this-file-compiled)])
+                  (let ([mtime-before (file-or-directory-modify-seconds
+                                       this-file-compiled
+                                       #f
+                                       (λ () -1))])
                     (parameterize ([current-output-port (make-output-port-noop)]
                                    [current-input-port (make-input-port-noop)])
                       (system* raco-exe "make" "-v" this-file))
@@ -238,7 +241,10 @@
                       (dynamic-require 'compiler/commands/make #f))
                     #;
                     (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" "--" this-file)
-                    (let ([mtime-after (file-or-directory-modify-seconds this-file-compiled)])
+                    (let ([mtime-after (file-or-directory-modify-seconds
+                                        this-file-compiled
+                                        #f
+                                        (λ () -2))])
                       (when (not (= mtime-before mtime-after))
                         (println (format "running raco exe -v ~a" this-file))
                         (parameterize ([current-output-port (make-output-port-noop)]
