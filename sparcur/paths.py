@@ -225,16 +225,16 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         dataset = self.dataset
         if dataset == self:
             if not hasattr(self, '_c__dataset_metadata'):
-                bdd = backends.BlackfynnDatasetData(self)
+                pdd = backends.PennsieveDatasetData(self)
                 try:
-                    blob = bdd.fromCache()
+                    blob = pdd.fromCache()
                 except FileNotFoundError as e:
                     # FIXME TODO also check cached rmeta dates during pull
                     if force_cache:
                         raise e
                     else:
                         log.warning(e)
-                        blob = bdd()
+                        blob = pdd()
 
                 self._c__dataset_metadata = blob
 
