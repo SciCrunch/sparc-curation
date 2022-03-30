@@ -577,7 +577,7 @@ class Main(Dispatcher):
 
         if self.options.export or self.options.shell:
             self._setup_export()
-            self._setup_ontquery()
+            #self._setup_ontquery()
 
     def _setup_local(self):
         self.Remote = self._cache_class._remote_class
@@ -631,11 +631,14 @@ class Main(Dispatcher):
         self.Integrator.setup()
 
     def _setup_ontquery(self):
+        # this should all be in SciGraph by now
+        return
         # FIXME this should be in its own setup method
         # pull in additional graphs for query that aren't loaded properly
         RDFL = oq.plugin.get('rdflib')
         olr = Path(pauth.get_path('ontology-local-repo'))
         branch = 'origin/methods'
+        # FIXME the blast radius on this thing is of unknown size :/
         for fn in ('methods', 'methods-helper', 'methods-core'):
             org = OntResGit(olr / f'ttl/{fn}.ttl', ref=branch)
             OntTerm.query.ladd(RDFL(org.graph, OntId))
