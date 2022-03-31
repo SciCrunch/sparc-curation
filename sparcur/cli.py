@@ -514,6 +514,11 @@ class Main(Dispatcher):
 
         self.cwdintr = self.Integrator(self.cwd)
 
+        # deal with no network case
+        if self.options.no_network:
+            from sparcur.sheets import Sheet
+            Sheet._only_cache = True
+
         # pass debug along (sigh)
         from augpathlib import RemotePath, AugmentedPath  # for debug
         AugmentedPath._debug = self.options.debug
@@ -554,6 +559,7 @@ class Main(Dispatcher):
               self.options.stash or
               self.options.contributors or
               self.options.make_url or
+              self.options.find or
               self.options.missing):
             self.Integrator.no_google = True
 
@@ -1667,10 +1673,6 @@ done"""
     def sheets(self):
         from pyontutils import sheets as ps
         #from sparcur import sheets as ss
-
-        if self.options.no_network:
-            from sparcur.sheets import Sheet
-            Sheet._only_cache = True
 
         if self.options.cache:
             from sparcur.sheets import Sheet, Organs, Affiliations
