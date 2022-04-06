@@ -1,6 +1,7 @@
 """ string normalizers, strings that change their content to match a standard """
 
 import numbers
+import datetime
 from ast import literal_eval
 from types import GeneratorType
 from html.parser import HTMLParser
@@ -430,6 +431,13 @@ class NormValues(HasErrors):
         cell_errors = []
         #if 'software_rrid' in path:
             #breakpoint()
+        def skipt(th, _types=(numbers.Number, datetime.datetime, datetime.date, datetime.time)):
+            # FIXME _types should cover all the extraneous types that thing could take on
+            # specifically those produced by openpyxl
+            for t in _types:
+                if isinstance(th, t):
+                    return True
+
         if isinstance(thing, dict):
             out = {}
             for i, (k, v) in enumerate(thing.items()):
@@ -518,7 +526,7 @@ class NormValues(HasErrors):
 
             return out
 
-        elif isinstance(thing, numbers.Number):
+        elif skipt(thing):
             # this way we don't have to check the schema here
             # we avoid an AttributeError in the event we treated
             # a number like a string, and if it is incorrect we
