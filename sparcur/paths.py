@@ -322,6 +322,10 @@ class BFPNCacheBase(PrimaryCache, EatCache):
                     # see note below
                     self._remote_class.anchorToCache(self.anchor)
 
+                # make sure we can write to locp since cached objects
+                # are set readonly on completion
+                self.local_object_cache_path.chmod(0o0644)
+
                 rgen = self._remote_class.get_file_by_id(
                     meta.id, meta.file_id, **kwargs)
                 gen = chain(
@@ -372,6 +376,9 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             self.local_object_cache_path.cache_init(meta)
 
             yield from self.local_object_cache_path._data_setter(gen)
+
+        # ensure we don't accidentally modify cached files if they are symlinked
+        self.local_object_cache_path.chmod(0o0444)  # unlink works on 444
 
         ls = self.local_object_cache_path.size
         if ls != meta.size:
@@ -972,24 +979,29 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             # if upstream fails that means that somehow a previous
             # cleanup did not succeed (for some reason), this time it
             # should succeed and next time everything should work
-
-            # if mkdir succeeds then any failure that happens between
-            # then and the point where we swap needs to move the folder
-            # to a unique path marked as an error so that future calls
-            # to this function are not stopped by an existing directory
-            # that failed to be cleaned up
-            upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
-            # pull and prep for comparison of relative paths
-            upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
-            upstream_children = [c.local.relative_to(upstream)
-                                 for c in upstream_c_children]
-            working_children = [c.relative_to(working)
-                                for c in working.rchildren]
+        except FileExistsError as e:
+            log.exception(e)
+            error_suf = f'{time_now.START_TIMESTAMP_LOCAL_SAFE}-ERROR'
+            upstream.rename(upstream.parent / (upstream.name + error_suf))
+            upstream.mkdir()
         except BaseException as e:
             error_suf = f'{time_now.START_TIMESTAMP_LOCAL_SAFE}-ERROR'
             upstream.rename(upstream.parent / (upstream.name + error_suf))
             # TODO do we need to log here or can we log up the stack?
             raise e
+
+        # if mkdir succeeds then any failure that happens between
+        # then and the point where we swap needs to move the folder
+        # to a unique path marked as an error so that future calls
+        # to this function are not stopped by an existing directory
+        # that failed to be cleaned up
+        upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
+        # pull and prep for comparison of relative paths
+        upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
+        upstream_children = [c.local.relative_to(upstream)
+                                for c in upstream_c_children]
+        working_children = [c.relative_to(working)
+                            for c in working.rchildren]
 
         # FIXME TODO comparison/diff and support for non-curation workflows
 
@@ -1002,8 +1014,32 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
         # neither of these cleanup approaches is remotely desireable
         suf = f'-{time_now.START_TIMESTAMP_LOCAL_SAFE}'
-        upstream_now_old.rename(upstream_now_old.parent /
-                                (upstream_now_old.name + suf))  # FIXME
+        old = upstream_now_old.parent / (upstream_now_old.name + suf)
+        upstream_now_old.rename(old)  # FIXME
+        # TODO cleanup old either by removing things older than X
+        # or by symlinking unmodified files to their package cache
+        old._symlink_packages_transitive()
+
+    def _eq_data(self, other):
+        for schunk, ochunk in zip(self.data, other.data):
+            if schunk != ochunk:
+                return False
+
+        return True
+
+    def _symlink_packages_transitive(self):
+        # find all real files
+        # determine if they differ from the cache XXX this is going to be slow right now
+        # if not changed remove the file in the tree and symlink it to the package
+        # if changed leave the modified file
+        for c in self.rchildren:
+            locp = c.cache.local_object_cache_path
+            if (c.is_file() and locp.exists() and
+                c.size == locp.size and
+                c._eq_data(locp)):
+                c.unlink()
+                relsym = c.relative_path_to(locp)
+                c.symlink_to(relsym)
 
     def updated_cache_transitive(self):
         """ fast get the date for the most recently updated cached path """
