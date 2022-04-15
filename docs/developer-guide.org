@@ -63,7 +63,7 @@ Implementation of =sparcur.simple.validate=.
 # #+header: :epilogue "import pprint; return pprint.pformat(data.keys())"
 # #+header: :epilogue "import pprint; return pprint.pformat(data)"
 #+name: validate.py
-#+begin_src python :results drawer :exports both :cache yes :tangle ../sparcur/simple/validate.py
+#+begin_src python :results drawer :exports both :cache yes :tangle ../sparcur/simple/validate.py :eval no-export
 import augpathlib as aug
 from sparcur import pipelines as pipes
 from sparcur.paths import PathL, CacheL
@@ -2853,6 +2853,138 @@ if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main)#, after=pprint.pprint)
 
+#+end_src
+*** _*Combine*_
+This is equivalent to creating objects that match the summary schema
+for legacy organization level curation-export.json files.
+
+FIXME it might be the case that individual datasets were exported
+under different schemas, which means that there would no longer be a
+single consistent schema for checking the merge, this is why we
+sometimes need to rerun all datasets when there is a schema change
+even if ther is not a schema change it very well may be the case that
+indvidiual datasets will have been run on different versions of the
+export pipeline, and slightly different images
+
+#+name: combine.py
+#+begin_src python :tangle ../sparcur/simple/combine.py
+import json
+#from sparcur.utils import fromJson, register_all_types  # FIXME this should go in sparcron
+from sparcur.simple.export import add_prov
+
+tu = 'timestamp_updated'
+tuc = 'timestamp_updated_contents'
+ip = 'inputs'
+rmk = 'remote_dataset_metadata'
+
+
+def max_dataset_or_contents_updated(datasets_list):
+    return max(set.union(
+        set([a['meta'][tuc] for a in datasets_list
+            if tuc in a['meta'] and a['meta'][tuc]]),
+        set([a['meta'][tu] for a in datasets_list
+            if tu in a['meta'] and a['meta'][tu]])))
+
+
+def from_dataset_export_path_datasets_lists(dataset_export_path):
+    dep = dataset_export_path
+    alld = []
+    pubd = []
+    for c in dep.children:
+        lp = c / 'LATEST'
+        if lp.exists():
+            with open(lp / 'curation-export.json', 'rt') as f:
+                j = json.load(f)
+                # TODO validate the load XXX this should probably
+                # happen as a final roundtrip check during export
+                # TODO filter by organization
+                alld.append(j)
+                if ip in j and rmk in j[ip] and 'id_published' in j[ip][rmk]:
+                    pubd.append(j)
+
+    return alld, pubd
+
+
+def from_datasets_list_summary_json(datasets_list, project_id, time_now):
+    out = {
+        'id': project_id.id,
+        'meta': {
+            'count': len(datasets_list),
+            'uri_api': project_id.uri_api,
+            'uri_human': project_id.uri_human(),
+        },
+        'datasets': datasets_list,
+    }
+    add_prov(out, time_now)
+    # some potential prov summaries, but lets not do that here
+    # most prov stats should be on the single dataset level
+    #'export_timestamp_start_min': min(tes),
+    #'export_timestamp_start_max': max(tes),
+    return out
+
+def from_dataset_export_path_summary_json(dataset_export_path, project_id, time_now):
+    l_all, l_pub = from_dataset_export_path_datasets_lists(dataset_export_path)
+    #[a['meta']['timestamp_updated'] < a['meta']['timestamp_updated_contents']
+    #for a in l_all if a['meta']['timestamp_updated_contents']]
+    sum_all = from_datasets_list_summary_json(l_all, project_id, time_now)
+    sum_pub = from_datasets_list_summary_json(l_pub, project_id, time_now)
+    return sum_all, sum_pub
+
+
+def main(project_id=None, export_path=None, time_now=None,
+         project_id_auth_var='remote-organization',  # FIXME move to clifun
+         ,**kwargs):
+    from sparcur.paths import Path
+    from sparcur.config import auth
+
+    if project_id is None:
+        from sparcur.config import auth
+        from sparcur.utils import PennsieveId
+        project_id = auth.get(project_id_auth_var)
+        project_id = PennsieveId(project_id)  # FIXME abstract the hardcoded backend
+
+    if export_path is None:  # XXX see issues mentioned above
+        export_path = Path(auth.get_path('export-path'))
+
+    dataset_export_path = export_path / 'datasets'
+    sum_all, sum_pub = from_dataset_export_path_summary_json(
+        dataset_export_path, project_id, time_now)
+    maxdt = max_dataset_or_contents_updated(sum_all['datasets'])
+    # FIXME there are some bad assumptions in here that should be refactored out
+    # at some point, but for now we implicitly assume that all datasets come from
+    # the same organization, which can easily be violated because we don't check 
+    # however the existing internal schema requires an id for the summary which is
+    # currenty the organization id
+    # FIXME summary is a hardcoded path
+    # XXX WARNING it is possible to overwrite since maxdt might not change between runs
+    # this is desirable behavior for development, but could cause issues in other cases
+    pexpath = export_path / 'summary' / project_id.uuid
+    latest = pexpath / 'LATEST'
+    npath = pexpath / maxdt
+    if not npath.exists():
+        npath.mkdir(parents=True)
+
+    npath_ce = npath / 'curation-export.json'
+    npath_cep = npath / 'curation-export-published.json'
+    for path, blob in ((npath_ce, sum_all),
+                       (npath_cep, sum_pub)):
+        with open(path, 'wt') as f:
+            json.dump(blob, f)
+
+    if latest.is_symlink():
+        latest.unlink()
+
+    latest.symlink_to(maxdt)
+
+    return sum_all, sum_pub
+
+
+if __name__ == '__main__':
+    #import pprint
+    from sparcur.simple.utils import pipe_main
+    # these are really big, don't print them
+    # pipe_main(main, after=pprint.pprint)
+    pipe_main(main)
 #+end_src
 ** Utility
 *** _*Init*_
