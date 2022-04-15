@@ -2890,17 +2890,17 @@ def from_dataset_export_path_datasets_lists(dataset_export_path):
     dep = dataset_export_path
     alld = []
     pubd = []
-    for c in dep.children:
-        lp = c / 'LATEST'
-        if lp.exists():
-            with open(lp / 'curation-export.json', 'rt') as f:
-                j = json.load(f)
-                # TODO validate the load XXX this should probably
-                # happen as a final roundtrip check during export
-                # TODO filter by organization
-                alld.append(j)
-                if ip in j and rmk in j[ip] and 'id_published' in j[ip][rmk]:
-                    pubd.append(j)
+    derefs = [l.resolve() for l in [c / 'LATEST' for c in dep.children] if l.exists()]
+    # TODO consider creating a folder that is just symlinks before this
+    for lp in derefs:
+        with open(lp / 'curation-export.json', 'rt') as f:
+            j = json.load(f)
+            # TODO validate the load XXX this should probably
+            # happen as a final roundtrip check during export
+            # TODO filter by organization
+            alld.append(j)
+            if ip in j and rmk in j[ip] and 'id_published' in j[ip][rmk]:
+                pubd.append(j)
 
     return alld, pubd
 
