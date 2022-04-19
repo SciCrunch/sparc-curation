@@ -23,6 +23,17 @@ def curation_export_published(export_path, out_base=None):
     merged.write(op / 'curation-export-published.ttl')
 
 
+def _merge_graphs(graphs):
+    merged = OntGraph()
+    for g in graphs:
+        merged.namespace_manager.populate_from(
+            {k:v for k, v in dict(g.namespace_manager).items()
+            if k not in ('contributor', 'sample', 'subject')})
+        merged.populate_from_triples(g.data)  # g.data excludes the owl:Ontology section
+        # TODO switch the rdf:type of metadata section on combination to preserve export related metadata
+    return merged
+
+
 def _populate_published(curation_export, graphs):
 
     # datasets = [list(g[:rdf.type:sparc.Dataset]) for g in graphs]
@@ -31,14 +42,12 @@ def _populate_published(curation_export, graphs):
                         for g in graphs for ds in g[:rdf.type:sparc.Dataset]]
         if doi]
 
-    merged = OntGraph()
-    for g in published_graphs:
-        merged.namespace_manager.populate_from(
-            {k:v for k, v in dict(g.namespace_manager).items()
-            if k not in ('contributor', 'sample', 'subject')})
-        merged.populate_from_triples(g.data)  # g.data excludes the owl:Ontology section
-        # TODO switch the rdf:type of metadata section on combination to preserve export related metadata
+    merged = _merge_graphs(published_graphs)
+    _fix_for_pub(curation_export, merged)
+    return merged
 
+
+def _fix_for_pub(curation_export, merged):
     mg = curation_export.metadata().graph
     mg.namespace_manager.populate(merged)
 
@@ -54,8 +63,7 @@ def _populate_published(curation_export, graphs):
 
     new_meta = mg.replaceIdentifiers(replace_pairs)
     new_meta.populate(merged)
-
-    return merged
+    return replace_pairs
 
 
 def main():
