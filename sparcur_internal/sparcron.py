@@ -462,14 +462,14 @@ def check_for_updates(project_id):
         rq = state == _qed_run
         running = state == _run or rq
         queued = state == _qed or rq
-            
+
         #log.debug(f'STATUS :id {dataset_id} :u {updated} :f {failed} :q {queued} :r {running}')
         # All the logic for whether to run a particular dataset
         # timestamp_updated or timestamp_updated_contents whichever is greater
         # NOTE we populate updated values into redis at startup from
         # the latest export of each individual dataset
         # TODO also need to check sparcur code changes to see if we need to rerun
-        if (pipeline_changed or
+        if (pipeline_changed and not failed or
             not (updated or failed) or
             failed and dataset.updated > failed or
             not failed and updated and dataset.updated > updated):
