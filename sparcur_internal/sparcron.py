@@ -199,8 +199,8 @@ def populate_existing_redis(conn):
                 blob = json.load(f)
             updated = blob['meta']['timestamp_updated']
             #prov_commit = blob['prov']['commit']  # TODO need to be able to detect software changes and rerun
-            prov_p_i_version = (blob['prov']['pipeline_internal_version']
-                                if 'pipeline_internal_version' in blob['prov']
+            internal_version = (int(blob['prov']['sparcur_internal_version'])
+                                if 'sparcur_internal_version' in blob['prov']
                                 else 0)
             sid = 'state-' + dataset_id
             uid = 'updated-' + dataset_id
@@ -209,7 +209,7 @@ def populate_existing_redis(conn):
             conn.set(sid, _none)
             conn.set(uid, updated)
             conn.set(fid, '')
-            conn.set(vid, prov_p_i_version)
+            conn.set(vid, internal_version)
 
     log.info(pprint.pformat({k:conn.get(k) for k in
                              sorted(conn.keys()) if b'N:dataset' in k},
@@ -438,7 +438,9 @@ def check_for_updates(project_id):
         fid = 'failed-' + dataset_id
         vid = 'verpi-' + dataset_id
         qid = 'queued-' + dataset_id
-        
+
+        # FIXME TODO new dataset case ???
+
         _updated = conn.get(uid)
         updated = _updated.decode() if _updated is not None else _updated
 
@@ -454,7 +456,7 @@ def check_for_updates(project_id):
         _internal_version = conn.get(vid)
         internal_version = (int(_internal_version.decode())
                             if _internal_version is not None
-                            else _internal_version)
+                            else 0)  # FIXME new dataset case?
         pipeline_changed = internal_version < sparcur.__internal_version__
 
         rq = state == _qed_run
@@ -503,6 +505,7 @@ def status_report():
         sid = 'state-' + dataset_id
         uid = 'updated-' + dataset_id
         fid = 'failed-' + dataset_id
+        vid = 'verpi-' + dataset_id
 
         _updated = conn.get(uid)
         updated = _updated.decode() if _updated is not None else _updated
