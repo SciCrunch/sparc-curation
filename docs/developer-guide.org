@@ -2735,10 +2735,12 @@ def export_blob(blob, blob_file_name, time_now=None,
 
 def add_prov(blob, time_now):
     """ Mutate blob in place to add prov. """
+    # FIXME this will klobber cases where prov was embedded by the pipelines
     blob['prov'] = {'timestamp_export_start': time_now.START_TIMESTAMP,
                     'export_system_identifier': Path.sysid,
                     'export_hostname': gethostname(),
                     'sparcur_version': sparcur.__version__,
+                    'sparcur_internal_version': sparcur.__internal_version__,
                     }
     rp = aug.RepoPath(sparcur.core.__file__)
     if rp.working_dir is not None:

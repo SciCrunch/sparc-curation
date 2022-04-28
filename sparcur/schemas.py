@@ -775,7 +775,9 @@ class ProvSchema(JSONSchema):
                              'export_system_identifier': {'type': 'string'},
                              'export_system_hostname': {'type': 'string'},
                              'export_project_path': {'type': 'string'},
+                             'remote': {'type': 'string'},
                              'sparcur_version': {'type': 'string'},
+                             'sparcur_internal_version': {'type': 'string'},  # FIXME int
                              'sparcur_commit': {'type': 'string'},
                              'ontology_mappings': {
                                  'type': 'array',

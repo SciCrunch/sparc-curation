@@ -58,6 +58,7 @@ from celery import Celery, Task
 from celery.signals import worker_process_init, worker_process_shutdown
 from celery.schedules import crontab
 
+import sparcur
 from sparcur.cli import Main, Options, __doc__ as clidoc
 from sparcur.utils import PennsieveId, GetTimeNow, log
 from sparcur.paths import Path
@@ -198,12 +199,17 @@ def populate_existing_redis(conn):
                 blob = json.load(f)
             updated = blob['meta']['timestamp_updated']
             #prov_commit = blob['prov']['commit']  # TODO need to be able to detect software changes and rerun
+            prov_p_i_version = (blob['prov']['pipeline_internal_version']
+                                if 'pipeline_internal_version' in blob['prov']
+                                else 0)
             sid = 'state-' + dataset_id
             uid = 'updated-' + dataset_id
             fid = 'failed-' + dataset_id
+            vid = 'verpi-' + dataset_id
             conn.set(sid, _none)
             conn.set(uid, updated)
             conn.set(fid, '')
+            conn.set(vid, prov_p_i_version)
 
     log.info(pprint.pformat({k:conn.get(k) for k in
                              sorted(conn.keys()) if b'N:dataset' in k},
@@ -315,6 +321,7 @@ def ret_val_exp(dataset_id, updated, time_now):
     did = PennsieveId(dataset_id)
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
+    vid = 'verpi-' + dataset_id
 
     # FIXME detect cases where we have already pulled the latest and don't pull again
     # FIXME TODO smart retrieve so we don't pull if we failed during
@@ -361,6 +368,11 @@ def ret_val_exp(dataset_id, updated, time_now):
 
         conn.set(uid, updated)
         conn.delete(fid)
+        # XXX for vid some weird environment thing could mean that the internal
+        # version might not match what was embedded in prov, but really that
+        # should never happen, we just don't want to have to open the json file
+        # in this process
+        conn.set(vid, sparcur.__internal_version__)
         log.info(f'DONE: u: {uid} {updated}')
     except Exception as e:
         log.critical(f'FAIL: {fid} {updated}')
@@ -424,6 +436,7 @@ def check_for_updates(project_id):
         sid = 'state-' + dataset_id
         uid = 'updated-' + dataset_id
         fid = 'failed-' + dataset_id
+        vid = 'verpi-' + dataset_id
         qid = 'queued-' + dataset_id
         
         _updated = conn.get(uid)
@@ -438,6 +451,12 @@ def check_for_updates(project_id):
         _state = conn.get(sid)
         state = int(_state) if _state is not None else _state
 
+        _internal_version = conn.get(vid)
+        internal_version = (int(_internal_version.decode())
+                            if _internal_version is not None
+                            else _internal_version)
+        pipeline_changed = internal_version < sparcur.__internal_version__
+
         rq = state == _qed_run
         running = state == _run or rq
         queued = state == _qed or rq
@@ -448,7 +467,8 @@ def check_for_updates(project_id):
         # NOTE we populate updated values into redis at startup from
         # the latest export of each individual dataset
         # TODO also need to check sparcur code changes to see if we need to rerun
-        if (not (updated or failed) or
+        if (pipeline_changed or
+            not (updated or failed) or
             failed and dataset.updated > failed or
             not failed and updated and dataset.updated > updated):
             log.debug((f'MAYBE ENQUEUE :id {dataset_id} du: '

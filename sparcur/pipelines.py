@@ -1,6 +1,7 @@
 import copy
 import json
 import pathlib
+from socket import gethostname
 from itertools import chain
 from collections import deque, defaultdict
 import idlib
@@ -1127,8 +1128,13 @@ class SDSPipeline(JSONPipeline):
     )
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
+    # FIXME replace this with something common from sparcur.simple.export.add_prov
     adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],
             [['prov', 'sparcur_version'], lambda _: sparcur.__version__],
+            [['prov', 'sparcur_internal_version'], lambda _: sparcur.__internal_version__],
+            [['prov', 'export_system_identifier'], lambda _: Path.sysid],
+            [['prov', 'export_hostname'], lambda _: gethostname()],
+            #[['prov', 'export_project_path'], lambda _: None],  # FIXME XXX added in curation.py atm
             [['prov', 'remote'], lambda lifters: lifters.remote],
             ]
 

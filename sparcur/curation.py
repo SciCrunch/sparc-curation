@@ -288,12 +288,15 @@ class Integrator(PathData, OntologyData):
     def data_for_export(self, timestamp):
         data = self.data(timestamp)
         # NOTE this timestamps the cached data AS INTENDED
-        data['prov'] = {
-            'export_system_identifier': Path.sysid,
-            'export_hostname': gethostname(),
-            'export_project_path': self.path.cache.anchor.local,
-        }
-        data['prov']['timestamp_export_start'] = timestamp
+        # XXX DO NOT OVERWRITE THE PROV FROM THE PIPELINE ITSELF!
+        #data['prov'] = {
+            #'export_system_identifier': Path.sysid,
+            #'export_hostname': gethostname(),
+            #'export_project_path': self.path.cache.anchor.local,
+        #}
+        #data['prov']['timestamp_export_start'] = timestamp
+        # FIXME XXX there has GOT to be a better way to get this out
+        data['prov']['export_project_path'] = self.path.cache.anchor.local
         return data
 
     @property
