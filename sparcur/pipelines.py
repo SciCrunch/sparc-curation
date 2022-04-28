@@ -798,12 +798,10 @@ class JSONPipeline(Pipeline):
                          (m['type'] == 'all-xml-files' and m['xml']
                           or 'xml' not in m)) or
                         (isinstance(m, list)
-                         and [d for d in m
-                              if 'errors' not in d or
-                              # missing manifest_records is handled elsewhere
-                              'errors' in d
-                              and 'manifest_records' in d
-                              and d['manifest_records']]))}
+                         # we now embed errors in the manifest file objects
+                         # if they exist, so the false positives here should
+                         # be gone now?
+                         and [d for d in m if 'errors' not in d]))}
 
             if matches:
                 breakpoint()

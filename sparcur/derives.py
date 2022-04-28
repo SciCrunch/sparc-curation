@@ -193,6 +193,7 @@ class Derives:
         path_metadata = []
         scaffolds = []  # FIXME need a better abstraction for additional known types e.g. the mbf segmentations
         for manifest in manifests:
+            he = HasErrors(pipeline_stage='Derives.path_metadata')
             if 'contents' in manifest:
                 contents = manifest['contents']
                 if 'manifest_records' in contents:
@@ -203,14 +204,21 @@ class Derives:
                             lifted, _should_log = cls._lift_mr(
                                 path_dataset, drp, record, _should_log)
                         except FileNotFoundError as e:
-                            logd.error(e)
+                            # FIXME all this is horribly tangled and we repeatedly compute the same value
+                            record_drp = drp.parent / record['filename']
+                            msg = f'A path listed in manifest {drp} does not exist! {record_drp}'
+                            if he.addError(msg, blame='submission', path=drp):
+                                logd.error(e)
                             continue  # FIXME need this in the errors record
                         except exc.BadDataError as e:
-                            logd.error(e)
+                            if he.addError(e, blame='submission', path=drp):
+                                logd.error(e)
                             continue  # FIXME need this in the errors record
                         path_metadata.append(lifted)
                         if 'errors' not in lifted:
                             cls._scaffolds(lifted, scaffolds)
+
+                    he.embedErrors(manifest)
 
         path_metadata.extend(xmls['xml'])
         # TODO try to construct/resolve the referent paths in these datasets as well
