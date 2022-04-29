@@ -3375,36 +3375,42 @@ def rglob(path, pattern):
     return paths
 
 
+def _fetch(cache):  # sigh joblib multiprocessing pickling
+    # lambda functions are great right up until you have to handle an
+    # error function inside of them ... thanks python for yet another
+    # failure to be homogenous >_<
+    meta = cache.meta
+    try:
+        size_mb = meta.size.mb
+    except AttributeError as e:
+        if meta.errors:
+            logd.debug(f'remote errors {meta.errors} for {cache!r}')
+            return
+        else:
+            raise exc.StopTheWorld(cache) from e
+
+    return cache.fetch(size_limit_mb=size_mb + 1)  # FIXME somehow this is not working !?
+
+
+def _fetch_path(path):  # sigh joblib multiprocessing pickling
+    path = Path(path)
+    cache = path.cache
+    if cache is None:
+        raise exc.NoCachedMetadataError(path)
+
+    # do not return to avoid cost of serialization back to the control process
+    _fetch(cache)
+
+
 def fetch_paths_parallel(paths, n_jobs=12):
-    def fetch(cache):
-        # lambda functions are great right up until you have to handle an
-        # error function inside of them ... thanks python for yet another
-        # failure to be homogenous >_<
-        meta = cache.meta
-        try:
-            size_mb = meta.size.mb
-        except AttributeError as e:
-            if meta.errors:
-                logd.debug(f'remote errors {meta.errors} for {cache!r}')
-                return
-            else:
-                raise exc.StopTheWorld(cache) from e
-
-        return cache.fetch(size_limit_mb=size_mb + 1)
-
-    def fetch_path(path):
-        cache = path.cache
-        if cache is None:
-            raise exc.NoCachedMetadataError(path)
-
-        # do not return to avoid cost of serialization back to the control process
-        fetch(cache)
-
     if n_jobs <= 1:
-        [fetch_path(path) for path in paths]
+        [_fetch_path(path) for path in paths]
     else:
+        import pathlib
         from joblib import Parallel, delayed
-        Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths)
+        backend = 'multiprocessing' if hasattr(sys, 'pypy_version_info') else None
+        Parallel(n_jobs=n_jobs, backend=backend)(delayed(_fetch_path)(pathlib.Path(path)) for path in paths)
+        #Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths)
 
 
 def combinate(*functions):
