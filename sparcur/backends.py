@@ -338,11 +338,11 @@ class BlackfynnRemote(aug.RemotePath):
         if isinstance(self.bfobject, self._File) and not self.from_packages:
             return name.suffix
         elif isinstance(self.bfobject, self._Collection):
-            return ''
+            return name.suffix
         elif isinstance(self.bfobject, self._Dataset):
-            return ''
+            return name.suffix
         elif isinstance(self.bfobject, self._Organization):
-            return ''
+            return name.suffix
         else:
             if self.from_packages or not list(self.errors):
                 # still needed for cache.children when remote data is in error
