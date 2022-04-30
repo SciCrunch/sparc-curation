@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import logging
+import warnings
 import idlib
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
@@ -15,9 +16,7 @@ from pyontutils.utils import (makeSimpleLogger,
 from . import exceptions as exc
 from .config import auth
 
-
 _find_command = 'gfind' if sys.platform == 'darwin' else 'find'
-
 
 log = makeSimpleLogger('sparcur')
 logd = log.getChild('data')
@@ -30,6 +29,9 @@ _alog.addHandler(log.handlers[0])
 _ilog.removeHandler(_alog.handlers[0])
 _ilog.addHandler(log.handlers[0])
 
+# silence known warnings on pypy3
+if hasattr(sys, 'pypy_version_info'):
+    warnings.filterwarnings('ignore', module='.+protobuf.+')
 
 __type_registry = {None: None}
 def register_type(cls, type_name):
