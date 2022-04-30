@@ -3122,6 +3122,7 @@ Usage:
     sparcur-simple get-uuid  <remote-id>...
     sparcur-simple datasets
     sparcur-simple for-racket
+    sparcur-simple check-names
     sparcur-simple git-repos [update] [options]
     sparcur-simple [options] [<path>...]
     sparcur-simple [options] [--dataset-id=<ID>...]
@@ -3146,7 +3147,7 @@ Options:
                                     to be the parent path, don't use this ...
     --invariant-local-path=PATH     path relative to parent path for dataset [default: dataset]
     --export-local                  set export-parent-path to {{:parent-path}}/exports/
-    --export-path=PATH              base export path containing the standard path structure
+    --export-path=PATH              base export path containing the standard path structure [default: {auth.get_path('export-path')}]
     --export-parent-path=PATH       direct parent path into which exports will be placed
     --extension=<EXT>...            one or more file extensions to fetch
 
@@ -3298,6 +3299,8 @@ class Options(clif.Options):
             raise TypeError('Only one of --export-path and --export-parent-path may be set.')
         elif ep:
             return Path(ep).expanduser().resolve()
+        else:
+            raise Exception('should not happen')
 
     @property
     def export_parent_path(self):
@@ -3475,21 +3478,23 @@ class DataWrapper:
 
 
 def main(id=None, **kwargs):
+    def ik(key):
+        return key in kwargs and kwargs[key]
+
     if id is not None:
         print(id.uuid)
 
-    if 'get_uuid' in kwargs and kwargs['get_uuid']:
+    if ik('get_uuid'):
         for id in kwargs['remote_id']:
             print(id.uuid)
 
         return
 
-    if ('datasets' in kwargs and kwargs['datasets'] or
-        'for_racket' in kwargs and kwargs['for_racket']):
+    if (ik('datasets') or ik('for_racket') or ik('check_names')):
         log.setLevel(60)  # logging.CRITICAL = 50
         from sparcur.config import auth
         from sparcur.simple.utils import backend_pennsieve
-        if 'project_id' in kwargs and kwargs['project_id']:
+        if ik('project_id'):
             pass  # project_id from command line
         else:
             project_id = auth.get('remote-organization')
@@ -3498,10 +3503,10 @@ def main(id=None, **kwargs):
         root = PennsieveRemote(project_id)
         datasets = list(root.children)
 
-    if 'datasets' in kwargs and kwargs['datasets']:
+    if ik('datasets'):
         print('\n'.join([d.id for d in datasets]))
 
-    if 'for_racket' in kwargs and kwargs['for_racket']:
+    if ik('for_racket'):
         import json
         _dsmeta = '\n'.join([f"({json.dumps(d.id)} {json.dumps(d.name)})"
                              for d in datasets])
@@ -3509,7 +3514,88 @@ def main(id=None, **kwargs):
         # lab pi last name should be cached in some other way
         print(dsmeta)
 
-    if 'git_repos' in kwargs and kwargs['git_repos']:
+    if ik('check_names'):
+        # you will want to run sparcur.simple.fetch_remote_metadata_all
+        from pathlib import PurePosixPath
+        def report(pid, exp, pub):
+            pname = pub['name']
+            name_mismatch = (
+                False if exp['basename'] == pname
+                else (exp['basename'], pname))
+            # [6:] to strip files/
+            ppname = PurePosixPath(pub['path']).name
+            pathname_mismatch = (
+                False if exp['basename'] == ppname
+                else (exp['basename'], ppname))
+
+            eppp = PurePosixPath(exp['dataset_relative_path']).parent.as_posix()
+            pppp = PurePosixPath(pub['path'][6:]).parent.as_posix()
+            parent_path_mismatch = (
+                False if eppp == pppp
+                else (eppp, pppp))
+
+            # once we fix things on our end names should match
+            # parent paths should match
+            # name and pathname might match but do not have to match
+            pid = f'  {pid}'
+            nsp = '\n        '
+            if name_mismatch:
+                if pathname_mismatch and pname != ppname:
+                    return (f'{pid}    name mismatch and pathname mismatch                '
+                            f'{nsp}{nsp.join(name_mismatch)}{nsp}{nsp.join(pathname_mismatch)}')
+                else:
+                    return (f'{pid}    name mismatch                                      '
+                            f'{nsp}{nsp.join(name_mismatch)}')
+
+            if parent_path_mismatch:
+                if True:
+                    return (f'{pid}                                        parent mismatch'
+                            f'{nsp}{nsp.join(parent_path_mismatch)}')
+
+            if True:
+                if True:
+                    return ''
+                    #return (f'{pid} ok                                                    ')
+
+        import json
+        from sparcur.backends import PennsieveDatasetData
+        export_path = kwargs['export_path']
+        epd = export_path / 'datasets'
+        for dataset in datasets:
+            latest = epd / dataset.identifier.uuid / 'LATEST'
+            export_path_metadata =  latest / 'path-metadata.json'
+            exported = export_path_metadata.exists()
+
+            # pass the remote not just the id so that bfobject is
+            # accessible to the RemoteDatasetData class
+            pdd = PennsieveDatasetData(dataset)
+            rmeta = pdd.fromCache()
+            published = 'id_published' in rmeta
+            if exported and published:
+                with open(export_path_metadata, 'rt') as f:
+                    j = json.load(f)
+                epni = {'N:' + o['remote_id']:o for o in j['data']
+                        if o['remote_id'].startswith('package:')}
+                ppni = pdd._published_package_name_index()
+                se, sp = set(epni), set(ppni)
+                e_missing = sp - se
+                p_missing = se - sp
+                s_common = sp & se
+                rep = [report(c, epni[c], ppni[c]) for c in s_common]
+                repstr = '\n'.join([r for r in rep if r])
+                if repstr:
+                    print(dataset.id, 'bad')
+                    print(repstr)
+                else:
+                    print(dataset.id, 'ok')
+            elif exported:
+                print(dataset.id, 'unpublished')
+            elif published:
+                print(dataset.id, 'unexported')
+            else:
+                print(dataset.id, 'unpublished and unexported')
+
+    if ik('git_repos'):
         import augpathlib as aug
         from sparcur import cli
         from sparcur.config import auth
@@ -3519,7 +3605,7 @@ def main(id=None, **kwargs):
         setups = [p for p in [p.parent / 'setup.py' for p in rps] if p.exists()]
         wds = sorted(set([p.working_dir for p in rps]))
         never_update = auth.get('never-update')
-        pretend='pretend' in kwargs and kwargs['pretend'] or never_update
+        pretend=ik('pretend') or never_update
         if pretend:
             if never_update:
                 print(f'never-update: true is set in {auth.user_config._path}')
@@ -3533,7 +3619,7 @@ def main(id=None, **kwargs):
             print(rp.repo.git.stash())
             # TODO checkout to a safety branch and tag for rollback
             print(rp.repo.git.pull())
-        if 'update' in kwargs and kwargs['update']:
+        if ik('update'):
             for wd in wds:
                 doupdate(wd)
             # indescriminately run setup.py with --release set to tangle
@@ -3556,7 +3642,7 @@ def main(id=None, **kwargs):
             finally:
                 sys.argv = oldargv
 
-    if 'manifest' in kwargs and kwargs['manifest']:
+    if ik('manifest'):
         from sparcur.utils import write_manifests
         paths = kwargs['paths']
         if not paths:
@@ -3566,10 +3652,10 @@ def main(id=None, **kwargs):
         manifests, rendered = zip(*manifests_rendered)
         nl = '\n'
         print(f'generated manifests at:\n{nl.join([m.as_posix() for m in manifests])}')
-        if 'open' in kwargs and kwargs['open']:
+        if ik('open'):
             cmd = kwargs['open']
             [m.xopen(cmd) for m in manifests]
-        elif 'show' in kwargs and kwargs['show']:
+        elif ik('show'):
             [m.xopen() for m in manifests]
 
 

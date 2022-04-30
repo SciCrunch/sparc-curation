@@ -1544,11 +1544,39 @@ class RemoteDatasetData:
         if pm is not None:
             blob['id_published'] = pm['id']
             # TODO identify the additional information that we want to embed
+            blob['published_version'] = pm['version']
+            blob['published_revision'] = pm['revision']
 
         with open(self.cache, 'wt') as f:
             json.dump(blob, f, indent=2, sort_keys=True, cls=self._JEncode)
 
         return blob
+
+    def _published_metadata(self):
+        pm = self.bfobject.publishedMetadata
+        pvm = self.bfobject.publishedVersionMetadata(pm['id'], pm['version'])
+        return pvm
+
+    def _published_files(self):
+        pvm = self._published_metadata()
+        def fixf(f):
+            path = PurePosixPath(f['path'])
+            if 'name' not in f:
+                # the files schema may or may not have a name key
+                # depending on when the dataset was published SIGH
+                f['name'] = path.name
+            if path.name != f['name']:
+                msg = f'path name != name:\n{path.name}\n{f["name"]}'
+                log.critical(msg)
+
+            return f
+
+        files = [fixf(f) for f in pvm['files']]
+        return files
+
+    def _published_package_name_index(self):
+        return {f['sourcePackageId']:f for f in self._published_files()
+                if 'sourcePackageId' in f}
 
 
 class LocalDatasetData(RemoteDatasetData):

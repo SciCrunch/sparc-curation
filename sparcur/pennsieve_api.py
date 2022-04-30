@@ -59,6 +59,7 @@ Dataset.meta = monkey.Dataset_meta
 Dataset.packagesByName = monkey.packagesByName
 Dataset.packageTypeCounts = monkey.packageTypeCounts
 Dataset.publishedMetadata = monkey.publishedMetadata
+Dataset.publishedVersionMetadata = monkey.publishedVersionMetadata
 Dataset.readme = monkey.Dataset_readme
 Dataset.contributors = monkey.Dataset_contributors
 Dataset.doi = monkey.Dataset_doi

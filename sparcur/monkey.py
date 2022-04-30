@@ -410,6 +410,17 @@ def publishedMetadata(self):
         resp.raise_for_status()
 
 
+def publishedVersionMetadata(self, id_published, published_version):
+    session = self._api.session
+    resp = session.get((
+        f'{self._api._host}/discover/datasets/'
+        f'{id_published}/versions/{published_version}/metadata'))
+    if resp.ok:
+        return resp.json()
+    else:
+        resp.raise_for_status()
+
+
 @property
 def Dataset_users(self):
     session = self._api.session

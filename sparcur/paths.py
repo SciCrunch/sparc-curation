@@ -803,7 +803,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
     def _file_type_status_lookup(cls):
         import json  # FIXME
         if not hasattr(cls, '_sigh_ftslu'):
-            resources = auth.get_path('resources')
+            resources = auth.get_path('resources')  # FIXME breaks outside git
             with open(resources / 'mimetypes.json', 'rt') as f:
                 classification = json.load(f)
 
