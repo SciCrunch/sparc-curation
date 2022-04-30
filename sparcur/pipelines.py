@@ -297,7 +297,7 @@ class PathPipeline(PrePipeline):
 
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '._transformer')
             if he.addError(e, path=self.path):
-                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+                logd.error(e)  # FIXME isn't this were we should accumulate errors?
 
             he.embedErrors(NoData.data)
             return NoData
@@ -326,7 +326,7 @@ class PathPipeline(PrePipeline):
             data = {}
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.transformer')
             if he.addError(e, path=self.path):
-                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
+                logd.error(e)  # FIXME isn't this were we should accumulate errors?
 
             he.embedErrors(data)
             return data
