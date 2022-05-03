@@ -1,0 +1,12 @@
+* Release NEXT
+** New models
+*** ApiNATOMY
+*** NPO evidence based models
+** New neuron populations
+** Updated populations
+*** Added NPO modelling
+*** Updated/added/removed routes, terminals, or sources
+*** Changed ApiNATOMY ontologyTerms mappings
+** Removed populations
+** Other changes
+General data harmonization and identifier alignment.
