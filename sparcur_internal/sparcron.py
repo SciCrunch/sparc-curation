@@ -7,6 +7,10 @@ test with
 python sparcron.py
 
 # run with
+PYTHONBREAKPOINT=0 celery --app sparcron worker -n wcron -Q cron,default --detach --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
+PYTHONBREAKPOINT=0 celery --app sparcron worker -n wexport -Q export --loglevel=INFO
+
+# old run with
 PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
 
 # --queues cron:2,export:4,default:1  # SIGH https://github.com/celery/celery/issues/1599
@@ -28,9 +32,9 @@ PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --queues export,default -
 celery -A sparcron purge
 
 rabbitmqctl list_queues
-rabbitmqctl purge_queue celery
-rabbitmqctl delete_queue cron
-rabbitmqctl delete_queue export
+rabbitmqctl purge_queue celery;\
+rabbitmqctl delete_queue cron;\
+rabbitmqctl delete_queue export;\
 rabbitmqctl delete_queue default
 
 """
@@ -124,6 +128,7 @@ cel.conf.task_default_exchange = 'default'
 #cel.conf.task_default_exchange_type = 'topic'
 cel.conf.task_default_routing_key = 'task.default'
 
+
 def route(name, args, kwargs, options, task=None, **kw):
     if name == 'sparcron.check_for_updates':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
@@ -152,11 +157,14 @@ cel.control.add_consumer(
     routing_key='task.cron',
 )
 
-cel.control.add_consumer(
-    queue='export',
-    exchange='export',
-    routing_key='task.export',
-)
+# don't add export to the core control consumer, we need a separate process
+# that the work pool is separate and does not block the cron pool
+
+#cel.control.add_consumer(
+#    queue='export',
+#    exchange='export',
+#    routing_key='task.export',
+#)
 
 
 def get_redis_conn():
@@ -220,9 +228,11 @@ def populate_existing_redis(conn):
 def cleanup_redis(sender, **kwargs):
     """ For the time being ensure that any old data about process
         state is wiped when we restart. """
-    log.info('cleaning up old redis connection ...')
-    reset_redis_keys(conn)
-    populate_existing_redis(conn)
+    i = cel.control.inspect()
+    if i.active_queues() is None:
+        log.info('cleaning up old redis connection ...')
+        reset_redis_keys(conn)
+        populate_existing_redis(conn)
 
 
 sync_interval = 17  # seconds
