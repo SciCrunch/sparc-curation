@@ -1041,7 +1041,7 @@ pushd /var/www/sparc/sparc/
         find -maxdepth 1 -not -path '.' -type d -newer $(ls -At *.tar.xz | head -n 1) -exec tar -cvJf '{}.tar.xz' '{}' \;
         chown nginx:nginx *.tar.xz
         # remove previous years
-        find -maxdepth 1 -not -path '.' -not -path "*$(date +%Y)-*" -type d -exec echo rm -r '{}' \;
+        find -maxdepth 1 -not -path '.' -not -path "*$(date +%Y)-*" -type d -exec echo rm -r '{}' \+
         # remove all the but most recent 8 folders
         find -maxdepth 1 -not -path '.' -type d | sort -u | head -n -8 | xargs echo rm -r
     popd

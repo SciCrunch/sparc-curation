@@ -39,6 +39,11 @@ rabbitmqctl delete_queue default
 
 """
 
+# FIXME split this in half to avoid high memory usage
+# from all the imports needed for the cron half that
+# are not needed in the export section because it is
+# all in the subprocess
+
 # FIXME need a way to separate the periodic tasks and avoid double setup
 # because celery will create as many as you want for top level ...
 # alternatvely figure out how to pin workers to queus within a single
