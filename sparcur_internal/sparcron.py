@@ -7,7 +7,7 @@ test with
 python sparcron.py
 
 # run with
-PYTHONBREAKPOINT=0 celery --app sparcron worker -n wcron -Q cron,default --detach --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
+PYTHONBREAKPOINT=0 celery --app sparcron worker -n wcron -Q cron,default --concurrency=1 --detach --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
 PYTHONBREAKPOINT=0 celery --app sparcron worker -n wexport -Q export --loglevel=INFO
 
 # old run with
