@@ -428,7 +428,12 @@ def export_single_dataset(dataset_id, updated):
     conn.decr(sid)  # we always go back 2 either to none or queued
     conn.decr(sid)
     if state == _qed_run:
-        export_single_dataset.delay(dataset_id)
+        qid = 'queued-' + dataset_id
+        _qupdated = conn.get(qid)
+        # there are race conditions here, but we don't care because we
+        # can't get a sane file list snapshot anyway
+        qupdated = _qupdated.decode() if _qupdated is not None else None
+        export_single_dataset.delay(dataset_id, qupdated)
 
     status_report()
 
