@@ -103,8 +103,13 @@ options = Options(args, defaults)
 
 project_id = auth.get('remote-organization')
 path_source_dir = Path('~/files/sparc-datasets-test').expanduser().resolve()  # FIXME hardcoded  XXX resolve required to avoid mismatches
+path_log_base = auth.get_path('log-path')
+path_log_datasets = path_log_base / 'datasets'
+
 if not path_source_dir.exists():
     path_source_dir.mkdir(parents=True)
+if not path_log_datasets.exists():
+    path_log_datasets.mkdir(parents=True)
 
 cel = Celery('sparcur-cron',)
 
@@ -233,7 +238,7 @@ def populate_existing_redis(conn):
 def cleanup_redis(sender, **kwargs):
     """ For the time being ensure that any old data about process
         state is wiped when we restart. """
-    i = cel.control.inspect()
+    i = cel.control.inspect()  # FIXME yes, still has a data race and can run twice
     if i.active_queues() is None:
         log.info('cleaning up old redis connection ...')
         reset_redis_keys(conn)
@@ -332,7 +337,8 @@ argv_spc_export = [
 
 pid = PennsieveId(project_id)
 def ret_val_exp(dataset_id, updated, time_now):
-    log.info(f'START {dataset_id}')
+    timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
+    log.info(f'START {dataset_id} {timestamp}')
     did = PennsieveId(dataset_id)
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
@@ -352,34 +358,48 @@ def ret_val_exp(dataset_id, updated, time_now):
 
     # FIXME detect cases where it appears that a new dataset is in the process of being
     # uploaded and don't run for a while if it is being continually modified
+
+    # FIXME somehow rmeta is missing ??!?!?!
+
+    logfile = path_log_datasets / did.uuid / timestamp / 'stdout.log'
+    if not logfile.parent.exists():
+        logfile.parent.mkdir(parents=True)
+
     try:
-        try:
-            p1 = subprocess.Popen(argv_simple_retrieve(dataset_id))
-            out1 = p1.communicate()
-            if p1.returncode != 0:
-                raise Exception(f'oops return code was {p1.returncode}')
-        except KeyboardInterrupt as e:
-            p1.send_signal(signal.SIGINT)
-            raise e
+        with open(logfile, 'wt') as logfd:
+            try:
+                p1 = subprocess.Popen(argv_simple_retrieve(dataset_id),
+                                    stderr=subprocess.STDOUT, stdout=logfd)
+                out1 = p1.communicate()
+                if p1.returncode != 0:
+                    #logfd.flush()
+                    raise Exception(f'oops return code was {p1.returncode}')
+            except KeyboardInterrupt as e:
+                p1.send_signal(signal.SIGINT)
+                raise e
 
-        dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
-        try:
-            p2 = subprocess.Popen(argv_spc_find_meta, cwd=dataset_path)
-            out2 = p2.communicate()
-            if p2.returncode != 0:
-                raise Exception(f'oops return code was {p2.returncode}')
-        except KeyboardInterrupt as e:
-            p2.send_signal(signal.SIGINT)
-            raise e
+            dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
+            try:
+                p2 = subprocess.Popen(argv_spc_find_meta, cwd=dataset_path,
+                                    stderr=subprocess.STDOUT, stdout=logfd)
+                out2 = p2.communicate()
+                if p2.returncode != 0:
+                    #logfd.flush()
+                    raise Exception(f'oops return code was {p2.returncode}')
+            except KeyboardInterrupt as e:
+                p2.send_signal(signal.SIGINT)
+                raise e
 
-        try:
-            p3 = subprocess.Popen(argv_spc_export, cwd=dataset_path)
-            out3 = p3.communicate()
-            if p3.returncode != 0:
-                raise Exception(f'oops return code was {p3.returncode}')
-        except KeyboardInterrupt as e:
-            p3.send_signal(signal.SIGINT)
-            raise e
+            try:
+                p3 = subprocess.Popen(argv_spc_export, cwd=dataset_path,
+                                    stderr=subprocess.STDOUT, stdout=logfd)
+                out3 = p3.communicate()
+                if p3.returncode != 0:
+                    #logfd.flush()
+                    raise Exception(f'oops return code was {p3.returncode}')
+            except KeyboardInterrupt as e:
+                p3.send_signal(signal.SIGINT)
+                raise e
 
         conn.set(uid, updated)
         conn.delete(fid)
@@ -396,13 +416,15 @@ def ret_val_exp(dataset_id, updated, time_now):
 
 
 @cel.task
-def export_single_dataset(dataset_id, updated):  # FIXME this is being called way too often, that message queue is super hefty
+def export_single_dataset(dataset_id, updated):
     sid = 'state-' + dataset_id
     time_now = GetTimeNow()
     conn.incr(sid)
+    #log.critical(f'STATE INCRED TO: {conn.get(sid)}')
+    status_report()
     ret_val_exp(dataset_id, updated, time_now)
-    state = conn.get(sid)
-    # FIXME I'm seeing -1 and -2 in here somehow
+    _sid = conn.get(sid)
+    state = int(_sid) if _sid is not None else None
     conn.decr(sid)  # we always go back 2 either to none or queued
     conn.decr(sid)
     if state == _qed_run:
@@ -457,16 +479,16 @@ def check_for_updates(project_id):
         # FIXME TODO new dataset case ???
 
         _updated = conn.get(uid)
-        updated = _updated.decode() if _updated is not None else _updated
+        updated = _updated.decode() if _updated is not None else None
 
         _qupdated = conn.get(qid)
-        qupdated = _qupdated.decode() if _qupdated is not None else _qupdated
+        qupdated = _qupdated.decode() if _qupdated is not None else None
 
         _failed = conn.get(fid)
-        failed = _failed.decode() if _failed is not None else _failed
+        failed = _failed.decode() if _failed is not None else None
 
         _state = conn.get(sid)
-        state = int(_state) if _state is not None else _state
+        state = int(_state) if _state is not None else None
 
         _internal_version = conn.get(vid)
         internal_version = (int(_internal_version.decode())
@@ -488,12 +510,13 @@ def check_for_updates(project_id):
             not (updated or failed) or
             failed and dataset.updated > failed or
             not failed and updated and dataset.updated > updated):
-            log.debug((f'MAYBE ENQUEUE :id {dataset_id} du: '
-                      f'{dataset.updated} u: {updated} f: {failed}'))
-            if queued:
+            log.debug((f'MAYBE ENQUEUE :id {dataset_id} s: {state} du: '
+                       f'{dataset.updated} u: {updated} f: {failed}'))
+            if queued or running and dataset.updated == qupdated:
                 pass
-            elif running and updated and qupdated and updated > qupdated:
+            elif running and dataset.updated > qupdated:
                 conn.incr(sid)
+                conn.set(qid, dataset.updated)
             else:
                 conn.incr(sid)
                 conn.set(qid, dataset.updated)
