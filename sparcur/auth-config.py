@@ -13,10 +13,10 @@
   'resources': {
       'default': [
           '../resources/',  # git
-          '{:cwd}/share/sparcur/resources',  # ebuild testing
-          '{:user-data-path}/sparcur/resources',  # pip install --user
-          '{:prefix}/share/sparcur/resources',  # system
-          '/usr/share/sparcur/resources',],  # pypy3
+          '{:cwd}/share/sparcur',  # ebuild testing
+          '{:user-data-path}/sparcur',  # pip install --user
+          '{:prefix}/share/sparcur',  # system
+          '/usr/share/sparcur',],  # pypy3
       'environment-variables': 'SPARCUR_RESOURCES'},
   'export-url': {
       'default': None,
