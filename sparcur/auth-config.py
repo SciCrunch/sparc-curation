@@ -10,7 +10,14 @@
   'log-path': {
       'default': '{:user-log-path}/sparcur',
       'environment-variables': 'SPARCUR_LOG_PATH LOG_PATH'},
-  'resources': ['../resources/',],
+  'resources': {
+      'default': [
+          '../resources/',  # git
+          '{:cwd}/share/sparcur/resources',  # ebuild testing
+          '{:user-data-path}/sparcur/resources',  # pip install --user
+          '{:prefix}/share/sparcur/resources',  # system
+          '/usr/share/sparcur/resources',],  # pypy3
+      'environment-variables': 'SPARCUR_RESOURCES'},
   'export-url': {
       'default': None,
       'environment-variables': 'SPARCUR_EXPORT_URL'},
