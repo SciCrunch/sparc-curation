@@ -99,5 +99,5 @@ setup(name='sparcur',
               'spc=sparcur.cli:main',
           ],
       },
-      data_files=[]
-     )
+      data_files=[('share/sparcur/', ['resources/mimetypes.json']),],
+)
