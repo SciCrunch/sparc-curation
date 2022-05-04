@@ -49,7 +49,8 @@ if RELEASE or NEED_SIMPLE:
     tangle_files(
         './docs/developer-guide.org',)
 
-tests_require = ['pytest', 'pytest-runner']
+cron_requires = ['celery', 'redis']
+tests_require = ['pytest', 'pytest-runner'] + cron_requires
 setup(name='sparcur',
       version=__version__,
       description='assorted',
@@ -72,18 +73,17 @@ setup(name='sparcur',
       python_requires='>=3.6',
       tests_require=tests_require,
       install_requires=[
-          'augpathlib>=0.0.21',
+          'augpathlib>=0.0.23',
           'beautifulsoup4',
-          #'blackfynn>=3.0.0',
           'pennsieve',
           'dicttoxml',
-          'idlib>=0.0.1.dev8',
+          'idlib>=0.0.1.dev10',
           "ipython; python_version < '3.7'",
           'jsonschema>=3.0.1',  # need the draft 6 validator
-          'ontquery>=0.2.7',
+          'ontquery>=0.2.8',
           'openpyxl',
-          'protcur>=0.0.7',
-          'pyontutils>=0.1.26',
+          'protcur>=0.0.8',
+          'pyontutils>=0.1.28',
           'pysercomb>=0.0.8',
           'rdflib>=6.0.2',
           'terminaltables',
@@ -91,6 +91,7 @@ setup(name='sparcur',
       ],
       extras_require={'dev': ['wheel'],
                       'filetypes': ['nibabel', 'pydicom', 'scipy'],
+                      'cron': cron_requires,
                       'test': tests_require},
       scripts=[],
       entry_points={

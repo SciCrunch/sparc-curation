@@ -4,32 +4,14 @@ services
 /etc/init.d/redis start
 
 test with
-python sparcron.py
+python -m sparcur.sparcron
 
 # run with
-PYTHONBREAKPOINT=0 celery --app sparcron worker -n wcron -Q cron,default --concurrency=1 --detach --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
-PYTHONBREAKPOINT=0 celery --app sparcron worker -n wexport -Q export --loglevel=INFO
-
-# old run with
-PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
-
-# --queues cron:2,export:4,default:1  # SIGH https://github.com/celery/celery/issues/1599
-#celery multi start cron export default -c:cron 2 -c:export 5 -c:default 1
-
-# old run
-## in one process
-celery --app sparcron worker --beat --queues cron --schedule-filename ./sparcur-cron-schedule
-#--concurrency=2
-
-## in another process
-PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --queues export,default --loglevel=INFO
-
-#                   celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule
-#PYTHONBREAKPOINT=0 celery --app sparcron worker --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
-
+PYTHONBREAKPOINT=0 celery --app sparcur.sparcron worker -n wcron -Q cron,default --concurrency=1 --detach --beat --schedule-filename ./sparcur-cron-schedule --loglevel=INFO
+PYTHONBREAKPOINT=0 celery --app sparcur.sparcron worker -n wexport -Q export --loglevel=INFO
 
 # to clean up
-celery -A sparcron purge
+celery -A sparcur.sparcron purge
 
 rabbitmqctl list_queues
 rabbitmqctl purge_queue celery;\
@@ -140,13 +122,13 @@ cel.conf.task_default_routing_key = 'task.default'
 
 
 def route(name, args, kwargs, options, task=None, **kw):
-    if name == 'sparcron.check_for_updates':
+    if name == 'sparcur.sparcron.check_for_updates':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
-    elif name == 'sparcron.check_sheet_updates':
+    elif name == 'sparcur.sparcron.check_sheet_updates':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
-    elif name == 'sparcron.heartbeat':
+    elif name == 'sparcur.sparcron.heartbeat':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 3, 'queue': 'cron'}
-    elif name == 'sparcron.export_single_dataset':
+    elif name == 'sparcur.sparcron.export_single_dataset':
         out = {'exchange': 'export', 'routing_key': 'task.export', 'priority': 1, 'queue': 'export'}
     elif 'celery' in name:
         out = options
