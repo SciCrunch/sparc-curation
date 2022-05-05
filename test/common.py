@@ -35,9 +35,6 @@ SKIP_NETWORK = ('SKIP_NETWORK' in os.environ or
                 'FEATURES' in os.environ and 'network-sandbox' in os.environ['FEATURES'])
 skipif_no_net = pytest.mark.skipif(SKIP_NETWORK, reason='Skipping due to network requirement')
 
-ddih = DatasetDescriptionFile.ignore_header  # save original skips
-DatasetDescriptionFile.ignore_header = tuple(_ for _ in ddih if _ != 'example')  # use the example values for tests
-
 ds_roots = (
     'ds1',
     'ds2/ds2',

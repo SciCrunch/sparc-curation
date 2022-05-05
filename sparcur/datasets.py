@@ -923,6 +923,8 @@ class MetadataFile(HasErrors):
     normalization_class = nml.NormValues  # FIXME normalize SHOULD NOT BE DONE AT THIS STAGE
     normalize_alt = True
     normalize_header = True
+    normalize_mismatch_ok = tuple()
+    normalize_alt_mismatch_ok = tuple()
     _expect_single = tuple()
 
     def __new__(cls, path, template_schema_version=None):
@@ -1281,7 +1283,8 @@ class MetadataFile(HasErrors):
             # Subject_id instead of subject_id will cause issues for
             # other people who are not using this pipeline to
             # normalize everything (for example)
-            logd.debug(msg)
+            if self._alt_header.data[0] not in self.normalize_mismatch_ok:
+                logd.debug(msg)
 
         if self.primary_key_rule is not None:
             nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
@@ -1302,16 +1305,24 @@ class MetadataFile(HasErrors):
             msg = (f'Potentially bad header value {self.header[0]!r} '
                    f'!= {self._header.data[0]!r}'
                    f' in {self.path.as_posix()!r}')
-            logd.debug(msg)
+            if self._header.data[0] not in self.normalize_alt_mismatch_ok:
+                logd.debug(msg)
 
         _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)
         if _matched:
-            # this has to be fatal because it violates assumptions made by
-            # downstream code that are useful to deal with nesting
-            # we may be able to fix this in the future but skip for now
-            msg = f'Common cells between alt header and header! {_matched}'
-            log.warning(msg)  # can't quite error yet due to metadata_element
-            #raise exc.MalformedHeaderError(msg)
+            if (self.record_type_key_header == self.record_type_key_alt and
+                {self.record_type_key_header} == _matched):
+                # if 0,0 in the sheet is the key for both with the same name
+                # then we skip here because it is expected, we might also add
+                # a check that it is in ignored, but I don't think we need it
+                pass
+            else:
+                # this has to be fatal because it violates assumptions made by
+                # downstream code that are useful to deal with nesting
+                # we may be able to fix this in the future but skip for now
+                msg = f'Common cells between alt header and header! {_matched}'
+                #log.warning(msg)  # can't quite error yet due to metadata_element
+                raise exc.MalformedHeaderError(msg)
 
         yield self.header
         yield from gen
@@ -1424,12 +1435,13 @@ class DatasetDescriptionFile(MetadataFile):
                   'related_protocol__paper__dataset__etc_', 'participant_information',)
     raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
+    normalize_mismatch_ok = 'metadata_element',
+    normalize_alt_mismatch_ok = normalize_mismatch_ok
     _expect_single = _nddfes
 
     @property
     def data(self):
         data = super().data
-        #breakpoint()
         return data
 
 
@@ -1473,7 +1485,6 @@ class SubjectsFile(MetadataFile):
     @property
     def data(self):
         data = super().data
-        #breakpoint()
         return data
 
 

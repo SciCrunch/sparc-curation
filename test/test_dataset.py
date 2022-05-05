@@ -11,7 +11,7 @@ from sparcur.datasets import (Tabular,
                               remove_rule,)
 from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
-from .common import examples_root, template_root, project_path, temp_path, ddih
+from .common import examples_root, template_root, project_path, temp_path
 
 template_root = aug.RepoPath(template_root)
 
@@ -23,6 +23,7 @@ class TestTabular(unittest.TestCase):
 
 class Helper:
     use_examples = False
+    canary_key = False
 
     refs = ('d8a6aa5f83021b3b9ea208c295a19051ffe83cd9',  # located in working dir not resources
             'dataset-template-1.1',
@@ -40,11 +41,8 @@ class Helper:
         temp_path.mkdir()
 
         self.file = template_root / self.template
-        self._ddih = DatasetDescriptionFile.ignore_header
-        DatasetDescriptionFile.ignore_header = ddih
 
     def tearDown(self):
-        DatasetDescriptionFile.ignore_header = self._ddih
         temp_path.rmtree()
 
     def _versions(self):
@@ -79,6 +77,12 @@ class Helper:
 
             try:
                 data = obj.data
+                # for dataset_description_file
+                # we expect template_schema_version to be duplicated
+                # because it is present in value and test_value
+                # columns, which is ok for this stage
+                if self.canary_key and self.canary_key not in data:
+                    raise ValueError('canary missing, something is wrong with the test')
                 if ref == 'HEAD':
                     # breakpoint()  # XXX testing here
                     'sigh'
@@ -145,6 +149,7 @@ class TestDatasetDescription(Helper, unittest.TestCase):
     metadata_file_class = DatasetDescriptionFile
     pipe = pipes.DatasetDescriptionFilePipeline
     use_examples = 2
+    canary_key = 'contributors'
     
     def test_dataset_description(self):
         pass

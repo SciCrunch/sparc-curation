@@ -2000,13 +2000,15 @@ def main():
         if main.options.debug:
             print(main.options)
 
-        main()
-    except BaseException as e:
-        log.exception(e)
-        print()
-        cwd = main.cwd if hasattr(main, 'cwd') else Path.cwd()
-        msg = f'Command failed!\n{cwd}\n{options!r}'
-        raise exc.SparCurError(msg) from e
+        try:
+            main()
+        except BaseException as e:
+            log.exception(e)
+            print()
+            cwd = main.cwd if hasattr(main, 'cwd') else Path.cwd()
+            msg = f'Command failed!\n{cwd}\n{options!r}'
+            raise exc.SparCurError(msg) from e
+
     finally:
         if logfile.size == 0:
             # close log handlers to safely unlink on windows

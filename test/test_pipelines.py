@@ -35,7 +35,7 @@ class PipelineHelper:
         class lifters:
             # minimal set
             id = context.id
-            remote = context.path._cache_class._remote_type
+            remote = context.path._cache_class._remote_class._remote_type
             folder_name = context.path.name
             uri_api = context.uri_api
             uri_human = context.uri_human
