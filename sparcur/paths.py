@@ -1171,7 +1171,9 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
 
     @property
     def uri_human(self):
-        return self.identifier.uri_human
+        return self.identifier.uri_human(
+            dataset=self.dataset,
+            organization=self.anchor)
 
     @property
     def anchor(self):

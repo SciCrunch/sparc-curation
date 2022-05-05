@@ -757,15 +757,6 @@ class BlackfynnId(idlib.Identifier):
         return self.id
 
 
-class BlackfynnInst(BlackfynnId):
-    # This isn't equivalent to BlackfynnRemote
-    # because it needs to be able to obtain the
-    # post pipeline data about that identifier
-    @property
-    def uri_human(self):
-        pass
-
-
 class PennsieveId(BlackfynnId):
     # FIXME this isn't really a subclass but you know how bad oo
     # implementations tend to conflate type with functionality ...
@@ -786,5 +777,7 @@ class LocId(idlib.Identifier):
         if '/' not in path:
             raise TypeError(f'WHAT HAVE YOU DONE {path}')
         self.uri_api = 'file://' + path
-        self.uri_human = self.uri_api
         self._identifier = self.uri_api
+
+    def uri_human(self, *args, **kwargs):
+        return self.uri_api
