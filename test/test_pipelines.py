@@ -4,7 +4,6 @@ import pytest
 from sparcur import pipelines as pipes
 from .common import (examples_root,
                      project_path,
-                     RDHBF,
                      RDHPN,
                      )
 
@@ -36,6 +35,7 @@ class PipelineHelper:
         class lifters:
             # minimal set
             id = context.id
+            remote = context.path._cache_class._remote_type
             folder_name = context.path.name
             uri_api = context.uri_api
             uri_human = context.uri_human
@@ -82,11 +82,6 @@ class PipelineHelper:
 
 
 class TestPipelines(unittest.TestCase):
-    pass
-
-
-class TestPipelinesRealBF(RDHBF, PipelineHelper, unittest.TestCase):
-    # RealDataHelper needs to resolve first to get correct setUpClass
     pass
 
 

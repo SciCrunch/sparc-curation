@@ -5,7 +5,7 @@ import pytest
 from pyontutils.utils import Async, deferred
 from sparcur.core import JEncode
 from sparcur.extract import xml as exml
-from .common import examples_root, RDHBF, RDHPN
+from .common import examples_root, RDHPN
 
 export = False
 
@@ -49,10 +49,6 @@ class ExtractMetadataReal:
                 json.dump(errors, f, indent=2, cls=JEncode)
 
         assert error_types == {'not'} or not error_types, f'unexpected error type! {error_types}'
-
-
-class TestExtractMetadataRealBF(RDHBF, ExtractMetadataReal, unittest.TestCase):
-    pass
 
 
 class TestExtractMetadataRealPN(RDHPN, ExtractMetadataReal, unittest.TestCase):

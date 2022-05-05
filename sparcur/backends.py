@@ -40,28 +40,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @staticmethod
     def _setup(*args, **kwargs):
-        if BlackfynnRemote.__new__ == BlackfynnRemote._renew:
-            return  # we already ran the imports here
-
-        import requests
-        BlackfynnRemote._requests = requests
-
-        # FIXME there should be a better way ...
-        from sparcur.blackfynn_api import BFLocal, id_to_type
-        BlackfynnRemote._api_class = BFLocal
-        BlackfynnRemote._id_to_type = staticmethod(id_to_type)
-        BlackfynnRemote.__new__ = BlackfynnRemote._renew
-
-        from blackfynn import Collection, DataPackage, Organization, File
-        from blackfynn import Dataset
-        from blackfynn.models import BaseNode
-        Dataset._id_to_type = staticmethod(id_to_type)
-        BlackfynnRemote._Collection = Collection
-        BlackfynnRemote._DataPackage = DataPackage
-        BlackfynnRemote._Organization = Organization
-        BlackfynnRemote._File = File
-        BlackfynnRemote._Dataset = Dataset
-        BlackfynnRemote._BaseNode = BaseNode
+        log.warning('blackfynn is long gone')
 
     @property
     def uri_human(self):

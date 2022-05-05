@@ -111,6 +111,9 @@ class TestContributorNamePatternRegex(unittest.TestCase):
     def test_positive(self):
         strings = (
             'Last, First Middle',
+            'Di Last, First Middle',
+            'Von Last, First Middle',
+            'van Last, First Middle',
         )
         schema = self.schema()
         for s in strings:

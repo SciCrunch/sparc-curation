@@ -187,17 +187,6 @@ class RealDataHelper:
             fetch_files.main(cls.project_path)
 
 
-class RDHBF(RealDataHelper):
-
-    @classmethod
-    def setUpClass(cls):
-        from sparcur.paths import BlackfynnCache
-        from sparcur.backends import BlackfynnRemote
-        cls._cache_class = BlackfynnCache
-        cls._remote_class = BlackfynnRemote
-        super().setUpClass()
-
-
 class RDHPN(RealDataHelper):
 
     @classmethod
