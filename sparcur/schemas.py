@@ -1728,10 +1728,14 @@ class PathSchema(JSONSchema):
             'type': {'type': 'string',
                      'enum': ['path']},
             'dataset_relative_path': {'type': 'string'},
-            'uri_api': {'type': 'string',
-                        'pattern': simple_url_pattern},
-            'uri_human': {'type': 'string',
-                          'pattern': simple_url_pattern},
+            'uri_api': {'oneOf': [{'type': 'string',
+                                   'pattern': simple_url_pattern},
+                                  {'type': 'string',
+                                   'pattern': simple_file_url_pattern}]},
+            'uri_human': {'oneOf': [{'type': 'string',
+                                     'pattern': simple_url_pattern},
+                                    {'type': 'string',
+                                     'pattern': simple_file_url_pattern}]},
             'dataset_id': {'type': 'string'},
             'remote_id': {'type': 'string'},
             'parent_id': {'type': 'string'},
@@ -1873,15 +1877,21 @@ class MetaOutExportSchema(JSONSchema):
                                        'pattern': iso8601pattern,
                                        'context_value': 'TEMP:contentsWereUpdatedAtTime',
                                        },
-        'uri_human': {'type': 'string',
-                      'pattern': r'^https://app\.pennsieve\.io/N:organization:',  # FIXME proper regex
-                      'context_value': idtype('TEMP:hasUriHuman'),
-        },
-        'uri_api': {'type': 'string',
-                    'pattern': r'^https://api\.pennsieve\.io/(datasets|packages)/',  # FIXME proper regex
-                    #'context_value': idtype('TEMP:hasUriApi'),
-                    'context_value': idtype('@id'),
-        },
+        'uri_human': {'allOf': [  # FIXME this is absolutely not the right way to solve this problem
+            {'type': 'string',
+             'context_value': idtype('TEMP:hasUriHuman'),},
+            {'oneOf': [
+                # FIXME proper regex
+                {'pattern': r'^https://app\.pennsieve\.io/N:organization:',},
+                {'pattern': simple_file_url_pattern},]}]},
+        'uri_api': {'allOf': [  # FIXME this is absolutely not the right way to solve this problem
+            {'type': 'string',
+             #'context_value': idtype('TEMP:hasUriApi'),
+             'context_value': idtype('@id'),},
+            {'oneOf': [
+                # FIXME proper regex
+                {'pattern': r'^https://api\.pennsieve\.io/(datasets|packages)/',},
+                {'pattern': simple_file_url_pattern},]}]},
         'award_number': {'type': 'string',
                          'pattern': award_pattern,
                          'context_value': idtype('TEMP:hasAwardNumber', base=TEMP['awards/']),
@@ -2097,17 +2107,25 @@ class SummarySchema(JSONSchema):
     schema = {'type': 'object',
               'required': ['id', 'meta', 'prov'],
               'properties': {'id': {'type': 'string',
-                                    'pattern': '^N:organization:'},
+                                    'oneOf': [
+                                        {'pattern': '^.*/.*$'},  # a file path based id
+                                        {'pattern': '^N:organization:'},
+                                    ],},
                              'meta': {'type': 'object',
-                                      'required': ['folder_name', 'count', 'uri_api', 'uri_human'],
+                                      # folder name cannot be required when combining from existing exports
+                                      'required': ['count', 'uri_api', 'uri_human'],
                                       'properties': {'folder_name': {'type': 'string'},
                                                      # FIXME common source for these with MetaOutSchema
                                                      'uri_human': {'type': 'string',
-                                                                   'pattern': r'^https://app\.pennsieve\.io/N:organization:',
-        },
+                                                                   'oneOf': [
+                                                                       {'pattern': simple_file_url_pattern},
+                                                                       {'pattern': r'^https://app\.pennsieve\.io/N:organization:'},
+                                                                   ],},
                                                      'uri_api': {'type': 'string',
-                                                                 'pattern': r'^https://api\.pennsieve\.io/organizations/N:organization:',
-                                                     },
+                                                                 'oneOf': [
+                                                                     {'pattern': simple_file_url_pattern},
+                                                                     {'pattern': r'^https://api\.pennsieve\.io/organizations/N:organization:'},
+                                                                 ],},
                                                      'count': {'type': 'integer'},},},
                              'prov': {'type': 'object'},
                              'datasets': {'type': 'array',
