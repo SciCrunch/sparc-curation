@@ -1417,6 +1417,10 @@ class RemoteDatasetData:
             self.id = self._c_cache_path.id
         else:
             self.id = remote_cache_or_id
+            if '/' in self.id:
+                # ntfs_safe_id broken for LocId asdf:/home/user/etc
+                msg = f'likely trying to pass a local id as a remote id {self.id}'
+                raise ValueError(msg)
 
         self.ntfs_safe_id = self.id.split(':')[-1]  # sigh
         self.cache = self.cache_base / self.ntfs_safe_id

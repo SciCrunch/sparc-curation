@@ -26,7 +26,7 @@ from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_erro
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
 from sparcur.core import json_identifier_expansion, dereference_all_identifiers
 from sparcur.core import JApplyRecursive, resolve_context_runtime, get_nested_by_key
-from sparcur.paths import Path
+from sparcur.paths import Path, PathL
 from sparcur.utils import PennsieveId  # XXXXX FIXME
 from sparcur.state import State
 from sparcur.config import auth
@@ -109,7 +109,9 @@ class RemoteDatasetDataPipeline(DatasourcePipeline):
         # cases where we need to avoid a network sandbox violation
         # and we don't want to create a stub for the remote data in
         # a cache because it doesn't exist at all on the remote
-        self._no_remote = runtime_context.path.cache.meta.updated is None
+        self._no_remote = (
+            isinstance(runtime_context.path, PathL) or
+            runtime_context.path.cache.meta.updated is None)
 
         self.dataset_id = previous_pipeline.data['id']
         if not hasattr(self.__class__, 'RemoteDatasetData'):
