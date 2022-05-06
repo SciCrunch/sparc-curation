@@ -2696,7 +2696,7 @@ def prepare_dataset_export(path, export_path=None):  # FIXME do we need export_b
     # FIXME dataset metadata export setup basically needs to do all of this first
     # set latest run and then latest complete at the end, but complete is kind of arbitrary
     # from the atomic point of view
-    tupdated = path.updated_cache_transitive()  # FIXME this causes us to travers all files twice
+    tupdated = path.updated_cache_transitive()  # FIXME this causes us to traverse all files twice
     # XXX TODO I think that the dataset updated date is now transitive as well? though the dataset
     # updated timestamp seems to happen a bit before the created/updated date on the file itself?
     # FIXME somehow tupdated can be None !??!?! XXX yes, it happens on empty sparse datasets

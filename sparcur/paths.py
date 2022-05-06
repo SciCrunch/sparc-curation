@@ -1067,6 +1067,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                        for c in gen]
         if simple_meta:
             return max(m.updated for m in simple_meta)
+        else:
+            # in the even that the current folder is empty
+            updated = self.getxattr('bf.updated').decode()
+            return aug.PathMeta(updated=updated).updated
 
     def upload(self, replace=True, local_backup=False):
         # FIXME we really need a staging area ...
