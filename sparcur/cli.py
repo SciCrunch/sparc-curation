@@ -2011,7 +2011,7 @@ def main():
             raise exc.SparCurError(msg) from e
 
     finally:
-        if logfile.exist() and logfile.size == 0:
+        if logfile.exists() and logfile.size == 0:
             # close log handlers to safely unlink on windows
             [h.close() for h in log.handlers]
             logfile.unlink()

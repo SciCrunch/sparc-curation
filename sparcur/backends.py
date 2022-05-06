@@ -864,7 +864,12 @@ class BlackfynnRemote(aug.RemotePath):
             log.error(f'{e}\nYou will need to individually refresh {self.local}')
             return
         except exc.NoRemoteFileWithThatIdError as e:
-            log.exception(e)
+            # TODO figure out how to squash this logging when we
+            # expect the file to be gone, this is hard because we have
+            # to construct a new remote from the cache every time so
+            # the fact that we have another instance that represents
+            # this remote where rmdir was actually called
+            log.error(e)
             return
 
         if self.is_file() and not force:  # this will tigger a fetch

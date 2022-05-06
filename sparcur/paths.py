@@ -117,7 +117,10 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         if self.__class__._actually_crumple:
             super().crumple()
         else:
-            self.unlink()
+            if self.is_dir():
+                self.rmdir()  # the dir has to be empty
+            else:
+                self.unlink()
 
     @property
     def _trashed_path(self):
