@@ -343,7 +343,9 @@ def ret_val_exp(dataset_id, updated, time_now):
 
     # FIXME somehow rmeta is missing ??!?!?!
 
-    logfile = path_log_datasets / did.uuid / timestamp / 'stdout.log'
+    logdir = path_log_datasets / did.uuid
+    logfile = logdir / timestamp / 'stdout.log'
+    latest = logdir / 'LATEST'
     if not logfile.parent.exists():
         logfile.parent.mkdir(parents=True)
 
@@ -382,6 +384,11 @@ def ret_val_exp(dataset_id, updated, time_now):
             except KeyboardInterrupt as e:
                 p3.send_signal(signal.SIGINT)
                 raise e
+
+        if latest.exists():
+            latest.unlink()
+
+        latest.symlink_to(timestamp)
 
         conn.set(uid, updated)
         conn.delete(fid)
