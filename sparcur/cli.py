@@ -1993,7 +1993,8 @@ def main():
 
     try:
         logfile = logpath / time_now.START_TIMESTAMP_SAFE  # FIXME configure and switch
-        bind_file_handler(logfile)
+        if False:  # python file loggers are ... not capable of what we need it seems
+            bind_file_handler(logfile)
 
         options = Options(args, defaults)
         main = Main(options, time_now)
@@ -2010,7 +2011,7 @@ def main():
             raise exc.SparCurError(msg) from e
 
     finally:
-        if logfile.size == 0:
+        if logfile.exist() and logfile.size == 0:
             # close log handlers to safely unlink on windows
             [h.close() for h in log.handlers]
             logfile.unlink()
