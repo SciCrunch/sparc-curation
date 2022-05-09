@@ -1036,13 +1036,14 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         # if not changed remove the file in the tree and symlink it to the package
         # if changed leave the modified file
         for c in self.rchildren:
-            locp = c.cache.local_object_cache_path
-            if (c.is_file() and locp.exists() and
-                c.size == locp.size and
-                c._eq_data(locp)):
-                c.unlink()
-                relsym = c.relative_path_to(locp)
-                c.symlink_to(relsym)
+            if c.cache is not None:  # FIXME need a way to recover the original package?
+                locp = c.cache.local_object_cache_path
+                if (c.is_file() and locp.exists() and
+                    c.size == locp.size and
+                    c._eq_data(locp)):
+                    c.unlink()
+                    relsym = c.relative_path_to(locp)
+                    c.symlink_to(relsym)
 
     def updated_cache_transitive(self):
         """ fast get the date for the most recently updated cached path """
