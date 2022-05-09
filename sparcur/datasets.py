@@ -744,6 +744,7 @@ class Tabular(HasErrors):
 
             yield fixed_row
 
+        wb.close()
         if emptyrs > 0:
             msg = f'{emptyrs} empty rows detected in {self.path}'
             if self.addError(msg,
@@ -977,11 +978,15 @@ class MetadataFile(HasErrors):
 
     @property
     def data(self):
+        self._to_embed = tuple()
         data = self._data()
 
         condition = False
         if condition:
             breakpoint()
+
+        for embedErrors in self._to_embed:
+            embedErrors(data)
 
         self.embedErrors(data)
         return data
@@ -1284,6 +1289,8 @@ class MetadataFile(HasErrors):
         else:
             alt = t.T
             head = t
+
+        self._to_embed = alt.embedErrors, head.embedErrors
 
         agen = iter(alt)
         gen = iter(head)
