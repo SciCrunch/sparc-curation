@@ -9,7 +9,8 @@
          compiler/embed
          gui-widget-mixins
          json
-         json-view)
+         json-view
+         net/url)
 
 (define-runtime-path asdf "viewer.rkt")
 (define this-file (path->string asdf))
@@ -31,6 +32,7 @@
 (define path-export-dir (make-parameter #f))
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
+(define url-prod-datasets (make-parameter "https://cassava.ucsd.edu/sparc/datasets"))
 (define current-blob (make-parameter #f))
 (define current-dataset (make-parameter #f))
 (define current-datasets (make-parameter #f))
@@ -112,6 +114,11 @@
    "--name" "README*"
    "--limit" "-1"
    "--fetch"))
+(define argv-clean-metadata-files
+  (python-mod-args ; XXX note that this is separate from normalize metadata files
+   "sparcur.simple.clean_metadata_files"
+   ; TODO output folder
+   ))
 
 (define (argv-open-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path (current-dataset))]
@@ -146,6 +153,12 @@
   (let ([path (expand-user-path (if (path? path) path (string->path path)))])
     (with-input-from-file path
       (λ () (read-json)))))
+
+(define (url->json url)
+  (call/input-url
+   (string->url url)
+   get-pure-port
+   read-json))
 
 (define (resolve-relative-path path)
   ; FIXME path->complete-path I think
@@ -423,6 +436,7 @@
   (dataset-export-latest-path ds)
   (fetch-export-dataset ds)
   (fetch-dataset ds)
+  (load-remote-json ds)
   (export-dataset ds))
 
 (define (make-input-port-noop)
@@ -480,11 +494,13 @@
            (parameterize ([current-directory cwd-1]
                           [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
-             (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
+             (with-output-to-string (thunk (set! status-1
+                                                 (apply system* argv-1 #:set-pwd? #t)))))
            (parameterize ([current-directory (resolve-relative-path cwd-2)]
                           [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
-             (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t)))))
+             (with-output-to-string (thunk (set! status-2
+                                                 (apply system* argv-2 #:set-pwd? #t)))))
            (println (format "dataset fetch completed for ~a" (dataset-id ds))))))))
    (define (export-dataset ds)
      (println (format "dataset export starting for ~a" (dataset-id ds))) ; TODO gui and/or log
@@ -498,7 +514,8 @@
            (parameterize ([current-directory (resolve-relative-path cwd-2)]
                           [current-output-port (make-output-port-noop)]
                           [current-input-port (make-input-port-noop)])
-             (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))
+             (with-output-to-string (thunk (set! status-3
+                                                 (apply system* argv-3 #:set-pwd? #t)))
                ))
            (if status-3
                (begin
@@ -531,15 +548,18 @@
                           [current-input-port (make-input-port-noop)])
              #;
              (println (string-join argv-1 " "))
-             (with-output-to-string (thunk (set! status-1 (apply system* argv-1 #:set-pwd? #t)))))
+             (with-output-to-string (thunk (set! status-1
+                                                 (apply system* argv-1 #:set-pwd? #t)))))
            (if status-1
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
                  (parameterize ([current-directory cwd-2-resolved]
                                 [current-output-port (make-output-port-noop)]
                                 [current-input-port (make-input-port-noop)])
-                   (with-output-to-string (thunk (set! status-2 (apply system* argv-2 #:set-pwd? #t))))
+                   (with-output-to-string (thunk (set! status-2
+                                                       (apply system* argv-2 #:set-pwd? #t))))
                    ; TODO figure out if we need to condition this run on status-2 #t
-                   (with-output-to-string (thunk (set! status-3 (apply system* argv-3 #:set-pwd? #t)))))
+                   (with-output-to-string (thunk (set! status-3
+                                                       (apply system* argv-3 #:set-pwd? #t)))))
                  ; TODO gui indication
                  (if (and status-2 status-3)
                      (begin
@@ -561,6 +581,27 @@
            ; that don't actually meet your use cases?
            (set-lview-item-color lview ds) ; FIXME lview free variable
            )))))
+   (define (dataset-latest-prod-url ds)
+     (string-append (url-prod-datasets) "/" (id-uuid ds) "/LATEST/curation-export.json"))
+   (define (load-remote-json ds)
+     (let* ([uuid (id-uuid ds)]
+            [hr-jview (hash-ref jviews uuid #f)]
+            [jview-inner
+             (or hr-jview
+                 (new json-view%
+                      [hier-class% json-hierlist%]
+                      [parent frame-helper]))]
+            [url (dataset-latest-prod-url ds)]
+            [json (url->json url)]
+            [jhash (for/hash ([(k v) (in-hash json)]
+                              ; FIXME I think we don't need include keys anymore
+                              ; XXX false, there are still performance issues
+                              #:when (member k include-keys))
+                     (values k v))])
+       (current-blob json) ; FIXME this will go stale
+       (set-jview! jview-inner jhash)
+       (hash-set! jviews uuid jview-inner)
+       jview-inner))
    (define (set-lview-item-color lview ds)
      ; find the current row based on data ??? and then change color ?
      (println "TODO set color") ; pretty sure this cannot be done with this gui widgit
@@ -709,6 +750,9 @@
 (define (cb-fetch-export-dataset obj event)
   (fetch-export-current-dataset))
 
+(define (cb-load-remote-json obj event)
+  (load-remote-json (current-dataset)))
+
 (define (cb-open-export-folder obj event)
   (let*-values ([(path) (dataset-export-latest-path (current-dataset))]
                 [(parent name dir?) (split-path path)])
@@ -756,6 +800,13 @@
     (send ed scroll-to-position 0))
   (when show
     (send frame-manifest-report show #t)))
+
+(define (cb-clean-metadata-files obj event)
+  ; WARNING THIS IS A DESTRUCTIVE OPERATION
+  ; check if there are metadata files that need to be cleaned up
+  ; clean them up and put them in a hierarchy that mirrors where they should be
+  ; at some point provide flow to automatically do upload and replace
+  (println "TODO"))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
@@ -873,6 +924,7 @@ switch to that"
   (map-function "f5"      "fetch-export-dataset")
   (map-function "c:t"     "fetch-export-dataset") ; XXX bad overlap with find
   (map-function "c:f"     "focus-search-box") ; XXX bad overlap with find
+  (map-function "c:l"     "focus-search-box") ; this makes more sense
   #;
   (map-function "c:c;c:e" "fetch-export-dataset") ; XXX cua intersection
   (map-function "c:x"     "export-dataset")
@@ -1005,6 +1057,11 @@ switch to that"
                                    [callback cb-export-dataset]
                                    [parent panel-ds-actions]))
 
+(define button-load-remote-json (new button%
+                                     [label "View Prod Export"]
+                                     [callback cb-load-remote-json]
+                                     [parent panel-ds-actions]))
+
 ; FXIME probably goes in the bottom row of a vertical panel
 (define button-toggle-expand (new button%
                                   [label "Expand All"]
@@ -1025,6 +1082,13 @@ switch to that"
                                     [label "Manifest Report"]
                                     [callback cb-manifest-report]
                                     [parent panel-ds-actions]))
+
+(define button-clean-metadata-files (new button%
+                                         [label "Clean Metadata"]
+                                         [callback cb-clean-metadata-files]
+                                         [parent panel-ds-actions]))
+(send button-clean-metadata-files enable #f) ; XXX remove when implementation complete
+
 #; ; too esoteric
 (define button-open-export-folder (new button%
                                        [label "Open Export"]
