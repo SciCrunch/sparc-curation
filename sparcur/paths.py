@@ -202,7 +202,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             return self
 
         elif self.parent and self.parent != self:  # Path('.') issue
-            log.debug(self.parent)
+            log.log(9, self.parent)
             return self.parent.dataset
 
     @property

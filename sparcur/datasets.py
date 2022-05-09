@@ -50,23 +50,26 @@ class Header:
 
     @property
     def normalized(self):
-        orig_header = self.pipeline_start
-        header = []
-        prefix = 'TEMPA' if self._alt else 'TEMPH' # prevent collision
-        for i, c in enumerate(orig_header):
-            if c:
-                c = to_string_and_then_python_identifier(c)
-                c = nml.NormHeader(c)
+        if not hasattr(self, '_cache_normalized'):
+            orig_header = self.pipeline_start
+            header = []
+            prefix = 'TEMPA' if self._alt else 'TEMPH' # prevent collision
+            for i, c in enumerate(orig_header):
+                if c:
+                    c = to_string_and_then_python_identifier(c)
+                    c = nml.NormHeader(c)
 
-            if not c:
-                c = f'{prefix}_{i}'
+                if not c:
+                    c = f'{prefix}_{i}'
 
-            if c in header:
-                c = c + f'_{prefix}_{i}'
+                if c in header:
+                    c = c + f'_{prefix}_{i}'
 
-            header.append(c)
+                header.append(c)
 
-        return header
+            self._cache_normalized = header
+
+        return self._cache_normalized
 
     @hasSchema(sc.HeaderSchema)
     def data(self):
@@ -471,7 +474,7 @@ class DatasetStructure:
                      'pipeline_stage': 'DatasetStructure.data_dir_structure',}]
         # FIXME this is just the directories so it is probably ok to
         # resolve the cache for now so we can get the nice json
-        # metadata but ultimately we will need _caceh_jsonMetadata or similar
+        # metadata but ultimately we will need _cache_jsonMetadata or similar
         # that uses xattrs to avoid the overhead of constructing the cache class
         # XXX yep, _cache_jsonMetadata is needed especially for standalone validation
         jsonMeta = jmc if self.cache is not None else jml
@@ -681,6 +684,30 @@ class Tabular(HasErrors):
         # which apparently happens really frequently in our workflows?!
         # https://openpyxl.readthedocs.io/en/latest/datetime.html  # XXX OH NOOOOOOOOOOOOOOOOOOOOOO
         # yeah ... iso8601 as a string :/
+
+        # xlsx: bringing deep sadness to everyone involved
+
+        # read sheet read only to find empty columns without destroying memory
+        wbro = self._openpyxl.load_workbook(self.path, read_only=True)
+        if wbro is None:
+            raise exc.NoDataError(f'{self.path}')
+
+        lnn = []
+        for row in wbro.active.rows:
+            last_not_none = 0
+            for i, cell in enumerate(row):
+                if isinstance(cell, self._openpyxl.cell.read_only.EmptyCell) or cell.value is None:
+                    pass
+                else:
+                    last_not_none = i
+            lnn.append(last_not_none)
+
+        wbro.close()
+        s_lnn = set(lnn)
+        log.debug(f'unique last not nones {s_lnn}')
+        max_lnn = max(s_lnn)
+
+        # read sheet rw so that hyperlinks and other stuff work
         wb = self._openpyxl.load_workbook(self.path)
         wb.iso_dates=True  # XXX NOTE I think only relevant for writing, but will be useful when we run these in reverse
 
@@ -688,6 +715,16 @@ class Tabular(HasErrors):
             raise exc.NoDataError(f'{self.path}')
 
         sheet = wb.active
+        if sheet.max_column > max_lnn:
+            # over count a bit using max_column, but safe if max_lnn
+            # is somehow zero
+            sheet.delete_cols(max_lnn, sheet.max_column)
+            msg = f'Empty columns detected in {self.path}'
+            if self.addError(msg,
+                             blame='submission',
+                             path=self.path):
+                logd.warning(msg)
+
         longrs = 0
         emptyrs = 0
         for row in sheet.rows:
@@ -705,15 +742,6 @@ class Tabular(HasErrors):
                 emptyrs += 1
                 continue
 
-            lfr = len(fixed_row)
-            if lfr > 30:
-                longrs += 1
-                if longrs < 1:
-                    msg = f'Long row {lfr} > 30 detected in {self.path}'
-                    if self.addError(msg,
-                                     blame='submission',
-                                     path=self.path):
-                        logd.warning(msg)
             yield fixed_row
 
         if emptyrs > 0:
