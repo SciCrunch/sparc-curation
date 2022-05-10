@@ -245,6 +245,7 @@
                    [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [status
                     (parameterize ([current-output-port (make-output-port-noop)]
+                                   [current-error-port (make-error-port-noop)]
                                    [current-input-port (make-input-port-noop)])
                       (apply system* argv-simple-git-repos-update))])
                   ; TODO pull changes for racket dependent repos as well
@@ -254,6 +255,7 @@
                                        #f
                                        (λ () -1))])
                     (parameterize ([current-output-port (make-output-port-noop)]
+                                   [current-error-port (make-error-port-noop)]
                                    [current-input-port (make-input-port-noop)])
                       (system* raco-exe "make" "-v" this-file))
                     #; ; raco exe issues ... i love it when abstractions break :/
@@ -270,6 +272,7 @@
                         (println (format "running raco exe -v -o ~a ~a "
                                          this-file-exe this-file))
                         (parameterize ([current-output-port (make-output-port-noop)]
+                                       [current-error-port (make-error-port-noop)]
                                        [current-input-port (make-input-port-noop)])
                           (rename-file-or-directory this-file-exe this-file-exe-tmp)
                           (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
@@ -449,6 +452,9 @@
 (define (make-output-port-noop)
   (dup-output-port (current-output-port)))
 
+(define (make-error-port-noop)
+  (dup-output-port (current-error-port)))
+
 (struct dataset (id title pi-last-name)
   #:methods gen:ds
   [(define (populate-list ds list-box)
@@ -493,11 +499,13 @@
            (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1]
                           [current-output-port (make-output-port-noop)]
+                          [current-error-port (make-error-port-noop)]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-1
                                                  (apply system* argv-1 #:set-pwd? #t)))))
            (parameterize ([current-directory (resolve-relative-path cwd-2)]
                           [current-output-port (make-output-port-noop)]
+                          [current-error-port (make-error-port-noop)]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-2
                                                  (apply system* argv-2 #:set-pwd? #t)))))
@@ -510,9 +518,11 @@
            [argv-3 argv-spc-export])
        (thread
         (thunk
-         (let ([status-3 #f])
-           (parameterize ([current-directory (resolve-relative-path cwd-2)]
+         (let ([status-3 #f]
+               [cwd-2-resolved (resolve-relative-path cwd-2)])
+           (parameterize ([current-directory cwd-2-resolved]
                           [current-output-port (make-output-port-noop)]
+                          [current-error-port (make-error-port-noop)]
                           [current-input-port (make-input-port-noop)])
              (with-output-to-string (thunk (set! status-3
                                                  (apply system* argv-3 #:set-pwd? #t)))
@@ -545,6 +555,7 @@
            (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1]
                           [current-output-port (make-output-port-noop)]
+                          [current-error-port (make-error-port-noop)]
                           [current-input-port (make-input-port-noop)])
              #;
              (println (string-join argv-1 " "))
@@ -554,6 +565,7 @@
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
                  (parameterize ([current-directory cwd-2-resolved]
                                 [current-output-port (make-output-port-noop)]
+                                [current-error-port (make-error-port-noop)]
                                 [current-input-port (make-input-port-noop)])
                    (with-output-to-string (thunk (set! status-2
                                                        (apply system* argv-2 #:set-pwd? #t))))
@@ -715,6 +727,7 @@
          [status #f]
          [result-string
           (parameterize ([current-output-port (make-output-port-noop)]
+                         [current-error-port (make-error-port-noop)]
                          [current-input-port (make-input-port-noop)])
             (with-output-to-string (λ () (set! status (apply system* argv)))))]
          [result (read (open-input-string result-string))])
