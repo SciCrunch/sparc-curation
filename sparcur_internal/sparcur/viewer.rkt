@@ -161,14 +161,12 @@
    read-json))
 
 (define (resolve-relative-path path)
-  ; FIXME path->complete-path I think
-  ; FIXME for some reason resolve-path returns only the relative
-  ; portion of the path !? not helpful ...
-  ; FIXME this can fail with a weird error message
-  ; if the symlink does not exist
-  (if (or (directory-exists? path) (file-exists? path))
-      (simple-form-path (build-path path ".." ".." (resolve-path path)))
-      (error 'non-existent-path "cannot resolve a non-existent path ~a" path)))
+  "Resolve a symlink to a relative path from the parent folder of the symlink."
+  ; simple-form-path calls path->complete-path internally, which we don't want
+  ; also have to tell simplify-path not to use the file system
+  (if (link-exists? path)
+      (path->complete-path (resolve-path path) (simplify-path (build-path path 'up) #f))
+      (error 'non-existent-path "cannot resolve a non-existent link ~a" path)))
 
 (define (object->methods obj)
   (interface->method-names (object-interface obj)))
@@ -244,8 +242,7 @@
              (let ([exec-file (path->string (find-system-path 'exec-file))]
                    [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [status
-                    (parameterize ([current-output-port (make-output-port-noop)]
-                                   [current-input-port (make-input-port-noop)])
+                    (parameterize ()
                       (apply system* argv-simple-git-repos-update))])
                   ; TODO pull changes for racket dependent repos as well
                   (println (format "running raco make -v ~a" this-file))
@@ -253,8 +250,7 @@
                                        this-file-compiled
                                        #f
                                        (λ () -1))])
-                    (parameterize ([current-output-port (make-output-port-noop)]
-                                   [current-input-port (make-input-port-noop)])
+                    (parameterize ()
                       (system* raco-exe "make" "-v" this-file))
                     #; ; raco exe issues ... i love it when abstractions break :/
                     (parameterize ([current-command-line-arguments
@@ -269,8 +265,7 @@
                       (when (not (= mtime-before mtime-after))
                         (println (format "running raco exe -v -o ~a ~a "
                                          this-file-exe this-file))
-                        (parameterize ([current-output-port (make-output-port-noop)]
-                                       [current-input-port (make-input-port-noop)])
+                        (parameterize ()
                           (rename-file-or-directory this-file-exe this-file-exe-tmp)
                           (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
                           (unless (file-exists? this-file-exe) ; restore the old version on failure
@@ -439,16 +434,6 @@
   (load-remote-json ds)
   (export-dataset ds))
 
-(define (make-input-port-noop)
-  "If the primary input port is inherited by windows for a gui application
-   then when system* finishes it will try to close the primary input port,
-   and in the process also kill the whole program, which is ... undesireable."
-  ; see https://github.com/racket/racket/issues/4026
-  (make-input-port "noopport" (λ (_) eof) #f (λ () 'done)))
-
-(define (make-output-port-noop)
-  (dup-output-port (current-output-port)))
-
 (struct dataset (id title pi-last-name)
   #:methods gen:ds
   [(define (populate-list ds list-box)
@@ -491,19 +476,18 @@
          (let ([status-1 #f]
                [status-2 #f])
            (ensure-directory! cwd-1)
-           (parameterize ([current-directory cwd-1]
-                          [current-output-port (make-output-port-noop)]
-                          [current-input-port (make-input-port-noop)])
-             (println "")
+           (parameterize ([current-directory cwd-1])
              (with-output-to-string (thunk (set! status-1
                                                  (apply system* argv-1 #:set-pwd? #t)))))
-           (parameterize ([current-directory (resolve-relative-path cwd-2)]
-                          [current-output-port (make-output-port-noop)]
-                          [current-input-port (make-input-port-noop)])
-             (println "")
+           (parameterize ([current-directory (resolve-relative-path cwd-2)])
              (with-output-to-string (thunk (set! status-2
                                                  (apply system* argv-2 #:set-pwd? #t)))))
-           (println (format "dataset fetch completed for ~a" (dataset-id ds))))))))
+           (if (and status-1 status-2)
+               (begin
+                 #; ; FIXME TODO if (equal? (select-dataset) current-dataset)
+                 (send button-export-dataset enable #t)
+                 (println (format "dataset fetch completed for ~a" (dataset-id ds))))
+               (println (format "dataset fetch FAILED for ~a" (dataset-id ds)))))))))
    (define (export-dataset ds)
      (println (format "dataset export starting for ~a" (dataset-id ds))) ; TODO gui and/or log
      (let ([cwd-2 (build-path (dataset-src-path ds)
@@ -514,10 +498,7 @@
         (thunk
          (let ([status-3 #f]
                [cwd-2-resolved (resolve-relative-path cwd-2)])
-           (parameterize ([current-directory cwd-2-resolved]
-                          [current-output-port (make-output-port-noop)]
-                          [current-input-port (make-input-port-noop)])
-             (println "")
+           (parameterize ([current-directory cwd-2-resolved])
              (with-output-to-string (thunk (set! status-3
                                                  (apply system* argv-3 #:set-pwd? #t)))
                ))
@@ -542,25 +523,15 @@
          (let ([status-1 #f]
                [status-2 #f]
                [status-3 #f])
-           ; FIXME on the one hand this is amazing because I am getting
-           ; logging output into the racket comint window in emacs on
-           ; the other hand it is not amazing because system* is
-           ; blocking, so probably switch to user subprocess?
            (ensure-directory! cwd-1)
-           (parameterize ([current-directory cwd-1]
-                          [current-output-port (make-output-port-noop)]
-                          [current-input-port (make-input-port-noop)])
+           (parameterize ([current-directory cwd-1])
              #;
              (println (string-join argv-1 " "))
-             (println "")
              (with-output-to-string (thunk (set! status-1
                                                  (apply system* argv-1 #:set-pwd? #t)))))
            (if status-1
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
-                 (parameterize ([current-directory cwd-2-resolved]
-                                [current-output-port (make-output-port-noop)]
-                                [current-input-port (make-input-port-noop)])
-                   (println "")
+                 (parameterize ([current-directory cwd-2-resolved])
                    (with-output-to-string (thunk (set! status-2
                                                        (apply system* argv-2 #:set-pwd? #t))))
                    ; TODO figure out if we need to condition this run on status-2 #t
@@ -571,6 +542,8 @@
                      (begin
                        ; now that we have 1:1 jview:json we can automatically update the jview for
                        ; this dataset in the background thread and it shouldn't block the ui
+                       #; ; FIXME TODO if (equal? (select-dataset) current-dataset)
+                       (send button-export-dataset enable #t)
                        (dataset-jview! ds #:update #t #:background #t)
                        (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
                      (format "dataset ~a FAILED for ~a"
@@ -701,13 +674,26 @@
 ;; callbacks
 
 (define (cb-dataset-selection obj event)
+  (define (set-button-status-for-dataset ds)
+    (let* ([path (dataset-src-path ds)]
+           [symlink (build-path path "dataset")])
+      ; performance is a little bit better, but wow this seems like a bad way to
+      ; say "wait and see if the current dataset is actually the current dataset"
+      ; I think what needs to happen is that there is a parameter for the
+      ; selected-dataset which is static per thread, and then current-dataset is
+      ; the module variable that transcends threads, compare the two to see if we
+      ; do anything
+      'TODO
+      #; ; TODO
+      (thread (thunk (send button-export-dataset enable (link-exists? symlink))))))
   (for ([index (send obj get-selections)])
     (let ([dataset (send obj get-data index)]
           [cd (current-dataset)])
       ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
       (when (not (equal? dataset cd))
         (current-dataset dataset) ; FIXME multiple selection case
-        (get-jview! dataset)))))
+        (get-jview! dataset)
+        (set-button-status-for-dataset dataset)))))
 
 (define (result->dataset-list result)
   (map (λ (ti)
@@ -720,8 +706,7 @@
   (let* ([argv argv-simple-for-racket]
          [status #f]
          [result-string
-          (parameterize ([current-output-port (make-output-port-noop)]
-                         [current-input-port (make-input-port-noop)])
+          (parameterize ()
             (with-output-to-string (λ () (set! status (apply system* argv)))))]
          [result (read (open-input-string result-string))])
     (unless status
@@ -1056,6 +1041,7 @@ switch to that"
                           [callback cb-fetch-dataset]
                           [parent panel-ds-actions]))
 
+; TODO disable this button if the dataset has not been fetched
 (define button-export-dataset (new (tooltip-mixin button%)
                                    [label "Export"]
                                    [tooltip "Shortcut C-x"]
@@ -1073,6 +1059,7 @@ switch to that"
                                   [label "Expand All"]
                                   [callback cb-toggle-expand]
                                   [parent panel-ds-actions]))
+(send button-toggle-expand enable #f) ; XXX remove when implementation complete
 
 (define button-open-dataset-folder (new button%
                                         [label "Open Folder"]
