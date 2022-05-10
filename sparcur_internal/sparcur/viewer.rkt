@@ -25,6 +25,7 @@
 
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
 (define update-running? #f)
+(define selected-dataset #f) ; selected dataset is the global value across threads
 
 ;; parameters (yay dynamic variables)
 (define path-cache-dir (make-parameter #f))
@@ -121,7 +122,7 @@
    ))
 
 (define (argv-open-ipython ds)
-  (let*-values ([(path) (dataset-export-latest-path (current-dataset))]
+  (let*-values ([(path) (dataset-export-latest-path ds)]
                 [(parent name dir?) (split-path path)]
                 [(path-meta-path) (build-path parent "path-metadata.json")])
     (cons "/usr/bin/urxvt" ; FIXME find the right terminal emulator
@@ -484,8 +485,8 @@
                                                  (apply system* argv-2 #:set-pwd? #t)))))
            (if (and status-1 status-2)
                (begin
-                 #; ; FIXME TODO if (equal? (select-dataset) current-dataset)
-                 (send button-export-dataset enable #t)
+                 (when (equal? ds selected-dataset)
+                   (send button-export-dataset enable #t))
                  (println (format "dataset fetch completed for ~a" (dataset-id ds))))
                (println (format "dataset fetch FAILED for ~a" (dataset-id ds)))))))))
    (define (export-dataset ds)
@@ -542,8 +543,8 @@
                      (begin
                        ; now that we have 1:1 jview:json we can automatically update the jview for
                        ; this dataset in the background thread and it shouldn't block the ui
-                       #; ; FIXME TODO if (equal? (select-dataset) current-dataset)
-                       (send button-export-dataset enable #t)
+                       (when (equal? ds selected-dataset)
+                         (send button-export-dataset enable #t))
                        (dataset-jview! ds #:update #t #:background #t)
                        (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
                      (format "dataset ~a FAILED for ~a"
@@ -680,17 +681,22 @@
       ; performance is a little bit better, but wow this seems like a bad way to
       ; say "wait and see if the current dataset is actually the current dataset"
       ; I think what needs to happen is that there is a parameter for the
-      ; selected-dataset which is static per thread, and then current-dataset is
+      ; current-dataset which is static per thread, and then selected-dataset is
       ; the module variable that transcends threads, compare the two to see if we
-      ; do anything
-      'TODO
-      #; ; TODO
-      (thread (thunk (send button-export-dataset enable (link-exists? symlink))))))
+      ; do anything, yep, this seems to work
+      (thread
+       (thunk
+        (if (equal? selected-dataset (current-dataset))
+            (send button-export-dataset enable (link-exists? symlink))
+            (void)
+            #; ; yep, this case does happen :)
+            (println "TOO FAST! dataset no longer selected"))))))
   (for ([index (send obj get-selections)])
     (let ([dataset (send obj get-data index)]
           [cd (current-dataset)])
       ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
       (when (not (equal? dataset cd))
+        (set! selected-dataset dataset)
         (current-dataset dataset) ; FIXME multiple selection case
         (get-jview! dataset)
         (set-button-status-for-dataset dataset)))))
@@ -1041,7 +1047,6 @@ switch to that"
                           [callback cb-fetch-dataset]
                           [parent panel-ds-actions]))
 
-; TODO disable this button if the dataset has not been fetched
 (define button-export-dataset (new (tooltip-mixin button%)
                                    [label "Export"]
                                    [tooltip "Shortcut C-x"]
