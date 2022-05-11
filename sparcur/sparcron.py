@@ -349,14 +349,18 @@ def ret_val_exp(dataset_id, updated, time_now):
     if not logfile.parent.exists():
         logfile.parent.mkdir(parents=True)
 
+    if latest.exists():
+        latest.unlink()
+
+    latest.symlink_to(timestamp)
+
     try:
         with open(logfile, 'wt') as logfd:
             try:
                 p1 = subprocess.Popen(argv_simple_retrieve(dataset_id),
-                                    stderr=subprocess.STDOUT, stdout=logfd)
+                                      stderr=subprocess.STDOUT, stdout=logfd)
                 out1 = p1.communicate()
                 if p1.returncode != 0:
-                    #logfd.flush()
                     raise Exception(f'oops return code was {p1.returncode}')
             except KeyboardInterrupt as e:
                 p1.send_signal(signal.SIGINT)
@@ -365,10 +369,9 @@ def ret_val_exp(dataset_id, updated, time_now):
             dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
             try:
                 p2 = subprocess.Popen(argv_spc_find_meta, cwd=dataset_path,
-                                    stderr=subprocess.STDOUT, stdout=logfd)
+                                      stderr=subprocess.STDOUT, stdout=logfd)
                 out2 = p2.communicate()
                 if p2.returncode != 0:
-                    #logfd.flush()
                     raise Exception(f'oops return code was {p2.returncode}')
             except KeyboardInterrupt as e:
                 p2.send_signal(signal.SIGINT)
@@ -376,19 +379,13 @@ def ret_val_exp(dataset_id, updated, time_now):
 
             try:
                 p3 = subprocess.Popen(argv_spc_export, cwd=dataset_path,
-                                    stderr=subprocess.STDOUT, stdout=logfd)
+                                      stderr=subprocess.STDOUT, stdout=logfd)
                 out3 = p3.communicate()
                 if p3.returncode != 0:
-                    #logfd.flush()
                     raise Exception(f'oops return code was {p3.returncode}')
             except KeyboardInterrupt as e:
                 p3.send_signal(signal.SIGINT)
                 raise e
-
-        if latest.exists():
-            latest.unlink()
-
-        latest.symlink_to(timestamp)
 
         conn.set(uid, updated)
         conn.delete(fid)
