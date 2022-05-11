@@ -3663,6 +3663,8 @@ def main(id=None, **kwargs):
                             spec.loader.exec_module(mod)
                     except SystemExit:
                         pass
+                    except Exception as e:
+                        log.exception(e)
             finally:
                 sys.argv = oldargv
 
