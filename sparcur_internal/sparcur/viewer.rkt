@@ -804,15 +804,16 @@
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
-(define (xopen-folder path #:cd [cd #f])
+(define (xopen-folder path)
   (case (system-type)
     ((windows)
      (thread ; if this is not in a thread then for some reason it
       (thunk ; will crash the whole program ?? weird stuff going on here
-       (if cd
-           (parameterize ([current-directory path])
-             (subprocess #f #f #f (find-executable-path "explorer.exe") "."))
-           (subprocess #f #f #f (find-executable-path "explorer.exe") path)))))
+       (parameterize ([current-directory path])
+         ; it looks like implemeting this with subprocess #f #f #f
+         ; somehow class the evil rktio function which was fixed, so
+         ; for now we use system* while we wait for the fix
+         (system* (find-executable-path "explorer.exe") "." #:set-pwd? #t)))))
     (else (xopen-path path))))
 
 (define (cb-open-export-ipython obj event)
@@ -859,7 +860,7 @@
       (let ([thread-clean (clean-metadata-files ds)])
         (thread-wait thread-clean)
         (let ([path (dataset-cleaned-latest-path ds)])
-          (xopen-folder path #:cd #t)))))))
+          (xopen-folder path)))))))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
