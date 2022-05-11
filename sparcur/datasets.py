@@ -690,24 +690,29 @@ class Tabular(HasErrors):
         empty_rows = []
         for i, row in enumerate(wbro.active.rows):
             last_not_none = 0
-            for i, cell in enumerate(row):
+            for j, cell in enumerate(row):
                 if isinstance(cell, self._openpyxl.cell.read_only.EmptyCell) or cell.value is None:
                     pass
                 else:
-                    last_not_none = i
+                    last_not_none = j
             lnn.append(last_not_none)
             if last_not_none == 0:
-                empty_rows.append(i)
-                if first_cont_empty < i - 1:  # there was an intervening non-empty row
+                if not empty_rows or empty_rows and empty_rows[-1] < i - 1:
+                    # there was an intervening non-empty row
                     first_cont_empty = i
+
+                empty_rows.append(i)
 
         # non-contiguous empty rows
         sparse_empty_rows = [e for e in empty_rows if e < first_cont_empty]
 
         wbro.close()
         s_lnn = set(lnn)
-        log.debug(f'unique last not nones {s_lnn}')
-        max_lnn = max(s_lnn)
+        max_lnn = max(s_lnn) + 1  # + 1 to convert from index -> column number
+        start_cols_empty = max_lnn + 1  # start deleting one column after last non-empty
+        msg = (f'unique last not nones {s_lnn}, max {max_lnn}, '
+               f'delete from {start_cols_empty}')
+        log.debug(msg)
 
         # read sheet rw so that hyperlinks and other stuff work
         wb = self._openpyxl.load_workbook(self.path)
@@ -720,16 +725,18 @@ class Tabular(HasErrors):
         if sheet.max_column > max_lnn:
             # over count a bit using max_column, but safe if max_lnn
             # is somehow zero
-            sheet.delete_cols(max_lnn, sheet.max_column)
-            msg = f'Empty columns detected in {self.path}'
+            sheet.delete_cols(start_cols_empty, sheet.max_column)
+            msg = f'Empty columns beyond {max_lnn} detected in {self.path}'
             if self.addError(msg,
                              blame='submission',
                              path=self.path):
                 logd.warning(msg)
 
         if first_cont_empty > 0:
-            sheet.delete_rows(first_cont_empty, sheet.max_row)
-            msg = f'Empty rows detected in {self.path}'
+            # add 1 since row number starts at 1 not 0
+            fce_rn = first_cont_empty + 1
+            sheet.delete_rows(fce_rn, sheet.max_row)
+            msg = f'Empty rows beyond {first_cont_empty} detected in {self.path}'
             if self.addError(msg,
                              blame='submission',
                              path=self.path):
