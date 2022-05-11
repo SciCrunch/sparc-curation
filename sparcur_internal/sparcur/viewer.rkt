@@ -120,9 +120,12 @@
    "--limit" "-1"
    "--fetch"))
 (define (argv-clean-metadata-files ds)
-  (python-mod-args ; XXX note that this is separate from normalize metadata files
-   "sparcur.simple.clean_metadata_files"
-   "--dataset-id" (dataset-id ds)))
+  (let ([argv (python-mod-args ; XXX note that this is separate from normalize metadata files
+               "sparcur.simple.clean_metadata_files"
+               "--dataset-id" (dataset-id ds))])
+    (if (power-user?) ; FIXME decouple
+        (append argv '("--log-level" "DEBUG"))
+        argv)))
 
 (define (argv-open-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
