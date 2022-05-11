@@ -679,21 +679,16 @@ class Tabular(HasErrors):
         else:
             raise exc.NoDataError(f'{self.path}') from e2
 
-    def xlsx2(self):
-        # FIXME this has horrible performance on sheets with lots of empty cells
-        # which apparently happens really frequently in our workflows?!
-        # https://openpyxl.readthedocs.io/en/latest/datetime.html  # XXX OH NOOOOOOOOOOOOOOOOOOOOOO
-        # yeah ... iso8601 as a string :/
-
-        # xlsx: bringing deep sadness to everyone involved
-
+    def _openpyxl_fixes(self):
         # read sheet read only to find empty columns without destroying memory
         wbro = self._openpyxl.load_workbook(self.path, read_only=True)
         if wbro is None:
             raise exc.NoDataError(f'{self.path}')
 
         lnn = []
-        for row in wbro.active.rows:
+        first_cont_empty = 0
+        empty_rows = []
+        for i, row in enumerate(wbro.active.rows):
             last_not_none = 0
             for i, cell in enumerate(row):
                 if isinstance(cell, self._openpyxl.cell.read_only.EmptyCell) or cell.value is None:
@@ -701,6 +696,13 @@ class Tabular(HasErrors):
                 else:
                     last_not_none = i
             lnn.append(last_not_none)
+            if last_not_none == 0:
+                empty_rows.append(i)
+                if first_cont_empty < i - 1:  # there was an intervening non-empty row
+                    first_cont_empty = i
+
+        # non-contiguous empty rows
+        sparse_empty_rows = [e for e in empty_rows if e < first_cont_empty]
 
         wbro.close()
         s_lnn = set(lnn)
@@ -709,10 +711,10 @@ class Tabular(HasErrors):
 
         # read sheet rw so that hyperlinks and other stuff work
         wb = self._openpyxl.load_workbook(self.path)
-        wb.iso_dates=True  # XXX NOTE I think only relevant for writing, but will be useful when we run these in reverse
-
         if wb is None:
             raise exc.NoDataError(f'{self.path}')
+
+        wb.iso_dates=True  # XXX NOTE I think only relevant for writing, useful when run in reverse
 
         sheet = wb.active
         if sheet.max_column > max_lnn:
@@ -725,6 +727,24 @@ class Tabular(HasErrors):
                              path=self.path):
                 logd.warning(msg)
 
+        if first_cont_empty > 0:
+            sheet.delete_rows(first_cont_empty, sheet.max_row)
+            msg = f'Empty rows detected in {self.path}'
+            if self.addError(msg,
+                             blame='submission',
+                             path=self.path):
+                logd.warning(msg)
+
+        return sheet, wb, sparse_empty_rows
+
+    def xlsx2(self):
+        # FIXME this has horrible performance on sheets with lots of empty cells
+        # which apparently happens really frequently in our workflows?!
+        # https://openpyxl.readthedocs.io/en/latest/datetime.html  # XXX OH NOOOOOOOOOOOOOOOOOOOOOO
+        # yeah ... iso8601 as a string :/
+
+        # xlsx: bringing deep sadness to everyone involved
+        sheet, wb, _ser = self._openpyxl_fixes()
         longrs = 0
         emptyrs = 0
         for row in sheet.rows:
@@ -746,6 +766,7 @@ class Tabular(HasErrors):
 
         wb.close()
         if emptyrs > 0:
+            # should only be catching sparse empty rows at this point
             msg = f'{emptyrs} empty rows detected in {self.path}'
             if self.addError(msg,
                              blame='submission',

@@ -180,6 +180,7 @@ def json_version(version):
             'iso8601_date': iso8601datepattern,
                 'iso8601_datetime': iso8601pattern,
                 'whitespace_lead_trail': pattern_whitespace_lead_trail,
+                'whitespace_multi': pattern_whitespace_multi,
             },
             'NoLTWhitespace': NoLTWhitespaceSchema.schema,
             'EmbeddedIdentifier': EmbeddedIdentifierSchema.schema,
@@ -663,15 +664,16 @@ contributor_name_pattern = r'^((([Vv](an|on))|[Dd][ia]|([Dd]e( [Ll]os)?)) )?[^, 
 ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = r'(^[\s]+[^\s].*|.*[^\s][\s]+$)'
+pattern_whitespace_multi = r'[\s]{2,}'
 
 award_pattern = '^(OT2OD|OT3OD|U18|TR|U01)'  # really just no whitespace or / ?
 
 
 class NoLTWhitespaceSchema(JSONSchema):
     schema = {'allOf': [{'type': 'string'},
-                        {'not': {'type': 'string',
-                                 'pattern': pattern_whitespace_lead_trail,
-                        }},]}
+                        {'not': {'pattern': pattern_whitespace_lead_trail,}},
+                        {'not': {'pattern': pattern_whitespace_multi}},
+                        ]}
 
 
 string_noltws = NoLTWhitespaceSchema.schema

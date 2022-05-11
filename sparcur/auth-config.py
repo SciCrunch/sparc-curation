@@ -7,6 +7,10 @@
   'cache-path': {
       'default': '{:user-cache-path}/sparcur',
       'environment-variables': 'SPARCUR_CACHE_PATH CACHE_PATH'},
+  'cleaned-path': {
+     'default': '{:user-data-path}/sparcur/cleaned',
+     'environment-variables':
+     'SPARCUR_CLEANED_PATH SPARC_CLEANED CLEANED_PATH'},
   'log-path': {
       'default': '{:user-log-path}/sparcur',
       'environment-variables': 'SPARCUR_LOG_PATH LOG_PATH'},
