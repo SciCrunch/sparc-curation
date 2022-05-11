@@ -30,6 +30,7 @@
 ;; parameters (yay dynamic variables)
 (define path-cache-dir (make-parameter #f))
 (define path-cache-datasets (make-parameter #f))
+(define path-cleaned-dir (make-parameter #f))
 (define path-export-dir (make-parameter #f))
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
@@ -115,11 +116,10 @@
    "--name" "README*"
    "--limit" "-1"
    "--fetch"))
-(define argv-clean-metadata-files
+(define (argv-clean-metadata-files ds)
   (python-mod-args ; XXX note that this is separate from normalize metadata files
    "sparcur.simple.clean_metadata_files"
-   ; TODO output folder
-   ))
+   "--dataset-id" (dataset-id ds)))
 
 (define (argv-open-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
@@ -207,6 +207,7 @@
   (path-source-dir (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))
   (path-cache-dir (expand-user-path (user-cache-path "sparcur/racket")))
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
+  (path-cleaned-dir (expand-user-path (user-data-path "sparcur/cleaned")))
   (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
   (path-export-datasets (build-path (path-export-dir) "datasets")))
 
@@ -430,8 +431,10 @@
   (uri-human ds)
   (dataset-src-path ds)
   (dataset-export-latest-path ds)
+  (dataset-cleaned-latest-path ds)
   (fetch-export-dataset ds)
   (fetch-dataset ds)
+  (clean-metadata-files ds)
   (load-remote-json ds)
   (export-dataset ds))
 
@@ -461,6 +464,13 @@
             [qq (and (file-exists? lp) (resolve-path lp))])
        ; FIXME not quite right?
        qq))
+   (define (dataset-cleaned-latest-path ds)
+     (let* ([uuid (id-uuid ds)]
+            [lp (build-path (path-cleaned-dir)
+                            uuid "LATEST")]
+            [qq (and (directory-exists? lp) ; sigh, paths are hard
+                     (build-path (path-cleaned-dir) uuid (resolve-path lp)))])
+       qq))
    (define (dataset-src-path ds)
      (let ([uuid (id-uuid ds)])
        (build-path (path-source-dir) uuid)))
@@ -486,7 +496,8 @@
            (if (and status-1 status-2)
                (begin
                  (when (equal? ds selected-dataset)
-                   (send button-export-dataset enable #t))
+                   (send button-export-dataset enable #t)
+                   (send button-clean-metadata-files enable #t))
                  (println (format "dataset fetch completed for ~a" (dataset-id ds))))
                (println (format "dataset fetch FAILED for ~a" (dataset-id ds)))))))))
    (define (export-dataset ds)
@@ -544,7 +555,8 @@
                        ; now that we have 1:1 jview:json we can automatically update the jview for
                        ; this dataset in the background thread and it shouldn't block the ui
                        (when (equal? ds selected-dataset)
-                         (send button-export-dataset enable #t))
+                         (send button-export-dataset enable #t)
+                         (send button-clean-metadata-files enable #t))
                        (dataset-jview! ds #:update #t #:background #t)
                        (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
                      (format "dataset ~a FAILED for ~a"
@@ -561,6 +573,25 @@
            ; that don't actually meet your use cases?
            (set-lview-item-color lview ds) ; FIXME lview free variable
            )))))
+   (define (clean-metadata-files ds)
+     (println (format "cleaning metadata files for ~a" (dataset-id ds))) ; TODO gui and/or log
+     (let ([cwd (build-path (dataset-src-path ds)
+                            ; FIXME dataset here is hardcoded
+                            "dataset")]
+           [argv-1 (argv-clean-metadata-files ds)])
+       (thread
+        (thunk
+         (let ([status-1 #f]
+               [cwd-resolved (resolve-relative-path cwd)])
+           (parameterize ([current-directory (path-source-dir)])
+             (with-output-to-string (thunk (set! status-1
+                                                 (apply system* argv-1 #:set-pwd? #t)))
+               ))
+           (if status-1
+               (begin
+                 ; TODO open folder probably ?
+                 (println (format "cleaning metadata files completed for ~a" (dataset-id ds))))
+               (println (format "cleaning metadata files FAILED for ~a" (dataset-id ds)))))))))
    (define (dataset-latest-prod-url ds)
      (string-append (url-prod-datasets) "/" (id-uuid ds) "/LATEST/curation-export.json"))
    (define (load-remote-json ds)
@@ -687,7 +718,9 @@
       (thread
        (thunk
         (if (equal? selected-dataset (current-dataset))
-            (send button-export-dataset enable (link-exists? symlink))
+            (let ([enable? (link-exists? symlink)])
+              (send button-export-dataset enable enable?)
+              (send button-clean-metadata-files enable enable?))
             (void)
             #; ; yep, this case does happen :)
             (println "TOO FAST! dataset no longer selected"))))))
@@ -768,6 +801,14 @@
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
+(define (xopen-folder path)
+  (case (system-type)
+    ((windows)
+     (thread ; if this is not in a thread then for some reason it
+      (thunk ; will crash the whole program ?? weird stuff going on here
+       (subprocess #f #f #f (find-executable-path "explorer.exe") path))))
+    (else (xopen-path path))))
+
 (define (cb-open-export-ipython obj event)
   (let ([argv (argv-open-ipython (current-dataset))])
     ; FIXME bad use of thread
@@ -803,7 +844,16 @@
   ; check if there are metadata files that need to be cleaned up
   ; clean them up and put them in a hierarchy that mirrors where they should be
   ; at some point provide flow to automatically do upload and replace
-  (println "TODO"))
+  ; TODO (probably on the python side) figure out how to track the source
+  ; files and make sure that we don't run multiple times, and that we don't
+  ; clean files that have already been cleaned
+  (let ([ds (current-dataset)])
+    (thread
+     (thunk
+      (let ([thread-clean (clean-metadata-files ds)])
+        (thread-wait thread-clean)
+        (let ([path (dataset-cleaned-latest-path ds)])
+          (xopen-folder path)))))))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
@@ -814,12 +864,7 @@
 
     (if (directory-exists? symlink)
         (let ([path (resolve-relative-path symlink)])
-          (case (system-type)
-            ((windows)
-             (thread ; if this is not in a thread then for some reason it
-              (thunk ; will crash the whole program ?? weird stuff going on here
-               (subprocess #f #f #f (find-executable-path "explorer.exe") path))))
-            (else (xopen-path path))))
+          (xopen-folder path))
         ; TODO gui visible logging
         (println "Dataset has not been fetched yet!"))))
 
@@ -1085,7 +1130,6 @@ switch to that"
                                          [label "Clean Metadata"]
                                          [callback cb-clean-metadata-files]
                                          [parent panel-ds-actions]))
-(send button-clean-metadata-files enable #f) ; XXX remove when implementation complete
 
 #; ; too esoteric
 (define button-open-export-folder (new button%
