@@ -3383,6 +3383,10 @@ def pipe_main(main, after=None, argv=None):
 def rglob(path, pattern):
     """ Hack around the absurd slowness of python's rglob """
 
+    if sys.platform == 'win32':
+        log.warning('no findutils on windows, watch out for unexpected files')
+        return list(path.rglob(pattern))
+
     doig = (hasattr(path, 'cache') and
             path.cache and
             path.cache.cache_ignore)

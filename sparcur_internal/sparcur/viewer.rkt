@@ -65,31 +65,34 @@
 (define (config-paths [os #f])
   (case (or os (system-type))
     ;; ucp udp uchp ulp
-    ((unix) '("~/.config"
-              "~/.local/share"
-              "~/.cache"
-              "~/.cache/log"))
-    ((macosx) '("~/Library/Application Support"
-                "~/Library/Application Support"
-                "~/Library/Caches"
-                "~/Library/Logs"))
+    ((unix) (map
+             string->path
+             '("~/.config"
+               "~/.local/share"
+               "~/.cache"
+               "~/.cache/log")))
+    ((macosx) (map
+               string->path
+               '("~/Library/Application Support"
+                 "~/Library/Application Support"
+                 "~/Library/Caches"
+                 "~/Library/Logs")))
     ((windows) (let ((ucp (build-path (find-system-path 'home-dir) "AppData" "Local")))
                  (list ucp ucp ucp (build-path ucp "Logs"))))
     (else (error (format "Unknown OS ~a" (or os (system-type)))))))
 
 (define *config-paths* (config-paths))
 
-(define (fcp position [suffix #f])
+(define (fcp position suffix-list)
   (let ([base-path (position *config-paths*)])
-    (string->path
-     (if suffix
-         (format "~a/~a" base-path suffix)
-         base-path))))
+    (if suffix-list
+        (apply build-path base-path suffix-list)
+        base-path)))
 
-(define (user-config-path [suffix #f]) (fcp first  suffix))
-(define (user-data-path   [suffix #f]) (fcp second suffix))
-(define (user-cache-path  [suffix #f]) (fcp third  suffix))
-(define (user-log-path    [suffix #f]) (fcp fourth suffix))
+(define (user-config-path . suffix) (fcp first  suffix))
+(define (user-data-path   . suffix) (fcp second suffix))
+(define (user-cache-path  . suffix) (fcp third  suffix))
+(define (user-log-path    . suffix) (fcp fourth suffix))
 
 ;; python argvs
 
@@ -205,10 +208,10 @@
   ; FIXME more cryptic errors if sparcur.simple isn't tangled
   ; FIXME it should be possible for the user to configure path-source-dir
   (path-source-dir (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))
-  (path-cache-dir (expand-user-path (user-cache-path "sparcur/racket")))
+  (path-cache-dir (expand-user-path (user-cache-path "sparcur" "racket")))
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
-  (path-cleaned-dir (expand-user-path (user-data-path "sparcur/cleaned")))
-  (path-export-dir (expand-user-path (user-data-path "sparcur/export")))
+  (path-cleaned-dir (expand-user-path (user-data-path "sparcur" "cleaned")))
+  (path-export-dir (expand-user-path (user-data-path "sparcur" "export")))
   (path-export-datasets (build-path (path-export-dir) "datasets")))
 
 (define (manifest-report)
@@ -801,12 +804,15 @@
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
-(define (xopen-folder path)
+(define (xopen-folder path #:cd [cd #f])
   (case (system-type)
     ((windows)
      (thread ; if this is not in a thread then for some reason it
       (thunk ; will crash the whole program ?? weird stuff going on here
-       (subprocess #f #f #f (find-executable-path "explorer.exe") path))))
+       (if cd
+           (parameterize ([current-directory path])
+             (subprocess #f #f #f (find-executable-path "explorer.exe") "."))
+           (subprocess #f #f #f (find-executable-path "explorer.exe") path)))))
     (else (xopen-path path))))
 
 (define (cb-open-export-ipython obj event)
@@ -853,7 +859,7 @@
       (let ([thread-clean (clean-metadata-files ds)])
         (thread-wait thread-clean)
         (let ([path (dataset-cleaned-latest-path ds)])
-          (xopen-folder path)))))))
+          (xopen-folder path #:cd #t)))))))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
@@ -1099,6 +1105,8 @@ switch to that"
                                    [callback cb-export-dataset]
                                    [parent panel-ds-actions]))
 
+; FIXME there is currently no way to go back to viewing the local
+; export without running export or restarting
 (define button-load-remote-json (new button%
                                      [label "View Prod Export"]
                                      [callback cb-load-remote-json]
