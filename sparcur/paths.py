@@ -539,8 +539,15 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
     @property
     def dataset_relative_path(self):
         # FIXME broken for local validation
+        # update: I'm pretty sure this works for total local validation
+        # because we use CacheL, so the fix here is all we need to cover
+        # the file changed case
         try:
-            return self.relative_path_from(self.cache.dataset.local)
+            if self.cache is None and self.parent.cache is not None:
+                # file has been modified case
+                return self.relative_path_from(self.parent.cache.dataset.local)
+            else:
+                return self.relative_path_from(self.cache.dataset.local)
         except AttributeError as e:
             raise exc.NoCachedMetadataError(self) from e
 
