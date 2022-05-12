@@ -689,14 +689,14 @@ class Tabular(HasErrors):
         first_cont_empty = 0
         empty_rows = []
         for i, row in enumerate(wbro.active.rows):
-            last_not_none = 0
+            last_not_none = -1
             for j, cell in enumerate(row):
                 if isinstance(cell, self._openpyxl.cell.read_only.EmptyCell) or cell.value is None:
                     pass
                 else:
                     last_not_none = j
             lnn.append(last_not_none)
-            if last_not_none == 0:
+            if last_not_none == -1:  # empty row case
                 if not empty_rows or empty_rows and empty_rows[-1] < i - 1:
                     # there was an intervening non-empty row
                     first_cont_empty = i
