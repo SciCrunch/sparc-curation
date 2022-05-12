@@ -339,6 +339,10 @@ def _transitive_(path, command):
 
 def transitive_paths(path, exclude_patterns=tuple()):
     """Fast list of all child directories using unix find."""
+    if sys.platform == 'win32':
+        # XXX assumes that rchildren already implements exclude patterns
+        return = list(path.rchildren)
+
     hrm = ' '.join(['-not -path ' + repr(pat) for pat in exclude_patterns])
     if hrm:
         hrm = ' ' + hrm
@@ -349,6 +353,11 @@ def transitive_paths(path, exclude_patterns=tuple()):
 
 def transitive_dirs(path):
     """Fast list of all child directories using unix find."""
+    if sys.platform == 'win32':  # no findutils
+        gen = os.walk(path)
+        next(gen)  # drop path itself to avoid drp == Path('.')
+        return [path / t[0] for t in gen]
+
     command = f"""{_find_command} -type d"""
     # TODO failover to builtin rglob + filter
     return _transitive_(path, command)
