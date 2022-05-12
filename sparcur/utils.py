@@ -341,7 +341,7 @@ def transitive_paths(path, exclude_patterns=tuple()):
     """Fast list of all child directories using unix find."""
     if sys.platform == 'win32':
         # XXX assumes that rchildren already implements exclude patterns
-        return = list(path.rchildren)
+        return list(path.rchildren)
 
     hrm = ' '.join(['-not -path ' + repr(pat) for pat in exclude_patterns])
     if hrm:
