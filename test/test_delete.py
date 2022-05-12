@@ -7,6 +7,7 @@ from sparcur.utils import GetTimeNow
 from sparcur.paths import PennsieveCache, LocalPath, Path
 from sparcur.backends import PennsieveRemote
 from .common import test_organization, test_dataset, _pid
+from .common import skipif_ci, skipif_no_net
 import pytest
 
 
@@ -69,8 +70,8 @@ class _TestOperation:
         #wat = asdf.bfobject.upload(Fun(), use_agent=False)
         #breakpoint()
 
-
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+@skipif_ci
+@skipif_no_net
 class TestDelete(_TestOperation, unittest.TestCase):
 
     def test_0(self):
@@ -107,7 +108,9 @@ def make_rand(n, width=80):
     return string.encode()
 
 
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+@skipif_ci
+@skipif_no_net
+@pytest.mark.skip('VERY SLOW')
 class TestFilenames(_TestOperation, unittest.TestCase):
 
     _evil_names = (
@@ -176,6 +179,17 @@ class TestFilenames(_TestOperation, unittest.TestCase):
         test_file_b = test_folder / (name + '.txe')
         test_folder_i = test_folder / name
 
+        for _f in (test_file_a, test_file_b):
+            if _f.exists() or _f.is_broken_symlink():
+                msg = (f'bad test environment: file/link already exists: {_f}')
+                raise FileExistsError(msg)
+
+        # FIXME maybe don't straight fail here, but instead
+        # don't upload and just compare the existing name?
+        # the fact that we get an error is a sign that the
+        # name matches actually ... so not getting an error
+        # in subsequent runs is bad ... for test_base at least
+
         test_file_a.data = iter((make_rand(fsize),))
         test_file_b.data = iter((make_rand(fsize),))
 
@@ -203,23 +217,30 @@ class TestFilenames(_TestOperation, unittest.TestCase):
         return self.test_filenames_evil(self._more_evil_names)
 
     def test_filenames_evil(self, names=_evil_names):
-        #if names != self._evil_names:
-            #breakpoint()
-        test_folder = self.test_base / 'pandora'
-        test_folder.mkdir_remote()
-        test_folder.__class__.upload = Path.upload
-        results = []
-        fsize = 1024  # needed for uniqueish hashes colloisions will still happen
-        # FIXME this pretty clearly reveals a need for
-        # batching to multiplex the fetch ... SIGH
-        for name in names:
-            name_a, name_b, name_i = self._op(test_folder, fsize, name)
-            results.append((name_a, name_b, name_i))
+        # XXX warning slow!
+        now = GetTimeNow()
+        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP_LOCAL_FRIENDLY}'
+        remote = local.mkdir_remote()
 
-        #breakpoint()
+        try:
+            # FIXME consider going back to self.test_base instead of local here
+            test_folder = local / 'pandora'
+            test_folder.mkdir_remote()
+            test_folder.__class__.upload = Path.upload
+            results = []
+            fsize = 1024  # needed for uniqueish hashes colloisions will still happen
+            # FIXME this pretty clearly reveals a need for
+            # batching to multiplex the fetch ... SIGH
+            for name in names:
+                name_a, name_b, name_i = self._op(test_folder, fsize, name)
+                results.append((name_a, name_b, name_i))
+        finally:
+            remote.rmdir()
+            remote.cache.refresh()
 
 
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+@skipif_ci
+@skipif_no_net
 class TestUpdate(_TestOperation, unittest.TestCase):
 
     @pytest.mark.skip('the question has been answered')
@@ -269,7 +290,8 @@ class TestUpdate(_TestOperation, unittest.TestCase):
         test_file.upload()
 
 
-@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+@skipif_ci
+@skipif_no_net
 class TestClone(_TestOperation, unittest.TestCase):
     # TODO test a variety of clone scenarios
     # and consider whether testing for and
@@ -334,6 +356,8 @@ class TestClone(_TestOperation, unittest.TestCase):
         self._do_target(target, exc.DirectoryNotEmptyError)
 
 
+@skipif_ci
+@skipif_no_net
 class TestMkdirRemote(_TestOperation, unittest.TestCase):
 
     def test_mkdir_remote_parents_false(self):
@@ -377,8 +401,19 @@ class TestMkdirRemote(_TestOperation, unittest.TestCase):
             lparent = parent.local
             parent.cache.refresh()  # we just removed the child so the parent is stale
             parent.rmdir()
-            parent.cache.refresh()  # and THIS is the error we have been trying to handle all night!
+            parent.cache.refresh()
             assert not lparent.exists(), f'should have been deleted {parent}'
+
+
+
+class TestRenameFolder:
+    # TODO
+    pass
+
+
+class TestMoveFolder:
+    # TODO
+    pass
 
 
 class TestRemote(_TestOperation, unittest.TestCase):
