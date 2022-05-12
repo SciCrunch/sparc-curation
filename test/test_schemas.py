@@ -77,7 +77,7 @@ class TestNoLTWhitespaceRegex(unittest.TestCase):
         strings = (
             'asdf',
             'asdf asdf',
-            'asdfaAdf asZf asd | " f asdf as df  131 23 45 ..as f91891l`1823409`-5',
+            'asdfaAdf asZf asd | " f asdf as df 131 23 45 ..as f91891l`1823409`-5',
         )
         schema = self.schema()
         for s in strings:
@@ -92,7 +92,8 @@ class TestNoLTWhitespaceRegex(unittest.TestCase):
             ' asdf asdf',
             'asdf asdf ',
             ' asdf asdf ',
-            ' asdfaAdf asZf asd | " f asdf as df  131 23 45 ..as f91891l`1823409`-5 ',
+            'asdfaAdf asZf asd | " f asdf as df  131 23 45 ..as f91891l`1823409`-5',
+            ' asdfaAdf asZf asd | " f asdf as df 131 23 45 ..as f91891l`1823409`-5 ',
         )
 
         schema = self.schema()
