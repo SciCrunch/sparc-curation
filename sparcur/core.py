@@ -846,6 +846,11 @@ class AtomicDictOperations:
                     #log.debug(f'{source_path}')
 
         elif is_list_or_tuple(source):
+            if not isinstance(source_key, int):
+                msg = (f'path {source_path} indicates that schema does not '
+                       'expect an array here')
+                raise exc.BadDataError(msg)
+
             try:
                 source[source_key]
             except IndexError as e:

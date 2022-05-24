@@ -1185,6 +1185,11 @@ class MetadataFile(HasErrors):
                                   if g != GROUP_ALL for e in g)
 
         # TODO how to flag exclude the header fields ?
+        # XXX NOTE failure mode on array but should be string? e.g. study_data_collection
+        # the order of operations is why this happens, but the behavior is correct
+        # fields that are grouped can and do have multiple entires, so if you are
+        # expecting a single object where internally there are multipel entries you
+        # you do not get that using the group functionality
         transformed = {}
         for key, alt_grouped_norm in self.groups_alt.items():
             merge = alt_grouped_norm == GROUP_ALL

@@ -26,6 +26,7 @@ from sparcur.core import DictTransformer, copy_all, get_all_errors, compact_erro
 from sparcur.core import JT, JEncode, log, logd, lj, OntId, OntTerm, OntCuries
 from sparcur.core import json_identifier_expansion, dereference_all_identifiers
 from sparcur.core import JApplyRecursive, resolve_context_runtime, get_nested_by_key
+from sparcur.core import adops
 from sparcur.paths import Path, PathL
 from sparcur.utils import PennsieveId  # XXXXX FIXME
 from sparcur.state import State
@@ -677,7 +678,11 @@ class JSONPipeline(Pipeline):
         # moved to the head
 
         data = self.pipeline_start
+        return self._ffs(data)
 
+    def _ffs(self, data):
+        # FIXME this doesn't catch embedded errors, only top level errors
+        # so it must run on each subpipeline individually ARGH ARGH ARGH
         if 'errors' in data:
             pop_paths = [tuple(p) for p, e in [(e['path'], e) for e in data['errors']
                                             if 'path' in e]
@@ -729,6 +734,19 @@ class JSONPipeline(Pipeline):
             log.exception(e)
             log.critical('Unhandled error!')
             raise e  # don't know the consequence of not failing hard here so continue to raise for now
+
+        if self.subpipelines:
+            # XXX filter failures must also run on subpipelines
+            # otherwise have would have to insert a dummy pipeline
+            # just to run ffail for each subpipeline since there is no
+            # other gatekeeper for input data
+            for _in, _f, _path in self.subpipelines:
+                # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+                # EVIL
+                # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+                _dss = adops.get(data, _path, on_failure=False)
+                if _dss:
+                    self._ffs(_dss)
 
         errors = tuple(es for es in errors_subpipelines if isinstance(es, tuple))
         self.subpipeline_errors(errors)
@@ -932,6 +950,10 @@ class PipelineStart(JSONPipeline):
 
     previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
     # metadata should come first since structure can fail, error handling sigh
+
+    filter_failures = (
+        lambda e, p: ('study' in p),
+    )
 
     subpipelines = [
         # FIXME in theory subpipelines can run sequentially
