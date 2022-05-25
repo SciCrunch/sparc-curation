@@ -1336,7 +1336,7 @@ done"""
         [print(t if isinstance(t, str) else safe_repr(t)) for t in tables]  # FIXME _print_tables?
 
     def find(self):
-        paths = []
+        _paths = set()  # set to avoid duplicate paths breaking fetch?
         if self.options.name:  # has to always be true now
             patterns = self.options.name
             path = self.cwd
@@ -1347,8 +1347,9 @@ done"""
                     #pattern = pattern + '.fake*'
 
                 for file in path.rglob(pattern):
-                    paths.append(file)
+                    _paths.add(file)
 
+        paths = sorted(_paths)
         if paths:
             n_skipped = 0
             paths = [p for p in paths if not p.is_dir()]
