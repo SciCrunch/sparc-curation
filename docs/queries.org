@@ -2545,8 +2545,30 @@ with open(csv_path, 'wt') as f:
     csv.writer(f).writerows(rows)
 #+end_src
 
-#+RESULTS:
-: heatmap-pop-reg.csv
+**** generate npo representation of apinatomy population location phenotypes
+undifferentiated NPO representation that matches the heatmap above
+
+run the blocks in the section above first
+#+begin_src jupyter-python :session pys
+#len(blobs)
+#pprint(id_label)
+#pprint(blobs[0])
+sorted([[a, *sorted(b)] for a, b in ext_pop.items()])
+#+end_src
+
+#+begin_src jupyter-python :session pys
+from neurondm import Neuron, Phenotype, EntailedPhenotype, Config
+from pyontutils.namespaces import ilxtr, owl, skos, rdfs
+config = Config('apinatomy-locations')
+neurons = [Neuron(Phenotype(id), *(EntailedPhenotype(loc, ilxtr.hasLocationPhenotype) for loc in sorted(locs)), id_=id) for id, locs in ext_pop.items()]
+config.write()
+to_mod = [(s, skos.altLabel, o) for s, p, o in config._written_graph if p == rdfs.label]
+to_remove = [t for t in config._written_graph if t[1] in (owl.equivalentClass, ilxtr.genLabel, ilxtr.localLabel, ilxtr.simpleLabel, ilxtr.simpleLocalLabel, rdfs.label, skos.prefLabel)]
+[config._written_graph.remove(t) for t in to_remove]
+[config._written_graph.add(t) for t in to_mod]
+config._written_graph.write()
+config.write_python()
+#+end_src
 
 *** region by region
 * SciGraph cypher queries

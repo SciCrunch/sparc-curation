@@ -1408,6 +1408,7 @@ python -m neurondm.build release
 # apinat-build --deploy  # XXX manual
 # apinat-build --tangle  # XXX OLD
 # source ~/git/sparc-curation/bin/apinat-functions.sh  # XXX OLD
+# for new apinatomy models also update ~/git/sparc-curation/resources/scigraph/sparc-data.ttl
 
 # scigraph/README.org
 sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
@@ -1430,6 +1431,14 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 
 # release.org
 ~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --resume
+
+### changelog
+
+# XXX manual
+# pushd ~/git/apinatomy-models
+# git diff $(the last commit before the previous release)..HEAD -- models
+# pushd ~/git/NIF-Ontology
+# git diff $(the last commit before the previous release)..HEAD -- *.ttl ttl
 
 ### docker image build
 

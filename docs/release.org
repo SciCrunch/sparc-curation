@@ -292,6 +292,7 @@ Yes this is make."
         (mis-path "data/sparc-methods.ttl")
         (mis-r-path "data/sparc-methods-reasoned.ttl")
         (sct-path "data/sparc-community-terms.ttl")
+        (sml-path "data/sparc-missing-labels.ttl")
 
         (ub-path "data/uberon.ttl")
         (em-path "data/emapa.ttl")
@@ -328,6 +329,9 @@ Yes this is make."
     (unless-file-exists-p sct-path
       (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-community-terms.ttl")
                      sct-path))
+    (unless-file-exists-p sml-path
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-missing-labels.ttl")
+                     sml-path))
     ;; load apinatomy files
     (unless-file-exists-p sparc-data-path
       ;; FIXME timestamp the release, but coordinate with SciGraph
