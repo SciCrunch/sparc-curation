@@ -27,6 +27,7 @@
 @prefix sstom: <https://apinatomy.org/uris/models/sawg-stomach/ids/> .
 @prefix splen: <https://apinatomy.org/uris/models/spleen/ids/> .
 @prefix dlcon: <https://apinatomy.org/uris/models/dev-layout-conn/ids/> .
+@prefix pancr: <https://apinatomy.org/uris/models/pancreas/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
     owl:imports-todo <file:///tmp/scigraph-build/sparc-data/build-prov.ttl> ;
@@ -35,6 +36,7 @@
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/ard-arm-cardiac.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/pancreas.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl> ;
