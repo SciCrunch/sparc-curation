@@ -93,6 +93,7 @@ exit
 #+link: sstom https://apinatomy.org/uris/models/sawg-stomach/ids/
 #+link: dlcon https://apinatomy.org/uris/models/dev-layout-conn/ids/
 #+link: splen https://apinatomy.org/uris/models/spleen/ids/
+#+link: pancr https://apinatomy.org/uris/models/pancreas/ids/
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
@@ -238,46 +239,7 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+call: dataset-subjects(startsubj="<https://api.pennsieve.io/datasets/N:dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_19>", limit="100")
-
-#+RESULTS:
-| dataset                                      | subj                                                              |
-|----------------------------------------------+-------------------------------------------------------------------|
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_01   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_03   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_04   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_06   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_07   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_08   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_09   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_10   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_11   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_12   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_07   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_08   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_11   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_13   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_14   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_15   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_16   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_02 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_04 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_10 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_11 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_12 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_13 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_15 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_17 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_18 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_19 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_02 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_05 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_09 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_14 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_15 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_16 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_18 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_19 |
+#+call: dataset-subjects(startsubj="<https://api.pennsieve.io/datasets/N:dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF-19>", limit="100")
 
 **** Dataset groups
 #+name: dataset-groups
@@ -293,46 +255,7 @@ WHERE {
 } LIMIT ?limit
 #+end_src
 
-#+call: dataset-groups(startsubj="<https://api.pennsieve.io/datasets/N:dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_19>", limit="100")
-
-#+RESULTS:
-| dataset                                      | group                | subj                                                              |
-|----------------------------------------------+----------------------+-------------------------------------------------------------------|
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_01   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_03   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_04   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_06   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_07   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_08   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_09   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_10   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_11   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact female L6     | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IF_12   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_07   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_08   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_11   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_13   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_14   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_15   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Intact male L6       | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-IM_16   |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_02 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_04 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_10 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_11 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_12 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_13 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_15 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_17 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_18 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected female L6 | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF_19 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_02 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_05 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_09 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_14 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_15 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_16 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_18 |
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | Transected male L6   | dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxM_19 |
+#+call: dataset-groups(startsubj="<https://api.pennsieve.io/datasets/N:dataset:07c31ef4-cc72-4348-813a-f074675643ed/subjects/sub-STxF-19>", limit="100")
 
 **** Dataset bundle
 #+name: dataset-bundle
@@ -555,8 +478,12 @@ where {
 | protocol      | anno_count |
 |---------------+------------|
 | pio.api:19220 |        413 |
+| pio.api:19131 |        390 |
 | pio.api:26704 |        386 |
+| pio.api:19576 |        374 |
 | pio.api:22831 |        370 |
+| pio.api:26841 |        319 |
+| pio.api:19262 |        301 |
 | pio.api:18925 |        285 |
 | pio.api:26886 |        284 |
 | pio.api:26887 |        278 |
@@ -580,15 +507,14 @@ where {
 | pio.api:26688 |        105 |
 | pio.api:22888 |        101 |
 | pio.api:22891 |        100 |
+| pio.api:25121 |        100 |
+| pio.api:25230 |        100 |
 | pio.api:25122 |         94 |
 | pio.api:18769 |         88 |
 | pio.api:22875 |         88 |
 | pio.api:22890 |         87 |
 | pio.api:22948 |         87 |
-| pio.api:20025 |         82 |
 | pio.api:22889 |         80 |
-| pio.api:29396 |         69 |
-| pio.api:22868 |         64 |
 | pio.api:18394 |         63 |
 | pio.api:22844 |         63 |
 | pio.api:19640 |         61 |
@@ -596,11 +522,14 @@ where {
 | pio.api:19135 |         51 |
 | pio.api:19227 |         51 |
 | pio.api:19798 |         49 |
+| pio.api:19153 |         47 |
 | pio.api:22895 |         40 |
 | pio.api:20254 |         34 |
 | pio.api:21417 |         33 |
 | pio.api:19206 |         29 |
 | pio.api:26709 |         13 |
+| pio.api:19139 |         12 |
+| pio.api:21193 |         10 |
 | pio.api:34589 |          9 |
 | pio.api:30122 |          5 |
 
@@ -818,7 +747,7 @@ SELECT DISTINCT
 ?dataset
 ?protocol
 
-?label_drug
+(str(?label_drug) as ?l_drug)
 ?value_lt
 WHERE {
     VALUES ?t {protcur:invariant protcur:parameter} .
@@ -1082,36 +1011,22 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | sample                                                                   |
-|----------------------------------------------+--------------------------------------------------------------------------|
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60A-3 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60A-4 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-1 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-2 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-3 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_60B-4 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_65A-1 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-1 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-3 |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | dataset:0170271a-8fac-4769-a8f5-2b9520291d03/samples/sub-HB_sam-HB_70A-4 |
-
 *** Total
-Show me the total number of subjects in the knowledge graph.
+Show me the total number of samples in the knowledge graph.
 #+begin_src sparql
 SELECT DISTINCT
-(COUNT(DISTINCT ?subject) as ?count_subject)
+(COUNT(DISTINCT ?sample) as ?count_sample)
 WHERE {
   ?dataset a sparc:Dataset .
-  ?dataset TEMP:isAboutParticipant ?subject .
-  ?subject a sparc:Sample .
+  ?dataset TEMP:isAboutParticipant ?sample .
+  ?sample a sparc:Sample .
 }
 #+end_src
 
 #+RESULTS:
-| count_subject |
-|---------------|
-|          7052 |
+| count_sample |
+|--------------|
+|         5259 |
 
 *** Sample predicates
 #+begin_src sparql
@@ -1694,8 +1609,8 @@ ORDER BY ?id
 #+end_src
 
 # #+header: :results drawer output
+# #+header: :var by_id=(and)
 #+header: :epilogue "return table" :results value table
-#+header: :var by_id=(and)
 #+name: pds-v2-python
 #+begin_src python :var data=pds-v2(limit="99999") :exports results
 import sys
@@ -1947,10 +1862,6 @@ pprint(blob)
 #+begin_src python :noweb yes :exports none
 <<python-process-neru>>
 #+end_src
-
-#+RESULTS: python-neru-helper
-:results:
-:end:
 
 ** terminal regions
 Find the ontology identifiers for terminal regions.
@@ -5179,26 +5090,27 @@ WHERE {
 | label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops | neupops_pat | somas |
 |------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------+-------------+-------|
 | ApiNATOMY model of the stomach                                         | sstom:sawg-stomach      |   751 |          38 |        75 |            8 |    14 |      14 |          14 |    14 |
-| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  2586 |         139 |       175 |           30 |    22 |      20 |          20 |    34 |
-| SAWG ApiNATOMY model of the distal colon                               | sdcol:sawg-distal-colon |   962 |          85 |       118 |            4 |    17 |      17 |          17 |    23 |
+| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1977 |         136 |       145 |            1 |    17 |      17 |          17 |    41 |
 | Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   499 |         107 |       168 |          238 |    29 |      29 |          29 |    29 |
-| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1977 |         136 |       146 |            1 |    17 |      17 |          17 |    41 |
+| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  2586 |         139 |       175 |           30 |    21 |      20 |          20 |    34 |
+| SAWG ApiNATOMY model of the distal colon                               | sdcol:sawg-distal-colon |   962 |          85 |       118 |            4 |    17 |      17 |          17 |    23 |
 | SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   556 |         143 |       135 |            6 |     6 |       6 |           6 |    19 |
-| spleen model                                                           | splen:spleen            |   474 |          43 |        93 |            4 |     5 |         |           5 |     8 |
-| Total unique                                                           | 7                       |  7806 |         691 |       538 |          292 |   110 |     103 |         108 |   168 |
+| pancreas model                                                         | pancr:pancreas          |   351 |          51 |         1 |              |     8 |       1 |           1 |       |
+| spleen model                                                           | splen:spleen            |   474 |          43 |        99 |            4 |     5 |       5 |           5 |     8 |
+| Total unique                                                           | 8                       |  8157 |         742 |       547 |          292 |   117 |     109 |         109 |   168 |
 
 #+RESULTS: apinat-dashboard-overview
 | element         | count |
 |-----------------+-------|
-| models          |     7 |
-| models scigraph |     7 |
-| lyphs           |  7810 |
-| lyphs input     |   691 |
-| externals       |   538 |
+| models          |     8 |
+| models scigraph |     8 |
+| lyphs           |  8162 |
+| lyphs input     |   742 |
+| externals       |   547 |
 | publications    |   292 |
-| nerus           |   110 |
-| neupops         |   115 |
-| neupops pattern |   120 |
+| nerus           |   117 |
+| neupops         |   117 |
+| neupops pattern |   117 |
 
 # TODO links to a way to view the terms per ontology if possible
 #+RESULTS: sparql-apinat-prefixes
@@ -5207,17 +5119,17 @@ WHERE {
 | nlx     |     1 |
 | pubmed  |     1 |
 | CL      |     3 |
-| GO      |     4 |
 | sao     |     4 |
+| GO      |     5 |
 | NCIT    |     8 |
+| EMAPA   |     9 |
 | CHEBI   |    11 |
-| EMAPA   |    16 |
-| ilx     |    78 |
-| fma     |    88 |
-| tgbugs  |   108 |
-| UBERON  |   215 |
-| :SUM:   |   537 |
-| :TOTAL: |   538 |
+| fma     |    70 |
+| ilx     |   101 |
+| tgbugs  |   109 |
+| UBERON  |   224 |
+| :SUM:   |   546 |
+| :TOTAL: |   547 |
 
 #+header: :var n-sparql-apinat-graphs=n-sparql-apinat-graphs()
 #+header: :var cypher-apinat-models=cypher-apinat-models()
@@ -5617,6 +5529,20 @@ WHERE {
 Keast
 Bolser Lewis
 First pass NLP output
+
+****** location
+experimental
+#+begin_src cypher :limit 99 :results drawer :wrap src json :var neupop_id="ilxtr:neuron-type-keast-2"
+MATCH
+(neuron:Class{iri: "http://uri.neuinfo.org/nif/nifstd/sao1417703748"})<-[:subClassOf*1..]-
+(neupop)
+//(neupop:Class{iri: $neupop_id})
+-[e:ilxtr:hasLocationPhenotype!]->(blank)
+-[q]->(more)
+//-[q:BFO:0000050]->(more)
+RETURN e, q
+#+end_src
+
 ****** phenotypes for neuron
 #+name: npo-basic-phenotypes
 #+begin_src cypher :limit 99 :results drawer :wrap src json :var neupop_id="ilxtr:neuron-type-keast-2"
@@ -5741,6 +5667,60 @@ MATCH (neuron)-[e]->
 //RETURN region_or_blank
 //RETURN neuron
 RETURN edge
+#+end_src
+
+#+begin_src sparql
+select distinct ?p ?o
+where {
+# ilxtr:neuron-type-keast-1 ?p ?o
+ilxtr:neuron-type-keast-1 owl:equivalentClass ?b1 .
+?b1 owl:intersectionOf ?b2 .
+?b2 ?unkp ?b3 .
+# lists
+?b3 owl:onProperty ?p .
+?b3 owl:someValuesFrom ?o .
+}
+#+end_src
+
+#+begin_src sparql
+select distinct ?neuron ?prop ?value ?prop2 ?value2 # ?p ?ox # ?p2 ?o2 # ?p3 # ?o3 ?p4 ?o4 ?p5 ?o5 ?p6 ?o6
+where {
+#ilxtr:neuron-type-keast-1 owl:equivalentClass ?o .
+?neuron a owl:Class .
+?neuron ilxtr:simpleLocalLabel ?sll .  # XXX hack to filter for neurons
+?neuron owl:equivalentClass ?o .
+# ?o ?p2 ?o2 .
+?o owl:intersectionOf ?list .
+?list rdf:rest*/rdf:first ?elem . # FIXME at least one elem subClassOf neuron or cell
+?elem a owl:Restriction .
+?elem owl:onProperty ?prop .
+?elem owl:someValuesFrom ?value .
+OPTIONAL {
+?value a owl:Restriction .
+?value owl:onProperty ?prop2 .
+?value owl:someValuesFrom ?value2 .
+# ?value ?p ?ox .
+#OPTIONAL {
+#?ox ?p2 ?o2 .
+#?o2 a owl:Class .
+#}
+}
+
+# then do optional for location vs other types
+
+#?o3 ?p4 ?o4 .
+#?o4 ?p5 ?o5 .  # first on property hits here
+#?o5 ?p6 ?o6 .
+# TODO list optional ???
+}
+limit 300
+#+end_src
+
+#+begin_src cypher :results drawer
+MATCH path = (neuron)
+//MATCH path = (neuron:Class{iri: "ilxtr:neuron-type-keast-1"})
+-[:equivalentClass|subClassOf]->(hrm)
+RETURN path
 #+end_src
 
 ****** number of distinct phenotypes

@@ -1436,7 +1436,7 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 
 # XXX manual
 # right you now have to go through all the steps above at least up to the scigraph load
-# and then run [[queries.org::generate npo representation of apinatomy population location phenotypes]]
+# and then run [[queries.org::*generate npo representation of apinatomy population location phenotypes]]
 # to generate apinatomy-locations.ttl delete the junk at the bottom of the file
 # save, commit, push, merge, push and THEN you have to run the whole export process AGAIN
 # adding a good hour or so to the release process
@@ -1463,6 +1463,10 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 # create the new docker container volume for sckan data
 # run it with the latest version of tgbugs/musl:kg-release-user
 # run all the examples etc.
+
+# XXX manual
+# [[release.org::*Deploy journal to local server]]
+# ~/ni/dev/bin/run-deploy-graph-selene
 
 ### publication
 
