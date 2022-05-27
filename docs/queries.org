@@ -2414,7 +2414,15 @@ rows = header + [[id, *[region in ext_pop[id] for region in ext_all]] for id in 
 
 def jac(a, b):
     anb, aub = zip(*[(ar and br, ar or br) for ar, br in zip(a, b)])
-    return sum(anb) / sum(aub)
+    sanb, saub = sum(anb) , sum(aub)
+    if not sanb and not saub:
+        return sanb  # 0
+    elif not sanb:
+        return saub
+    elif not saub:
+        return sanb
+    else:
+        return sanb / saub
 
 def sumjac(rows, norm=False):
     # actually want distance from .5 ?
