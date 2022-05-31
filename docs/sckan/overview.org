@@ -6,7 +6,7 @@ Contents
 :PROPERTIES:
 :CUSTOM_ID:  introduction
 :END:
-The SPARC Knowledge base of the Automatic Nervous System is an
+The SPARC Knowledge base of the Autonomic Nervous System is an
 integrated graph database composed of three parts: the SPARC dataset
 metadata graph, ApiNATOMY and NPO models of connectivity, and the
 larger ontology used by SPARC which is a combination of the
