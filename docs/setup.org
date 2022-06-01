@@ -290,12 +290,21 @@ like you did for the google json file.
 You will be prompted for your protocols.io email and password the first
 time you run.
 ***** Refresh
-If you hit a refresh error because something expired, move or delete the pickle file and then run
+If you hit a refresh error because something expired, run the following block
+
 #+begin_src bash
-spc report protocols
+_file_name=$(python3 -c "from idlib.config import auth;print(auth.get_path('protocols-io-api-store-file').as_posix())")
+echo "${_file_name}"
+mv "${_file_name}" "${_file_name}.$(date -I)"
+pushd ~/git/idlib
+# you will be promted for email and password for protocols.io after running this
+python3 -m pytest -k TestPio -s
 #+end_src
+
 and you should be prompted to renew the token
 you will have to install and manually fix robobrowser at the moment
+and you may need to install pytest
+
 **** Hypothes.is
 As your user Install the hypothesis client in chrome.
 #+CAPTION: open chrome to hypothesis extension install page
