@@ -305,6 +305,7 @@ Yes this is make."
         (npo-r-path "data/npo-reasoned.ttl")
 
         (rguc "https://raw.githubusercontent.com/")
+        (ont-git-ref "dev")
         (cass-px "https://cassava.ucsd.edu/sparc/preview/exports/")
 
         (apinat-base-url "https://cassava.ucsd.edu/ApiNATOMY/ontologies/")
@@ -322,15 +323,15 @@ Yes this is make."
       (url-copy-file (concat cass-px (file-name-nondirectory ce-path))
                      ce-path))
     (unless-file-exists-p mis-path
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-methods.ttl")
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-methods.ttl")
                      mis-path))
     (unless-file-exists-p mis-r-path
       (reason-ontology mis-path mis-r-path))
     (unless-file-exists-p sct-path
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-community-terms.ttl")
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-community-terms.ttl")
                      sct-path))
     (unless-file-exists-p sml-path
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/sparc/ttl/sparc-missing-labels.ttl")
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-missing-labels.ttl")
                      sml-path))
     ;; load apinatomy files
     (unless-file-exists-p sparc-data-path
@@ -368,12 +369,12 @@ Yes this is make."
       ;; FIXME this pulls in a staggering amount of the nif ontology and is quite large
       ;; FIXME reasoner errors between methods-helper, ro, and pato prevent this
       ;;(get-ontology (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/methods.ttl") me-path)
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/methods.ttl") me-path))
+      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/methods.ttl") me-path))
     (unless-file-exists-p me-r-path
       (reason-ontology me-path me-r-path))
     ;; npo
     (unless-file-exists-p npo-path
-      (get-ontology (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/npo.ttl") npo-path))
+      (get-ontology (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/npo.ttl") npo-path))
     (unless-file-exists-p npo-r-path ; FIXME (npo-path npo-r-path) ?? npo newer than npo-r issues sigh make
       (reason-ontology npo-path npo-r-path))
 
