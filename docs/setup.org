@@ -244,8 +244,8 @@ You will need to get API access for an OAuth client.
 4. Download JSON
 5. Add the name of the downloaded JSON file to =(-> google api creds-file)=.
 6. Run the following \\
-   =googapis auth sheets= and \\
-   =googapis auth sheets --readonly=.
+   =googapis auth drive sheets --drive-scopes metadata.readonly= and \\
+   =googapis auth drive sheets --readonly --drive-scopes metadata.readonly=.
 
 Those commands will run the auth workflow and create the
 file specified at =(-> google api store-file)= for you.
