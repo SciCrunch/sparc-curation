@@ -55,7 +55,7 @@ class TriplesExport(ProtcurData):
         return rdflib.Literal(f'{self.folder_name} curation export graph')
 
     def _triples_header(self, ontid, nowish):
-        epoch = nowish.timestamp()
+        epoch = int(nowish.timestamp())  # truncate to second to match iso
         iso = isoformat(nowish)
         ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
         sparc_methods = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
@@ -422,7 +422,7 @@ class TriplesExportIdentifierMetadata(TriplesExport):
     def triples_header(self):
         ontid = self.ontid
         nowish = utcnowtz()
-        epoch = nowish.timestamp()
+        epoch = int(nowish.timestamp())  # truncate to second to match iso
         iso = isoformat(nowish)
         ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
         pos = (
