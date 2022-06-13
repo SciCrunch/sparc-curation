@@ -2896,7 +2896,9 @@ export pipeline, and slightly different images
 import json
 import rdflib
 from pathlib import Path
+from dateutil import parser as dateparser
 from pyontutils.core import OntResPath
+from pyontutils.utils import TZLOCAL, timeformat_friendly
 from pyontutils.namespaces import TEMP, rdf, sparc
 #from sparcur.utils import fromJson, register_all_types  # FIXME this should also go in sparcron
 from sparcur.export.triples import TriplesExportSummary
@@ -3089,6 +3091,9 @@ def main(project_id=None, export_path=None, time_now=None,
         snapshot_path, project_id, time_now, sum_all)
     # write symlink LATEST
     maxdt = max_dataset_or_contents_updated(sum_all['datasets'])
+    dt_maxdt = dateparser.parse(maxdt)
+    dt_maxdt_local = dt_maxdt.astimezone(TZLOCAL())
+    friendly_maxdt_local = timeformat_friendly(dt_maxdt_local)
     # FIXME there are some bad assumptions in here that should be refactored out
     # at some point, but for now we implicitly assume that all datasets come from
     # the same organization, which can easily be violated because we don't check 
@@ -3099,7 +3104,7 @@ def main(project_id=None, export_path=None, time_now=None,
     # this is desirable behavior for development, but could cause issues in other cases
     pexpath = export_path / 'summary' / project_id.uuid
     latest = pexpath / 'LATEST'
-    npath = pexpath / maxdt  # reminder that maxdt is in zulu
+    npath = pexpath / friendly_maxdt_local
     snapshot_link = npath / 'snapshot'
     if not npath.exists():
         npath.mkdir(parents=True)
