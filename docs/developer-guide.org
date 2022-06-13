@@ -3165,7 +3165,7 @@ def from_curation_export_json_path_xml_and_disco(curation_export_json_path):
 
     datasets_json = summary['datasets']
     from_curation_export_json_path_datasets_json_xml_and_disco(
-        curation_export_json_path, datasets_json, graphs)
+        curation_export_json_path, datasets_json)
 
 
 def from_curation_export_json_path_datasets_json_xml_and_disco(
