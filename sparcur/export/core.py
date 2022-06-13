@@ -63,6 +63,23 @@ def latest_ir(org_id=None):
     return export.latest_ir
 
 
+# needed for reuse in simple
+
+def export_xml(filepath_json, dataset_blobs):
+    # xml export TODO paralleize
+    for xml_name, xml in ex.xml(dataset_blobs):
+        with open(filepath_json.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
+            f.write(xml)
+
+
+def export_disco(filepath_json, dataset_blobs, graphs):
+    # datasets, contributors, subjects, samples, resources
+    for table_name, tabular in ex.disco(dataset_blobs, graphs):
+        with open(filepath_json.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
+            writer = csv.writer(f, delimiter='\t', lineterminator='\n')
+            writer.writerows(tabular)
+
+
 class ExportBase:
 
     export_type = None
@@ -597,19 +614,13 @@ class Export(ExportBase):
         return teim
 
     @staticmethod
-    def export_xml(filepath, dataset_blobs):
-        # xml export TODO paralleize
-        for xml_name, xml in ex.xml(dataset_blobs):
-            with open(filepath.with_suffix(f'.{xml_name}.xml'), 'wb') as f:
-                f.write(xml)
+    def export_xml(filepath_json, dataset_blobs):
+        export_xml(filepath_json, dataset_blobs)
 
     @staticmethod
-    def export_disco(filepath, dataset_blobs, teds):
-        # datasets, contributors, subjects, samples, resources
-        for table_name, tabular in ex.disco(dataset_blobs, [t.graph for t in teds]):
-            with open(filepath.with_suffix(f'.{table_name}.tsv'), 'wt') as f:
-                writer = csv.writer(f, delimiter='\t', lineterminator='\n')
-                writer.writerows(tabular)
+    def export_disco(filepath_json, dataset_blobs, teds):
+        graphs = [t.graph for t in teds]
+        export_disco(filepath_json, dataset_blobs, graphs)
 
     def export(self, dataset_paths=tuple(), exclude=tuple()):
         """ export output of curation workflows to file """
