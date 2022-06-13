@@ -899,7 +899,7 @@ function preview-export-rest () {
 # git repos are in ~/files/venvs/sparcur-dev/git
 # use the development pull code
 source ~/files/venvs/sparcur-dev/bin/activate
-source ~/files/venvs/sparcur-dev/git/sparc-cruation/bin/pipeline-functions.sh
+source ~/files/venvs/sparcur-dev/git/sparc-curation/bin/pipeline-functions.sh
 export PYTHONBREAKPOINT=0  # ensure that breakpoints do not hang export
 pushd ~/files/
 PARENT_PATH=$(sparc-time-friendly)
@@ -935,6 +935,29 @@ find -maxdepth 1 -type d -exec sudo chown -R nginx:nginx {} \;
 popd
 #+end_src
 
+*** Export v4
+#+begin_src bash
+source ~/files/venvs/sparcur-dev/bin/activate
+python -m sparcur.simple.combine
+python -m sparcur.simple.disco ~/.local/share/sparcur/export/summary/618*/LATEST/curation-export.json
+#+end_src
+
+Then as root run =combine-sparc-export-to-server=, which is defined as
+follows and should be in =~/.bashrc=.
+#+begin_src bash
+function combine-sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    FULLPATH=$(readlink -f ${SPARCUR_EXPORTS}/summary/618*/LATEST)
+    FOLDERNAME=$(basename "${FULLPATH}")
+    pushd /var/www/sparc/sparc/preview
+    ln -s "${FULLPATH}" "archive/exports/${FOLDERNAME}" \
+    && unlink exports \
+    ; ln -s "archive/exports/${FOLDERNAME}" exports
+    popd
+    echo Export complete. Check results at:
+    echo https://cassava.ucsd.edu/sparc/preview/archive/exports/${FOLDERNAME}
+}
+#+end_src
 *** Reporting
 :PROPERTIES:
 :VISIBILITY: folded
