@@ -1083,6 +1083,13 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             updated = self.getxattr('bf.updated').decode()
             return aug.PathMeta(updated=updated).updated
 
+    def _upload_raw(self):
+        remote, old_remote = (
+            self
+            ._cache_class
+            ._remote_class
+            ._stream_from_local_raw(self))
+
     def upload(self, replace=True, local_backup=False):
         # FIXME we really need a staging area ...
         remote, old_remote = (

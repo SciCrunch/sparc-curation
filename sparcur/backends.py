@@ -1145,6 +1145,11 @@ class BlackfynnRemote(aug.RemotePath):
         return remote.bfobject.upload(local, use_agent=False)
 
     @classmethod
+    def _stream_from_local_raw(cls, local_path):
+        parent_remote = local_path.parent.remote
+        _ = cls._upload(local_path.as_posix(), parent_remote)
+
+    @classmethod
     def _stream_from_local(cls, local_path, replace=True, local_backup=False):
         # FIXME touch_child -> stream data ??? as a bridge to sanity?
         # /packages/ endpoint should allow us to create a new empty package
