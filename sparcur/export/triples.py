@@ -51,9 +51,10 @@ class TriplesExport(ProtcurData):
         raise NotImplementedError
 
     @property
-    def triples_header(self):
-        ontid = self.ontid
-        nowish = utcnowtz()
+    def header_label(self):
+        return rdflib.Literal(f'{self.folder_name} curation export graph')
+
+    def _triples_header(self, ontid, nowish):
         epoch = nowish.timestamp()
         iso = isoformat(nowish)
         ver_ontid = rdflib.URIRef(ontid + f'/version/{epoch}/{self.id}')
@@ -61,21 +62,28 @@ class TriplesExport(ProtcurData):
                                       'NIF-Ontology/sparc/ttl/sparc-methods.ttl')
         sparc_mis_helper = rdflib.URIRef('https://raw.githubusercontent.com/SciCrunch/'
                                          'NIF-Ontology/sparc/ttl/sparc-mis-helper.ttl')
-
         pos = (
             (rdf.type, owl.Ontology),
-            (owl.versionIRI, ver_ontid),
-            (owl.versionInfo, rdflib.Literal(iso)),
             (isAbout, rdflib.URIRef(self.uri_api)),
             (TEMP.hasUriHuman, rdflib.URIRef(self.uri_human)),
-            (rdfs.label, rdflib.Literal(f'{self.folder_name} curation export graph')),
-            (rdfs.comment, self.header_graph_description),
             (owl.imports, sparc_methods),
             (owl.imports, sparc_mis_helper),
+
+            (owl.versionIRI, ver_ontid),
+            (owl.versionInfo, rdflib.Literal(iso)),
+
             (TEMP.TimestampExportStart, rdflib.Literal(self.timestamp_export_start)),
+            (rdfs.label, self.header_label),
+            (rdfs.comment, self.header_graph_description),
         )
         for p, o in pos:
             yield ontid, p, o
+
+    @property
+    def triples_header(self):
+        ontid = self.ontid
+        nowish = utcnowtz()
+        yield from self._triples_header(ontid, nowish)
 
     @property
     def graph(self):
