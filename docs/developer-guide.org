@@ -3221,12 +3221,16 @@ compact them
 
 #+name: compact.py
 #+begin_src python :tangle ../sparcur/simple/compact.py
+"""
+Example:
+    python -m sparcur.simple.compact | xargs -I{} echo tar -cvJf '{}.tar.xz' '{}'
+"""
 from sparcur.paths import Path
 from sparcur.config import auth
 
 
 __dep_cache = {}
-def latest_snapped(dataset_export_path):
+def latest_snapped(dataset_export_path, snapped):
     if dataset_export_path not in __dep_cache:
         cs = set(c for c in dataset_export_path.children if c.is_dir() and not c.is_symlink())
         csnap = cs.intersection(snapped)
@@ -3268,7 +3272,7 @@ def main():
 
     older_not_snap = [
         a for a in all_builds
-        if a not in snapped and a.name < latest_snapped(a.parent)]
+        if a not in snapped and a.name < latest_snapped(a.parent, snapped)]
 
     assert not snapped.intersection(older_not_snap)
 
