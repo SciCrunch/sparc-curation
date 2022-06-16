@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: 3ed9a00b795c37db8be6c0f126f9bb93e6fc9d211ea2e97204244e7735cf8a29; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1\.0; orgstrap-block-checksum: ffb05a046b697a8e464d6b8979d9857e657acc0f640d98d2f4ddb6872d5e1fef; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -28,6 +28,10 @@ exit
 This is an executable org file! Here is an example of how to use it to build an apinatomy model.
 #+begin_src bash
 ./apinatomy.org --model-id keast-bladder
+#+end_src
+It +can also+ /will soon be able to/ deploy ttl files.
+#+begin_src bash
+./apinatomy.org --deploy
 #+end_src
 * ApiNATOMY to RDF/OWL2 conversion
 :PROPERTIES:
@@ -404,7 +408,7 @@ gsx:google-sheet-id
      collect
      ;; TODO consider whether we can somehow use invocation-name invocation-directory so that
      ;; specific versions of emacs are used to run the block instead of always the system version
-     (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets))
+     (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets "--repo" apinat-model-repo))
     (while (< (length apinat-process-results) (length model-ids))
       (sleep-for 5)
       (message "complete: %s/%s" (length apinat-process-results) (length model-ids)))))
@@ -458,8 +462,6 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
       (unwind-protect
           (let* (;(version "TODO datetime etc, or better, read it from the ttl file")
                  (version (int-to-string (time-convert nil 'integer)))
-                 ;; system users have no home, tramp will error without override t
-                 (tramp-histfile-override t)
                  (version-path-local
                   (concat (symbol-name model-id) "/" version "/" (file-name-nondirectory ttl)))
                  (version-path
@@ -473,14 +475,23 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
             ;; if the version already exists, error
             ;; otherwise make it via tramp
             (if (file-directory-p version-path)
+                ;; XXX this call to `file-directory-p' outside where
+                ;; `tramp-histfile-override' is bound to t is critical
+                ;; to prevent the tramp ssh sudo chain from truncating
+                ;; your .bash_history file, see
                 (error "Version exists!")
-              (make-directory (file-name-directory version-path) 'parents)
-              (write-file version-path)
-                                        ;(message "%S %S" version-path-local latest-path)
-              (make-symbolic-link
-               version-path-local
-               latest-path
-               'ok-if-already-exists)))
+              (let ((tramp-histfile-override t))
+                ;; system users have no home, tramp will error without override t
+                ;; XXX WARNING if `tramp-histfile-override' is set to t and somehow
+                ;; the scope of a call affects a local file path or runs on the
+                ;; local system it WILL truncate the history file for the current user ;_;
+                (make-directory (file-name-directory version-path) 'parents)
+                (write-file version-path)
+                ;;(message "%S %S" version-path-local latest-path)
+                (make-symbolic-link
+                 version-path-local
+                 latest-path
+                 'ok-if-already-exists))))
         (kill-buffer (current-buffer))))))
 
 (defun apinat-deploy-models (model-ids)
@@ -977,7 +988,8 @@ obj:   {n_pair}''')
 | Individual |     1714 |    25940 |
 | Statement  |     8274 |   318378 |
 | owl:Class  |      n/a |      395 |
-
+* External links
+https://scicrunch.org/sawg/about/ApiNATOMY
 * Bootstrap :noexport:
 
 #+name: orgstrap
@@ -1019,8 +1031,8 @@ obj:   {n_pair}''')
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '542400910cb9946e13f4d0ee4fae18837e0c9cb81af39a8272b6770ea9453de0
-           (concat ghost "01ed4fd9ce3ca0ea344ba33292c044d5ce1f43a2" "/ow.el"))))
+    (reval 'sha256 '230f8cff6da6aa6514f333e1f0263653d6d8c5f7d633d4a33aa9d9b46598f427
+           (concat ghost "c761da3d5e9d4761335b74cfb43c75df7336f067" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package
@@ -1067,6 +1079,8 @@ obj:   {n_pair}''')
       ((:install)
        (:tangle)
        (:deploy) ; FIXME decouple from build
+       (:after-commit nil)
+       (:after-tag nil)
        (:all)
        (:model-id nil) ; the id of the model to build
        ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
@@ -1085,6 +1099,7 @@ obj:   {n_pair}''')
           (update-all-models-async)
         (update-models (list (intern model-id)))))
     (when deploy
+      (message "argv: %S ac: %S" argv after-commit)
       "TODO")))
 #+end_src
 
