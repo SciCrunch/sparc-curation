@@ -23,7 +23,7 @@ from sparcur.core import (OntId,
                           get_nested_by_key,
                           get_nested_by_type,
                           )
-from sparcur.utils import want_prefixes, log as _log
+from sparcur.utils import want_prefixes, log as _log, PennsieveId
 from sparcur.utils import expand_label_curie, is_list_or_tuple
 from sparcur.paths import Path
 from sparcur.config import auth
@@ -711,7 +711,15 @@ class Report:
     @sheets.Reports.makeReportSheet('id')
     def size(self, ext=None):
         data = self._data_ir()
-        project_path = PurePath(data['prov']['export_project_path'])
+        if 'export_project_path' in data['prov']:
+            project_path = PurePath(data['prov']['export_project_path'])
+        else:
+            # best guess
+            project_path = PurePath(
+                '/var/lib/sparc/files/sparc-datasets/',
+                PennsieveId(data['id']).uuid,
+                'dataset')
+
         rows = [['path', 'id', 'sparse', 'dirs', 'files', 'size', 'hr'],
                 *sorted([[(project_path / m['folder_name']).name
                           if 'folder_name' in m else '',
