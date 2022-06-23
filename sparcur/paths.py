@@ -1037,11 +1037,17 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
 
         return True
 
-    def _symlink_packages_transitive(self):
-        # find all real files
+    def _symlink_packages_transitive(self, remove_circular=True):
+        # the ext4 defaults on are at least an order of magnitude too low to
+        # retain all the broken symlinks for thousands of snapshots, we also
+        # don't particularly need to keep them around
+
+        # find all files
+        # if real file
         # determine if they differ from the cache XXX this is going to be slow right now
         # if not changed remove the file in the tree and symlink it to the package
         # if changed leave the modified file
+        # if broken symlink unlink to keep inodes under control
         for c in self.rchildren:
             if c.cache is not None:  # FIXME need a way to recover the original package?
                 locp = c.cache.local_object_cache_path
@@ -1051,6 +1057,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                     c.unlink()
                     relsym = c.relative_path_to(locp)
                     c.symlink_to(relsym)
+                if remove_circular and c.is_broken_symlink():
+                    c.unlink()
 
     def updated_cache_transitive(self):
         """ fast get the date for the most recently updated cached path """
