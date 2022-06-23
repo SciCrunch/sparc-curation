@@ -492,7 +492,14 @@ class BlackfynnRemote(aug.RemotePath):
             if not hasattr(self, '_cache_updated'):
                 # string comparison of dates fails if the padding
                 # is different, how extremely unfortunate :/
-                dt, sZ = self.bfobject.updated_at.rsplit('.', 1)
+                if '.' in self.bfobject.updated_at:
+                    dt, sZ = self.bfobject.updated_at.rsplit('.', 1)
+                else:
+                    # when someone hits the jackpot aka why you should
+                    # never truncate your iso8601 timestamps :/
+                    dt = self.bfobject.updated_at[:-1]
+                    sZ = 'Z'
+
                 if len(sZ) < 7:
                     self._cache_updated = f'{dt},{sZ[:-1]:0<6}Z'
                 else:
