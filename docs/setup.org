@@ -1195,7 +1195,54 @@ find protocol_json -size -2 -exec cat {} \+
 # check to make sure that there weren't any manually provided caches
 find protocol_json -size -2 -execdir cat ../protocol_json-old/{} \;
 #+end_src
+**** clean up org folders
+:PROPERTIES:
+:CREATED:  [2022-06-22 Wed 21:52]
+:END:
+THIS COMMAND IS DANGEROUS ONLY RUN IT IN =SPARC Consortium= folders that you want to nuke.
+#+begin_src bash :eval never
+find -maxdepth 1 -type d -not -name '.operations' -not -name '.' -exec rm -r {} \;
+#+end_src
+**** clean up broken symlinks in temp-upstream
+:PROPERTIES:
+:CREATED:  [2022-06-22 Wed 21:52]
+:END:
+Unfortunately keeping these around causes inode exhaustion issues.
+Very slow, but only needs to be run once per system since the code has
+been updated to do this during the transitive unsymlink.
+#+begin_src python
+from sparcur.paths import Path
+here = Path.cwd()
+here = Path('/var/lib/sparc/files/sparc-datasets-test')
+bs = [
+    rc
+    for c in here.children
+    for rc in (c / 'SPARC Consortium' / '.operations' / 'temp-upstream').rchildren
+    if rc.is_broken_symlink()]
+_ = [b.unlink() for b in bs]
+#+end_src
+*** datasets causing issues with fetching files
+:PROPERTIES:
+:CREATED:  [2022-02-08 Tue 13:58]
+:END:
+#+name: datasets-with-fetch-errors
+#+begin_src bash :dir ~/files/sparc-datasets-test
+find */SPARC\ Consortium/.operations/temp-upstream/ -type d -name '*-ERROR' | cut -d'/' -f 1 | sort -u
+#+end_src
 
+#+call: datasets-with-fetch-errors() :dir ~/files/sparc-datasets
+
+#+begin_src bash
+python -m sparcur.simple.retrieve --jobs 1 --sparse-limit -1 --parent-parent-path . --dataset-id $1
+pushd $1
+spc export 
+#+end_src
+*** viewing single dataset logs
+#+begin_src bash
+pushd ~/.cache/log/sparcur/datasets
+find -name stdout.log -printf "%T@ %Tc %p\n" | sort -n
+less -R $_some_path
+#+end_src
 ** SODA
 Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
 #+header: :var parent_folder="~/files/blackfynn_local/"
