@@ -649,7 +649,8 @@ class Report:
     @sheets.Reports.makeReportSheet('id')  # FIXME vs path
     def completeness(self, ext=None):
         if self.options.raw:
-            raw = self.summary.completeness
+            sb = self._data_ir()
+            raw = (self.summary._completeness(d) for d in sb['datasets'])
         else:
             from sparcur import export as ex
             datasets = self._data_ir()['datasets']
@@ -701,7 +702,7 @@ class Report:
         rows = [list(r) for r in sorted(
             set(tuple(r) for r in _rows if r),
             key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
-        header = [[f'{i + 1}' for i, _ in enumerate(rows[-1])]]
+        header = [[f'{i + 1}' for i, _ in enumerate(rows[-1])]] if rows else []
         rows = header + rows
         return self._print_table(rows,
                                  title='Keywords Report',
@@ -810,9 +811,9 @@ class Report:
         else:
             pprint.pprint(
                 sorted([(d['meta']['folder_name'],
-                         [e['message'] for e in get_all_errors(d)])
+                         [e['message'] for path, e in get_all_errors(d)])
                         for d in datasets],
-                       key=lambda ab: -len(ab[-1])))
+                       key=lambda ab: (bool(ab), -len(ab[-1]) if ab else 0)))
 
     def pathids(self, ext=None):
         base = self.project_path.parent

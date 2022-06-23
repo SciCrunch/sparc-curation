@@ -1,4 +1,5 @@
 import os
+import uuid
 import atexit
 import shutil
 from tempfile import gettempdir
@@ -12,6 +13,7 @@ from sparcur.paths import Path, PathL
 from sparcur.paths import LocalPath, PrimaryCache
 from sparcur.paths import SymlinkCache
 from sparcur.state import State
+from sparcur.utils import PennsieveId
 from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
 from sparcur.pennsieve_api import FakeBFLocal
@@ -22,8 +24,9 @@ print(template_root)
 _pid = os.getpid()
 path_project_container = this_file.parent / f'test_local-{_pid}'
 project_path = PathL(path_project_container) / 'test_project'
-fake_org_uuid4 = 'bbad875b-9290-405a-9b5c-4c6ea1bc7a70'
-fake_organization = f'L:organization:{fake_org_uuid4}'
+fake_org_uuid4 = '0000dead-f00d-4bad-beef-00f000000000'
+fake_organization = f'N:organization:{fake_org_uuid4}'
+PennsieveId(fake_organization)  # canary
 project_path_real = path_project_container / 'UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:aa859fe9-02d0-4518-981b-012ef8f35c34'
@@ -53,10 +56,8 @@ DIVISION_SLASH = '\u2215'  # what have we done XXX evil
 
 
 def mk_fldr_meta(fldr_path, ftype='collection', id=None):
-    #import uuid
-    #altid = f'N:{ftype}:{uuid.uuid4()}'  # sigh  # XXX don't do this, because we need to be able to validate without that
-    #altid = f'N:{ftype}:' + fldr_path.as_posix()  # use L: to mark local instead of N: as the platform does
-    altid = f'L:{ftype}:' + fldr_path.as_posix()  # use L: to mark local instead of N: as the platform does
+    tuuid = 'deadbeef' + str(uuid.uuid4())[8:]
+    altid = f'N:{ftype}:{tuuid}'  # ok, we validate without remote in a different way
     _id = id if id is not None else altid
     _id = _id.replace('/', DIVISION_SLASH)  # ARGH there must be a way to ensure file system safe ids :/ XXX evil
     _meta = fldr_path.meta

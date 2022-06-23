@@ -18,10 +18,11 @@ def fake_setup(self, *args, **kwargs):
     # utter insanity that cli.Main.__init__ is at the moment ...
 
     if self.anchor.id != fake_organization:
+        self.Remote = self._remote_class._new(self._cache_class._local_class, self._cache_class)
         self._old_setup_bfl()
     else:
-        self.BlackfynnRemote._cache_anchor = self.anchor  # don't trigger remote lookup
-        self.bfl = self.BlackfynnRemote._api = FakeBFLocal(self.anchor.id, self.anchor)
+        self._cache_class._cache_anchor = self.anchor  # don't trigger remote lookup
+        self.bfl = self._remote_class._api = FakeBFLocal(self.anchor.id, self.anchor)
 
 
 sparcur.cli.Main._old_setup_bfl = sparcur.cli.Main._setup_bfl
@@ -44,13 +45,13 @@ def post_main():
     # that can occur because of mutation of class aka global state
     # they really don't teach the fact that class level variables
     # are actually global variables and should be treated with fear
-    sparcur.backends.BlackfynnRemote._new(sparcur.paths.Path,
-                                          sparcur.paths.BlackfynnCache)
+    sparcur.backends.PennsieveRemote._new(sparcur.paths.Path,
+                                          sparcur.paths.PennsieveCache)
 
 
 mains = {'cli-real': [['spc', 'clone', test_organization],
                       ['spc', 'pull'],
-                      ['spc', 'refresh'],
+                      #['spc', 'refresh'],  # XXX insanely slow and no longer used due to brokeness
                       ['spc', 'fetch'],
                       ['spc', 'fetch', '--mbf'],  # FIXME abstract --mbf
                       #['spc', 'report', 'access'],  # TODO no easy way to test this ...
@@ -76,12 +77,14 @@ mains = {'cli-real': [['spc', 'clone', test_organization],
 
                  ['spc', 'tables'],
                  ['spc', 'missing'],
-                 ['spc', 'annos'],
-                 ['spc', 'annos', 'export'],
+                 #['spc', 'annos'],  # XXX insanely slow
+                 #['spc', 'annos', 'export'],  # XXX insanely slow
          ],
 }
 
-mains['cli'] = [args + ['--project-path', project_path.as_posix(), '-N', '--local', '--jobs', '1']
+mains['cli'] = [args +
+                ['--project-path', project_path.as_posix(), '-N', '--local', '--jobs', '1'] +
+                (['--raw'] if 'report' in args else [])
                 for args in mains['cli']]
 _cli_real = mains.pop('cli-real')
 if 'CI' not in os.environ:

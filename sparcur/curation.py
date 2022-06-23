@@ -542,7 +542,7 @@ class Summary(Integrator, ExporterSummarizer):
 
     def __iter__(self):
         for ds in self.iter_datasets:
-            yield ds.data
+            yield ds.data()  # FIXME SIGH can't pass timestamp KILL IT WITH FIRE
 
     @property
     def completeness(self):

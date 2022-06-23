@@ -277,10 +277,9 @@ from sparcur.core import JT
 from sparcur.core import OntId, OntTerm, adops
 from sparcur.utils import GetTimeNow  # top level
 from sparcur.utils import log, logd, loge, bind_file_handler
-from sparcur.utils import register_type, fromJson, BlackfynnId
-from sparcur.paths import Path, BlackfynnCache, StashPath
+from sparcur.utils import register_type, fromJson
+from sparcur.paths import Path, StashPath
 from sparcur.state import State
-from sparcur.backends import BlackfynnRemote
 from sparcur.protocols import ProtocolData
 
 try:
@@ -526,7 +525,8 @@ class Main(Dispatcher):
 
         # FIXME populate this via decorator
         if (self.options.export and not
-            (self.options.schemas or self.options.protcur)):
+            (self.options.schemas or self.options.protcur) or
+            (self.options.report and self.options.raw)):
             pass  # simplify setup for consumers beyond this file
         elif (self.options.clone or
               self.options.meta or
@@ -543,7 +543,6 @@ class Main(Dispatcher):
               self.options.annos or
               self.options.fab or
               (self.options.fix and self.options.cache) or
-              (self.options.report and not self.options.raw) or
               (self.options.report and self.options.size) or
               (self.options.report and self.options.export_file) or
               (self.options.report and self.options.protocols) or
@@ -581,7 +580,7 @@ class Main(Dispatcher):
                 else:
                     raise e
 
-        if self.options.export or self.options.shell:
+        if self.options.export or self.options.shell or self.options.raw:
             self._setup_export()
             #self._setup_ontquery()
 
@@ -1908,9 +1907,9 @@ class Fix(Shell):
         new_dirs = set()
         def make_target(path):
             pm = path._xattr_meta
-            id = BlackfynnId(pm.id, file_id=pm.file_id)
+            id = PennsieveId(pm.id, file_id=pm.file_id)
             uuid = id.uuid
-            # XXX see BlackfynnCache.cache_key for the pattern
+            # XXX see PennsieveCache.cache_key for the pattern
             new_dir = uuid[:2]
             new_dirs.add(lod / new_dir)
             target_suffix = f'{new_dir}/{uuid}-{id.file_id}'

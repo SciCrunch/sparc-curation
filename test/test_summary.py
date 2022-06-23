@@ -1,9 +1,12 @@
 import unittest
-from .common import template_root, project_path
 from sparcur.curation import Summary
 from sparcur.pennsieve_api import FakeBFLocal
+from .common import skipif_no_net, skipif_ci
+from .common import template_root, project_path
 
 
+@skipif_ci
+@skipif_no_net
 class TestSummary(unittest.TestCase):
     def setUp(self):
         try:
