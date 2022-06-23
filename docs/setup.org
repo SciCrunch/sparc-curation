@@ -1468,7 +1468,7 @@ If you make any changes to this section be sure to run =#+SRC= and =#+CALL:= blo
 
 GitHub repositories
 #+NAME: tgbugs-repos
-| augpathlib idlib hyputils orthauth ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap racket-breadcrumb racket-json-view |
+| sxpyr augpathlib idlib hyputils orthauth ontquery parsercomb pyontutils protc rrid-metadata rkdf orgstrap racket-breadcrumb racket-json-view |
 #+NAME: sci-repos
 | NIF-Ontology scibot sparc-curation |
 #+NAME: other-repos
@@ -1476,7 +1476,7 @@ GitHub repositories
 
 Repository local roots. The ordering of the entries matters.
 #+NAME: py-roots
-| augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
+| sxpyr augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
 #+NAME: rkt-roots
 | qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid sparc-curation/sparcur_internal/sparcur NIF-Ontology/ |
 # note that breadcrumb and json-view are not in this list due to the need to use raco pkg install --name
@@ -1500,7 +1500,7 @@ return [' '.join(out)]
 
 #+NAME: repos
 #+RESULTS: repos-code
-| https://github.com/tgbugs/augpathlib https://github.com/tgbugs/idlib https://github.com/tgbugs/hyputils https://github.com/tgbugs/orthauth https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/tgbugs/racket-breadcrumb https://github.com/tgbugs/racket-json-view https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
+| https://github.com/tgbugs/sxpyr https://github.com/tgbugs/augpathlib https://github.com/tgbugs/idlib https://github.com/tgbugs/hyputils https://github.com/tgbugs/orthauth https://github.com/tgbugs/ontquery https://github.com/tgbugs/parsercomb https://github.com/tgbugs/pyontutils https://github.com/tgbugs/protc https://github.com/tgbugs/rrid-metadata https://github.com/tgbugs/rkdf https://github.com/tgbugs/orgstrap https://github.com/tgbugs/racket-breadcrumb https://github.com/tgbugs/racket-json-view https://github.com/SciCrunch/NIF-Ontology https://github.com/SciCrunch/scibot https://github.com/SciCrunch/sparc-curation https://github.com/Ophirr33/pda https://github.com/zussitarze/qrcode |
 
 ** Variables testing
 #+CAPTION: testing
@@ -1534,6 +1534,7 @@ echo "'"
 #+RESULTS: remote-exports-code
 #+begin_src bash
 export REPOS='
+https://github.com/tgbugs/sxpyr
 https://github.com/tgbugs/augpathlib
 https://github.com/tgbugs/idlib
 https://github.com/tgbugs/hyputils
@@ -1554,6 +1555,7 @@ https://github.com/Ophirr33/pda
 https://github.com/zussitarze/qrcode
 '
 export PYROOTS='
+sxpyr
 augpathlib
 idlib
 pyontutils/htmlfn
@@ -1579,6 +1581,7 @@ protc/protc-tools
 rkdf/rkdf-lib
 rkdf/rkdf
 rrid-metadata/rrid
+sparc-curation/sparcur_internal/sparcur
 NIF-Ontology/
 '
 #+end_src
@@ -1947,6 +1950,7 @@ _*NOTE: DO NOT EDIT THE CODE BELOW IT WILL BE OVERWRITTEN.*_
 #+RESULTS:
 #+begin_src bash
 export REPOS='
+https://github.com/tgbugs/sxpyr
 https://github.com/tgbugs/augpathlib
 https://github.com/tgbugs/idlib
 https://github.com/tgbugs/hyputils
@@ -1967,6 +1971,7 @@ https://github.com/Ophirr33/pda
 https://github.com/zussitarze/qrcode
 '
 export PYROOTS='
+sxpyr
 augpathlib
 idlib
 pyontutils/htmlfn
@@ -1992,9 +1997,8 @@ protc/protc-tools
 rkdf/rkdf-lib
 rkdf/rkdf
 rrid-metadata/rrid
+sparc-curation/sparcur_internal/sparcur
 NIF-Ontology/
-racket-breadcrumb/
-racket-json-view/
 '
 #+end_src
 * Bootstrap :noexport:
