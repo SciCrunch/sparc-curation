@@ -1542,10 +1542,18 @@ class RemoteDatasetData:
 
         pm = self.bfobject.publishedMetadata
         if pm is not None:
+            # note that there are discover records for unpublished
+            # datasets but there is no mapping to the internal
+            # accession id so we would never be able to find them
+            # given the way bfobject.publishedMetadata works
             blob['id_published'] = pm['id']
             # TODO identify the additional information that we want to embed
             blob['published_version'] = pm['version']
             blob['published_revision'] = pm['revision']
+            if 'versionPublishedAt' in pm:
+                blob['timestamp_published_version'] = pm['versionPublishedAt']
+            # TODO do we want to save the published file manifest in the cache?
+            # some of them can be ... quite large
 
         with open(self.cache, 'wt') as f:
             json.dump(blob, f, indent=2, sort_keys=True, cls=self._JEncode)
