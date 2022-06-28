@@ -3915,8 +3915,13 @@ def prepare_dataset_cleaned(dataset_path, cleaned_path=None, time_now=None):
 
 
 def from_dataset_path_metadata_file_paths(dataset_path):
-    # FIXME TODO shouldn't this be ALL xlsx files?
-    return rglob(dataset_path, '*.xlsx')
+    matches = []
+    for candidate in rglob(dataset_path, '*.xlsx'):
+        rp = candidate.relative_path_from(dataset_path)
+        if not rp.parent.name or 'anifest' in rp.name:
+            matches.append(candidate)
+
+    return matches
 
 
 def from_path_cleaned_object(path):
