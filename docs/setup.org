@@ -744,7 +744,7 @@ function Git-Pull-All {
    *INSTEAD* use =rsync -X -u -v=. \\
    =cp= does not remove absent fields from xattrs of the file previously
    occupying that name! OH NO (is this a =cp= bug!?)
-*** Get data
+*** COMMENT Get data
 :PROPERTIES:
 :CUSTOM_ID: get-data
 :VISIBILITY: folded
@@ -802,7 +802,7 @@ rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local
 =-v= verbose
 =-r= recursive
 =-e= remote shell to use
-*** Fetch missing files
+*** COMMENT Fetch missing files
 :PROPERTIES:
 :VISIBILITY: folded
 :END:
@@ -993,7 +993,7 @@ import rdflib
 from pyontutils.core import OntResIri
 from pyontutils.namespaces import sparc, TEMP, dc, rdfs
 
-ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl')
 g = ori.graph
 gns = g.namespace_manager
 
@@ -1220,7 +1220,8 @@ here = Path('/var/lib/sparc/files/sparc-datasets-test')
 bs = [
     rc
     for c in here.children
-    for rc in (c / 'SPARC Consortium' / '.operations' / 'temp-upstream').rchildren
+    for rd in (c / 'SPARC Consortium' / '.operations' / 'temp-upstream').rchildren_dirs
+    for rc in rd.children
     if rc.is_broken_symlink()]
 _ = [b.unlink() for b in bs]
 #+end_src
@@ -1901,6 +1902,7 @@ for repo_url in ${REPOS}; do git clone ${repo_url}.git 2>&1; done
 popd
 #+END_SRC
 
+# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX WARNING --user may be COMPLETELY BROKEN on macos !??!?!
 #+NAME: python-setup
 #+CAPTION: Set up all python repositories so that they can be used from git.
 #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.
@@ -1908,7 +1910,7 @@ popd
 #+BEGIN_SRC bash :results output :eval no-export
 [ -z $VIRTUAL_ENV ] || pip install --user wheel  # if in a venv wheel will be missing
 pushd ~/git
-for repo in ${PYROOTS}; do pushd ${repo}; pip install --user --editable .[dev,test] 2>&1 || break; popd; done
+for repo in ${PYROOTS}; do pushd ${repo}; python3 -m pip install --user --editable .[dev,test] 2>&1 || break; popd; done
 popd
 #+END_SRC
 
