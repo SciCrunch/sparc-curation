@@ -205,25 +205,13 @@ SELECT DISTINCT
 ?dataset
 ?about
 WHERE {
-    ?dataset rdf:type sparc:Dataset .
-    ?dataset isAbout: ?about .
+  ?type rdfs:subClassOf* sparc:Resource .
+  ?dataset rdf:type ?type .
+  ?dataset isAbout: ?about .
 }
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | about                                       |
-|----------------------------------------------+---------------------------------------------|
-| dataset:013224e7-e3e3-4d8a-90ef-d1b237323eff | cardiac                                     |
-| dataset:013224e7-e3e3-4d8a-90ef-d1b237323eff | elelectrophysiology                         |
-| dataset:013224e7-e3e3-4d8a-90ef-d1b237323eff | patch clamp                                 |
-| dataset:013224e7-e3e3-4d8a-90ef-d1b237323eff | UBERON:0002240                              |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | Laser Capture Microdissection               |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | Molecular Phenotype Gradients of Cell Types |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | Rat Intracardiac Neurons                    |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | Single Neuron Transcriptomics               |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | NCBITaxon:10116                             |
-| dataset:0170271a-8fac-4769-a8f5-2b9520291d03 | UBERON:0000948                              |
 **** Dataset subjects
 #+name: dataset-subjects
 #+begin_src sparql
@@ -286,34 +274,14 @@ SELECT DISTINCT
 ?dataset
 ?species
 WHERE {
-    #VALUES ?species { "human" "homo sapiens" "homo sapien (human)" } .
     ?dataset TEMP:isAboutParticipant ?subject .
     ?subject sparc:animalSubjectIsOfSpecies ?species .
-    FILTER ( CONTAINS(str(?species), "human") || CONTAINS(str(?species), "homo sapiens") || ?species = NCBITaxon:9606 )
+    FILTER ( CONTAINS(str(?species), "human")
+          || CONTAINS(str(?species), "homo sapiens")
+          || ?species = NCBITaxon:9606 )
 }
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| dataset                                      | species             |
-|----------------------------------------------+---------------------|
-| dataset:3b28ba19-e7ca-4ee2-be69-34029c31060a | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | homo sapien (human) |
-| dataset:b0c104b4-f448-4a33-9adb-33704a1890f8 | homo sapien (human) |
-| dataset:194f0c6e-cfd5-4a40-9904-713c14111f80 | NCBITaxon:9606      |
-| dataset:217920c9-08cc-4680-99ff-d321b0484098 | NCBITaxon:9606      |
-| dataset:55c5b69c-a5b8-4881-a105-e4048af26fa5 | NCBITaxon:9606      |
-| dataset:57466879-2cdd-4af2-8bd6-7d867423c709 | NCBITaxon:9606      |
-| dataset:6d6818f2-ef75-4be5-9360-8d37661a8463 | NCBITaxon:9606      |
-| dataset:6f657e63-735b-4ef0-9f31-06b8c2077703 | NCBITaxon:9606      |
-| dataset:7a338939-fd82-4dbe-a1c0-3c0632fdd7ef | NCBITaxon:9606      |
-| dataset:7d3aed89-ca43-41f5-9f21-e4bbce0d5888 | NCBITaxon:9606      |
-| dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | NCBITaxon:9606      |
-| dataset:093c54b7-34c3-4204-9cea-0e2bdfd1fa93 | NCBITaxon:9606      |
-| dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | NCBITaxon:9606      |
-| dataset:a698310c-6310-4de4-83be-39e2f539581c | NCBITaxon:9606      |
-| dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | NCBITaxon:9606      |
-| dataset:c34c5b05-4934-4a17-953c-069adf3aec46 | NCBITaxon:9606      |
 
 **** Dataset human subjects and samples
 #+begin_src sparql :var limit="10"
@@ -2255,6 +2223,7 @@ select distinct ?s ?p where {
 *** TODO costimulation by location
 *** neupop by region
 # FIXME if missing :session breaks on evil =o=
+#+name: py-nbr-1
 #+begin_src jupyter-python :session pys :noweb yes :results none :var remove=(and "sigh")
 <<py-neupop-helper>>
 import seaborn
@@ -2275,6 +2244,7 @@ blobs = [neupop_blob(id) for id in ids]
 id_label = {n['id']:n['lbl'] if 'lbl' in n and n['lbl'] else n['id'] for blob in blobs for n in blob['nodes']}
 #+end_src
 
+#+name: py-nbr-2
 #+begin_src jupyter-python :session pys
 _ext_all = sorted(set([obj(e) for b in blobs for e in b['edges'] if pred(e, 'apinatomy:ontologyTerms')]))
 ext_pop = {i:set([obj(e) for e in blob['edges'] if pred(e, 'apinatomy:ontologyTerms')]) for i, blob in zip(ids, blobs)}
@@ -2475,6 +2445,7 @@ run the blocks in the section above first
 sorted([[a, *sorted(b)] for a, b in ext_pop.items()])
 #+end_src
 
+#+name: py-nbr-3
 #+begin_src jupyter-python :session pys
 from neurondm import Neuron, Phenotype, EntailedPhenotype, Config
 from pyontutils.namespaces import ilxtr, owl, skos, rdfs
@@ -2487,6 +2458,12 @@ to_remove = [t for t in config._written_graph if t[1] in (owl.equivalentClass, i
 [config._written_graph.add(t) for t in to_mod]
 config._written_graph.write()
 config.write_python()
+#+end_src
+
+#+begin_src jupyter-python :noweb yes :session pys :var remove=(and "sigh")
+<<py-nbr-1>>
+<<py-nbr-2>>
+<<py-nbr-3>>
 #+end_src
 
 *** region by region

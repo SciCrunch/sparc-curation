@@ -17,7 +17,7 @@ class TestCurationExportTtl(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.ori = OntResIri('https://cassava.ucsd.edu/sparc/exports/curation-export.ttl')
+        cls.ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl')
         cls.graph = cls.ori.graph
         cls.nsm = cls.graph.namespace_manager
         cls.spaql_templates = SparqlQueries(cls.nsm)
@@ -47,17 +47,15 @@ class TestCurationExportTtl(unittest.TestCase):
         assert len(res) > 0
 
     def test_dataset_subjects(self):
-        subj = rdflib.URIRef('https://api.blackfynn.io/datasets/'
-                             'N:dataset:c2a014b8-2c15-4269-b10a-3345420e3d56/subjects/53')
+        subj = rdflib.URIRef('https://api.pennsieve.io/datasets/'
+                             'N:dataset:c2a014b8-2c15-4269-b10a-3345420e3d56/subjects/sub-53')
         query = self.spaql_templates.dataset_subjects()
         res = list(self.graph.query(query, initBindings={'startsubj': subj}))
         self.pp(res)
         assert len(res) > 0
 
     def test_dataset_groups(self):
-        #subj = rdflib.URIRef('https://api.blackfynn.io/datasets/'
-                             #'N:dataset:c2a014b8-2c15-4269-b10a-3345420e3d56/subjects/53')
-        subj = rdflib.URIRef('https://api.blackfynn.io/datasets/'
+        subj = rdflib.URIRef('https://api.pennsieve.io/datasets/'
                              'N:dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c/samples/104_sample4')
         query = self.spaql_templates.dataset_groups()
         res = list(self.graph.query(query, initBindings={'startsubj': subj}))
@@ -84,8 +82,11 @@ class TestCurationExportTtl(unittest.TestCase):
         for award, affil in res:
             award = self.nsm._qhrm(award)
             if isinstance(affil, rdflib.URIRef):
-                ror = idlib.Ror(affil)
-                affil = f'{ror.identifier.curie} ({ror.label})'
+                try:
+                    ror = idlib.Ror(affil)
+                    affil = f'{ror.identifier.curie} ({ror.label})'
+                except idlib.exceptions.IdDoesNotExistError:
+                    affil = f'{affil} (DOES NOT EXIST ERROR)'
             else:
                 continue  # skip these for now
                 affil = affil.toPython()
@@ -124,7 +125,7 @@ class TestCurationExportTtl(unittest.TestCase):
 class TestProtcurTtl(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        iri = 'https://cassava.ucsd.edu/sparc/preview/exports/protcur.ttl'
+        iri = 'https://cassava.ucsd.edu/sparc/ontologies/protcur.ttl'
         cls.graph = OntGraph().parse(iri, format='ttl')
         cls.nsm = cls.graph.namespace_manager
         cls.spaql_templates = SparqlQueries(cls.nsm)
