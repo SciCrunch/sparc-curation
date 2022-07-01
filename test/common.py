@@ -13,7 +13,7 @@ from sparcur.paths import Path, PathL
 from sparcur.paths import LocalPath, PrimaryCache
 from sparcur.paths import SymlinkCache
 from sparcur.state import State
-from sparcur.utils import PennsieveId
+from sparcur.utils import PennsieveId, log
 from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
 from sparcur.pennsieve_api import FakeBFLocal
@@ -170,6 +170,16 @@ class RealDataHelper:
         slot = slot if slot.exists() else None
         cls.organization_id = auth.get('remote-organization')
         cls.Remote = cls._remote_class._new(Path, cls._cache_class)
+        if (hasattr(cls.Remote, '_api') and
+            not isinstance(cls.Remote._api, cls.Remote._api_class)):
+            log.warning(f'stale _api on remote {cls.Remote._api}')
+            for cls in self.Remote.mro():
+                if hasattr(cls, '_api'):
+                    try:
+                        del cls._api
+                    except AttributeError as e:
+                        pass
+
         cls.Remote.init(cls.organization_id)
         cls.anchor = cls.Remote.smartAnchor(path_project_container)
         cls.anchor.local_data_dir_init(symlink_objects_to=slot)

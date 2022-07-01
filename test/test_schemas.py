@@ -115,6 +115,7 @@ class TestContributorNamePatternRegex(unittest.TestCase):
             'Di Last, First Middle',
             'Von Last, First Middle',
             'van Last, First Middle',
+            'Last-Last, First-First',
         )
         schema = self.schema()
         for s in strings:

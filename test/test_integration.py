@@ -8,6 +8,7 @@ import sparcur
 import sparcur.cli
 import sparcur.paths
 import sparcur.backends
+from sparcur.utils import log
 from sparcur.pennsieve_api import FakeBFLocal
 
 
@@ -18,12 +19,17 @@ def fake_setup(self, *args, **kwargs):
     # utter insanity that cli.Main.__init__ is at the moment ...
 
     if self.anchor.id != fake_organization:
-        self.__class__.Remote = self._remote_class._new(
+        self.Remote = self._remote_class._new(
             self._cache_class._local_class, self._cache_class)
-        if (hasattr(self.__class__.Remote, '_api') and
-            not isinstance(self.__class__.Remote._api, self.__class__.Remote._api_class)):
-            log.warning(f'stale _api on remote {self.__class__.Remote._api}')
-            del self.__class__.Remote._api
+        if (hasattr(self.Remote, '_api') and
+            not isinstance(self.Remote._api, self.Remote._api_class)):
+            log.warning(f'stale _api on remote {self.Remote._api}')
+            for cls in self.Remote.mro():
+                if hasattr(cls, '_api'):
+                    try:
+                        del cls._api
+                    except AttributeError as e:
+                        pass
 
         self._old_setup_bfl()
     else:

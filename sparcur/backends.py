@@ -1,6 +1,7 @@
 import os
 import json
 from pathlib import PurePosixPath, PurePath
+from dateutil import parser as dateparser
 import idlib
 import augpathlib as aug
 from augpathlib import PathMeta
@@ -1551,7 +1552,9 @@ class RemoteDatasetData:
             blob['published_version'] = pm['version']
             blob['published_revision'] = pm['revision']
             if 'versionPublishedAt' in pm:
-                blob['timestamp_published_version'] = pm['versionPublishedAt']
+                # parse the date to avoid known pennsieve truncation issues
+                vpa = dateparser.parse(pm['versionPublishedAt'])
+                blob['timestamp_published_version'] = vpa
             # TODO do we want to save the published file manifest in the cache?
             # some of them can be ... quite large
 
