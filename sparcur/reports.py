@@ -77,7 +77,7 @@ class SparqlQueries:
         query = """
             SELECT ?dataset
             WHERE {
-                ?dataset rdf:type sparc:Resource .
+                ?dataset rdf:type sparc:Dataset .
                 ?dataset isAbout: ?about .
             }
         """
@@ -131,9 +131,11 @@ class SparqlQueries:
         query = """
             SELECT DISTINCT ?dataset
             WHERE {
-                VALUES ?species { "human" "homo sapiens" } .
                 ?dataset TEMP:isAboutParticipant ?subject .
                 ?subject sparc:animalSubjectIsOfSpecies ?species .
+                FILTER ( CONTAINS(str(?species), "human")
+                      || CONTAINS(str(?species), "homo sapiens")
+                      || ?species = NCBITaxon:9606 )
             }
         """
         return self.sparql.prepareQuery(query, initNs=self.prefixes)

@@ -18,7 +18,13 @@ def fake_setup(self, *args, **kwargs):
     # utter insanity that cli.Main.__init__ is at the moment ...
 
     if self.anchor.id != fake_organization:
-        self.Remote = self._remote_class._new(self._cache_class._local_class, self._cache_class)
+        self.__class__.Remote = self._remote_class._new(
+            self._cache_class._local_class, self._cache_class)
+        if (hasattr(self.__class__.Remote, '_api') and
+            not isinstance(self.__class__.Remote._api, self.__class__.Remote._api_class)):
+            log.warning(f'stale _api on remote {self.__class__.Remote._api}')
+            del self.__class__.Remote._api
+
         self._old_setup_bfl()
     else:
         self._cache_class._cache_anchor = self.anchor  # don't trigger remote lookup
