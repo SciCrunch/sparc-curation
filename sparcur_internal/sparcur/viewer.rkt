@@ -236,6 +236,7 @@
 
 (define (update-viewer)
   "stash and pull all git repos, rebuild the viewer"
+  ;; FIXME the menu option should be disabled if on a system where this is broken/banned
   ; find the git repos
   (if update-running?
       (println "Update is already running!")
@@ -435,6 +436,7 @@
   (id-short ds)
   (id-uuid ds)
   (uri-human ds)
+  (uri-sds-viewer ds)
   (dataset-src-path ds)
   (dataset-export-latest-path ds)
   (dataset-cleaned-latest-path ds)
@@ -644,7 +646,10 @@
      ; FIXME derive from file system
      "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0")
    (define (uri-human ds)
-     (string-append "https://app.pennsieve.io/" (id-project ds) "/datasets/N:dataset:" (id-uuid ds)))])
+     (string-append "https://app.pennsieve.io/" (id-project ds) "/datasets/N:dataset:" (id-uuid ds)))
+   (define (uri-sds-viewer ds)
+     ; FIXME hardcoded
+     (string-append "https://metacell.github.io/sds-viewer/?id=" (id-uuid ds)))])
 
 (define (set-datasets-view! list-box datasets)
   (send/apply list-box set (apply map list (map lb-cols datasets)))
@@ -827,6 +832,9 @@
 (define (cb-open-dataset-remote obj event)
   (xopen-path (uri-human (current-dataset))))
 
+(define (cb-open-dataset-sds-viewer obj event)
+  (xopen-path (uri-sds-viewer (current-dataset))))
+
 (define (cb-manifest-report obj event #:show [show #t])
   (let ([lp (dataset-export-latest-path (current-dataset))])
     ; this was moved from the fast branch of dataset-jview!
@@ -843,6 +851,7 @@
   ; TODO implement this as a method on edcanv-man-rep ?
   (let ((ed (send edcanv-man-rep get-editor)))
     (send ed select-all)
+    ;; FIXME somehow select-all clear does not work if the cursor is moved manually?
     (send ed clear)
     (send ed insert (with-output-to-string (λ () (manifest-report))))
     (send ed scroll-to-position 0))
@@ -1095,19 +1104,10 @@ switch to that"
                             [callback cb-fetch-export-dataset]
                             [parent panel-ds-actions]))
 
-(define button-fetch (new (tooltip-mixin button%)
-                          [label "Fetch"]
-                          [tooltip "Shortcut <not-set>"]
-                          [tooltip-delay 100]
-                          [callback cb-fetch-dataset]
-                          [parent panel-ds-actions]))
-
-(define button-export-dataset (new (tooltip-mixin button%)
-                                   [label "Export"]
-                                   [tooltip "Shortcut C-x"]
-                                   [tooltip-delay 100]
-                                   [callback cb-export-dataset]
-                                   [parent panel-ds-actions]))
+(define button-open-dataset-folder (new button%
+                                        [label "Open Folder"]
+                                        [callback cb-open-dataset-folder]
+                                        [parent panel-ds-actions]))
 
 ; FIXME there is currently no way to go back to viewing the local
 ; export without running export or restarting
@@ -1116,30 +1116,18 @@ switch to that"
                                      [callback cb-load-remote-json]
                                      [parent panel-ds-actions]))
 
-; FXIME probably goes in the bottom row of a vertical panel
-(define button-toggle-expand (new button%
-                                  [label "Expand All"]
-                                  [callback cb-toggle-expand]
-                                  [parent panel-ds-actions]))
-(send button-toggle-expand enable #f) ; XXX remove when implementation complete
-
-(define button-open-dataset-folder (new button%
-                                        [label "Open Folder"]
-                                        [callback cb-open-dataset-folder]
-                                        [parent panel-ds-actions]))
-
-(define button-open-dataset-remote (new button%
-                                        [label "Open Remote"]
-                                        [callback cb-open-dataset-remote]
-                                        [parent panel-ds-actions]))
+(define button-open-dataset-sds-viewer (new button%
+                                            [label "Viewer"]
+                                            [callback cb-open-dataset-sds-viewer]
+                                            [parent panel-ds-actions]))
 
 (define button-manifest-report (new button%
-                                    [label "Manifest Report"]
+                                    [label "Manifest Report"] ; used sometimes
                                     [callback cb-manifest-report]
                                     [parent panel-ds-actions]))
 
 (define button-clean-metadata-files (new button%
-                                         [label "Clean Metadata"]
+                                         [label "Clean Metadata"] ; 5 star
                                          [callback cb-clean-metadata-files]
                                          [parent panel-ds-actions]))
 
@@ -1149,18 +1137,53 @@ switch to that"
                                        [callback cb-open-export-folder]
                                        [parent panel-ds-actions]))
 
+#; ; never used ; FXIME probably goes in the bottom row of a vertical panel
+(define button-toggle-expand (new button%
+                                  [label "Expand All"]
+                                  [callback cb-toggle-expand]
+                                  [parent panel-ds-actions]))
+#;
+(send button-toggle-expand enable #f) ; XXX remove when implementation complete
+#;
+(send button-toggle-expand show #f)
+
+;; power user panel
+
+(define panel-power-user (new horizontal-panel%
+                              [stretchable-height #f]
+                              [parent frame-helper]))
+(when (power-user?)
+  (send panel-power-user reparent panel-ds-actions))
+
+(define button-fetch (new (tooltip-mixin button%)
+                          [label "Fetch"] ; curation does not use
+                          [tooltip "Shortcut <not-set>"]
+                          [tooltip-delay 100]
+                          [callback cb-fetch-dataset]
+                          [parent panel-power-user]))
+
+(define button-export-dataset (new (tooltip-mixin button%)
+                                   [label "Export"] ; curation does not use
+                                   [tooltip "Shortcut C-x"]
+                                   [tooltip-delay 100]
+                                   [callback cb-export-dataset]
+                                   [parent panel-power-user]))
+
+(define button-open-dataset-remote (new button%
+                                        ; curation doesn't use this, flow is inverted
+                                        [label "Remote"]
+                                        [callback cb-open-dataset-remote]
+                                        [parent panel-power-user]))
+
 (define button-open-export-json (new button%
-                                         [label "Open JSON"]
+                                         [label "JSON"]
                                          [callback cb-open-export-json]
-                                         [parent panel-ds-actions]))
+                                         [parent panel-power-user]))
 
 (define button-open-export-ipython (new button%
-                                         [label "Open IPython"]
+                                         [label "IPython"]
                                          [callback cb-open-export-ipython]
-                                         [parent panel-ds-actions]))
-
-(send button-open-export-json show (power-user?))
-(send button-open-export-ipython show (power-user?))
+                                         [parent panel-power-user]))
 
 ;; manifest report
 
@@ -1240,8 +1263,10 @@ switch to that"
                                   [callback (λ (o e)
                                               (power-user? (not (power-user?)))
                                               ; XXX these can get out of sync
-                                              (toggle-show button-open-export-json)
-                                              (toggle-show button-open-export-ipython))]
+                                              (send panel-power-user reparent
+                                                    (if (power-user?)
+                                                        panel-ds-actions
+                                                        frame-helper)))]
                                   [parent panel-prefs-holder]))
 
 (define button-prefs-path
