@@ -1406,4 +1406,8 @@ switch to that"
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (cb-dataset-selection lview #f)
-  (render-datasets))
+  (unless (eq? (system-type) 'unix)
+    ; do NOT run this when gtk is the windowing toolkit it will eat up
+    ; tens of gigs of memory, windows and macos don't have the issue
+    ; it also takes multiple minutes to run due to all the allocations?
+    (render-datasets)))
