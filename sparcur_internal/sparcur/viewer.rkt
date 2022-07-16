@@ -50,8 +50,51 @@
                                 ; osx is still stuck on 2.7 by default so need brew
                                 ; but for whatever reason find-executable-path is not brew aware
                                 ((macosx) "/usr/local/bin/python3")
-                                ((unix) "python") ; all of these should be >= 3.7 by this point
+                                ((unix) (or (find-executable-path "pypy3") "python")) ; all of these should be >= 3.7 by this point
                                 (else (error "uhhhhh? beos is this you?")))))))
+(define terminal-emulator
+  (begin
+    #;
+    (sort (environment-variables-names (current-environment-variables)) bytes<?)
+    (for/or ([emu '("urxvt"
+                    "xfce4-terminal"
+                    "konsole"
+                    "gnome-terminal"
+                    #; ; here's a nickle kid, go buy yourself a real terminal emulator
+                    "xterm")]
+             [args (list "-cd" ; urxvt
+                         "--default-working-directory" ; xfce4-terminal
+                         "--workdir" ; konsole
+                         "--working-directory" ; gnome-terminal
+                         #; ; xterm
+                         (lambda (ps) (format "-e 'cd \"~a\"; ~a'" ps (getenv "SHELL"))))])
+      (let ([ep (find-executable-path emu)])
+        (and ep (list ep args))))))
+
+(define (unix-vt path-string)
+  (append terminal-emulator (list path-string)))
+
+(define (win-vt path-string)
+  (list (find-executable-path "cmd") "/c" "start"
+        "powershell" "-NoLogo" "-WindowStyle" "normal" "-WorkingDirectory" path-string))
+
+(define (macos-vt path-string)
+  ;; oh the horror ... racket -> osascript -> bash/zsh/whoevenknows
+  ;; and yes, users put single quotes in their dataset names ALL THE TIME AAAAAAAAAAAAAAAAAAAAAAAAA
+  (let* ([ps (string-replace (string-replace path-string "'" "\\'") "\"" "\\\"")]
+         [horror (format "tell application \"Terminal\" to do script \"cd '~a'\"" ps)])
+    (list (find-executable-path "osascript") "-e" horror)))
+
+(define (vt-at-path path [os #f])
+  (case (or os (system-type))
+    ((unix) (unix-vt path))
+    ((macosx) (macos-vt path))
+    ((windows) (win-vt path))))
+
+;; string constants
+
+(define msg-dataset-not-fetched "Dataset has not been fetched yet!")
+(define msg-dataset-not-exported "Dataset has not been exported yet!")
 
 ;; other variables
 
@@ -127,19 +170,35 @@
         (append argv '("--log-level" "DEBUG"))
         argv)))
 
-(define (argv-open-ipython ds)
+(define (argv-open-dataset-shell ds)
+  (let ([path (dataset-src-path ds)])
+    (if (directory-exists? path)
+        (let ([dpath (resolve-relative-path (build-path path "dataset"))])
+          (vt-at-path dpath)
+          #;
+          (cons terminal-emulator ; FIXME find the right terminal emulator
+                (cons "-cd"
+                      (list dpath))))
+        (begin (println msg-dataset-not-fetched) #f))))
+
+(define (argv-open-export-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
                 [(parent name dir?) (split-path path)]
-                [(path-meta-path) (build-path parent "path-metadata.json")])
-    (cons "/usr/bin/urxvt" ; FIXME find the right terminal emulator
-          (cons "-e" ; FIXME running without bash loses readline somehow
-                (cons "rlwrap"
-                      (python-mod-args
-                       "IPython"
-                       "-i" "-c"
-                       ; LOL PYTHON can't use with in the special import line syntax SIGH
-                       (format "import json;print('~a');f = open('~a', 'rt');blob = json.load(f);f.close();f = open('~a', 'rt');path_meta = json.load(f);f.close()"
-                               parent path path-meta-path)))))))
+                [(path-meta-path) (build-path parent "path-metadata.json")]
+                [(python-code) ; LOL PYTHON can't use with in the special import line syntax SIGH
+                 (format "import json;print('~a');f = open('~a', 'rt');\
+                          blob = json.load(f);f.close();f = open('~a', 'rt');\
+                          path_meta = json.load(f);f.close()"
+                         parent path path-meta-path)])
+    (if (directory-exists? parent)
+        (append (unix-vt parent)
+                (cons "-e" ; FIXME running without bash loses readline somehow
+                      (cons "rlwrap"
+                            (python-mod-args
+                             "IPython"
+                             "-i" "-c"
+                             python-code))))
+        (begin (println msg-dataset-not-exported) #f))))
 
 ;; utility functions
 
@@ -505,6 +564,7 @@
                (begin
                  (when (equal? ds selected-dataset)
                    (send button-export-dataset enable #t)
+                   (send button-open-dataset-shell enable #t)
                    (send button-clean-metadata-files enable #t))
                  (println (format "dataset fetch completed for ~a" (dataset-id ds))))
                (println (format "dataset fetch FAILED for ~a" (dataset-id ds)))))))))
@@ -564,6 +624,7 @@
                        ; this dataset in the background thread and it shouldn't block the ui
                        (when (equal? ds selected-dataset)
                          (send button-export-dataset enable #t)
+                         (send button-open-dataset-shell enable #t)
                          (send button-clean-metadata-files enable #t))
                        (dataset-jview! ds #:update #t #:background #t)
                        (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
@@ -731,6 +792,7 @@
         (if (equal? selected-dataset (current-dataset))
             (let ([enable? (link-exists? symlink)])
               (send button-export-dataset enable enable?)
+              (send button-open-dataset-shell enable enable?)
               (send button-clean-metadata-files enable enable?))
             (void)
             #; ; yep, this case does happen :)
@@ -762,6 +824,9 @@
     (unless status
       (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
     result))
+
+(define (cb-toggle-prefs o e)
+  (send frame-preferences show (not (send frame-preferences is-shown?))))
 
 (define (cb-refresh-dataset-metadata obj event)
   ; XXX requries python sparcur to be installed
@@ -808,26 +873,30 @@
                   (case (system-type 'os*)
                     ((linux) "xdg-open")
                     ((macosx) "open")
-                    ;((windows) "start") ; XXX only works from powerhsell it seems
+                    ;((windows) "start") ; XXX only works from powerhsell it seems "cmd" "/c" "start"
                     (else (error "don't know xopen command for this os"))))])
     (subprocess #f #f #f command path)))
 
 (define (xopen-folder path)
   (case (system-type)
     ((windows)
-     (thread ; if this is not in a thread then for some reason it
-      (thunk ; will crash the whole program ?? weird stuff going on here
+     (thread
+      (thunk
        (parameterize ([current-directory path])
-         ; it looks like implemeting this with subprocess #f #f #f
-         ; somehow class the evil rktio function which was fixed, so
-         ; for now we use system* while we wait for the fix
          (system* (find-executable-path "explorer.exe") "." #:set-pwd? #t)))))
     (else (xopen-path path))))
 
 (define (cb-open-export-ipython obj event)
-  (let ([argv (argv-open-ipython (current-dataset))])
+  (let ([argv (argv-open-export-ipython (current-dataset))])
     ; FIXME bad use of thread
-    (thread (thunk (apply system* argv)))))
+    (when argv
+      (thread (thunk (apply system* argv))))))
+
+(define (cb-open-dataset-shell obj event)
+  (let ([argv (argv-open-dataset-shell (current-dataset))])
+    ; FIXME bad use of thread
+    (when argv
+      (thread (thunk (apply system* argv))))))
 
 (define (cb-open-dataset-remote obj event)
   (xopen-path (uri-human (current-dataset))))
@@ -885,7 +954,7 @@
         (let ([path (resolve-relative-path symlink)])
           (xopen-folder path))
         ; TODO gui visible logging
-        (println "Dataset has not been fetched yet!"))))
+        (println msg-dataset-not-fetched))))
 
 (define (match-datasets text datasets)
   "given text return datasets whose title or identifier matches"
@@ -926,9 +995,18 @@ switch to that"
         (send lview set-selection 0)
         (cb-dataset-selection lview #f)))))
 
+(define (cb-power-user o e)
+  (power-user? (not (power-user?)))
+  ; XXX these can get out of sync
+  (send check-box-power-user set-value (power-user?))
+  (send panel-power-user reparent
+        (if (power-user?)
+            panel-ds-actions
+            frame-helper)))
+
 ;; keymap keybind
 
-(define keymap (new keymap%))
+(define keymap (new (keymap:aug-keymap-mixin keymap%)))
 
 (define (k-test receiver event)
   (pretty-print (list "test" receiver event)))
@@ -940,6 +1018,9 @@ switch to that"
 
 (define (k-fetch-export-dataset receiver event)
   (fetch-export-current-dataset))
+
+(define (k-fetch-dataset receiver event)
+  (fetch-current-dataset))
 
 (define (k-export-dataset receiver event)
   (export-current-dataset))
@@ -956,10 +1037,14 @@ switch to that"
       ; delete from epos to the backward word break
       )))
 
+(define (k-next-thing r e)
+  "do nothing")
+
 ; add functions
 (send* keymap
   (add-function "test" k-test)
   (add-function "fetch-export-dataset" k-fetch-export-dataset)
+  (add-function "fetch-dataset" k-fetch-dataset)
   (add-function "export-dataset" k-export-dataset)
   (add-function "quit" k-quit)
   (add-function "test-backspace" (λ (a b) (displayln (format "delete all the things! ~a ~a" a b))))
@@ -969,21 +1054,32 @@ switch to that"
                                  (let ([value (node-data-value (send (send obj get-selected) user-data))])
                                    (send the-clipboard set-clipboard-string value (current-milliseconds))))))
   (add-function "backward-kill-word" backward-kill-word)
+  (add-function "next-thing" k-next-thing)
   (add-function "focus-search-box" (λ (a b) (send text-search-box focus)))
   (add-function "open-dataset-folder" cb-open-dataset-folder)
   (add-function "open-export-folder" cb-open-export-folder)
+  (add-function "toggle-power-user" cb-power-user)
   (add-function "open-export-json" cb-open-export-json)
-  (add-function "open-export-ipython" cb-open-export-ipython))
+  (add-function "open-export-ipython" cb-open-export-ipython)
+  (add-function "open-dataset-shell" cb-open-dataset-shell)
+  (add-function "toggle-prefs" cb-toggle-prefs)
+  )
+
+(define (fox key-string)
+  ; TODO if osx relace c: with cmd: or whatever
+  key-string)
 
 ; map functions
 (send* keymap
   (map-function "m:backspace" "backward-kill-word")
+  (map-function "tab" "next-thing")
+  (map-function "c:semicolon" "toggle-prefs")
   #;
   (map-function "c:r"     "refresh-datasets")
-  (map-function "c:c"     "copy-value")
+  (map-function (fox "c:c")     "copy-value") ; FIXME osx cmd:c
   (map-function "c:t"     "test")
   (map-function "f5"      "fetch-export-dataset")
-  (map-function "c:t"     "fetch-export-dataset") ; XXX bad overlap with find
+  (map-function "c:t"     "fetch-dataset")
   (map-function "c:f"     "focus-search-box") ; XXX bad overlap with find
   (map-function "c:l"     "focus-search-box") ; this makes more sense
   #;
@@ -993,9 +1089,13 @@ switch to that"
   (map-function "c:q"     "quit")
   (map-function "c:w"     "quit")
   (map-function "c:o" "open-dataset-folder")
+  #;
   (map-function "c:p" "open-export-folder") ; FIXME these are bad bindings
+  (map-function "c:p" "toggle-power-user")
   (map-function "c:j" "open-export-json")
-  (map-function "c:i" "open-export-ipython"))
+  (map-function "c:i" "open-export-ipython")
+  (map-function "c:b" "open-dataset-shell")
+  )
 
 #;
 (send keymap call-function "test" 1 (new event%))
@@ -1036,9 +1136,9 @@ switch to that"
 (define menu-edit (new menu% [label "Edit"] [parent menu-bar-main]))
 (define menu-item-preferences (new menu-item%
                                    [label "Preferences..."]
-                                   [shortcut #\;]
+                                   [shortcut #\;] ; shortcut here for discoverability only
                                    [shortcut-prefix '(ctl)]
-                                   [callback (λ (a b) (send frame-preferences show #t))]
+                                   [callback (λ (o e) #f)] ; see `cb-toggle-prefs' above
                                    [parent menu-edit]))
 
 (define panel-holder (new panel:horizontal-dragable%
@@ -1175,15 +1275,27 @@ switch to that"
                                         [callback cb-open-dataset-remote]
                                         [parent panel-power-user]))
 
-(define button-open-export-json (new button%
-                                         [label "JSON"]
-                                         [callback cb-open-export-json]
-                                         [parent panel-power-user]))
+(define button-open-export-json (new (tooltip-mixin button%)
+                                     [label "JSON"]
+                                     [tooltip "Shortcut C-j"]
+                                     [tooltip-delay 100]
+                                     [callback cb-open-export-json]
+                                     [parent panel-power-user]))
 
-(define button-open-export-ipython (new button%
+(define button-open-export-ipython (new (tooltip-mixin button%)
                                          [label "IPython"]
+                                         [tooltip "Shortcut C-i"]
+                                         [tooltip-delay 100]
                                          [callback cb-open-export-ipython]
                                          [parent panel-power-user]))
+
+(define button-open-dataset-shell (new (tooltip-mixin button%)
+                                       [label "Shell"]
+                                       [tooltip "Shortcut C-b"]
+                                       [tooltip-delay 100]
+                                       [callback cb-open-dataset-shell]
+                                       [parent panel-power-user]))
+
 
 ;; manifest report
 
@@ -1260,13 +1372,7 @@ switch to that"
 
 (define check-box-power-user (new check-box%
                                   [label "Power user?"]
-                                  [callback (λ (o e)
-                                              (power-user? (not (power-user?)))
-                                              ; XXX these can get out of sync
-                                              (send panel-power-user reparent
-                                                    (if (power-user?)
-                                                        panel-ds-actions
-                                                        frame-helper)))]
+                                  [callback cb-power-user]
                                   [parent panel-prefs-holder]))
 
 (define button-prefs-path
