@@ -127,9 +127,12 @@ def protocol_url_or_doi(value):
 
         if isinstance(normed, idlib.Pio):
             try:
-                normed = normed.uri_api_int  # integer id preferred if available
+                uh = normed.uri_human  # deal with new slugs
+                normed = uh.uri_api_int  # integer id preferred if available
             except idlib.exc.IdDoesNotExistError as e:
                 logd.error(e)  # we'll catch this again later too
+            except idlib.exc.NotAuthorizedError as e:
+                logd.error(e)
             except Exception as e:
                 breakpoint()
                 log.exception(e)  # FIXME don't know what we will get here
