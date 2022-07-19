@@ -76,6 +76,14 @@ what should happen
   `(unless (file-exists-p ,file)
      ,@body))
 
+(defun url-copy-file-safe (url newname &optional ok-if-already-exists &rest _ignored)
+  "There does not seem to be a way to capture `url-http-response-status' when
+calling `url-copy-file' so we have to check whether the url exists first."
+  (with-url-handler-mode
+    (unless-file-exists-p url
+      (error "Url does not exist! %s" url)))
+  (url-copy-file url newname ok-if-already-exists))
+
 (defun build-dir ()
   "rule for where to put the build directory"
   ;; (make-temp-file )  ;; FIXME TODO sigh
@@ -306,6 +314,7 @@ Yes this is make."
 
         (rguc "https://raw.githubusercontent.com/")
         (ont-git-ref "dev")
+        (cass-ont "https://cassava.ucsd.edu/sparc/ontologies/")
         (cass-px "https://cassava.ucsd.edu/sparc/preview/exports/")
 
         (apinat-base-url "https://cassava.ucsd.edu/ApiNATOMY/ontologies/")
@@ -317,28 +326,28 @@ Yes this is make."
     ;; 4
     (unless-file-exists-p p-path
       ;; FIXME decouple this location
-      (url-copy-file (concat cass-px "protcur.ttl")
-                     p-path))
+      (url-copy-file-safe (concat cass-ont "protcur.ttl")
+                          p-path))
     (unless-file-exists-p ce-path
-      (url-copy-file (concat cass-px (file-name-nondirectory ce-path))
-                     ce-path))
+      (url-copy-file-safe (concat cass-px (file-name-nondirectory ce-path))
+                          ce-path))
     (unless-file-exists-p mis-path
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-methods.ttl")
-                     mis-path))
+      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-methods.ttl")
+                          mis-path))
     (unless-file-exists-p mis-r-path
       (reason-ontology mis-path mis-r-path))
     (unless-file-exists-p sct-path
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-community-terms.ttl")
-                     sct-path))
+      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-community-terms.ttl")
+                          sct-path))
     (unless-file-exists-p sml-path
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-missing-labels.ttl")
-                     sml-path))
+      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/sparc-missing-labels.ttl")
+                          sml-path))
     ;; load apinatomy files
     (unless-file-exists-p sparc-data-path
       ;; FIXME timestamp the release, but coordinate with SciGraph
       ;; XXX REMINDER sparc-data.ttl is NOT used as an entry point for loading
-      (url-copy-file (concat rguc "SciCrunch/sparc-curation/master/" sparc-data-source)
-                     sparc-data-path))
+      (url-copy-file-safe (concat rguc "SciCrunch/sparc-curation/master/" sparc-data-source)
+                          sparc-data-path))
 
     (unless (and (file-exists-p apinat-sentinel-path)
                  (file-exists-p journal-path))
@@ -347,9 +356,8 @@ Yes this is make."
        (lambda (a-path)
          (let ((dapath (concat "data/" a-path)))
            (unless-file-exists-p dapath
-             ;; FIXME fail on 404 ??!
-             (url-copy-file (concat apinat-base-url a-path)
-                            dapath))))
+             (url-copy-file-safe (concat apinat-base-url a-path)
+                                 dapath))))
        apinat-paths))
 
     ;; retrieve, reason, and load various ontologies
@@ -369,7 +377,7 @@ Yes this is make."
       ;; FIXME this pulls in a staggering amount of the nif ontology and is quite large
       ;; FIXME reasoner errors between methods-helper, ro, and pato prevent this
       ;;(get-ontology (concat rguc "SciCrunch/NIF-Ontology/dev/ttl/methods.ttl") me-path)
-      (url-copy-file (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/methods.ttl") me-path))
+      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/methods.ttl") me-path))
     (unless-file-exists-p me-r-path
       (reason-ontology me-path me-r-path))
     ;; npo
