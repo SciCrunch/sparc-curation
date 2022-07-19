@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: ffb05a046b697a8e464d6b8979d9857e657acc0f640d98d2f4ddb6872d5e1fef; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: fde3f5cbf0129a4bcf016b66fdfe0ac13a106c3f1f6370fd354af7df0ff5d42f; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -471,7 +471,8 @@ bronchomotor.ttl~. NOTE Both functions need to be defined.
                  (latest-path
                   (expand-file-name
                    (file-name-nondirectory ttl)
-                   apinat--remote-onts-path)))
+                   apinat--remote-onts-path))
+                 (tramp-histfile-override "/dev/null"))
             ;; if the version already exists, error
             ;; otherwise make it via tramp
             (if (file-directory-p version-path)
@@ -1087,20 +1088,24 @@ https://scicrunch.org/sawg/about/ApiNATOMY
        ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
        ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
        ((:debug) apinat-converter-debug)) ; enable debug mode
-    (when tangle
+    (cond
+     (tangle
       (let (enable-local-eval)
         ;; this pattern is required when tangling to avoid infinite loops
         (revert-buffer nil t nil)
         (setq-local find-file-literally nil))
       (org-babel-tangle))
-    (when (or all model-id)
+     (deploy ; XXX TODO multiple models logic from diffs etc. XXX better yet, diff remote
+      (message "argv: %S ac: %S" argv after-commit)
+      (cond
+       (all (apinat-deploy-models (all-models)))
+       (model-id (apinat-deploy-models (list (intern model-id))))))
+     ((or all model-id)
       (message "updating %s" (or model-id "all"))
       (if all
           (update-all-models-async)
         (update-models (list (intern model-id)))))
-    (when deploy
-      (message "argv: %S ac: %S" argv after-commit)
-      "TODO")))
+     )))
 #+end_src
 
 #+begin_src elisp
