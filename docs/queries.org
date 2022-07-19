@@ -197,6 +197,19 @@ WHERE {
 }
 #+end_src
 
+*** Datasets by contents updated time
+#+begin_src sparql
+SELECT DISTINCT
+?dataset
+?ut
+(substr(str(?l), 0, 40) as ?label)
+WHERE {
+  ?dataset a sparc:Dataset .
+  ?dataset TEMP:contentsWereUpdatedAtTime ?ut .
+  ?dataset rdfs:label ?l .
+} ORDER BY DESC(?ut)
+#+end_src
+
 *** Test
 Originally from =sparcur.reports.SparqlQueries=.
 **** Dataset about
