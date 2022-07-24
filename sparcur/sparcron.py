@@ -180,6 +180,7 @@ def populate_existing_redis(conn):
     # be done by check_for_updates
     datasets_export_base = Path(options.export_path) / 'datasets'
     uuids = [c.name for c in datasets_export_base.children if c.is_dir()]
+    initd = {}
     for uuid in uuids:
         dataset_id = 'N:dataset:' + uuid
         try:
@@ -206,14 +207,21 @@ def populate_existing_redis(conn):
             uid = 'updated-' + dataset_id
             fid = 'failed-' + dataset_id
             vid = 'verpi-' + dataset_id
-            conn.set(sid, _none)
-            conn.set(uid, updated)
-            conn.set(fid, '')
-            conn.set(vid, internal_version)
+            eid = 'sheet-' + dataset_id
+            initd.update(
+                {sid: _none,
+                 uid: updated,
+                 fid: '',
+                 vid: internal_version,
+                 eid: 0,
+                 })
 
-    log.info(pprint.pformat({k:conn.get(k) for k in
-                             sorted(conn.keys()) if b'N:dataset' in k},
-                            width=120))
+    conn.mset(initd)
+
+    _keys = [k for k in sorted(conn.keys()) if b'N:dataset' in k]
+    _values = conn.mget(keys)
+    _inits = {k:v for k, v in zip(_keys, _values)}
+    log.info(pprint.ppformat(_inits, width=120))
 
 
 @cel.on_after_finalize.connect
@@ -265,8 +273,13 @@ def heartbeat():  # FIXME this has to run in a separate priority queue with its 
     #print(shared_state)
     #print(dataset_status)
     keys = conn.keys()
-    vals = [int(conn.get(k)) for k in keys if b'state-N:dataset:' in k]
-    fails = [k for k in keys if b'failed-' in k and conn.get(k)]
+    _skeys = [k for k in keys if b'state-N:dataset:' in k]
+    _fkeys = [k for k in keys if b'failed-' in k]
+    vals = [int(v) for v in conn.mget(_skeys)]
+    fvals = [v for v in conn.mget(_fkeys)]
+    fails = [k for k, v in zip(_fkeys, fvals) if v]
+
+    #fails = [k for k in keys if b'failed-' in k and conn.get(k)]
     #vals = shared_state.values()
     ln = len([1 for n in vals if not n or n == _none])
     lf = len(fails)
@@ -315,10 +328,12 @@ argv_spc_export = [
     '-m',
     'sparcur.cli',
     'export',
-    '--no-network']
+    '--no-network',
+    # explicitly avoid joblib which induces absurd process overhead
+    '--jobs', '1']
 
 pid = PennsieveId(project_id)
-def ret_val_exp(dataset_id, updated, time_now):
+def ret_val_exp(dataset_id, updated, time_now, fetch=True):
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     log.info(f'START {dataset_id} {timestamp}')
     did = PennsieveId(dataset_id)
@@ -356,26 +371,32 @@ def ret_val_exp(dataset_id, updated, time_now):
 
     try:
         with open(logfile, 'wt') as logfd:
-            try:
-                p1 = subprocess.Popen(argv_simple_retrieve(dataset_id),
-                                      stderr=subprocess.STDOUT, stdout=logfd)
-                out1 = p1.communicate()
-                if p1.returncode != 0:
-                    raise Exception(f'oops return code was {p1.returncode}')
-            except KeyboardInterrupt as e:
-                p1.send_signal(signal.SIGINT)
-                raise e
+            if fetch:
+                try:
+                    p1 = subprocess.Popen(
+                        argv_simple_retrieve(dataset_id),
+                        stderr=subprocess.STDOUT, stdout=logfd)
+                    out1 = p1.communicate()
+                    if p1.returncode != 0:
+                        raise Exception(f'oops return code was {p1.returncode}')
+                except KeyboardInterrupt as e:
+                    p1.send_signal(signal.SIGINT)
+                    raise e
 
-            dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
-            try:
-                p2 = subprocess.Popen(argv_spc_find_meta, cwd=dataset_path,
-                                      stderr=subprocess.STDOUT, stdout=logfd)
-                out2 = p2.communicate()
-                if p2.returncode != 0:
-                    raise Exception(f'oops return code was {p2.returncode}')
-            except KeyboardInterrupt as e:
-                p2.send_signal(signal.SIGINT)
-                raise e
+                dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
+                try:
+                    p2 = subprocess.Popen(
+                        argv_spc_find_meta, cwd=dataset_path,
+                        stderr=subprocess.STDOUT, stdout=logfd)
+                    out2 = p2.communicate()
+                    if p2.returncode != 0:
+                        raise Exception(f'oops return code was {p2.returncode}')
+                except KeyboardInterrupt as e:
+                    p2.send_signal(signal.SIGINT)
+                    raise e
+            else:
+                # sheet updated case
+                dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
 
             try:
                 p3 = subprocess.Popen(argv_spc_export, cwd=dataset_path,
@@ -402,19 +423,35 @@ def ret_val_exp(dataset_id, updated, time_now):
 
 
 @cel.task
-def export_single_dataset(dataset_id, updated):
+def export_single_dataset(dataset_id, qupdated_when_called):
+    # have to calculate fetch here because a sheet change may arrive
+    # immediately before a data change and fetch is based on all events
+    # that trigger a run, not just the first
+    qid = 'queued-' + dataset_id
+    _qupdated = conn.get(qid)
+    qupdated = _qupdated.decode() if _qupdated is not None else None
+    if qupdated_when_called < qupdated:
+        log.debug(f'queue updated changed between call and run')
+
+    uid = 'updated-' + dataset_id
+    _updated = conn.get(uid)
+    updated = _updated.decode() if _updated is not None else None
+    fetch = updated < qupdated  # this can be false if only the sheet changed
+
     sid = 'state-' + dataset_id
+    eid = 'sheet-' + dataset_id
     time_now = GetTimeNow()
     conn.incr(sid)
+    conn.set(eid, 0)
     #log.critical(f'STATE INCRED TO: {conn.get(sid)}')
     status_report()
-    ret_val_exp(dataset_id, updated, time_now)
+
+    ret_val_exp(dataset_id, qupdated, time_now, fetch)
     _sid = conn.get(sid)
     state = int(_sid) if _sid is not None else None
     conn.decr(sid)  # we always go back 2 either to none or queued
     conn.decr(sid)
     if state == _qed_run:
-        qid = 'queued-' + dataset_id
         _qupdated = conn.get(qid)
         # there are race conditions here, but we don't care because we
         # can't get a sane file list snapshot anyway
@@ -424,14 +461,50 @@ def export_single_dataset(dataset_id, updated):
     status_report()
 
 
+def diff_sheet(old_s, new_s):
+    old_r0 = old_s.row_object(0)
+    new_r0 = new_s.row_object(0)
+    old_rh = old_r0.header
+    new_rh = new_r0.header
+    valid_columns = [h for h in new_rh if
+                     h.startswith('modality') or
+                     h.startswith('technique') or
+                     h in ('organ_term', 'award_manual')]
+    old_sheet_ids = [i for i in getattr(old_r0, old_s.index_columns[0])().column.values[1:] if i]
+    new_sheet_ids = [i for i in getattr(new_r0, old_s.index_columns[0])().column.values[1:] if i]
+    for did in new_sheet_ids:
+        if did not in old_sheet_ids:
+            log.debug(f'new dataset {did}')
+
+        old_row, _dido = old_s._row_from_index('id', did)
+        new_row, _didn = new_s._row_from_index('id', did)
+        if old_row.values != new_row.values:
+            # using valid columns elides checking header ordering changes
+            log.debug(f'sheet row changed for {did}')
+            #log.debug(f'{old_row.values}, {new_row.values}')
+            #log.debug(f'{list(zip(old_row.values, new_row.values))}')
+            for v in valid_columns:
+                old_c = getattr(old_row, v)()
+                new_c = getattr(new_row, v)()
+                if old_c.value != new_c.value:
+                    log.debug(f'sheet value {v} changed for {did}: {old_c.value!r} {new_c.value!r}')
+                    eid = 'sheet-' + PennsieveId(did).id
+                    conn.incr(eid)
+
+
 @cel.task
 def check_sheet_updates():
-    # TODO see if we need locking
-    for sheetcls in (Organs, Affiliations):
+    # XXX NOTE this is oblivious to the semantics of the changes to the sheets
+    # so ANY time a change happens for a dataset it will trigger another run
+    # even if those changes went back to a previous state
+    for sheetcls in (Affiliations, Organs):
         old_s = sheetcls(fetch=False)
         try:
-            old = old_s.metadata_file()['modifiedTime']
+            assert old_s._only_cache
+            old_s.fetch()
+            old = old_s._values
         except AttributeError as e:
+            log.exception(e)
             # FIXME risk of some other source of AttributeError
             # triggering this which this is specifically trying to
             # handle the case where the cache does not exist
@@ -442,17 +515,89 @@ def check_sheet_updates():
         s._setup_saf()
         s._setup()
         s._saf = None
-        new = s.metadata_file()['modifiedTime']
-        #log.info(f':old {old} :new {new}')
+        assert not s._do_cache
+        assert not s._only_cache
+        s.fetch(fetch_meta=False)
+        new = s._values
+        #log.debug(pprint.pformat(s._meta_file, width=120))
+        #log.info(f':sheet {sheetcls.__name__} :old {old} :new {new}')
         if new != old:
             # something has changed
             s._do_cache = True
             s._re_cache = True
             s._setup()
-            s.fetch()
+            s.fetch()  # NOTE metadata_file will often be stale
             log.info(f'spreadsheet cache updated for {s.name}')
-            # TODO check which datasets (if any) changed
-            # and put them in the queue to rerun
+            try:
+                diff_sheet(old_s, s)  # enqueues changed datasets
+            except Exception as e:
+                log.exception(e)
+
+
+def mget_all(dataset):
+    dataset_id = dataset.id
+    sid = 'state-' + dataset_id
+    uid = 'updated-' + dataset_id
+    fid = 'failed-' + dataset_id
+    vid = 'verpi-' + dataset_id
+    qid = 'queued-' + dataset_id
+    eid = 'sheet-' + dataset_id
+
+    (_updated, _qupdated, _failed, _state, _internal_version, _sheet_changed
+     ) = conn.mget(uid, qid, fid, sid, vid, eid)
+    updated = _updated.decode() if _updated is not None else None
+    qupdated = _qupdated.decode() if _qupdated is not None else None
+    failed = _failed.decode() if _failed is not None else None
+    state = int(_state) if _state is not None else None
+    internal_version = (int(_internal_version.decode())
+                        if _internal_version is not None
+                        else 0)  # FIXME new dataset case?
+    sheet_changed = int(_sheet_changed) if _sheet_changed is not None else None
+    pipeline_changed = internal_version < sparcur.__internal_version__
+
+    rq = state == _qed_run
+    running = state == _run or rq
+    queued = state == _qed or rq
+    return (updated, qupdated, failed, state, internal_version, sheet_changed,
+            pipeline_changed, rq, running, queued)
+
+
+def check_single_dataset(dataset):
+    dataset_id = dataset.id
+    sid = 'state-' + dataset_id
+    qid = 'queued-' + dataset_id
+    # FIXME there are so many potential race conditions here ...
+    (updated, qupdated, failed, state, internal_version, sheet_changed,
+     pipeline_changed, rq, running, queued) = mget_all(dataset)
+
+    # XXX race condition if export_single_dataset conn.incr(sid) is called
+    # while this function is after the call conn.get(sid) and the logic below
+
+    #log.debug(f'STATUS :id {dataset_id} :u {updated} :f {failed} :q {queued} :r {running}')
+    # All the logic for whether to run a particular dataset
+    # timestamp_updated or timestamp_updated_contents whichever is greater
+    # NOTE we populate updated values into redis at startup from
+    # the latest export of each individual dataset
+    # TODO also need to check sparcur code changes to see if we need to rerun
+    if ((pipeline_changed or sheet_changed) and not failed or
+        not (updated or failed) or
+        failed and dataset.updated > failed or
+        not failed and updated and dataset.updated > updated):
+
+        log.debug((f'MAYBE ENQUEUE :id {dataset_id} s: {state} du: '
+                   f'{dataset.updated} u: {updated} f: {failed}'))
+        if queued:
+            if dataset.updated > qupdated:
+                conn.set(qid, dataset.updated)
+        elif running and dataset.updated == qupdated and not sheet_changed:
+            pass
+        elif running and (dataset.updated > qupdated or sheet_changed):
+            conn.incr(sid)
+            conn.set(qid, dataset.updated)
+        else:
+            conn.incr(sid)
+            conn.set(qid, dataset.updated)
+            export_single_dataset.delay(dataset_id, dataset.updated)
 
 
 @cel.task
@@ -460,59 +605,7 @@ def check_for_updates(project_id):
     datasets = datasets_remote_from_project_id(project_id)
     #datasets = sorted(datasets, key=lambda r:r.id)[:3]
     for dataset in datasets:
-        dataset_id = dataset.id
-        sid = 'state-' + dataset_id
-        uid = 'updated-' + dataset_id
-        fid = 'failed-' + dataset_id
-        vid = 'verpi-' + dataset_id
-        qid = 'queued-' + dataset_id
-
-        # FIXME TODO new dataset case ???
-
-        _updated = conn.get(uid)
-        updated = _updated.decode() if _updated is not None else None
-
-        _qupdated = conn.get(qid)
-        qupdated = _qupdated.decode() if _qupdated is not None else None
-
-        _failed = conn.get(fid)
-        failed = _failed.decode() if _failed is not None else None
-
-        _state = conn.get(sid)
-        state = int(_state) if _state is not None else None
-
-        _internal_version = conn.get(vid)
-        internal_version = (int(_internal_version.decode())
-                            if _internal_version is not None
-                            else 0)  # FIXME new dataset case?
-        pipeline_changed = internal_version < sparcur.__internal_version__
-
-        rq = state == _qed_run
-        running = state == _run or rq
-        queued = state == _qed or rq
-
-        #log.debug(f'STATUS :id {dataset_id} :u {updated} :f {failed} :q {queued} :r {running}')
-        # All the logic for whether to run a particular dataset
-        # timestamp_updated or timestamp_updated_contents whichever is greater
-        # NOTE we populate updated values into redis at startup from
-        # the latest export of each individual dataset
-        # TODO also need to check sparcur code changes to see if we need to rerun
-        if (pipeline_changed and not failed or
-            not (updated or failed) or
-            failed and dataset.updated > failed or
-            not failed and updated and dataset.updated > updated):
-            log.debug((f'MAYBE ENQUEUE :id {dataset_id} s: {state} du: '
-                       f'{dataset.updated} u: {updated} f: {failed}'))
-            if queued or running and dataset.updated == qupdated:
-                pass
-            elif running and dataset.updated > qupdated:
-                conn.incr(sid)
-                conn.set(qid, dataset.updated)
-            else:
-                conn.incr(sid)
-                conn.set(qid, dataset.updated)
-                export_single_dataset.delay(dataset_id, dataset.updated)
-
+        check_single_dataset(dataset)
 
 PennsieveRemote = backend_pennsieve(project_id)
 root = PennsieveRemote(project_id)
