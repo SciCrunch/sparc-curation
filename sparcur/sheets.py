@@ -80,7 +80,7 @@ class Sheet(SheetBase):
             self._values_formula = values_formula
             self.grid = grid
             self.cells_index = cells_index
-            return raw_values, values, grid, cells_index
+            return meta, meta_file, raw_values, values, grid
 
         return super().fetch(**kwargs)
 
