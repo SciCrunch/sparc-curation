@@ -436,7 +436,8 @@ def export_single_dataset(dataset_id, qupdated_when_called):
     uid = 'updated-' + dataset_id
     _updated = conn.get(uid)
     updated = _updated.decode() if _updated is not None else None
-    fetch = updated < qupdated  # this can be false if only the sheet changed
+    # < can be false if only the sheet changed
+    fetch = updated < qupdated if updated is not None else True
 
     sid = 'state-' + dataset_id
     eid = 'sheet-' + dataset_id
