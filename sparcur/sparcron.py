@@ -652,8 +652,8 @@ def status_report():
         if queued:
             que += 1
 
-    fails = '\n  '.join(sorted([f.id for f in fail]))
-    todos = '\n  '.join(sorted([f.id for f in todo]))
+    fails = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in fail]))
+    todos = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in todo]))
     report = (
         '\nStatus Report\n'
         f'Datasets: {len(datasets)}\n'
