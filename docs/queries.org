@@ -5023,7 +5023,7 @@ Try to come up with a basis set from FMA as well.
 If there are regional hierarchies that have been missed we will see them.
 *** Summary statistics
 **** debug
-fuck everything about this
+# fuck everything about this
 #+begin_src sparql
 SELECT distinct ?o
 WHERE {
