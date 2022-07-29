@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 51cc694dc77e33eaa14c28d14788f1768486bc1267bd4e1f30c759ad5dd79467; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: e7cb3e532bb4b6b3ae254bb43c074571cb7e7be5cc5038f1b3eb769289ed84ae; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Welcome
 
@@ -81,6 +81,11 @@ emacs -eval "(find-file-noselect (pop argv))" welcome.org
   (org-next-visible-heading 1)
   (org-narrow-to-subtree)
   (read-only-mode)
+
+  (setq org-file-apps
+        (append org-file-apps
+                '(("\\.jpeg\\'" . "feh \"%s\"")
+                  ("\\.png\\'" . "feh \"%s\""))))
 
   (setq desktop-path (list user-emacs-directory))
   (setq desktop-dirname user-emacs-directory)
