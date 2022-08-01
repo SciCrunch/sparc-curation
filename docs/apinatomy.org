@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: fde3f5cbf0129a4bcf016b66fdfe0ac13a106c3f1f6370fd354af7df0ff5d42f; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 2320719854d450734751846154263b58eec9bedd4afafd0a2abce19cc76aa77c; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -159,6 +159,11 @@ gsx:google-sheet-id
   ;; per line, otherwise you have to figure out what it means to have 20 things that
   ;; can all in princilple happen after the completion of a step, which is possible
   ;; but would need a solution
+  ;;
+  ;; scheduling, queue theory, with the additional notion of affinity, because human
+  ;; executors are not interchangable in the same way as a cpu
+  ;; I think you model it as generic + specialzed, and you schedule specialized
+  ;; first because the pool for those is limited
   "AAAAAAAAA!")
 
 (defmacro apinat--with-model (model-id &rest body)
@@ -246,6 +251,8 @@ gsx:google-sheet-id
                                  "-t" "json"
                                  "-t" "json-resources"
                                  "-t" "json-flattened"
+                                 (when apinat-converter-debug
+                                   "-t" "json-ld")
                                  "-i" google-sheet-id
                                  "-o" path-internal))))
           (cl-loop for path in (list path-xlsx path-json path-jsonld) do
@@ -408,7 +415,8 @@ gsx:google-sheet-id
      collect
      ;; TODO consider whether we can somehow use invocation-name invocation-directory so that
      ;; specific versions of emacs are used to run the block instead of always the system version
-     (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets "--repo" apinat-model-repo))
+     (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets "--repo" apinat-model-repo
+                           (when apinat-converter-debug "--debug")))
     (while (< (length apinat-process-results) (length model-ids))
       (sleep-for 5)
       (message "complete: %s/%s" (length apinat-process-results) (length model-ids)))))
