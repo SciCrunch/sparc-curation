@@ -737,6 +737,9 @@ sens = Phenotype('ilxtr:SensoryPhenotype', 'ilxtr:hasCircuitRolePhenotype')
 motor = Phenotype('ilxtr:MotorPhenotype', 'ilxtr:hasCircuitRolePhenotype')
 intrin = Phenotype('ilxtr:IntrinsicPhenotype', 'ilxtr:hasCircuitRolePhenotype')
 
+excite = Phenotype('ILX:0104003', 'ilxtr:hasFunctionalCircuitRolePhenotype')
+inhib = Phenotype('ILX:0105486', 'ilxtr:hasFunctionalCircuitRolePhenotype')
+
 mapping = {
     'sympathetic': sym,
     'parasympathetic': para,
@@ -746,9 +749,11 @@ mapping = {
     'motor': motor,
     'local': intrin,
     'interneuron': intrin,
+    'excitatory': excite,
+    'inhibitory': inhib,
 }
 
-bad_bits = {'neuron', '', 'first', 'order', 'circuit', 'lower', 'somatic'}
+bad_bits = {'neuron', '', 'first', 'order', 'circuit', 'lower', 'somatic', 'Vagal'}
 bad_sets = (  # from the school of maximum wat
     {'inhibitor', 'motor'},
     # inhibitory motor in the context of the stomach means nitric
@@ -790,6 +795,8 @@ neuron_classes = {
 
 def dophen(oid, bag):
     label, x = _genlabel(oid)
+    if x == 'bolew':
+        x = 'unbranched'  # XXX
     neuron_class = neuron_classes[x]
     # FIXME this doesn't work because entailed phenotypes don't work
     # with the correct logic because they are still acting like ec
@@ -818,6 +825,15 @@ og.parse()
 ng = OntGraph().populate_from_triples((t for t in og if 'able' not in t[1] and 'abel' not in t[1]))
 ng.namespace_manager.populate_from(og)
 ng.write(olr / repo_relative_path)
+None
+#+end_src
+
+#+begin_src jupyter-python :session pys
+pprint([(a, b, c) for a, b, c in bagged if not a])
+#pprint(insts[-3].values)
+#pprint(_id_oid_type)
+#pprint(id_oid_type)
+#pprint(neuron_classes)
 #+end_src
 
 * Dynamic cypher queries
