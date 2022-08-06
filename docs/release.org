@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: a25df01b8f26b9f5657fc711b41481727c5eff14a5ebee6d04c7c8a791c22d47; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: bf98b7f010983b5750cb74faf66b79a958c39876a8b9dec953bfbcc044f80687; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -68,8 +68,8 @@ what should happen
 (defvar-local prefixes-path nil)
 
 (defvar-local curies
-  '((owl . "http://www.w3.org/2002/07/owl#")
-    (ilxtr . "http://uri.interlex.org/tgbugs/uris/readable/")))
+    '((owl . "http://www.w3.org/2002/07/owl#")
+      (ilxtr . "http://uri.interlex.org/tgbugs/uris/readable/")))
 
 (defmacro unless-file-exists-p (file &rest body)
   (declare (indent 1))
@@ -114,7 +114,7 @@ Yes this is make."
           (and latest-release-dir ; XXX and0 would be fun wouldn't it?
                (not (file-exists-p (concat latest-release-dir ".zip")))
                latest-release-dir)))
-         to-resume))
+    to-resume))
 
 (defun py-x ()
   (or (executable-find "pypy3")
@@ -151,9 +151,13 @@ Yes this is make."
 
 (defun read-ttl-file (path)
   "Convert path to ttl file into a list of triples. Extremely inefficient."
-  (let ((bstr (run-command
-               (py-x)
-               "-m" "ttlser.ttlfmt" path "-t" "nt" "-o" "/dev/stdout")))
+  (let ((bstr
+         ;; wow the infinite hang bug is back with a fucking vengance
+         ;; (ow-run-command (py-x) "-m" "ttlser.ttlfmt" path "-t" "nt" "-o" "/dev/stdout")
+         (with-temp-buffer
+           (call-process (py-x) nil (list (current-buffer) nil) nil
+                         "-m" "ttlser.ttlfmt" path "-t" "nt" "-o" "/dev/stdout")
+           (buffer-string))))
     ;; FIXME run-command has a buffer like this internally, a variant
     ;; that would allow us to return a buffer output instead of a string might be nice
     (with-temp-buffer
@@ -164,7 +168,8 @@ Yes this is make."
         (replace-regexp "<" "" nil mi ma)
         (replace-regexp ">" "" nil mi ma)
         (replace-regexp "\n\n" "" nil mi ma)
-        (replace-regexp "^" "(" nil mi ma)
+        (goto-char ma) (backward-char) (when (looking-at "\n") (delete-char 1))
+        (replace-regexp "^" "(" nil mi ma) ; diverges vim behavior by replacing \n at eof :/
         (replace-regexp "\\.$" ")" nil mi ma)
         (replace-regexp "#" "\\\\#" nil mi ma) ; apparently sharps are special, I think I missed that in reader tests
         (goto-char (point-min))
