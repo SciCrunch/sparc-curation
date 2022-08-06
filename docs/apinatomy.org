@@ -678,9 +678,20 @@ g.populate_from_triples(
      ((rdf.type, owl.Ontology),
 )))
 
+skip = 'small-intestine',
 amr = aug.LocalPath("~/git/apinatomy-models").expanduser()
 models = [c for c in (amr / 'models').children if c.name != 'too-map']
-mgraphs = [OntResPath(p).graph for m in models for p in (m / 'derived' / (m.name + '.ttl'),) if p.exists()]
+mgraphs = []
+for m in models:
+    if m.name in skip:
+        continue
+    for p in (m / 'derived' / (m.name + '.ttl'),):
+        if p.exists():
+            try:
+                mgraphs.append(OntResPath(p).graph)
+            except Exception as e:
+                raise Exception(p) from e
+
 for mg in mgraphs:
     mg.namespace_manager.populate(g)
     for s in mg[:rdf.type:elements.OntologyTerm]:
