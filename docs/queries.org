@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 96de33e5e1d979ec776acb7df7d18c682cbdfddfff5084b97007d67c4ff94764; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 25a1d5b7e434242f020a9f66d22681c4119ebbf88dd5f3f11396b220139597f2; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5950,6 +5950,10 @@ RETURN p1, p2, p3, p4, p5, p6
 (unless (fboundp #'ob-cypher/scigraph/query)
   (reval 'sha256 '70915a959168c67ff51281c17e7ed6f45fd3ecfd4fed226e12b75c4f73ef5d9c
          "https://raw.githubusercontent.com/tgbugs/ob-cypher/7ed675f82fcc67978e689103cf828365546dc223/ob-cypher.el"))
+
+(unless (fboundp #'org-babel-sparql--table-replace-curies)
+  (reval 'sha256 '62bdbaf3d54f16b5019715f1dd175ecda8b37de420d14bcb8a469ef6820c5386
+         "https://raw.githubusercontent.com/tgbugs/sparql-mode/62ee958fe5abb1212a351025abce522e53ef1fae/ob-sparql.el"))
 
 (defun-local json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
