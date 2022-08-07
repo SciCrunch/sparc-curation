@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: dc91084bb8e5e04840c8fc04f6c75d71a111a0fac3f0a12642da1317a1e0c6b8; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 96de33e5e1d979ec776acb7df7d18c682cbdfddfff5084b97007d67c4ff94764; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -35,6 +35,7 @@ exit
 # #+property: header-args:sparql+ :epilogue "LIMIT ?limit"
 
 <<cypher-settings>>
+# #+property: header-args:cypher :scigraph https://scicrunch.org/api/1/sparc-scigraph :api-key (and (fboundp 'get-scicrunch-api-key) (get-scicrunch-api-key))
 #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
 #+property: header-args:cypher+ :limit 10
 #+end:
@@ -5913,9 +5914,9 @@ RETURN p1, p2, p3, p4, p5, p6
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '9598b71a4b1d997d74e1945de71ebb672749b0f7f05f763ade49bb9ac7f9ae17
-           ;; "~/git/orgstrap/ow.el"
-           (concat ghost "651bb04a1ccf1103c4eddc1f92dcc8ad46d5a9f2" "/ow.el")))
+    (reval 'sha256 'b3b26172d8e54abd0d3c4503d1b5438e0fc29d05fb6275a6da17d4d1b628a38a
+           ;;"~/git/orgstrap/ow.el"
+           (concat ghost "f4df67e94926f9d389f4a456a9cbf721c9b22b89" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
@@ -5947,8 +5948,8 @@ RETURN p1, p2, p3, p4, p5, p6
          ,(when gt26 '(jupyter . t))))))))
 
 (unless (fboundp #'ob-cypher/scigraph/query)
-  (reval 'sha256 'c2122c94c3bbf19999ddc857ace64e7746b7bca65dbf1453caaff1605f1bb4ad
-         "https://raw.githubusercontent.com/tgbugs/ob-cypher/db6947729564ca8bcc29b31b62b26c60d4f5856d/ob-cypher.el"))
+  (reval 'sha256 '70915a959168c67ff51281c17e7ed6f45fd3ecfd4fed226e12b75c4f73ef5d9c
+         "https://raw.githubusercontent.com/tgbugs/ob-cypher/7ed675f82fcc67978e689103cf828365546dc223/ob-cypher.el"))
 
 (defun-local json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
@@ -5977,6 +5978,13 @@ RETURN p1, p2, p3, p4, p5, p6
     (while (re-search-forward "^ +$" nil t)
       (replace-match ""))))
 (add-hook 'org-babel-tangle-body-hook #'ow---strip-empty-lines)
+
+;; support for passing scigraph api keys via envars
+(unless (fboundp 'get-scicrunch-api-key)
+  (defun get-scicrunch-api-key ()
+    (or (getenv "SCIGRAPH_API_KEY")
+        (getenv "SCICRUNCH_API_KEY")
+        (oa-path :scicrunch :api :key))))
 
 ;; command line interface
 (when noninteractive
