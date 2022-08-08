@@ -1739,21 +1739,15 @@ result = func(data)
 (ow-babel-eval "neru-simplified")
 #+end_src
 
-#+header: :var json-string=python-neru-helper(result=cypher-neru-5-helper(neupop_id="ilxtr:neuron-type-keast-10"))
-#+header: :var path="./images/neru-simplified-10.svg" :results file
+#+header: :var json-string=python-neru-helper(result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-aacar-12"))
+#+header: :var path="./images/neru-simplified-aacar-12.svg" :results file
 #+name: neru-simplified
 #+begin_src elisp :exports none
 (json->svg-file json-string path)
 #+end_src
 
 #+RESULTS: neru-simplified
-[[file:./images/neru-simplified-6.svg]]
-
-[[file:./images/neru-simplified-11.svg]]
-
-[[file:./images/neru-simplified-5.svg]]
-
-[[file:./images/neru-simplified.svg]]
+[[file:./images/neru-simplified-aacar-12.svg]]
 
 ** simple
 Python code to simplify =neru= and supporting functions to extract terminal regions.
@@ -1766,6 +1760,7 @@ Python code to simplify =neru= and supporting functions to extract terminal regi
 #+header: :var result=(or) remove=(or)
 #+name: python-process-neru
 #+begin_src jupyter-python :session pys
+from pyontutils.config import auth
 from nifstd_tools.simplify import apinat_deblob, sub, pred, obj, ematch
 from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, ext, fasIn, endIn, layerIn, onts
 
@@ -1774,8 +1769,8 @@ ext = onts  # XXX schema change
 
 def query(neupop_id):
     import requests
-    url = ('http://sparc-data.scicrunch.io:9000/scigraph/dynamic/'
-           f'demos/apinat/neru-5/{neupop_id}?limit=9999999')
+    url = ('https://scicrunch.org/api/1/sparc-scigraph/scigraph/dynamic/'
+           f'demos/apinat/neru-6/{neupop_id}?limit=9999999&key={auth.get("scigraph-api-key")}')
     resp = requests.get(url, headers={'Accept': 'application/json'})
     blob = resp.json()
     return blob
@@ -1831,7 +1826,7 @@ def main(blob=None, blob_string=None, neupop_id=None, remove_converge=remove):
     return v
 #+end_src
 
-#+call: python-process-neru(result=cypher-neru-5-helper(neupop_id="ilxtr:neuron-type-keast-6"))
+#+call: python-process-neru(result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-aacar-12"))
 
 #+begin_src jupyter-python :session pys
 pprint(blob)
@@ -1855,8 +1850,6 @@ Find the ontology identifiers for terminal regions.
 # run this to populate/update the kernel (sigh)
 #+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-1"))
 
-#+RESULTS:
-
 #+name: neru-find-terminal-regions
 #+begin_src jupyter-python :session pys :exports both :var neupop_id=""
 from pprint import pprint
@@ -1869,25 +1862,6 @@ dend_terminal_regions = find_terminal_regions(blob, dend)
 pprint(axon_terminal_regions)
 pprint(dend_terminal_regions)
 #+end_src
-
-#+RESULTS: neru-find-terminal-regions
-#+begin_example
-[{'id': 'UBERON:0016508',
-  'lbl': 'pelvic ganglion',
-  'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['pelvic ganglion'],
-           'https://apinatomy.org/uris/readable/generated': [True],
-           'types': ['Class']}}]
-[{'id': 'UBERON:0006460',
-  'lbl': None,
-  'meta': {'https://apinatomy.org/uris/readable/generated': [True],
-           'types': ['Class']}},
- {'id': 'EMAPA:19574',
-  'lbl': 'Sixth lumbar spinal cord segment',
-  'meta': {'http://www.w3.org/2000/01/rdf-schema#label': ['Sixth lumbar spinal '
-                                                          'cord segment'],
-           'https://apinatomy.org/uris/readable/generated': [True],
-           'types': ['Class']}}]
-#+end_example
 
 ** connectivity pairs
 
@@ -2028,7 +2002,7 @@ def render_blob(blob):
 
 #+RESULTS: py-conn-pairs
 
-#+call: python-process-neru(result=cypher-neru-5-helper(neupop_id="ilxtr:neuron-type-keast-1"))
+#+call: python-process-neru(result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-keast-1"))
 
 #+begin_src jupyter-python :session pys
 blob, *_ = main(blob_string=result)
@@ -2044,12 +2018,12 @@ from pyontutils.scigraph import Cypher, Vocabulary
 <<py-conn-pairs>>
 sgv = Vocabulary()
 sgc = Cypher()
-q_neru_5 = """
-<<cypher-neru-5>>
+q_neru_6 = """
+<<cypher-neru-6>>
 """
 def neupop_blob(neupop_id):
     # XXX requires a patch to Cypher and CypherBase to support arbitrary kwargs
-    blob = sgc.execute(query=q_neru_5, limit=None, neupop_id=neupop_id, output='application/json')
+    blob = sgc.execute(query=q_neru_6, limit=None, neupop_id=neupop_id, output='application/json')
     return blob
 
 def sigh():
@@ -2489,18 +2463,48 @@ config.write_python()
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru
-*** neru-5
-nesting
+*** neru-6
+The only difference between 5 and 6 is that 6 also traverses apinat:nextChainStartLevels
+# #+header: :var neupop_id="ilxtr:neuron-type-aacar-12"
+#+name: cypher-neru-6-helper
+#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
+<<cypher-neru-6>>
+#+end_src
 
+#+header: :limit 999999 :file ./images/neru-6-aacar-12.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-aacar-12"
+#+name: cypher-neru-6
+#+begin_src cypher :noweb yes
+<<cypher-neru-5/6-common-1>>
+-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+<<cypher-neru-5/6-common-2>>
+#+end_src
+
+#+RESULTS: cypher-neru-6
+[[file:./images/neru-5-aacar-12.svg]]
+
+*** neru-5
+**** query
+# #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-5-helper
 #+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
 <<cypher-neru-5>>
 #+end_src
 
 # #+header: :results drawer :limit 99999999 :exports none
-#+header: :limit 999999 :file ./images/neru-5.svg :results file :exports both
+#+header: :limit 999999 :file ./images/neru-5-keast-6.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-5
+#+begin_src cypher :noweb yes
+<<cypher-neru-5/6-common-1>>
+-[f:apinatomy:next*0..]->()
+<<cypher-neru-5/6-common-2>>
+#+end_src
+
+#+RESULTS: cypher-neru-5
+[[file:./images/neru-5-keast-6.svg]]
+
+#+name: cypher-neru-5/6-common-1
 #+begin_src cypher
 MATCH (neupop:Class{iri: $neupop_id})
 -[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
@@ -2533,7 +2537,10 @@ MATCH (lyph)
 
 // use apinatomy:next to extract ordering information
 , (link)
--[f:apinatomy:next*0..]->()
+#+end_src
+
+#+name: cypher-neru-5/6-common-2
+#+begin_src cypher
 -[g:apinatomy:target*0..1]->()
 -[h:apinatomy:rootOf*0..1]->()
 -[i:apinatomy:levels*0..1]->()
@@ -2571,9 +2578,6 @@ OPTIONAL MATCH more = (lyph)
 
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext, more
 #+end_src
-
-#+RESULTS: cypher-neru-5
-[[file:./images/neru-5.svg]]
 
 *** neru-4
 :PROPERTIES:
@@ -4041,6 +4045,11 @@ cypherResources:
     operations: *neru-ops
     query: |
       <<cypher-neru-5>>
+
+  - path: /dynamic/demos/apinat/neru-6/{neupop_id}
+    operations: *neru-ops
+    query: |
+      <<cypher-neru-6>>
 
   - path: /dynamic/demos/apinat/modelList
     operations:
