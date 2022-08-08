@@ -603,7 +603,13 @@ procexp `
 python `
 racket `
 rsync `
-vim
+vim `
+wsl2 `
+wsl-ubuntu-2004 `
+vcxsrv `
+docker-desktop `
+docker
+
 #+end_src
 
 # visualstudio2019community `
@@ -664,7 +670,14 @@ sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 [[https://brew.sh/][Install homebrew]].
 
 #+begin_src bash :exports code :eval never
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/5ecca39372cffdc4c9fbacee6e22328a0dc61eac/install)"
+set -e  # this will exit your shell if you run at the top level and something fails
+
+curl -fsSL https://raw.githubusercontent.com/Homebrew/install/fcfea5bbf7130d754360d3056601bad131b09762/install.sh -o brew-install.sh
+test $(shasum -a 256 brew-install.sh | awk '{print $1}') = bcdaa4ade908e3766c74883f829c3dbb553a9808899bf58702651bd229d0c463 || { echo FAIL; rm brew-install.sh }
+
+/bin/bash brew-install.sh
+rm brew-install.sh
+
 brew install --cask \
 docker \
 emacs \
@@ -693,7 +706,15 @@ redland \
 rxvt-unicode \
 sbcl \
 sqlite \
-tree
+tree \
+virtualbox \
+xquartz \
+imagemagick@6 \
+poppler \
+cmake \
+ninja \
+berkeley-db
+
 #+end_src
 
 Add the following to your ~/.bash_profile
@@ -707,7 +728,7 @@ Add the following to your ~/.bash_profile
 Add the following to your ~/.bashrc
 #+CAPTION: .bashrc
 #+begin_src bash :exports code :eval never
-export PATH=${HOME}/bin:${HOME}/Library/Python/3.7/bin:${PATH}
+export PATH=${HOME}/bin:${HOME}/Library/Python/3.9/bin:${PATH}
 #+end_src
 
 Run the following to symlink python3 to python
@@ -912,9 +933,9 @@ popd
 *** Export v4
 #+begin_src bash
 source ~/files/venvs/sparcur-dev/bin/activate
-python -m sparcur.simple.combine
-python -m sparcur.simple.disco ~/.local/share/sparcur/export/summary/618*/LATEST/curation-export.json
-echo Export complete. Check results at:
+python -m sparcur.simple.combine &&
+python -m sparcur.simple.disco ~/.local/share/sparcur/export/summary/618*/LATEST/curation-export.json &&
+echo Export complete. Check results at: ;
 echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/share/sparcur/export/summary/618*/LATEST)
 #+end_src
 
@@ -1248,6 +1269,18 @@ pushd ~/.cache/log/sparcur/datasets
 find -name stdout.log -printf "%T@ %Tc %p\n" | sort -n
 less -R $_some_path
 #+end_src
+*** fixing feff issues
+#+begin_src python
+from sparcur.datasets import Tabular
+from sparcur.paths import Path
+p = Path('dataset_description.xlsx')
+t = Tabular(p)
+hrm1 = list(t.xlsx1())
+hrm2 = list(t.xlsx2())
+#+end_src
+look for =\ufeff= at the start of strings and then use e.g. vim to
+open and edit the file removing it from the offending strings
+
 ** SODA
 Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
 #+header: :var parent_folder="~/files/blackfynn_local/"
