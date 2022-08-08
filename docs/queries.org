@@ -1823,6 +1823,9 @@ def main(blob=None, blob_string=None, neupop_id=None, remove_converge=remove):
     blob, edges, somas, externals, ordering_edges = v = apinat_deblob(
         blob, remove_converge=remove_converge)
 
+    test_call = False  # change to True to test the #+call: expression
+    if test_call:
+        pprint(v)
     return v
 #+end_src
 
@@ -1999,8 +2002,6 @@ def render_blob(blob):
     #pprint(connected_pairs)
     return connected_pairs
 #+end_src
-
-#+RESULTS: py-conn-pairs
 
 #+call: python-process-neru(result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-keast-1"))
 
@@ -2481,7 +2482,7 @@ The only difference between 5 and 6 is that 6 also traverses apinat:nextChainSta
 #+end_src
 
 #+RESULTS: cypher-neru-6
-[[file:./images/neru-5-aacar-12.svg]]
+[[file:./images/neru-6-aacar-12.svg]]
 
 *** neru-5
 **** query
