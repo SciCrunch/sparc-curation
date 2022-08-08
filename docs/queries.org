@@ -51,6 +51,7 @@ exit
 #+link: TEMPRAW http://uri.interlex.org/temp/uris/raw/
 #+link: awards http://uri.interlex.org/temp/uris/awards/
 #+link: rdf http://www.w3.org/1999/02/22-rdf-syntax-ns#
+#+link: fma http://purl.org/sig/ont/fma/
 #+link: FMA http://purl.org/sig/ont/fma/fma
 #+link: obo http://purl.obolibrary.org/obo/
 #+link: IAO http://purl.obolibrary.org/obo/IAO_
@@ -68,12 +69,14 @@ exit
 #+link: dc http://purl.org/dc/elements/1.1/
 #+link: dcterms http://purl.org/dc/terms/
 #+link: ILX http://uri.interlex.org/base/ilx_
+#+link: ilxr http://uri.interlex.org/base/readable/
 #+link: ilxtr http://uri.interlex.org/tgbugs/uris/readable/
 #+link: sparc http://uri.interlex.org/tgbugs/uris/readable/sparc/
 #+link: tech http://uri.interlex.org/tgbugs/uris/readable/technique/
 #+link: asp http://uri.interlex.org/tgbugs/uris/readable/aspect/
 #+link: unit http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/
 #+link: ilxtio http://uri.interlex.org/tgbugs/uris/indexes/ontologies/
+#+link: nposimtest http://uri.interlex.org/tgbugs/uris/readable/npo-simple-test-1/
 #+link: hyp-protcur https://uilx.org/tgbugs/u/hypothesis/protcur/
 #+link: NLXINV http://uri.neuinfo.org/nif/nifstd/nlx_inv_
 #+link: SAO http://uri.neuinfo.org/nif/nifstd/sao
@@ -123,6 +126,7 @@ exit
 #+link: mba http://api.brain-map.org/api/v2/data/Structure/
 #+link: jax http://jaxmice.jax.org/strain/
 #+link: npokb http://uri.interlex.org/npo/uris/neurons/
+#+link: PAXRAT http://uri.interlex.org/paxinos/uris/rat/labels/
 #+end:
 
 * Data queries
@@ -4344,6 +4348,91 @@ Expect
 | ilxtr:neuron-type-sdcol-q  |
 
 #+call: cypher-neru-processes-pop-only(region_id="UBERON:0005453") :results table :note inferior mesenteric ganglion
+
+* Simple blaze
+simple sckan queries over blazegraph
+
+#+begin_src sparql
+#select (count(*) as ?c) {
+select distinct ?s ?o
+where
+{
+  #?s nposimtest:hasSomaLocatedIn ?o
+  ?s nposimtest:hasDendriteLocatedIn ?o
+} order by ?s ?o
+#}
+#+end_src
+
+#+begin_src sparql :noweb yes
+PREFIX nposimtest: <http://uri.interlex.org/tgbugs/uris/readable/npo-simple-test-1/>
+SELECT (COUNT(*) as ?count) {
+  <<simple-sckan-load-1>>
+}
+#+end_src
+
+#+RESULTS:
+| count |
+|-------|
+|   943 |
+
+convert this into an insert query and we're good to go more or less
+#+name: simple-sckan-load-1
+#+begin_src sparql
+#PREFIX nposimtest: <http://uri.interlex.org/tgbugs/uris/readable/npo-simple-test-1/>
+
+select
+distinct ?s ?np ?o
+where
+{
+  {
+    values (?p ?np) {
+      (ilxtr:hasAxonPresynapticElementIn        nposimtest:hasAxonPresynapticElementIn)
+      (ilxtr:hasSomaLocatedIn                   nposimtest:hasSomaLocatedIn)
+      (ilxtr:hasSomaLocatedIn                   nposimtest:hasAxonLocatedIn) # add inferred axon locations
+      (ilxtr:hasAxonLocatedIn                   nposimtest:hasAxonLocatedIn)
+      (ilxtr:hasDendriteLocatedIn               nposimtest:hasDendriteLocatedIn)
+      (ilxtr:hasAxonSensorySubcellularElementIn nposimtest:hasAxonSensorySubcellularElementIn)
+
+      #(ilxtr:hasAxonPresynapticElementIn ilxtr:hasAxonTerminalLocation)
+      #(ilxtr:hasSomaLocatedIn ilxtr:hasSomaLocation)
+      #(ilxtr:hasAxonLocatedIn ilxtr:hasAxonLocation)
+      #(ilxtr:hasDendriteLocatedIn ilxtr:hasDendriteLocation)
+      #(ilxtr:hasAxonSensorySubcellularElementIn ilxtr:hasAxonSensoryLocation)
+    }
+    ?s owl:equivalentClass [
+                             rdf:type owl:Class ;
+                             owl:intersectionOf ?bn0
+                           ] .
+    ?bn0 rdf:rest*/rdf:first ilxtr:NeuronApinatSimple .
+    ?bn0 rdf:rest*/rdf:first [
+                               rdf:type owl:Restriction ;
+                               owl:onProperty ?p ;
+                               owl:someValuesFrom [
+                                                    a owl:Restriction ;
+                                                    owl:onProperty partOf: ;
+                                                    owl:someValuesFrom ?o
+                                                  ] ]
+
+  }
+  union
+  {
+    values (?p ?np) {
+      (ilxtr:hasForwardConnectionPhenotype     nposimtest:hasForwardConnectionPhenotype)
+      (ilxtr:hasFunctionalCircuitRolePhenotype nposimtest:hasFunctionalCircuitRolePhenotype)
+    }
+    ?s owl:equivalentClass [
+                             rdf:type owl:Class ;
+                             owl:intersectionOf ?bn0
+                           ] .
+    ?bn0 rdf:rest*/rdf:first ilxtr:NeuronApinatSimple .
+    ?bn0 rdf:rest*/rdf:first [
+                               rdf:type owl:Restriction ;
+                               owl:onProperty ?p ;
+                               owl:someValuesFrom ?o ]
+  }}
+order by ?s ?np ?o
+limit 5000
+#+end_src
 
 * Sanity checks
 Other queries run against various representations of the data.
