@@ -3456,7 +3456,21 @@ MATCH
 (t)-[:isDefinedBy]->(graph:Ontology{iri: "http://uri.interlex.org/sparc/ontologies/community-terms"})
 RETURN t
 #+end_src
+**** anatomyPhenotypes
+#+name: desc-anatomy-phenotypes
+Return phenotypes that inhere in some part of an anatomical entity.
+#+name: cyres-anatomy-phenotypes
+#+begin_src cypher :limit 100 :var id="UBERON:0001556"
+MATCH (anatomical_entity:Class{iri: $id})
+<-[part_of:subClassOf|BFO:0000050|RO:0002433*0..40]-(subclass_part_ctmo)
+<-[inheres_in:RO:0000052]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
+<-[has_process_part:BFO:0000051]-(phenotype) // has part (process)
 
+WHERE
+// filter out partOf/hasPart cases that induce circularity
+ALL(e IN part_of WHERE NOT EXISTS(e.owlType) OR e.owlType = "subClassOf" OR e.owlType = "operand")
+RETURN phenotype
+#+end_src
 *** shortestSimple
 # FIXME TODO make sure this actuall works as expected, I think it will?
 #+header: :var start_id=(or)
@@ -3757,7 +3771,7 @@ Example template.
 cypherResources:
   - path:
     operations: &name-ops
-      - summary: do the thing
+      - summary: <<nonl(desc-name())>>
         parameters:
           - name: some-id
             description: does something
@@ -3769,6 +3783,20 @@ cypherResources:
 #+name: cypher-resources
 #+begin_src yaml :noweb yes :tangle ../resources/scigraph/cypher-resources.tangled.yaml
 cypherResources:
+  - path: /dynamic/prod/sparc/anatomyPhenotypes/{id}
+    operations: &anatomyPhenotypes-ops
+      - summary: <<nonl(desc-anatomy-phenotypes())>>
+        parameters:
+          - name: id
+            description: uberon id of the anatomical entity to search from
+            paramType: path
+    query: &anatomyPhenotypes |
+      <<cyres-anatomy-phenotypes>>
+
+  - path: /dynamic/test/sparc/anatomyPhenotypes/{id}
+    operations: *anatomyPhenotypes-ops
+    query: *anatomyPhenotypes
+
   - path: /dynamic/prod/sparc/organParts/{id}
     operations: &organParts-ops
       - summary: <<nonl(desc-organ-parts())>>
