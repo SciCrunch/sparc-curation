@@ -74,6 +74,9 @@ docker run --volumes-from sckan-data -e DISPLAY=host.docker.internal:0 -it tgbug
 
 #+end_src
 
+See the [[./tutorial.org#mounting-the-sckan-folder-from-the-host][Mounting the sckan folder from the host]] section of the
+reference to run when mounting host folders to save your work.
+
 If you update to a new version of =tgbugs/sckan= you will want to run
 the following to update the =sckan-data= container.
 #+begin_src bash
@@ -114,7 +117,14 @@ Using https://brew.sh/.
 brew install virtualbox xquartz
 brew install --cask docker
 
-# there are some system level persmissions that you will need to set for virtualbox
+open -a Docker
+
+# The docker command will not appear until you
+# go to Applications and run Docker and accept
+# the license agreements and grant permissions
+
+# there are some system level persmissions that
+# you will need to set for virtualbox
 
 open -a XQuartz
 

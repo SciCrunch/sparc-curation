@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 25a1d5b7e434242f020a9f66d22681c4119ebbf88dd5f3f11396b220139597f2; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 02876b7fe6c59bc84cbaa30d667ac9a6b5efcdc77bf4feb2bb3ac34addd93d58; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -127,6 +127,7 @@ exit
 #+link: jax http://jaxmice.jax.org/strain/
 #+link: npokb http://uri.interlex.org/npo/uris/neurons/
 #+link: PAXRAT http://uri.interlex.org/paxinos/uris/rat/labels/
+#+link: NIFEXT http://uri.neuinfo.org/nif/nifstd/nifext_
 #+end:
 
 * Data queries
@@ -6084,7 +6085,7 @@ RETURN p1, p2, p3, p4, p5, p6
   (reval 'sha256 '62bdbaf3d54f16b5019715f1dd175ecda8b37de420d14bcb8a469ef6820c5386
          "https://raw.githubusercontent.com/tgbugs/sparql-mode/62ee958fe5abb1212a351025abce522e53ef1fae/ob-sparql.el"))
 
-(defun-local json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
+(defun json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
          (dot (ob-cypher/scigraph/json-to-dot json-string))
          (cmd (format
@@ -6112,12 +6113,40 @@ RETURN p1, p2, p3, p4, p5, p6
       (replace-match ""))))
 (add-hook 'org-babel-tangle-body-hook #'ow---strip-empty-lines)
 
-;; support for passing scigraph api keys via envars
+;; support for passing scigraph api keys via envars/secrets file
+;; envars are here for convenience but should never be used in
+;; practice mounting the secrets file is way more secure
 (unless (fboundp 'get-scicrunch-api-key)
   (defun get-scicrunch-api-key ()
     (or (getenv "SCIGRAPH_API_KEY")
         (getenv "SCICRUNCH_API_KEY")
         (oa-path :scicrunch :api :key))))
+
+;; temporary backport of fixes for ol-man behavior until a new version of org-mode is released
+(require 'ol-man)
+(defun org-man-open (path _)
+  "Visit the manpage on PATH.
+PATH should be a topic that can be thrown at the man command.
+If PATH contains extra ::STRING which will use `occur' to search
+matched strings in man buffer."
+  (string-match "\\(.*?\\)\\(?:::\\(.*\\)\\)?$" path)
+  (let* ((command (match-string 1 path))
+         (search (match-string 2 path))
+         (buffer (funcall org-man-command command)))
+    (when search
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (unless (search-forward search nil t)
+          (let ((process (get-buffer-process buffer)))
+            (while (process-live-p process)
+              (accept-process-output process)))
+          (goto-char (point-min))
+          (search-forward search))
+        (forward-line -1)
+        (let ((point (point)))
+          (let ((window (get-buffer-window buffer)))
+            (set-window-point window point)
+            (set-window-start window point)))))))
 
 ;; command line interface
 (when noninteractive

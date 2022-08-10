@@ -23,6 +23,7 @@ works in this case as well.
 For a written introduction see the manual on [[info:org#Working with Source Code][Working with Source Code]].
 
 ** Running queries
+
 There are two ways to run queries.
 1. Hit =C-c C-c= to run the source block under the cursor.
    =C-c C-c= is done by holding =Ctrl= and then hitting the =c= key twice.
@@ -169,6 +170,101 @@ that you renamed in the previous section.
 :PROPERTIES:
 :CUSTOM_ID: reference
 :END:
+** Saving to the host system
+:PROPERTIES:
+:CUSTOM_ID: saving-to-the-host-system
+:END:
+
+If you want to use this docker image for more than basic exploration
+the best approach is to dump the docker image files to a folder on the
+host system and then make that folder accessible to the container.
+
+You can save to the host system and =docker start= together since =docker
+start= also restores things window layout. See [[#saving-and-restoring][Saving and restoring]].
+
+*** Mounting the sckan folder from the host
+:PROPERTIES:
+:CUSTOM_ID: mounting-the-sckan-folder-from-the-host
+:END:
+
+If you have not yet dumped the =sckan= folder see the next section first.
+
+Running with =--mount type=bind,source=sckan,destination=/home/user/sckan=
+will mount the host =sckan= folder over the container =sckan= folder. Make
+sure you dump first or you will get an error. If for any reason the
+folder is empty the container will not start correctly.
+
+#+begin_src bash
+# run the image with host sckan mounted
+
+## linux
+
+docker run --mount type=bind,source=sckan,destination=/home/user/sckan --volumes-from sckan-data -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY -it tgbugs/musl:kg-release-user
+
+## macos
+
+docker run --mount type=bind,source=sckan,destination=/home/user/sckan --volumes-from sckan-data -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=host.docker.internal:0 -it tgbugs/musl:kg-release-user
+
+## windows
+
+docker run --mount type=bind,source=sckan,destination=/home/user/sckan --volumes-from sckan-data -e DISPLAY=host.docker.internal:0 -it tgbugs/musl:kg-release-user
+#+end_src
+
+*** Dumping the sckan folder
+
+Dump the =sckan= folder to the host file system.
+
+#+begin_src bash
+cid=$(docker ps -lqf ancestor=tgbugs/musl:kg-release-user)
+
+if [ -z "${cid}" ]; then
+  ncid=$(docker create tgbugs/musl:kg-release-user)
+  cid=${ncid}
+fi
+
+if [ -d sckan ]; then
+  echo error: sckan folder already exists
+else
+  docker cp ${cid}:/home/user/sckan sckan
+fi
+
+if [ -n "${ncid}" ]; then
+  docker rm -v ${ncid}
+fi
+#+end_src
+*** Updating the sckan folder
+
+Update the =sckan= folder on the host without overwriting =scratch.org=.
+
+#+begin_src bash
+cid=$(docker ps -lqf ancestor=tgbugs/musl:kg-release-user)
+
+if [ -z "${cid}" ]; then
+  ncid=$(docker create tgbugs/musl:kg-release-user)
+  cid=${ncid}
+fi
+
+td=$(mktemp -d --tmpdir=$(pwd))
+docker cp ${cid}:/home/user/sckan ${td}/sckan
+
+if [ -n "${ncid}" ]; then
+  docker rm -v ${ncid}
+fi
+
+if [ -d sckan ]; then
+  nowish=$(date +%Y-%m-%dT%H%M)
+  mkdir sckan/${nowish}
+  rm ${td}/sckan/scratch.org  # explicit ${td} to avoid any risk of rming the wrong one
+  pushd ${td}
+  find sckan/ -maxdepth 1 -type f -exec mv ../{} ../sckan/${nowish}/ \; -exec mv {} ../{} \;
+  popd
+else
+  mv ${td}/sckan sckan
+fi
+
+rm -r ${td}
+#+end_src
+
 ** Saving and restoring
 :PROPERTIES:
 :CUSTOM_ID: saving-and-restoring
@@ -193,6 +289,9 @@ from scratch by calling =docker run= as you did the first time you
 started the SCKAN image.
 
 ** Transferring work
+:PROPERTIES:
+:CUSTOM_ID: transferring-work
+:END:
 
 If you have queries that you have saved inside a SCKAN docker
 container it is possible to copy those files to the host system.
@@ -202,16 +301,33 @@ For example, to copy =scratch.org= to the host you can run the following.
 docker cp $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user):/home/user/scratch.org scratch-backup.org
 #+end_src
 
+# XXX this will fail if you pull a new image before you back up
+
+# TODO transferring any emacs settings/desktop history
+
 ** Keybinds
-| =C-c=       | copy              |
-| =C-v=       | paste             |
-| =C-z=       | undo              |
+| =C-c=     | copy              |
+| =C-v=     | paste             |
+| =C-z=     | undo              |
 | =C-y= =C-Z= | redo              |
-| =C-s=       | save              |
-| =C-f=       | find              |
-| =C-q=       | save and quit     |
-| =f5=        | run nearest block |
-| =C-c C-c=   | run block or call |
+| =C-s=     | save              |
+| =C-f=     | find              |
+| =C-q=     | save and quit     |
+| =f5=      | run nearest block |
+| =C-c C-c= | run block or call |
+
+** Navigating images
+Cypher query results can be rendered as images using the =:file= header argument.
+
+When you click on a an image link =feh= will open the image in a new window.
+
+Left click pans and middle click drag zooms.
+
+When in =feh= you can hit the =q= key to quit.
+
+You can click this [[./images/example.png][example image link]] to open =feh= and see how it works.
+
+See the [[man:feh::MOUSE ACTIONS][feh manual section on mouse actions]] for more details.
 
 ** Org mode
 The query interface for SCKAN is a computational notebook written in Org mode.

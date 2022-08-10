@@ -30,14 +30,14 @@ RETURN region
 #+end_src
 
 #+RESULTS: cypher-query-1
-| id             | label                            |
-|----------------+----------------------------------|
-| EMAPA:25281    | S1 ventral root                  |
-| UBERON:0006460 | first sacral spinal cord segment |
-| UBERON:0018675 | pelvic splanchnic nerve          |
-| UBERON:0016508 | pelvic ganglion                  |
-| EMAPA:25279    | L6 ventral root                  |
-| ILX:0738432    | Sixth lumbar spinal cord segment |
+| id             | label                                  |
+|----------------+----------------------------------------|
+| ILX:0738432    | Sixth lumbar spinal cord segment       |
+| ILX:0792853    | Anterior root of first sacral nerve    |
+| ILX:0793615    | Ventral root of the sixth lumbar nerve |
+| UBERON:0006460 | first sacral spinal cord segment       |
+| UBERON:0016508 | pelvic ganglion                        |
+| UBERON:0018675 | pelvic splanchnic nerve                |
 
 #+name: sparql-query-1
 #+begin_src sparql
@@ -62,14 +62,14 @@ ORDER BY ?region
 #+end_src
 
 #+RESULTS: sparql-query-1
-| region         | label                            |
-|----------------+----------------------------------|
-| EMAPA:25279    | L6 ventral root                  |
-| EMAPA:25281    | S1 ventral root                  |
-| ILX:0738432    | Sixth lumbar spinal cord segment |
-| UBERON:0006460 | first sacral spinal cord segment |
-| UBERON:0016508 | pelvic ganglion                  |
-| UBERON:0018675 | pelvic splanchnic nerve          |
+| region         | label                                  |
+|----------------+----------------------------------------|
+| ILX:0738432    | Sixth lumbar spinal cord segment       |
+| ILX:0792853    | Anterior root of first sacral nerve    |
+| ILX:0793615    | Ventral root of the sixth lumbar nerve |
+| UBERON:0006460 | first sacral spinal cord segment       |
+| UBERON:0016508 | pelvic ganglion                        |
+| UBERON:0018675 | pelvic splanchnic nerve                |
 
 * Neuron populations with processes in region
 Show all neuron populations that have some part in a given region.
@@ -100,18 +100,19 @@ RETURN neupop
 #+end_src
 
 #+RESULTS: cypher-query-2
-| id                         | label                                                                                    |
-|----------------------------+------------------------------------------------------------------------------------------|
-| ilxtr:neuron-type-keast-11 | L1-L2 sensory neuron innervating bladder                                                 |
-| ilxtr:neuron-type-keast-3  | inferior mesenteric ganglion neuron (kblad)                                              |
-| ilxtr:neuron-type-keast-6  | sympathetic preganglionic neuron innervating pelvic ganglion neuron (kblad)              |
-| ilxtr:neuron-type-keast-7  | sympathetic preganglionic neuron innervating inferior mesenteric ganglion neuron (kblad) |
-| ilxtr:neuron-type-sdcol-b  | neuron type sdcol b                                                                      |
-| ilxtr:neuron-type-sdcol-d  | neuron type sdcol d                                                                      |
-| ilxtr:neuron-type-sdcol-f  | neuron type sdcol f                                                                      |
-| ilxtr:neuron-type-sdcol-g  | neuron type sdcol g                                                                      |
-| ilxtr:neuron-type-sdcol-h  | neuron type sdcol h                                                                      |
-| ilxtr:neuron-type-sdcol-q  | neuron type sdcol q                                                                      |
+| id                              | label                                                                                    |
+|---------------------------------+------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-keast-3       | inferior mesenteric ganglion neuron (kblad)                                              |
+| ilxtr:neuron-type-keast-6       | sympathetic preganglionic neuron innervating pelvic ganglion neuron (kblad)              |
+| ilxtr:neuron-type-keast-7       | sympathetic preganglionic neuron innervating inferior mesenteric ganglion neuron (kblad) |
+| ilxtr:neuron-type-keast-11      | L1-L2 sensory neuron innervating bladder                                                 |
+| ilxtr:neuron-type-sdcol-b       | neuron type sdcol b                                                                      |
+| ilxtr:neuron-type-sdcol-d       | neuron type sdcol d                                                                      |
+| ilxtr:neuron-type-sdcol-f       | neuron type sdcol f                                                                      |
+| ilxtr:neuron-type-sdcol-g       | neuron type sdcol g                                                                      |
+| ilxtr:neuron-type-sdcol-h       | neuron type sdcol h                                                                      |
+| ilxtr:neuron-type-sdcol-q       | neuron type sdcol q                                                                      |
+| ilxtr:neuron-type-sdcol-q-prime | neuron type sdcol q'                                                                     |
 
 #+name: sparql-query-2
 #+begin_src sparql
@@ -139,18 +140,19 @@ ORDER BY ?neupop
 #+end_src
 
 #+RESULTS: sparql-query-2
-| neupop                     | label                | prefLabel                                                                                |
-|----------------------------+----------------------+------------------------------------------------------------------------------------------|
-| ilxtr:neuron-type-keast-11 | neuron type kblad 11 | L1-L2 sensory neuron innervating bladder                                                 |
-| ilxtr:neuron-type-keast-3  | neuron type kblad 3  | inferior mesenteric ganglion neuron (kblad)                                              |
-| ilxtr:neuron-type-keast-6  | neuron type kblad 6  | sympathetic preganglionic neuron innervating pelvic ganglion neuron (kblad)              |
-| ilxtr:neuron-type-keast-7  | neuron type kblad 7  | sympathetic preganglionic neuron innervating inferior mesenteric ganglion neuron (kblad) |
-| ilxtr:neuron-type-sdcol-b  | neuron type sdcol b  |                                                                                          |
-| ilxtr:neuron-type-sdcol-d  | neuron type sdcol d  |                                                                                          |
-| ilxtr:neuron-type-sdcol-f  | neuron type sdcol f  |                                                                                          |
-| ilxtr:neuron-type-sdcol-g  | neuron type sdcol g  |                                                                                          |
-| ilxtr:neuron-type-sdcol-h  | neuron type sdcol h  |                                                                                          |
-| ilxtr:neuron-type-sdcol-q  | neuron type sdcol q  |                                                                                          |
+| neupop                          | label                | prefLabel                                                                                |
+|---------------------------------+----------------------+------------------------------------------------------------------------------------------|
+| ilxtr:neuron-type-keast-3       | neuron type kblad 3  | inferior mesenteric ganglion neuron (kblad)                                              |
+| ilxtr:neuron-type-keast-6       | neuron type kblad 6  | sympathetic preganglionic neuron innervating pelvic ganglion neuron (kblad)              |
+| ilxtr:neuron-type-keast-7       | neuron type kblad 7  | sympathetic preganglionic neuron innervating inferior mesenteric ganglion neuron (kblad) |
+| ilxtr:neuron-type-keast-11      | neuron type kblad 11 | L1-L2 sensory neuron innervating bladder                                                 |
+| ilxtr:neuron-type-sdcol-b       | neuron type sdcol b  |                                                                                          |
+| ilxtr:neuron-type-sdcol-d       | neuron type sdcol d  |                                                                                          |
+| ilxtr:neuron-type-sdcol-f       | neuron type sdcol f  |                                                                                          |
+| ilxtr:neuron-type-sdcol-g       | neuron type sdcol g  |                                                                                          |
+| ilxtr:neuron-type-sdcol-h       | neuron type sdcol h  |                                                                                          |
+| ilxtr:neuron-type-sdcol-q       | neuron type sdcol q  |                                                                                          |
+| ilxtr:neuron-type-sdcol-q-prime | neuron type sdcol q' |                                                                                          |
 
 * Bootstrap :ARCHIVE:
 :properties:

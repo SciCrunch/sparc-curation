@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: e7cb3e532bb4b6b3ae254bb43c074571cb7e7be5cc5038f1b3eb769289ed84ae; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 087bc07694763650335941593bf488ea9037fb2de64d4f87bc3892486c646d9f; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Welcome
 
@@ -19,9 +19,18 @@ Browse the full [[./queries.org][Catalog]].
 ** Saving your work
 You can quit at any time and your work will be saved.
 
-You can continue your previous session by running =docker start -ai $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user)=.
+You can continue your previous session by running
+=docker start -ai $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user)=
 
-For more details see the [[./tutorial.org::#saving-and-restoring][reference section of the Tutorial]].
+For more details see [[./tutorial.org::#saving-and-restoring][Saving and restoring]] in the reference section.
+
+** Saving to the host system
+While using =docker start= keeps you safe from losing work,
+the best way to save your work across sessions is to mount
+a folder from the host system to the docker container.
+
+To configure your system so that your work lives on the host
+system see [[./tutorial.org::#saving-to-the-host-system][Saving to the host system]] in the reference section.
 
 ** Additional documentation
 - [[./overview.org][Overview, background, and glossary]]
@@ -57,7 +66,30 @@ emacs -eval "(find-file-noselect (pop argv))" welcome.org
   "Invert C-u C-x C-c behavior so that quit saves all visited files silently."
   (apply fun (mapcar #'not args)))
 
+;; make backup to a designated dir, mirroring the full path
+(defun --backup-file-name (fpath)
+  "Return a new file path of a given file path.
+   If the new path's directories does not exist, create them."
+  (let* ((backup-root-dir "~/.emacs.d/emacs-backup/")
+         (file-path (replace-regexp-in-string "[A-Za-z]:" "" fpath)) ; remove Windows driver letter in path, for example, “C:”
+         (backup-file-path (replace-regexp-in-string "//" "/" (concat backup-root-dir file-path "~"))))
+    (make-directory (file-name-directory backup-file-path) (file-name-directory backup-file-path))
+    backup-file-path))
+
 (unless ow-do-devel
+
+  ;;; prevent creation of files that will confuse the user
+  (setq make-backup-file-name-function '--backup-file-name)
+
+  ;; Save all tempfiles in $TMPDIR/emacs$UID/
+  (defconst emacs-tmp-dir (file-name-as-directory (expand-file-name (format "emacs%d" (user-uid)) temporary-file-directory)))
+  (setq backup-directory-alist
+        `((".*" . ,emacs-tmp-dir)))
+  (setq auto-save-file-name-transforms
+        `((".*" ,emacs-tmp-dir t)))
+  (setq auto-save-list-file-prefix
+        emacs-tmp-dir)
+
   (find-file-noselect "./queries.org")
   (global-set-key (kbd "C-q") #'save-buffers-kill-terminal)
   (global-unset-key (kbd "C-w")) ; cut is too dangerous, a user wouldn't know what they have done
