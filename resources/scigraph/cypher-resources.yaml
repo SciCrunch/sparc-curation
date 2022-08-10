@@ -9,8 +9,9 @@ cypherResources:
     query: &anatomyPhenotypes |
       MATCH (anatomical_entity:Class{iri: $id})
       <-[part_of:subClassOf|BFO:0000050|RO:0002433*0..40]-(subclass_part_ctmo)
-      <-[inheres_in:RO:0000052]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
-      <-[has_process_part:BFO:0000051]-(phenotype) // has part (process)
+      <-[inheres_in:RO:0000052|RO:0002314!]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
+      <-[has_process_part:BFO:0000051]-() // has part (process)
+      <-[:subClassOf*0..]-(phenotype) // phenotype and all subclasses
 
       WHERE
       // filter out partOf/hasPart cases that induce circularity
