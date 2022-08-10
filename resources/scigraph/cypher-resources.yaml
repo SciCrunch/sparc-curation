@@ -1,4 +1,26 @@
 cypherResources:
+  - path: /dynamic/prod/sparc/anatomyPhenotypes/{id}
+    operations: &anatomyPhenotypes-ops
+      - summary: Return phenotypes that inhere in some part of an anatomical entity.
+        parameters:
+          - name: id
+            description: uberon id of the anatomical entity to search from
+            paramType: path
+    query: &anatomyPhenotypes |
+      MATCH (anatomical_entity:Class{iri: $id})
+      <-[part_of:subClassOf|BFO:0000050|RO:0002433*0..40]-(subclass_part_ctmo)
+      <-[inheres_in:RO:0000052]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
+      <-[has_process_part:BFO:0000051]-(phenotype) // has part (process)
+
+      WHERE
+      // filter out partOf/hasPart cases that induce circularity
+      ALL(e IN part_of WHERE NOT EXISTS(e.owlType) OR e.owlType = "subClassOf" OR e.owlType = "operand")
+      RETURN phenotype
+
+  - path: /dynamic/test/sparc/anatomyPhenotypes/{id}
+    operations: *anatomyPhenotypes-ops
+    query: *anatomyPhenotypes
+
   - path: /dynamic/prod/sparc/organParts/{id}
     operations: &organParts-ops
       - summary: Get the parts list for an organ including nerves and blood vessels
