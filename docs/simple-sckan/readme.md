@@ -116,7 +116,7 @@ LIMIT 999
 
 # Running SIMPLE-SCKAN Queries in Stardog
 
-*	Contact [FDI Lab](https://www.fdilab.org/contact) for the username and password to access the FDI Lab's Stardog endpoint
+*	Contact [SPARC K-Core](kcore@sparc.science) for the username and password to access the FDI Lab's Stardog endpoint
 *	Load **Stardog Studio** from your web browser (Chrome works better)
     * Link: https://stardog.studio/#/
 *	Do the following to connect to our FDI Lab’s Stardog endpoint:
