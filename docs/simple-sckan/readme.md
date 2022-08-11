@@ -23,7 +23,7 @@
     * We also want to have the Stardog interface available for broader audience who would prefer a simpler way to query SCKAN connectivity knowledge.
 
 
-# Running Simple SCKAN Queries in Stardog
+# Running SIMPLE-SCKAN Queries in Stardog
 
 *	Contact [FDI Lab](https://www.fdilab.org/contact) for the username and password to access the FDI Lab's Stardog endpoint
 *	Load **Stardog Studio** from your web browser (Chrome works better)
