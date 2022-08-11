@@ -65,8 +65,8 @@ PREFIX partOf: <http://purl.obolibrary.org/obo/BFO_0000050>
 PREFIX ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/>
 
 SELECT 
-DISTINCT ?Neuron_ID ?Neuron_Label ?Soma_Location_ID ?Soma_Location 
-  				  ?Terminal_Location_ID ?Terminal_Location_Label
+DISTINCT ?Neuron_Label ?Soma_Location_ID ?Soma_Location 
+  				  ?Terminal_Location_ID ?Terminal_Location
 WHERE
 {
     VALUES (?npo_soma) {(ilxtr:hasSomaLocatedIn)}
@@ -101,9 +101,9 @@ WHERE
                               ] .
     ?Neuron_ID rdfs:label ?Neuron_Label .
     ?Soma_Location_ID rdfs:label ?Soma_Location .
-    ?Terminal_Location_ID rdfs:label ?Terminal_Location_Label
+    ?Terminal_Location_ID rdfs:label ?Terminal_Location
   }
-ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location_Label
+ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location
 LIMIT 999
 ```
 
@@ -117,7 +117,7 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX partOf: <http://purl.obolibrary.org/obo/BFO_0000050>
 PREFIX ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/>
 
-SELECT DISTINCT ?Neuron_ID ?Neuron_Label ?Soma_Location_ID ?Soma_Location 
+SELECT DISTINCT ?Neuron_Label ?Soma_Location_ID ?Soma_Location 
                                		 ?Terminal_Location_ID ?Terminal_Location
 {
      ?Neuron_ID rdfs:subClassOf ilxtr:NeuronApinatSimple;  
@@ -132,6 +132,31 @@ ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location
 LIMIT 999
 
 ```
+
+## Query Result (first few results)
+| Neuron_Label          | Soma_Location_ID | Soma_Location                          | Terminal_Location_ID | Terminal_Location                      |
+|-----------------------|------------------|----------------------------------------|----------------------|----------------------------------------|
+| neuron type aacar 1   | UBERON:0009050   | nucleus of solitary tract              | UBERON:0002022       | insula                                 |
+| neuron type aacar 10a | ILX:0793555      | atrial intrinsic cardiac ganglion      | ILX:0793555          | atrial intrinsic cardiac ganglion      |
+| neuron type aacar 10v | ILX:0793556      | ventricular intrinsic cardiac ganglion | ILX:0793556          | ventricular intrinsic cardiac ganglion |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0000947       | aorta                                  |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002348       | epicardium                             |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002084       | heart left ventricle                   |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002079       | left cardiac atrium                    |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0009050       | nucleus of solitary tract              |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002012       | pulmonary artery                       |
+| neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002078       | right cardiac atrium                   |
+| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0000947       | aorta                                  |
+| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0002440       | inferior cervical ganglion             |
+| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0001990       | middle cervical ganglion               |
+| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0002012       | pulmonary artery                       |
+| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0000947       | aorta                                  |
+| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0002440       | inferior cervical ganglion             |
+| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0001990       | middle cervical ganglion               |
+| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0002012       | pulmonary artery                       |
+
+
+
 
 # More **SIMPLE-SCKAN** Example Queries
 	* Link will be posted here.
