@@ -109,7 +109,7 @@ LIMIT 999
 
 
 ```SPARQL
-# This is the SIMPLE-SCKAN Query example in SPARQL.
+# This is the SIMPLE-SCKAN Query Example in SPARQL.
 
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
