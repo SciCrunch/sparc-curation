@@ -64,8 +64,8 @@ WHERE
     ?Soma_Location_ID rdfs:label ?Soma_Location .
     ?Terminal_Location_ID rdfs:label ?Terminal_Location_Label
   }
-ORDER BY ?Neuron_ID ?Soma_Label
-LIMIT 600
+ORDER BY ?Neuron_ID ?Soma_Label ?Terminal_Location_Label
+LIMIT 999
 ```
 
 
@@ -91,7 +91,7 @@ SELECT DISTINCT ?Neuron_ID ?Neuron_Label ?Soma_Location_ID ?Soma_Location
        
 }
 ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location
-LIMIT 5000
+LIMIT 999
 
 ```
 
