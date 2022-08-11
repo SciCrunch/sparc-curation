@@ -11,6 +11,91 @@
 	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its axon terminal location (i.e., the location of the axon presynaptic element)
 	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its sensory axon terminal location (i.e., the location of the axon sesory subcellular element)
 * The relational properties above in **SIMPLE-SCKAN** encapsulates the actual ontological connectivity axioms in NPO. In other words, SIMPLE-SCKAN encapsulates the complex OWL axioms from NPO into simple RDF graph patterns for the sole purpose of querying and retrieiving SCKAN's connectivity knowledge in a much simpler and managable manner.
+* Next section provides an example as to how SIMPLE-SCKAN queries can be simpler that SCKAN.
+
+# Query Example: SCKAN Vs. SIMPLE-SCKAN
+
+* Here is an example query to find all the orgins (soma locations) and the termination regions based on the ApINATOMY's neuronal connectivity models. In other words, this query asks where the origin of the ApINATOMY connections are and where do they terminate.
+
+```SPARQL
+# This is the SCKAN Query Example.
+
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX partOf: <http://purl.obolibrary.org/obo/BFO_0000050>
+PREFIX ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/>
+
+SELECT
+  DISTINCT ?Neuron_ID ?Neuron_Label ?Soma_Location_ID ?Soma_Location ?Terminal_Location_ID ?Terminal_Location_Label
+WHERE
+{
+    VALUES (?npo_soma) {(ilxtr:hasSomaLocatedIn)}
+    VALUES (?npo_terminal) 
+      { 
+        (ilxtr:hasAxonPresynapticElementIn)
+        (ilxtr:hasAxonSensorySubcellularElementIn)
+      }
+    ?Neuron_ID owl:equivalentClass [
+                                    rdf:type owl:Class ;
+                                    owl:intersectionOf ?bn0
+                                   ] .
+    ?bn0 rdf:rest*/rdf:first ilxtr:NeuronApinatSimple .
+    
+     ?bn0 rdf:rest*/rdf:first [
+                               rdf:type owl:Restriction ;
+                               owl:onProperty ?npo_soma ;
+                               owl:someValuesFrom [
+                                                    a owl:Restriction ;
+                                                    owl:onProperty partOf: ;
+                                                    owl:someValuesFrom ?Soma_Location_ID
+                                                  ] 
+                              ] .
+    ?bn0 rdf:rest*/rdf:first [
+                               rdf:type owl:Restriction ;
+                               owl:onProperty ?npo_terminal ;
+                               owl:someValuesFrom [
+                                                    a owl:Restriction ;
+                                                    owl:onProperty partOf: ;
+                                                    owl:someValuesFrom ?Terminal_Location_ID
+                                                  ] 
+                              ] .
+    ?Neuron_ID rdfs:label ?Neuron_Label .
+    ?Soma_Location_ID rdfs:label ?Soma_Location .
+    ?Terminal_Location_ID rdfs:label ?Terminal_Location_Label
+  }
+ORDER BY ?Neuron_ID ?Soma_Label
+LIMIT 600
+```
+
+
+```SPARQL
+# This is the SIMPLE-SCKAN Query example in SPARQL.
+
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX partOf: <http://purl.obolibrary.org/obo/BFO_0000050>
+PREFIX ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/>
+
+SELECT DISTINCT ?Neuron_ID ?Neuron_Label ?Soma_Location_ID ?Soma_Location 
+                               ?Terminal_Location_ID ?Terminal_Location
+{
+     ?Neuron_ID rdfs:subClassOf ilxtr:NeuronApinatSimple;  
+                ilxtr:hasSomaLocation ?Soma_Location_ID;  
+                (ilxtr:hasAxonTerminalLocation | ilxtr:hasAxonSensoryLocation) ?Terminal_Location_ID;
+                rdfs:label ?Neuron_Label.
+ 
+   ?Terminal_Location_ID rdfs:label ?Terminal_Location.
+   ?Soma_Location_ID rdfs:label ?Soma_Location.
+       
+}
+ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location
+LIMIT 5000
+
+```
+
+
 
 # Accessing SIMPLE-SCKAN
 * You can download **SIMPLE-SCKAN** from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
@@ -43,5 +128,5 @@
 		*	Run the query by pressing the **Blue Run Button** on the right panel
 		* The comments in the queries should provide information on how to customize the queries
 
-# **Simple-SCKAN** Example Queries
+# **Simple-SCKAN** More Example Queries
 	* Link will be posted here.
