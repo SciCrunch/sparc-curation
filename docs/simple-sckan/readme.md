@@ -103,7 +103,7 @@ WHERE
     ?Soma_Location_ID rdfs:label ?Soma_Location .
     ?Terminal_Location_ID rdfs:label ?Terminal_Location_Label
   }
-ORDER BY ?Neuron_ID ?Soma_Label ?Terminal_Location_Label
+ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location_Label
 LIMIT 999
 ```
 
