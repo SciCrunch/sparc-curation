@@ -120,7 +120,7 @@ PREFIX ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/>
 SELECT DISTINCT ?Neuron_Label ?Soma_Location_ID ?Soma_Location 
                                		 ?Terminal_Location_ID ?Terminal_Location
 {
-     ?Neuron_ID rdfs:subClassOf ilxtr:NeuronApinatSimple;  
+    ?Neuron_ID rdfs:subClassOf ilxtr:NeuronApinatSimple;  
                 ilxtr:hasSomaLocation ?Soma_Location_ID;  
                 (ilxtr:hasAxonTerminalLocation | ilxtr:hasAxonSensoryLocation) ?Terminal_Location_ID;
                 rdfs:label ?Neuron_Label.
