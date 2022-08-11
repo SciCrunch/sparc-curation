@@ -132,7 +132,6 @@ ORDER BY ?Neuron_ID ?Soma_Location ?Terminal_Location
 LIMIT 999
 
 ```
-
 ## Query Result (first few results)
 | Neuron_Label          | Soma_Location_ID | Soma_Location                          | Terminal_Location_ID | Terminal_Location                      |
 |-----------------------|------------------|----------------------------------------|----------------------|----------------------------------------|
