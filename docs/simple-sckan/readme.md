@@ -1,3 +1,9 @@
+## Contents
+- [SCKAN Vs. SIMPLE-SCKAN](#sckan-vs-simple-sckan)
+- [Query Example: SCKAN Vs. SIMPLE-SCKAN](#query-example-sckan-vs-simple-sckan)
+- [Accessing SIMPLE-SCKAN](#accessing-simple-sckan)
+- [Running SIMPLE-SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog)
+
 # SCKAN Vs. SIMPLE-SCKAN
 * The underlying ontologies for SCKAN are developed using standard OWL-DL formalism. The two main reasons for choosing the OWL-based formalism are the following: (a) defining the neuron types with precise logical axioms and quantifiers, and (b) utilizing standard inference engines or reasoners for automated classification of neuron types, detecting inconsistencies in the asserted axioms, and inferring implicit logical axioms from the explicit ones. 
 	* While OWL provides a useful formalism to specify the logical axioms of an ontology in a rigorous manner, it lacks the support for quiring and retreiving those axiom-level knowledge. There is simply not enough tool-support available for complex axiom-level queries that one could use against the OWL ontologies. 
@@ -128,5 +134,5 @@ LIMIT 999
 		*	Run the query by pressing the **Blue Run Button** on the right panel
 		* The comments in the queries should provide information on how to customize the queries
 
-# **Simple-SCKAN** More Example Queries
+# More **Simple-SCKAN** Example Queries
 	* Link will be posted here.
