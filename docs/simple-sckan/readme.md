@@ -19,10 +19,10 @@
 
 # Running Simple SCKAN Queries in Stardog
 
-*	Contact [FDI Lab](https://www.fdilab.org/contact) for the username and password to access the FDI Lab's Stardog server
+*	Contact [FDI Lab](https://www.fdilab.org/contact) for the username and password to access the FDI Lab's Stardog endpoint
 *	Load **Stardog Studio** from your web browser (Chrome works better)
     * Link: https://stardog.studio/#/
-*	Do the following to connect to our FDI Lab’s Stardog server:
+*	Do the following to connect to our FDI Lab’s Stardog endpoint:
 	* Press the **Red Power Button** at the bottom-left corner of the page
 	* On **Connect to Stardog** window, select **New Connection** and enter the following: 
 		* Username: Your username
