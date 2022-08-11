@@ -4,13 +4,15 @@
 	* The graph-based standard query laguages such as SPARQL and CYPHER are mostly meant for writing data or individual-level queries against a knowledgebase (comibination of ontological classes and their instantiations with actual instance data). 
 		* While one can use SPARQL or Cypher to retreive axiom-level knowledge from an OWL ontology, it usually requires an extensive amount of knowledge both about the domain and the structure of the ontology, as well as the technical jargon of the OWL/RDF formalisms. In fact, OWL class-level queries with complex logical axioms can be extremely difficult and tedious to write and test using SPARQL or Cypher. 
 	* Since the neuron types in NPO/SCKAN ontologies are defined based on a set of OWL logical axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies. 
-* **SIMPLE-SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified _**subject-predicate-object**_ relations about the basic connectivity knowledge available in NPO. The key objective of the **SIMPLE-SCKAN** is to **_support simplicity_** while writing the queries against NPO's axiom-level connectivity knowledge. The basic connevtivity relations that we thought would be useful are the soma, axon, and dendrite locations, as well as axon terminal and axon sensory terminal locations. Here is the list of simplified relational predicates or properties available in SIMPLE-SCKAN:
+* **SIMPLE-SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified _**subject-predicate-object**_ relations about the basic connectivity knowledge available in NPO. The key objective of the **SIMPLE-SCKAN** is to **_support simplicity_** while writing the queries against NPO's axiom-level connectivity knowledge. Following is the list of simplified relational predicates available in SIMPLE-SCKAN to express the connectivity relations between a neuron type and its locational phenotype(s):
 	* _**hasSomaLocation**_: a relation between a Neuron type and its soma location 
 	* _**hasAxonLocation**_: a relation between a Neuron type and its axon location  
 	* _**hasDendriteLocation**_: a relation between a Neuron type and its dendrite location 
-	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its axon terminal location 
-	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its sensory axon terminal location
-* The relational properties above in **SIMPLE-SCKAN** encapsulates the actual ontological connectivity axioms in NPO. In other words, SIMPLE-SCKAN converts the complex OWL axioms from NPO into simple RDF graph patterns for the sole purpose of querying and retrieiving SCKAN's connectivity knowledge in a much simpler and managable manner.
+	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its axon terminal location (i.e., the location of the axon presynaptic element)
+	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its sensory axon terminal location (i.e., the location of the axon sesory subcellular element)
+* The relational properties above in **SIMPLE-SCKAN** encapsulates the actual ontological connectivity axioms in NPO. In other words, SIMPLE-SCKAN encapsulates the complex OWL axioms from NPO into simple RDF graph patterns for the sole purpose of querying and retrieiving SCKAN's connectivity knowledge in a much simpler and managable manner.
+
+# Accessing SIMPLE-SCKAN
 * You can download **SIMPLE-SCKAN** from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
 	* [**Downlod Simple SCKAN from here**](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-2/sckan-npo-simple.ttl).
 * We recommend using **Stardog Studio** as the SPARQL query interface to query over the NPO/SCKAN connectivity knowledge
