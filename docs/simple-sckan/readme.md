@@ -10,7 +10,7 @@
 	* _**hasDendriteLocation**_: a relation between a Neuron type and its dendrite location 
 	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its axon terminal location 
 	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its sensory axon terminal location
-* The relational properties above in **SIMPLE-SCKAN** encapsulates the actual ontological connectivity axioms in NPO. In other words, SIMPLE-SCKAN converts the complex OWL axioms from NPO into simple RDF graph patterns for the sole purpose of querying and retrieiving SCKAN's connectivity knowledge in a much simpler manner.
+* The relational properties above in **SIMPLE-SCKAN** encapsulates the actual ontological connectivity axioms in NPO. In other words, SIMPLE-SCKAN converts the complex OWL axioms from NPO into simple RDF graph patterns for the sole purpose of querying and retrieiving SCKAN's connectivity knowledge in a much simpler and managable manner.
 * You can download **SIMPLE-SCKAN** from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
 	* [**Downlod Simple SCKAN from here**](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-2/sckan-npo-simple.ttl).
 * We recommend using **Stardog Studio** as the SPARQL query interface to query over the NPO/SCKAN connectivity knowledge
