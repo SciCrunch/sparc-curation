@@ -145,14 +145,6 @@ LIMIT 999
 | neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0009050       | nucleus of solitary tract              |
 | neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002012       | pulmonary artery                       |
 | neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002078       | right cardiac atrium                   |
-| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0000947       | aorta                                  |
-| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0002440       | inferior cervical ganglion             |
-| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0001990       | middle cervical ganglion               |
-| neuron type aacar 12  | UBERON:0002440   | inferior cervical ganglion             | UBERON:0002012       | pulmonary artery                       |
-| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0000947       | aorta                                  |
-| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0002440       | inferior cervical ganglion             |
-| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0001990       | middle cervical ganglion               |
-| neuron type aacar 12  | UBERON:0001990   | middle cervical ganglion               | UBERON:0002012       | pulmonary artery                       |
 
 
 
