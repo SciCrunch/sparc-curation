@@ -53,7 +53,7 @@ What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the 
 
 ## Query Example: SCKAN Vs. SIMPLE-SCKAN
 
-* Here is an example query to find all the orgins (soma locations) and the termination regions based on the ApINATOMY's neuronal connectivity models. In other words, this query asks where the origin of the ApINATOMY connections are and where do they terminate.
+* Here is an example query to find all the orgins (soma locations) and the termination regions of the neuronal connections specified in the ApINATOMY models. In other words, this query asks where the origin of the ApINATOMY connections are and where do they terminate.
 
 ```SPARQL
 # This is the SCKAN Query Example in SPARQL.
