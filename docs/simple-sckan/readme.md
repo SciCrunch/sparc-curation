@@ -48,7 +48,7 @@ What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the 
 	* _**hasDendriteLocation**_: a relation between a Neuron Type and its Dendrite Location 
 	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its Axon Terminal Location (i.e., the location of the axon presynaptic element)
 	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its Sensory Axon Terminal Location (i.e., the location of the axon sesory subcellular element)
-* The relational properties above in **SIMPLE-SCKAN** serve as the 'shortcuts' for the actaul ontological relations specified by the NPO to express its locational phenotypes of the neuron populations. Essentially, SIMPLE-SCKAN encapsulates the complex OWL axioms relevant to the NPO's locational phenotypes into simpler RDF graph patterns. The sole purpose of this encasulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. 
+* The relational properties above in **SIMPLE-SCKAN** serve as the 'shortcuts' for the actaul ontological relations specified by the NPO to express its axioms about the locational phenotypes of the neuron populations. Essentially, SIMPLE-SCKAN encapsulates the complex OWL axioms relevant to the NPO's locational phenotypes into simpler RDF graph patterns. The sole purpose of this encasulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. 
 * The next section provides an example as to how SIMPLE-SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
 
 ## Query Example: SCKAN Vs. SIMPLE-SCKAN
