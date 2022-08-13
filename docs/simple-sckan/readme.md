@@ -41,15 +41,15 @@ What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the 
 	* While OWL provides a useful formalism to specify the logical axioms of an ontology in a rigorous manner, it lacks the support for quiring and retreiving those axiom-level knowledge. There is simply not enough tool-support available for complex axiom-level queries that one could use against the OWL ontologies. 
 	* The graph-based standard query laguages such as SPARQL and CYPHER are mostly meant for writing data or individual-level queries against a knowledgebase (comibination of ontological classes and their instantiations with actual instance data). 
 		* While one can use SPARQL or Cypher to retreive axiom-level knowledge from an OWL ontology, it usually requires an extensive knowledge both about the domain and the structure of the ontology, as well as the technical jargon of the OWL/RDF formalisms. OWL class-level queries with complex logical axioms can be difficult and tedious to write and test using SPARQL or Cypher. 
-	* Since the neuron types in NPO/SCKAN ontologies are defined based on a set of OWL logical axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies. 
-* **SIMPLE-SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified _**subject-predicate-object**_ relations about the basic connectivity knowledge available in NPO. The key objective of the **SIMPLE-SCKAN** is to **_support simplicity_** while writing the queries against NPO's axiom-level connectivity knowledge. Following is the list of simplified relational predicates available in SIMPLE-SCKAN to express the connectivity relations between a neuron type and its locational phenotype(s):
-	* _**hasSomaLocation**_: a relation between a Neuron type and its soma location 
-	* _**hasAxonLocation**_: a relation between a Neuron type and its axon location  
-	* _**hasDendriteLocation**_: a relation between a Neuron type and its dendrite location 
-	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its axon terminal location (i.e., the location of the axon presynaptic element)
-	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its sensory axon terminal location (i.e., the location of the axon sesory subcellular element)
-* The relational properties above in **SIMPLE-SCKAN** encapsulates the actual ontological connectivity axioms in NPO. Essentially, SIMPLE-SCKAN encapsulates the complex OWL axioms from NPO into simple RDF graph patterns for the sole purpose of querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner.
-* Next section provides an example as to how SIMPLE-SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
+	* Since the neuron types in NPO/SCKAN ontologies are defined based on a set of OWL axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies. 
+* **SIMPLE-SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified _**subject-predicate-object**_ relations about the core connectivity knowledge available in NPO. The key objective of the **SIMPLE-SCKAN** is to **_support simplicity_** while writing and testing the queries against NPO's axiom-level connectivity knowledge. Following is the list of simplified relational predicates available in SIMPLE-SCKAN to express the connectivity between a neuron type and its locational phenotypes:
+	* _**hasSomaLocation**_: a relation between a Neuron Type and its Soma Location 
+	* _**hasAxonLocation**_: a relation between a Neuron Type and its Axon Location  
+	* _**hasDendriteLocation**_: a relation between a Neuron Type and its Dendrite Location 
+	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its Axon Terminal Location (i.e., the location of the axon presynaptic element)
+	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its Sensory Axon Terminal Location (i.e., the location of the axon sesory subcellular element)
+* The relational properties above in **SIMPLE-SCKAN** serve as the 'shortcuts' for the actaul ontological relations specified by the NPO to express its locational phenotypes of the neuron populations. Essentially, SIMPLE-SCKAN encapsulates the complex OWL axioms relevant to the NPO's locational phenotypes into simpler RDF graph patterns. The sole purpose of this encasulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. 
+* The next section provides an example as to how SIMPLE-SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
 
 ## Query Example: SCKAN Vs. SIMPLE-SCKAN
 
