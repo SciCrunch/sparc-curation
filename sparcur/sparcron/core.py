@@ -57,6 +57,8 @@ from sparcur.config import auth
 from sparcur.simple.utils import backend_pennsieve
 from sparcur.simple.retrieve import main as retrieve
 from sparcur.sheets import Sheet, Organs, Affiliations
+from sparcur.sparcron import get_redis_conn
+from sparcur.sparcron import _none, _qed, _run, _qed_run
 
 
 # we set only cache here to avoid hitting rate limits the cache should
@@ -122,13 +124,13 @@ cel.conf.task_default_routing_key = 'task.default'
 
 
 def route(name, args, kwargs, options, task=None, **kw):
-    if name == 'sparcur.sparcron.check_for_updates':
+    if name == 'sparcur.sparcron.core.check_for_updates':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
-    elif name == 'sparcur.sparcron.check_sheet_updates':
+    elif name == 'sparcur.sparcron.core.check_sheet_updates':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 10, 'queue': 'cron'}
-    elif name == 'sparcur.sparcron.heartbeat':
+    elif name == 'sparcur.sparcron.core.heartbeat':
         out = {'exchange': 'cron', 'routing_key': 'task.cron', 'priority': 3, 'queue': 'cron'}
-    elif name == 'sparcur.sparcron.export_single_dataset':
+    elif name == 'sparcur.sparcron.core.export_single_dataset':
         out = {'exchange': 'export', 'routing_key': 'task.export', 'priority': 1, 'queue': 'export'}
     elif 'celery' in name:
         out = options
@@ -157,12 +159,6 @@ cel.control.add_consumer(
 #    exchange='export',
 #    routing_key='task.export',
 #)
-
-
-def get_redis_conn():
-    rc = Celery(backend='redis://',
-                broker='redis://')
-    return rc.backend.client
 
 
 conn = get_redis_conn()
@@ -261,11 +257,6 @@ def setup_periodic_tasks(sender, **kwargs):
                                     name='heartbeat',
                                     expires=0.2)
 
-
-_none = 0
-_qed = 1
-_run = 2
-_qed_run = 3
 
 
 @cel.task
