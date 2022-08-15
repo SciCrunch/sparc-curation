@@ -34,8 +34,8 @@ rabbitmqctl delete_queue default
 # FIXME really bad because redis and rabbit get completely out of sync ...
 
 # TODO get the latest export dates from the file system when we start and/or don't purge redis
-# FIXME TODO need a way to poll google sheets to check for updates without reading
 
+import os
 import sys
 import json
 import pprint
@@ -385,6 +385,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
 
                 dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
                 try:
+                    os.sync()  # try to avoid missing xattr metadata
                     p2 = subprocess.Popen(
                         argv_spc_find_meta, cwd=dataset_path,
                         stderr=subprocess.STDOUT, stdout=logfd)
@@ -607,6 +608,7 @@ def check_for_updates(project_id):
     #datasets = sorted(datasets, key=lambda r:r.id)[:3]
     for dataset in datasets:
         check_single_dataset(dataset)
+
 
 PennsieveRemote = backend_pennsieve(project_id)
 root = PennsieveRemote(project_id)
