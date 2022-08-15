@@ -1280,7 +1280,19 @@ hrm2 = list(t.xlsx2())
 #+end_src
 look for =\ufeff= at the start of strings and then use e.g. vim to
 open and edit the file removing it from the offending strings
-
+*** View logs for failed single dataset exports
+Run the function, paste in the ids under failed and hit enter.
+#+begin_src bash
+function review-failed () {
+    local paths _id
+    paths=()
+    while read _id; do
+        paths+=(~/.cache/log/sparcur/datasets/${_id}/LATEST/stdout.log)
+        if [ -z $_id ]; then break; fi
+    done
+    less -R ${paths[@]}
+}
+#+end_src
 ** SODA
 Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
 #+header: :var parent_folder="~/files/blackfynn_local/"
