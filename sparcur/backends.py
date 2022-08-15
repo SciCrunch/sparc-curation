@@ -722,7 +722,9 @@ class BlackfynnRemote(aug.RemotePath):
             sparse = sparse or self.cache.is_sparse()
             deleted = []
             if sparse:
-                filenames = self._sparse_stems
+                filenames = [s + '.' + ext
+                             for s in self._sparse_stems
+                             for ext in self._sparse_exts]
                 sbfo = self.bfobject
                 _parents_yielded = set()
                 _int_id_map = {}

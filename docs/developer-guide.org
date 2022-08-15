@@ -38,6 +38,8 @@ datasets = list(root.children)
 :header-args:python: :comments link :exports code :mkdirp yes
 :header-args:python+: :shebang "#!/usr/bin/env python3"
 :END:
+This code is an example of how to use sparcur to get structured metadata from a local dataset.
+
 You can run this example block and it will validate the [[file:../resources/DatasetTemplate][DatasetTemplate]].
 
 # XXX when testing this you need to set an alternate sandboxed home
@@ -910,6 +912,7 @@ function sparc-fexport () {
     # FIXME we shouldn't need this refetch so I think that retrieve is
     # broken if files/folders already exist
     python -m sparcur.cli find \
+        --name '*.xlsx' \
         --name '*.xml' \
         --name 'submission*' \
         --name 'code_description*' \
@@ -919,6 +922,7 @@ function sparc-fexport () {
         --name 'manifest*' \
         --name 'resources*' \
         --name 'README*' \
+        --no-network \
         --limit -1 \
         --fetch
     wait $!
@@ -3535,6 +3539,14 @@ class Options(clif.Options):
             self._time_now = GetTimeNow()
 
         return self._time_now
+
+    @property
+    def log_level(self):  # FIXME not being pulled in by asKwargs ??
+        ll = self._args['--log-level']
+        if ll.isdigit() or ll[0] == '-' and ll[1:].isdigit():
+            return int(ll)
+        else:
+            return ll
 
 
 def pipe_main(main, after=None, argv=None):

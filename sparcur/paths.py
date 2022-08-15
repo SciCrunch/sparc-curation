@@ -411,6 +411,10 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         'manifest', 'dataset_description', 'submission', 'subjects', 'samples'
     )
 
+    _sparse_exts = (
+        'xlsx', 'csv', 'tsv', 'json'
+    )
+
     def _sparse_include(self):
         sl = self.stem.lower()
         return bool([an for an in self._sparse_stems if an in sl])
@@ -1284,6 +1288,7 @@ def bind_defaults(Remote, Cache):
     Remote._new(Path, Cache)
     Remote.cache_key = Cache.cache_key
     Remote._sparse_stems = Cache._sparse_stems
+    Remote._sparse_exts = Cache._sparse_exts
     Remote._sparse_include = Cache._sparse_include
 
 
