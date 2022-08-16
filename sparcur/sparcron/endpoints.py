@@ -7,15 +7,18 @@ def make_app(conn, name='sparcron-status-server'):
     app = Flask(name)
     yield app
 
+    ctaj = {'Content-Type': 'application/json'}
+
     @app.route('/status/<id>')
     def route_status(id):
         try:
-            return dataset_status(conn, id), 200, {'Content-Type': 'application/json'}
+            return dataset_status(conn, id), 200, ctaj
         except Exception as e:
             log.exception(e)
             return abort(404)
 
     @app.route('/failed')
     def route_failed():
-        failed = dataset_fails(conn)
-        return {'failed': failed}, 200, {'Content-Type': 'application/json'}
+        _failed = dataset_fails(conn)
+        failed = [f.id for f in _failed]  # explicit id instead of JEncode
+        return {'failed': failed}, 200, ctaj
