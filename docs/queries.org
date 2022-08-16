@@ -1899,6 +1899,7 @@ def reclr(blob, start_link):
     col = True
     def select_ext(e, m, collect=collect):
         nonlocal col
+        nonlocal layer
         if sub(e, m):
             if pred(e, 'apinatomy:cloneOf'):  # should be zapped during simplify
                 return ematch(blob, select_ext, obj(e))
@@ -1908,7 +1909,10 @@ def reclr(blob, start_link):
                 #print('se', col, layer)
                 if col:
                     if layer:
-                        l = layer.pop()
+                        if len(layer) > 1:
+                            l, *layer = layer
+                        else:
+                            l = layer.pop()
                     else:
                         l = None
                     r = [b for b in blob['nodes'] if b['id'] == external][0]['id']  # if this is empty we are in big trouble
