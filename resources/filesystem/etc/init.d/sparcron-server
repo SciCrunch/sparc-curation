@@ -1,0 +1,46 @@
+#!/sbin/openrc-run
+# Copyright 1999-2022 Gentoo Authors
+# Distributed under the terms of the GNU General Public License, v2 or later
+
+: ${LOG_LEVEL:=info}
+: ${SVCGROUP:=sparc}
+: ${SVCUSER:=sparc}
+: ${LOG_LOC:="/var/log/sparcur/sparcron"}
+: ${UWSGI_PYTHON_MODULE=python310}
+: ${UWSGI_SOCKET_SPARCRON:="unix:/run/${SVCNAME}/socket"}
+
+run_dir=${run_dir:-/run}
+LOG="${LOG_LOC}/sysout.log"
+
+socket=${UWSGI_SOCKET_SPARCRON}
+
+pidfile="${run_dir}/${SVCNAME}/pid"
+start_stop_daemon_args="
+--wait 1000
+--env LOG_LOC=${LOG_LOC}
+--env HOME=$(bash -c "cd ~$(printf %q ${SVCUSER}) && pwd")
+"
+command="/usr/bin/uwsgi"
+command_args_background="--daemonize ${LOG}"
+command_args="
+--pidfile ${pidfile}
+--gid ${SVCGROUP}
+--uid ${SVCUSER}
+--fastcgi-socket ${socket}
+--plugin ${UWSGI_PYTHON_MODULE}
+--module sparcur.sparcron.server:app
+--processes 1
+--threads 4"
+retry='TERM/30/KILL/5'
+
+command_owner="${SVCUSER}:${SVCGROUP}"
+
+depend() {
+    after net
+    want redis
+}
+
+start_pre() {
+    checkpath --directory --owner root:root --mode 0775 "/run/${SVCNAME}"
+    checkpath --directory --owner ${command_owner} --mode 0775 "${LOG_LOC}"
+}
