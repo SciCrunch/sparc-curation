@@ -1392,33 +1392,46 @@ After a release
 #+RESULTS[52b162604dfc475d3f664c6d68b4b125978871ed]:
 [[file:./images/sckan-ideal-run.png]]
 
-*** Bash implementation
+*** Implementation
+**** Data synchronization
+All of these things either run manually or are independent of the
+SCKAN release process. In most cases manual intervention is needed to
+ensure that various component sources are up to date.
+***** SPARC curation export
+See [[./setup.org::#export-v4]] for the most recent workflow for batch release.
+***** NPO
 #+begin_src bash
-### data synchronization
-
-# curation export
-# XXX see setup.org for most recent workflow for batch
-
-# NPO
 python -m neurondm.build release
-# super manual curation, identifier sync, review, merge, commit, push, etc.
-# TODO there are also two other sets of blocks in apinatomy.org
-# apinatomy-neuron-populations.py and apinat-pops-more.py that
-# require manual sync right now
+#+end_src
+Super manual curation, identifier sync, review, merge, commit, push, etc.
 
-# apinatomy.org
+There are also two other sets of blocks in [[./apinatomy.org::#npo-identifiers]]
+for apinatomy-neuron-populations.py and apinat-pops-more.py that require manual sync.
+***** ApiNATOMY
+#+begin_src bash
 ~/git/sparc-curation/docs/apinatomy.org --all
-# deploy to remote
-# apinat-build --deploy  # XXX manual
-# apinat-build --tangle  # XXX OLD
-# source ~/git/sparc-curation/bin/apinat-functions.sh  # XXX OLD
-# for new apinatomy models also update ~/git/sparc-curation/resources/scigraph/sparc-data.ttl
+#+end_src
+deploy to remote
+#+begin_src bash
+apinat-build --deploy  # XXX manual and not fully implemented
+#+end_src
+For new ApiNATOMY models also update [[../resources/scigraph/sparc-data.ttl]].
+***** NIF-Ontology dev branch
+Maybe update sparc community terms (sparc community termset now).
+#+begin_src bash
+# sh ~/git/pyontutils/nifstd/scigraph/README.org --sct  # XXX old use prrequaestor.el approach instead
+#+end_src
++Currently, run [[../../pyontutils/nifstd/scigraph/README.org::sparc-community-terms-update]], review, merge, push to NIF-Ontology+
+
+Use [[~/ni/sparc/prrequaestor.el]] with [[~/ni/sparc/sync-specs.el]]
+once they are published (still trying to figure out the best way to do
+that ... orgstrap repo? new repo? here?).
+**** Blazegraph and SciGraph builds
+#+begin_src bash
+### make sure all code is up-to-date
 
 # scigraph/README.org
 sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
-# maybe update sparc community terms
-# sh ~/git/pyontutils/nifstd/scigraph/README.org --sct  # XXX manual
-# currently run sparc-community-terms-update, review, merge, and push to NIF-Ontology
 
 ### release artifacts
 
@@ -1442,6 +1455,7 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 echo manual step waiting for signal from human to start next automated portion
 #+end_src
 
+**** Initial testing
 Deploy to local dev.
 [[./release.org::*Deploy journal to local server]]
 #+begin_src bash
@@ -1452,6 +1466,7 @@ critical checks:
 1. run the ApiNATOMY dashboard queries and inspect the numbers
 2. check for empty classes e.g. via =grep 'a owl:Class \.$'= (can do this before scigraph load)
 
+**** Deploy to staging
 #+begin_src bash
 ### deploy to sparc-scigraph
 # XXX NOTE we NEVER deploy to sckan-scigraph directly always via
@@ -1463,36 +1478,28 @@ critical checks:
 echo manual step waiting for signal from human to start next automated portion
 #+end_src
 
+**** Build docker images
 # TODO we can absolutely automate this, but bash is a bad top level to
 # try to express what needs to be done wrt nowebbing blocks in from
 # other files using the library of babel and also setting the
 # directory (pushd popd likely ok)
 run the docker build blocks in [[../../dockerfiles/source.org]] for the sckan release that
 do all the copying of the build state to the requisite locations
-order is bottom to top (maybe us ob-lob)
+order is bottom to top (maybe use ob-lob)
 [[../../dockerfiles/source.org::&musl-build-sckan-base]]
 [[../../dockerfiles/source.org::&musl-build-sckan-services]]
 
-#+begin_src bash
-### testing
-
-echo manual step waiting for signal from human to start next automated portion
-#+end_src
-
-TODO automate
-create the new docker container volume for sckan data
-run it with the latest version of tgbugs/musl:kg-release-user
-run all the examples etc.
-
-#+begin_src bash
-### publication
-
-echo manual step waiting for signal from human to start next automated portion
-#+end_src
+# FIXME we should be able to defer dumping the images until after
+# testing however the current docker build process expects the
+# temporary build dirs to still exist, so we can't clean them up and
+# can't run the dump independently, which is bad, need two paths, one
+# for if the build directory exists, another for if it does not, but
+# and artifact has been specified
 
 dump the docker image for the zenodo release
 [[../../dockerfiles/source.org::&sckan-save-image]]
 
+**** Archive release artifacts
 #+begin_src bash
 # archive all publication artifacts at one of the usual locations e.g. ~/nas/data
 # FIXME hardcoded paths
@@ -1506,13 +1513,39 @@ for _art in "${_arts[@]}"; do
 echo $(basename ${_art})
 rsync -a ${_art} ${_archive}
 done
+#+end_src
 
+**** Push docker images
+#+begin_src bash
 # push docker images
 docker push tgbugs/sckan:$(docker image ls tgbugs/sckan:base-*Z | sort | tail -n 1 | awk '{ print $2 }')
 docker push tgbugs/sckan:$(docker image ls tgbugs/sckan:data-*Z | sort | tail -n 1 | awk '{ print $2 }')
 docker push tgbugs/sckan:base-latest
 docker push tgbugs/sckan:latest
+#+end_src
+**** Test docker images
+Most of the testing at this stage is of the functionality in
+tgbugs/musl:kg-release-user so it is ok to push the data images first.
+#+begin_src bash
+### testing
 
+echo manual step waiting for signal from human to start next automated portion
+#+end_src
+
+TODO automate. Create the new docker container volume for sckan data
+run it with the latest version of tgbugs/musl:kg-release-user run all
+the examples etc. Use the shebang block in queries.org or similar to
+execute all the blocks and check to make sure they are working out as
+expected. Better yet if we can write some internal consistency checks
+i.e. between NPO and ApiNATOMY.
+**** Update changelog
+#+begin_src bash
+### publication
+
+echo manual step waiting for signal from human to start next automated portion
+#+end_src
+
+#+begin_src bash
 ### changelog
 
 # XXX manual
@@ -1526,6 +1559,7 @@ pushd ~/git/NIF-Ontology
 git diff $(the last commit before the previous release)..HEAD -- *.ttl ttl
 #+end_src
 
+**** Zenodo release
 #+begin_src bash
 # prepare the new zenodo release
 

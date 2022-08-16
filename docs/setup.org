@@ -931,6 +931,10 @@ popd
 #+end_src
 
 *** Export v4
+:PROPERTIES:
+:CUSTOM_ID: export-v4
+:END:
+
 #+begin_src bash
 source ~/files/venvs/sparcur-dev/bin/activate
 python -m sparcur.simple.combine &&
