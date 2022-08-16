@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: bf98b7f010983b5750cb74faf66b79a958c39876a8b9dec953bfbcc044f80687; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 591020981c68c5122129d59eda261dbe23d63341319ea617d267e6e2473ee2c9; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -309,6 +309,7 @@ Yes this is make."
 
         (ub-path "data/uberon.ttl")
         (em-path "data/emapa.ttl")
+        (ap-path "data/approach.ttl")
         (me-path "data/methods.ttl") ; FIXME ideally we want to pull in the near import closure for this
         (npo-path "data/npo.ttl")
 
@@ -377,6 +378,9 @@ Yes this is make."
       (get-ontology "http://purl.obolibrary.org/obo/emapa.owl" em-path))
     (unless-file-exists-p em-r-path
       (reason-ontology em-path em-r-path))
+    ;; approach
+    (unless-file-exists-p ap-path ; this doesn't need to be reasoned
+      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/approach.ttl") me-path))
     ;; methods
     (unless-file-exists-p me-path
       ;; FIXME this pulls in a staggering amount of the nif ontology and is quite large
@@ -403,6 +407,7 @@ Yes this is make."
            ;;"http://purl.obolibrary.org/obo/uberon.owl"
            ,em-path
            ,ub-path
+           ,ap-path
            ,me-path
            ,npo-path
            ,mis-path
