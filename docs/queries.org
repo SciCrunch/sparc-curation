@@ -4397,6 +4397,18 @@ Expect
 * Simple blaze
 simple sckan queries over blazegraph
 
+** inserts
+:PROPERTIES:
+:header-args:sparql: :url http://localhost:9999/blazegraph/namespace/kb/sparql
+:header-args: :eval never
+:END:
+
+#+begin_src sparql :noweb yes
+insert { ?s ?np ?o }
+<<simple-sckan-load-1-where>>
+#+end_src
+
+** queries
 #+begin_src sparql
 #select (count(*) as ?c) {
 select distinct ?s ?o
@@ -4420,20 +4432,27 @@ SELECT (COUNT(*) as ?count) {
 |-------|
 |   943 |
 
-convert this into an insert query and we're good to go more or less
 #+name: simple-sckan-load-1
-#+begin_src sparql
+#+begin_src sparql :noweb yes
 #PREFIX nposimtest: <http://uri.interlex.org/tgbugs/uris/readable/npo-simple-test-1/>
-
 select
 distinct ?s ?np ?o
+<<simple-sckan-load-1-where>>
+order by ?s ?np ?o
+limit 5000
+#+end_src
+
+# TODO add expansion over equivalentClass
+
+#+name: simple-sckan-load-1-where
+#+begin_src sparql
 where
 {
   {
     values (?p ?np) {
       (ilxtr:hasAxonPresynapticElementIn        nposimtest:hasAxonPresynapticElementIn)
       (ilxtr:hasSomaLocatedIn                   nposimtest:hasSomaLocatedIn)
-      (ilxtr:hasSomaLocatedIn                   nposimtest:hasAxonLocatedIn) # add inferred axon locations
+      #(ilxtr:hasSomaLocatedIn                   nposimtest:hasAxonLocatedIn) # add inferred axon locations (decided to exclude)
       (ilxtr:hasAxonLocatedIn                   nposimtest:hasAxonLocatedIn)
       (ilxtr:hasDendriteLocatedIn               nposimtest:hasDendriteLocatedIn)
       (ilxtr:hasAxonSensorySubcellularElementIn nposimtest:hasAxonSensorySubcellularElementIn)
@@ -4475,8 +4494,6 @@ where
                                owl:onProperty ?p ;
                                owl:someValuesFrom ?o ]
   }}
-order by ?s ?np ?o
-limit 5000
 #+end_src
 
 * Sanity checks
