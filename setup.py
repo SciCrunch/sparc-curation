@@ -76,7 +76,7 @@ setup(name='sparcur',
           'Operating System :: Microsoft :: Windows',
       ],
       keywords='SPARC curation biocuration ontology pennsieve protc protocols hypothesis',
-      packages=['sparcur', 'sparcur.export', 'sparcur.extract', 'sparcur.simple'],
+      packages=['sparcur', 'sparcur.export', 'sparcur.extract', 'sparcur.sparcron', 'sparcur.simple'],
       python_requires='>=3.6',
       tests_require=tests_require,
       install_requires=[
