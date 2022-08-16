@@ -1436,49 +1436,67 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 # release.org
 ~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --resume
 
-### annoying apinatomy npo sync
+### testing phase 1, probably move to docker
 
 # XXX manual
-# right you now have to go through all the steps above at least up to the scigraph load
-# and then run [[queries.org::*generate npo representation of apinatomy population location phenotypes]]
-# to generate apinatomy-locations.ttl delete the junk at the bottom of the file
-# save, commit, push, merge, push and THEN you have to run the whole export process AGAIN
-# adding a good hour or so to the release process
+echo manual step waiting for signal from human to start next automated portion
+#+end_src
 
-### changelog
+Deploy to local dev.
+[[./release.org::*Deploy journal to local server]]
+#+begin_src bash
+~/ni/dev/bin/run-deploy-graph-selene
+#+end_src
 
-# XXX manual
-# pushd ~/git/apinatomy-models
-# git diff $(the last commit before the previous release)..HEAD -- models
-# pushd ~/git/NIF-Ontology
-# git diff $(the last commit before the previous release)..HEAD -- *.ttl ttl
+critical checks:
+1. run the ApiNATOMY dashboard queries and inspect the numbers
+2. check for empty classes e.g. via =grep 'a owl:Class \.$'= (can do this before scigraph load)
+
+#+begin_src bash
+### deploy to sparc-scigraph
+# XXX NOTE we NEVER deploy to sckan-scigraph directly always via
+# sparc-scigraph and then once that passes we do the release
+~/git/pyontutils/nifstd/scigraph/bin/run-deploy-graph-sparc-sckan
 
 ### docker image build
 
-# run the docker build blocks in source.org for the sckan release that
-# do all the copying of the build state to the requisite locations
-# order is bottom to top (maybe us ob-lob)
-# &musl-build-sckan-base
-# &musl-build-sckan-services
+echo manual step waiting for signal from human to start next automated portion
+#+end_src
 
+# TODO we can absolutely automate this, but bash is a bad top level to
+# try to express what needs to be done wrt nowebbing blocks in from
+# other files using the library of babel and also setting the
+# directory (pushd popd likely ok)
+run the docker build blocks in [[../../dockerfiles/source.org]] for the sckan release that
+do all the copying of the build state to the requisite locations
+order is bottom to top (maybe us ob-lob)
+[[../../dockerfiles/source.org::&musl-build-sckan-base]]
+[[../../dockerfiles/source.org::&musl-build-sckan-services]]
+
+#+begin_src bash
 ### testing
 
-# TODO automate
-# create the new docker container volume for sckan data
-# run it with the latest version of tgbugs/musl:kg-release-user
-# run all the examples etc.
+echo manual step waiting for signal from human to start next automated portion
+#+end_src
 
-# XXX manual
-# [[release.org::*Deploy journal to local server]]
-# ~/ni/dev/bin/run-deploy-graph-selene
+TODO automate
+create the new docker container volume for sckan data
+run it with the latest version of tgbugs/musl:kg-release-user
+run all the examples etc.
 
+#+begin_src bash
 ### publication
 
-# dump the docker image for the zenodo release
-# &sckan-save-image
+echo manual step waiting for signal from human to start next automated portion
+#+end_src
 
+dump the docker image for the zenodo release
+[[../../dockerfiles/source.org::&sckan-save-image]]
+
+#+begin_src bash
 # archive all publication artifacts at one of the usual locations e.g. ~/nas/data
 # FIXME hardcoded paths
+# FIXME need to set -e on ALL of these blocks I think?
 _archive=~/"nas/data/"
 _sckanrz="$(ls -d /tmp/build/release-*-sckan.zip | sort -u | tail -n 1)"
 _sckansz=/tmp/scigraph-build/sparc-sckan/$(readlink /tmp/scigraph-build/sparc-sckan/LATEST)
@@ -1489,13 +1507,27 @@ echo $(basename ${_art})
 rsync -a ${_art} ${_archive}
 done
 
-# prepare the new zenodo release
-
 # push docker images
 docker push tgbugs/sckan:$(docker image ls tgbugs/sckan:base-*Z | sort | tail -n 1 | awk '{ print $2 }')
 docker push tgbugs/sckan:$(docker image ls tgbugs/sckan:data-*Z | sort | tail -n 1 | awk '{ print $2 }')
 docker push tgbugs/sckan:base-latest
 docker push tgbugs/sckan:latest
+
+### changelog
+
+# XXX manual
+#+end_src
+
+One way to generate a changelog, not the best, but possible.
+#+begin_src bash
+pushd ~/git/apinatomy-models
+git diff $(the last commit before the previous release)..HEAD -- models
+pushd ~/git/NIF-Ontology
+git diff $(the last commit before the previous release)..HEAD -- *.ttl ttl
+#+end_src
+
+#+begin_src bash
+# prepare the new zenodo release
 
 # deploy scigraph image to production
 #+end_src
