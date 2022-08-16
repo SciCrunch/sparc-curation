@@ -26,7 +26,8 @@ command_args="
 --pidfile ${pidfile}
 --gid ${SVCGROUP}
 --uid ${SVCUSER}
---fastcgi-socket ${socket}
+--log-format '%(time) %(addr) %(method) %(uri)'
+--http-socket ${socket}
 --plugin ${UWSGI_PYTHON_MODULE}
 --module sparcur.sparcron.server:app
 --processes 1
