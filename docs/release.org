@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 591020981c68c5122129d59eda261dbe23d63341319ea617d267e6e2473ee2c9; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 96cc3ace673febf8b54d60920be0d6bcb8c21b188e659d102d073f16d34d51f2; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -380,7 +380,7 @@ Yes this is make."
       (reason-ontology em-path em-r-path))
     ;; approach
     (unless-file-exists-p ap-path ; this doesn't need to be reasoned
-      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/approach.ttl") me-path))
+      (url-copy-file-safe (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/approach.ttl") ap-path))
     ;; methods
     (unless-file-exists-p me-path
       ;; FIXME this pulls in a staggering amount of the nif ontology and is quite large
