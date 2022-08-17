@@ -631,6 +631,9 @@ An example run is
 [[http://ontology.neuinfo.org/trees/sparc/dynamic/demos/apinat/soma-processes][Soma processes]]
 [[http://ontology.neuinfo.org/trees/sparc/simple/dynamic/demos/apinat/soma-processes][Soma processes simple]]
 * NPO identifiers
+:PROPERTIES:
+:CUSTOM_ID: npo-identifiers
+:END:
 ** minimal listing
 #+begin_src elisp :exports none
 (jupyter-repl-restart-kernel) ; and this is why we don't use python kids
@@ -751,6 +754,12 @@ intrin = Phenotype('ilxtr:IntrinsicPhenotype', 'ilxtr:hasCircuitRolePhenotype')
 excite = Phenotype('ILX:0104003', 'ilxtr:hasFunctionalCircuitRolePhenotype')
 inhib = Phenotype('ILX:0105486', 'ilxtr:hasFunctionalCircuitRolePhenotype')
 
+asc = Phenotype('ilxtr:SpinalCordAscendingProjectionPhenotype', 'ilxtr:hasProjectionPhenotype')
+desc = Phenotype('ilxtr:SpinalCordDescendingProjectionPhenotype', 'ilxtr:hasProjectionPhenotype')
+intfug = Phenotype('ilxtr:IntestinoFugalProjectionPhenotype', 'ilxtr:hasProjectionPhenotype')
+
+enteric = Phenotype('ilxtr:EntericPhenotype')  # probably not just partOf some enteric nervous system ... though maybe given developmental origin
+
 mapping = {
     'sympathetic': sym,
     'parasympathetic': para,
@@ -762,16 +771,22 @@ mapping = {
     'interneuron': intrin,
     'excitatory': excite,
     'inhibitory': inhib,
+
+    'intestinofugal': intfug,
+    'enteric': enteric,
+    'descending': desc,
+    'ascending': asc,
 }
 
 bad_bits = {'neuron', '', 'first', 'order', 'circuit', 'lower', 'somatic', 'Vagal'}
 bad_sets = (  # from the school of maximum wat
-    {'inhibitor', 'motor'},
+    {'inhibitory', 'motor'},
     # inhibitory motor in the context of the stomach means nitric
     # oxide releaseing, motor usually implies actuating ach, we need
     # to clarify the definition because neuro/myo/modulatory release
     # is usually not what we mean in other systems
     {'primary', 'afferent', 'intrinsic'},
+    {'visceral', 'sensory'},  # I think this one is just wrong
 )
 
 def normalize_type(string):
