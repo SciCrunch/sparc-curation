@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 2320719854d450734751846154263b58eec9bedd4afafd0a2abce19cc76aa77c; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: d5dc6d1a43217d261456890398b9f97541aeb9c71c3659884f4f5157598099fd; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -244,17 +244,21 @@ gsx:google-sheet-id
         (let* ((default-directory path-temp)
                (google-sheet-id (symbol-name (-ms-> model-id)))
                (path-internal (concat path-temp "/build")) ; should not exist to avoid date suffix
-               (_ (let (backtrace-on-error-noninteractive) ; we know where the error happens
-                    (run-command apinat-converter-command
-                                 "-f" "id"
-                                 "-t" "xlsx"
-                                 "-t" "json"
-                                 "-t" "json-resources"
-                                 "-t" "json-flattened"
-                                 (when apinat-converter-debug
-                                   "-t" "json-ld")
-                                 "-i" google-sheet-id
-                                 "-o" path-internal))))
+               (_ (let (backtrace-on-error-noninteractive ; we know where the error happens
+                        (rc-argv (list
+                                  apinat-converter-command
+                                  "-f" "id"
+                                  "-t" "xlsx"
+                                  "-t" "json"
+                                  "-t" "json-resources"
+                                  "-t" "json-flattened"
+                                  (if apinat-converter-debug "-t" "")
+                                  (if apinat-converter-debug "json-ld" "")
+                                  "-i" google-sheet-id
+                                  "-o" path-internal)))
+                    (when apinat-converter-debug
+                      (message "command: %s" (string-join rc-argv " ")))
+                    (apply #'run-command rc-argv))))
           (cl-loop for path in (list path-xlsx path-json path-jsonld) do
                    (let ((parent (file-name-directory path)))
                      (unless (file-directory-p parent)
@@ -416,7 +420,7 @@ gsx:google-sheet-id
      ;; TODO consider whether we can somehow use invocation-name invocation-directory so that
      ;; specific versions of emacs are used to run the block instead of always the system version
      (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets "--repo" apinat-model-repo
-                           (when apinat-converter-debug "--debug")))
+                           (if apinat-converter-debug "--debug" "")))
     (while (< (length apinat-process-results) (length model-ids))
       (sleep-for 5)
       (message "complete: %s/%s" (length apinat-process-results) (length model-ids)))))
