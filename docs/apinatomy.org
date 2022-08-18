@@ -763,6 +763,7 @@ desc = Phenotype('ilxtr:SpinalCordDescendingProjectionPhenotype', 'ilxtr:hasProj
 intfug = Phenotype('ilxtr:IntestinoFugalProjectionPhenotype', 'ilxtr:hasProjectionPhenotype')
 
 enteric = Phenotype('ilxtr:EntericPhenotype')  # probably not just partOf some enteric nervous system ... though maybe given developmental origin
+nos = Phenotype('TEMPIND:Nos1', 'ilxtr:hasMolecularPhenotype')
 
 mapping = {
     'sympathetic': sym,
@@ -780,6 +781,7 @@ mapping = {
     'enteric': enteric,
     'descending': desc,
     'ascending': asc,
+    'NOS': nos,
 }
 
 bad_bits = {'neuron', '', 'first', 'order', 'circuit', 'lower', 'somatic', 'Vagal'}
@@ -800,7 +802,8 @@ def normalize_type(string):
         return set()
     id_bits = set([mapping[b] if b in mapping else b for b in bits
                    if b in mapping])
-    return id_bits
+    missed = [b for b in bits if b not in mapping]
+    return id_bits, missed
 
 _id_oid_type = [
     (r.id().value,
@@ -812,11 +815,14 @@ id_oid_type = [(i, o, t) for i, o, t in _id_oid_type if o]
 raw_types = sorted(set([t for i, o, t in id_oid_type]))
 #pprint(raw_types)
 #pprint([(t, normalize_type(t)) for t in raw_types])
-bagged = [(normalize_type(t), t, o) for i, o, t in id_oid_type]
+bagged_missed = [(normalize_type(t), t, o) for i, o, t in id_oid_type]
+bagged = [(a, c, d, b) for ((a, b), c, d) in bagged_missed]
 #pprint(bagged, width=240)
 neuron_classes = {
     sn: type(f'Neuron{sn.capitalize()}', (Neuron,), {'owlClass': f'ilxtr:Neuron{sn.capitalize()}'})
-    for sn in ['kblad' if _ == 'keast' else _ for _ in
+    for sn in [('kblad' if _ == 'keast' else
+                ('bolew' if _ == 'unbranched' else _))
+               for _ in
                set(oid.rsplit("-", 3)[-3]
                    if oid.endswith('-prime')
                    else oid.rsplit("-", 2)[-2]
@@ -825,8 +831,6 @@ neuron_classes = {
 
 def dophen(oid, bag):
     label, x = _genlabel(oid)
-    if x == 'bolew':
-        x = 'unbranched'  # XXX
     neuron_class = neuron_classes[x]
     # FIXME this doesn't work because entailed phenotypes don't work
     # with the correct logic because they are still acting like ec
@@ -839,7 +843,7 @@ def dophen(oid, bag):
                         id_=u)
 
 config = Config('apinat-pops-more')
-neus = [dophen(oid, bag) for bag, _, oid in bagged if bag]
+neus = [dophen(oid, bag) for bag, _, oid, _ in bagged if bag]
 pprint(neus)
 #sys.modules['__main__'].__file__ = __file__
 #import linecache
@@ -859,7 +863,8 @@ None
 #+end_src
 
 #+begin_src jupyter-python :session pys
-pprint([(a, b, c) for a, b, c in bagged if not a])
+pprint([(a, b, c, d) for a, b, c, d in bagged if not a])
+pprint([(d, b, c) for a, b, c, d in bagged if d])
 #pprint(insts[-3].values)
 #pprint(_id_oid_type)
 #pprint(id_oid_type)
