@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 02876b7fe6c59bc84cbaa30d667ac9a6b5efcdc77bf4feb2bb3ac34addd93d58; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 34c93162129faccb3cc5cd2d289627edef9df7857f04bbc00a1a394f3684a0be; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -6109,14 +6109,16 @@ RETURN p1, p2, p3, p4, p5, p6
 (defun json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
          (dot (ob-cypher/scigraph/json-to-dot json-string))
-         (cmd (format
-               (concat
-                "dot "
-                "-Efontname='Dejavu Sans Mono' "
-                "-Nfontname='Dejavu Sans Mono' "
-                "-Grankdir=LR "
-                "-T%s -o %s %s")
-               (file-name-extension path) path tmp)))
+         (cmd (if (string= (file-name-extension path) "graphml")
+                  (format "dot2graphml %s %s" tmp path)
+                (format
+                 (concat
+                  "dot "
+                  "-Efontname='Dejavu Sans Mono' "
+                  "-Nfontname='Dejavu Sans Mono' "
+                  "-Grankdir=LR "
+                  "-T%s -o %s %s")
+                 (file-name-extension path) path tmp))))
     (with-temp-file tmp
       (insert dot))
     (org-babel-eval cmd "")
