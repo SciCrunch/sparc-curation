@@ -1231,7 +1231,7 @@ After a release
    sckan-blazegraph -> prefixes.conf
    sckan-blazegraph -> queries.org -> |git clone sparc-curation| -> remote
    sckan-blazegraph -> approach.ttl -> nifstd
-   :                   approach.ttl -> |BLAZEGRAPH MISSING| ; FIXME missing approach.ttl in release.org
+   :                   approach.ttl -> nifstd
    sckan-blazegraph -> protcur.ttl -> cassava-protcur.ttl
    sckan-blazegraph -> hypothesis-protcur
    sckan-blazegraph -> sparc-community-terms.ttl -> nifstd
@@ -1445,6 +1445,8 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 # but we also want to use the configured NIF-Ontology repo from
 # scigraph for blazegraph, too many layers ...
 ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-sckan
+# if you are iterating hard on apinat model development, this is the point
+# at which you usually want to deploy to dev scigraph and test
 
 # release.org
 ~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --resume
@@ -1456,11 +1458,13 @@ echo manual step waiting for signal from human to start next automated portion
 #+end_src
 
 **** Initial testing
-Deploy to local dev.
-[[./release.org::*Deploy journal to local server]]
+Deploy to dev scigraph.
 #+begin_src bash
 ~/ni/dev/bin/run-deploy-graph-selene
 #+end_src
+
+Deploy to local dev blazegraph.
+[[./release.org::*Deploy journal to local server]]
 
 critical checks:
 1. run the ApiNATOMY dashboard queries and inspect the numbers
