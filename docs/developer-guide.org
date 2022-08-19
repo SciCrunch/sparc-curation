@@ -1519,6 +1519,13 @@ rsync -a ${_art} ${_archive}
 done
 #+end_src
 
+**** GitHub release
+Create a new pre-release at https://github.com/SciCrunch/NIF-Ontology/releases
+tag: =sckan-%Y-%m-pre-{n}=
+target: =dev=
+title: =SCKAN %Y-%m-pre-{n}=
+Upload the blazegraph and scigraph zips.
+
 **** Push docker images
 #+begin_src bash
 # push docker images
