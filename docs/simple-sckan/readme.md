@@ -1,5 +1,5 @@
 # About SIMPLE-SCKAN
-What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the SCKAN that allows writing queries about the [NPO's](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of SIMPLE-SCKAN is to **_support simplicity_** while writing and testing the queries against NPO's complex, axiom-level ontological connectivity statements. SIMPLE-SCKAN adds that 'query-friendly' simplification layer on top of the SCKAN.
+What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the [SCKAN](https://zenodo.org/record/6369432#.YwSlZOzMJJU) that allows writing queries about the [NPO's](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of SIMPLE-SCKAN is to **_support simplicity_** while writing and testing the queries against NPO's complex, axiom-level ontological connectivity statements. SIMPLE-SCKAN adds that 'query-friendly' simplification layer on top of the SCKAN.
 - [Accessing SIMPLE-SCKAN](#accessing-simple-sckan)
 - [Running SIMPLE-SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog)
 - [SCKAN Vs. SIMPLE-SCKAN](#sckan-vs-simple-sckan)
