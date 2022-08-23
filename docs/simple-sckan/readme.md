@@ -7,7 +7,7 @@ What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the 
 
 # Accessing SIMPLE-SCKAN
 * You can download **SIMPLE-SCKAN** ontology from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
-	* [**Downlod SIMPLE-SCKAN in Turtle format from here**](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-3/simple-sckan.ttl).
+	* [**Downlod SIMPLE-SCKAN in Turtle format from here**](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-3/simple-sckan-merged-with-npo.ttl).
 * We recommend using **Stardog Studio** as the SPARQL query interface to query over the NPO/SCKAN connectivity knowledge
     * A Stardog endpoint is set up by the FDI lab to support the **Stardog Stuio** interface for the users like SCKAN's NLP curators to check whether a connection exists between regions based on a set of neuron populations in NPO
     * We have a set of predefined "canned" query patterns avialable via Stardog that we think would be useful for the NLP curators and other interested users.
