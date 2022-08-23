@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 34c93162129faccb3cc5cd2d289627edef9df7857f04bbc00a1a394f3684a0be; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0cae02769c301e8633c7a103d4a243381ef6cdc20c78221caa6a9a363de13402; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -523,7 +523,7 @@ where {
 *** Conditions studied
 *** Experimental groups
 #+name: experimental-groups-core
-#+begin_src sparql :var limit="10"
+#+begin_src sparql :var limit="10" :eval never
 WHERE {
     ?startsubj TEMP:hasDerivedInformationAsParticipant ?dataset .
     ?subj  TEMP:hasDerivedInformationAsParticipant ?dataset .
@@ -6077,6 +6077,7 @@ RETURN p1, p2, p3, p4, p5, p6
   (ow-enable-use-package)
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
+     csv-mode
      rainbow-delimiters
      orgstrap
      (when gt26 jupyter)
