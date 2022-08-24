@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 96cc3ace673febf8b54d60920be0d6bcb8c21b188e659d102d073f16d34d51f2; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3ea4fbffcedfc9806f59ca1eefba8367a622489ab03a5467dc15c4ba685abae8; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -456,7 +456,7 @@ Yes this is make."
 
 ;; N release
 
-(defun step-release (build-dir &optional this-release-dir release-time no-blaze no-load)
+(defun step-release (build-dir &optional this-release-dir release-time no-blaze no-load no-annos)
   (step-ensure-commands)
   (step-ensure-services)
   ;; FIXME something about the resume process is still broken
@@ -485,7 +485,8 @@ Yes this is make."
           (unless (file-directory-p "opt")
             (mkdir "opt"))
           (step-arrange-blazegraph build-dir path-jar))
-        (step-annotations)
+        (unless no-annos
+          (step-annotations))
         (step-load-store (concat path "bin") no-load)
         (step-add-prefixes-file)
         (unless no-blaze
@@ -650,6 +651,7 @@ popd
        ;; handled at the end
        (:no-blaze)
        (:no-load)
+       (:no-annos)
        ((:path-release nil) release-dir))
     (message "%S" sckan-release)
     (when build
@@ -657,9 +659,9 @@ popd
         (if resume
             (let ((resume-dir (find-resume-dir build-dir)))
               (if resume-dir
-                  (step-release build-dir resume-dir nil no-blaze no-load)
+                  (step-release build-dir resume-dir nil no-blaze no-load no-annos)
                 (message "No build to resume.")))
-          (step-release build-dir release-dir nil no-blaze no-load))))))
+          (step-release build-dir release-dir nil no-blaze no-load no-annos))))))
 #+end_src
 
 ** Local variables :ARCHIVE:
