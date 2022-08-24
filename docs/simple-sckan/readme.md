@@ -14,6 +14,7 @@ What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the 
 * What to expect in the future:
     * Have the Simple SCKAN graph available via SciGraph so that the SciGraph users can develop different tools and apps based on simpler queries using SPARQL or Cypher.
     * We also want to have the Stardog interface available for broader audience who would prefer a simpler way to query SCKAN connectivity knowledge.
+    * We will have SPARQL endpoint for SIMPLE-SCKAN.
 
 
 # Running SIMPLE-SCKAN Queries in Stardog
