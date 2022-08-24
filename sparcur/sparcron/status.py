@@ -15,6 +15,9 @@ def dataset_status(conn, rawid):
     out['sheet'] = int(out['sheet'])
     out['pipeline_internal_version'] = int(out.pop('verpi'))
     out['updated'] = out['updated'].decode()
+    if out['failed'] and out['updated'] and out['failed'] < out['updated']:
+        out['failed'] = False
+
     return out
 
 
@@ -22,9 +25,11 @@ def dataset_fails(conn):
     keys = conn.keys()
     _fkeys = [k for k in keys if b'failed-' in k]
     fvals = [v for v in conn.mget(_fkeys)]
-    fails = [PennsieveId(('dataset:' + k.split(b':')[-1].decode()))
-             for k, v in zip(_fkeys, fvals) if v]
-
+    _fails = [(PennsieveId(('dataset:' + k.split(b':')[-1].decode())), v)
+              for k, v in zip(_fkeys, fvals) if v]
+    _ukeys = ['updated-N:dataset:' + i.uuid for i, _ in _fails]
+    uvals = [v for v in conn.mget(_ukeys)]
+    fails = [i for (i, f), u in zip(_fails, uvals) if not u or f > u]
     return fails
 
 

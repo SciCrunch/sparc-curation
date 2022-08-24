@@ -1393,6 +1393,13 @@ After a release
 [[file:./images/sckan-ideal-run.png]]
 
 *** Implementation
+It should be possible to run all of these steps in a container
+derived from a =tgbugs/musl:kg-dev-user= docker image. See
+https://github.com/tgbugs/dockerfiles/blob/master/source.org#kg-dev-user
+https://hub.docker.com/repository/docker/tgbugs/musl/tags?name=kg-dev-user
+# In fact you should be able to get an interactive version of this file
+# in those images directly and be able to run these blocks directly from
+# emacs, but we aren't quite there yet.
 **** Data synchronization
 All of these things either run manually or are independent of the
 SCKAN release process. In most cases manual intervention is needed to
@@ -1439,6 +1446,7 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 
 # release.org to retrieve
 ~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --no-load
+# XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
 
 # we have a circular dependency issue here, which is that
 # we want to use the apinatomy models from blazegraph for scigraph
@@ -1450,6 +1458,7 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 
 # release.org
 ~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --resume
+# XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
 
 ### testing phase 1, probably move to docker
 
