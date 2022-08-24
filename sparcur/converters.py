@@ -199,7 +199,7 @@ class ContributorConverter(TripleConverter):
                     yield from idlib.Ror(value).triples_gen
                 else:
                     yield from value.triples_gen
-            except idlib.exc.RemoteError as e:
+            except (idlib.exc.RemoteError, idlib.exc.ResolutionError) as e:
                 # FIXME sigh, temp until we can split out the
                 # remote data resolution phase from the rest
                 loge.exception(e)
