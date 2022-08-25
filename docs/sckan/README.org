@@ -174,12 +174,31 @@ Beyond the interactive query interface, these docker images can be run
 as standalone SciGraph and Blazegraph instances of SCKAN for use in a
 variety of applications.
 
+For example to run a specific release as a standalone endpoint you can
+run the following.
+
+#+begin_src bash
+docker pull tgbugs/sckan:data-2022-03-19T001639Z
+docker create \
+  -v /var/lib/blazegraph \
+  -v /var/lib/scigraph \
+  --name sckan-data-2022-03-19 \
+  tgbugs/sckan:data-2022-03-19T001639Z \
+  /bin/true
+#+end_src
+
 #+begin_src bash
 docker run \
---volumes-from sckan-data \
+--detach \
+--volumes-from sckan-data-2022-03-19 \
 -p 9000:9000 \
 -p 9999:9999 \
 --entrypoint /etc/services.sh \
 tgbugs/musl:kg-release-user
 #+end_src
+
 # TODO examples of how to modify the entrypoint
+
+#+begin_src bash
+curl http://localhost:9000/scigraph/vocabulary/term/brain
+#+end_src
