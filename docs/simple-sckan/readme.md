@@ -1,23 +1,21 @@
-# About SIMPLE-SCKAN
-What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the [SCKAN](https://zenodo.org/record/6369432#.YwSlZOzMJJU) that allows writing queries about the [NPO's](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of SIMPLE-SCKAN is to **_support simplicity_** while writing and testing the queries against NPO's complex, axiom-level connectivity statements. SIMPLE-SCKAN adds that query-friendly abstraction layer on top of the SCKAN.
-- [Accessing SIMPLE-SCKAN](#accessing-simple-sckan)
-- [Running SIMPLE-SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog)
-- [SCKAN Vs. SIMPLE-SCKAN](#sckan-vs-simple-sckan)
-- [Query Example: SCKAN Vs. SIMPLE-SCKAN](#query-example-sckan-vs-simple-sckan)
+# About Simple SCKAN
+What do we mean by **Simple SCKAN**? Simple SCKAN refers to an extension of the [SCKAN](https://zenodo.org/record/6369432#.YxkD5OzML0q) that allows writing queries about the [NPO's](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of Simple SCKAN is to support simplicity while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Simple SCKAN adds that query-friendly abstraction layer on top of the SCKAN.
+- [Accessing Simple SCKAN](#accessing-simple-sckan)
+- [Running Simple SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog)
+- [SCKAN Vs. Simple SCKAN](#sckan-vs-simple-sckan)
+- [Query Example: SCKAN Vs. Simple SCKAN](#query-example-sckan-vs-simple-sckan)
 
-# Accessing SIMPLE-SCKAN
-* You can download **SIMPLE-SCKAN** ontology from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
-	* [**Downlod SIMPLE-SCKAN in Turtle format from here**](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-3/simple-sckan-merged-with-npo.ttl).
-* We recommend using **Stardog Studio** as the SPARQL query interface to query over the NPO/SCKAN connectivity knowledge
-    * A Stardog endpoint is set up by the FDI lab to support the **Stardog Stuio** interface for the users like SCKAN's NLP curators. Using Stardog Studio, they can run the queries against SCKAN to check whether a connection exists between two regions based on a set of neuron populations in NPO.
-    * We have a set of predefined "canned" query patterns avialable via Stardog that we think would be useful for the NLP curators and other interested users.
+# Accessing Simple SCKAN
+* You can download **Simple SCKAN** ontology from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
+	* [Downlod Simple SCKAN in Turtle format from here](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-3/simple-sckan-merged-with-npo.ttl).
+* We recommend using [Stardog Studio](https://www.stardog.com/studio/) as the SPARQL query interface for Simple SCKAN. A Stardog endpoint is set up by the [FDI Lab](https://www.fdilab.org/) to provide access to the SCKAN connectivity knowledge via Stardog Studio. 
+    * We have a set of predefined 'canned' query patterns avialable via Stardog Studio that we think would be useful for the users like SPARC's NLP curators, anatomical experts, and other interested users.
 * What to expect in the future:
-    * Have the Simple SCKAN graph available via SciGraph so that the SciGraph users can develop different tools and apps based on simpler queries using SPARQL or Cypher.
-    * We also want to have the Stardog interface available for broader audience who would prefer a simpler way to query SCKAN connectivity knowledge.
-    * We will work on having an SPARQL endpoint for the SIMPLE-SCKAN.
+    * Have the Simple SCKAN graph available via [SciGraph](https://github.com/SciCrunch/SciGraph) so that the SciGraph users can utilize the benifits of Simple SCKAN while writing queries relevant to their tools and apps.
+    * We will consider setting up a publicly available SPARQL endpoint for the Simple SCKAN.
 
 
-# Running SIMPLE-SCKAN Queries in Stardog
+# Running Simple SCKAN Queries in Stardog
 
 *	Contact [SPARC K-Core](mailto:kcore@sparc.science) for the username and password to access the FDI Lab's Stardog endpoint
 *	Load **Stardog Studio** from your web browser (Chrome works better)
@@ -33,28 +31,31 @@ What do we mean by **SIMPLE-SCKAN**? SIMPLE-SCKAN refers to an extension of the 
 *	Once connected, do the following:
 	*	Click on the **Workspace** icon at the top-left corner
 		*	Simply click **All Databases** dropdown box and select **NPO**
-	* Select one of the **STORED** queries under NPO
-		*	Run the query by pressing the **Blue Run Button** on the right panel
+	* Select one of the **STORED** queries under **NPO**
+		*	Run selected the query by pressing the **Blue Run Button** on the right panel
 		* The comments in the queries should provide information on how to customize the queries
 
-# SCKAN Vs. SIMPLE-SCKAN
-* The underlying ontologies for SCKAN are developed using standard OWL-DL formalism. The main reasons for choosing the OWL-based formalism are the following: (a) specififying the neuron types with precise logical axioms and quantifiers, and (b) utilizing standard inference engines or reasoners for automated classification of neuron types, detecting inconsistencies in the asserted axioms, and inferring implicit logical axioms from the explicit ones. 
-	* While OWL provides a useful formalism to specify the logical axioms of an ontology in a rigorous manner, it lacks the support for quiring and retreiving those axiom-level knowledge. There is simply not enough tool-support available for complex axiom-level queries that one could use against the OWL ontologies.
-		* While one can use SPARQL or CYPHER to retreive axiom-level knowledge from the OWL ontologies, it usually requires an extensive knowledge about the domain and the structure of the ontologies as well as the technical jargon of the OWL/RDF formalisms. The graph-based standard query laguages such as SPARQL and CYPHER are meant for writing data or individual-level queries against a knowledgebase. They are not meant for writing the class-level queries with complex logical axioms. Writing and testing such class-level queries using SPARQL or Cypher can be quite difficult and tedious. 
-	* Since the neuron types in NPO/SCKAN ontologies are defined based on a set of OWL axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies.
+# SCKAN Vs. Simple SCKAN
+The underlying ontologies in SCKAN are developed using standard OWL-DL formalism. The ontology that formalizes the SCKAN's core connectivity knowledge, the [Neuron Phenotype Ontology](https://link.springer.com/article/10.1007/s12021-022-09566-7) (NPO), is also encoded in OWL-DL. When it comes to the NPO, the main reasons for choosing the OWL-DL formalism are the following: (a) explicitly specifying the neuronal phenotypes with precise logical axioms and quantifiers, and (b) utilizing standard ontology reasoners for automated classification of neuron types, and detecting inconsistencies within the asserted axioms of the neuron populations. 
+	
+  * While OWL-DL supports automated reasoning and provides a rigorous formalism to specify the logical axioms of an ontology, it lacks support for quiring and retrieving those axiom-level specifications. We simply don't have enough tool support for complex axiom-level queries that one could use against the OWL ontologies.
+  * While one can use SPARQL or CYPHER to retreive axiom-level knowledge from the OWL ontologies, it usually requires an extensive knowledge about the domain of the ontologies as well as the technical jargon of the OWL/RDF formalisms. 
+  * The standard graph-based query laguages like SPARQL and CYPHER are meant for writing data or individual-level queries against a knowledgebase. They are not very suitable for writing the class-level queries with complex ontological axioms. Writing and testing such class-level queries against an OWL ontology can become quite difficult and tedious.
+  * Since the neuron types in SCKAN are defined based on a set of OWL logical axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies.
  
-* **SIMPLE-SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified _**subject-predicate-object**_ relations about the core connectivity knowledge available in NPO. The key objective of the **SIMPLE-SCKAN** is to **_support simplicity_** while writing and testing the queries against NPO's axiom-level connectivity knowledge. Following is the list of simplified relational predicates available in SIMPLE-SCKAN to express the connectivity between a neuron type and its locational phenotypes:
-	* _**hasSomaLocation**_: a relation between a Neuron Type and its Soma Location 
-	* _**hasAxonLocation**_: a relation between a Neuron Type and its Axon Location  
-	* _**hasDendriteLocation**_: a relation between a Neuron Type and its Dendrite Location 
-	* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its Axon Terminal Location (i.e., the location of the axon presynaptic element)
-	* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its Sensory Axon Terminal Location (i.e., the location of the axon sesory subcellular element)
-* The relational properties above in **SIMPLE-SCKAN** serve as the 'shortcuts' for the actaul ontological relations specified by the NPO to express its axioms about the locational phenotypes of the neuron populations. Essentially, SIMPLE-SCKAN encapsulates the complex OWL axioms relevant to the NPO's locational phenotypes into simpler RDF graph patterns. The sole purpose of this encasulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. 
-* The next section provides an example as to how SIMPLE-SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
+The **Simple SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified **subject-predicate-object** relations about the core connectivity knowledge available in NPO. The key objective of the Simple SCKAN is to **support simplicity** while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Following is the list of simplified relational predicates available in Simple SCKAN to express the connectivity between a neuron type and its locational phenotypes:
 
-## Query Example: SCKAN Vs. SIMPLE-SCKAN
+  * _**hasSomaLocation**_: a relation between a Neuron Type and its Soma Location 
+  * _**hasAxonLocation**_: a relation between a Neuron Type and its Axon Location  
+  * _**hasDendriteLocation**_: a relation between a Neuron Type and its Dendrite Location 
+  * _**hasAxonTerminalLocation**_: a relation between a Neuron type and its Axon Terminal Location (i.e., the location of the axon presynaptic element)
+  * _**hasAxonSensoryLocation**_: a relation between a Neuron type and its Sensory Axon Terminal Location (i.e., the location of the axon sesory subcellular element)
 
-* Here is an example query to find all the orgins (soma locations) and the termination regions of the neuronal connections specified in the ApINATOMY models. In other words, this query asks where the origin of the ApINATOMY connections are and where do they terminate.
+The relational properties above in **Simple SCKAN** serve as the 'shortcuts' for the NPO's actaul ontological axioms about the locational phenotypes of the neuron populations. Essentially, Simple SCKAN encapsulates those complex OWL axioms relevant to the NPO's locational phenotypes into simpler RDF graph patterns. The sole purpose of this encasulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. The next section provides an example as to how Simple SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
+
+## Query Example: SCKAN Vs. Simple SCKAN
+
+* Here is an example query to find all the orgins (soma locations) and the termination regions of the neuronal connections specified in the [ApINATOMY](https://scicrunch.org/sawg/about/ApiNATOMY) models. In other words, this query asks where the origins of the ApINATOMY connections are and where do they terminate.
 
 ```SPARQL
 # This is the SCKAN Query Example in SPARQL.
@@ -110,7 +111,7 @@ LIMIT 999
 
 
 ```SPARQL
-# This is the SIMPLE-SCKAN Query Example in SPARQL.
+# This is the Simple SCKAN Query Example in SPARQL.
 
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -150,5 +151,5 @@ LIMIT 999
 
 
 
-# More **SIMPLE-SCKAN** Example Queries
+# More **Simple SCKAN** Example Queries
 	* Link will be posted here.
