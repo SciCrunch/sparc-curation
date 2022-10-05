@@ -150,7 +150,6 @@
   (python-mod-args
    "sparcur.cli"
    "find"
-   "--name" "*.xlsx"
    "--name" "*.xml"
    "--name" "submission*"
    "--name" "code_description*"
