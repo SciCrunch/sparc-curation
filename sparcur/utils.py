@@ -102,6 +102,7 @@ def fromJson(blob):
                 log.critical(msg)
                 if False:  # set true if debugging when implementing new types
                     raise NotImplementedError(msg)
+                type_name = None
             else:
                 type_name = t
 
