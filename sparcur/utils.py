@@ -90,8 +90,18 @@ def fromJson(blob):
                 type_name = t
             elif nitr(t):
                 breakpoint()
-                raise NotImplementedError(f'TODO fromJson for type {t} '
-                                          f'currently not implemented\n{blob}')
+                # XXX FIXME should this be fatal ??? we have cases where
+                # it is impossible to avoid because a user will use type
+                # as a column header and then we are toast if we also want
+                # to set the type of that object to convert back ... what
+                # happens if we want to have subject metadata as a class?
+                # do we just ... hope for the best that there are no collisions
+                # and make collisions non-fatal ???
+                msg = (f'TODO fromJson for type {t} '
+                       f'currently not implemented\n{blob}')
+                log.critical(msg)
+                if False:  # set true if debugging when implementing new types
+                    raise NotImplementedError(msg)
             else:
                 type_name = t
 
