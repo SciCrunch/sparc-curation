@@ -1613,6 +1613,21 @@ def from_group_name_fetch_annotations(group_name):
     return cache_file  # needed for next phase, annos are not
 
 
+def from_group_name_cached_annos(group_name):
+    group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
+    cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+    get_annos = hyp.AnnoReader(cache_file, group=group_id)
+    annos = get_annos()
+    return annos
+
+
+def from_user_name_group_name_h(user_name, group_name):
+    group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
+    h = hyp.HypothesisUtils(username=user_name, group=group_id)
+    h.token = auth.user_config.secrets('hypothesis', 'api', user_name)
+    return h
+
+
 def main(hypothesis_group_name=None, **kwargs):
     if hypothesis_group_name is None:
         hypothesis_group_name = 'sparc-curation'
@@ -1624,6 +1639,34 @@ if __name__ == '__main__':
     from sparcur.simple.utils import pipe_main
     pipe_main(main)
 #+end_src
+
+Temporary location for some helper code to clone protcur annos to a new group.
+#+begin_src python
+from sparcur.simple.fetch_annotations import (
+    from_group_name_cached_annos, from_user_name_group_name_h)
+from protcur import document as ptcdoc
+
+
+def main():
+    annos = from_group_name_cached_annos('sparc-curation')
+
+    bannos = [ptcdoc.Annotation(a) for a in annos]
+    pool = ptcdoc.Pool(bannos)
+    anno_counts = ptcdoc.AnnoCounts(pool)
+
+    html_annos = from_group_name_cached_annos('fixed-sparc-curation')
+    html_bannos = [ptcdoc.Annotation(a) for a in html_annos]
+    html_pool = ptcdoc.Pool(html_bannos)
+
+    h_p_f = from_user_name_group_name_h('protbot', 'fixed-sparc-curation')
+
+    pool.clone_to(html_pool, h_p_f)
+
+
+if __name__ == '__main__':
+    main()
+#+end_src
+
 **** _Datasets_
 ***** Clone
 This is an example of how to clone the top level of a project.
