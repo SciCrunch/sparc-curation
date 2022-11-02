@@ -272,7 +272,7 @@ class Reports(Sheet):
                     # TODO improve the ergonimcs here
                     report = RC(fetch=False, readonly=False)
                     report.metadata()  # idlib.Stream vs ? behavior not decided
-                    rows_stringified = rowcellify(rows)
+                    rows_stringified = rowcellify(rows)  # FIXME align to upstream schema
                     if report.sheetId() is None:
                         report.createRemoteSheet()
                         report.update(rows_stringified)
@@ -283,7 +283,22 @@ class Reports(Sheet):
                             # ordering remains the same?  FIXME upsert
                             # should be ok in this situation but
                             # dropping the header causes issues
-                            report.upsert(*rows_stringified[1:])
+                            # XXX sort of fixedish no longer mismatching now at least
+                            remap = [rows[0].index(c) if c in rows[0] else None
+                                     for c in report.values[0]]
+                            aligned = [[None if i is None else rs[i]
+                                        for ui, i in enumerate(remap)]
+                                       for rs in rows_stringified[1:]]
+                            def gmr(a):
+                                try:
+                                    return report._row_from_index(row=a)[0].values
+                                except AttributeError:
+                                    return a
+
+                            preserved = [[cr if ca is None else ca for cr, ca in zip(r, a)]
+                                         for r, a in zip([gmr(a) for a in aligned], aligned)]
+                            # FIXME seems to produce duplicate rows or something?
+                            report.upsert(*preserved)
                         else:
                             report.update(rows)
 
@@ -606,7 +621,7 @@ class Organs(FieldAlignment):
             except StopIteration:
                 log.info(f'no term for technique {value}')
 
-    def _update_dataset_metadata(self, id, name, award, species, update_techniques=False):
+    def _update_dataset_metadata(self, *, id, name, award, species, update_techniques=False):
         try:
             row_index = self._dataset_row_index(id)
             row = self.row_object(row_index)
