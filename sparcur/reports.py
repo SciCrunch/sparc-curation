@@ -1418,6 +1418,14 @@ class Report:
                     idlib.exc.RemoteError) as e:
                 pass
 
+        def tht(i):
+            try:
+                return i.uri_human_html
+            except (AttributeError,
+                    idlib.exc.MalformedIdentifierError,
+                    idlib.exc.RemoteError) as e:
+                pass
+
         blob_data = self._data_ir(org_id=self.options.project_id)
         blob_protcur = self._protcur()
 
@@ -1426,8 +1434,10 @@ class Report:
              blob_data, blob_protcur)
 
         header = [['uri',
+                   'uri_html',
                    'uri_human',
                    'doi',
+                   #'datasets',
                    'exists',
                    'access',
                    'count annos',
@@ -1448,6 +1458,7 @@ class Report:
             if isinstance(i, idlib.Stream):
                 is_pio = isinstance(i, idlib.Pio)
                 uri = i
+                uri_html = tht(i)
                 uri_human = th(i)
                 try:
                     if isinstance(i, idlib.Doi):
@@ -1464,6 +1475,7 @@ class Report:
                     doi = None
             else:
                 uri = idlib.Uri(i)
+                uri_html = None
                 uri_human = None
                 if i in dios:
                     exists = bool(deref[dios.index(i)])
@@ -1491,8 +1503,10 @@ class Report:
 
             row = [
                 uri,
+                uri_html,
                 uri_human,
                 doi,
+                #datasets,
                 exists,
                 access,
                 n_annos,
@@ -1507,10 +1521,10 @@ class Report:
 
         def sk(r):
             return (
-                r[3],
                 r[4],
+                r[5],
+                r[3] is not None, r[3],
                 r[2] is not None, r[2],
-                r[1] is not None, r[1],
                 r[0] is not None, r[0],
             )
 
