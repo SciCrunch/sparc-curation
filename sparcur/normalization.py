@@ -761,7 +761,7 @@ class NormDatasetDescriptionFile(NormValues):
                                               # since clean didn't function ...
                                               # unless ... we add an expand lists step ...
                                               # HRM, interesting
-                                              if e is not None and e is not '')
+                                              if e is not None and e != '')
                                if o]))
             nonlocal cell_error
             if cell_error:
