@@ -575,7 +575,13 @@ class BlackfynnRemote(aug.RemotePath):
         if hasattr(self.bfobject, 'checksum'):
             checksum = self.bfobject.checksum
             if checksum and '-' not in checksum:
-                return bytes.fromhex(checksum)
+                try:
+                    return bytes.fromhex(checksum)
+                except ValueError as e:
+                    msg = f'nonsensical checksum for {self}: {checksum!r}'
+                    if msg not in self._errors:
+                        logd.critical(msg)
+                        self._errors.append(msg)
 
     @property
     def etag(self):
