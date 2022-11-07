@@ -337,11 +337,12 @@ def symlink_latest(dump_path, path, relative=True):
 
 
 def _transitive_(path, command):
+    safe_command = command + ' -print0'
     with path:
-        with os.popen(command) as p:
+        with os.popen(safe_command) as p:
             string = p.read()
 
-    path_strings = string.split('\n')  # XXX posix path names can contain newlines
+    path_strings = string.split('\x00')
     # XXXXXXXXXXXXXXXXXXX REMINDER THAT THIS IS NOT SORTED
     # https://doi.org/10.1021/acs.orglett.9b03216
     paths = [path / s for s in path_strings if s][1:]  # leave out the parent folder itself

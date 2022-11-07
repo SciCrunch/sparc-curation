@@ -669,7 +669,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         # cache classes when no cache was present, namely that if
         # there is no cache then PathMeta will still return the
         # correct structure, but it will be empty, which is bad
-        if meta.id is None:
+        if meta is None:
+            log.critical(f'something is very wrong with path: {self}')
+            raise exc.NoCachedMetadataError(self)
+        elif meta.id is None:
             raise exc.NoCachedMetadataError(self)
 
         _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
