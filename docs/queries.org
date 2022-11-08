@@ -2943,60 +2943,9 @@ OPTIONAL MATCH (start:Ontology {iri: $model_id})
 ,
 (graph)
 -[:apinatomy:references]->(pub)
--[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"})
+-[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Reference"})
 RETURN e
 #+end_src
-
-#+RESULTS: cypher-apinat-model-pops-and-refs
-| id                         | label                                                                                                                                                                  |
-|----------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ilxtr:neuron-type-keast-5  | ilxtr:neuron-phenotype-keast-5 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-16 | MnPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                        |
-| PMID:7636036               |                                                                                                                                                                        |
-| ilxtr:neuron-type-keast-6  | ilxtr:neuron-phenotype-keast-6 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-17 | LPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                         |
-| ilxtr:neuron-type-keast-3  | ilxtr:IMG (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) neuron                                                                    |
-| ilxtr:neuron-type-keast-4  | ilxtr:neuron-phenotype-keast-4 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-15 | medial preoptic region (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                      |
-| ilxtr:neuron-type-keast-9  | ilxtr:neuron-phenotype-keast-9 neuron                                                                                                                                  |
-| elements:Publication       |                                                                                                                                                                        |
-| ilxtr:neuron-type-keast-7  | ilxtr:neuron-phenotype-keast-7 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-18 | LH (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                          |
-| ilxtr:neuron-type-keast-8  | ilxtr:neuron-phenotype-keast-8 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-19 | pAG (with-axons-in MB) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                             |
-| PMID:2713886               |                                                                                                                                                                        |
-| PMID:3722467               |                                                                                                                                                                        |
-| PMID:7644029               |                                                                                                                                                                        |
-| elements:External          |                                                                                                                                                                        |
-| PMID:9442414               |                                                                                                                                                                        |
-| PMID:30704972              |                                                                                                                                                                        |
-| PMID:9421141               |                                                                                                                                                                        |
-| PMID:10494620              |                                                                                                                                                                        |
-| PMID:1358408               |                                                                                                                                                                        |
-| PMID:1726105               |                                                                                                                                                                        |
-| PMID:4700666               |                                                                                                                                                                        |
-| PMID:3558884               |                                                                                                                                                                        |
-| PMID:2891149               |                                                                                                                                                                        |
-| ilxtr:neuron-type-keast-2  | ilxtr:neuron-phenotype-keast-2 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-20 | Barrington's nucleus (with-axon-in pons) neuron                                                                                                                        |
-| ilxtr:neuron-type-keast-14 | central amygdaloid nucleus (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                      |
-| PMID:7174880               |                                                                                                                                                                        |
-| PMID:1619047               |                                                                                                                                                                        |
-| PMID:135840                |                                                                                                                                                                        |
-| ilxtr:neuron-type-keast-1  | ilxtr:PG (with-axon-in ilxtr:nerve-bladder) (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) ilxtr:neuron-phenotype-para-post neuron |
-| ilxtr:neuron-type-keast-10 | ilxtr:neuron-phenotype-keast-10 neuron                                                                                                                                 |
-| ilxtr:neuron-type-keast-13 | BST (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                             |
-| PMID:8786273               |                                                                                                                                                                        |
-| PMID:11382385              |                                                                                                                                                                        |
-| ilxtr:neuron-type-keast-11 | ilxtr:neuron-phenotype-keast-11 neuron                                                                                                                                 |
-| ilxtr:neuron-type-keast-12 | ilxtr:neuron-phenotype-keast-12 neuron                                                                                                                                 |
-| PMID:12811806              |                                                                                                                                                                        |
-| PMID:3225349               |                                                                                                                                                                        |
-| PMID:11748568              |                                                                                                                                                                        |
-| PMID:6736301               |                                                                                                                                                                        |
-| PMID:8923445               |                                                                                                                                                                        |
-| PMID:1765622               |                                                                                                                                                                        |
-| PMID:20484700              |                                                                                                                                                                        |
 
 *** TODO neru regions projected to
 #+begin_src cypher
