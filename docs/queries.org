@@ -2610,7 +2610,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 
 WITH neugrp, link, lyph, a, c, d
 OPTIONAL MATCH layer_ext = (lyph)
-<-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedExternal]->()
+<-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedOntologyTerms]->()
 
 WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
 MATCH (lyph)
@@ -2621,7 +2621,7 @@ MATCH (lyph)
 -[:apinatomy:topology]->()
 
 , (cl)
--[x:apinatomy:inheritedExternal*0..1]->()
+-[x:apinatomy:inheritedOntologyTerms*0..1]->()
 
 // use apinatomy:next to extract ordering information
 , (link)
@@ -2705,7 +2705,7 @@ MATCH p2 = (link)
 
 WITH neugrp, link, a, b, c, d, e, path, p2, cl
 MATCH (cl)
--[x:apinatomy:inheritedExternal*0..1]->()
+-[x:apinatomy:inheritedOntologyTerms*0..1]->()
 
 WITH neugrp, link, a, b, c, d, e, path, p2, x
 MATCH (link)
@@ -2975,7 +2975,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.org/uris/readable/BAG2"]
 WITH neugrp, end_lyph, t
 MATCH (type) // FIXME we need more information in the models
-<-[x:apinatomy:inheritedExternal*0..1]-(end_lyph)
+<-[x:apinatomy:inheritedOntologyTerms*0..1]-(end_lyph)
 -[a:apinatomy:conveys]->(link)
 -[b:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
 -[c:apinatomy:layerIn*0..1]->(lyph)
@@ -3134,7 +3134,7 @@ conventions used in ApiNATOMY models.
 WITH e, neupop, neugrp, link
 MATCH (link)
 -[:apinatomy:conveyingLyph]->(cl)
--[:apinatomy:inheritedExternal]->(:Class {iri: $type_id})
+-[:apinatomy:inheritedOntologyTerms]->(:Class {iri: $type_id})
 #+end_src
 
 Filter processes based on their topology. For example, this is used to
@@ -4758,7 +4758,7 @@ where {
   ?ele a ?type .
   ?model ( apinatomy:lyphs | apinatomy:chains | apinatomy:groups | apinatomy:materials ) ?ele .
   ?model a elements:Graph .
-  #?ele apinatomy:inheritedExternal ?organ .
+  #?ele apinatomy:inheritedOntologyTerms ?organ .
   #?o ?p ?q .
   }
 }
@@ -5849,7 +5849,7 @@ MATCH (neupop:Class{iri: $neupop_id})
 ,
 (lyph_or_layer) // FIXME WHERE ARE MY DENDRITES MOTHER FUCKER
 -[z:apinatomy:cloneOf*0..1]->()
--[y:apinatomy:external|apinatomy:inheritedExternal*0..1]->(layer)
+-[y:apinatomy:external|apinatomy:inheritedOntologyTerms*0..1]->(layer)
 ,
 (lyph)
 -[e:apinatomy:external]->(region)
@@ -5868,7 +5868,7 @@ p2 = (link)
 -[:apinatomy:topology]->()
 ,
 (cl)
--[x:apinatomy:inheritedExternal*0..1]->()
+-[x:apinatomy:inheritedOntologyTerms*0..1]->()
 
 //WHERE top.iri IN ["https://apinatomy.org/uris/readable/BAG", "https://apinatomy.org/uris/readable/BAG2"]
 
@@ -5927,7 +5927,7 @@ p5 = (link)
 -[:apinatomy:topology]->()
 ,
 p6 = (cl)
--[:apinatomy:inheritedExternal*0..1]->()
+-[:apinatomy:inheritedOntologyTerms*0..1]->()
 //,
 //p7 = (layer)
 //-[:apinatomy:layerIn:*0..1]->(lyph) // FIXME this is wrong it will bull in unrelated layers
