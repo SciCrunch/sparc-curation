@@ -725,7 +725,7 @@ cypherResources:
 
       WITH neugrp, link, a, b, c, d, e, path, p2, cl
       MATCH (cl)
-      -[x:apinatomy:inheritedExternal*0..1]->()
+      -[x:apinatomy:inheritedOntologyTerms*0..1]->()
 
       WITH neugrp, link, a, b, c, d, e, path, p2, x
       MATCH (link)
@@ -766,7 +766,7 @@ cypherResources:
 
       WITH neugrp, link, lyph, a, c, d
       OPTIONAL MATCH layer_ext = (lyph)
-      <-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedExternal]->()
+      <-[d*1]-(layer)-[:apinatomy:cloneOf]->()-[:apinatomy:inheritedOntologyTerms]->()
 
       WITH neugrp, link, lyph, a, c, d, layer_ext // there is a difference here because the previous match does not require lyphs to have external ids
       MATCH (lyph)
@@ -777,7 +777,7 @@ cypherResources:
       -[:apinatomy:topology]->()
 
       , (cl)
-      -[x:apinatomy:inheritedExternal*0..1]->()
+      -[x:apinatomy:inheritedOntologyTerms*0..1]->()
 
       // use apinatomy:next to extract ordering information
       , (link)
@@ -988,5 +988,5 @@ cypherResources:
       ,
       (graph)
       -[:apinatomy:references]->(pub)
-      -[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Publication"})
+      -[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Reference"})
       RETURN e
