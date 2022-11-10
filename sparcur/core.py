@@ -216,11 +216,11 @@ class HasErrors:
 
         if isinstance(e, str):
             o['message'] = e
-            o['type'] = None  # FIXME probably wan our own?
+            #o['error_type'] = None  # FIXME probably want our own? XXX nearly all error objects do not have type as a key
 
         elif isinstance(e, BaseException):
             o['message'] = str(e)
-            o['type'] = str(type(e))
+            o['error_type'] = str(type(e))
 
         else:
             raise TypeError(repr(e))

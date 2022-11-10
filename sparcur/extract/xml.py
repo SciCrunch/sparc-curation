@@ -197,7 +197,16 @@ class XmlSource(HasErrors):
             else:
                 return thing
 
-        data_in = self._extract(*args, **kwargs)
+        try:
+            data_in = self._extract(*args, **kwargs)
+        except Exception as e:
+            msg = f'extract failed with {e}'
+            if self.addError(msg, blame='stage', path=self.path):
+                # usually is submission, but can't always tell
+                log.exception(e)
+
+            return {}
+
         data_out = condense(data_in)
         for k, v in tuple(data_out.items()):
             if not v:

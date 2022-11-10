@@ -514,6 +514,9 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             he = dat.HasErrors(pipeline_stage='XmlFilePipeline._path_to_json_meta')
             he.addError(e, path=path)
             he.embedErrors(metadata)
+        except Exception as e:
+            log.error(f'xml pipeline failure for {path!r}')
+            raise e
 
         return metadata
 
@@ -1695,7 +1698,7 @@ class PipelineEnd(JSONPipeline):
                 if not blamed:
                     curation_errors.append(error)
             else:
-                if blame not in ('pipeline', 'submission', 'debug'):
+                if blame not in ('pipeline', 'submission', 'debug', 'stage'):
                     unclassified_errors.append(error)
                     unclassified_stages.append(blame)
                     #raise ValueError(f'Unhandled stage {stage}\n{message}')
