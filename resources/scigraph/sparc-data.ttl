@@ -36,7 +36,7 @@
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bronchomotor.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/ard-arm-cardiac.ttl>,
-        # <https://cassava.ucsd.edu/ApiNATOMY/ontologies/pancreas.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/pancreas.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl> ;
