@@ -1986,10 +1986,17 @@ class ProtcurPipeline(Pipeline):
             else:
                 return a.text
 
-
         def lift_urls(a):
-            if isinstance(a, OntTerm):
-                return a
+            # XXX FIXME likely want a way to check that the text of
+            # the annotation matches the uberon identifier
+            wat = normalize_other(a)
+            if isinstance(wat, OntTerm):
+                return wat
+
+        def lift_urls_raw(a):
+            t = lift_urls(a)
+            if t is not None:
+                return t.label
 
         def clean(v):
             if isinstance(v, str) and not isinstance(v, OntId):  # sigh, yep, idlib has the better design
@@ -2089,6 +2096,10 @@ class ProtcurPipeline(Pipeline):
             else:
                 norm, = norm
 
+            _traw = predicate.startswith('TEMPRAW:')
+            if _traw and tag == 'sparc:AnatomicalLocation':
+                norm = lift_urls_raw  # XXX avoid putting uberon urls in raw output
+
             normed = [norm(a) for a in annos if tag in a.tags]
             # FIXME not at all clear that these should be sorted
             # it added tons of complexity to the pyru implementation
@@ -2096,13 +2107,13 @@ class ProtcurPipeline(Pipeline):
                           key=key)
             if vals:
                 #if [p for p in ('ilxtr:', 'protc:', 'sparc:') if tag.startswith(p)]:
-                if predicate.startswith('TEMPRAW:'):
+                if _traw:
                     pred = tag
                 else:
                     pred = predicate
 
                 pred = pred.replace(':', '_')  # FIXME sigh
-                if predicate.startswith('TEMPRAW:'):
+                if _traw:
                     data[pred] = vals
                 else:
                     #log.critical((tag, pred, norm, vals))
@@ -2171,6 +2182,17 @@ class ProtcurPipeline(Pipeline):
                         if not orig_pio.identifier.is_int():
                             data['uri_human'] = orig_pio
 
+        def fixbf(i):
+            if i.startswith('BF:'):
+                return i[3:]  # XXX TODO somehow log the source of the issue so we can correct the annotation
+            else:
+                return i
+
+        bad_tags = (  # XXX SIGH
+            # missing final char and bad tag was not removed ...
+            'dataset:2f832725-5ab1-4711-90d6-8538e2b7d5e',  # missing f https://hyp.is/3KVLkM4AEeq7SNPGaiMUww
+            'dataset:0452b8b3-dc9b-44d5-a5cc-93b8d8742d0',  # missing 8 https://hyp.is/2dsqXFcyEe21gINV0ofl9g https://hyp.is/0a16wsWQEeuyCl8HzvfNUQ
+        )
         sheets_lookup = self._sheets_lookup()
         annos, idints, pidints = self._idints(annos=annos)
         out = []
@@ -2219,13 +2241,14 @@ class ProtcurPipeline(Pipeline):
                     _doi = pio.doi
                     if _doi:
                         #data['TEMP:hasDoi'] = _doi
-                        data['doi'] = _doi
+                        data['hasDoi'] = _doi
             except idlib.exc.RemoteError as e:
                 # TODO embed error status
                 pass
 
-            data['datasets'] = sorted(set([t for p in pannos if p._anno.is_page_note
-                                           for t in p.tags if 'dataset:' in t]))
+            data['datasets'] = sorted(set([PennsieveId(fixbf(t)) for p in pannos if p._anno.is_page_note
+                                           for t in p.tags if 'dataset:' in t
+                                           and t not in bad_tags]))
 
             from pysercomb.pyr.units import Term
             extras = list(self._annos_to_json(data, pannos, sheets_lookup, Term))

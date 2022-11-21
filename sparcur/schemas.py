@@ -94,11 +94,14 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
 
     #'verb': {'@id': 'https://uilx.org/tgbugs/u/executor-verb/', '@prefix': True},
 
+    'hasDoi': {'@id': 'TEMP:hasDoi', '@type': '@id'},
+
     'fuzzy': {'@id': 'https://uilx.org/tgbugs/u/fuzzy-quantity/', '@prefix': True},
 
     'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},
     'ast_value': {'@id': 'TEMP:hasValue', '@type': '@id'},
     'raw_value': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
+    #'original': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},  # XXX this doesn't seem to do anything?
 
     'protcur_anno_count': {'@id': 'TEMP:hasNumberOfProtcurAnnotations'},
     'datasets': {'@id': 'TEMP:priorInformationalConstraintOnProcessThatGenerated', '@type': '@id'},

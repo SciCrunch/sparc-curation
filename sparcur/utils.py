@@ -727,6 +727,10 @@ class BlackfynnId(idlib.Identifier):
                 self.id == other.id and
                 self.file_id == other.file_id)  # works because None == None
 
+    def __lt__(self, other):
+        return (type(self) == type(other) and
+                self.id < other.id)
+
     @property
     def label(self):
         return self.curie

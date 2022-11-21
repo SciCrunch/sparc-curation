@@ -518,7 +518,7 @@ class WorkingBlackBox(AnnoTags):
         mapping_ok = row.mapping_ok().value == 'TRUE'  # FIXME
         not_input = row.not_input_().value
         bad_for_mapping = row.bad_for_mapping_().value
-        manual_mapping = row.manual_mapping().value
+        manual_mapping = row.manual_mapping().value.split('|')[0]
         if mapping_ok and not not_input:
             pass
 
