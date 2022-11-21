@@ -101,7 +101,7 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},
     'ast_value': {'@id': 'TEMP:hasValue', '@type': '@id'},
     'raw_value': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
-    #'original': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},  # XXX this doesn't seem to do anything?
+    'original': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
 
     'protcur_anno_count': {'@id': 'TEMP:hasNumberOfProtcurAnnotations'},
     'datasets': {'@id': 'TEMP:priorInformationalConstraintOnProcessThatGenerated', '@type': '@id'},
