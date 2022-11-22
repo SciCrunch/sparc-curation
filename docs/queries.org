@@ -4287,47 +4287,45 @@ WHERE {
 #+RESULTS: apinat-dashboard-model-summary
 | label                                                                  | graph                   | lyphs | lyphs_input | externals | publications | nerus | neupops | neupops_pat | somas |
 |------------------------------------------------------------------------+-------------------------+-------+-------------+-----------+--------------+-------+---------+-------------+-------|
-| ApiNATOMY model of the stomach                                         | sstom:sawg-stomach      |   751 |          38 |        75 |            8 |    14 |      14 |          14 |    14 |
-| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1977 |         136 |       145 |            1 |    17 |      17 |          17 |    41 |
-| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |   499 |         107 |       168 |          238 |    29 |      29 |          29 |    29 |
-| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  2586 |         139 |       175 |           30 |    21 |      20 |          20 |    34 |
-| SAWG ApiNATOMY model of the distal colon                               | sdcol:sawg-distal-colon |   962 |          85 |       118 |            4 |    17 |      17 |          17 |    23 |
-| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   556 |         143 |       135 |            6 |     6 |       6 |           6 |    19 |
-| pancreas model                                                         | pancr:pancreas          |   351 |          51 |         1 |              |     8 |       1 |           1 |       |
-| spleen model                                                           | splen:spleen            |   474 |          43 |        99 |            4 |     5 |       5 |           5 |     8 |
-| Total unique                                                           | 8                       |  8157 |         742 |       547 |          292 |   117 |     109 |         109 |   168 |
+| ApiNATOMY model of the stomach                                         | sstom:sawg-stomach      |   668 |          37 |        77 |            8 |    14 |      14 |          14 |    14 |
+| Ardell Armour Cardiac Model                                            | aacar:ard-arm-cardiac   |  1827 |         137 |       161 |            2 |    17 |      17 |          17 |    41 |
+| Bolser-Lewis Model of the Physiology of the Superior Cervical Ganglion | bolew:bolser-lewis      |  1151 |         107 |       141 |          239 |    29 |      29 |          29 |    29 |
+| Keast ApiNATOMY model of bladder innervation                           | kblad:keast-bladder     |  2394 |         139 |       174 |           30 |    21 |      20 |          20 |    35 |
+| SAWG ApiNATOMY model of the descending colon                           | sdcol:sawg-distal-colon |  1066 |          89 |       135 |            5 |    18 |      18 |          18 |    24 |
+| SPARC Bronchomotor Flatmap                                             | bromo:bronchomotor      |   623 |         144 |       187 |            6 |     6 |       6 |           6 |    19 |
+| pancreas model                                                         | pancr:pancreas          |   452 |          17 |       529 |            1 |     5 |       5 |           5 |    11 |
+| ApiNATOMY model of the spleen                                          | splen:spleen            |   580 |          47 |       103 |            5 |     5 |       5 |           5 |     8 |
+| Total unique                                                           | 8                       |  8761 |         717 |       823 |          296 |   115 |     114 |         114 |   181 |
 
 #+RESULTS: apinat-dashboard-overview
 | element         | count |
 |-----------------+-------|
 | models          |     8 |
 | models scigraph |     8 |
-| lyphs           |  8162 |
-| lyphs input     |   742 |
-| externals       |   547 |
-| publications    |   292 |
-| nerus           |   117 |
-| neupops         |   117 |
-| neupops pattern |   117 |
+| lyphs           |  8761 |
+| lyphs input     |   717 |
+| externals       |   583 |
+| publications    |   296 |
+| nerus           |   115 |
+| neupops         |   114 |
+| neupops pattern |   114 |
 
 # TODO links to a way to view the terms per ontology if possible
 #+RESULTS: sparql-apinat-prefixes
 | prefix  | count |
 |---------+-------|
 | nlx     |     1 |
-| pubmed  |     1 |
 | CL      |     3 |
-| sao     |     4 |
 | GO      |     5 |
-| NCIT    |     8 |
-| EMAPA   |     9 |
+| NCIT    |     5 |
 | CHEBI   |    11 |
-| fma     |    70 |
-| ilx     |   101 |
-| tgbugs  |   109 |
-| UBERON  |   224 |
-| :SUM:   |   546 |
-| :TOTAL: |   547 |
+| sao     |    11 |
+| fma     |    15 |
+| tgbugs  |   114 |
+| ilx     |   179 |
+| UBERON  |   239 |
+| :SUM:   |   583 |
+| :TOTAL: |   583 |
 
 #+header: :var n-sparql-apinat-graphs=n-sparql-apinat-graphs()
 #+header: :var cypher-apinat-models=cypher-apinat-models()
@@ -4367,6 +4365,7 @@ WHERE {
 #+name: apinat-dashboard-model-summary
 #+begin_src sparql :noweb no-export
 select distinct
+?label
 ?graph
 #?g
 ?lyphs
@@ -4382,7 +4381,6 @@ select distinct
 ?neupops
 ?neupops_pat
 ?somas
-?label
 <<apinat-model-summary-where>>
 #+end_src
 
@@ -4537,7 +4535,7 @@ WHERE { ?s a elements:Lyph . }
 #+RESULTS: n-sparql-apinat-lyphs
 | total_lyphs |
 |-------------|
-|        5525 |
+|        8162 |
 
 generated vs input
 s? rdf:type element:Lyph
@@ -4563,7 +4561,7 @@ LIMIT ?limit
 #+RESULTS: n-sparql-apinat-lyphs-input
 | input_lyphs |
 |-------------|
-|         761 |
+|         742 |
 
 ****** publications referenced
 apinatomy:references
@@ -4582,7 +4580,7 @@ WHERE { ?s apinatomy:references ?pub . }
 #+RESULTS: n-sparql-apinat-publications
 | publications |
 |--------------|
-|          275 |
+|          293 |
 
 ****** TODO species
 both model level and lyph level
@@ -4653,7 +4651,7 @@ SELECT (COUNT(*) as ?count) {
 #+RESULTS: n-apinat-nerus
 | count |
 |-------|
-|    97 |
+|   117 |
 
 #+name: apinat-nerus
 #+begin_src sparql
@@ -4680,7 +4678,7 @@ SELECT (COUNT(*) as ?count) {
 #+RESULTS: n-apinat-neupops
 | count |
 |-------|
-|    49 |
+|   117 |
 
 #+name: apinat-neupops
 #+begin_src sparql
@@ -4707,7 +4705,7 @@ SELECT (COUNT(*) as ?count) {
 #+RESULTS: n-apinat-neupops-pat
 | count |
 |-------|
-|    49 |
+|   117 |
 
 #+name: apinat-neupops-pat
 #+begin_src sparql
