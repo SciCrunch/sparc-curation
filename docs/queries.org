@@ -1234,8 +1234,59 @@ def find_region(blob, edge):
     return collect
 
 
+def find_region_layer(blob, edge, bindex):
+    collect = []
+    layers = []
+    layers_ies = []
+    donel = set()
+    doner = set()
+    def select_term(e, m, layers=layers):
+        if sub(e, m):
+            pprint(e)
+            if (pred(e, onts)
+                or pred(e, ies)):
+                layer = obj(e)
+                if layer not in donel:
+                    donel.add(layer)
+                    if pred(e, ies):
+                        layers_ies.append(bindex[layer])
+                    else:
+                        layers.append(bindex[layer])
+                return layer
+
+    def select(e, m, collect=collect):
+        if sub(e, m):
+            if pred(e, layerIn):
+                # we're at a layer
+                ematch(blob, select_term, sub(e))
+                return ematch(blob, select, obj(e))
+            elif (pred(e, fasIn)
+                  or pred(e, endIn)):
+                return ematch(blob, select, obj(e))
+            elif pred(e, onts):
+                region = obj(e)
+                if region not in doner:
+                    doner.add(region)
+                    collect.append(bindex[region])
+                return region
+    ematch(blob, select, sub(edge))
+    if collect and not layers and not layers_ies:
+        layers = [None]
+    elif layers_ies and not layers:
+        layers = layers_ies
+
+    if len(collect) != len(layers):
+        raise ValueError(f'len not matched {len(collect)} {len(layers)}')
+    return list(zip(collect, layers))
+
+
 def find_terminal_regions(blob, type):
     return [region for es in find_terminals(blob, type) for region in find_region(blob, es)]
+
+
+def find_terminal_region_layers(blob, type, bindex):
+    return [(region, layer) for es in find_terminals(blob, type)
+            for region, layer in find_region_layer(blob, es, bindex)]
 
 
 def main(blob=None, blob_string=None, neupop_id=None, remove_converge=remove):
@@ -1280,19 +1331,26 @@ pprint(blob)
 Find the ontology identifiers for terminal regions.
 
 # run this to populate/update the kernel (sigh)
-#+call: python-process-neru(result=cypher-neru-4-helper(neupop_id="ilxtr:neuron-type-keast-1"))
+#+call: python-process-neru(result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-aacar-5"))
 
 #+name: neru-find-terminal-regions
-#+begin_src jupyter-python :session pys :exports both :var neupop_id=""
+#+begin_src jupyter-python :session pys :exports both :var neupop_id="" :noweb yes
+<<python-process-neru>>
 from pprint import pprint
 
-blob, *_ = main(blob_string=result)
+#blob, *_ = main(blob_string=result)
+#bindex = {n['id']:n for n in blob['nodes']}
 
 # find terminal regions
 axon_terminal_regions = find_terminal_regions(blob, axon)
 dend_terminal_regions = find_terminal_regions(blob, dend)
-pprint(axon_terminal_regions)
-pprint(dend_terminal_regions)
+#pprint(axon_terminal_regions)
+#pprint(dend_terminal_regions)
+
+axon_terminal_rl = find_terminal_region_layers(blob, axon, bindex)
+dend_terminal_rl = find_terminal_region_layers(blob, dend, bindex)
+pprint([(r['id'], (l if l is None else l['id'])) for r, l in axon_terminal_rl])
+pprint([(r['id'], (l if l is None else l['id'])) for r, l in dend_terminal_rl])
 #+end_src
 
 ** connectivity pairs
