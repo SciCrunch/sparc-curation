@@ -1868,7 +1868,7 @@ class ExtractProtocolIds(Pipeline):
                         'protocol_url_or_doi',
                         collect=collect)
         unique = sorted(set(collect))  # already dereferenced and normalized at this point
-        return [i for i in ids if isinstance(i, idlib.Pio)]
+        return [i for i in unique if isinstance(i, idlib.Pio)]
 
 
 class ProtcurPipeline(Pipeline):
