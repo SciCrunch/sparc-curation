@@ -145,47 +145,6 @@ WHERE {
 } ORDER BY ?p
 #+end_src
 
-#+RESULTS:
-| p                                        |
-|------------------------------------------|
-| IAO:0000136                              |
-| dc:description                           |
-| dc:title                                 |
-| TEMP:collectionTitle                     |
-| TEMP:completenessOfDataset               |
-| TEMP:contentsWereUpdatedAtTime           |
-| TEMP:curationIndex                       |
-| TEMP:errorIndex                          |
-| TEMP:hasAdditionalFundingInformation     |
-| TEMP:hasAwardNumber                      |
-| TEMP:hasContactPerson                    |
-| TEMP:hasDatasetTemplateSchemaVersion     |
-| TEMP:hasDoi                              |
-| TEMP:hasExpectedNumberOfSamples          |
-| TEMP:hasExpectedNumberOfSubjects         |
-| TEMP:hasExperimentalApproach             |
-| TEMP:hasNumberOfContributors             |
-| TEMP:hasNumberOfDirectories              |
-| TEMP:hasNumberOfFiles                    |
-| TEMP:hasNumberOfSamples                  |
-| TEMP:hasNumberOfSubjects                 |
-| TEMP:hasProtocol                         |
-| TEMP:hasResponsiblePrincipalInvestigator |
-| TEMP:hasSizeInBytes                      |
-| TEMP:hasUriApi                           |
-| TEMP:hasUriHuman                         |
-| TEMP:isAboutParticipant                  |
-| TEMP:isDescribedBy                       |
-| TEMP:milestoneCompletionDate             |
-| TEMP:protocolEmploysTechnique            |
-| TEMP:statusOnPlatform                    |
-| TEMP:submissionIndex                     |
-| TEMP:unclassifiedIndex                   |
-| TEMP:unclassifiedStages                  |
-| TEMP:wasCreatedAtTime                    |
-| TEMP:wasUpdatedAtTime                    |
-| rdf:type                                 |
-| rdfs:label                               |
 *** Electrophysiology datasets
 #+begin_src sparql
 SELECT DISTINCT
@@ -278,15 +237,6 @@ LIMIT ?limit
 
 #+call: dataset-bundle(startdataset="dataset:bec4d335-9377-4863-9017-ecd01170f354")
 
-#+RESULTS:
-| dataset                                      |
-|----------------------------------------------|
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 |
-| dataset:6d6818f2-ef75-4be5-9360-8d37661a8463 |
-| dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 |
-| dataset:bec4d335-9377-4863-9017-ecd01170f354 |
-
 **** Dataset subject species
 #+begin_src sparql :var limit="100"
 SELECT DISTINCT
@@ -322,20 +272,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | subject                                                       | subject_meta                                                                                     | sample                                                                      | sample_meta | species             |
-|----------------------------------------------+---------------------------------------------------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------|
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | _:t64799                                                                                         | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | control                                                                                          | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec                                                     | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | sub_258                                                                                          | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | cold fixative (2 % formaldehyde plus 0.2 % picric acid in 0.1 M sodium phosphate buffer, pH 7.0) | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | UNKNOWN                                                                                          | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | homo sapien (human)                                                                              | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | obo:PATO_0000384                                                                                 | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | owl:NamedIndividual                                                                              | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-| dataset:5e8be903-8796-408b-a404-8cf6bdca5cec | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/subjects/sub_258 | sparc:Subject                                                                                    | dataset:5e8be903-8796-408b-a404-8cf6bdca5cec/samples/sub_258_sam-258-Corp-A | control     | homo sapien (human) |
-
 **** Dataset milestone completion date
 #+begin_src sparql
 SELECT DISTINCT
@@ -347,20 +283,6 @@ WHERE {
 ORDER BY ASC(?date)
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| dataset                                      |                   date |
-|----------------------------------------------+------------------------|
-| dataset:1da4fa02-b7e1-4fb3-8cd1-f27d489f2ed8 |             04/31/2019 |
-| dataset:8912fa28-8f9c-4851-8de8-bc0c788bf67b |          2019 - 12- 31 |
-| dataset:f88a25e8-dcb8-487e-9f2d-930b4d3abded |             2019-01-15 |
-| dataset:83fdbd3f-6028-4276-b2f0-bc6691b0d3cb | 2019-05-31, 2019-11-30 |
-| dataset:59e64463-8bff-481a-8318-6230518ee487 |             2019-06-06 |
-| dataset:f6dd731f-fa13-4dcd-af8f-00da5cc5855b |             2019-06-11 |
-| dataset:fc6e3a87-1241-4f81-b284-8ebc82efc499 |             2019-06-30 |
-| dataset:ae5ee3dc-1766-4c0d-a18f-c6ea2bb367c0 |             2019-11-30 |
-| dataset:ed9a0da6-8dc1-49d4-8df1-cd528097a6a2 |             2020-02-15 |
-| dataset:e2c90515-bbdb-4436-a48c-aafaefb604e6 |             2020-02-28 |
 
 **** Award affiliations
 Can we see the multi-institutional nature of SPARC collaborations?
@@ -379,20 +301,6 @@ WHERE {
 ORDER BY ASC(?award) ASC(?al)
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| award                              | affiliation   | al                                                |
-|------------------------------------+---------------+---------------------------------------------------|
-| awards:AOD18017                    | ror:046rm7j60 | University of California, Los Angeles             |
-| awards:NIH/FDAIAA:AOD1801700100000 | ror:002pd6e78 | Massachusetts General Hospital                    |
-| awards:OT20D024912                 | ror:04a9tmd77 | Icahn School of Medicine at Mount Sinai           |
-| awards:OT20D24912                  | ror:04a9tmd77 | Icahn School of Medicine at Mount Sinai           |
-| awards:OT2OD023847                 | ror:05ht4p406 | Indiana University School of Medicine - Lafayette |
-| awards:OT2OD023847                 | ror:02dqehb95 | Purdue University West Lafayette                  |
-| awards:OT2OD023847                 | ror:00ysqcn41 | Thomas Jefferson University                       |
-| awards:OT2OD023847                 | ror:01ej9dk98 | University of Melbourne                           |
-| awards:OT2OD023847                 | ror:04402f517 | University of Nevada, Reno School of Medicine     |
-| awards:OT2OD023848                 | ror:05a0ya142 | Broad Institute                                   |
 
 ** Protocols
 *** Protocol general report
@@ -461,65 +369,6 @@ where {
 } order by desc(?anno_count)
 #+end_src
 
-#+RESULTS:
-| protocol      | anno_count |
-|---------------+------------|
-| pio.api:19220 |        413 |
-| pio.api:19131 |        390 |
-| pio.api:26704 |        386 |
-| pio.api:19576 |        374 |
-| pio.api:22831 |        370 |
-| pio.api:26841 |        319 |
-| pio.api:19262 |        301 |
-| pio.api:18925 |        285 |
-| pio.api:26886 |        284 |
-| pio.api:26887 |        278 |
-| pio.api:22832 |        277 |
-| pio.api:24077 |        277 |
-| pio.api:19095 |        259 |
-| pio.api:18994 |        251 |
-| pio.api:22863 |        233 |
-| pio.api:19253 |        221 |
-| pio.api:19107 |        197 |
-| pio.api:20306 |        166 |
-| pio.api:22900 |        165 |
-| pio.api:19174 |        157 |
-| pio.api:22833 |        151 |
-| pio.api:19342 |        138 |
-| pio.api:20256 |        126 |
-| pio.api:19283 |        117 |
-| pio.api:19927 |        113 |
-| pio.api:22887 |        113 |
-| pio.api:29990 |        112 |
-| pio.api:26688 |        105 |
-| pio.api:22888 |        101 |
-| pio.api:22891 |        100 |
-| pio.api:25121 |        100 |
-| pio.api:25230 |        100 |
-| pio.api:25122 |         94 |
-| pio.api:18769 |         88 |
-| pio.api:22875 |         88 |
-| pio.api:22890 |         87 |
-| pio.api:22948 |         87 |
-| pio.api:22889 |         80 |
-| pio.api:18394 |         63 |
-| pio.api:22844 |         63 |
-| pio.api:19640 |         61 |
-| pio.api:22894 |         61 |
-| pio.api:19135 |         51 |
-| pio.api:19227 |         51 |
-| pio.api:19798 |         49 |
-| pio.api:19153 |         47 |
-| pio.api:22895 |         40 |
-| pio.api:20254 |         34 |
-| pio.api:21417 |         33 |
-| pio.api:19206 |         29 |
-| pio.api:26709 |         13 |
-| pio.api:19139 |         12 |
-| pio.api:21193 |         10 |
-| pio.api:34589 |          9 |
-| pio.api:30122 |          5 |
-
 *** Conditions studied
 *** Experimental groups
 #+name: experimental-groups-core
@@ -541,20 +390,6 @@ SELECT DISTINCT
 ORDER BY ASC(?dataset) ASC(?group) LIMIT ?limit
 #+end_src
 
-#+RESULTS: experimental-groups
-| dataset                                      | group | subj                                                           |
-|----------------------------------------------+-------+----------------------------------------------------------------|
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17064 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17065 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17066 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16013 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16014 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16016 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16017 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17018 |
-| dataset:01b5cc2d-b321-4fed-8767-52771c4d680f |     0 | dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17020 |
-
 #+name: experimental-groups-by-dataset
 #+begin_src sparql :noweb yes :var limit="10"
 SELECT DISTINCT
@@ -564,47 +399,9 @@ SELECT DISTINCT
 ORDER BY ASC(?group) LIMIT ?limit
 #+end_src
 
-#+RESULTS: experimental-groups-by-dataset
-| group                                                                               | subj                                                                                              |
-|-------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------|
-| (verify the effects of Actinomycin D (ActD) application on transcriptional changes) | dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1/samples/sub-20190807P_1_ActD_sam-20190807P_1_pC_ActD |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6616_sam-D6616%20LA                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6616_sam-D6616%20LV                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6616_sam-D6616%20RA                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6616_sam-D6616%20RV                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6845_sam-D6845%20LA                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6845_sam-D6845%20LV                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6845_sam-D6845%20RA                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6845_sam-D6845%20RV                     |
-| 0 mA                                                                                | dataset:257a485a-89b3-4187-888a-9843b277e6cb/samples/sub-D6863_sam-D6863%20LA                     |
-
 # #+call: experimental-groups-by-dataset(limit="20",dataset="dataset:01b5cc2d-b321-4fed-8767-52771c4d680f")
 # FIXME this is broken
 #+call: experimental-groups-by-dataset(limit="20", dataset="dataset:257a485a-89b3-4187-888a-9843b277e6cb")
-
-#+RESULTS:
-| group | subj                                                                                               |
-|-------+----------------------------------------------------------------------------------------------------|
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17067 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17068 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17074 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17075 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17077 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17078 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17079 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17080 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17083 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17084 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17099 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17113 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17114 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17140 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17154 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17172 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub17173 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16013 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16014 |
-|     0 | https://api.pennsieve.io/datasets/N:dataset:01b5cc2d-b321-4fed-8767-52771c4d680f/subjects/sub16015 |
 
 *** Techniques
 # #+header: :var dataset=(or)
@@ -628,20 +425,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | technique        |
-|----------------------------------------------+------------------|
-| dataset:bdef79e4-ec07-409e-9237-afc7656f55f9 | tech:libraryPrep |
-| dataset:d4ca262e-7893-4d72-9325-03dd08b053ce | tech:dissection  |
-| dataset:2d0a2996-be8a-441d-816c-adfe3577fc7d | tech:dissection  |
-| dataset:ff6eb067-62d4-4bfb-b4b2-15ad65db0999 | tech:dissection  |
-| dataset:ff6eb067-62d4-4bfb-b4b2-15ad65db0999 | tech:imaging     |
-| dataset:0e0a90b4-275f-40d9-b214-b84071bc0456 | tech:imaging     |
-| dataset:02786240-2033-4f86-808d-daf345ce3165 | NLXINV:20090607  |
-| dataset:6314677c-7dfd-41ff-96c8-2dd178207a84 | NLXINV:20090607  |
-| dataset:a6c6803a-3a2e-4c69-9a94-3527083f13dc | NLXINV:20090607  |
-| dataset:30237b91-610d-4d73-944b-5d7687508743 | tech:statistics  |
-
 *** Test
 Originally from =sparcur.reports.SparqlQueries=.
 **** Protocol techniques
@@ -656,20 +439,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| protocol                                  | technique        |
-|-------------------------------------------+------------------|
-| https://journals.plos.org/plosone/article | tech:measuring   |
-| https://journals.plos.org/plosone/article | tech:sigproc     |
-| pio.api:18394                             | tech:libraryPrep |
-| pio.api:18663                             | tech:surgical    |
-| pio.api:18980                             | tech:surgical    |
-| pio.api:18980                             | BIRNLEX:2135     |
-| pio.api:18985                             | tech:statistics  |
-| pio.api:18985                             | tech:surgical    |
-| pio.api:18994                             | tech:dissection  |
-| pio.api:19088                             | tech:dissection  |
-
 **** Protocol aspects
 #+begin_src sparql
 SELECT DISTINCT
@@ -683,20 +452,6 @@ WHERE {
 }
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| protocol      | aspect          |
-|---------------+-----------------|
-| pio.api:18578 | PATO:0000033    |
-| pio.api:18578 | PATO:0000146    |
-| pio.api:18578 | PATO:0000918    |
-| pio.api:18578 | PATO:0001309    |
-| pio.api:18578 | asp:temperature |
-| pio.api:18539 | PATO:0000146    |
-| pio.api:18539 | asp:acidity     |
-| pio.api:18539 | PATO:0001986    |
-| pio.api:18539 | PATO:0000918    |
-| pio.api:18578 | asp:location    |
 
 **** Protocol inputs
 # Note that the ontology alignment here is often incorrect
@@ -713,20 +468,6 @@ WHERE {
 }
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| protocol                                         | ast_in                             | input                                                      |
-|--------------------------------------------------+------------------------------------+------------------------------------------------------------|
-| https://journals.plos.org/plosone/article        | hyp-protcur:6lXR_IuiEemgDZOF7_cfnQ | http://www.cognitiveatlas.org/ontology/cogat.owl#CAO_00597 |
-| https://journals.plos.org/plosone/article        | hyp-protcur:7sKuSovFEemigA9jhMKA-A | UBERON:0000020                                             |
-| https://journals.plos.org/plosone/article        | hyp-protcur:8TBOcIcREem_VB9-fOAI0Q | PATO:0001199                                               |
-| https://journals.plos.org/plosone/article        | hyp-protcur:bMhpYobsEemuebcALxBaUg | GO:0004235                                                 |
-| https://journals.plos.org/plosone/article        | hyp-protcur:dPdc0oZXEemfeb-n9lk0Rw | UBERON:0003148                                             |
-| https://www.biorxiv.org/content/10.1101/661033v1 | hyp-protcur:2ucUuowAEeq9npt2H-bQyA | CHEBI:6015                                                 |
-| https://www.biorxiv.org/content/10.1101/661033v1 | hyp-protcur:7u4hZIwBEeq45CPjC1qfPw | CHEBI:16236                                                |
-| https://www.biorxiv.org/content/10.1101/661033v1 | hyp-protcur:9W2mfIwBEeqfzsvP5y8ZjA | CHEBI:27338                                                |
-| https://www.biorxiv.org/content/10.1101/661033v1 | hyp-protcur:C7X1yowBEeq40E_t4SzHlA | CHEBI:17790                                                |
-| https://www.biorxiv.org/content/10.1101/661033v1 | hyp-protcur:dQqe4IvoEeqc3LelMIm4iQ | SCR:017322                                                 |
 
 **** Protocol species dose
 #+begin_src sparql
@@ -763,26 +504,6 @@ WHERE {
 }
 ORDER BY ?label_input ?value_lt
 #+end_src
-
-#+RESULTS:
-| dataset                                      | protocol      | label_drug         | value_lt |
-|----------------------------------------------+---------------+--------------------+----------|
-| dataset:4a216c79-1eab-451f-b096-5fa44bc00789 | pio.api:19342 | dexmedetomidine    |   3.3E-2 |
-|                                              | pio.api:18980 | bolus of food      |   1.0E-1 |
-|                                              | pio.api:18980 | bolus of food      |   1.0E-1 |
-|                                              | pio.api:18980 | atropine           |   5.4E-1 |
-| dataset:277a76fa-7f1e-4a19-9a70-d0729beef331 | pio.api:24077 | midazolam          |        1 |
-| dataset:91dab959-7600-4f14-bae3-d1e6ba5c15ae | pio.api:24077 | midazolam          |        1 |
-| dataset:98e467ce-7e43-4bbd-8ee7-ab8e2adcc6c0 | pio.api:24077 | midazolam          |        1 |
-| dataset:d4ca262e-7893-4d72-9325-03dd08b053ce | pio.api:18994 | bupivacaine        |        2 |
-| dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c | pio.api:23160 | lidocaine          |        2 |
-| dataset:d4ca262e-7893-4d72-9325-03dd08b053ce | pio.api:18994 | lidocaine          |        4 |
-| dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 | pio.api:19107 | lipopolysaccharide |        4 |
-| dataset:4a216c79-1eab-451f-b096-5fa44bc00789 | pio.api:19342 | ketamine           |    6.6E0 |
-| dataset:378d07cf-4b8b-49e8-a069-e96810e68b57 | pio.api:19640 | mixture            |        9 |
-| dataset:378d07cf-4b8b-49e8-a069-e96810e68b57 | pio.api:19640 | xylazine           |        9 |
-| dataset:fd07322c-ac30-488f-a6db-f5ff52c69e1b | pio.api:20256 | mixture            |        9 |
-| dataset:fd07322c-ac30-488f-a6db-f5ff52c69e1b | pio.api:20256 | xylazine           |        9 |
 
 **** Protocols with known anaesthetic or analgesic roles
 #+begin_src sparql
@@ -824,19 +545,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | completeness         |
-|----------------------------------------------+----------------------|
-| dataset:0426ab91-194d-431d-acf7-f9dfad26e295 | hasNEXT              |
-| dataset:3b28ba19-e7ca-4ee2-be69-34029c31060a | Yes                  |
-| dataset:88d3bbc6-014e-4ba3-a5ca-b27eddccfcc7 | hasNext, hasChildren |
-| dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | hasNEXT              |
-| dataset:a9b14217-9084-4fd8-ae0a-5e801e708e86 | part, Q4 yr 2        |
-| dataset:ac2279ba-b8b0-4214-98af-437111a2ae61 | Ongoing study        |
-| dataset:bfa288a0-1f6e-482f-858e-9529baa50b0f | On going             |
-| dataset:c0b435a5-15d9-4cc8-9eb9-3c4a00626690 | hasNext, hasChildren |
-| dataset:d484110a-e6e3-4574-aab2-418703c978e2 | hasNext              |
-| dataset:dae2fef9-05e6-418f-8374-3af267643340 | hasNext              |
 *** Dataset collections
 #+begin_src sparql
 SELECT DISTINCT
@@ -849,20 +557,6 @@ WHERE {
 ORDER BY ASC(?title)
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| title                                                                                                                                   | dataset                                      |
-|-----------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------|
-| A multi-scale model of cardiac electrophysiology                                                                                        | dataset:c5c2f40f-76be-4979-bfc4-b9f9947231cf |
-| AAV Serotypes 6_8_9 Intrapancreatic 4 weeks                                                                                             | dataset:fce3f57f-18ea-4453-887e-58a885e90e7e |
-| AAV8 Titer and Route                                                                                                                    | dataset:458d3e2c-8f75-4298-bf10-8322b058b148 |
-| AAV8 Titer and Route                                                                                                                    | dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a |
-| AAVretro Serotype Intrapancreatic 4 weeks                                                                                               | dataset:43da251b-59bd-43fa-8a8a-3a0276da968f |
-| Acute Effects of Efferent/Afferent Vagus Nerve Stimulation (VNS) on neural activity accessed with functional Magnetic Resonance Imaging | dataset:99592359-0c48-4b0c-ab3d-b8b1b79bb7bf |
-| Acute Effects of Gastric Electrical Stimulation (GES) Settings on neural activity accessed with functional Magnetic Resonance Imaging   | dataset:2f4afec4-6e4d-4c20-b913-8e115fc8631b |
-| Acute Effects of Vagus Nerve Stimulation (VNS) Settings on neural activity in the nucleus of solitary tract (NTS)                       | dataset:e25a096b-7180-471a-847d-4aa711113d54 |
-| Acute Effects of efferent/afferent Vagus Nerve Stimulation (VNS) on neural activity accessed with functional Magnetic Resonance Imaging | dataset:70f8888b-0b9e-4e9d-93ca-2103e8828512 |
-| Acute effects of gastric electrical stimulation settings on gastric motility assessed with MRI                                          | dataset:c2564991-28d5-42cf-bfb6-8f93b874a5af |
 
 ** Subjects
 *** Members
@@ -879,20 +573,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | subject                                                        |
-|----------------------------------------------+----------------------------------------------------------------|
-| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11050    |
-| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11051    |
-| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11052    |
-| dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649 | dataset:6a280dc2-1d0b-434f-8387-3c8e3615c649/subjects/11053    |
-| dataset:6b29ddff-86fc-4dc3-bb78-8e572a788a85 | dataset:6b29ddff-86fc-4dc3-bb78-8e572a788a85/subjects/sub-cat5 |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-10   |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-11   |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-12   |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-13   |
-| dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1 | dataset:6c059ef7-f94a-40af-ab5a-50f482737fc1/subjects/sub-14   |
-
 *** Total
 Show me the total number of subjects in the knowledge graph.
 #+begin_src sparql
@@ -904,11 +584,6 @@ WHERE {
   ?subject a sparc:Subject .
 }
 #+end_src
-
-#+RESULTS:
-| count_subject |
-|---------------|
-|          2271 |
 
 *** Subject Metadata
 Show me a regularized set of metadata for all subjects that includes the following.
@@ -970,35 +645,7 @@ WHERE {
 } LIMIT ?limit
 #+end_src
 
-#+RESULTS: subject-metadata
-| local_id                | assigned_group | l_species    | strain   | l_sex | age_category      | age_value | age_unit           | mass_value | mass_unit |
-|-------------------------+----------------+--------------+----------+-------+-------------------+-----------+--------------------+------------+-----------|
-| sub-nNOS_Male_Subject_1 | nNOS-ChR2      | Mus musculus | C57BL/6  |       | prime adult stage |        84 | unit:dimensionless |            |           |
-| sub-nNOS_Male_Subject_2 | nNOS-ChR2      | Mus musculus | C57BL/6  |       | prime adult stage |        84 | unit:dimensionless |            |           |
-| sub-nNOS_Male_Subject_3 | nNOS-ChR2      | Mus musculus | C57BL/6  |       | prime adult stage |        56 | unit:dimensionless |            |           |
-| sub-C57 061801          | Cleared 1mm    | Mus musculus | C57/Bl6J |       |                   |         4 | unit:week          |            |           |
-| sub-C57 061802          | Cleared 1mm    | Mus musculus | C57/Bl6J |       |                   |         4 | unit:week          |            |           |
-| sub-C57 061803          | Cleared 1mm    | Mus musculus | C57/Bl6J |       |                   |         4 | unit:week          |            |           |
-| sub-C57 061804          | Cleared 1mm    | Mus musculus | C57/Bl6J |       |                   |         4 | unit:week          |            |           |
-| sub-C57 071019 01       | WT 150um       | Mus musculus | C57/Bl6J |       |                   |        18 | unit:week          |            |           |
-| sub-C57 071019 02       | WT 150um       | Mus musculus | C57/Bl6J |       |                   |        18 | unit:week          |            |           |
-| sub-C57 071019 03       | WT 150um       | Mus musculus | C57/Bl6J |       |                   |        18 | unit:week          |            |           |
-
 #+call: subject-metadata() :var species="NCBITaxon:10090"
-
-#+RESULTS:
-| local_id                              | assigned_group                                                                                                        | l_species    | strain    | l_sex | age_category      | age_value | age_unit           | mass_value | mass_unit |
-|---------------------------------------+-----------------------------------------------------------------------------------------------------------------------+--------------+-----------+-------+-------------------+-----------+--------------------+------------+-----------|
-| nNOS Male Subject 2                   | nNOS-NpHR                                                                                                             | Mus musculus | C57/bl6   |       | prime adult stage |        56 | unit:dimensionless |            |           |
-| nNOS Male Subject 3                   | nNOS-NpHR                                                                                                             | Mus musculus | C57/bl6   |       | prime adult stage |        56 | unit:dimensionless |            |           |
-| AV8-NSE-IP-1                          | AAV Serotypes 6_8_9 intrapancreatic injection                                                                         | Mus musculus | C57BL/6J  |       | Adult             |         3 | unit:month         |            |           |
-| AV8-NSE-IP-2                          | AAV Serotypes 6_8_9 intrapancreatic injection                                                                         | Mus musculus | C57BL/6J  |       | Adult             |         3 | unit:month         |            |           |
-| AV8-NSE-IP-3                          | AAV Serotypes 6_8_9 intrapancreatic injection                                                                         | Mus musculus | C57BL/6J  |       | Adult             |         3 | unit:month         |            |           |
-| AV8-NSE-IP-4                          | AAV Serotypes 6_8_9 intrapancreatic injection                                                                         | Mus musculus | C57BL/6J  |       | Adult             |         3 | unit:month         |            |           |
-| AV8-NSE-IP-5                          | AAV Serotypes 6_8_9 intrapancreatic injection                                                                         | Mus musculus | C57BL/6J  |       | Adult             |         3 | unit:month         |            |           |
-| AV8-NSE-IP-6                          | AAV Serotypes 6_8_9 intrapancreatic injection                                                                         | Mus musculus | C57BL/6J  |       | Adult             |         3 | unit:month         |            |           |
-| sub-RZ9-L10EGFP-AAV-cre-mcherry-BAT1  | AAV6-hSyn-mCherry-cre injected in iBAT bilaterally, followed by about 4 week incubation and then 7-day 28°C treatment | Mus musculus | EGFP-L10a |       |                   |        21 | unit:postnatal_day |            |           |
-| sub-RZ9-L10EGFP-AAV-cre-mcherry-BAT10 | AAV6-hSyn-mCherry-cre injected in iBAT bilaterally, followed by about 4 week incubation and then 7-day 28°C treatment | Mus musculus | EGFP-L10a |       |                   |        17 | unit:postnatal_day |            |           |
 
 *** TODO By sex
 #+begin_src sparql
@@ -1037,11 +684,6 @@ WHERE {
 }
 #+end_src
 
-#+RESULTS:
-| count_sample |
-|--------------|
-|         5259 |
-
 *** Sample predicates
 #+begin_src sparql
 SELECT DISTINCT
@@ -1051,22 +693,6 @@ WHERE {
   ?sample ?p ?o .
 }
 #+end_src
-
-#+RESULTS:
-| p                                         |
-|-------------------------------------------|
-| TEMP:TODO                                 |
-| TEMP:hasDerivedInformationAsParticipant   |
-| TEMP:localId                              |
-| TEMP:raw/wasExtractedFromAnatomicalRegion |
-| TEMP:wasDerivedFromSubject                |
-| rdf:type                                  |
-| TEMP:participantInPerformanceOf           |
-| TEMP:hasAssignedGroup                     |
-| TEMP:hasFolderAboutIt                     |
-| TEMP:raw/hasDigitalArtifactThatIsAboutIt  |
-| TEMP:providerNote                         |
-| TEMP:localPerformanceNumber               |
 
 *** Sample Metadata
 Show me a regularized set of metadata for all subjects that includes the following.
@@ -1100,20 +726,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS: sample-metadata
-| subject_lid     | local_id        | assigned_group | aess                           |
-|-----------------+-----------------+----------------+--------------------------------|
-| sub-20181127_G3 | sam-20181127_G3 | stretch        | Colon, inner submucosal plexus |
-| sub-20190212_G1 | sam-20190212_G1 | compression    | Colon, inner submucosal plexus |
-| sub-20190214_G1 | sam-20190214_G1 | compression    | Colon, inner submucosal plexus |
-| sub-20190220_G3 | sam-20190220_G3 | compression    | Colon, inner submucosal plexus |
-| sub-20190220_G5 | sam-20190220_G5 | compression    | Colon, inner submucosal plexus |
-| sub-20190226_G2 | sam-20190226_G2 | stretch        | Colon, inner submucosal plexus |
-| sub-20190228_G4 | sam-20190228_G4 | stretch        | Colon, inner submucosal plexus |
-| sub-20190306_G1 | sam-20190306_G1 | stretch        | Colon, inner submucosal plexus |
-| sub-20190306_G2 | sam-20190306_G2 | stretch        | Colon, inner submucosal plexus |
-| sub-20190306_G3 | sam-20190306_G3 | stretch        | Colon, inner submucosal plexus |
-
 ** Anatomical entities
 *** Dataset
 **** Involves
@@ -1134,40 +746,6 @@ ORDER BY ASC(?entity)
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| dataset                                      | protocol      | entity                                  |
-|----------------------------------------------+---------------+-----------------------------------------|
-| dataset:07c31ef4-cc72-4348-813a-f074675643ed | pio.api:19369 |                                         |
-| dataset:ac2279ba-b8b0-4214-98af-437111a2ae61 | pio.api:32915 | 2 CMOS cameras (SciMedia, MiCAM ULTIMA) |
-| dataset:6ce2e98e-5217-4952-897d-017285d303b2 | pio.api:18769 | BAT                                     |
-| dataset:fd2de29c-4f29-494c-8da4-b157a10223ef | pio.api:18925 | BAT                                     |
-| dataset:5f54d5c1-82ab-4a4c-b3bc-5b6767419010 | pio.api:36610 | Bladder                                 |
-| dataset:ca9afa19-b616-41a9-a532-3ae5aaf4088f | pio.api:22894 | C2 and C3 dorsal roots                  |
-| dataset:ca9afa19-b616-41a9-a532-3ae5aaf4088f | pio.api:22894 | C2 lamina                               |
-| dataset:ca9afa19-b616-41a9-a532-3ae5aaf4088f | pio.api:22894 | C2 nerve roots                          |
-| dataset:ae5ee3dc-1766-4c0d-a18f-c6ea2bb367c0 | pio.api:30983 | Cervical Vagus Nerve                    |
-| dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | pio.api:19127 | Coeliac ganglia                         |
-| dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a | pio.api:19127 | Coeliac ganglia                         |
-| dataset:c23e9319-fe3c-4354-aca8-259e8cff0f7a | pio.api:19127 | Coeliac ganglia                         |
-| dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | pio.api:19127 | Coeliac ganglia                         |
-| dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | pio.api:18947 | Coeliac ganglia                         |
-| dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | pio.api:18947 | Coeliac ganglia                         |
-| dataset:78e5602a-98a8-4323-8efd-db77466030c3 | pio.api:18947 | Coeliac ganglia                         |
-| dataset:8742cd78-1ad8-4c17-aa12-42c06e898ded | pio.api:18947 | Coeliac ganglia                         |
-| dataset:9b5f78ac-850a-43ab-aebe-c15b470a008b | pio.api:18947 | Coeliac ganglia                         |
-| dataset:b4e7758e-9a8f-4806-9bb0-1d5e7098df6a | pio.api:18947 | Coeliac ganglia                         |
-| dataset:c23e9319-fe3c-4354-aca8-259e8cff0f7a | pio.api:18947 | Coeliac ganglia                         |
-| dataset:fce3f57f-18ea-4453-887e-58a885e90e7e | pio.api:18947 | Coeliac ganglia                         |
-| dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | pio.api:19127 | Coeliac ganglia                         |
-| dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | pio.api:19127 | Coeliac ganglia                         |
-| dataset:78e5602a-98a8-4323-8efd-db77466030c3 | pio.api:19127 | Coeliac ganglia                         |
-| dataset:8742cd78-1ad8-4c17-aa12-42c06e898ded | pio.api:19127 | Coeliac ganglia                         |
-| dataset:277a76fa-7f1e-4a19-9a70-d0729beef331 | pio.api:24077 | Colon                                   |
-| dataset:91dab959-7600-4f14-bae3-d1e6ba5c15ae | pio.api:24077 | Colon                                   |
-| dataset:98e467ce-7e43-4bbd-8ee7-ab8e2adcc6c0 | pio.api:24077 | Colon                                   |
-| dataset:43da251b-59bd-43fa-8a8a-3a0276da968f | pio.api:19127 | Dorsal Root Ganglia                     |
-| dataset:458d3e2c-8f75-4298-bf10-8322b058b148 | pio.api:19127 | Dorsal Root Ganglia                     |
-
 **** About
 #+begin_src sparql
 SELECT DISTINCT
@@ -1183,20 +761,6 @@ WHERE {
 ORDER BY ASC(?l_ae)
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| dataset                                      | entity                   |
-|----------------------------------------------+--------------------------|
-| dataset:1284a4e8-21e1-4b9f-9280-6ba06f6b9a50 | adipose tissue           |
-| dataset:1873396f-8d82-4d6c-93f7-52117470e4a1 | autonomic nervous system |
-| dataset:1b137c7e-2f07-4a78-8079-828b37743306 | autonomic nervous system |
-| dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 | autonomic nervous system |
-| dataset:29df9b97-a20b-469c-bf48-9389f1e31a11 | axon tract               |
-| dataset:11d3dbdf-d90c-4e42-8341-cc4a956f5c9c | bladder organ            |
-| dataset:7067a6f5-8df2-4ef8-953a-4d0bfafe6555 | bladder organ            |
-| dataset:b2a88634-e2b0-49dc-9fe3-f61f784459f2 | bladder organ            |
-| dataset:f7570dd0-24c4-4bc8-8faf-b93bd0e759f3 | bladder organ            |
-| dataset:b0c104b4-f448-4a33-9adb-33704a1890f8 | body of stomach          |
 
 **** Sample Source
 #+name: dataset-sample-source
@@ -1218,30 +782,6 @@ DESC(?ae)
 LIMIT ?limit
 #+end_src
 
-#+RESULTS: dataset-sample-source
-| dataset                                      | aes                             |
-|----------------------------------------------+---------------------------------|
-| dataset:b225fa8a-9eb5-4716-8399-0f7fac9c2b64 | whole stomach                   |
-| dataset:82c228a2-134a-4f6f-82f2-d89e64cb7be1 | whole stomach                   |
-| dataset:57466879-2cdd-4af2-8bd6-7d867423c709 | vasculature of the the pancreas |
-| dataset:91b1cfca-05e9-4445-bac8-04bf7a4593f1 | transverse colon                |
-| dataset:4a361ad8-d500-4f3d-81f8-c92f504946b2 | torus pyloricus                 |
-| dataset:21957eae-0824-4fb5-b18f-04d6ed12ce18 | systemic                        |
-| dataset:3a7ccb46-4320-4409-b359-7f4a7027bb9c | superior cervical ganglia       |
-| dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 | subdiaphragmatic vagus nerve    |
-| dataset:bec4d335-9377-4863-9017-ecd01170f354 | subdiaphragmatic vagus nerve    |
-| dataset:c082215b-6765-4cc8-a965-92773b4c18c1 | subdiaphragmatic vagus nerve    |
-| dataset:e8816bce-809a-4c78-8950-6f61911b6eac | stomach                         |
-| dataset:c50d5ab3-1370-4492-9d16-00834e0d34f3 | stellate ganglion/T1-T5         |
-| dataset:c34c5b05-4934-4a17-953c-069adf3aec46 | stellate ganglion               |
-| dataset:d1f386c0-1715-49ce-be14-890a4ede011d | stellate ganglion               |
-| dataset:e8816bce-809a-4c78-8950-6f61911b6eac | spleen                          |
-| dataset:9d8ad16c-2ae7-414c-8573-048303039c76 | spinal cord, segments L5-S2     |
-| dataset:7d3aed89-ca43-41f5-9f21-e4bbce0d5888 | sigmoid colon                   |
-| dataset:03dd0308-c7c0-47ab-b9ae-03042723b1ce | sigmoid colon                   |
-| dataset:aec9ab8f-3c7f-4dd2-a638-466a6fb57f96 | sigma                           |
-| dataset:be6c03c9-e427-488a-9dea-f4f64fca1f14 | sample middle ~2 cm             |
-
 *** Protocol
 **** Simple
 #+begin_src sparql :var limit="10"
@@ -1252,20 +792,6 @@ WHERE {
   FILTER CONTAINS(str(?protocol), "protocols.io")
 } LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| protocol      |
-|---------------|
-| pio.api:18394 |
-| pio.api:18417 |
-| pio.api:18444 |
-| pio.api:18445 |
-| pio.api:18539 |
-| pio.api:18578 |
-| pio.api:18595 |
-| pio.api:18655 |
-| pio.api:18663 |
-| pio.api:18769 |
 
 **** Protocol triples
 #+begin_src sparql :var limit="20"
@@ -1279,30 +805,6 @@ WHERE {
   FILTER CONTAINS(str(?protocol), "protocols.io")
 } LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-| protocol      | p                                  | o                                  |
-|---------------+------------------------------------+------------------------------------|
-| pio.api:18394 | TEMP:hasNumberOfProtcurAnnotations | 63                                 |
-| pio.api:18394 | TEMP:protocolEmploysTechnique      | tech:libraryPrep                   |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:4F6uUDCwEemuIwe2CVh8qw |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:dATrNFDbEemP_Pt1hFU0Jg |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:Eexs4kTsEem4nRdvaoZSBA |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:EKfe_DCwEemocGufjfOTWw |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:eoEhhjCvEemMdjMzyrpv_w |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:eR8AzkTrEemyKMNIUcyiDQ |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:fNEBiETpEemLec_DS2dlpQ |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:gqhZvjCwEemuIivyBGDcHg |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:hBM99jCvEempX7O2kC2gWQ |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:hW9jEkToEemm91_9sqXgdg |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:i7vKoDCvEemMd1tB16R8lg |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:J4e-RDCwEemjsb-nUO42IA |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:LhWxbDCwEem83ttc8K5YCg |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:lPXfUkTrEemhtU_Jwz0Gyw |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:Mtec6DCvEemma080RWXdWw |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:OHfIOjCvEem88rcFq1qp4Q |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:pSUcjjCwEemp22thowiTcw |
-| pio.api:18394 | TEMP:protocolInvolvesAction        | hyp-protcur:PyxS-DCwEemeJA9Q0nCKog |
 
 **** Involves
 NOTE In order for these to work with subClassOf =UBERON= uberon must be loaded.
@@ -1323,18 +825,6 @@ WHERE {
 } LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| protocol      | bb_value       | ls                        |
-|---------------+----------------+---------------------------|
-| pio.api:18947 | UBERON:0003684 | abdominal cavity          |
-| pio.api:19127 | UBERON:0003684 | abdominal cavity          |
-| pio.api:20025 | UBERON:0006082 | fundus of urinary bladder |
-| pio.api:26704 | UBERON:0000974 | neck                      |
-| pio.api:19341 | UBERON:0005363 | inferior vagus X ganglion |
-| pio.api:23160 | UBERON:0014398 | respiratory muscle        |
-| pio.api:22833 | UBERON:0000945 | stomach                   |
-| pio.api:25817 | UBERON:0000948 | heart                     |
-
 # seems like there are some issues with labels https://jira.blazegraph.com/browse/BLZG-4476
 # :format application/sparql-results+xml
 #+begin_src sparql :var limit="20"
@@ -1354,30 +844,6 @@ WHERE {
 } ORDER BY ?bbl LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| protocol      | bbc_value      | bbl     |
-|---------------+----------------+---------|
-| pio.api:19297 | UBERON:0000916 | abdomen |
-| pio.api:26737 | UBERON:0000916 | abdomen |
-| pio.api:19255 | UBERON:0000916 | abdomen |
-| pio.api:19269 | UBERON:0000916 | abdomen |
-| pio.api:36547 | UBERON:0000916 | abdomen |
-| pio.api:19341 | UBERON:0000916 | abdomen |
-| pio.api:36609 | UBERON:0000916 | abdomen |
-| pio.api:31143 | UBERON:0000916 | abdomen |
-| pio.api:25923 | UBERON:0000916 | abdomen |
-| pio.api:19299 | UBERON:0000916 | abdomen |
-| pio.api:18655 | UBERON:0000916 | abdomen |
-| pio.api:18663 | UBERON:0000916 | abdomen |
-| pio.api:36610 | UBERON:0000916 | abdomen |
-| pio.api:19298 | UBERON:0000916 | abdomen |
-| pio.api:18786 | UBERON:0000916 | abdomen |
-| pio.api:36552 | UBERON:0000916 | abdomen |
-| pio.api:36617 | UBERON:0000916 | abdomen |
-| pio.api:19127 | UBERON:0000916 | abdomen |
-| pio.api:22900 | UBERON:0000916 | abdomen |
-| pio.api:26687 | UBERON:0000916 | abdomen |
-
 ** Uberon tests
 In order to use these you need to load the latest version of uberon into blazegraph.
 #+begin_src sparql :var limit="15"
@@ -1389,60 +855,12 @@ SELECT DISTINCT ?sc (str(?l) as ?label) WHERE {
 } ORDER BY ASC(?label) LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-| sc             | label                                               |
-|----------------+-----------------------------------------------------|
-| UBERON:0013155 | 1st arch mandibular ectoderm                        |
-| UBERON:0013156 | 1st arch mandibular endoderm                        |
-| UBERON:0010339 | 1st arch mandibular mesenchyme from head mesenchyme |
-| UBERON:0007238 | 1st arch maxillary component                        |
-| UBERON:0012313 | 1st arch maxillary ectoderm                         |
-| UBERON:0013154 | 1st arch maxillary endoderm                         |
-| UBERON:0010338 | 1st arch maxillary mesenchyme from head mesenchyme  |
-| UBERON:0013157 | 1st arch maxillary-mandibular cleft                 |
-| UBERON:0010341 | 1st arch mesenchyme from head mesenchyme            |
-| UBERON:0005872 | 1st arch pharyngeal cleft                           |
-| UBERON:0019249 | 2-cell stage embryo                                 |
-| UBERON:0005660 | 2nd arch ectoderm                                   |
-| UBERON:0005664 | 2nd arch endoderm                                   |
-| UBERON:0005689 | 2nd arch mesenchyme                                 |
-| UBERON:0010343 | 2nd arch mesenchyme from head mesenchyme            |
-
 #+begin_src sparql
 select ?p ?o where {
     VALUES (?s) { ( UBERON:0001062 ) }
     ?s ?p ?o .
 }
 #+end_src
-
-#+RESULTS:
-| p                        | o                                                                                                                                                                         |
-|--------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| oboInOwl:id              | UBERON:0001062                                                                                                                                                            |
-| definition:              | Biological entity that is either an individual member of a biological species or constitutes the structural organization of an individual member of a biological species. |
-| oboInOwl:hasDbXref       | AAO:0010841                                                                                                                                                               |
-| oboInOwl:hasDbXref       | AEO:0000000                                                                                                                                                               |
-| oboInOwl:hasDbXref       | BILA:0000000                                                                                                                                                              |
-| oboInOwl:hasDbXref       | BIRNLEX:6                                                                                                                                                                 |
-| oboInOwl:hasDbXref       | CARO:0000000                                                                                                                                                              |
-| oboInOwl:hasDbXref       | EHDAA2:0002229                                                                                                                                                            |
-| oboInOwl:hasDbXref       | FBbt_root:00000000                                                                                                                                                        |
-| oboInOwl:hasDbXref       | FBbt:10000000                                                                                                                                                             |
-| oboInOwl:hasDbXref       | FMA:62955                                                                                                                                                                 |
-| oboInOwl:hasDbXref       | HAO:0000000                                                                                                                                                               |
-| oboInOwl:hasDbXref       | MA:0000001                                                                                                                                                                |
-| oboInOwl:hasDbXref       | NCIT:C12219                                                                                                                                                               |
-| oboInOwl:hasDbXref       | TAO:0100000                                                                                                                                                               |
-| oboInOwl:hasDbXref       | TGMA:0001822                                                                                                                                                              |
-| oboInOwl:hasDbXref       | UMLS:C1515976                                                                                                                                                             |
-| oboInOwl:hasDbXref       | WBbt:0000100                                                                                                                                                              |
-| oboInOwl:hasDbXref       | XAO:0000000                                                                                                                                                               |
-| oboInOwl:hasDbXref       | ZFA:0100000                                                                                                                                                               |
-| oboInOwl:hasDbXref       | http://linkedlifedata.com/resource/umls/id/C1515976                                                                                                                       |
-| oboInOwl:hasOBONamespace | uberon                                                                                                                                                                    |
-| oboInOwl:inSubset        | http://purl.obolibrary.org/obo/uberon/core#upper_level                                                                                                                    |
-| rdf:type                 | owl:Class                                                                                                                                                                 |
-| rdfs:label               | anatomical entity                                                                                                                                                         |
 
 ** Associated scaffolds
 ** Manifest files
@@ -1471,11 +889,6 @@ WHERE {
 LIMIT ?limit
 #+end_src
 
-#+RESULTS:
-|  cp |
-|-----|
-| 656 |
-
 *** ORCiD
 Count the number of contributors that have ORCiDs.
 #+begin_src sparql
@@ -1491,11 +904,6 @@ WHERE {
 }
 LIMIT ?limit
 #+end_src
-
-#+RESULTS:
-|  cp |
-|-----|
-| 257 |
 
 ** Other
 NOTE These are not yet in the ttl file, the queries written here will not work yet.
@@ -1594,11 +1002,6 @@ SELECT (COUNT(*) as ?count) {
 }
 #+end_src
 
-#+RESULTS: pds-v2-count
-| count |
-|-------|
-|   608 |
-
 #+name: pds-v2
 #+begin_src sparql :epilogue "\nLIMIT ?limit\n" :var limit="9"
 SELECT DISTINCT ?s ?dataset (str(?id) as ?local_id) ?award ?species
@@ -1658,8 +1061,6 @@ table = [hardcoded_header] + [None] + sorted(set(tuple(_) for _ in multi))#, key
 (let ((org-table-convert-region-max-lines most-positive-fixnum))
   (ow-babel-eval "pds-v2-python"))
 #+end_src
-
-#+RESULTS: pds-v2-python
 
 *** v1
 # #+header: :cache yes
@@ -2095,8 +1496,6 @@ sigh = [s for n, si in enumerate(simples)  for s in ((f'--------- {n + 1}','----
 
 #+end_src
 
-#+RESULTS:
-
 #+begin_src jupyter-python :session pys
 #sigh
 #pprint(blobs[0])
@@ -2112,135 +1511,11 @@ select distinct ?s ?p where {
   ?s ?p ilxtr:NeuronCUT . }
 #+end_src
 
-#+RESULTS:
-| s                                            | p               |
-|----------------------------------------------+-----------------|
-| NLX:cell_100311                              | rdfs:subClassOf |
-| NLX:cell_20081201                            | rdfs:subClassOf |
-| NLX:cell_20081202                            | rdfs:subClassOf |
-| NLX:cell_20090304                            | rdfs:subClassOf |
-| NLX:cell_20090305                            | rdfs:subClassOf |
-| NLX:cell_20090311                            | rdfs:subClassOf |
-| NLX:cell_20090401                            | rdfs:subClassOf |
-| SAO:1103104164                               | rdfs:subClassOf |
-| SAO:1154704263                               | rdfs:subClassOf |
-| SAO:1415726815                               | rdfs:subClassOf |
-| SAO:1438006234                               | rdfs:subClassOf |
-| SAO:1582628662                               | rdfs:subClassOf |
-| SAO:383526650                                | rdfs:subClassOf |
-| SAO:471801888                                | rdfs:subClassOf |
-| SAO:666951243                                | rdfs:subClassOf |
-| SAO:830368389                                | rdfs:subClassOf |
-| NLX:cell_100212                              | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/1   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/10  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/11  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/12  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/13  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/14  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/15  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/16  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/17  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/18  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/19  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/2   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/20  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/21  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/22  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/23  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/24  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/25  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/26  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/27  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/28  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/29  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/3   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/30  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/31  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/32  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/33  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/34  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/35  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/36  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/37  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/38  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/39  | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/4   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/5   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/6   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/7   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/8   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/9   | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/913 | rdfs:subClassOf |
-| http://uri.interlex.org/npo/uris/neurons/914 | rdfs:subClassOf |
-| NLX:cell_1003113                             | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/BAMSC1125  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_106 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_109 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_113 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_116 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_118 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_119 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_120 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_121 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_122 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_123 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_124 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_128 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_130 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_132 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_133 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_135 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_136 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_144 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_153 | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_17  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_31  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_36  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_40  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_49  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_53  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_55  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_56  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_57  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_66  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_68  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_69  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_70  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_72  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_73  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_74  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_75  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_76  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_81  | rdfs:subClassOf |
-| http://uri.neuinfo.org/nif/nifstd/nifext_84  | rdfs:subClassOf |
-| NLX:144252                                   | rdfs:subClassOf |
-| NLX:153867                                   | rdfs:subClassOf |
-| NLX:153868                                   | rdfs:subClassOf |
-| NLX:16848                                    | rdfs:subClassOf |
-| NLX:268                                      | rdfs:subClassOf |
-| NLX:38713                                    | rdfs:subClassOf |
-| NLX:50129                                    | rdfs:subClassOf |
-| NLX:70345                                    | rdfs:subClassOf |
-| NLX:82555                                    | rdfs:subClassOf |
-| NLX:cell_091001                              | rdfs:subClassOf |
-| NLX:cell_091002                              | rdfs:subClassOf |
-| NLX:cell_091005                              | rdfs:subClassOf |
-| NLX:cell_091202                              | rdfs:subClassOf |
-| NLX:cell_091205                              | rdfs:subClassOf |
-| NLX:cell_091207                              | rdfs:subClassOf |
-| NLX:cell_091213                              | rdfs:subClassOf |
-| NLX:cell_100201                              | rdfs:subClassOf |
-
 #+begin_src cypher :limit 10
 // MATCH path = (a)-[t]-(:Class) RETURN a
 //MATCH path = ()-[:apinatomy:conveyingLyph]-() RETURN path
 // MATCH path = ()-[:TEMPRAW:protocolInvolvesInputInstance]-() RETURN path
 #+end_src
-
-#+RESULTS:
-| id | label |
-|----+-------|
 
 ** heatmaps
 *** TODO get the numbers along the axis, so n populations
@@ -2919,30 +2194,6 @@ MATCH (start:Ontology {iri: $model_id})
 -[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"}) // FIXME
 RETURN external
 #+end_src
-
-#+RESULTS:
-| id                         | label                                                                                                                                                                  |
-|----------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ilxtr:neuron-type-keast-1  | ilxtr:PG (with-axon-in ilxtr:nerve-bladder) (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) ilxtr:neuron-phenotype-para-post neuron |
-| ilxtr:neuron-type-keast-10 | ilxtr:neuron-phenotype-keast-10 neuron                                                                                                                                 |
-| ilxtr:neuron-type-keast-11 | ilxtr:neuron-phenotype-keast-11 neuron                                                                                                                                 |
-| ilxtr:neuron-type-keast-12 | ilxtr:neuron-phenotype-keast-12 neuron                                                                                                                                 |
-| ilxtr:neuron-type-keast-13 | BST (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                             |
-| ilxtr:neuron-type-keast-14 | central amygdaloid nucleus (with-axons-in DiE MB collection of basal ganglia) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                      |
-| ilxtr:neuron-type-keast-15 | medial preoptic region (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                      |
-| ilxtr:neuron-type-keast-16 | MnPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                        |
-| ilxtr:neuron-type-keast-17 | LPO (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                         |
-| ilxtr:neuron-type-keast-18 | LH (with-axons-in DiE) MB pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                          |
-| ilxtr:neuron-type-keast-19 | pAG (with-axons-in MB) pons (with-axon-presynaptic-element-in Barrington's nucleus) neuron                                                                             |
-| ilxtr:neuron-type-keast-2  | ilxtr:neuron-phenotype-keast-2 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-20 | Barrington's nucleus (with-axon-in pons) neuron                                                                                                                        |
-| ilxtr:neuron-type-keast-3  | ilxtr:IMG (with-axon-presynaptic-element-in ilxtr:bladder-dome-wall ilxtr:bladder-neck-wall) neuron                                                                    |
-| ilxtr:neuron-type-keast-4  | ilxtr:neuron-phenotype-keast-4 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-5  | ilxtr:neuron-phenotype-keast-5 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-6  | ilxtr:neuron-phenotype-keast-6 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-7  | ilxtr:neuron-phenotype-keast-7 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-8  | ilxtr:neuron-phenotype-keast-8 neuron                                                                                                                                  |
-| ilxtr:neuron-type-keast-9  | ilxtr:neuron-phenotype-keast-9 neuron                                                                                                                                  |
 
 *** neru model populations and references
 #+name: desc-cypher-apinat-model-pops-and-refs
@@ -4207,82 +3458,6 @@ Images of nerus that have some process in the IMG, from =keast-bladder= and =saw
 ** kg queries
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :results table drawer
 
-#+RESULTS:
-:results:
-{
-  "nodes": [
-  ],
-  "edges": [
-    {
-      "sub": "kblad:snl65",
-      "obj": "kblad:ref_mat_K_83_K_129_K27_7",
-      "pred": "apinatomy:internalIn",
-      "meta": {
-        "owlType": [
-          "Annotation"
-        ],
-        "isDefinedBy": [
-          "https://apinatomy.org/uris/models/keast-bladder"
-        ]
-      }
-    },
-    {
-      "sub": "kblad:neuron-5",
-      "obj": "kblad:sns15",
-      "pred": "apinatomy:lyphs",
-      "meta": {
-        "owlType": [
-          "Annotation"
-        ],
-        "isDefinedBy": [
-          "https://apinatomy.org/uris/models/keast-bladder"
-        ]
-      }
-    },
-    {
-      "sub": "kblad:sns15",
-      "obj": "kblad:ref_mat_K_83_K_129_K28_7",
-      "pred": "apinatomy:internalIn",
-      "meta": {
-        "owlType": [
-          "Annotation"
-        ],
-        "isDefinedBy": [
-          "https://apinatomy.org/uris/models/keast-bladder"
-        ]
-      }
-    },
-    {
-      "sub": "ilxtr:neuron-type-keast-5",
-      "obj": "kblad:neuron-5",
-      "pred": "apinatomy:annotates",
-      "meta": {
-        "owlType": [
-          "Annotation"
-        ],
-        "isDefinedBy": [
-          "https://apinatomy.org/uris/models/keast-bladder"
-        ]
-      }
-    },
-    {
-      "sub": "kblad:neuron-5",
-      "obj": "kblad:snl65",
-      "pred": "apinatomy:lyphs",
-      "meta": {
-        "owlType": [
-          "Annotation"
-        ],
-        "isDefinedBy": [
-          "https://apinatomy.org/uris/models/keast-bladder"
-        ]
-      }
-    }
-  ],
-  "meta": {}
-}
-:end:
-
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/neru-3-ntk-5-wat.svg
 
 #+RESULTS:
@@ -4402,11 +3577,6 @@ SELECT (COUNT(*) as ?count) {
   <<simple-sckan-load-1>>
 }
 #+end_src
-
-#+RESULTS:
-| count |
-|-------|
-|   943 |
 
 #+name: simple-sckan-load-1
 #+begin_src sparql :noweb yes
@@ -5055,88 +4225,9 @@ asdf = ['ILX:0727875',
 qq = [OntTerm(a) for a in asdf]
 #+end_src
 
-#+RESULTS:
-
 #+begin_src jupyter-python :session pys2
 [(repr(_), _('ilxtr:hasIlxPreferredId')[0].curie) for _ in qq]
 #+end_src
-
-#+RESULTS:
-| OntTerm('ILX:0727875', label='autonomic nerve')                              | UBERON:0034728 |
-| OntTerm('ILX:0727396', label='carotid sinus nerve')                          | UBERON:0009009 |
-| OntTerm('ILX:0727235', label='chorda tympani branch of facial nerve')        | UBERON:0009675 |
-| OntTerm('ILX:0736783', label='dorsal nerve of clitoris')                     | UBERON:0019198 |
-| OntTerm('ILX:0725331', label='dorsal nerve of penis')                        | UBERON:0019197 |
-| OntTerm('ILX:0724284', label='enteric nerve')                                | UBERON:0010380 |
-| OntTerm('ILX:0732483', label='cholinergic enteric nerve')                    | UBERON:0010406 |
-| OntTerm('ILX:0725803', label='facial nerve')                                 | UBERON:0001647 |
-| OntTerm('ILX:0723837', label='glossopharyngeal nerve')                       | UBERON:0001649 |
-| OntTerm('ILX:0737036', label='oculomotor nerve')                             | UBERON:0001643 |
-| OntTerm('ILX:0725086', label='terminal nerve')                               | UBERON:0002924 |
-| OntTerm('ILX:0736097', label='trigeminal nerve')                             | UBERON:0001645 |
-| OntTerm('ILX:0733375', label='vagus nerve')                                  | UBERON:0001759 |
-| OntTerm('ILX:0730739', label='greater splanchnic nerve')                     | UBERON:0018680 |
-| OntTerm('ILX:0734588', label='iris nerve')                                   | UBERON:0003438 |
-| OntTerm('ILX:0728741', label='lacrimal nerve')                               | UBERON:0011096 |
-| OntTerm('ILX:0728157', label='laryngeal nerve')                              | UBERON:0035642 |
-| OntTerm('ILX:0724431', label='left recurrent laryngeal nerve')               | UBERON:0011766 |
-| OntTerm('ILX:0728322', label='right recurrent laryngeal nerve')              | UBERON:0011767 |
-| OntTerm('ILX:0486534', label='Recurrent Laryngeal Nerve')                    | UBERON:0003716 |
-| OntTerm('ILX:0731053', label='superior laryngeal nerve')                     | UBERON:0011326 |
-| OntTerm('ILX:0734339', label='laryngeus ventralis')                          | UBERON:3010764 |
-| OntTerm('ILX:0731969', label='least splanchnic nerve')                       | UBERON:0001964 |
-| OntTerm('ILX:0726449', label='lesser splanchnic nerve')                      | UBERON:0018681 |
-| OntTerm('ILX:0734582', label='lingual nerve')                                | UBERON:0003721 |
-| OntTerm('ILX:0731914', label='long ciliary nerve')                           | UBERON:0022301 |
-| OntTerm('ILX:0729870', label='lumbar splanchnic nerve')                      | UBERON:0018683 |
-| OntTerm('ILX:0728987', label='maxillary nerve')                              | UBERON:0000377 |
-| OntTerm('ILX:0736712', label='meningeal branch of mandibular nerve')         | UBERON:0036143 |
-| OntTerm('ILX:0735649', label='meningeal branch of spinal nerve')             | UBERON:0017641 |
-| OntTerm('ILX:0730231', label='nasociliary nerve')                            | UBERON:0022300 |
-| OntTerm('ILX:0725969', label='nasopalatine nerve')                           | UBERON:0008810 |
-| OntTerm('ILX:0725552', label='nerve of clitoris')                            | UBERON:0035650 |
-| OntTerm('ILX:0729045', label='nerve of penis')                               | UBERON:0035649 |
-| OntTerm('ILX:0732611', label='superior branch of oculomotor nerve')          | UBERON:0015162 |
-| OntTerm('ILX:0724152', label='pelvic splanchnic nerve')                      | UBERON:0018675 |
-| OntTerm('ILX:0724140', label='perineal nerve')                               | UBERON:0011391 |
-| OntTerm('ILX:0736057', label='phrenic nerve')                                | UBERON:0001884 |
-| OntTerm('ILX:0726733', label='pterygopalatine nerve')                        | UBERON:0034725 |
-| OntTerm('ILX:0735212', label='pudendal nerve')                               | UBERON:0011390 |
-| OntTerm('ILX:0726145', label='sacral nerve')                                 | UBERON:0009625 |
-| OntTerm('ILX:0736880', label='sacral splanchnic nerve')                      | UBERON:0018684 |
-| OntTerm('ILX:0732740', label='short ciliary nerve')                          | UBERON:0022302 |
-| OntTerm('ILX:0730942', label='splanchnic nerve')                             | UBERON:0003715 |
-| OntTerm('ILX:0736020', label='thoracic splanchnic nerve')                    | UBERON:0018679 |
-| OntTerm('ILX:0733193', label='tibial nerve')                                 | UBERON:0001323 |
-| OntTerm('ILX:0733995', label='tympanic nerve')                               | UBERON:0036216 |
-| OntTerm('ILX:0503992', label='Vidian Nerve')                                 | UBERON:0018412 |
-| OntTerm('ILX:0734328', label='parasympathetic ganglion')                     | UBERON:0001808 |
-| OntTerm('ILX:0724764', label='accessory ciliary ganglion')                   | UBERON:0035776 |
-| OntTerm('ILX:0729794', label='autonomic ganglion')                           | UBERON:0001805 |
-| OntTerm('ILX:0734607', label='cardiac ganglion')                             | UBERON:0014463 |
-| OntTerm('ILX:0727602', label='celiac ganglion')                              | UBERON:0002262 |
-| OntTerm('ILX:0735024', label='ganglion of ciliary nerve')                    | UBERON:0035783 |
-| OntTerm('ILX:0725520', label='glossopharyngeal ganglion')                    | UBERON:0001701 |
-| OntTerm('ILX:0728778', label='inferior glossopharyngeal IX ganglion')        | UBERON:0005360 |
-| OntTerm('ILX:0726312', label='glossopharyngeal-vagus IX-X ganglion complex') | UBERON:0013500 |
-| OntTerm('ILX:0733021', label='mesenteric ganglion')                          | UBERON:0035769 |
-| OntTerm('ILX:0732970', label='superior mesenteric ganglion')                 | UBERON:0005479 |
-| OntTerm('ILX:0725326', label='inferior mesenteric ganglion')                 | UBERON:0005453 |
-| OntTerm('ILX:0725956', label='superior cervical ganglion')                   | UBERON:0001989 |
-| OntTerm('ILX:0726454', label='middle cervical ganglion')                     | UBERON:0001990 |
-| OntTerm('ILX:0734766', label='inferior cervical ganglion')                   | UBERON:0002440 |
-| OntTerm('ILX:0733700', label='otic ganglion')                                | UBERON:0003963 |
-| OntTerm('ILX:0733004', label='paravertebral ganglion')                       | UBERON:0001807 |
-| OntTerm('ILX:0732328', label='pelvic ganglion')                              | UBERON:0016508 |
-| OntTerm('ILX:0735011', label='prevertebral ganglion')                        | UBERON:0003964 |
-| OntTerm('ILX:0734057', label='pterygopalatine ganglion')                     | UBERON:0003962 |
-| OntTerm('ILX:0730509', label='sublingual ganglion')                          | UBERON:0005407 |
-| OntTerm('ILX:0727725', label='submandibular ganglion')                       | UBERON:0002059 |
-| OntTerm('ILX:0730966', label='sympathetic ganglion')                         | UBERON:0001806 |
-| OntTerm('ILX:0729052', label='vagus X ganglion')                             | UBERON:0005362 |
-| OntTerm('ILX:0736358', label='superior vagus X ganglion')                    | UBERON:0005364 |
-| OntTerm('ILX:0727970', label='inferior vagus X ganglion')                    | UBERON:0005363 |
-| OntTerm('ILX:0736369', label='vertebral ganglion')                           | UBERON:0000408 |
 
 ** ApiNATOMY
 *** Coverage of FMA by the TOO map.
@@ -5158,19 +4249,6 @@ WHERE {
   ?o a elements:Graph .
 } order by str(?o)
 #+end_src
-
-#+RESULTS:
-| o                       |
-|-------------------------|
-| aacar:ard-arm-cardiac   |
-| bolew:bolser-lewis      |
-| bromo:bronchomotor      |
-| dlcon:dev-layout-conn   |
-| kblad:keast-bladder     |
-| sdcol:sawg-distal-colon |
-| sstom:sawg-stomach      |
-| scaft:scaffold-test     |
-| vagnr:vagus-nerve       |
 
 #+begin_src sparql
 select distinct
@@ -5195,8 +4273,10 @@ WHERE {
 } }
 #+end_src
 
-
 **** Dashboard
+:PROPERTIES:
+:CUSTOM_ID: apinat-dashboard
+:END:
 # TODO configure header args for development vs production
 #+begin_src elisp :results none :exports none
 (ow-babel-eval "apinat-dashboard-model-summary")
@@ -5686,16 +4766,6 @@ def get_phenotypes(neupop_id):
 
 pprint(get_phenotypes('ilxtr:neuron-type-keast-1'))
 #+end_src
-
-#+RESULTS:
-: [{'meta': {'convenience': [True], 'owlType': ['subClassOf']},
-:   'obj': 'ilxtr:PostGanglionicPhenotype',
-:   'pred': 'ilxtr:hasPhenotype',
-:   'sub': 'ilxtr:neuron-type-keast-1'},
-:  {'meta': {'convenience': [True], 'owlType': ['subClassOf']},
-:   'obj': 'ilxtr:ParasympatheticPhenotype',
-:   'pred': 'ilxtr:hasPhenotype',
-:   'sub': 'ilxtr:neuron-type-keast-1'}]
 
 ****** number of neuron populations aka neuron types
 # TODO load NPO, and we have to use robot to reason the NPO graph
