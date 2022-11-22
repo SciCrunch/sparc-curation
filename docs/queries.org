@@ -481,9 +481,9 @@ WHERE {
     VALUES ?t {protcur:invariant protcur:parameter} .
     ?ast_inv a ?t .
     ?ast_inv TEMP:hasValue ?bnode .
-    ?bnode ilxtr:jsonRecordType <https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/quantity> .
     ?bnode rdf:value ?value_lt .
-    ?bnode TEMP:hasUnit <https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/milligram%20%2F%20kilogram> .
+    #?bnode TEMP:hasUnit unit:milligram%20%2F%20kilogram . # seems like the %20 etc. break curies?
+    ?bnode TEMP:hasUnit <http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/milligram%20%2F%20kilogram> .
     FILTER (?value_lt < ?limit)
 
     ?ast_drug a protcur:input .
