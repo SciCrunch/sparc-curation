@@ -1506,10 +1506,14 @@ render_blob(blob)
 #+begin_src jupyter-python :noweb yes :session pys :var remove=(and "sigh") :results none
 from pprint import pprint
 from pyontutils.scigraph import Cypher, Vocabulary
+from pyontutils.scigraph_codegen import moduleDirect
+from pyontutils.config import auth
+scigraphd = moduleDirect(auth.get('scigraph-api'), 'scigraphd')
 <<python-process-neru>>
 <<py-conn-pairs>>
 sgv = Vocabulary()
-sgc = Cypher()
+sgd = scigraphd.Dynamic(cache=True, verbose=True, do_error=True)
+sgc = scigraphd.Cypher(cache=True, verbose=True)
 q_neru_6 = """
 <<cypher-neru-6>>
 """
@@ -1584,7 +1588,6 @@ select distinct ?s ?p where {
 #+name: py-nbr-1
 #+begin_src jupyter-python :session pys :noweb yes :results none :var remove=(and "sigh")
 <<py-neupop-helper>>
-import seaborn
 from collections import defaultdict
 q_cnap = """
 <<cy-neru-all-pop>>
@@ -1773,16 +1776,18 @@ rows = resort(rows, sumth)
 rows = list(zip(*resort(list(zip(*rows)), blank, reverse=True)))
 rows = resort(rows, jmc)
 
-seaborn.set(rc={'figure.figsize':(50, 50)})
-#seaborn.set(rc={'figure.figsize':(5, 5)})
-axes = seaborn.heatmap(
-    [r[1:] for r in rows[1:]],
-    xticklabels=xl,
-    yticklabels=[r[0] for r in rows[1:]],
-    cbar=False,
-    square=True,
-)
-# axes.get_figure().savefig('heatmap-pop-reg-test.svg')
+if False:
+    import seaborn
+    seaborn.set(rc={'figure.figsize':(50, 50)})
+    #seaborn.set(rc={'figure.figsize':(5, 5)})
+    axes = seaborn.heatmap(
+        [r[1:] for r in rows[1:]],
+        xticklabels=xl,
+        yticklabels=[r[0] for r in rows[1:]],
+        cbar=False,
+        square=True,
+    )
+    # axes.get_figure().savefig('heatmap-pop-reg-test.svg')
 #+end_src
 
 #+begin_src jupyter-python :session pys
