@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3ea4fbffcedfc9806f59ca1eefba8367a622489ab03a5467dc15c4ba685abae8; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 1f1710be5dce6f5cbfc2a7d7860bc19735276e8f0eed5bf3daa754f8c51221aa; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -224,14 +224,25 @@ Yes this is make."
 ;; 0 ensure commands
 (defun step-ensure-commands ()
   "make sure all the commands we need are present on the system"
-  (dolist (command '("python" "zip" "tar" "rsync" "protcur" "ttlfmt"))
+  (unless (py-x)
+    (error "Cannot continue. No python implementation found."))
+  (dolist (command '("zip" "tar" "rsync"))
     (unless (executable-find command)
       (error "Cannot continue. No executable found for %s" command))))
+
+;; 0.25 ensure python modules
+(defun step-ensure-python-modules ()
+  "Make sure all required python modules are present."
+  (dolist (module '("protcur" "ttlser"))
+    (run-command (py-x) "-c"
+                 (format "import importlib.util; assert importlib.util.find_spec('%s'), '%s'"
+                         module module))))
 
 ;; 0.5 ensure services
 (defun step-ensure-services ()
   "Make sure that all required services are accessible"
   ;; protcur needs scigraph queries to be working
+  ' ; no longer required, moved network calls out of this step
   (run-command "scig" "t" "brain"))
 
 ;; 1
@@ -294,7 +305,7 @@ Yes this is make."
            "%S" ; TODO check if we can safely strip out the group at this stage
            '(FIXME TODO replace the group id with some garbage so that it doesn't leak))))
       ;; 6 FIXME TODO this requires scigraph to be running FIXME this is a very slow step
-      (run-command "protcur" "convert" hypothesis-annos protcur-path))))
+      (run-command (py-x) "-m" "protcur.cli" "convert" hypothesis-annos protcur-path))))
 
 (defun step-load-store (path-br-bin &optional no-load)
   "download latest ttl files and load into blazegraph"
@@ -307,6 +318,7 @@ Yes this is make."
         (sct-path "data/sparc-community-terms.ttl")
         (sml-path "data/sparc-missing-labels.ttl")
 
+        (ch-path "data/chebi.ttl")
         (ub-path "data/uberon.ttl")
         (em-path "data/emapa.ttl")
         (ap-path "data/approach.ttl")
@@ -368,6 +380,10 @@ Yes this is make."
 
     ;; retrieve, reason, and load various ontologies
     ;; FIXME when to patch
+    ;; chebi
+    (unless-file-exists-p ch-path ; doesn't need to be reasoned
+      (url-copy-file-safe
+       (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/generated/chebislim.ttl") ch-path))
     ;; uberon
     (unless-file-exists-p ub-path
       (get-ontology "http://purl.obolibrary.org/obo/uberon.owl" ub-path))
@@ -405,6 +421,7 @@ Yes this is make."
          `("blazegraph-runner" ,(concat "--journal=" journal-path)
            "load" "--use-ontology-graph" ,p-path ,ce-path
            ;;"http://purl.obolibrary.org/obo/uberon.owl"
+           ,ch-path
            ,em-path
            ,ub-path
            ,ap-path
@@ -458,6 +475,7 @@ Yes this is make."
 
 (defun step-release (build-dir &optional this-release-dir release-time no-blaze no-load no-annos)
   (step-ensure-commands)
+  (step-ensure-python-modules)
   (step-ensure-services)
   ;; FIXME something about the resume process is still broken
   (unless (file-directory-p build-dir)
