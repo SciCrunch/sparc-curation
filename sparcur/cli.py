@@ -541,7 +541,7 @@ class Main(Dispatcher):
 
         # FIXME populate this via decorator
         if (self.options.export and not
-            (self.options.schemas or self.options.protcur) or
+            (self.options.schemas or self.options.protcur or self.options.protocols) or
             (self.options.report and self.options.raw)):
             pass  # simplify setup for consumers beyond this file
         elif (self.options.clone or
@@ -563,6 +563,7 @@ class Main(Dispatcher):
               (self.options.report and self.options.export_file) or
               (self.options.report and self.options.protocols) or
               (self.options.export and self.options.schemas) or
+              (self.options.export and self.options.protocols) or  # FIXME if protocols require export ...
               (self.options.export and self.options.protcur) or  # FIXME if protocols require export ...
               (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
@@ -1169,7 +1170,9 @@ done"""
             # to ttl or bulk load into foundry etc.
             if self.options.protocols:  # TODO
                 protcur_dump_path = dump_path
-                dataset_blob = []  # FIXME FIXME
+                dataset_blobs = (self._data_ir()['datasets']
+                                 if self.options.export_file else
+                                 [])  # could be worse ...
                 dump_path = (self.options.export_protocols_base /
                              self._folder_timestamp)
                 dump_path.mkdir(parents=True)
