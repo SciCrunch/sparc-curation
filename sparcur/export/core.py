@@ -487,7 +487,7 @@ class Export(ExportBase):
 
         pipeline = pipes.ProtcurPipeline(*hypothesis_groups,
                                          no_network=no_network)
-        annos = pipeline.load()
+        annos, lsus = pipeline.load()
         if not annos:
             msg = ('No annos. Did you remember to run\n'
                    'python -m sparcur.simple.fetch_annotations')
@@ -509,14 +509,20 @@ class Export(ExportBase):
         context = {**sc.base_context,
                    **sc.protcur_context,
                    }
+        # we don't need/want system and type for protcur, it just adds noise
+        context.pop('system', None)
+        context.pop('type', None)
+
         for f in ('meta', 'subjects', 'samples', 'contributors'):
             # subjects samples and contributors no longer included in context directly
             if f in context:
                 context.pop(f)  # FIXME HACK meta @graph for datasets
 
+        lastmod = max(lsus)
         ontology_header = {  # FIXME should probably not be added here since it is obscure ...
             '@id': 'https://cassava.ucsd.edu/sparc/ontologies/protcur.ttl',
             '@type': 'owl:Ontology',
+            'owl:versionInfo': lastmod,
         }
 
         protcur.append(ontology_header)

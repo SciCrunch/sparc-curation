@@ -239,6 +239,7 @@ Options:
     --mbf                   fetch/export mbf related metadata
     --unique                return a unique set of values without additional info
 
+    --log-level=LEVEL       set python logging log level
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
     --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
@@ -355,6 +356,16 @@ class Options(clif.Options):
         # FIXME this should also be determined by
         # checking the schema version of the data being run
         return self._args['--preview'] or auth.get('preview')
+
+    @property
+    def log_level(self):
+        ll = self._args['--log-level']
+        if ll is None:
+            return
+        if ll.isdigit() or ll[0] == '-' and ll[1:].isdigit():
+            return int(ll)
+        else:
+            return ll
 
 
 class Dispatcher(clif.Dispatcher):
@@ -490,6 +501,11 @@ class Main(Dispatcher):
             log.setLevel('INFO')
             logd.setLevel('INFO')
             loge.setLevel('INFO')
+
+        if self.options.log_level:
+            log.setLevel(self.options.log_level)
+            logd.setLevel(self.options.log_level)
+            loge.setLevel(self.options.log_level)
 
         if self.options.configure:
             return
@@ -1214,7 +1230,7 @@ done"""
         from protcur.analysis import protc
         from sparcur import pipelines as pipes
         pipe = pipes.ProtcurPipeline(hgn)
-        _annos = pipe.load()
+        _annos, _lsus = pipe.load()
 
         # using _annos here as we transition to use ptcdoc.Annotation
         # instead of the base hypothesis annotation as the substrate

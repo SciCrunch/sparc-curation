@@ -55,7 +55,6 @@ class ValidationError(SparCurError):
         return error.message
 
 
-
 class MissingSecretError(SparCurError):
     """ key not in secrets """
 
@@ -161,3 +160,7 @@ class StopTheWorld(SparCurError):
 
 class NotUploadedToRemoteYetError(SparCurError):
     """ signal that the file in question has not been uploaded """
+
+
+class NotMappedError(SparCurError):
+    """ an input value has no known mapping where you are searching """

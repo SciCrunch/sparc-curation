@@ -6,6 +6,7 @@ from datetime import datetime, date
 import idlib
 from pyontutils.utils import isoformat
 from pyontutils.sheets import Sheet as SheetBase, get_cells_from_grid
+from sparcur import exceptions as exc
 from sparcur.core import adops, OntId, OntTerm
 from sparcur.utils import log, logd
 from sparcur.config import auth
@@ -375,11 +376,27 @@ class AnnoTags(Reports):
         """ anno tags don't need a preview class """
         return cls
 
-    def _annotation_row(self, anno):
+    def _annotation_row(self, anno, edfix=False):
         key = self.index_columns[0]
         value = getattr(anno, key)
         value = value.strip()  # FIXME align with id normalization maybe?
+        if edfix and value.endswith('ed'):
+            ree = None
+            for i in range(3):
+                try:
+                    return self._kv_row(key, value)
+                except exc.NotMappedError as e:
+                    if i == 0:
+                        ree = e
+                        value = value[:-2]
+                    elif i == 1:
+                        value = value + 'e'
+                    else:
+                        raise ree
+        else:
+            return self._kv_row(key, value)
 
+    def _kv_row(self, key, value):
         header = self.row_object(0)
         #index = getattr(header, key)().column  # ;_; but it was so elegant
         #row = getattr(index, value)().row
@@ -389,7 +406,7 @@ class AnnoTags(Reports):
             index = getattr(header, key)().column
 
         if value in index._trouble:
-            row = index._trouble[value]
+            row = index._trouble[value]().row
         else:
             try:
                 row = getattr(index, value)().row
@@ -401,7 +418,7 @@ class AnnoTags(Reports):
                     row = getattr(index, value.lower())().row
                 except AttributeError as e:
                     # TODO
-                    raise
+                    raise exc.NotMappedError(f'no record for {value}') from e
 
         return row
 
@@ -440,7 +457,7 @@ class WorkingExecVerb(AnnoTags):
         return value_to_map_to, create  # old -> new, original -> correct
 
     def map(self, anno):
-        row = self._annotation_row(anno)
+        row = self._annotation_row(anno, edfix=True)
         bad = row.bad().value
         help__ = row.help__().value
         map_to = row.map_to().value
@@ -449,7 +466,10 @@ class WorkingExecVerb(AnnoTags):
         if not (bad or help__):
             if map_to:
                 if map_to == '-':
-                    suffix = getattr(anno, self.index_cols[0])
+                    # suffix = getattr(anno, self.index_columns[0])  # XXX ignores normalization
+                    # XXX TODO consider moving this kind of normalization to the anno class
+                    # to avoid these situations
+                    suffix = row.value().value
                 else:
                     suffix = map_to
             elif merge:
@@ -502,7 +522,7 @@ class WorkingAspectsImplied(AnnoTags):
         bad = row.bad().value
         if not bad and map_to:
             if map_to == '-':
-                suffix = getattr(anno, self.index_cols[0])
+                suffix = getattr(anno, self.index_columns[0])
             else:
                 suffix = map_to
 
@@ -531,7 +551,16 @@ class WorkingBlackBox(AnnoTags):
         elif mapping_ok:  # FIXME anno.astValue can drift from auto_mapping
             # this is so hilariously inefficient, we parse the same stuff
             # 3 times or something
-            return OntTerm(anno.asPython().asPython().black_box.curie)
+            _v = anno.asPython().asPython()
+            if hasattr(_v, 'black_box'):  # black-box-components only have a name
+                # XXX this will fail when black_box is not a term because
+                # mapping_ok is true but we removed the old mapping
+                if hasattr(_v.black_box, 'curie'):
+                    return OntTerm(_v.black_box.curie)
+                else:
+                    raise exc.NotMappedError(f'no curie mapping {_v}')
+            else:
+                raise exc.NotMappedError(f'no black_box mapping {_v} ')
 
 
 class WorkingBlackBoxComponent(WorkingBlackBox):

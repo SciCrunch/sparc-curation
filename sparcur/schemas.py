@@ -82,6 +82,9 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
 
     'spjl': {'@id': 'https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/', '@prefix': True},
 
+    # XXX FIXME annoying context collisions
+    'unt': {'@id': str(unit), '@prefix': True},
+
     #'protc': {'@id': 'https://uilx.org/tgbugs/u/protc/', '@prefix': True},
 
     #'protcur': {'@id': 'https://uilx.org/tgbugs/u/protcur/', '@prefix': True},
@@ -94,6 +97,9 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
 
     #'verb': {'@id': 'https://uilx.org/tgbugs/u/executor-verb/', '@prefix': True},
 
+    'start': {'@id': 'TEMP:rangeStart', '@type': '@id'},
+    'stop': {'@id': 'TEMP:rangeStop', '@type': '@id'},
+
     'hasDoi': {'@id': 'TEMP:hasDoi', '@type': '@id'},
 
     'fuzzy': {'@id': 'https://uilx.org/tgbugs/u/fuzzy-quantity/', '@prefix': True},
@@ -101,7 +107,7 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'children': {'@id': 'TEMP:protcurChildren', '@type': '@id'},
     'ast_value': {'@id': 'TEMP:hasValue', '@type': '@id'},
     'raw_value': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
-    'original': {'@id': 'TEMPRAW:hasValue', '@type': '@id'},
+    'original': {'@id': 'TEMPRAW:hasValue'},  # don't want @type @id for this one
 
     'protcur_anno_count': {'@id': 'TEMP:hasNumberOfProtcurAnnotations'},
     'datasets': {'@id': 'TEMP:priorInformationalConstraintOnProcessThatGenerated', '@type': '@id'},

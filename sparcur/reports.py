@@ -328,6 +328,24 @@ class Report:
 
         super().__init__(*args, **kwargs)
 
+    _all_anno_tags = (
+        'protc:input',  # this is slower now
+        'protc:input-instance',
+        'protc:implied-input',
+        'protc:aspect',
+        'protc:implied-aspect',
+        'protc:executor-verb',
+        'protc:parameter*',
+        'protc:invariant',
+        'protc:output',
+        'protc:black-box',
+        'protc:black-box-component',
+        'protc:objective*',
+        'protc:*measure',
+        'protc:symbolic-input',
+        'protc:symbolic-output',
+    )
+
     def all(self):
         #self.access()  # must be on live data
         # TODO add a prov report for when this was last run etc.
@@ -354,23 +372,7 @@ class Report:
         self.hubmap_anatomy()
         self.mis()
         self.milestones()
-        for tag in (
-                'protc:input',  # this is slower now
-                'protc:input-instance',
-                'protc:implied-input',
-                'protc:aspect',
-                'protc:implied-aspect',
-                'protc:executor-verb',
-                'protc:parameter*',
-                'protc:invariant',
-                'protc:output',
-                'protc:black-box',
-                'protc:black-box-component',
-                'protc:objective*',
-                'protc:*measure',
-                'protc:symbolic-input',
-                'protc:symbolic-output',
-        ):
+        for tag in self._all_anno_tags:
             # FIXME hack around broken anno_tags impl
             self.anno_tags(tag)
 
@@ -1303,7 +1305,15 @@ class Report:
 
         links = links or self.options.uri or self.options.uri_api
 
-        return self._by_tags(*tags, links=links, ext=ext)
+        if tags == ['all']:
+            out = []
+            for tag in self._all_anno_tags:
+                o = self._by_tags(tag, links=links, ext=ext)
+                out.append(o)
+
+            return out
+        else:
+            return self._by_tags(*tags, links=links, ext=ext)
 
     @property
     @idlib.utils.cache_result

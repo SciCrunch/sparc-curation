@@ -1882,11 +1882,14 @@ class ProtcurPipeline(Pipeline):
 
     def load(self):  # if the dereferenced resource is remote, get a local copy
         annos = []
+        lsus = []
         for group_name in self._hypothesis_group_names:
             group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
             cache_file = pathlib.Path(hyp.group_to_memfile(group_id + 'sparcur'))
             get_annos = hyp.AnnoReader(cache_file, group_id)
-            annos.extend(get_annos())
+            _annos, last_sync_updated = get_annos.get_annos_from_file()
+            lsus.append(last_sync_updated)
+            annos.extend(_annos)
             # FIXME hyputils has never been engineered to work with
             # multiple groups at the same time using the same auth
             # so everything is backwards from what it should be since
@@ -1894,7 +1897,7 @@ class ProtcurPipeline(Pipeline):
             # on groups (and because no implementation should be focused
             # on auth, which should be handled orthgonally)
 
-        return annos#[:5000]  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        return annos, lsus
 
     _logged_nn = set()
     @staticmethod
@@ -1957,7 +1960,8 @@ class ProtcurPipeline(Pipeline):
                         alt = Term(aligned, None, ast._value)  # None to avoid mismatch in OntTerm
                         nast = ast.__class__(alt, *ast.body, prov=ast.prov)
                         return nast
-                except AttributeError as e:
+                except exc.NotMappedError as e:
+                    log.log(9, f'{at} {e}')
                     # TODO
                     pass
             else:
@@ -2131,7 +2135,7 @@ class ProtcurPipeline(Pipeline):
 
     def _idints(self, annos=None):
         if annos is None:
-            annos = self.load()
+            annos, lsus = self.load()
 
         _annos = annos
         annos = [ptcdoc.Annotation(a) for a in annos]
