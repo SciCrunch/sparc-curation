@@ -784,6 +784,33 @@ ORDER BY ?label_input ?value_lt
 | dataset:fd07322c-ac30-488f-a6db-f5ff52c69e1b | pio.api:20256 | mixture            |        9 |
 | dataset:fd07322c-ac30-488f-a6db-f5ff52c69e1b | pio.api:20256 | xylazine           |        9 |
 
+**** Protocols with known anaesthetic or analgesic roles
+#+begin_src sparql
+select distinct
+?pro
+?ana
+?l
+?u
+?v
+where {
+  ?pro TEMP:protocolInvolvesInput ?anno .
+  ?anno TEMP:hasValue ?ana .
+  ?anno TEMP:protcurChildren ?ad .
+  ?ad TEMP:hasValue ?asp .
+  ?ad TEMP:protcurChildren ?ai .
+  ?ai TEMP:hasValue ?bn .
+  ?bn TEMP:hasUnit ?u .
+  ?bn rdf:value ?v .
+  ?ana rdfs:label ?l .
+  ?ana ?p ?b .
+  ?b owl:onProperty RO:0000087 .
+  ?b owl:someValuesFrom ?o .
+  ?o rdfs:subClassOf* ?role .
+  values ?asp {asp:dose asp:percent-volume} .
+  values ?role {CHEBI:38867 CHEBI:35480} .
+} order by ?l
+#+end_src
+
 ** Datasets following same protocol with different subjects
 *** Completeness
 #+begin_src sparql
