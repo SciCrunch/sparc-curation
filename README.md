@@ -13,7 +13,7 @@ New developers or curators should start by following [setup.org](./docs/setup.or
 ## Background
 For a general introduction to the SPARC curpation process see [background.org](./docs/background.org).
 
-For background on the SDS (with out-of-date technical details) see this (paper)[https://doi.org/10.1101/2021.02.10.430563].
+For background on the SDS (with out-of-date technical details) see this [paper](https://doi.org/10.1101/2021.02.10.430563).
 
 ## Workflows
 Documentation for curation workflows currently lives in [setup.org](./docs/setup.org#workflows).
@@ -33,8 +33,8 @@ an update mechanism which simplifies keeping the pipelines in sync.
 This repo contains the core of the [SCKAN release pipelines](./docs/developer-guide.org#sckan) as well as the [documentation](./docs/sckan) for running and querying SCKAN.
 
 ## Related links
-[SODA](https://github.com/fairdataihub/SODA-for-SPARC) GUI app for creating, validating, and uploading SDS formatted datasets.  
-[SDS Viewer](https://github.com/MetaCell/sds-viewer) a web UI for viewing SDS formatted datatsets via the output of the SDS validator.  
-[dockerfiles/source.org](https://github.com/tgbugs/dockerfiles/blob/master/source.org#kg-dev-user) spec for developer docker image for this repo. Also has specs for the image that runs the [sparcron](./sparcur/sparcron/core.py) single dataset pipelines, SCKAN images, and more.  
-[tgbugs/musl](https://hub.docker.com/r/tgbugs/musl) dockerhub repo with latest build of images.  
-[open-physiology-viewer](https://github.com/open-physiology/open-physiology-viewer) code for converting ApiNATOMY models to OWL/RDF needed for [apinatomy pipelines](./docs/apinatomy.org).
+- [SODA](https://github.com/fairdataihub/SODA-for-SPARC) GUI app for creating, validating, and uploading SDS formatted datasets.  
+- [SDS Viewer](https://github.com/MetaCell/sds-viewer) a web UI for SDS formatted datatsets via the SDS validator.  
+- [dockerfiles/source.org](https://github.com/tgbugs/dockerfiles/blob/master/source.org#kg-dev-user) spec for developer docker image for this repo. Also has specs for the image that runs the [sparcron](./sparcur/sparcron/core.py) single dataset pipelines, SCKAN images, and more.  
+- [tgbugs/musl](https://hub.docker.com/r/tgbugs/musl) dockerhub repo with latest build of images.  
+- [open-physiology-viewer](https://github.com/open-physiology/open-physiology-viewer) code for converting ApiNATOMY models to OWL/RDF needed for [apinatomy pipelines](./docs/apinatomy.org).
