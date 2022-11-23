@@ -1191,7 +1191,7 @@ Python code to simplify =neru= and supporting functions to extract terminal regi
 #+begin_src jupyter-python :session pys
 from pyontutils.config import auth
 from nifstd_tools.simplify import apinat_deblob, sub, pred, obj, ematch
-from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, ext, fasIn, endIn, layerIn, onts
+from nifstd_tools.simplify import axon, dend, bag, top, ie, ies, iot, iots, ext, fasIn, endIn, layerIn, onts
 
 ext = onts  # XXX schema change
 
@@ -1208,7 +1208,7 @@ def query(neupop_id):
 def find_terminals(blob, type):
     return [es for es in blob['edges']
             if
-            pred(es, ies) and
+            pred(es, iots) and
             obj(es, type) and
             ematch(blob,
                    (lambda e, m:
@@ -1237,19 +1237,19 @@ def find_region(blob, edge):
 def find_region_layer(blob, edge, bindex):
     collect = []
     layers = []
-    layers_ies = []
+    layers_iots = []
     donel = set()
     doner = set()
     def select_term(e, m, layers=layers):
         if sub(e, m):
             pprint(e)
             if (pred(e, onts)
-                or pred(e, ies)):
+                or pred(e, iots)):
                 layer = obj(e)
                 if layer not in donel:
                     donel.add(layer)
-                    if pred(e, ies):
-                        layers_ies.append(bindex[layer])
+                    if pred(e, iots):
+                        layers_iots.append(bindex[layer])
                     else:
                         layers.append(bindex[layer])
                 return layer
@@ -1270,10 +1270,10 @@ def find_region_layer(blob, edge, bindex):
                     collect.append(bindex[region])
                 return region
     ematch(blob, select, sub(edge))
-    if collect and not layers and not layers_ies:
+    if collect and not layers and not layers_iots:
         layers = [None]
-    elif layers_ies and not layers:
-        layers = layers_ies
+    elif layers_iots and not layers:
+        layers = layers_iots
 
     if len(collect) != len(layers):
         raise ValueError(f'len not matched {len(collect)} {len(layers)}')
@@ -1333,13 +1333,14 @@ Find the ontology identifiers for terminal regions.
 # run this to populate/update the kernel (sigh)
 #+call: python-process-neru(result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-aacar-5"))
 
+#+header: :var remove=(or) result=cypher-neru-6-helper(neupop_id="ilxtr:neuron-type-keast-6")
 #+name: neru-find-terminal-regions
 #+begin_src jupyter-python :session pys :exports both :var neupop_id="" :noweb yes
 <<python-process-neru>>
 from pprint import pprint
 
-#blob, *_ = main(blob_string=result)
-#bindex = {n['id']:n for n in blob['nodes']}
+blob, *_ = main(blob_string=result)
+bindex = {n['id']:n for n in blob['nodes']}
 
 # find terminal regions
 axon_terminal_regions = find_terminal_regions(blob, axon)
@@ -1389,7 +1390,7 @@ def reclr(blob, start_link):
         if sub(e, m):
             if pred(e, 'apinatomy:cloneOf'):  # should be zapped during simplify
                 return ematch(blob, select_ext, obj(e))
-            if pred(e, onts) or pred(e, ie) or pred(e, ies):
+            if pred(e, onts) or pred(e, iot) or pred(e, iots):
                 #print('select_ext', e)
                 external = obj(e)
                 #print('se', col, layer)
@@ -1435,8 +1436,8 @@ def lay_reg(blob, start):
     layers = [obj(t) for d in direct for t in
               ematch(blob, (lambda e, m: sub(e, m)
                             and isLayer(blob, m)
-                            and (pred(e, ie) or
-                                 pred(e, ies) or
+                            and (pred(e, iot) or
+                                 pred(e, iots) or
                                  pred(e, onts))),
                      d)]
 
@@ -1450,16 +1451,16 @@ def lay_reg(blob, start):
         lregs = [obj(t) for d in ldir for t in
                  ematch(blob, (lambda e, m: sub(e, m)
                                and not isLayer(blob, m)
-                               and (pred(e, ie) or
-                                    pred(e, ies) or  # XXX ie seems to have no hits now
+                               and (pred(e, iot) or
+                                    pred(e, iots) or  # XXX ie seems to have no hits now
                                     pred(e, onts))),
                         d)]
 
     regions = [obj(t) for d in direct for t in
                ematch(blob, (lambda e, m: sub(e, m)
                              and not isLayer(blob, m)
-                             and (pred(e, ie) or
-                                  pred(e, ies) or
+                             and (pred(e, iot) or
+                                  pred(e, iots) or
                                   pred(e, onts))),
                       d)]
 
@@ -1834,6 +1835,88 @@ config.write_python()
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
 ** neru
+*** neru-7
+Switch over to =apinat:inheritedOntologyTerms=.
+
+#+name: cypher-neru-7-helper
+#+begin_src cypher :noweb yes :results drawer :limit 99999999 :exports none
+<<cypher-neru-7>>
+#+end_src
+
+#+header: :limit 999999 :file ./images/neru-7-keast-6.graphml :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-6"
+#+name: cypher-neru-7
+#+begin_src cypher
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+
+, (neugrp)
+-[:apinatomy:links]->(link)
+-[c:apinatomy:fasciculatesIn|apinatomy:endsIn*0..1]->(lyph_or_layer) // real lyphs convey things, layers do not
+-[d:apinatomy:layerIn*0..1]->(lyph)
+-[:apinatomy:conveys*0..1]->() // make sure we are at a real lyph
+
+WITH neugrp, link, lyph, a, c, d
+OPTIONAL MATCH layer_ext = (lyph)
+<-[d*1]-(layer)-[:apinatomy:cloneOf*0..1]->()-[:apinatomy:inheritedOntologyTerms]->()
+
+WITH neugrp, link, lyph, a, c, d, layer_ext
+OPTIONAL MATCH more = (lyph)
+-[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
+-[:apinatomy:ontologyTerms|apinatomy:inheritedOntologyTerms]->()
+
+WITH neugrp, link, lyph, a, c, d, layer_ext, more // there is a difference here because the previous match does not require lyphs to have external ids
+MATCH (lyph)
+-[e:apinatomy:ontologyTerms]->(region)
+
+, p2 = (link)
+-[:apinatomy:conveyingLyph]->(cl)
+-[:apinatomy:topology]->()
+
+, (cl)
+-[x:apinatomy:inheritedOntologyTerms*0..1]->()
+
+// use apinatomy:next to extract ordering information
+, (link)
+-[f:apinatomy:next|apinatomy:nextChainStartLevels*0..]->()
+-[g:apinatomy:target*0..1]->()
+-[h:apinatomy:rootOf*0..1]->()
+-[i:apinatomy:levels*0..1]->()
+<-[:apinatomy:links]-(neugrp)
+
+// publications
+WITH neugrp, a, c, d, e, f, g,h,i, p2, x, layer_ext, more
+OPTIONAL MATCH path = (neugrp)
+-[:apinatomy:references]->(pub)
+-[:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Reference"}) // cannot be curied, dynamic endpoints will not expand it
+
+RETURN a, null as b, c, d, e, f, g,h,i, path, p2, x, layer_ext, more
+
+UNION
+
+// this part usually only returns the soma housing lyph
+MATCH (neupop:Class{iri: $neupop_id})
+-[a:apinatomy:annotates]->(neugrp:NamedIndividual{`https://apinatomy.org/uris/readable/description`: "dynamic"}) // FIXME HACK
+-[b:apinatomy:lyphs]->(lyph)
+-[c:apinatomy:internalIn]->()
+-[d:apinatomy:ontologyTerms*0..1]->(region)
+, p2 = (lyph)
+-[:apinatomy:conveys]->(soma_link)
+-[:apinatomy:source|apinatomy:target]->(soma_node)
+-[:apinatomy:sourceOf]->(chain_link)
+, (chain_link)
+-[:apinatomy:levelIn]->(chain)
+, (soma_node)
+-[:apinatomy:rootOf]->(chain)
+
+WITH lyph, a, b, c, d, p2
+OPTIONAL MATCH more = (lyph)
+-[:apinatomy:layerIn|apinatomy:endsIn|apinatomy:fasciculatesIn|apinatomy:internalIn|apinatomy:cloneOf*1..]->()
+-[:apinatomy:ontologyTerms|apinatomy:inheritedOntologyTerms]->()
+
+RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext, more
+#+end_src
+
 *** neru-6
 The only difference between 5 and 6 is that 6 also traverses apinat:nextChainStartLevels
 # #+header: :var neupop_id="ilxtr:neuron-type-aacar-12"
@@ -3376,6 +3459,11 @@ cypherResources:
     operations: *neru-ops
     query: |
       <<cypher-neru-6>>
+
+  - path: /dynamic/demos/apinat/neru-7/{neupop_id}
+    operations: *neru-ops
+    query: |
+      <<cypher-neru-7>>
 
   - path: /dynamic/demos/apinat/modelList
     operations:
