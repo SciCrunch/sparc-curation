@@ -512,6 +512,8 @@ class Export(ExportBase):
         # we don't need/want system and type for protcur, it just adds noise
         context.pop('system', None)
         context.pop('type', None)
+        # prov collides with an internal key at this point
+        context.pop('prov', None)
 
         for f in ('meta', 'subjects', 'samples', 'contributors'):
             # subjects samples and contributors no longer included in context directly
