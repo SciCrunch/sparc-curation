@@ -37,8 +37,14 @@ def tangle_files(*files):
     os.system(' '.join(argv))
 
 
+def fix_relative_links(md):
+    group = 'SciCrunch'
+    repo = 'sparc-curation'
+    return md.replace('](./', f'](https://github.com/{group}/{repo}/blob/master/')
+
+
 with open('README.md', 'rt') as f:
-    long_description = f.read()
+    long_description = fix_relative_links(f.read())
 
 RELEASE = '--release' in sys.argv
 NEED_SIMPLE = not Path('sparcur', 'simple').exists()
@@ -56,7 +62,7 @@ setup(name='sparcur',
       description='assorted',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      url='https://github.com/tgbugs/sparc-curation',
+      url='https://github.com/SciCrunch/sparc-curation',
       author='Tom Gillespie',
       author_email='tgbugs@gmail.com',
       license='MIT',
