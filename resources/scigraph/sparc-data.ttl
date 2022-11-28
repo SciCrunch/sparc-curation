@@ -30,7 +30,7 @@
 @prefix pancr: <https://apinatomy.org/uris/models/pancreas/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
-    owl:imports-todo <file:///tmp/scigraph-build/sparc-data/build-prov.ttl> ;
+    owl:imports <file:///tmp/scigraph-build/sparc-data/prov-record.ttl> ;
     owl:imports <https://cassava.ucsd.edu/sparc/ontologies/protcur.ttl> ;
     owl:imports <https://cassava.ucsd.edu/ApiNATOMY/ontologies/keast-bladder.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/bolser-lewis.ttl>,
