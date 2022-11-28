@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 1f1710be5dce6f5cbfc2a7d7860bc19735276e8f0eed5bf3daa754f8c51221aa; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: f8365b82b3759ef55f67f3165a3d3881c0354c4ee13fa1a49afd0ff18dba00bb; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -119,6 +119,14 @@ Yes this is make."
 (defun py-x ()
   (or (executable-find "pypy3")
       (executable-find "python")))
+
+(defun make-prov-record (path)
+  ;; reminder: because the id is always build:prov processes can
+  ;; add additional prov triples independently as needed without
+  ;; needing to extend the core python code
+  (run-command
+   (py-x) "-m" "pyontutils.ontload"
+   "prov" "blazegraph" path))
 
 (defun get-ontology (iri merged-path)
   (run-command ;; FIXME not clear that this is the best approach here
@@ -311,6 +319,7 @@ Yes this is make."
   "download latest ttl files and load into blazegraph"
   (let ((exec-path (cons path-br-bin exec-path))
         (journal-path "data/blazegraph.jnl")
+        (prov-path "data/prov-record.ttl") ; FIXME coordinated by convention with SciGraph load
         (p-path "data/protcur.ttl")
         (ce-path (concat "data/curation-export" (and sckan-release "-published") ".ttl"))
         (mis-path "data/sparc-methods.ttl")
@@ -342,6 +351,9 @@ Yes this is make."
         (apinat-sentinel-path "data/keast-bladder.ttl")
         apinat-paths)
     ;; 4
+    (unless-file-exists-p prov-path
+      ;; note that load prov explicitly does not change on resume
+      (make-prov-record prov-path))
     (unless-file-exists-p p-path
       ;; FIXME decouple this location
       (url-copy-file-safe (concat cass-ont "protcur.ttl")
@@ -436,7 +448,9 @@ Yes this is make."
            ,npo-r-path
            ,mis-r-path
 
-           ,@(mapcar (lambda (p) (concat "data/" p)) apinat-paths)))))))
+           ,@(mapcar (lambda (p) (concat "data/" p)) apinat-paths)
+
+           ,prov-path))))))
 
 (defun step-add-prefixes-file ()
   "Get or create the latest prefix specification file."
