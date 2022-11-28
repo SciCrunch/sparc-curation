@@ -1201,7 +1201,7 @@ ext = onts  # XXX schema change
 def query(neupop_id):
     import requests
     url = ('https://scicrunch.org/api/1/sparc-scigraph/scigraph/dynamic/'
-           f'demos/apinat/neru-6/{neupop_id}?limit=9999999&key={auth.get("scigraph-api-key")}')
+           f'demos/apinat/neru-7/{neupop_id}?limit=9999999&key={auth.get("scigraph-api-key")}')
     resp = requests.get(url, headers={'Accept': 'application/json'})
     blob = resp.json()
     return blob
