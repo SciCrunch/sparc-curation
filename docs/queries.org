@@ -75,6 +75,8 @@ exit
 #+link: tech http://uri.interlex.org/tgbugs/uris/readable/technique/
 #+link: asp http://uri.interlex.org/tgbugs/uris/readable/aspect/
 #+link: unit http://uri.interlex.org/tgbugs/uris/readable/aspect/unit/
+#+link: build http://uri.interlex.org/tgbugs/uris/readable/build/
+#+link: buildid http://uri.interlex.org/tgbugs/uris/readable/build/id/
 #+link: ilxtio http://uri.interlex.org/tgbugs/uris/indexes/ontologies/
 #+link: nposimtest http://uri.interlex.org/tgbugs/uris/readable/npo-simple-test-1/
 #+link: hyp-protcur https://uilx.org/tgbugs/u/hypothesis/protcur/
@@ -3832,8 +3834,21 @@ select ?s ?p ?o where {
 values ?p { prov:startedAtTime prov:wasGeneratedBy dc:date owl:versionInfo TEMP:TimestampExportStart }
 ?s ?p ?o . } order by desc(str(?o))
 #+end_src
-** TODO versions
+** versions
 Useful version information is not present in all ontology files at the moment.
+*** embedded load provenance record
+#+begin_src sparql
+SELECT ?p ?o WHERE {
+build:prov ?p ?o .
+}
+#+end_src
+
+#+begin_src cypher :results drawer
+MATCH
+(p)-[i:build:id]-(),
+(p)-[e]-()
+RETURN i, e
+#+end_src
 
 *** curation-export.ttl
 #+begin_src sparql
