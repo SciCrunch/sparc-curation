@@ -3858,8 +3858,22 @@ select ?s ?tes ?vi where {
 }
 #+end_src
 
-*** TODO protcur.ttl
-*** TODO apinat models
+*** protcur.ttl
+#+begin_src sparql
+select distinct ?o where {
+  <https://cassava.ucsd.edu/sparc/ontologies/protcur.ttl> owl:versionInfo ?o
+}
+#+end_src
+
+*** apinat models
+:PROPERTIES:
+:CUSTOM_ID: apinat-models
+:END:
+From [[cypher-apinat-graphs]]
+#+begin_src cypher :results drawer
+MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g) RETURN g
+#+end_src
+
 * Use cases
 ** Connectivity dashboard
 *** organs
@@ -4663,12 +4677,13 @@ WHERE {
 #+name: sparql-apinat-models
 #+begin_src sparql
 SELECT DISTINCT
-?o (str(?l) as ?label)
+?o (str(?l) as ?label) (str(?v) as ?version)
 WHERE {
 ?o a owl:Ontology ;
    rdfs:label ?l ;
    apinatomy:hasGraph ?g .
 ?g a elements:Graph .
+?g apinatomy:version ?v .
 }
 #+end_src
 
@@ -4676,6 +4691,7 @@ WHERE {
 # something other than the graph results so that we can match
 # sparql unfortunately that is a larger engineering undertaking the
 # requires modifying scigraph again
+
 #+name: cypher-apinat-graphs
 #+begin_src cypher
 MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g) RETURN g
