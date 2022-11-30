@@ -6,16 +6,16 @@
 - ApiNATOMY models now contain version information in the form of a
   checksum on their input model ([[./queries.org::#apinat-models][example query]]).
 - ApiNATOMY schema change =inheritedExternal -> inheritedOntologyTerms=
-=inheritedExternal= still exists and may appear in some models,
-however ontology terms now only show up under =inheritedOntologyTerms=
-and are no longer included in =inheritedExternals=.
+  =inheritedExternal= still exists and may appear in some models,
+  however ontology terms now only show up under =inheritedOntologyTerms=
+  and are no longer included in =inheritedExternals=.
 - NPO added ebm sparc-nlp (replaces ebm nerves)
 - NPO removed ebm nerves
 - NPO aacar added hasInstanceInTaxon axioms
 - NPO kblad added hasInstanceInTaxon axioms
 - Blazegraph/SciGraph loaded graphs now embed information about
-build provenance that can be used to identify the version of a graph.
-See [[./queries.org::#versions]] for examples.
+  build provenance that can be used to identify the version of a graph.
+  See [[./queries.org::#versions]] for examples.
 * Release NEXT
 ** New models
 *** ApiNATOMY
