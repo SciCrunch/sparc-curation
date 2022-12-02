@@ -39,7 +39,8 @@
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/pancreas.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/spleen.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-distal-colon.ttl>,
-        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl> ;
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sawg-stomach.ttl>,
+        <https://cassava.ucsd.edu/ApiNATOMY/ontologies/wbrcm.ttl> ;
     ilxtr:imports-big <http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl>,
         <http://ontology.neuinfo.org/NIF/extra.ttl>,
         <http://ontology.neuinfo.org/NIF/ttl/nif.ttl> ;
