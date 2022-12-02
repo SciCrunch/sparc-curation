@@ -3940,10 +3940,10 @@ def main(id=None, **kwargs):
 
     if ik('git_repos'):
         import augpathlib as aug
-        from sparcur import cli
+        import sparcur
         from sparcur.config import auth
         from importlib import metadata
-        d = metadata.distribution(cli.__package__)
+        d = metadata.distribution(sparcur.__package__)
         rps = [p for p in [aug.RepoPath(d._path) for d in d.discover()] if p.working_dir]
         setups = [p for p in [p.parent / 'setup.py' for p in rps] if p.exists()]
         wds = sorted(set([p.working_dir for p in rps]))
