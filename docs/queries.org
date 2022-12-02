@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: fe0aec87dfc269b9939a06981edd79b65a8518c846ef41006fb277d8fdb10517; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: dc994acd7e01cb578f585cf84dced28894803062a3cb3cc3d18ddf971a621a59; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -100,6 +100,7 @@ exit
 #+link: dlcon https://apinatomy.org/uris/models/dev-layout-conn/ids/
 #+link: splen https://apinatomy.org/uris/models/spleen/ids/
 #+link: pancr https://apinatomy.org/uris/models/pancreas/ids/
+#+link: wbrcm https://apinatomy.org/uris/models/wbrcm/ids/
 # FIXME definition is not expanding as expected, probably because my
 # implementation is wrong?? but only occasionally? other times it works ??
 #+link: definition http://purl.obolibrary.org/obo/IAO_0000115
@@ -5329,8 +5330,7 @@ RETURN p1, p2, p3, p4, p5, p6
          ,(when gt26 '(jupyter . t))))))))
 
 (unless (fboundp #'ob-cypher/scigraph/query)
-  (reval 'sha256 '70915a959168c67ff51281c17e7ed6f45fd3ecfd4fed226e12b75c4f73ef5d9c
-         "https://raw.githubusercontent.com/tgbugs/ob-cypher/7ed675f82fcc67978e689103cf828365546dc223/ob-cypher.el"))
+  (reval 'sha256 '30fd7742d7b00bd963310b4af9e505f07f981ff8b26f9b6315baa14574348e88 "https://raw.githubusercontent.com/tgbugs/ob-cypher/7778fa42ae3a49b9370939b14a3e9cefbd884a51/ob-cypher.el"))
 
 (unless (fboundp #'org-babel-sparql--table-replace-curies)
   (reval 'sha256 '62bdbaf3d54f16b5019715f1dd175ecda8b37de420d14bcb8a469ef6820c5386
