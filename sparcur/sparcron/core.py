@@ -306,6 +306,7 @@ argv_spc_find_meta = [
     "--name", "dataset_description*",
     "--name", "subjects*",
     "--name", "samples*",
+    "--name", "performances*",
     "--name", "manifest*",
     "--name", "resources*",
     "--name", "README*",
