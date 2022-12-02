@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0cae02769c301e8633c7a103d4a243381ef6cdc20c78221caa6a9a363de13402; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: fe0aec87dfc269b9939a06981edd79b65a8518c846ef41006fb277d8fdb10517; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5231,6 +5231,9 @@ RETURN p1, p2, p3, p4, p5, p6
 #+begin_src elisp :results none :exports none :lexical yes
 (defvar ow-do-packages-emacs t "Install Emacs packages.")
 (defvar ow-do-config-emacs t "Run code that modifies the Emacs configuration.")
+
+(unless (symbol-function 'org-assert-version) ;; sigh
+  (defmacro org-assert-version () 't))
 
 (setq inhibit-startup-screen t)
 
