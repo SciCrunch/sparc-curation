@@ -234,6 +234,7 @@ class TriplesExportDataset(TriplesExport):
         for _s, p, o in dconverter.triples_gen(dcs):
             if p == sparc.isContactPerson and o._value == True:
                 yield dsid, TEMP.hasContactPerson, s
+
             yield _s, p, o
 
     @property
@@ -245,18 +246,15 @@ class TriplesExportDataset(TriplesExport):
         except BaseException as e:  # FIXME ...
             raise e
 
-        if 'meta' in data:
-            meta_converter = conv.MetaConverter(data['meta'], self)
-            yield from meta_converter.triples_gen(dsid)
-        else:
-            loge.warning(f'{self} has no meta!')  # FIXME split logs into their problems, and our problems
-
-        if 'submission' in data:
-            submission_converter = conv.SubmissionConverter(data['submission'], self)
-            yield from submission_converter.triples_gen(dsid)
-        else:
-            loge.warning(f'{self} has no submission!')  # FIXME split logs into their problems, and our problems
-
+        for key, convclass in (('meta', conv.MetaConverter),
+                               ('rmeta', conv.RmetaConverter),
+                               ('submission', conv.SubmissionConverter)
+                               ):
+            if key in data:
+                converter = convclass(data[key], self)
+                yield from converter.triples_gen(dsid)
+            else:
+                loge.warning(f'{self} has no {key}!')  # FIXME split logs into their problems, and our problems
         if 'status' not in data:
             breakpoint()
 
@@ -361,7 +359,7 @@ class TriplesExportDataset(TriplesExport):
                 yield s, rdf.type, sparc.Subject
                 yield s, TEMP.hasDerivedInformationAsParticipant, dsid
                 yield dsid, TEMP.isAboutParticipant, s
-                yield from converter.triples_gen(s)
+                yield from converter.triples_gen(s, raw_keys=True)
 
         yield from triples_gen(self.subject_id, self.subjects)
 
@@ -399,7 +397,7 @@ class TriplesExportDataset(TriplesExport):
                 # collapses to? specimen - hasInformationDerivedFromProce -> <- containsInformationAbout - dataset
                 yield dsid, TEMP.isAboutParticipant, s  # containsInformationAboutParticipant[Primary] TEMP.containsInformationAbout, isAbout is probably a better base
                 # could be further refined to isAboutParticiantPrimary, with a note that if multiple measurement processes happened, there can be multiple primaries for a dataset
-                yield from converter.triples_gen(s)
+                yield from converter.triples_gen(s, raw_keys=True)
                 # see https://github.com/information-artifact-ontology/IAO/issues/60, there isn't a good inverse relation
                 # original though was subjectOfInformation, but that was confusing in the current terminology where subject already has 2 meanings
                 # hasInformationDerivedFromProcessWhereWasParticipant -> hasInformationDerivedFromProcessWhereWasPrimaryParticipant seems most correct, but is extremely verbose

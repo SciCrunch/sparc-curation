@@ -8,6 +8,7 @@ import idlib
 import rdflib
 import augpathlib as aug
 from joblib import Parallel, delayed
+from dateutil import parser as dateparser
 from hyputils import hypothesis as hyp
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses
@@ -1318,6 +1319,19 @@ class PipelineExtras(JSONPipeline):
         [['inputs', 'remote_dataset_metadata', 'readme', 'readme'],
          ['rmeta', 'readme']],
 
+        # TODO grab ['inputs' , 'remote_dataset_metadata', 'contributors'] as well
+
+        *copy_all(['inputs' , 'remote_dataset_metadata'], ['rmeta'],
+                  'id_published',
+                  'id_int',
+                  'canPublish',
+                  'published_version',
+                  'published_revision',
+                  'timestamp_published_version',
+                  'tags',  # TODO merge/reconcile with keywords
+                  'description',
+                  'license',
+                  )
         # 2.0.0 -> 1.2.3 ir compat # FIXME technically should be conditional
 
         # FIXME we cannot include this because subtitle has specific semanitcs on
@@ -1338,6 +1352,7 @@ class PipelineExtras(JSONPipeline):
         # the madness that is the current normalization implementation ...
         [['meta', 'description'], norm.description],
         [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['rmeta', 'timestamp_published_version'], dateparser.parse],
         [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [__mr_path + ['protocol_url_or_doi'], norm.protocol_url_or_doi],

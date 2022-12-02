@@ -65,7 +65,7 @@ class TripleConverter(dat.HasErrors):
         if isinstance(value, ProtcurExpression):
             return value
         if isinstance(value, Quantity):
-            return value
+            return value  # FIXME raw_keys doesn't handle this correctly
         elif isinstance(value, str) and value.startswith('http'):
             return OntId(value).u
         elif isinstance(value, dict):  # FIXME this is too late to convert?
@@ -82,7 +82,7 @@ class TripleConverter(dat.HasErrors):
         else:
             return rdflib.Literal(value)
 
-    def triples_gen(self, subject):
+    def triples_gen(self, subject, raw_keys=False):
         if not (isinstance(subject, rdflib.URIRef) or
                 isinstance(subject, rdflib.BNode)):
             if isinstance(subject, idlib.Stream):
@@ -171,6 +171,15 @@ class TripleConverter(dat.HasErrors):
                 msg = f'Unhandled {self.__class__.__name__} field: {field}'
                 if self.addError(msg, pipeline_stage=self.__class__.__name__ + '.export-error'):
                     log.warning(msg)
+
+                if raw_keys:
+                    _o = self.l(value)
+                    if not isinstance(_o, rdflib.term.Node):
+                        msg = f'wat {_o}, {type(_o)}'
+                        log.critical(msg)
+                        _o = rdflib.Literal(str(_o))
+
+                    yield subject, TEMPRAW[field], _o
 
 
 class ContributorConverter(TripleConverter):
@@ -368,6 +377,27 @@ class MetaConverter(TripleConverter):
 MetaConverter.setup()  # box in so we don't forget
 
 
+class RmetaConverter(TripleConverter):
+    known_skipped = [
+        'canPublish',
+        'readme',
+        'tags',  # TODO
+        'description',
+    ]
+    mapping = [
+        ['license', TEMP.hasLicense],
+        ['timestamp_published_version', TEMP.wasPublishedAtTime],
+        ['published_version', TEMP.publishedVersion],
+        ['published_revision', TEMP.publishedRevision],
+    ]
+    def id_published(self, value):
+        if value is not None:
+            uri = f'https://sparc.science/datasets/{value}'
+            return TEMP.hasUriPublished, self.l(uri)
+        else:
+            raise exc.NoTripleError('value was None')  # SIGH
+RmetaConverter.setup()  # box in so we don't forget
+
 class DatasetConverter(TripleConverter):
     known_skipped = 'id', 'errors', 'inputs', 'subjects', 'meta', 'creators'
     mapping = []
@@ -479,6 +509,8 @@ class SubjectConverter(TripleConverter):
         ['age', TEMP.hasAge],
         ['age_years', TEMP.hasAge],  # FIXME this is ok because we catch it when converting but
         # it is yet another case where things are decoupled
+        ['age_range_min', TEMP.hasAgeMin],
+        ['age_range_max', TEMP.hasAgeMax],
 
         ['body_mass_weight', TEMP.subjectHasWeight],  # FIXME human vs animal, sigh
 
@@ -513,7 +545,9 @@ class SampleConverter(TripleConverter):
         ['sample_description', dc.description],
         ['experimental_group', TEMP.hasAssignedGroup],
         ['group', TEMP.hasAssignedGroup],
+    ] + file_related + performance_related + utility
 
+    _mapping_todo = [
         ['specimen', TEMP.TODO],  # sometimes used as anatomical location ...
         ['tissue', TEMP.TODO],
         ['counterstain', TEMP.TODO],
@@ -525,7 +559,8 @@ class SampleConverter(TripleConverter):
         ['electrode_implant_location', TEMP.TODO],
         ['stimulation_electrode___chronic_or_acute', TEMP.TODO],
         ['includes_chronically_implanted_electrode_', TEMP.TODO],
-    ] + file_related + performance_related + utility
+    ]
+
     def subject_id(self, value):
         # FIXME _subject_id is monkey patched in
         return TEMP.wasDerivedFromSubject, self._subject_id(value)
