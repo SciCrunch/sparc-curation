@@ -28,6 +28,7 @@
 @prefix splen: <https://apinatomy.org/uris/models/spleen/ids/> .
 @prefix dlcon: <https://apinatomy.org/uris/models/dev-layout-conn/ids/> .
 @prefix pancr: <https://apinatomy.org/uris/models/pancreas/ids/> .
+@prefix wbrcm: <https://apinatomy.org/uris/models/wbrcm/ids/> .
 
 <https://cassava.ucsd.edu/ApiNATOMY/ontologies/sparc-data.ttl> a owl:Ontology ;
     owl:imports <file:///tmp/scigraph-build/sparc-data/prov-record.ttl> ;
