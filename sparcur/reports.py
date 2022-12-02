@@ -10,7 +10,6 @@ import idlib
 import htmlfn as hfn
 import augpathlib as aug
 from hyputils import hypothesis as hyp
-from protcur import document as ptcdoc
 from pyontutils.core import OntGraph, OntRes, OntResIri, OntResPath
 from pyontutils.utils import UTCNOWISO, anyMembers, Async, deferred
 from pyontutils.namespaces import isAbout, ilxtr, TEMP
@@ -1243,6 +1242,7 @@ class Report:
                                     ext=ext)
 
     def _by_tags(self, *tags, links=True, ext=None):
+        from protcur import document as ptcdoc
         annos = self._annos()
         bannos = [ptcdoc.Annotation(a) for a in annos]  # better annos
         pool = ptcdoc.Pool(bannos)
