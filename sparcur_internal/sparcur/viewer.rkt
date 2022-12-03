@@ -13,10 +13,10 @@
          net/url)
 
 (define-runtime-path asdf "viewer.rkt")
-(define this-file (and asdf (path->string asdf)))
-(define this-file-compiled (and this-file (with-handlers ([exn? (λ (e) #f)]) (get-compilation-bytecode-file this-file))))
-(define this-file-exe (and this-file (embedding-executable-add-suffix (path-replace-extension this-file "") #f)))
-(define this-file-exe-tmp (and this-file-exe (path-add-extension this-file-exe "tmp")))
+(define this-file (path->string asdf))
+(define this-file-compiled (with-handlers ([exn? (λ (e) this-file)]) (get-compilation-bytecode-file this-file)))
+(define this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file "") #f))
+(define this-file-exe-tmp (path-add-extension this-file-exe "tmp"))
 
 (when (and this-file-exe-tmp (file-exists? this-file-exe-tmp))
   ; windows can't remove a running exe ... but can rename it ... and then delete the old
@@ -42,16 +42,21 @@
 (define current-jview (make-parameter #f))
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
-(define python-interpreter (make-parameter
-                            (path->string
-                             (find-executable-path
-                              (case (system-type)
-                                ((windows) "python.exe")
-                                ; osx is still stuck on 2.7 by default so need brew
-                                ; but for whatever reason find-executable-path is not brew aware
-                                ((macosx) "/usr/local/bin/python3")
-                                ((unix) (or (find-executable-path "pypy3") "python")) ; all of these should be >= 3.7 by this point
-                                (else (error "uhhhhh? beos is this you?")))))))
+(define python-interpreter
+  (make-parameter
+   (path->string
+    (let ([interp (find-executable-path
+                   (case (system-type)
+                     ((windows) "python.exe")
+                     ; osx is still stuck on 2.7 by default so need brew
+                     ; but for whatever reason find-executable-path is not brew aware
+                     ((macosx) "/usr/local/bin/python3")
+                     ((unix) (or #;(find-executable-path "pypy3") "python")) ; all of these should be >= 3.7 by this point
+                     (else (error "uhhhhh? beos is this you?"))))])
+      (or interp (error "no python interpreter found!"))))))
+
+;; TODO add check to make sure that the python modules are accessible as well
+
 (define terminal-emulator
   (begin
     #;
@@ -334,9 +339,11 @@
                         (println (format "running raco exe -v -o ~a ~a "
                                          this-file-exe this-file))
                         (parameterize ()
-                          (rename-file-or-directory this-file-exe this-file-exe-tmp)
+                          (when (file-exists? this-file-exe)
+                            (rename-file-or-directory this-file-exe this-file-exe-tmp))
                           (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
-                          (unless (file-exists? this-file-exe) ; restore the old version on failure
+                          (unless (and (file-exists? this-file-exe) (file-exists? this-file-exe-tmp))
+                            ; restore the old version on failure
                             (rename-file-or-directory this-file-exe-tmp this-file-exe)))
                         #; ; this is super cool but an eternal pain for raco exe
                         (parameterize ([current-command-line-arguments
