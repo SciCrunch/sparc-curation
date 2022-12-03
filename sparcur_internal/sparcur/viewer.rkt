@@ -14,11 +14,11 @@
 
 (define-runtime-path asdf "viewer.rkt")
 (define this-file (and asdf (path->string asdf)))
-(define this-file-compiled (and this-file (get-compilation-bytecode-file this-file)))
+(define this-file-compiled (and this-file (with-handlers ([exn? (λ (e) #f)]) (get-compilation-bytecode-file this-file))))
 (define this-file-exe (and this-file (embedding-executable-add-suffix (path-replace-extension this-file "") #f)))
 (define this-file-exe-tmp (and this-file-exe (path-add-extension this-file-exe "tmp")))
 
-(when (file-exists? this-file-exe-tmp)
+(when (and this-file-exe-tmp (file-exists? this-file-exe-tmp))
   ; windows can't remove a running exe ... but can rename it ... and then delete the old
   ; file on next start
   (delete-file this-file-exe-tmp))
@@ -1199,7 +1199,7 @@ switch to that"
 
 (define button-fexport (new (tooltip-mixin button%)
                             [label "Fetch+Export"]
-                            [tooltip "Shortcut C-f"] ; FIXME this should populate dynamically
+                            [tooltip "Shortcut F5"] ; FIXME this should populate dynamically
                             [tooltip-delay 100]
                             [callback cb-fetch-export-dataset]
                             [parent panel-ds-actions]))
