@@ -1,0 +1,55 @@
+* Installation
+Big mess. Annoying order dependencies for installation of python
+packages. Manual installs from git repos for racket json view, etc.
+
+Consider using gentoo prefix on macos to manage the python deps, need
+to retain the native racket on macos though, or figure out how to get
+the gentoo ebuild to trigger a macos build instead of a linux based
+build when in prefix, likely too much work and the long compile times
+are bad for users.
+
+* Configuration
+Initial configuration is currently a mess, it needs to be managable
+via the options window, and the initial updates to use sxpr files for
+config so that configs are accessible across languages have been made,
+but the switchover has not been completed yet.
+
+1. google: use a services account read only json blob.
+2. pennsieve key, secret
+3. hypothes.is key
+4. protocols.io key and more
+
+* Reminders
+Don't close the viewer terminal!
+
+* Upgrading across racket versions, upgrading across python versions
+Auto update mostly works until you get to a point where you have to update your racket version.
+Then we are out of luck because the update has to fully succeed without any errors otherwise
+the system will likely be left in a bad state.
+
+** python
+updating python versions is an even bigger nightmare due to the installation order issues
+minimally it seems we need to install sparcur and pyontutils, but the ordering is still
+bad news, don't forget to remove all the .egg-info folders first etc
+
+#+begin_src bash
+brew install python3
+# and then manually
+for folder in things_in_the_right_order; do
+pushd ${folder};
+pip install --user -e .;
+popd;
+done
+#+end_src
+
+** racket
+#+begin_src bash
+brew update
+brew upgrade
+
+raco pkg migrate ${previous_version}
+pushd ~/git/sparc-curation/sparcur_internal/sparcur
+raco make viewer.rkt
+raco exe viewer.rkt
+popd
+#+end_src
