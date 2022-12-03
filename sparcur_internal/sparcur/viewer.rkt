@@ -342,9 +342,9 @@
                           (when (file-exists? this-file-exe)
                             (rename-file-or-directory this-file-exe this-file-exe-tmp))
                           (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
-                          (unless (and (file-exists? this-file-exe) (file-exists? this-file-exe-tmp))
-                            ; restore the old version on failure
-                            (rename-file-or-directory this-file-exe-tmp this-file-exe)))
+                          (unless (file-exists? this-file-exe) ; restore the old version on failure
+                            (when (file-exists? this-file-exe-tmp)
+                              (rename-file-or-directory this-file-exe-tmp this-file-exe))))
                         #; ; this is super cool but an eternal pain for raco exe
                         (parameterize ([current-command-line-arguments
                                         (vector
