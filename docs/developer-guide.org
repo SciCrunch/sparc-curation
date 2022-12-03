@@ -1476,8 +1476,13 @@ Deploy to local dev blazegraph.
 [[./release.org::*Deploy journal to local server]]
 
 critical checks:
-1. run the ApiNATOMY dashboard queries and inspect the numbers
-2. check for empty classes e.g. via =grep 'a owl:Class \.$'= (can do this before scigraph load)
+1. run the [[file:queries.org::#apinat-dashboard][ApiNATOMY dashboard]] queries and inspect the numbers
+
+2. check files in data folder for empty classes e.g. via =grep 'a owl:Class \.$'= (can do this before scigraph load)
+
+3. check prov-record matches expected
+
+4. future run the [[file:queries.org::#npo-dashboard][NPO dashboard]]
 
 **** Deploy to staging
 #+begin_src bash
@@ -1491,6 +1496,128 @@ critical checks:
 echo manual step waiting for signal from human to start next automated portion
 #+end_src
 
+**** Test staging
+Use mapknowledge to test over all neurons where all
+neurons is the list from some other query
+#+begin_src elisp
+(defun advise--obe-python-path (command &rest args)
+  (let* ((params (cadr args))
+         (_ (message "%s" params))
+         (python-path (cdr (assq :python-path params)))
+         (process-environment
+          (or (and python-path
+                   (cons (format "PYTHONPATH=%s" python-path)
+                         process-environment))
+              process-environment)))
+    (apply command args)))
+
+(advice-add #'org-babel-execute:python :around
+            #'advise--obe-python-path)
+#+end_src
+
+# #+header: :python "/usr/bin/urxvt -e /usr/bin/python -- "
+# #+header: :epilogue "\nreturn result"
+#+begin_src python :noweb yes :python-path (expand-file-name "~/git/NOFORK/map-knowledge:")
+#import sys
+#return [[p] for p in sys.path]
+from mapknowledge import KnowledgeStore
+from mapknowledge.scicrunch import SCICRUNCH_PRODUCTION, SCICRUNCH_STAGING, SciCrunch
+from pyontutils.scigraph_codegen import moduleDirect
+from pyontutils.config import auth
+from sparcur.utils import log
+
+
+def test_prod(curie):
+    return test_endpoint(curie, SCICRUNCH_PRODUCTION)
+
+
+def test_stage(curie):
+    return test_endpoint(curie, SCICRUNCH_STAGING)
+
+
+def test_endpoint(curie, endpoint):
+    store = KnowledgeStore(scicrunch_release=endpoint)
+    store._KnowledgeStore__scicrunch._SciCrunch__scicrunch_key = auth.get('scigraph-api-key')  # XXX SSIIIIIGH
+    try:
+        wat, *rest = curie.rsplit('/', 1)
+        result = store.entity_knowledge(wat)
+        log.info(result)
+    finally:
+        store.close()
+    #
+    skip = ('id', 'label', 'long-label', 'phenotypes', 'references')
+    out = {k:v for k, v in result.items() if v and k not in skip}
+    return out  # !?!??!?!!?! apparently a newline before this breaks everything !??!
+
+
+def testn(curie):
+    p = test_prod(curie)
+    s = test_stage(curie)
+    # XXX probably not quite right given ps and s values
+    if p and not s:
+        return False, ('removed', p, s)
+    elif not s:
+        return False, ('missing', p, s)
+
+    if s and not p:
+        log.info(f'new neuron {curie}')
+
+    #
+    return True, ('ok', p, s)
+
+
+def testnall(curies):
+    bads = []
+    for curie in curies:
+        try:
+            ok, data = testn(curie)
+        except Exception as e:
+            ok, data = False, ('error', e, e)
+
+        if not ok:
+            bads.append((curie, data))
+    if bads:
+        log.error(bads)
+    #
+    return bads
+
+
+def dewit(endpoint):
+    base = f'https://scicrunch.org/api/1/{endpoint}'  # XXX no trailing path
+    scigraphd = moduleDirect(base, 'scigraphd')
+    scigraphd.restService._api_key = auth.get('scigraph-api-key')
+    sgc = scigraphd.Cypher()
+    #sgd = scigraphd.Dynamic()  # XXX FIXME all pops no in the dynamic endpoints atm
+    curies_raw = sgc.execute(
+    # XXX must use `org-babel-lob-ingest' on queries.org for this to work
+    """
+    OPTIONAL MATCH (start:Ontology)
+    <-[:isDefinedBy]-(graph:NamedIndividual)
+    -[:type]->({iri: "https://apinatomy.org/uris/elements/Graph"})
+    , (start)
+    <-[:isDefinedBy]-(external:Class)
+    -[:subClassOf*]->(:Class {iri: "http://uri.interlex.org/tgbugs/uris/readable/NeuronEBM"})
+    return external
+    """, limit=99999, output='application/json')
+    #curies_raw = sgd
+    curies = [c['id'] for c in curies_raw['nodes']]
+    #breakpoint()
+    count = 2
+    sample_size = 15
+    bads = []
+    for n in range(count):
+        # randomly sample the subset to test
+        test_set = random.sample(curies, sample_size)
+        _bads = testnall(test_set)
+        bads.extend(_bads)
+
+    return bads
+
+
+result = dewit(SCICRUNCH_STAGING)
+#+end_src
+
+Future: similar for NPO
 **** Build docker images
 # TODO we can absolutely automate this, but bash is a bad top level to
 # try to express what needs to be done wrt nowebbing blocks in from
