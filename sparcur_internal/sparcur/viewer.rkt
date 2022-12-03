@@ -13,10 +13,10 @@
          net/url)
 
 (define-runtime-path asdf "viewer.rkt")
-(define this-file (path->string asdf))
-(define this-file-compiled (get-compilation-bytecode-file this-file))
-(define this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file "") #f))
-(define this-file-exe-tmp (path-add-extension this-file-exe "tmp"))
+(define this-file (and asdf (path->string asdf)))
+(define this-file-compiled (and this-file (get-compilation-bytecode-file this-file)))
+(define this-file-exe (and this-file (embedding-executable-add-suffix (path-replace-extension this-file "") #f)))
+(define this-file-exe-tmp (and this-file-exe (path-add-extension this-file-exe "tmp")))
 
 (when (file-exists? this-file-exe-tmp)
   ; windows can't remove a running exe ... but can rename it ... and then delete the old
