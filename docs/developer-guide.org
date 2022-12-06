@@ -1409,11 +1409,10 @@ See [[./setup.org::#export-v4]] for the most recent workflow for batch release.
 ***** NPO
 #+begin_src bash
 python -m neurondm.build release
+python -m neurondm.models.apinat_pops_more
 #+end_src
 Super manual curation, identifier sync, review, merge, commit, push, etc.
 
-There are also two other sets of blocks in [[./apinatomy.org::#npo-identifiers]]
-for apinatomy-neuron-populations.py and apinat-pops-more.py that require manual sync.
 ***** ApiNATOMY
 #+begin_src bash
 ~/git/sparc-curation/docs/apinatomy.org --all
