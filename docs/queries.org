@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: dc994acd7e01cb578f585cf84dced28894803062a3cb3cc3d18ddf971a621a59; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 200eba5e2ae97057d8d0681280d4051dd8a1cae4dd8e4da99b7c2c34955236bc; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -357,20 +357,60 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 
 #+RESULTS:
 [[file:./reports/protocol-report.csv]]
+*** Total protocols
+#+name: sparql-count-protocols
+#+begin_src sparql
+SELECT (COUNT(DISTINCT ?protocol) AS ?count)
+WHERE { ?protocol a sparc:Protocol . }
+#+end_src
 
 *** Published protocols with complex protcur annotations
+#+name: sparql-complex-protocols-count
+#+begin_src sparql :noweb no-export
+SELECT (COUNT(*) as ?count) {
+  <<sparql-complex-protocols>>
+}
+#+end_src
+
+#+name: sparql-complex-protocols-published-count
+#+begin_src sparql :noweb no-export
+SELECT (COUNT(*) as ?count) {
+  <<sparql-complex-protocols-published>>
+}
+#+end_src
+
+#+name: sparql-complex-protocols
+#+begin_src sparql :noweb no-export
+<<sparql-complex-protocols-1>>
+<<sparql-complex-protocols-2>>
+#+end_src
+
+#+name: sparql-complex-protocols-published
+#+begin_src sparql :noweb no-export
+<<sparql-complex-protocols-1>>
+    ?protocol TEMP:hasDoi ?doi .
+<<sparql-complex-protocols-2>>
+#+end_src
+
+#+name: sparql-complex-protocols-1
 #+begin_src sparql
 select distinct
 ?protocol ?anno_count
-#(count(distinct ?protocol) as ?pc)
 where {
-    ?protocol a sparc:Protocol .
-    ?protocol TEMP:hasDoi ?doi .
-    ?protocol ?some_predicate ?annotation .
     ?annotation TEMP:protcurChildren ?some_child .
-    ?protocol TEMP:hasNumberOfProtcurAnnotations ?anno_count .
+    ?protocol a sparc:Protocol ;
+              ?some_predicate ?annotation ;
+              TEMP:hasNumberOfProtcurAnnotations ?anno_count .
+#+end_src
+#+name: sparql-complex-protocols-2
+#+begin_src sparql
 } order by desc(?anno_count)
 #+end_src
+
+# FIXME one failure of noweb is that you cannot remix and recombine in
+# case where there is nesting, e.g. if I wanted the where clause to be
+# the same except for one line, I couldn't reuse a block because you
+# can make a noweb ref something that can be passed as an argument
 
 *** Conditions studied
 *** Experimental groups
@@ -3895,7 +3935,7 @@ expand into triples using arrays or something like that."
 #+end_src
 
 #+name: py-ttl-subjects
-#+begin_src python :noweb yes :var input=ttl-organs() :results code :wrap src ttl
+#+begin_src python :noweb yes :var input=(orgstrap--with-block "ttl-organs" body) :results code :wrap src ttl
 from pyontutils.core import OntGraph
 
 g = OntGraph().parse(data=input, format='ttl')
@@ -4095,13 +4135,13 @@ UBERON:0002441 l: "cervicothoracic ganglion"; e: FMA:6469; syn: "stellate gangli
 *** neuron population by organ
 
 #+name: organ-subjects
-#+call: py-ttl-subjects(input=ttl-organs())
+#+call: py-ttl-subjects(input=(orgstrap--with-block "ttl-organs" body)) :cache yes
 
 #+name: ganglia-subjects
-#+call: py-ttl-subjects(input=ttl-ganglia())
+#+call: py-ttl-subjects(input=(orgstrap--with-block "ttl-ganglia" body)) :cache yes
 
 #+name: nerve-subjects
-#+call: py-ttl-subjects(input=ttl-nerves())
+#+call: py-ttl-subjects(input=(orgstrap--with-block "ttl-nerves" body)) :cache yes
 
 # FIXME somehow selecting only predicates here produces numerical results only !?
 #+name: thing
@@ -5236,7 +5276,8 @@ RETURN p1, p2, p3, p4, p5, p6
 (unless (symbol-function 'org-assert-version) ;; sigh
   (defmacro org-assert-version () 't))
 
-(setq inhibit-startup-screen t)
+(when ow-do-config-emacs
+  (setq inhibit-startup-screen t))
 
 ;; FIXME somehow need to mkdir images, unfortunately mkdirp doesn't work for files
 ;; only for tangling ... maybe we should add it so that it works for :file results as well?
