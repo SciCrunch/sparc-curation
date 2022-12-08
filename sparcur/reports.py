@@ -1077,11 +1077,31 @@ class Report:
 
     @idlib.utils.cache_result
     def _annos(self):
-        group_id = auth.get('hypothesis-group')
-        cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
-        get_annos = hyp.Memoizer(memoization_file=cache_file, group=group_id)
-        get_annos.api_token = auth.get('hypothesis-api-key')
-        return get_annos()
+        cache_file = self.options.hypothesis_cache_file
+        if cache_file is None:
+            group_id = auth.get('hypothesis-group')
+            cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
+            get_annos = hyp.Memoizer(memoization_file=cache_file, group=group_id)
+            get_annos.api_token = auth.get('hypothesis-api-key')
+            annos = get_annos()
+        else:
+            group_name = self.options.hypothesis_group_name  # there is a default value
+            group_id = (auth.user_config.secrets('hypothesis', 'group', group_name)
+                if group_name else auth.get('hypothesis-group'))
+            get_annos = hyp.AnnoReader(memoization_file=cache_file, group=group_id)
+            annos, last_sync_updated = get_annos.get_annos_from_file()
+
+        self._annos_cache_file = cache_file
+        return annos
+
+    @idlib.utils.cache_result
+    def _annos_bpc(self):
+        from protcur import document as ptcdoc
+        annos = self._annos()
+        bannos = [ptcdoc.Annotation(a) for a in annos]  # better annos
+        pool = ptcdoc.Pool(bannos)
+        anno_counts = ptcdoc.AnnoCounts(pool)
+        return annos, bannos, pool, anno_counts
 
     @idlib.utils.cache_result
     def _helpers(self):
@@ -1242,11 +1262,7 @@ class Report:
                                     ext=ext)
 
     def _by_tags(self, *tags, links=True, ext=None):
-        from protcur import document as ptcdoc
-        annos = self._annos()
-        bannos = [ptcdoc.Annotation(a) for a in annos]  # better annos
-        pool = ptcdoc.Pool(bannos)
-        anno_counts = ptcdoc.AnnoCounts(pool)
+        annos, bannos, pool, anno_counts = self._annos_bpc()
 
         self._helpers()
         process_protc = anyMembers(tags,
@@ -1283,7 +1299,7 @@ class Report:
                         e,        # key
                         c,        # count
                         (' '.join([a.htmlLink  # links
-                                   if self.options.uri_api else
+                                   if self.options.uri_html else
                                    a.shareLink for a in md[e]]
                                   if links else '')),
                         '',       # docs
@@ -1305,7 +1321,7 @@ class Report:
 
         links = links or self.options.uri or self.options.uri_api
 
-        if tags == ['all']:
+        if list(tags) == ['all']:
             out = []
             for tag in self._all_anno_tags:
                 o = self._by_tags(tag, links=links, ext=ext)
@@ -1436,8 +1452,8 @@ class Report:
                     idlib.exc.RemoteError) as e:
                 pass
 
-        blob_data = self._data_ir(org_id=self.options.project_id)
         blob_protcur = self._protcur()
+        blob_data = self._data_ir(org_id=self.options.project_id)
 
         (either, uios, dois, dios, deref, from_datasets,
          from_hypothesis, protocols) = self._get_protocol_ids(

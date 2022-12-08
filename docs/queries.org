@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 200eba5e2ae97057d8d0681280d4051dd8a1cae4dd8e4da99b7c2c34955236bc; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 214759152ee9a1e8ea8744b82f85d874f4bed3417e487f180d2bad711cde135b; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5292,8 +5292,13 @@ RETURN p1, p2, p3, p4, p5, p6
     (or
      (member lang '("cypher" "sparql"))
      (and
+      (string= lang "python") ; XXX THIS IS TO MAKE AUDITING EASIER YOU SHOULD AUDIT ALL safe-block declarations like this
+      (string-prefix-p "# py-safe-block" body))
+     (and
       (string= lang "elisp")
       (string= body "(string-trim (replace-regexp-in-string \"\\n\" \"\" paragraph))"))))))
+
+(setq-local org-confirm-babel-evaluate-cell nil)
 
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)

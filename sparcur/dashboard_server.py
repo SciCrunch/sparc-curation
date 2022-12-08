@@ -32,6 +32,12 @@ args = {'server': True,
         '--ttl-compare': None,  # FIXME TODO needed for terms
         'hubmap': False,
         'hubmap-anatomy': False,
+
+        '<project-id>': auth.get('remote-organization'),  # '--project-id':
+        '--protcur-file': None,
+        '--uri': True,  # needed by protcur export
+        '--uri-html': True,  # use html link because share links are broken
+        '--hypothesis-cache-file': None,
 }
 
 options = Options(args, defaults)

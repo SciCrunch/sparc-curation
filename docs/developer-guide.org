@@ -1769,24 +1769,57 @@ if __name__ == '__main__':
 Temporary location for some helper code to clone protcur annos to a new group.
 #+begin_src python
 from sparcur.simple.fetch_annotations import (
-    from_group_name_cached_annos, from_user_name_group_name_h)
+    from_group_name_fetch_annotations,
+    from_group_name_cached_annos,
+    from_user_name_group_name_h)
 from protcur import document as ptcdoc
 
 
-def main():
-    annos = from_group_name_cached_annos('sparc-curation')
+#def main():
+annos = from_group_name_cached_annos('sparc-curation')
 
-    bannos = [ptcdoc.Annotation(a) for a in annos]
-    pool = ptcdoc.Pool(bannos)
-    anno_counts = ptcdoc.AnnoCounts(pool)
+bannos = [ptcdoc.Annotation(a) for a in annos]
+pool = ptcdoc.Pool(bannos)
+anno_counts = ptcdoc.AnnoCounts(pool)
 
-    html_annos = from_group_name_cached_annos('fixed-sparc-curation')
-    html_bannos = [ptcdoc.Annotation(a) for a in html_annos]
-    html_pool = ptcdoc.Pool(html_bannos)
+if False: # sort debug
+    ta = pool.topological_annos
+    def asdf(ta):
+        hrm = [a.id for a in ta]
+        de = [(i, [(hrm.index(pid) if pid in hrm else 'oops') for pid in a.text_parent_ids]) for i, a in enumerate(ta) if a.text_parent_ids]
+        qq = [(i, l) for i, l in de if [_ for _ in l if _ != 'oops' and i < _]]
+        sigh = sorted(set([x for i, l in qq for x in [i] + l if x != 'oops']))
+        return qq, sigh
 
-    h_p_f = from_user_name_group_name_h('protbot', 'fixed-sparc-curation')
+    qq, sigh = asdf(ta)
+    bads = [ta[f] for f in sigh]
+    sbads = ptcdoc.toposort(bads)
+    qq2, sigh2 = asdf(sbads)
 
-    pool.clone_to(html_pool, h_p_f)
+group_name = 'fixed-sparc-curation'
+cache_file = from_group_name_fetch_annotations(group_name)
+html_annos = from_group_name_cached_annos(group_name)
+html_bannos = [ptcdoc.Annotation(a) for a in html_annos]
+#html_bannos = []
+html_pool = ptcdoc.Pool(html_bannos)
+
+h_p_f = from_user_name_group_name_h('protbot', group_name)
+
+#pool.clone_to(html_pool, h_p_f)
+
+test = False
+if test:
+    test_bannos = list(pool.bySlugTail('wzuff6w'))  # published with most annos
+    #test_bannos = list(pool.bySlugTail('ba8hiht6'))  # published with low number of annos
+    test_pool = ptcdoc.Pool(test_bannos)
+    test_pool.clone_to(html_pool, h_p_f, test=False)
+else:
+    pool.clone_to(html_pool, h_p_f, test=test)
+
+[a._row for a in html_pool._annos]
+
+# [h_p_f.delete_annotation(a.id) for a in html_pool._annos]
+
 
 
 if __name__ == '__main__':

@@ -117,6 +117,7 @@ Commands:
                 test            do as little as possible (use with --profile)
                 mbf             mbf term report (can use with --unique)
                 anno-tags       list anno exact for a curation tag
+                protocols       general report on status of protocols
                 changes         diff two curation exports
                 mis             list summary predicates used per dataset
                 access          report on dataset access master vs pipelines
@@ -131,6 +132,7 @@ Commands:
                        : --unique
                        : --uri
                        : --uri-api
+                       : --uri-html
                        : --debug
                        : --export-file=PATH
                        : --protcur-file=PATH
@@ -194,6 +196,7 @@ Options:
     -b --browser            open the uri in default browser
     -u --uri                print the human uri for the path in question
     -a --uri-api            print the api uri for the path in question
+       --uri-html           print the html uri for the path in question
     -c --context            include context for a file e.g. dataset
     -n --name=<PAT>         filename pattern to match (like find -name)
     -e --empty              only pull empty directories
@@ -247,6 +250,7 @@ Options:
     --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
 
     --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: sparc-curation]
+    --hypothesis-cache-file=PATH  path to hyputils json cache file
     --i-know-what-i-am-doing      don't use this unless you already know what it does
 """
 
@@ -314,6 +318,12 @@ class Options(clif.Options):
         pp = self._args['--project-path']
         if pp:
             return Path(pp).expanduser().resolve()
+
+    @property
+    def protcur_file(self):
+        pf = self._args['--protcur-file']
+        if pf:
+            return Path(pf).expanduser().resolve()
 
     @property
     def jobs(self):
@@ -704,8 +714,8 @@ class Main(Dispatcher):
         return data
 
     def _protcur(self):
-        from sparcur import export as ex
-        export = self._export(ex.Export, org_id=self.options.project_id)  # FIXME org_id not needed ...
+        #from sparcur import export as ex
+        #export = self._export(ex.Export, org_id=self.options.project_id)  # FIXME org_id not needed ...
         if self.options.raw:  # FIXME currently lacking impl of LATEST for protcur export
             if not self.options.protcur:
                 self.options._args['protcur'] = True  # FIXME hack
@@ -724,11 +734,11 @@ class Main(Dispatcher):
                 (pyru._Quant, pyru.Range, pyru.Approximately, *iso8601s)]
                 pyru.Term._OntTerm = OntTerm  # the tangled web grows ever deeper :x
 
-
             if self.options.protcur_file:
                 with open(self.options.protcur_file, 'rt') as f:
                     blob_protcur = json.load(f)
                     #blob_protcur = fromJson(json.load(f))  # FIXME do we need to run fromJson on this?
+                    # way too many uri lookups and validations are done by fromJson
 
             else:
                 latest_path = self.options.export_protcur_base / 'LATEST'
@@ -1764,6 +1774,7 @@ class Report(reports.Report, Dispatcher):
 
     _pyru_loaded = False
     _data_ir = Main._data_ir  # done statically for server
+    _protcur = Main._protcur  # done statically for server
 
 
 class Shell(Dispatcher):

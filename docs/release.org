@@ -321,6 +321,7 @@ Yes this is make."
         (journal-path "data/blazegraph.jnl")
         (prov-path "data/prov-record.ttl") ; FIXME coordinated by convention with SciGraph load
         (p-path "data/protcur.ttl")
+        (pj-path "data/protcur.json")
         (ce-path (concat "data/curation-export" (and sckan-release "-published") ".ttl"))
         (mis-path "data/sparc-methods.ttl")
         (mis-r-path "data/sparc-methods-reasoned.ttl")
@@ -358,6 +359,10 @@ Yes this is make."
       ;; FIXME decouple this location
       (url-copy-file-safe (concat cass-ont "protcur.ttl")
                           p-path))
+    (unless-file-exists-p pj-path
+      ;; FIXME decouple this location
+      (url-copy-file-safe (concat cass-ont "protcur.json")
+                          pj-path))
     (unless-file-exists-p ce-path
       (url-copy-file-safe (concat cass-px (file-name-nondirectory ce-path))
                           ce-path))
