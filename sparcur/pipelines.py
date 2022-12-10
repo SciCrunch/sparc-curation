@@ -1416,7 +1416,8 @@ class PipelineExtras(JSONPipeline):
          # subjects then this will fail and won't run at all, yet another reason
          # to move away from using derives entirely, too limited in expressivity
          De.validate_structure,
-         [['specimen_dirs']]],
+         [['specimen_dirs']],
+         lambda p: []],
 
     )
 
