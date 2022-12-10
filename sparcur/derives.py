@@ -455,6 +455,35 @@ class Derives:
             else:
                 pass  # TODO that's an error!
 
+        # handle nesting where parents may not have separate data
+        # and this is why we want all ids to be unique per dataset
+        # XXX at the moment performance metadata does not require a list of participating specimens
+        # and we would have to infer it from the file system hierarchy which is not good
+        # TODO populations and friends also an issue here
+        _combined_index = {**perfs, **subs, **{v['primary_key']:v for vs in samps.values() for v in vs}}
+        # XXX the real solution here is to add a column to the metadata sheets which
+        # just makes it possible to assert that there this is a metadata only field
+        # which I thought we had already discussed
+        def getmaybe(blob):
+            # TODO populations are a bit tricky here
+            if 'sample_id' in blob:  # FIXME sigh missing types on these
+                yield blob['subject_id']
+                if 'was_derived_from' in blob:  # TODO member_of works backward with populations, so may need to deal with that case as well
+                    parent = blob['was_derived_from']
+                    yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
+            elif 'subject_id' in blob:
+                return
+            elif 'performance_id' in blob:
+                return # XXX see note about non-required spec id above
+            else:
+                raise TypeError(f'unknown blob types {blob}')
+
+        # for all done specs
+        # check if there is a parent spec
+        # and add it to the maybe done spec list
+        maybe_done_specs_all = set(m for i in done_specs | inter_perf for m in getmaybe(_combined_index[i]) if m)
+        maybe_not_done_specs = maybe_done_specs_all - set(done_specs)
+
         usamps = set(v['primary_key'] for vs in samps.values() for v in vs)
         udirs = set(nv for path_name, subpaths in dirs.items()
                     for nv in (((subpath[-1][1], path_name) for subpath in subpaths) # -1 rpaths 1 parent  # XXX FIXME clearly wrong ???
@@ -462,6 +491,8 @@ class Derives:
                                (path_name,)))
         not_done_specs = (set(subs) | usamps) - set(done_specs)
         not_done_dirs = set(udirs) - set(done_dirs)
+
+        def_not_done_specs = not_done_specs - maybe_not_done_specs
 
         obj = {}
 
@@ -478,11 +509,17 @@ class Derives:
                            path=path):
                 logd.error(msg)
 
-        if not_done_specs:
-            # TODO separate out cases where a child specimen does have
-            # folders and report those at warning/info
+        if maybe_not_done_specs:
+            msg = ('Warning. Unmarked metadata-only specimens that have no corresponding '
+                   f'directory, but have children that do.\n{maybe_not_done_specs}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.warning(msg)
+
+        if def_not_done_specs:
             msg = ('There are specimens that have no corresponding '
-                   f'directory!\n{not_done_specs}')
+                   f'directory!\n{def_not_done_specs}')
             if he.addError(msg,
                            blame='submission',
                            path=path):
@@ -490,7 +527,7 @@ class Derives:
 
         if not_done_dirs:
             msg = ('There are directories that have no corresponding '
-                   f'specimen!\n{not_done_dirs}')
+                   f'metadata record!\n{not_done_dirs}')
             if he.addError(msg,
                            blame='submission',
                            path=path):
