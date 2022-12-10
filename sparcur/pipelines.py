@@ -1151,6 +1151,10 @@ class SDSPipeline(JSONPipeline):
                 DT.BOX(De.dataset_species),
                 [['meta', 'species']]],
 
+               [[['performances']],
+                DT.BOX(len),
+                [['meta', 'performance_count']]],
+
                [[['subjects']],
                 DT.BOX(len),
                 [['meta', 'subject_count']]],

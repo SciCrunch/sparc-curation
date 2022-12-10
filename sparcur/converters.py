@@ -164,6 +164,9 @@ class TripleConverter(dat.HasErrors):
                     if extra is not None:
                         yield from extra(v)
 
+            elif extra is not None:
+                yield from extra(value)(subject)
+
             elif field in self.known_skipped:
                 pass
 
@@ -173,13 +176,19 @@ class TripleConverter(dat.HasErrors):
                     log.warning(msg)
 
                 if raw_keys:
-                    _o = self.l(value)
-                    if not isinstance(_o, rdflib.term.Node):
-                        msg = f'wat {_o}, {type(_o)}'
-                        log.critical(msg)
-                        _o = rdflib.Literal(str(_o))
+                    if isinstance(value, tuple) or isinstance(value, list):
+                        values = value
+                    else:
+                        values = value,
 
-                    yield subject, TEMPRAW[field], _o
+                    for v in values:
+                        _o = self.l(v)
+                        if not isinstance(_o, rdflib.term.Node):
+                            msg = f'wat {_o}, {type(_o)}'
+                            log.critical(msg)
+                            _o = rdflib.Literal(str(_o))
+
+                        yield subject, TEMPRAW[field], _o
 
 
 class ContributorConverter(TripleConverter):
@@ -254,6 +263,7 @@ class MetaConverter(TripleConverter):
         ['dirs', TEMP.hasNumberOfDirectories],
         ['files', TEMP.hasNumberOfFiles],
         ['size', TEMP.hasSizeInBytes],
+        ['performance_count', TEMP.hasNumberOfPerformances],
         ['subject_count', TEMP.hasNumberOfSubjects],
         ['sample_count', TEMP.hasNumberOfSamples],
         ['contributor_count', TEMP.hasNumberOfContributors],
@@ -383,6 +393,7 @@ class RmetaConverter(TripleConverter):
         'readme',
         'tags',  # TODO
         'description',
+        'id_int',  # of limited utility in this context
     ]
     mapping = [
         ['license', TEMP.hasLicense],
@@ -421,6 +432,30 @@ class StatusConverter(TripleConverter):
         ['curation_index', TEMP.curationIndex],
         ['error_index', TEMP.errorIndex],
     ]
+
+    class Extra:
+        def __init__(self, converter):
+            self.c = converter
+            self.integrator = converter.integrator
+
+        def path_error_report(self, value):
+            # FIXME not sure if this is a good idea ... multiple
+            # return types, at least it will fail loudly
+            def comb(subject):
+                bnode = rdflib.URIRef(subject + '/path-error-report')  # FIXME timestamp from elsewhere might be nice
+                yield subject, TEMP.hasPathErrorReport, bnode
+                yield bnode, rdf.type, TEMP.PathErrorReport
+                for k, v in value.items():
+                    b0 = rdflib.BNode()
+                    yield bnode, TEMP.hasPath, b0
+                    yield b0, TEMP.jsonPointer, rdflib.Literal(k)
+                    for message in v['messages']:
+                        p = TEMP.message
+                        # p = rdflib.Literal(k)  # will serialize, but totally against the spec everything will break
+                        yield b0, p, rdflib.Literal(message)
+
+            return comb
+
     def status_on_platform(self, value):
         # FIXME should probably be implemented in extras and
         # we should yield all the records under TEMP.hasStatusHistory
@@ -444,6 +479,7 @@ file_related = [
 performance_related = [
 
     ['experiment_number', TEMP.localPerformanceNumber],
+    ['date_of_experiment', TEMP.protocolPerformanceDate],
     ['session', TEMP.localPerformanceNumber],
 
     #['protocol_title']  # skip, but maybe cross reference the metadata?
@@ -485,6 +521,13 @@ subject_ambiguous = [
         ['injection_date', TEMP.protocolPerformanceDate],  # FIXME needs to reference a protocol
         ['date_of_injection', TEMP.protocolPerformanceDate],
 ]
+
+
+class PerformanceConverter(TripleConverter):
+    mapping = [
+        ['performance_id', TEMP.localId],
+    ] + performance_related
+PerformanceConverter.setup()
 
 
 class SubjectConverter(TripleConverter):
