@@ -1525,6 +1525,18 @@ _nsffes = [k for k, v in chain(_props.items(), _props2.items(), _props3.items())
 _nsffes = sorted(set(_nsffes))
 
 
+class PerformancesFile(MetadataFile):
+    renames_header = {'performance_id': 'metadata_element',}
+    record_type_key_alt = 'performance_id'
+    record_type_key_header = 'metadata_element'
+    groups_alt = {'performances': GROUP_ALL,}
+    normalize_header = False
+
+
+class PerformancesFilePath(ObjectPath):
+    obj = PerformancesFile
+
+
 class SubjectsFile(MetadataFile):
     #default_record_type = COLUMN_TYPE
     __internal_id_1 = object()
@@ -1684,6 +1696,7 @@ class ManifestFilePath(ObjectPath):
 DatasetStructure.sections = {'submission': SubmissionFilePath,
                              'code_description': CodeDescriptionFilePath,
                              'dataset_description': DatasetDescriptionFilePath,
+                             'performances': PerformancesFilePath,
                              'subjects': SubjectsFilePath,
                              'samples': SamplesFilePath,
                              'manifest': ManifestFilePath,}

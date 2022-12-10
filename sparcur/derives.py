@@ -258,8 +258,7 @@ class Derives:
         return subjects,
 
     @staticmethod
-    def validate_structure(path, dir_structure, subjects, samples):
-
+    def validate_structure(path, dir_structure, performances, subjects, samples):
         he = HasErrors(pipeline_stage='Derives.validate_structure')
 
         # FIXME TODO handle pools as well and figure out cases where subjects/samples are metadata only

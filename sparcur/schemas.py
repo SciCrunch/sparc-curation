@@ -198,6 +198,7 @@ def json_version(version):
             'prov': ProvSchema.schema,
             'errors': ErrorSchema.schema,
             'contributor': ContributorOutExportSchema.schema,
+            'performance': PerformanceExportSchema.schema,
             'subject': SubjectExportSchema.schema,
             'sample': SampleExportSchema.schema,
             'dataset_description_file': DatasetDescriptionSchema.schema,
@@ -1470,6 +1471,51 @@ subsam_common_properties = {  # FIXME these should not be in the samples sheet, 
 }
 
 
+class PerformanceExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Performance', 'owl:NamedIndividual']},
+        '': [{'context_runtime': [
+                '#/meta/uri_api',
+                (lambda uri_api: uri_api + '/performances/'),
+                '#/performances/@context/@base']},
+             {'context_runtime': [
+                 '#/meta/uri_api',
+                 (lambda uri_api: {'@id': uri_api + '/performances/',
+                                   '@prefix': True}),
+                 '#/@context/performances']}],
+        'required': ['performance_id',],
+        'properties': {
+            'performance_id': {'type': 'string',
+                               'pattern': fs_safe_identifier_pattern,
+                               'context_value': {"@id": "@id",
+                                                 "@type": "@id"},
+                           },
+            'protocol_url_or_doi': _protocol_url_or_doi_schema,
+        },}
+
+
+class PerformancesExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        #'context_value': {'@id': 'graph-subjects', CONTEXT_ROOT: None},  # not needed, schemas have their own context
+        'required': ['performances'],
+        'properties': {
+            'performances': {
+                'type': 'array',
+                'minItems': 1,
+                # FIXME there is currently no way to require that
+                # a key be unique among all objects
+                'items': PerformanceExportSchema.schema,},
+            'errors': ErrorSchema.schema,}}
+
+
+class PerformancesSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(PerformancesExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+
+
 class SubjectExportSchema(JSONSchema):
     schema = {
         'type': 'object',
@@ -2009,6 +2055,7 @@ class DatasetOutExportSchema(JSONSchema):
         'errors': ErrorSchema.schema,
         'contributors': ContributorsOutExportSchema.schema,
         'creators': CreatorsExportSchema.schema,
+        'performances': PerformancesExportSchema.schema['properties']['performances'],  # 2.0.0
         # FIXME subjects_file might make the name overlap clearer
         'subjects': SubjectsExportSchema.schema['properties']['subjects'],  # FIXME SubjectsOutSchema
         'samples': SamplesFileExportSchema.schema['properties']['samples'],

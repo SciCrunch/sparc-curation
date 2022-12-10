@@ -451,6 +451,17 @@ class CodeDescriptionFilePipeline(PathPipeline):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
+class PerformancesFilePipeline(PathPipeline):
+
+    data_transformer_class = dat.PerformancesFile
+
+    @hasSchema(sc.PerformancesSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class SubjectsFilePipeline(PathPipeline):
 
     data_transformer_class = dat.SubjectsFile
@@ -1019,6 +1030,11 @@ class SDSPipeline(JSONPipeline):
          SubmissionFilePipeline,
          ['submission_file']],
 
+        [[[['performances_file'], ['path']],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
+         PerformancesFilePipeline,
+         ['performances_file']],
+
         [[[['subjects_file'], ['path']],
           [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          SubjectsFilePipeline,
@@ -1037,6 +1053,7 @@ class SDSPipeline(JSONPipeline):
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
               [['code_description_file',], ['inputs', 'code_description_file']],
+              [['performances_file',], ['inputs', 'performances_file']],
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
@@ -1081,6 +1098,9 @@ class SDSPipeline(JSONPipeline):
          ['meta', 'additional_links', int, 'link']],
 
         [['dataset_description_file',], ['inputs', 'dataset_description_file']],
+        # FIXME these moves do not sufficiently transform the contents and
+        # still contain raw data, inducing the 'type' key collision issue
+        [['performances_file', 'performances'], ['performances']],
         [['subjects_file', 'software'], ['resources']],  # FIXME update vs replace
         #[['subjects'], ['subjects_file']],  # first step in ending the confusion
         [['subjects_file', 'subjects'], ['subjects']],
@@ -1385,7 +1405,7 @@ class PipelineExtras(JSONPipeline):
          De.samples_to_subjects,
          [['subjects_from_samples']]],
 
-        [[THIS_PATH, ['dir_structure'], ['subjects'], ['samples']],
+        [[THIS_PATH, ['dir_structure'], ['performances'], ['subjects'], ['samples']],
          # FIXME this needs to happen fast and early
          # FIXME structure is going to be in a separate file/blob for export
          # without the hack to augmented below if there are no samples or no
@@ -1780,6 +1800,7 @@ class IrToExportJsonPipeline(JSONPipeline):
 class ToJsonLdPipeline(JSONPipeline):
     moves = (
         [['contributors'], ['contributors', '@graph']],
+        [['performances'], ['performances', '@graph']],
         [['subjects'], ['subjects', '@graph']],
         [['samples'], ['samples', '@graph']],
         [['resources'], ['resources', '@graph']],
@@ -1801,6 +1822,7 @@ class ToJsonLdPipeline(JSONPipeline):
         [['@context'], lambda l: copy.deepcopy(sc.base_context)],  # FIXME should be a link
         [['meta', '@context'], lambda l: sc.MetaOutExportSchema.context()],
         [['contributors', '@context'], lambda l: sc.ContributorExportSchema.context()],
+        [['performances', '@context'], lambda l: sc.PerformancesExportSchema.context()],
         [['subjects', '@context'], lambda l: sc.SubjectsExportSchema.context()],
         [['samples', '@context'], lambda l: sc.SamplesFileExportSchema.context()],
         #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()]
