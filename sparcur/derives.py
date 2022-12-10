@@ -287,6 +287,8 @@ class Derives:
                 # cull empty in a single step
                 if av} 
 
+        perfs = {p['performance_id']:p for p in performances}
+
         # subject_id could be missing, but we filter failures on all of
         # those so in theory we shouldn't need to handle it as this stage
         subs = {s['subject_id']:s for s in subjects}
@@ -296,6 +298,7 @@ class Derives:
             dd[s['sample_id']].append(s)
         samps = dict(dd)
 
+        ### pools
         dd = defaultdict(list)
         for s, d in subs.items():
             if 'pool_id' in d:
@@ -317,9 +320,18 @@ class Derives:
         done_dirs = set()
         done_specs = set()
 
+        ### performances
+        union_perf = set(dirs) | set(perfs)
+        inter_perf = set(dirs) & set(perfs)
+        done_dirs.update(inter_perf)
+        not_done_perfs = set(perfs) - inter_perf
+
+        ### subject pools
         inter_sub_pool = set(dirs) & set(sub_pools)
         pooled_subjects = set(s for p, ss in sub_pools.items() if p in inter_sub_pool for s in ss)
         done_dirs.update(inter_sub_pool)
+
+        ### subjects
         union_sub = set(dirs) | set(subs)
         inter_sub = set(dirs) & set(subs)
 
@@ -350,10 +362,12 @@ class Derives:
                             if subject_id in dirs else
                             [d[1] for d in dirs[pool_id]]})
 
+        ### sample pools
         inter_sam_pool = set(dirs) & set(sam_pools)
         pooled_samples = set(s for p, ss in sam_pools.items() if p in inter_sam_pool for s in ss)
         done_dirs.update(inter_sam_pool)
 
+        ### samples
         union_sam = set(dirs) | set(samps)
         inter_sam = set(dirs) & set(samps)
 
@@ -455,6 +469,14 @@ class Derives:
             obj['records'] = records
         else:
             pass # TODO embed an error
+
+        if not_done_perfs:
+            msg = ('There are performances that have no corresponding '
+                   f'directory!\n{not_done_perfs}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
 
         if not_done_specs:
             # TODO separate out cases where a child specimen does have
