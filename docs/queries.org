@@ -363,6 +363,38 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 SELECT (COUNT(DISTINCT ?protocol) AS ?count)
 WHERE { ?protocol a sparc:Protocol . }
 #+end_src
+*** Total protocols with at least one protcur annotation
+#+name: sparql-count-protocols-at-least-one-protc
+#+begin_src sparql :noweb no-export
+SELECT (COUNT(*) as ?count) {
+  <<sparql-protocols-at-least-one-protc>>
+}
+#+end_src
+
+#+begin_src bash :eval never
+grep -oE 'TEMP:protocol[^\ ]+' protcur.ttl | sort -u
+#+end_src
+
+#+name: sparql-protocols-at-least-one-protc
+#+begin_src sparql :epilogue "order by desc(?anno_count)"
+select distinct
+?protocol ?anno_count
+where {
+  values ?some_predicate {
+    TEMP:protocolEmploysTechnique
+    TEMP:protocolInvolvesAction
+    TEMP:protocolInvolvesAspect
+    TEMP:protocolInvolvesBlackBox
+    TEMP:protocolInvolvesBlackBoxComponent
+    TEMP:protocolInvolvesInput
+    TEMP:protocolInvolvesInvariant
+  }
+  ?protocol a sparc:Protocol ;
+    ?some_predicate ?annotation ;  # this line an the filter should wind up with the same number TODO add a test to check
+    TEMP:hasNumberOfProtcurAnnotations ?anno_count .
+  FILTER (?anno_count > 0 )
+}
+#+end_src
 
 *** Published protocols with complex protcur annotations
 #+name: sparql-complex-protocols-count
@@ -380,20 +412,20 @@ SELECT (COUNT(*) as ?count) {
 #+end_src
 
 #+name: sparql-complex-protocols
-#+begin_src sparql :noweb no-export
+#+begin_src sparql :noweb no-export :epilogue "order by desc(?anno_count)"
 <<sparql-complex-protocols-1>>
-<<sparql-complex-protocols-2>>
+}
 #+end_src
 
 #+name: sparql-complex-protocols-published
-#+begin_src sparql :noweb no-export
+#+begin_src sparql :noweb no-export :epilogue "order by desc(?anno_count)"
 <<sparql-complex-protocols-1>>
     ?protocol TEMP:hasDoi ?doi .
-<<sparql-complex-protocols-2>>
+}
 #+end_src
 
 #+name: sparql-complex-protocols-1
-#+begin_src sparql
+#+begin_src sparql :eval never
 select distinct
 ?protocol ?anno_count
 where {
@@ -401,10 +433,6 @@ where {
     ?protocol a sparc:Protocol ;
               ?some_predicate ?annotation ;
               TEMP:hasNumberOfProtcurAnnotations ?anno_count .
-#+end_src
-#+name: sparql-complex-protocols-2
-#+begin_src sparql
-} order by desc(?anno_count)
 #+end_src
 
 # FIXME one failure of noweb is that you cannot remix and recombine in
@@ -827,13 +855,21 @@ LIMIT ?limit
 
 *** Protocol
 **** Simple
-#+begin_src sparql :var limit="10"
+#+name: sparql-count-protocols-pio-api
+#+begin_src sparql :noweb yes
+SELECT (COUNT(*) as ?count) {
+  <<sparql-protocols-pio-api>>
+}
+#+end_src
+
+#+name: sparql-protocols-pio-api
+#+begin_src sparql :var limit="10" :epilogue "LIMIT ?limit"
 SELECT DISTINCT
 ?protocol
 WHERE {
   ?protocol a sparc:Protocol .
-  FILTER CONTAINS(str(?protocol), "protocols.io")
-} LIMIT ?limit
+  FILTER CONTAINS(str(?protocol), "protocols.io/api")
+}
 #+end_src
 
 **** Protocol triples
@@ -887,6 +923,33 @@ WHERE {
 } ORDER BY ?bbl LIMIT ?limit
 #+end_src
 
+**** Protc annotations
+#+begin_src bash :eval never
+grep -oE 'a\ protcur:[^\ ]+' protcur.ttl | sort -u | cut -d' ' -f2
+#+end_src
+
+#+name: sparql-count-annotations-protc
+#+begin_src sparql
+select (count(*) as ?count) {
+  select distinct ?anno where {
+    # TODO subPropertyOf
+    #values ?anno_predicate {}  # this is a bad way to do this
+    # ?s ?anno_predicate ?anno
+    values ?anno_type {
+      protcur:aspect
+      protcur:black-box
+      protcur:black-box-component
+      protcur:executor-verb
+      protcur:input
+      protcur:invariant
+      protcur:output
+      protcur:parameter
+    }
+    ?anno a ?anno_type
+  }
+}
+#+end_src
+
 ** Uberon tests
 In order to use these you need to load the latest version of uberon into blazegraph.
 #+begin_src sparql :var limit="15"
@@ -921,6 +984,7 @@ WHERE {
 }
 LIMIT ?limit
 #+end_src
+
 ** Contributors
 *** Count
 #+begin_src sparql
