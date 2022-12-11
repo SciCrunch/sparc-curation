@@ -161,6 +161,11 @@ class TriplesExportDataset(TriplesExport):
         return rdflib.Literal(f'SPARC single dataset graph for {self.id}')
 
     @property
+    def performances(self):
+        if 'performances' in self.data:
+            yield from self.data['performances']
+
+    @property
     def subjects(self):
         if 'subjects' in self.data:
             yield from self.data['subjects']
@@ -278,6 +283,7 @@ class TriplesExportDataset(TriplesExport):
                 #yield s, p, o
 
         yield from self.ddt(data)
+        yield from self.triples_performances
         yield from self.triples_subjects
         yield from self.triples_samples
         yield from self.triples_specimen_dirs
@@ -322,7 +328,7 @@ class TriplesExportDataset(TriplesExport):
                 for rec in recs:
                     yield from self._psd(rec, dsi)
 
-    def subject_id(self, v, species=None):  # TODO species for human/animal
+    def _thing_id(self, v, path):
         if not isinstance(v, str):
             #loge.critical('darn it max normlize your ids!')  # now caught by the schemas
             if isinstance(v, datetime):
@@ -334,8 +340,40 @@ class TriplesExportDataset(TriplesExport):
 
         v = quote(v, safe=tuple())
 
-        s = rdflib.URIRef(self.dsid + '/subjects/' + v)
+        s = rdflib.URIRef(self.dsid + path + v)
         return s
+
+    def performance_id(self, v):
+        return self._thing_id(v, '/performances/')
+
+    @property
+    def triples_performances(self):
+        try:
+            dsid = self.dsid  # FIXME json reload needs to deal with this
+        except BaseException as e:  # FIXME ...
+            loge.exception(e)
+            return
+
+        def triples_gen(prefix_func, performances):
+
+            for i, performance in enumerate(performances):
+                converter = conv.PerformanceConverter(performance)
+                if 'performance_id' in performance:
+                    s_local = performance['performance_id']
+                else:
+                    s_local = f'local-{i + 1}'  # sigh
+
+                s = prefix_func(s_local)
+                yield s, rdf.type, owl.NamedIndividual
+                yield s, rdf.type, sparc.Performance
+                yield s, TEMP.hasDerivedInformation, dsid
+                yield dsid, TEMP.isAboutPerformance, s
+                yield from converter.triples_gen(s, raw_keys=True)
+
+        yield from triples_gen(self.performance_id, self.performances)
+
+    def subject_id(self, v, species=None):  # TODO species for human/animal
+        return self._thing_id(v, '/subjects/')
 
     @property
     def triples_subjects(self):

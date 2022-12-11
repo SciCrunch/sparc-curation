@@ -1379,6 +1379,7 @@ class PipelineExtras(JSONPipeline):
         [['rmeta', 'timestamp_published_version'], dateparser.parse],
         [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
+        [['performances', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [__mr_path + ['protocol_url_or_doi'], norm.protocol_url_or_doi],
         #[__mr_path + ['software_rrid'], norm.rrid],  # FIXME how do we handle errors here?
 
@@ -1536,16 +1537,19 @@ class PipelineExtras(JSONPipeline):
 
         if 'protocol_url_or_doi' not in data['meta']:
             if self.lifters.protocol_uris:
-                data['meta']['protocol_url_or_doi'] = tuple(self.lifters.protocol_uris)
+                _p_normed = norm.protocol_url_or_doi(tuple(self.lifters.protocol_uris))
+                data['meta']['protocol_url_or_doi'] = normed
 
         else:
             if not isinstance(data['meta']['protocol_url_or_doi'], tuple):
                 _test_path = deque(['meta', 'protocol_url_or_doi'])
                 if not [e for e in data['errors']
                         if 'path' in e and e['path'] == _test_path]:
+                    breakpoint()
                     raise exc.ShouldNotHappenError('urg')
             else:
-                data['meta']['protocol_url_or_doi'] += tuple(self.lifters.protocol_uris)
+                _p_normed = norm.protocol_url_or_doi(tuple(self.lifters.protocol_uris))
+                data['meta']['protocol_url_or_doi'] += _p_normed
                 key = lambda i: i.asStr() if hasattr(i, 'asStr') else i
                 # FIXME sorting heterogenous types and whether the objects
                 # themselves should define that via comaprison dunders or what ...

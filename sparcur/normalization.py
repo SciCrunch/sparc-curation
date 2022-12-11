@@ -149,6 +149,12 @@ def protocol_url_or_doi(value):
 
         out.append(normed)
 
+    if len(out) > 1:
+        # condense cases where the same id came from multiple sources
+        # e.g. dataset description and subjects XXX sigh, not where
+        # the problem lies it seems?
+        out = list(set(out))
+
     if isinstance(value, tuple):
         out = tuple(out)  # preserve types prevent errors!
 
