@@ -368,6 +368,21 @@ WHERE { ?protocol a sparc:Protocol . }
 #+begin_src sparql :noweb no-export
 SELECT (COUNT(*) as ?count) {
   <<sparql-protocols-at-least-one-protc>>
+}}
+#+end_src
+
+#+name: sparql-count-protocols-pio-api-at-least-one-protc
+#+begin_src sparql :noweb no-export
+SELECT (COUNT(*) as ?count) {
+  <<sparql-protocols-pio-api-at-least-one-protc>>
+}
+#+end_src
+
+#+name: sparql-protocols-pio-api-at-least-one-protc
+#+begin_src sparql :noweb yes :epilogue " order by desc(?anno_count)"
+<<sparql-protocols-at-least-one-protc>>
+  FILTER CONTAINS(str(?protocol), "protocols.io/api")
+  #FILTER CONTAINS(str(?protocol), "protocols.io")
 }
 #+end_src
 
@@ -376,7 +391,7 @@ grep -oE 'TEMP:protocol[^\ ]+' protcur.ttl | sort -u
 #+end_src
 
 #+name: sparql-protocols-at-least-one-protc
-#+begin_src sparql :epilogue "order by desc(?anno_count)"
+#+begin_src sparql :epilogue "} order by desc(?anno_count)"
 select distinct
 ?protocol ?anno_count
 where {
@@ -393,7 +408,6 @@ where {
     ?some_predicate ?annotation ;  # this line an the filter should wind up with the same number TODO add a test to check
     TEMP:hasNumberOfProtcurAnnotations ?anno_count .
   FILTER (?anno_count > 0 )
-}
 #+end_src
 
 *** Published protocols with complex protcur annotations
@@ -411,21 +425,15 @@ SELECT (COUNT(*) as ?count) {
 }
 #+end_src
 
-#+name: sparql-complex-protocols
-#+begin_src sparql :noweb no-export :epilogue "order by desc(?anno_count)"
-<<sparql-complex-protocols-1>>
-}
-#+end_src
-
 #+name: sparql-complex-protocols-published
 #+begin_src sparql :noweb no-export :epilogue "order by desc(?anno_count)"
-<<sparql-complex-protocols-1>>
+<<sparql-complex-protocols>>
     ?protocol TEMP:hasDoi ?doi .
 }
 #+end_src
 
-#+name: sparql-complex-protocols-1
-#+begin_src sparql :eval never
+#+name: sparql-complex-protocols
+#+begin_src sparql :epilogue "} order by desc(?anno_count)"
 select distinct
 ?protocol ?anno_count
 where {
@@ -869,6 +877,7 @@ SELECT DISTINCT
 WHERE {
   ?protocol a sparc:Protocol .
   FILTER CONTAINS(str(?protocol), "protocols.io/api")
+  #FILTER CONTAINS(str(?protocol), "protocols.io")
 }
 #+end_src
 
@@ -929,25 +938,47 @@ grep -oE 'a\ protcur:[^\ ]+' protcur.ttl | sort -u | cut -d' ' -f2
 #+end_src
 
 #+name: sparql-count-annotations-protc
-#+begin_src sparql
+#+begin_src sparql :noweb yes
 select (count(*) as ?count) {
-  select distinct ?anno where {
-    # TODO subPropertyOf
-    #values ?anno_predicate {}  # this is a bad way to do this
-    # ?s ?anno_predicate ?anno
-    values ?anno_type {
-      protcur:aspect
-      protcur:black-box
-      protcur:black-box-component
-      protcur:executor-verb
-      protcur:input
-      protcur:invariant
-      protcur:output
-      protcur:parameter
-    }
-    ?anno a ?anno_type
-  }
+  <<sparql-annotations-protc>>
+}}
+#+end_src
+
+#+name: sparql-count-annotations-pio-api-protc
+#+begin_src sparql :noweb yes
+select (count(*) as ?count) {
+  <<sparql-annotations-pio-api-protc>>
 }
+#+end_src
+
+#+name: sparql-annotations-pio-api-protc
+#+begin_src sparql :noweb yes
+<<sparql-annotations-protc>>
+  ?protocol a sparc:Protocol .
+  ?protocol ?p ?banno .
+  ?banno TEMP:protcurChildren* ?anno .
+  FILTER CONTAINS(str(?protocol), "protocols.io/api")
+  #FILTER CONTAINS(str(?protocol), "protocols.io")
+}
+#+end_src
+
+#+name: sparql-annotations-protc
+#+begin_src sparql :epilogue "}"
+select distinct ?anno where {
+  # TODO subPropertyOf
+  #values ?anno_predicate {}  # this is a bad way to do this
+  # ?s ?anno_predicate ?anno
+  values ?anno_type {
+    protcur:aspect
+    protcur:black-box
+    protcur:black-box-component
+    protcur:executor-verb
+    protcur:input
+    protcur:invariant
+    protcur:output
+    protcur:parameter
+  }
+  ?anno a ?anno_type .
 #+end_src
 
 ** Uberon tests
