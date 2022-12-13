@@ -466,11 +466,15 @@ def diff_sheet(old_s, new_s):
     old_sheet_ids = [i for i in getattr(old_r0, old_s.index_columns[0])().column.values[1:] if i]
     new_sheet_ids = [i for i in getattr(new_r0, old_s.index_columns[0])().column.values[1:] if i]
     for did in new_sheet_ids:
+        new_row, _didn = new_s._row_from_index('id', did)
+
         if did not in old_sheet_ids:
             log.debug(f'new dataset {did}')
+            # pretend like it was already in the sheet
+            old_row, _dido = type('FakeRow', (object,), {'values', ['' for _ in new_row]}), did
+        else:
+            old_row, _dido = old_s._row_from_index('id', did)
 
-        old_row, _dido = old_s._row_from_index('id', did)
-        new_row, _didn = new_s._row_from_index('id', did)
         if old_row.values != new_row.values:
             # using valid columns elides checking header ordering changes
             log.debug(f'sheet row changed for {did}')
