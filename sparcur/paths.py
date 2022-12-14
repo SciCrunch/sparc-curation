@@ -369,11 +369,16 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             # that we can pick up where we left off with the fetch, this also explains
             # why all the cases where the cached data size did not match were missing
             # xattrs entirely
-            if not self.local_object_cache_path.parent.exists():
+            _lcp = self.local_object_cache_path.parent
+            if not _lcp.exists():
                 # FIXME sigh, no obvious way around having to check
                 # every time other than creating all the cache
                 # subfolders in advance
-                self.local_object_cache_path.parent.mkdir()
+                # XXX SOMEHOW between the call in the if statement above
+                # this call right here it is possible for something running
+                # in async in pypy3 to manage to have another threadthing
+                # create the directory ... this is beyond annoying
+                _lcp.mkdir(exist_ok=True)
 
             self.local_object_cache_path.touch()
             self.local_object_cache_path.cache_init(meta)
