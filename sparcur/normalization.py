@@ -110,7 +110,10 @@ def protocol_url_or_doi(value):
 
     for v in value:
         if not isinstance(v, idlib.Stream):
-            raise TypeError(f'should already be in stream form {v}')
+            if v in NormValues._na_things:
+                raise exc.NotApplicableError(f'na/none value: {v!r}')
+
+            raise exc.CouldNotNormalizeError(f'should already be in stream form {v!r}')
 
         try:
             normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
@@ -393,6 +396,8 @@ class NormValues(HasErrors):
 
     embed_bad_key_message = False  # TODO probably don't want this, better to zap bad values in pipeline
 
+    _na_things = ('NA', 'n/a', 'N/A', 'none', 'None', 'no protocols', 'na')
+
     def __init__(self, obj_inst):
         super().__init__()
         self._obj_inst = obj_inst
@@ -408,7 +413,7 @@ class NormValues(HasErrors):
         """ N/A -> raise for cases where it should just be removed """
         if isinstance(value, str):
             v = value.strip()
-            if v in ('NA', 'n/a', 'N/A', 'none', 'None', 'no protocols', 'na'):
+            if v in self._na_things:
                 # TODO consider double checking these cases ?
                 raise exc.NotApplicableError(key)
 

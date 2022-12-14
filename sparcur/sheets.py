@@ -805,9 +805,11 @@ class Organs(FieldAlignment):
                     try:
                         return idlib.Doi(hl)
                     except idlib.exc.IdlibError as e:
+                        # XXX WARNING the fall through here
+                        # kicks the can down the road
                         pass
 
-            logd.warning(f'unhandled value {cell.value}')
+            logd.warning(f'unhandled value {cell.value!r}')
             return cv
 
         if row:
