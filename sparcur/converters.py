@@ -182,7 +182,12 @@ class TripleConverter(dat.HasErrors):
                         values = value,
 
                     for v in values:
-                        _o = self.l(v)
+                        try:
+                            _o = self.l(v)
+                        except ValueError as e:
+                            loge.exception(e)
+                            continue
+
                         if not isinstance(_o, rdflib.term.Node):
                             msg = f'wat {_o}, {type(_o)}'
                             log.critical(msg)
