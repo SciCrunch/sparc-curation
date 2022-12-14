@@ -99,6 +99,18 @@ if not path_source_dir.exists():
 if not path_log_datasets.exists():
     path_log_datasets.mkdir(parents=True)
 
+
+def ensure_caches():
+    # make sure that all other values that should
+    # be cached from the network are cached
+    from sparcur import datasources as d
+    od = d.OrganData()
+
+
+ensure_caches()
+
+# celeary setup
+
 cel = Celery('sparcur-cron',)
 
 cel.conf.worker_hijack_root_logger = False
