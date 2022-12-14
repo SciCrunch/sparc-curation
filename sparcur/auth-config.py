@@ -1,6 +1,9 @@
 {'config-search-paths': ['{:user-config-path}/sparcur/config.yaml',],
  'auth-variables':
- {'export-path': {
+ {'data-path': {
+     'default': None,
+     'environment-variables': 'SPARCUR_DATA_PATH SPARC_DATA_PATH DATA_PATH'},
+  'export-path': {
      'default': '{:user-data-path}/sparcur/export',
      'environment-variables':
      'SPARCUR_EXPORT_PATH SPARC_EXPORTS EXPORT_PATH'},

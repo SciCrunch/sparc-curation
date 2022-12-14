@@ -86,7 +86,11 @@ args = {**defaults, 'export': True, '--jobs': 1, 'schemas': False, 'protcur': Fa
 options = Options(args, defaults)
 
 project_id = auth.get('remote-organization')
-path_source_dir = Path('~/files/sparc-datasets-test').expanduser().resolve()  # FIXME hardcoded  XXX resolve required to avoid mismatches
+data_path = auth.get_path('data-path')
+path_source_dir = (
+    Path('~/files/sparc-datasets-test').expanduser().resolve()
+    if data_path is None else
+    data_path)
 path_log_base = auth.get_path('log-path')
 path_log_datasets = path_log_base / 'datasets'
 
@@ -532,15 +536,35 @@ def check_sheet_updates():
         #log.info(f':sheet {sheetcls.__name__} :old {old} :new {new}')
         if new != old:
             # something has changed
+            # see if old exists
+            old_exists = not (old is None and not hasattr(old_s, '_values'))
+            if not old_exists:
+                log.info(f'No existing cache for {sheetcls}')
+
+            # fetch the latest changes
             s._do_cache = True
             s._re_cache = True
             s._setup()
             s.fetch()  # NOTE metadata_file will often be stale
             log.info(f'spreadsheet cache updated for {s.name}')
-            try:
-                diff_sheet(old_s, s)  # enqueues changed datasets
-            except Exception as e:
-                log.exception(e)
+            if old_exists:
+                # avoid trying to call diff on a nonexistent state
+                # we can't call fetch again because old_s will access
+                # the cache populated by the call to s.fetch() below
+
+                # if there is no cache then there is no point in
+                # running anything because we don't know what changed
+                # also this usually only happens on the very first run
+                # in which case all datasets are going in the queue
+                try:
+                    diff_sheet(old_s, s)  # enqueues changed datasets
+                except Exception as e:
+                    log.exception(e)
+
+
+@cel.task
+def check_discover_updates():  # TODO
+    pass
 
 
 def mget_all(dataset):
