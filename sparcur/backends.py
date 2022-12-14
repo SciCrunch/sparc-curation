@@ -48,15 +48,17 @@ class BlackfynnRemote(aug.RemotePath):
         # org /datasets/ N:dataset /files/ N:collection
         # org /datasets/ N:dataset /files/ wat? /N:package  # opaque but consistent id??
         # org /datasets/ N:dataset /viewer/ N:package
-        if not self.is_absolute():
-            self = self.resolve()  # relative paths should not have to fail here
 
-        oid = self.organization.identifier
-        did = self._id_class(self.dataset_id)
-        return self.identifier.uri_human(organization=oid,
-                                         dataset=did)
-
-        #return self.dataset.uri_human + prefix + id
+        if self.is_organization():
+            return self.identifier.uri_human()
+        else:
+            oid = self.organization.identifier
+            if self.is_dataset():
+                return self.identifier.uri_human(organization=oid)
+            else:
+                did = self._id_class(self.dataset_id)
+                return self.identifier.uri_human(organization=oid,
+                                                 dataset=did)
 
     @property
     def uri_api(self):
@@ -462,7 +464,7 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def identifier(self):
-        return BlackfynnId(self.id)
+        return self._id_class(self.id)
 
     @property
     def doi(self):
