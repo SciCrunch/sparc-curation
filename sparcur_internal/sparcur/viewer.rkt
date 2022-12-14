@@ -28,6 +28,7 @@
 (define selected-dataset #f) ; selected dataset is the global value across threads
 
 ;; parameters (yay dynamic variables)
+(define path-log-dir (make-parameter #f))
 (define path-cache-dir (make-parameter #f))
 (define path-cache-datasets (make-parameter #f))
 (define path-cleaned-dir (make-parameter #f))
@@ -100,6 +101,7 @@
 
 (define msg-dataset-not-fetched "Dataset has not been fetched yet!")
 (define msg-dataset-not-exported "Dataset has not been exported yet!")
+(define msg-no-logs "Dataset has no logs.")
 
 ;; other variables
 
@@ -185,6 +187,13 @@
                 (cons "-cd"
                       (list dpath))))
         (begin (println msg-dataset-not-fetched) #f))))
+
+(define (argv-open-dataset-latest-log ds)
+  (let ([path (dataset-log-path ds)])
+    (if (directory-exists? path)
+        (let ([latest-log-path (resolve-relative-path (build-path path "LATEST/stdout.log"))])
+          (xopen-path latest-log-path))
+        (begin (println msg-no-logs) #f))))
 
 (define (argv-open-export-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
@@ -275,6 +284,7 @@
   ; FIXME more cryptic errors if sparcur.simple isn't tangled
   ; FIXME it should be possible for the user to configure path-source-dir
   (path-source-dir (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))
+  (path-log-dir (expand-user-path (user-log-path "sparcur" "datasets")))
   (path-cache-dir (expand-user-path (user-cache-path "sparcur" "racket")))
   (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
   (path-cleaned-dir (expand-user-path (user-data-path "sparcur" "cleaned")))
@@ -504,6 +514,7 @@
   (uri-human ds)
   (uri-sds-viewer ds)
   (dataset-src-path ds)
+  (dataset-log-path ds)
   (dataset-export-latest-path ds)
   (dataset-cleaned-latest-path ds)
   (fetch-export-dataset ds)
@@ -548,6 +559,9 @@
    (define (dataset-src-path ds)
      (let ([uuid (id-uuid ds)])
        (build-path (path-source-dir) uuid)))
+   (define (dataset-log-path ds)
+     (let ([uuid (id-uuid ds)])
+       (build-path (path-log-dir) uuid)))
    (define (fetch-dataset ds)
      (println (format "dataset fetch starting for ~a" (dataset-id ds))) ; TODO gui and/or log
      (let ([cwd-1 (path-source-dir)]
@@ -905,6 +919,12 @@
     (when argv
       (thread (thunk (apply system* argv))))))
 
+(define (cb-open-dataset-lastest-log obj event)
+  (let ([argv (argv-open-dataset-latest-log (current-dataset))])
+    (when argv
+      ; FIXME bad use of thread
+      (thread (thunk (apply system* argv))))))
+
 (define (cb-open-dataset-remote obj event)
   (xopen-path (uri-human (current-dataset))))
 
@@ -1069,6 +1089,7 @@ switch to that"
   (add-function "open-export-json" cb-open-export-json)
   (add-function "open-export-ipython" cb-open-export-ipython)
   (add-function "open-dataset-shell" cb-open-dataset-shell)
+  (add-function "open-dataset-lastest-log" cb-open-dataset-lastest-log)
   (add-function "toggle-prefs" cb-toggle-prefs)
   )
 
@@ -1102,6 +1123,7 @@ switch to that"
   (map-function "c:j" "open-export-json")
   (map-function "c:i" "open-export-ipython")
   (map-function "c:b" "open-dataset-shell")
+  (map-function "c:l" "open-dataset-latest-log")
   )
 
 #;
@@ -1303,6 +1325,13 @@ switch to that"
                                        [callback cb-open-dataset-shell]
                                        [parent panel-power-user]))
 
+(define button-open-dataset-latest-log (new (tooltip-mixin button%)
+                                            [label "Logs"]
+                                            [tooltip "Shortcut C-l"]
+                                            [tooltip-delay 100]
+                                            [callback cb-open-dataset-lastest-log]
+                                            [parent panel-power-user]
+                                            ))
 
 ;; manifest report
 
