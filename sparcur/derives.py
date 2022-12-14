@@ -470,7 +470,19 @@ class Derives:
                 yield blob['subject_id']
                 if 'was_derived_from' in blob:  # TODO member_of works backward with populations, so may need to deal with that case as well
                     parent = blob['was_derived_from']
-                    yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
+                    if parent in _combined_index:
+                        yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
+                    else:
+                        if parent.startswith('='):
+                            msg = f'Sample was_derived_from specified as a formula. We do not currently support this.'
+                        else:
+                            msg = 'Sample was_derived_from does not exist!'
+
+                        msg += f' {blob["sample_id"]!r} -> {parent!r}'
+
+                        if he.addError(msg, blame='submission', path=path):
+                            logd.error(msg)
+
             elif 'subject_id' in blob:
                 return
             elif 'performance_id' in blob:
