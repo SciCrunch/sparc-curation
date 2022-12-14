@@ -3615,7 +3615,7 @@ Options:
     --project-path=PATH             the project path, will be path if <path>... is empty
     --parent-path=PATH              the parent path where the project will be cloned to
     --parent-parent-path=PATH       parent in which a random tempdir is generated
-                                    to be the parent path, don't use this ...
+                                    or the dataset uuid is used as the parent path, don't use this ...
     --invariant-local-path=PATH     path relative to parent path for dataset [default: dataset]
     --export-local                  set export-parent-path to {{:parent-path}}/exports/
     --export-path=PATH              base export path containing the standard path structure [default: {auth.get_path('export-path')}]
@@ -3907,13 +3907,18 @@ def _fetch_path(path):  # sigh joblib multiprocessing pickling
     _fetch(cache)
 
 
-def fetch_paths_parallel(paths, n_jobs=12):
+def fetch_paths_parallel(paths, n_jobs=12, use_async=True):
     if n_jobs <= 1:
         [_fetch_path(path) for path in paths]
+    elif use_async:
+        from pyontutils.utils import Async, deferred
+        Async()(deferred(_fetch_path)(path) for path in paths)
     else:
         import pathlib
         from joblib import Parallel, delayed
         backend = 'multiprocessing' if hasattr(sys, 'pypy_version_info') else None
+        # FIXME FIXME FIXME somehow this can result in samples.xlsx being fetched to subjects.xlsx !?!??!!
+        # XXX either a race condition on our end or something insane from the remote
         Parallel(n_jobs=n_jobs, backend=backend)(delayed(_fetch_path)(pathlib.Path(path)) for path in paths)
         #Parallel(n_jobs=n_jobs)(delayed(fetch_path)(path) for path in paths)
 
