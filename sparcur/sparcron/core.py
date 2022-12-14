@@ -421,7 +421,19 @@ def export_single_dataset(dataset_id, qupdated_when_called):
     # that trigger a run, not just the first
     qid = 'queued-' + dataset_id
     _qupdated = conn.get(qid)
-    qupdated = _qupdated.decode() if _qupdated is not None else None
+    if _qupdated is None:
+        #  conn.set(qid, dataset.updated) is called IMMEDIATELY before
+        # export_single_dataset.delay, so it should ALWAYS find a value
+        # ... if _qupdated is None this means redis and rabbit are out of
+        # sync and yes, rabbitmqctl list_queues shows export 187 because
+        # we clear redis on restart when those mesages get sent there is
+        # nothing in redis
+        msg = (f'Task to run {dataset_id} was called when qupdated was None! '
+               'Doing nothing. Usual cause is stale messages in rabbit.')
+        log.info(msg)
+        return
+
+    qupdated = _qupdated.decode()
     if qupdated_when_called < qupdated:
         log.debug(f'queue updated changed between call and run')
 
