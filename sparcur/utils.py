@@ -72,7 +72,13 @@ class IdentityJsonType:
         return blob
 
 
-def fromJson(blob):
+def fromJson(blob, *,
+             # nct is a hack around the fact that external
+             # data can provide a column called type and we
+             # do not currently have a way to indicate that
+             # fromJson should treat those subtrees specially
+             _no_convert_type=False,
+             _no_convert_type_keys=('subjects', 'samples')):
     def nitr(value):
         try:
             return value not in __type_registry
@@ -88,6 +94,8 @@ def fromJson(blob):
                 type_name = blob['system']
             elif t in ('quantity', 'range'):
                 type_name = t
+            elif _no_convert_type:
+                type_name = None
             elif nitr(t):
                 breakpoint()
                 # XXX FIXME should this be fatal ??? we have cases where
@@ -112,11 +120,13 @@ def fromJson(blob):
 
         return {k: v
                 if k == 'errors' or k.endswith('_errors') else
-                fromJson(v)
+                fromJson(v, _no_convert_type=(_no_convert_type or
+                                              type(v) == list and
+                                              k in _no_convert_type_keys))
                 for k, v in blob.items()}
 
     elif isinstance(blob, list):
-        return [fromJson(_) for _ in blob]
+        return [fromJson(_, _no_convert_type=_no_convert_type) for _ in blob]
     else:
         return blob
 
