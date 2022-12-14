@@ -1491,7 +1491,7 @@ class PerformanceExportSchema(JSONSchema):
                                'context_value': {"@id": "@id",
                                                  "@type": "@id"},
                            },
-            'protocol_url_or_doi': _protocol_url_or_doi_schema,
+            'protocol_url_or_doi': _protocol_url_or_doi_schema,  # FIXME ideally this would be true but are we sure it always is?
         },}
 
 

@@ -1111,3 +1111,7 @@ class NormSamplesFile(NormSubjectsFile):
             return str(value)
         else:
             return value
+
+
+class NormPerformancesFile(NormSubjectsFile):
+    """ this will do for now """

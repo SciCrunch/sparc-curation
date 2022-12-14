@@ -1151,6 +1151,12 @@ class SDSPipeline(JSONPipeline):
                 DT.BOX(De.dataset_species),
                 [['meta', 'species']]],
 
+               # TODO this is what we have to do to fix the issue with external types, but the blast radius will be quite large
+               # so we have to do it in a way such that all the different parts of the code will be upgraded at the same time
+               #[[['subjects']],
+               # DT.BOX(lambda blob: {'type': 'sparc:Subject', 'sds_normalize_fields': blob}),
+               #[['meta', 'species']]],
+
                [[['performances']],
                 DT.BOX(len),
                 [['meta', 'performance_count']]],
@@ -1535,10 +1541,14 @@ class PipelineExtras(JSONPipeline):
 
                 data['meta']['organ'] = out
 
+        def dlp():
+            _p_normed = norm.protocol_url_or_doi(tuple(self.lifters.protocol_uris))
+            return _p_normed
+
         if 'protocol_url_or_doi' not in data['meta']:
             if self.lifters.protocol_uris:
                 try:
-                    _p_normed = norm.protocol_url_or_doi(tuple(self.lifters.protocol_uris))
+                    _p_normed = dlp()
                     data['meta']['protocol_url_or_doi'] = _p_normed
                 except exc.CouldNotNormalizeError as e:
                     log.exception(e)
@@ -1554,7 +1564,7 @@ class PipelineExtras(JSONPipeline):
                     raise exc.ShouldNotHappenError('urg')
             else:
                 try:
-                    _p_normed = norm.protocol_url_or_doi(tuple(self.lifters.protocol_uris))
+                    _p_normed = dlp()
                     data['meta']['protocol_url_or_doi'] += _p_normed
                 except exc.CouldNotNormalizeError as e:
                     log.exception(e)

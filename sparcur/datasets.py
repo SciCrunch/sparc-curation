@@ -1520,7 +1520,8 @@ class DatasetDescriptionFilePath(ObjectPath):
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
 _props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
 _props3 = sc._software_schema['items']['properties']
-_nsffes = [k for k, v in chain(_props.items(), _props2.items(), _props3.items())
+_props4 = sc.PerformancesSchema.schema['properties']['performances']['items']['properties']
+_nsffes = [k for k, v in chain(_props.items(), _props2.items(), _props3.items(), _props4.items())
            if isinstance(v, dict) and sc.not_array(v)]
 _nsffes = sorted(set(_nsffes))
 
@@ -1530,7 +1531,9 @@ class PerformancesFile(MetadataFile):
     record_type_key_alt = 'performance_id'
     record_type_key_header = 'metadata_element'
     groups_alt = {'performances': GROUP_ALL,}
+    normalization_class = nml.NormPerformancesFile
     normalize_header = False
+    _expect_single = _nsffes
 
 
 class PerformancesFilePath(ObjectPath):
