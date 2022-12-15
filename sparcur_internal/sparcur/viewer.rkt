@@ -216,6 +216,31 @@
 
 ;; utility functions
 
+(define (datetime-file-system-safe inexact-seconds)
+  "Y-M-DTHMS,6Z"
+  (let ([d (seconds->date inexact-seconds #f)])
+    (string-join
+     (map (λ (e) (format "~a" e))
+          (list
+           (date-year d)
+           "-"
+           (date-month d)
+           "-"
+           (date-day d)
+           "T"
+           (date-hour d)
+           (date-minute d)
+           (date-second d)
+           ","
+           (inexact->exact (truncate (/ (date*-nanosecond d) 1e3)))
+           "Z"
+           ))
+     "")))
+
+(define (datetime-for-path-now)
+  (datetime-file-system-safe
+   (/ (current-inexact-milliseconds) 1e3)))
+
 #; ; sigh
 (define (in-cwd-thread argv cwd)
   ; FIXME not quite right because we need to be able to run multiple things in a row
@@ -616,9 +641,18 @@
            [cwd-2 (build-path (dataset-src-path ds)
                               ; FIXME dataset here is hardcoded
                               "dataset")]
+           [dataset-log-path (build-path (path-log-dir) (id-uuid ds) (datetime-for-path-now) "stdout.log")]
            [argv-1 (argv-simple-retrieve ds)]
            [argv-2 argv-spc-find-meta]
            [argv-3 argv-spc-export])
+       (let*-values ([(date-path _ __) (split-path dataset-log-path)]
+                     [(uuid-path local-date-path __) (split-path date-path)]
+                     [(latest-path) (build-path uuid-path "LATEST")])
+         (ensure-directory! uuid-path)
+         (ensure-directory! date-path)
+         (when (link-exists? latest-path)
+           (delete-file latest-path))
+         (make-file-or-directory-link local-date-path latest-path))
        (thread
         (thunk
          (let ([status-1 #f]
@@ -628,16 +662,27 @@
            (parameterize ([current-directory cwd-1])
              #;
              (println (string-join argv-1 " "))
-             (with-output-to-string (thunk (set! status-1
-                                                 (apply system* argv-1 #:set-pwd? #t)))))
+             (with-output-to-file
+               dataset-log-path
+               (thunk
+                (parameterize (#;[current-error-port (current-output-port)]) ; TODO
+                  (set! status-1
+                        (apply system* argv-1 #:set-pwd? #t))))
+               #:exists 'append))
            (if status-1
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
                  (parameterize ([current-directory cwd-2-resolved])
-                   (with-output-to-string (thunk (set! status-2
-                                                       (apply system* argv-2 #:set-pwd? #t))))
+                   (with-output-to-file
+                     dataset-log-path
+                     (thunk (set! status-2
+                                  (apply system* argv-2 #:set-pwd? #t)))
+                     #:exists 'append)
                    ; TODO figure out if we need to condition this run on status-2 #t
-                   (with-output-to-string (thunk (set! status-3
-                                                       (apply system* argv-3 #:set-pwd? #t)))))
+                   (with-output-to-file
+                     dataset-log-path
+                     (thunk (set! status-3
+                                  (apply system* argv-3 #:set-pwd? #t)))
+                     #:exists 'append))
                  ; TODO gui indication
                  (if (and status-2 status-3)
                      (begin
