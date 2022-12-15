@@ -169,6 +169,7 @@
    "--name" "README*"
    "--limit" "-1"
    "--fetch"))
+
 (define (argv-clean-metadata-files ds)
   (let ([argv (python-mod-args ; XXX note that this is separate from normalize metadata files
                "sparcur.simple.clean_metadata_files"
@@ -188,12 +189,18 @@
                       (list dpath))))
         (begin (println msg-dataset-not-fetched) #f))))
 
-(define (argv-open-dataset-latest-log ds)
+(define (xopen-dataset-latest-log ds)
   (let ([path (dataset-log-path ds)])
     (if (directory-exists? path)
-        (let ([latest-log-path (resolve-relative-path (build-path path "LATEST/stdout.log"))])
+        (let ([latest-log-path (build-path path "LATEST/stdout.log")])
           (xopen-path latest-log-path))
         (begin (println msg-no-logs) #f))))
+
+(define (argv-download-everything ds)
+  (python-mod-args
+   "sparcur.simple.fetch_files"
+   "--extension" "*"
+   (resolve-relative-path (build-path (path-source-dir) (id-uuid ds) "dataset"))))
 
 (define (argv-open-export-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
@@ -965,7 +972,10 @@
       (thread (thunk (apply system* argv))))))
 
 (define (cb-open-dataset-lastest-log obj event)
-  (let ([argv (argv-open-dataset-latest-log (current-dataset))])
+  (xopen-dataset-latest-log (current-dataset)))
+
+(define (cb-download-everything obj event)
+  (let ([argv (argv-download-everything (current-dataset))])
     (when argv
       ; FIXME bad use of thread
       (thread (thunk (apply system* argv))))))
@@ -1377,6 +1387,11 @@ switch to that"
                                             [callback cb-open-dataset-lastest-log]
                                             [parent panel-power-user]
                                             ))
+
+(define button-download-everything (new button%
+                                        [label "Download Everything"]
+                                        [callback cb-download-everything]
+                                        [parent panel-power-user]))
 
 ;; manifest report
 
