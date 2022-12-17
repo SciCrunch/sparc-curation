@@ -405,6 +405,7 @@ class RmetaConverter(TripleConverter):
         ['timestamp_published_version', TEMP.wasPublishedAtTime],
         ['published_version', TEMP.publishedVersion],
         ['published_revision', TEMP.publishedRevision],
+        ['previous_dois', TEMP.hasDoiPrevious],
     ]
     def id_published(self, value):
         if value is not None:

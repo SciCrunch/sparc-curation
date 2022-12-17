@@ -538,9 +538,27 @@ class Derives:
                 logd.error(msg)
 
         if not_done_dirs:
+            dists = {
+                d: sorted(
+                    [(nml.levenshteinDistance(d, s), s, source)
+                     for ss, source in
+                     (((def_not_done_specs | not_done_perfs), ' '),
+                      ((done_specs | inter_perf), '*'),)
+                     for s in ss])
+                for d in not_done_dirs}
+            align = {d: max([len(s) for _, s, _ in dss]) for d, dss in dists.items()}
+            report = '\n\n'.join(
+                [f'{" ".join([e[1].as_posix() for e in dirs[d]])}\n  0 {d}\n' + '\n'.join(
+                    [f'{dist:>3} {s:<{align[d]}} {source}' for dist, s, source in
+                     # unfortunately we can't limit the total number of entries because
+                     [(dist, s, so) for dist, s, so in dists[d]
+                      if dist < 10 or so == ' ' and dist < 15]])
+                 for d in sorted(not_done_dirs)])
+
             msg = ('There are directories that have no corresponding '
                    f'metadata record!\n{not_done_dirs}')
-            if he.addError(msg,
+            msg_report = msg + f'\nreport:\n{report}'
+            if he.addError(msg + msg_report,
                            blame='submission',
                            path=path):
                 logd.error(msg)

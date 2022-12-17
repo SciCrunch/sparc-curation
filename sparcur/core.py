@@ -225,7 +225,7 @@ class HasErrors:
         else:
             raise TypeError(repr(e))
 
-        log.debug(o)
+        log.log(9, o)  # too verbose for normal debug
         return o
 
     @property
