@@ -9,6 +9,7 @@ from pyontutils.utils import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, BlackfynnId, PennsieveId
 from sparcur.config import auth
+from urllib.parse import urlparse
 
 
 class BlackfynnRemote(aug.RemotePath):
@@ -100,8 +101,20 @@ class BlackfynnRemote(aug.RemotePath):
             return cls._api.get_file_url(id, file_id)
 
     @classmethod
-    def get_file_by_id(cls, id, file_id, ranges=tuple()):
+    def get_file_by_id(cls, id, file_id, ranges=tuple(), expect=None):
         url = cls.get_file_url(id, file_id)
+
+        if expect is not None:
+            up = urlparse(url)
+            pp = PurePath(up.path)
+            if pp.name != expect.name:
+                # probably gonna hit a file size mismatch error because
+                # we are about to download the wrong file due to a race
+                msg = f'url.path.name != expect.name: {pp.name} != {expect.name}'
+                log.critical(msg)
+
+        #log.log(9, f'file api mapping: {id} {file_id} {url}')
+        log.debug(f'file-api-mapping: {id} {file_id} {url}')
         yield from cls.get_file_by_url(url, ranges=ranges)
 
     @classmethod
@@ -400,6 +413,7 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def name(self):
         bfo = self.bfobject
+        filename = None
         if isinstance(bfo, self._File) and self.from_packages:
             #breakpoint()
             # at some point in time the blackfynn process that dumps
@@ -418,6 +432,7 @@ class BlackfynnRemote(aug.RemotePath):
             pn = PurePath(n)
             sf = pf.suffix
             sn = pn.suffix
+            filename = f
             if (sf and not sn or
                 sn and sf != sn or
                 not sf and not sn):
@@ -426,14 +441,25 @@ class BlackfynnRemote(aug.RemotePath):
 
                 #name.other          <<<   this case is annoying
                 #name.other.suffix
-                return f
+                out = f #return f
             #elif sf == sn and len(pf.suffixes) > 1:
                 #return n
             else:
                 log.log(9, 'New /packages schema detected')  # too verbose for debug
-                return n
+                out = n #return n
         else:
-            return self.stem + self.suffix
+            out = self.stem + self.suffix #return self.stem + self.suffix
+
+        if out != bfo.name:
+            # sed 's/\(bfo.name\|out\|filename\|uri_human\): /\n\1: /g'  # or grep -A 4 ?
+            msg = (f'name-check '
+                   f'bfo.name: {bfo.name!r} '
+                   f'out:      {out!r} '
+                   f'filename: {filename!r} '
+                   f'uri_human: {self.uri_human}')
+            logd.critical(msg)
+
+        return bfo.name
 
     @property
     def id(self):
@@ -946,7 +972,6 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise error
 
-    @property
     def _single_file(self):
         if isinstance(self.bfobject, self._DataPackage):
             files = list(self.bfobject.files)
@@ -961,15 +986,14 @@ class BlackfynnRemote(aug.RemotePath):
 
         return file
 
-    @property
     def _uri_file(self):
-        file = self._single_file
+        file = self._single_file()
         if file is not None:
             return file.url
 
     @property
     def data(self):
-        uri_file = self._uri_file
+        uri_file = self._uri_file()
         if uri_file is None:
             return
 
@@ -1553,10 +1577,18 @@ class RemoteDatasetData:
 
         pm = self.bfobject.publishedMetadata
         if pm is not None:
+            # stash this in the cached metadata, we will likely need
+            # it to resolve the stale doi issue via sparcron
+            blob['remote_published_metadata'] = pm
+
             # note that there are discover records for unpublished
             # datasets but there is no mapping to the internal
             # accession id so we would never be able to find them
             # given the way bfobject.publishedMetadata works
+
+            # FIXME one of these 204 not 32 :/ looks like there is an issue with the parts
+            # 9dd7a07b-2037-4ce7-829d-395cc4382518/curation-export.json:      "id_published": 32,
+            # b478b5d6-dfd6-4d6a-bd99-b1933987892f/curation-export.json:      "id_published": 32,
             blob['id_published'] = pm['id']
             # TODO identify the additional information that we want to embed
             blob['published_version'] = pm['version']
