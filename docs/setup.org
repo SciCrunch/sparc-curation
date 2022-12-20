@@ -6,6 +6,7 @@
 #+OPTIONS: num:nil ^:nil
 #+LATEX_HEADER: \usepackage[margin=1.0in]{geometry}
 #+STARTUP: showall
+#+property: header-args :eval no-export
 
 * Introduction
 This is a general guide to bootstrapping and maintaining a complete development environment for
@@ -1349,13 +1350,8 @@ the version number should match the metadata version embedded in
 Minor versions such as =dataset-template-1.2.1= are allowed.
 
 Attach =${CLEANROOM}/DatasetTemplate.zip= as a release asset.
-Update
-https://github.com/Pennsieve/docs.sparc.science/blob/master/pages/data_submission/submit_data.md
-https://github.com/Pennsieve/docs.sparc.science/blob/master/pages/sparc_portal/sparc_data_format.md
-and
-with the new link.
-[[file:../../docs.sparc.science/pages/data_submission/submit_data.md][Link to the local copy.]]
-[[file:../../docs.sparc.science/pages/sparc_portal/sparc_data_format.md][Link to the local copy.]]
+
+Inform curation so they can notify the community.
 *** Getting to know the codebase
 :PROPERTIES:
 :VISIBILITY: folded

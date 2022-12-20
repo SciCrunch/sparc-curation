@@ -16,7 +16,7 @@
 - NPO kblad added hasInstanceInTaxon axioms
 - Blazegraph/SciGraph loaded graphs now embed information about
   build provenance that can be used to identify the version of a graph.
-  See [[./queries.org::#versions]] for examples.
+  See [[./queries.org::#embedded-load-provenance-record][embedded load provenance record]] for examples.
 * Release NEXT
 ** New models
 *** ApiNATOMY

@@ -531,7 +531,7 @@ date -Is -d "@$(find | awk -F'/' '{ print $3 }' | sort | tail -n 1)"
 #+end_src
 
 # on devel
-#+header: :var LAST_DEPLOY=apinat-last-deploy-date() REPO=(expand-file-name apinat-model-repo)
+#+header: :var LAST_DEPLOY=apinat-last-deploy-date() REPO=(and (boundp 'apinat-model-repo) (expand-file-name apinat-model-repo))
 #+name: apinat-json-changed-since-last-deploy
 #+begin_src bash :results drawer
 pushd "${REPO}" 2>&1 > /dev/null

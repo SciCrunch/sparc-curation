@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 32b4c6dcae4b740062e4d4005c6dcec47c4bf1706b9fe2c46193167966b09430; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: f148302cf7064f071625e05e4fa7632d34ce3ef41846f9a4f94b0fa9d0dac811; -*-
 #+title: Tutorial
 # inherit configuration from [[./queries.org][queries.org]]
 #+setupfile: ./queries.org
@@ -331,7 +331,7 @@ See the [[man:feh::MOUSE ACTIONS][feh manual section on mouse actions]] for more
 
 ** Org mode
 The query interface for SCKAN is a computational notebook written in Org mode.
-An extensive [[info:Org][manual]] is built in.
+An extensive [[info:org#top][manual]] is built in.
 
 For general help you can type =F1 F1= or =C-h C-h=.
 
@@ -454,7 +454,7 @@ be fixed in some future release.
  (lambda (lang _body)
    (not (or (member lang '("cypher" "sparql")))))) ; (ref:ocbe)
 
-(unless ow-do-devel
+(unless (or ow-do-devel noninteractive)
   (find-file-noselect "./queries.org"))
 #+end_src
 
@@ -464,5 +464,6 @@ be fixed in some future release.
 # org-adapt-indentation: nil
 # org-edit-src-content-indentation: 0
 # org-hide-emphasis-markers: t
+# eval: (and noninteractive (defalias 'literal #'prin1-to-string))
 # eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
 # End:
