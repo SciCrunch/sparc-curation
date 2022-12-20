@@ -440,7 +440,7 @@ that at the moment =RETURN "hello world"= returns no values since
 SciGraph will not find graph elements in the query result. This will
 be fixed in some future release.
 
-* Bootstrap :ARCHIVE:
+* Bootstrap :ARCHIVE:noexport:
 :properties:
 :visibility: folded
 :end:

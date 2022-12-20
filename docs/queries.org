@@ -3972,6 +3972,10 @@ values ?p { prov:startedAtTime prov:wasGeneratedBy dc:date owl:versionInfo TEMP:
 ** versions
 Useful version information is not present in all ontology files at the moment.
 *** embedded load provenance record
+:PROPERTIES:
+:CUSTOM_ID: embedded-load-provenance-record
+:END:
+
 #+begin_src sparql
 SELECT ?p ?o WHERE {
 build:prov ?p ?o .

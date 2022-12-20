@@ -21,7 +21,7 @@
 
 #+end_src
 
-* Bootstrap :ARCHIVE:
+* Bootstrap :ARCHIVE:noexport:
 :properties:
 :visibility: folded
 :end:

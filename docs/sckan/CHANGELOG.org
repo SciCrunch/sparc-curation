@@ -1,6 +1,11 @@
-* 2022-12-02
+# -*- org-todo-keyword-faces: (("RC" . "khaki1")); -*-
+#+title: SCKAN Changelog
+#+todo: DEV RC | PROD
+#+options: p:t
+* PROD 2022-12-02
+CLOSED: <2022-12-20 Tue>
 - ApiNATOMY add model wbrcm for real this time
-* 2022-11-28
+* RC 2022-11-28
 - ApiNATOMY added model pancreas
 - ApiNATOMY aacar-6 fixed axon locations
 - ApiNATOMY bromo replaced FMA ids with UBERON and ILX ids
@@ -17,7 +22,7 @@
 - Blazegraph/SciGraph loaded graphs now embed information about
   build provenance that can be used to identify the version of a graph.
   See [[./queries.org::#embedded-load-provenance-record][embedded load provenance record]] for examples.
-* Release NEXT
+* Release NEXT :noexport:
 ** New models
 *** ApiNATOMY
 *** NPO evidence based models
