@@ -1711,6 +1711,63 @@ git diff $(the last commit before the previous release)..HEAD -- *.ttl ttl
 
 # deploy scigraph image to production
 #+end_src
+**** Promote to production
+Once all tests have passed and we receive the ok from MAP we promote
+sparc-scigraph to sckan-scigraph.
+
+1. back up existing prod services.yaml
+2. copy data from aws-scigraph-scigraph to aws-scigraph-sckan-scigraph
+   1. alternately curl from github release or rsync from internal
+      stores, the issue is the release id is not predictable right now
+3. copy services.yaml (and the raw) from aws-scigraph-scigraph to aws-scigraph-sckan-scigraph
+4. unzip data
+5. stop service
+6. unlink/ln -s
+7. start service
+
+#+begin_src bash :tangle ../bin/run-promote-both-sckan-prod :shebang "#!/usr/bin/env bash"
+echo "not running to avoid accidental deployment"
+echo "if you want to do this comment out these lines and the exit line"
+exit 1
+source "$(eval echo ~/git/pyontutils/nifstd/scigraph/bin/scigraph-functions.sh)"
+host_stage=aws-scigraph-scigraph
+host_prod=aws-scigraph-sckan-scigraph
+host_prod_sudo=aws-scigraph-sckan
+
+path_stamped="$(ssh ${host_stage} "realpath graph")"
+path_zip="${path_stamped}.zip"
+path_yaml="$(ssh ${host_stage} "realpath services.yaml")"
+path_yaml_raw="$(ssh ${host_stage} 'realpath $(head -n 1 services.yaml | cut -d" " -f 2)')"
+
+__TEST='echo ${USER}@${HOSTNAME} '
+__TEST=''
+
+# prod backup existing services
+ssh ${host_prod} "${__TEST}"'cp services.yaml services.yaml-'"$(date +%s)" || exit $?
+
+# stage>prod data and services
+# XXX no rsync because the service users should not have ssh access to anything
+# FIXME the egress on this is stupid, ideally run this whole script from within aws
+paths=("${path_zip}" "${path_yaml}" "${path_yaml_raw}")
+for path in "${paths[@]}"; do
+    ssh ${host_stage} "${__TEST}"'sha256sum '"${path}";
+    # XXX FIXME BEWARE cannot test the pipe and redirection easily
+    ssh ${host_stage} "${__TEST}"'cat '"${path}" |\
+        ssh ${host_prod} 'cat - > '"${path}";
+    ssh ${host_prod} "${__TEST}"'sha256sum '"${path}";
+done
+
+# prod unzip
+ssh ${host_prod} "${__TEST}"'unzip -n '"${path_zip}" || exit $?
+
+# prod stop relink start
+ssh -t ${host_prod_sudo} "$(typeset -f service-manager);"\
+"${__TEST}"'service-manager scigraph stop &&'\
+"${__TEST}"'sudo unlink /var/lib/scigraph/graph;'\
+"${__TEST}"'sudo ln -s '"${path_stamped}"' /var/lib/scigraph/graph;'\
+"${__TEST}"'service-manager scigraph start'
+#+end_src
+
 * Internal Structure
 :PROPERTIES:
 :header-args:python: :comments link :exports code :mkdirp yes
