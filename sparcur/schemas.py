@@ -1998,6 +1998,9 @@ class MetaOutExportSchema(JSONSchema):
         # TODO $ref these w/ pointer?
         # in contributor etc?
 
+        'performance_count': {'type': 'integer',
+                            'context_value': inttype('TEMP:hasNumberOfPerformances'),
+                              },
         'subject_count': {'type': 'integer',
                           'context_value': inttype('TEMP:hasNumberOfSubjects'),
                           },
