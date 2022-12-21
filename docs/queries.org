@@ -332,7 +332,7 @@ that the protocol is present only in =protcur.ttl= and the additional identifier
 processed.
 
 # FIXME mkdir reports somehow
-#+header: :results file :file ./reports/protocol-report.csv
+#+header: :results file :file ./reports/protocol-report.csv :exports code
 #+begin_src sparql
 select distinct
 ?protocol
@@ -356,6 +356,7 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 
 #+RESULTS:
 [[file:./reports/protocol-report.csv]]
+
 *** Total protocols
 #+name: sparql-count-protocols
 #+begin_src sparql
@@ -2180,8 +2181,8 @@ RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null A
 #+end_src
 
 # #+header: :results drawer :limit 99999999 :exports none
-#+header: :limit 999999 :file ./images/neru-4-k11.svg :results file :exports both
-#+header: :var neupop_id="ilxtr:neuron-type-keast-11"
+#+header: :limit 999999 :file ./images/neru-4.svg :results file :exports both
+#+header: :var neupop_id="ilxtr:neuron-type-keast-5"
 #+name: cypher-neru-4
 #+begin_src cypher
 MATCH (neupop:Class{iri: $neupop_id})
@@ -2243,10 +2244,6 @@ MATCH (neupop:Class{iri: $neupop_id})
 
 RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext
 #+end_src
-
-[[file:./images/neru-4-k11.svg]]
-
-[[file:./images/neru-4-k5.svg]]
 
 [[file:./images/neru-4.svg]]
 
@@ -2397,7 +2394,7 @@ RETURN path
 
 *** neru-1
 # #+header: :results drawer :limit 1
-#+header: :limit 999999 :file ./images/neru-1-hrm.svg :results file :exports both
+#+header: :limit 999999 :file ./images/neru-1.svg :results file :exports both
 #+header: :var neupop_id="ilxtr:neuron-type-keast-6"
 #+name: cypher-neru-1
 #+begin_src cypher
@@ -2437,7 +2434,7 @@ return a, b, c, d, null AS e, null AS path
 #+end_src
 
 #+RESULTS: cypher-neru-1
-[[file:./images/neru-1-hrm.svg]]
+[[file:./images/neru-1.svg]]
 
 *** all populations
 #+name: cy-neru-all-pop
@@ -3235,9 +3232,6 @@ RETURN path1, path2, path3
 
 #+call: cyres-apinat-soma-processes-start-id(start-id="UBERON:0006448")
 
-#+RESULTS:
-[[file:./images/soma-processes-id.svg]]
-
 **** weird-soma-processes/{process-id}
 #+header: :var process-id=(or)
 #+name: cyres-apinat-weird-soma-processes-process-id
@@ -3748,62 +3742,27 @@ Images of nerus that have some process in the IMG, from =keast-bladder= and =saw
 
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/neru-3-ntk-5-wat.svg
 
-#+RESULTS:
-[[file:./images/neru-3-ntk-5-wat.svg]]
-
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-11") :file ./images/neru-3-ntk-11.svg
 
-#+RESULTS:
-[[file:./images/neru-3-ntk-11.svg]]
-
 #+call: neru-simplified(path="./images/neru-simplified-ntk-11.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-11")))
-
-#+RESULTS:
-[[file:./images/neru-simplified-ntk-11.svg]]
-
 
 TODO point people to the query that returns a list of all neuron populations and all populations + papers per model
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-9") :file ./images/neru-3-ntk-9.svg
 
-#+RESULTS:
-[[file:./images/neru-3-ntk-9.svg]]
-
 #+call: neru-simplified(path="./images/neru-simplified-ntk-9.svg", json-string=python-neru-helper(result=cypher-neru-helper(neupop_id="ilxtr:neuron-type-keast-9")))
-
-#+RESULTS:
-[[file:./images/neru-simplified-ntk-9.svg]]
 
 #+call: cypher-neru-debug(neupop_id="ilxtr:neuron-type-keast-2") :file ./images/debug-2.svg
 
-#+RESULTS:
-[[file:./images/debug-2.svg]]
-
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-2") :file ./images/neru-3-ntk-2.svg
 
-#+RESULTS:
-[[file:./images/neru-3-ntk-2.svg]]
-
 #+call: neru-simplified(path="./images/neru-simplified-ntk-2.svg", json-string=python-neru-helper(result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-2")))
-
-#+RESULTS:
-[[file:./images/neru-simplified-ntk-2.svg]]
-
 
 5 is going to be the easiest
 #+call: cypher-neru-debug(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/debug-5.svg
 
-#+RESULTS:
-[[file:./images/debug-5.svg]]
-
 #+call: cypher-neru-3(neupop_id="ilxtr:neuron-type-keast-5") :file ./images/neru-3-ntk-5.svg
 
-#+RESULTS:
-[[file:./images/neru-3-ntk-5.svg]]
-
 #+call: neru-simplified(path="./images/neru-simplified-ntk-5.svg", json-string=python-neru-helper(result=cypher-neru-3-helper(neupop_id="ilxtr:neuron-type-keast-5")))
-
-#+RESULTS:
-[[file:./images/neru-simplified-ntk-5.svg]]
 
 *** neuron type keast 5 projects to
 #+begin_src cypher
@@ -4242,7 +4201,8 @@ UBERON:0002441 l: "cervicothoracic ganglion"; e: FMA:6469; syn: "stellate gangli
 #+call: py-ttl-subjects(input=(orgstrap--with-block "ttl-nerves" body)) :cache yes
 
 # FIXME somehow selecting only predicates here produces numerical results only !?
-#+name: thing
+#+name: ongrep
+#+header: :exports code
 #+begin_src sparql :noweb yes :var limit="99" :file ./reports/organ-nerve-ganglia.csv :results file
 select distinct
 ?organ_start
@@ -4285,11 +4245,12 @@ order by ?organ_start
 #+end_src
 
 #+begin_src elisp :results none :exports none
-(ow-babel-eval "thing")
+(ow-babel-eval "ongrep")
 #+end_src
 
-#+RESULTS: thing
+#+RESULTS: ongrep
 [[file:./reports/organ-nerve-ganglia.csv]]
+
 https://docs.google.com/spreadsheets/d/1pgprwTr4bvAaex8cNLeoRLUgt0VU5tilbWi4BCWF1JE/edit#gid=219324374
 =organ-nerve-ganglia=
 # TODO auto populate results
@@ -4422,14 +4383,14 @@ where {
 order by ?start_label
 #+end_src
 
-#+name: thing-table
-#+call: thing() :results table
+#+name: ongrep-table
+#+call: ongrep() :results table
 
-#+name: thing-push
-#+begin_src python :var data=thing-table() :results drawer
+#+name: ongrep-push
+#+begin_src python :var data=ongrep-table() :results drawer
 from sparcur.sheets import Reports
 
-class Thing:
+class ONGRep:
 
     _data = data
 
@@ -4442,13 +4403,13 @@ class Thing:
         return self._data, 'organ-nerve-ganglia coverage report'
 
 
-t = Thing()
+t = ONGRep()
 #t.populate()
 return t._data
 #+end_src
 
 #+begin_src elisp :results none :exports none
-(ow-babel-eval "thing-push")
+(ow-babel-eval "ongrep-push")
 #+end_src
 
 *** neuron population by nerve

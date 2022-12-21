@@ -5,7 +5,7 @@
 
 * Regions with processes from neuron population
 Show all regions that contain some part of a given neuron population.
-In this case, [[ilxtr:neuron-type-keast-5][Neuron type keast 5]]
+Here, [[ilxtr:neuron-type-keast-5][Neuron type keast 5]]
 
 #+name: cypher-query-1
 #+begin_src cypher
@@ -154,7 +154,7 @@ ORDER BY ?neupop
 | ilxtr:neuron-type-sdcol-q       | neuron type sdcol q  |                                                                                          |
 | ilxtr:neuron-type-sdcol-q-prime | neuron type sdcol q' |                                                                                          |
 
-* Bootstrap :ARCHIVE:
+* Bootstrap :ARCHIVE:noexport:
 :properties:
 :visibility: folded
 :end:

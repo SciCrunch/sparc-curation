@@ -40,7 +40,7 @@ datasets = list(root.children)
 :END:
 This code is an example of how to use sparcur to get structured metadata from a local dataset.
 
-You can run this example block and it will validate the [[file:../resources/DatasetTemplate][DatasetTemplate]].
+You can run this example block and it will validate the [[file:../resources/DatasetTemplate/][DatasetTemplate]].
 
 # XXX when testing this you need to set an alternate sandboxed home
 

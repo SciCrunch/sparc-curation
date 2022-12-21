@@ -619,7 +619,7 @@ spc report changes \
 #+end_src
 ** Load and deploy graph
 Then run
-[[file:~/git/pyontutils/nifstd/scigraph/README.org::run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
+[[file:../../pyontutils/nifstd/scigraph/README.org::#run-load-deploy-graph-sparc-data][run-load-deploy-graph-sparc-data]]
 to load and deploy in one shot.
 
 An example run is
@@ -1020,7 +1020,7 @@ https://scicrunch.org/sawg/about/ApiNATOMY
 #+end_src
 
 [[(sure)]] Ensure that the
-[[file:~/git/pyontutils/nifstd/scigraph/README.org::&are-you-sure][&are-you-sure]]
+[[file:../../pyontutils/nifstd/scigraph/README.org::&are-you-sure][&are-you-sure]]
 block can be nowebbed for tangling.
 
 ** Local Variables :ARCHIVE:

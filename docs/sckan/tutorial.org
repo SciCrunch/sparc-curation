@@ -175,7 +175,7 @@ that you renamed in the previous section.
 :CUSTOM_ID: saving-to-the-host-system
 :END:
 
-If you want to use this docker image for more than basic exploration
+If you want to use this docker image for more than basic exploration,
 the best approach is to dump the docker image files to a folder on the
 host system and then make that folder accessible to the container.
 
@@ -306,15 +306,15 @@ docker cp $(docker ps -lqf ancestor=tgbugs/musl:kg-release-user):/home/user/scra
 # TODO transferring any emacs settings/desktop history
 
 ** Keybinds
-| =C-c=     | copy              |
-| =C-v=     | paste             |
-| =C-z=     | undo              |
+| =C-c=       | copy              |
+| =C-v=       | paste             |
+| =C-z=       | undo              |
 | =C-y= =C-Z= | redo              |
-| =C-s=     | save              |
-| =C-f=     | find              |
-| =C-q=     | save and quit     |
-| =f5=      | run nearest block |
-| =C-c C-c= | run block or call |
+| =C-s=       | save              |
+| =C-f=       | find              |
+| =C-q=       | save and quit     |
+| =f5=        | run nearest block |
+| =C-c C-c=   | run block or call |
 
 ** Navigating images
 Cypher query results can be rendered as images using the =:file= header argument.
