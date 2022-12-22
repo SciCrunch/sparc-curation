@@ -600,25 +600,3 @@ except AttributeError as e:
     log.exception(e)
     log.error(f'explanation for error and local variables {c}')
 #+end_src
-* General
-** Updating an installation
-:PROPERTIES:
-:VISIBILITY: folded
-:END:
-#+NAME: git-pull-all
-#+CAPTION: new features that you want to use? aka git pull all or =gpa= if implemented as a function
-#+BEGIN_SRC bash :results output :var REPOS=repos
-pushd ~/git
-for d in $(ls); do if [ -d $d/.git ]; then pushd $d; git pull || break; popd; fi; done
-popd
-#+END_SRC
-
-#+name: git-pull-all-windows
-#+begin_src powershell
-function Git-Pull-All {
-    if($pwd.Path -eq $HOME) {
-        pushd ~/git }
-    foreach($p in Get-ChildItem -directory) {
-        if($p.GetDirectories(".git")) {
-            pushd $p; git pull; popd } } }
-#+end_src
