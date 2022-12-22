@@ -9,8 +9,19 @@
 #+property: header-args :eval no-export
 
 * Introduction
-This is a general guide to bootstrapping and maintaining a complete development environment for
-working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc.
+This is a general guide to bootstrapping and maintaining a complete development environment
+for working as a curator or developer on the NIF-Ontology, protc, sparc-curation, scibot, etc.
+
+As of =2022-12-21= the information in this file is somewhat out of date.
+Corrections for better and more up-to-date workflows have been made, but
+most users should not attempt to follow this guide unless they need to
+replicate the entirety of the primary development environment. There are
+now better options tailored to specific use cases.
+
+Reference build environments are linked in the [[#docker][docker]] section.
+If you need to create a development environment on a new system it is best
+to consult those as a reference because they have the full dependency tree.
+
 For a general introduction to the SPARC curation process see [[./background.org]]
 The environment bootstrapped by running this file was originally developed on Gentoo,
 and is portable to other distributions with a few tweaks.
@@ -19,22 +30,445 @@ Please report any bugs you find in this file or during the execution of any of t
 workflows described in this file to the sparc-curation GitHub
 [[https://github.com/SciCrunch/sparc-curation/issues][issue tracker]].
 * Setup
-Setup takes about 3 hours.
+Full setup takes about 3 hours.
 [[#one-shot][OS level setup]] takes about and hour, and [[#user][user setup]] takes about two hours. \\
 
-*If you do not have root or sudo access or do not administer the computer*
-*you are following this guide on you should start at [[#user][user setup]].*
+*If git, python, and Emacs are already installed on your computer*
+*you can start at [[#user][user setup]]. Otherwise start at [[#one-shot][OS level setup]].*
 
-If you do have admin access then do the [[#one-shot][OS level setup]] first
-and then come back to the [[#user][user setup]] once you are done.
+If you have admin access then do [[#one-shot][OS level setup]]
+first and then continue on to [[#user][user setup]] once you are done.
 
+** One shot
+:PROPERTIES:
+:CUSTOM_ID: one-shot
+:VISIBILITY: folded
+:END:
+These bits are os specific setup instructions that need to be run as =root=.
+They only need to be run once.
+Quick links for each os.
+- [[#windows][Windows]]
+- [[#macos][macOS]]
+- [[#ubuntu][Ubuntu]]
+- [[#docker][Docker]] images and full documentation of the environment are also available.
+*** Windows
+:PROPERTIES:
+:CUSTOM_ID: windows
+:END:
+**** Package manager
+For managing a windows development/curation environment I highly recommend using
+the [[https://chocolatey.org/][chocolatey]] package manager.
+[[https://chocolatey.org/install#install-with-powershellexe][Install chocolatey]].
+
+#+begin_src powershell :exports code :eval never
+choco install `
+autohotkey `
+clisp `
+emacs `
+firefox `
+GoogleChrome `
+nodejs `
+poshgit `
+procexp `
+python `
+racket `
+rsync `
+vim `
+wsl2 `
+wsl-ubuntu-2004 `
+vcxsrv `
+docker-desktop `
+docker
+
+#+end_src
+
+# visualstudio2019community `
+# When installing Visual Studio you will likely need to install
+# additional tools via the visual studio installer.
+
+Update system Path to include packages that don't add themselves.
+This needs to be run as administrator.
+#+begin_src powershell :exports code :eval never
+$path = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine)
+$prefix_path = "C:\Program Files\Racket;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;"
+[Environment]::SetEnvironmentVariable("Path",
+                                      $prefix_path + $path,
+                                      [EnvironmentVariableTarget]::Machine)
+#+end_src
+
+If you are logged in remotely restarting sshd is the easiest way to refresh
+the environment so commands are in PATH. This is because new shells inherit the
+environment of sshd at the time that it was started.
+#+begin_src powershell :exports code :eval never
+Restart-Service sshd
+#+end_src
+You will need to reconnect to a new ssh session in order to have access to git and other
+newly installed commands.
+
+**** Config
+***** Environment variables
+In order for Emacs to work in a way that is similar to other operating
+systems the HOME environment variable needs to be set. You can run these
+commands as a regular user.
+#+begin_src powershell
+setx HOME %USERPROFILE%
+setx PATH "C:\Program Files\Git\bin;%PATH%"
+#+end_src
+***** Group policy for file system issues
+****** Long Paths
+Datasets in SPARC often have long names. Windows 10 default settings
+break long paths in Python. To fix this enable win32 long paths.
+
+[[https://docs.microsoft.com/en-us/archive/blogs/jeremykuhne/net-4-6-2-and-long-paths-on-windows-10#enabling-win32-long-path-support][Microsoft Documentation]]
+
+You can use =gpedit.msc= to grant these permissions by navigating the
+menu tree below and adding the user. You can run =gpedit.msc= directly
+with =Win-r= or often =Win gpedit enter=.
+
+#+begin_example
+Computer configuration
+└── Administrative Templates
+    Enable Win32 long paths
+#+end_example
+
+#+begin_src powershell
+Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Policies  -Name LongPathsEnabled -Value 1
+#+end_src
+
+Double click to open the setting dialogue, select the enable radio
+button on the left and then click the ok button.
+
+Any program that is run after this is enabled will work as expected if
+it supports long paths. No restart or logout is required.
+****** Symlinks
+=augpathlib= makes extensive use of symlinks to store metadata for remote files
+that have not been downloaded. By default normal users cannot create symlinks on
+windows. The best way to fix this is by granting the user that will run =sparcur=
+permission to create symlinks (do NOT run the process as Administrator).
+
+Three relevant links:
+[[https://stackoverflow.com/questions/6260149/os-symlink-support-in-windows][stackoverflow]]
+[[https://superuser.com/questions/104845/permission-to-make-symbolic-links-in-windows-7][superuser]]
+[[https://dbondarchuk.com/2016/09/23/adding-permission-for-creating-symlink-using-powershell/][powershell script source]].
+
+*You will need to log out and log back in for the setting to take effect.*
+
+You can use =gpedit.msc= to grant these permissions by adding the user
+by navigating the menu tree below. You can run =gpedit.msc= directly
+with =Win-r= or often =Win gpedit enter=.
+
+#+begin_example
+Computer configuration
+└── Windows Settings
+    └── Security Settings
+        └── Local Policies
+            └── User Rights Assignment
+                Create symbolic links
+#+end_example
+
+Once symlinks are working it is safe to continue on to [[#user][user setup]].
+
+Alternately you can define and run the function below as Administrator.
+Run it as =addSymLinkPermissions("user-to-add")=.
+
+#+begin_src powershell
+function addSymLinkPermissions($accountToAdd){
+    Write-Host "Checking SymLink permissions.."
+    $sidstr = $null
+    try {
+        $ntprincipal = new-object System.Security.Principal.NTAccount "$accountToAdd"
+        $sid = $ntprincipal.Translate([System.Security.Principal.SecurityIdentifier])
+        $sidstr = $sid.Value.ToString()
+    } catch {
+        $sidstr = $null
+    }
+    Write-Host "Account: $($accountToAdd)" -ForegroundColor DarkCyan
+    if( [string]::IsNullOrEmpty($sidstr) ) {
+        Write-Host "Account not found!" -ForegroundColor Red
+        exit -1
+    }
+    Write-Host "Account SID: $($sidstr)" -ForegroundColor DarkCyan
+    $tmp = [System.IO.Path]::GetTempFileName()
+    Write-Host "Export current Local Security Policy" -ForegroundColor DarkCyan
+    secedit.exe /export /cfg "$($tmp)" 
+    $c = Get-Content -Path $tmp 
+    $currentSetting = ""
+    foreach($s in $c) {
+        if( $s -like "SECreateSymbolicLinkPrivilege*") {
+            $x = $s.split("=",[System.StringSplitOptions]::RemoveEmptyEntries)
+            $currentSetting = $x[1].Trim()
+        }
+    }
+    if( $currentSetting -notlike "*$($sidstr)*" ) {
+        Write-Host "Need to add permissions to SymLink" -ForegroundColor Yellow
+        
+        Write-Host "Modify Setting ""Create SymLink""" -ForegroundColor DarkCyan
+
+        if( [string]::IsNullOrEmpty($currentSetting) ) {
+            $currentSetting = "*$($sidstr)"
+        } else {
+            $currentSetting = "*$($sidstr),$($currentSetting)"
+        }
+        Write-Host "$currentSetting"
+    $outfile = @"
+[Unicode]
+Unicode=yes
+[Version]
+signature="`$CHICAGO`$"
+Revision=1
+[Privilege Rights]
+SECreateSymbolicLinkPrivilege = $($currentSetting)
+"@
+    $tmp2 = [System.IO.Path]::GetTempFileName()
+        Write-Host "Import new settings to Local Security Policy" -ForegroundColor DarkCyan
+        $outfile | Set-Content -Path $tmp2 -Encoding Unicode -Force
+        Push-Location (Split-Path $tmp2)
+        try {
+            secedit.exe /configure /db "secedit.sdb" /cfg "$($tmp2)" /areas USER_RIGHTS 
+        } finally { 
+            Pop-Location
+        }
+    } else {
+        Write-Host "NO ACTIONS REQUIRED! Account already in ""Create SymLink""" -ForegroundColor DarkCyan
+        Write-Host "Account $accountToAdd already has permissions to SymLink" -ForegroundColor Green
+        return $true;
+    }
+}
+#+end_src
+**** Manual install
+***** texlive
+https://www.tug.org/texlive/windows.html
+https://www.tug.org/texlive/acquire-netinstall.html
+http://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe
+This takes quite a while, about 50 mins on a good connection with a fast computer.
+***** protege
+https://github.com/protegeproject/protege-distribution/releases/latest
+***** redland
+rdf tools
+http://librdf.org/raptor/INSTALL.html
+https://github.com/dajobe/raptor
+Unfortunately to get the latest version of these it seems you have to build them yourself.
+**** ssh                                                           :optional:
+You can skip this if you will only be using the windows computer locally.
+In a local administrator powershell install OpenSSH. The rest can then be done remotely.
+#+begin_src powershell
+Get-WindowsCapability -Online | ? Name -like 'OpenSSH*'
+Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+Set-Service sshd -StartupType Automatic
+Start-Service sshd
+# add your ssh key to %programdata%\ssh\administrators_authorized_keys
+# disable password login in %programdata%\ssh\sshd_config
+Restart-Service sshd
+#+end_src
+
+Set default login shell.
+#+begin_src powershell
+New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
+#+end_src
+**** old                                                           :noexport:
+add to PATH so we can just link everything there
+=%HOMEPATH%\bin=
+=%APPDATA%\Python\Python37\Scripts=
+
+TODO =-l %HOMEPATH%/opt/scimax/init.el setup.org= in the shortcut ...
+also =%HOMEPATH%= for the start in ...
+*** macOS
+:PROPERTIES:
+:CUSTOM_ID: macos
+:END:
+**** Package manager
+[[https://brew.sh/][Install homebrew]].
+
+#+begin_src bash :exports code :eval never
+set -e  # this will exit your shell if you run at the top level and something fails
+
+curl -fsSL https://raw.githubusercontent.com/Homebrew/install/fcfea5bbf7130d754360d3056601bad131b09762/install.sh -o brew-install.sh
+test $(shasum -a 256 brew-install.sh | awk '{print $1}') = bcdaa4ade908e3766c74883f829c3dbb553a9808899bf58702651bd229d0c463 || { echo FAIL; rm brew-install.sh }
+
+/bin/bash brew-install.sh
+rm brew-install.sh
+
+brew install --cask \
+docker \
+emacs \
+firefox \
+gimp \
+google-chrome \
+inkscape \
+krita \
+mactex \
+macvim \
+protege \
+racket
+
+brew install \
+coreutils \
+curl \
+git \
+htop \
+hunspell \
+libmagic \
+pandoc \
+postgres \
+pyenv \
+python \
+python3 \
+redland \
+rxvt-unicode \
+sbcl \
+sqlite \
+tree \
+virtualbox \
+xquartz \
+imagemagick@6 \
+poppler \
+cmake \
+ninja \
+berkeley-db
+
+#+end_src
+
+Add the following to your ~/.bash_profile
+#+CAPTION: .bash_profile
+#+begin_src bash :exports code :eval never
+# This file is sourced by bash for login shells.  The following line
+# runs your .bashrc and is recommended by the bash info pages.
+[[ -f ~/.bashrc ]] && . ~/.bashrc
+#+end_src
+
+Add the following to your ~/.bashrc
+#+CAPTION: .bashrc
+#+begin_src bash :exports code :eval never
+export PATH=${HOME}/bin:${HOME}/Library/Python/3.10/bin:${PATH}
+#+end_src
+
+Run the following to symlink python3 to python.
+Note that python3 is now legacy as of =2022-12-21=, this is retained for the record.
+#+begin_src bash :eval never
+mkdir ~/bin
+ln -s /usr/local/bin/python3 ~/bin/python
+ln -s /usr/local/bin/pip3 ~/bin/pip
+#+end_src
+
+At this point it is safe to continue on to [[#user][user setup]].
+**** ssh                                                           :optional:
+You can skip this if you will only be using the osx computer locally.
+#+begin_src bash
+sudo systemsetup -setremotelogin on
+# scp your key over to ~/.ssh/authorized_keys
+# set PasswordAuthentication no in /etc/ssh/sshd_config
+# set ChallengeResponseAuthentication no in /etc/ssh/sshd_config
+sudo launchctl unload  /System/Library/LaunchDaemons/ssh.plist
+sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+#+end_src
+*** Ubuntu
+:PROPERTIES:
+:CUSTOM_ID: ubuntu
+:END:
+18.10 cosmic cuttlefish (and presumably other debian derivatives)
+
+The following need to be run in a shell where you have root (e.g. via =sudo su -=). \\
+
+# Remind me, why is an ssh server not provided by default!?
+#+CAPTION: Must be done locally as root prior to remote execution. \\
+#+BEGIN_SRC bash :exports code :eval never
+apt install openssh-server net-tools
+#+END_SRC
+
+Add your ssh public key to [[file:${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
+if you want to run this remotely.
+
+#+NAME: ubuntu-root-setup
+#+CAPTION: Can be run remotely as root.
+#+CAPTION: texlive-full is a big boy, minimal version is
+#+CAPTION: texlive texlive-luatex texlive-latex-extra  \\
+#+BEGIN_SRC bash :exports code :eval never
+wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' \
+>> /etc/apt/sources.list.d/google-chrome.list
+add-apt-repository ppa:plt/racket
+add-apt-repository ppa:kelleyk/emacs
+add-apt-repository ppa:pypy/ppa
+apt update
+apt install build-essential lib64readline-dev rxvt-unicode htop attr tree sqlite curl git
+apt install emacs26 vim-gtk3 texlive-full pandoc hunspell
+apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev maven
+apt install inkscape gimp krita graphviz firefox google-chrome-stable xfce4
+apt install nginx
+update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
+#+END_SRC
+
+At this point it is probably safe to continue on to [[#user][user setup]].
+If something goes wrong, come back and take a look at setting =PATH=.
+
+Ubuntu struggles to set user specific PATHs correctly via
+=~/.profile= This code works when the user logs in. It does not
+work correctly if you =su= to the user. Not entirely sure why.
+Doesn't work on xfce either apparently. The absolute madness.
+#+NAME: user-home-paths
+#+CAPTION: Set user home PATHs for all users to simplify later steps
+#+CAPTION: FIXME for some reason if this block is treated a source block it kills html export !?
+#+BEGIN_EXAMPLE
+{ cat <<EOL
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/bin" ] ; then
+    PATH="$HOME/bin:$PATH"
+fi
+
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/.local/bin" ] ; then
+    PATH="$HOME/.local/bin:$PATH"
+fi
+EOL
+} > /etc/profile.d/user-home-paths.sh
+#+END_EXAMPLE
+
+Other software that you will probably need at some point but that is not packaged on ubuntu.
+- [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
+*** Gentoo
+:PROPERTIES:
+:CUSTOM_ID: gentoo
+:END:
+The [[#docker][docker]] images section has links to complete Gentoo
+based build system that includes a development environment that
+matches the one described in this file.
+#+CAPTION: /var/lib/portage/world
+#+BEGIN_SRC text
+app-editors/emacs
+app-editors/gvim
+app-text/texlive
+dev-vcs/git
+dev-scheme/racket
+dev-lisp/sbcl
+www-client/google-chrome-stable
+#+END_SRC
+*** Docker
+:PROPERTIES:
+:CUSTOM_ID: docker
+:END:
+See the [[./sckan/README.org][SCKAN readme]] for instructions on how to get started with docker.
+
+The process originally described by this file grew over time into a
+series of dockerfiles that automate the creation of a an environment
+that is similar to the primary development environment.
+
+The literate source for all images lives at [[file:../../dockerfiles/source.org]].
+Relevant sections for this particular environment are as follows.
+- [[file:../../dockerfiles/source.org::#kg-dev][kg-dev]]
+- [[file:../../dockerfiles/source.org::#kg-dev-user][kg-dev-user]]
+- [[file:../../dockerfiles/source.org::#sparcron][sparcron]]
+- [[file:../../dockerfiles/source.org::#sparcron-user][sparcron-user]]
+
+The images can be found on dockerhub https://hub.docker.com/r/tgbugs/musl/tags.
 ** User
 :PROPERTIES:
 :CUSTOM_ID: user
 :END:
 If you are already on a system that has the [[#one-shot][prerequisites]]
 installed start here. If you are not you will find out fairly
-quickly when the following commands fail.
+quickly when one of the following commands fail.
 *** Git name and email
 These workflows make extensive use of git.
 Git needs to know who you are (and so do we) so that it can stash files
@@ -52,8 +486,8 @@ git config --global user.email "MY_NAME@example.com"
 *** Bootstrapping [[./setup.org][this =setup.org= file]]
 You can run all the code in [[./setup.org][this =setup.org= file]] automatically
 using emacs [[https://orgmode.org/][org-mode]]. The easiest way to accomplish this is to
-install [[https://github.com/jkitchin/scimax][scimax]] which is an emacs starterkit for scientists and
-engineers that has everything we will need. The following steps will do this automatically for you.
+download [[https://github.com/tgbugs/orgstrap/blob/master/init-simple.el][orgstrap/init-simple.el]] to get Emacs to a good state.
+The following steps will do this automatically for you.
 
 *All the code blocks in this Bootstrapping section need to be pasted into a terminal (shell) where you are logged in as your user.*
 *Run every code block in the order that they appear on this page. Do not skip any blocks.*
@@ -61,6 +495,9 @@ engineers that has everything we will need. The following steps will do this aut
 
 When pasting blocks into the terminal (middles mouse, or =C-V= =control-shift-v= in the ubuntu terminal)
 if you do not copy the last newline of the blocks then you will have to hit enter to run the last command.
+
+The following commands should work on all operating systems if you
+have followed the [[#one-shot][setup instructions]] for your os.
 # TODO emacs auto setup to be able to run this file
 #+NAME: setup-folders
 #+CAPTION: Set up the folder structure and clone this sparc-curation repository.
@@ -73,64 +510,36 @@ mkdir ~/files
 source .profile
 #+end_src
 
-Run the following block to clone this repository and the =scimax= repository.
+Run the following block to clone this repository and the =orgstrap= repository.
 #+begin_src bash :exports code :eval never
 pushd ~/git
 git clone https://github.com/SciCrunch/sparc-curation.git
-popd
-pushd ~/opt
-git clone https://github.com/jkitchin/scimax.git
+git clone https://github.com/tgbugs/orgstrap.git
 popd
 #+END_SRC
 
-Run the following command to initialize texlive for your user.
-It is needed for scimax to install correctly.
-#+name: setup-texlive
-#+begin_src bash :exports code :eval never
-tlmgr init-usertree
-#+end_src
+When running the next block =emacs= will launch and install a number of packages (DON'T PANIC).
 
-Run the following commands to create the =scimax= command (
-[[file:${HOME}/bin/scimax][~/bin/scimax]] on linux and macos,
-[[file:${HOME}/bin/scimax.ps1][~/bin/scimax.ps1]] on windows),
-and the config file
-[[file:${HOME}/opt/scimax/user/user.el][user.el]]
-that is needed for the rest of the process.
-# astoundingly powershell redirection and bash redirection have the same behavior for strings so it makes it
-# possible to work around the fact that the behavior is effectively mutually exclusive for strings passed as
-# arguments, all I can do is laugh at how dumb this is
-# NOTE: can't use line continuation here because it is different between powershell and posix
-#+name: tangle-setup-org
-#+begin_src sh :eval never
-echo '(defvar *path-to-setup.org* "~/git/sparc-curation/docs/setup.org")' > vars.el
-emacs --batch --load vars.el --load org --load ob-shell --eval '(org-babel-tangle-file *path-to-setup.org*)' --load ~/opt/scimax/user/user.el --eval '(org-babel-tangle-file *path-to-setup.org*)'
-rm vars.el
-#+end_src
-# yes we tangle twice here intentionally because user-config-path needs to be defined
-# before the second round of tangles can succeed
-
-When running the next block =scimax= will launch emacs an install a number of packages (DON'T PANIC).
 It is normal to see errors during this step. When everything finishes installing you should find
 yourself staring at next section of this file [[#per-user-setup][Per user setup]] and can continue
-from there in =scimax=.
-# NOTE: cannot use line continuation because it breaks posix/powershell portability
-#+name: scimax-bootstrap
+from there in =emacs=.
 #+begin_src bash :exports code :eval never
-scimax --find-file ~/git/sparc-curation/docs/setup.org --eval "(add-hook 'window-setup-hook (lambda () (org-goto-section *section-per-user-setup*)))"
+emacs -q --eval '(setq init-simple-testing t)' -l ~/git/orgstrap/init-simple.el --eval '(progn (with-current-buffer (find-file (pop argv)) (goto-char (org-find-exact-headline-in-buffer (pop argv))) (recenter-top-bottom 0)))' ~/git/sparc-curation/docs/setup.org "Per user setup"
 #+end_src
+
 *** Per user setup
 :PROPERTIES:
 :CUSTOM_ID: per-user-setup
 :END:
-You should now have this file open in =scimax=
+You should now have this file open in =emacs=
 and can run the code blocks directly by clicking on a block
 and typing =C-c C-c= (control c control c). In the default
-=scimax= setup code blocks will appear as yellow or green.
+=emacs= setup code blocks will appear as yellow or green.
 Note that not all yellow blocks are source code, some may be
 examples, you can tell because examples won't execute and the
 start with =#+BEGIN_EXAMPLE= instead of =#+BEGIN_SRC=.
 
-All the following should be run as your user in =scimax=.
+All the following should be run as your user in =emacs=.
 If you run these blocks from the command line be sure to run
 nameref:remote-exports first.
 
@@ -207,7 +616,7 @@ Clicking on the link will open it in another buffer. While editing the file
 you can save using the file menu, =C-x C-s= (emacs keys), or =:w= (vim keys).
 
 | Linux   | [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]                                         |
-| Macos   | [[file:${HOME}/Library/Application Support/orthauth/secrets.yaml][~/Library/Application Support/orthauth/secrets.yaml]] |
+| macOS   | [[file:${HOME}/Library/Application Support/orthauth/secrets.yaml][~/Library/Application Support/orthauth/secrets.yaml]] |
 | Windows | [[file:${HOME}/AppData/Local/orthauth/secrets.yaml][~/AppData/Local/orthauth/secrets.yaml]]                             |
 
 _*When you are done* there should be *NO* entries with =*replace-me-with:= in the file._
@@ -361,382 +770,6 @@ function HasXattrs()
  " don't create new inodes
  setlocal backupcopy=yes
 endfunction
-#+end_src
-** One shot
-:PROPERTIES:
-:CUSTOM_ID: one-shot
-:VISIBILITY: folded
-:END:
-These bits are os specific setup instructions that need to be run as =root=.
-They only need to be run once.
-*** Gentoo
-#+CAPTION: /var/lib/portage/world
-#+BEGIN_SRC text
-app-editors/emacs
-app-editors/gvim
-app-text/texlive
-dev-vcs/git
-dev-scheme/racket
-dev-lisp/sbcl
-www-client/google-chrome-stable
-#+END_SRC
-*** Ubuntu
-18.10 cosmic cuttlefish (and presumably other debian derivatives)
-
-The following need to be run in a shell where you have root (e.g. via =sudo su -=). \\
-
-# Remind me, why is an ssh server not provided by default!?
-#+CAPTION: Must be done locally as root prior to remote execution. \\
-#+BEGIN_SRC bash :exports code :eval never
-apt install openssh-server net-tools
-#+END_SRC
-
-Add your ssh public key to [[file:${HOME}/.ssh/authorized_keys][~/.ssh/authorized_keys]]
-if you want to run this remotely.
-
-#+NAME: ubuntu-root-setup
-#+CAPTION: Can be run remotely as root.
-#+CAPTION: texlive-full is a big boy, minimal version is
-#+CAPTION: texlive texlive-luatex texlive-latex-extra  \\
-#+BEGIN_SRC bash :exports code :eval never
-wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' \
->> /etc/apt/sources.list.d/google-chrome.list
-add-apt-repository ppa:plt/racket
-add-apt-repository ppa:kelleyk/emacs
-add-apt-repository ppa:pypy/ppa
-apt update
-apt install build-essential lib64readline-dev rxvt-unicode htop attr tree sqlite curl git
-apt install emacs26 vim-gtk3 texlive-full pandoc hunspell
-apt install librdf0-dev python3-dev python3-pip pypy3 jupyter racket sbcl r-base r-base-dev maven
-apt install inkscape gimp krita graphviz firefox google-chrome-stable xfce4
-apt install nginx
-update-alternatives --install /usr/bin/python python /usr/bin/python3 10
-update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 10
-#+END_SRC
-
-Ubuntu struggles to set user specific PATHs correctly via
-=~/.profile= This code works when the user logs in. It does not
-work correctly if you =su= to the user. Not entirely sure why.
-Doesn't work on xfce either apparently. The absolute madness.
-#+NAME: user-home-paths
-#+CAPTION: Set user home PATHs for all users to simplify later steps
-#+CAPTION: FIXME for some reason if this block is treated a source block it kills html export !?
-#+BEGIN_EXAMPLE
-{ cat <<EOL
-# set PATH so it includes user's private bin if it exists
-if [ -d "$HOME/bin" ] ; then
-    PATH="$HOME/bin:$PATH"
-fi
-
-# set PATH so it includes user's private bin if it exists
-if [ -d "$HOME/.local/bin" ] ; then
-    PATH="$HOME/.local/bin:$PATH"
-fi
-EOL
-} > /etc/profile.d/user-home-paths.sh
-#+END_EXAMPLE
-
-Other software that you will probably need at some point but that is not packaged on ubuntu.
-- [[https://imagej.net/Fiji/Downloads][Fiji/ImageJ]]
-
-*** Windows
-**** Config
-***** Environment variables
-In order for Emacs to work in a way that is similar to other operating
-systems the HOME environment variable needs to be set.
-#+begin_src powershell
-setx HOME %USERPROFILE%
-setx PATH "C:\Program Files\Git\bin;%PATH%"
-#+end_src
-***** Group policy for file system issues
-****** Long Paths
-Datasets in SPARC often have long names. Windows 10 default settings
-break long paths in Python. To fix this enable win32 long paths.
-
-[[https://docs.microsoft.com/en-us/archive/blogs/jeremykuhne/net-4-6-2-and-long-paths-on-windows-10#enabling-win32-long-path-support][Microsoft Documentation]]
-
-You can use =gpedit.msc= to grant these permissions by adding the user
-by navigating the menu tree below. You can run =gpedit.msc= directly
-with =Win-r= or often =Win gpedit enter=.
-
-#+begin_example
-Computer configuration
-└── Administrative Templates
-    Enable Win32 long paths
-#+end_example
-
-#+begin_src powershell
-Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Policies  -Name LongPathsEnabled -Value 1
-#+end_src
-
-Double click to open the setting dialogue, select the enable radio
-button on the left and then click the ok button.
-
-Any program that is run after this is enabled will work as expected if
-it supports long paths. No restart or logout is required.
-****** Symlinks
-=augpathlib= makes extensive use of symlinks to store metadata for remote files
-that have not been downloaded. By default normal users cannot create symlinks on
-windows. The best way to fix this is by granting the user that will run sparcur
-permission to create symlinks (NOT to run the process as Administrator).
-
-Three relevant links:
-[[https://stackoverflow.com/questions/6260149/os-symlink-support-in-windows][stackoverflow]]
-[[https://superuser.com/questions/104845/permission-to-make-symbolic-links-in-windows-7][superuser]]
-[[https://dbondarchuk.com/2016/09/23/adding-permission-for-creating-symlink-using-powershell/][powershell script source]].
-
-*You will need to log out and log back in for the setting to take effect.*
-
-You can use =gpedit.msc= to grant these permissions by adding the user
-by navigating the menu tree below. You can run =gpedit.msc= directly
-with =Win-r= or often =Win gpedit enter=.
-
-#+begin_example
-Computer configuration
-└── Windows Settings
-    └── Security Settings
-        └── Local Policies
-            └── User Rights Assignment
-                Create symbolic links
-#+end_example
-
-Alternately you can define and run the function below as Administrator.
-Run it as =addSymLinkPermissions("user-to-add")=.
-
-#+begin_src powershell
-function addSymLinkPermissions($accountToAdd){
-    Write-Host "Checking SymLink permissions.."
-    $sidstr = $null
-    try {
-        $ntprincipal = new-object System.Security.Principal.NTAccount "$accountToAdd"
-        $sid = $ntprincipal.Translate([System.Security.Principal.SecurityIdentifier])
-        $sidstr = $sid.Value.ToString()
-    } catch {
-        $sidstr = $null
-    }
-    Write-Host "Account: $($accountToAdd)" -ForegroundColor DarkCyan
-    if( [string]::IsNullOrEmpty($sidstr) ) {
-        Write-Host "Account not found!" -ForegroundColor Red
-        exit -1
-    }
-    Write-Host "Account SID: $($sidstr)" -ForegroundColor DarkCyan
-    $tmp = [System.IO.Path]::GetTempFileName()
-    Write-Host "Export current Local Security Policy" -ForegroundColor DarkCyan
-    secedit.exe /export /cfg "$($tmp)" 
-    $c = Get-Content -Path $tmp 
-    $currentSetting = ""
-    foreach($s in $c) {
-        if( $s -like "SECreateSymbolicLinkPrivilege*") {
-            $x = $s.split("=",[System.StringSplitOptions]::RemoveEmptyEntries)
-            $currentSetting = $x[1].Trim()
-        }
-    }
-    if( $currentSetting -notlike "*$($sidstr)*" ) {
-        Write-Host "Need to add permissions to SymLink" -ForegroundColor Yellow
-        
-        Write-Host "Modify Setting ""Create SymLink""" -ForegroundColor DarkCyan
-
-        if( [string]::IsNullOrEmpty($currentSetting) ) {
-            $currentSetting = "*$($sidstr)"
-        } else {
-            $currentSetting = "*$($sidstr),$($currentSetting)"
-        }
-        Write-Host "$currentSetting"
-    $outfile = @"
-[Unicode]
-Unicode=yes
-[Version]
-signature="`$CHICAGO`$"
-Revision=1
-[Privilege Rights]
-SECreateSymbolicLinkPrivilege = $($currentSetting)
-"@
-    $tmp2 = [System.IO.Path]::GetTempFileName()
-        Write-Host "Import new settings to Local Security Policy" -ForegroundColor DarkCyan
-        $outfile | Set-Content -Path $tmp2 -Encoding Unicode -Force
-        Push-Location (Split-Path $tmp2)
-        try {
-            secedit.exe /configure /db "secedit.sdb" /cfg "$($tmp2)" /areas USER_RIGHTS 
-        } finally { 
-            Pop-Location
-        }
-    } else {
-        Write-Host "NO ACTIONS REQUIRED! Account already in ""Create SymLink""" -ForegroundColor DarkCyan
-        Write-Host "Account $accountToAdd already has permissions to SymLink" -ForegroundColor Green
-        return $true;
-    }
-}
-#+end_src
-**** ssh                                                           :optional:
-You can skip this if you will only be using the windows computer locally.
-In a local administrator powershell install OpenSSH. The rest can then be done remotely.
-#+begin_src powershell
-Get-WindowsCapability -Online | ? Name -like 'OpenSSH*'
-Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-Set-Service sshd -StartupType Automatic
-Start-Service sshd
-# add your ssh key to %programdata%\ssh\administrators_authorized_keys
-# disable password login in %programdata%\ssh\sshd_config
-Restart-Service sshd
-#+end_src
-
-Set default login shell.
-#+begin_src powershell
-New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
-#+end_src
-**** Package manager
-For managing a windows development/curation environment I highly recommend using
-the [[https://chocolatey.org/][chocolatey]] package manager.
-[[https://chocolatey.org/install#install-with-powershellexe][Install chocolatey]].
-
-#+begin_src powershell :exports code :eval never
-choco install `
-autohotkey `
-clisp `
-emacs `
-firefox `
-GoogleChrome `
-nodejs `
-poshgit `
-procexp `
-python `
-racket `
-rsync `
-vim `
-wsl2 `
-wsl-ubuntu-2004 `
-vcxsrv `
-docker-desktop `
-docker
-
-#+end_src
-
-# visualstudio2019community `
-# When installing Visual Studio you will likely need to install
-# additional tools via the visual studio installer.
-
-Update system Path to include packages that don't add themselves.
-This needs to be run as administrator.
-#+begin_src powershell :exports code :eval never
-$path = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine)
-$prefix_path = "C:\Program Files\Racket;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;"
-[Environment]::SetEnvironmentVariable("Path",
-                                      $prefix_path + $path,
-                                      [EnvironmentVariableTarget]::Machine)
-#+end_src
-
-If you are logged in remotely restarting sshd is the easiest way to refresh
-the environment so commands are in PATH. This is because new shells inherit the
-environment of sshd at the time that it was started.
-#+begin_src powershell :exports code :eval never
-Restart-Service sshd
-#+end_src
-You will need to reconnect to a new ssh session in order to have access to git and other
-newly installed commands.
-
-**** Manual install
-***** texlive
-https://www.tug.org/texlive/windows.html
-https://www.tug.org/texlive/acquire-netinstall.html
-http://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe
-This takes quite a while, about 50 mins on a good connection with a fast computer.
-***** protege
-https://github.com/protegeproject/protege-distribution/releases/latest
-***** redland
-rdf tools
-http://librdf.org/raptor/INSTALL.html
-https://github.com/dajobe/raptor
-Unfortunately to get the latest version of these it seems you have to build them yourself.
-**** old                                                           :noexport:
-add to PATH so we can just link everything there
-=%HOMEPATH%\bin=
-=%APPDATA%\Python\Python37\Scripts=
-
-TODO =-l %HOMEPATH%/opt/scimax/init.el setup.org= in the shortcut ...
-also =%HOMEPATH%= for the start in ...
-*** OS X
-**** ssh                                                           :optional:
-You can skip this if you will only be using the osx computer locally.
-#+begin_src bash
-sudo systemsetup -setremotelogin on
-# scp your key over to ~/.ssh/authorized_keys
-# set PasswordAuthentication no in /etc/ssh/sshd_config
-# set ChallengeResponseAuthentication no in /etc/ssh/sshd_config
-sudo launchctl unload  /System/Library/LaunchDaemons/ssh.plist
-sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
-#+end_src
-**** Package manager
-[[https://brew.sh/][Install homebrew]].
-
-#+begin_src bash :exports code :eval never
-set -e  # this will exit your shell if you run at the top level and something fails
-
-curl -fsSL https://raw.githubusercontent.com/Homebrew/install/fcfea5bbf7130d754360d3056601bad131b09762/install.sh -o brew-install.sh
-test $(shasum -a 256 brew-install.sh | awk '{print $1}') = bcdaa4ade908e3766c74883f829c3dbb553a9808899bf58702651bd229d0c463 || { echo FAIL; rm brew-install.sh }
-
-/bin/bash brew-install.sh
-rm brew-install.sh
-
-brew install --cask \
-docker \
-emacs \
-firefox \
-gimp \
-google-chrome \
-inkscape \
-krita \
-mactex \
-macvim \
-protege \
-racket
-
-brew install \
-coreutils \
-curl \
-git \
-htop \
-hunspell \
-libmagic \
-pandoc \
-postgres \
-pyenv \
-python \
-redland \
-rxvt-unicode \
-sbcl \
-sqlite \
-tree \
-virtualbox \
-xquartz \
-imagemagick@6 \
-poppler \
-cmake \
-ninja \
-berkeley-db
-
-#+end_src
-
-Add the following to your ~/.bash_profile
-#+CAPTION: .bash_profile
-#+begin_src bash :exports code :eval never
-# This file is sourced by bash for login shells.  The following line
-# runs your .bashrc and is recommended by the bash info pages.
-[[ -f ~/.bashrc ]] && . ~/.bashrc
-#+end_src
-
-Add the following to your ~/.bashrc
-#+CAPTION: .bashrc
-#+begin_src bash :exports code :eval never
-export PATH=${HOME}/bin:${HOME}/Library/Python/3.9/bin:${PATH}
-#+end_src
-
-Run the following to symlink python3 to python
-#+begin_src bash :eval never
-mkdir ~/bin
-ln -s /usr/local/bin/python3 ~/bin/python
-ln -s /usr/local/bin/pip3 ~/bin/pip
 #+end_src
 * Workflows
 ** General
@@ -1802,8 +1835,9 @@ pennsieve:
 :END:
 **** user.el
 Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into scimax's
+# :tangle ~/opt/scimax/user/preload.el
 #+NAME: scimax-user-preload
-#+begin_src elisp :exports code :eval never :tangle ~/opt/scimax/user/preload.el
+#+begin_src elisp :exports code :eval never
 ;; silence ob-ipython complaining about missing command
 ;; THIS CAN CAUSE RUNTIME ERRORS
 (setq ob-ipython-html-to-image-program "/dev/null")
@@ -1840,9 +1874,10 @@ Tangle the following blocks with =C-c C-v C-t= in vanilla emacs or paste it into
 (defun user-log-path    (&optional suffix) (fcp #'cl-fourth suffix))
 #+end_src
 
+# :tangle ~/opt/scimax/user/user.el
 #+NAME: scimax-user-config
 #+CAPTION: Needed to get sane behavior for executing this file out of the box.
-#+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes :tangle ~/opt/scimax/user/user.el
+#+BEGIN_SRC emacs-lisp :exports code :eval never :noweb yes
 
 ;; org goto heading
 (defun org-goto-section (heading)
