@@ -485,6 +485,8 @@ find -maxdepth 1 -type d -exec sudo chown -R nginx:nginx {} \;
 popd
 #+end_src
 
+* SCKAN
+See the developer guide section on [[file:./developer-guide.org::#sckan][SCKAN]].
 * SODA
 Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
 #+header: :var parent_folder="~/files/blackfynn_local/"
@@ -539,8 +541,6 @@ Minor versions such as =dataset-template-1.2.1= are allowed.
 Attach =${CLEANROOM}/DatasetTemplate.zip= as a release asset.
 
 Inform curation so they can notify the community.
-*** SCKAN
-See the developer guide section on [[file:./developer-guide.org::#sckan][SCKAN]].
 ** Getting to know the codebase
 :PROPERTIES:
 :VISIBILITY: folded
