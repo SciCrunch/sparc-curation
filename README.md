@@ -7,8 +7,15 @@ This repo contains `sparcur`, a python implementation of a validator for the SPA
 
 It also contains code, files, and documentation for curation and knowledge management workflows for SPARC datasets, protocols, and anatomical connectivity.
 
-## Setup
-New developers or curators should start by following [setup.org](./docs/setup.org).
+## SDS Validator
+To use `sparcur` to validate an SDS formatted dataset run
+```bash
+pip install sparcur
+pushd path/to/my/dataset
+python -m sparcur.simple.validate
+```
+The result is written to `path/to/my/dataset/curation-export.json`.
+General issues with the dataset can be found under the `path_error_report` property.
 
 ## Background
 For a general introduction to the SPARC curpation process see [background.org](./docs/background.org).
@@ -16,10 +23,13 @@ For a general introduction to the SPARC curpation process see [background.org](.
 For background on the SDS (with out-of-date technical details) see this [paper](https://doi.org/10.1101/2021.02.10.430563).
 
 ## Workflows
-Documentation for curation workflows currently lives in [setup.org](./docs/setup.org#workflows).
+Documentation for curation workflows can be found in [workflows.org](./docs/workflows.org).
 
 ## Developer guide
 See the [developer guide](./docs/developer-guide.org) for examples of how to reuse and develop sparcur.
+
+## Setup
+New developers or curators should start by following [setup.org](./docs/setup.org).
 
 ## Curation viewer
 The [curation viewer](./sparcur_internal/sparcur/viewer.rkt) is a GUI application written in [Racket](https://racket-lang.org) that
