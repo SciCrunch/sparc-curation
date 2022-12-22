@@ -1,0 +1,774 @@
+#+TITLE: SPARC workflows
+#+AUTHOR: Tom Gillespie
+* Workflows
+** General
+*** Updating an installation
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+#+NAME: git-pull-all
+#+CAPTION: new features that you want to use? aka git pull all or =gpa= if implemented as a function
+#+BEGIN_SRC bash :results output :var REPOS=repos
+pushd ~/git
+for d in $(ls); do if [ -d $d/.git ]; then pushd $d; git pull || break; popd; fi; done
+popd
+#+END_SRC
+
+#+name: git-pull-all-windows
+#+begin_src powershell
+function Git-Pull-All {
+    if($pwd.Path -eq $HOME) {
+        pushd ~/git }
+    foreach($p in Get-ChildItem -directory) {
+        if($p.GetDirectories(".git")) {
+            pushd $p; git pull; popd } } }
+#+end_src
+** SPARC
+*** WARNINGS
+1. *DO NOT USE* =cp -a= copy files with xattrs! \\
+   *INSTEAD* use =rsync -X -u -v=. \\
+   =cp= does not remove absent fields from xattrs of the file previously
+   occupying that name! OH NO (is this a =cp= bug!?)
+*** COMMENT Get data
+:PROPERTIES:
+:CUSTOM_ID: get-data
+:VISIBILITY: folded
+:END:
+If you have never retrieved the data before run.
+#+CAPTION: first time per local network
+#+BEGIN_SRC bash :results none
+pushd ~/files/blackfynn_local/
+spc clone ${SPARC_ORG_ID} # initialize a new repo and pull existing structure
+scp refresh -f
+spc fetch  # actually download files
+spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'  # see what to fetch
+spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f  # fetch
+spc find -n '*.xlsx' -n '*.csv' -n '*.tsv' -n '*.msexcel'-f -r 10  # slow down you are seeing errors!
+#+END_SRC
+
+#+CAPTION: unfriendly refersh
+#+BEGIN_SRC bash :results none
+ls -Q | xargs -P10 -r -n 1 sh -c 'spc refresh -r 4 "${1}"'
+#+END_SRC
+
+#+CAPTION: friendly refersh
+#+BEGIN_SRC bash :results none
+find -maxdepth 1 -type d -name '[C-Z]*' -exec spc refresh -r 8 {} \;
+#+END_SRC
+
+#+CAPTION: find any stragglers
+#+BEGIN_SRC bash :results none
+find \( -name '*.xlsx' -o -name '*.csv' -o -name '*.tsv' \) -exec ls -hlS {} \+
+#+END_SRC
+
+Open the dataset page for all empty directories in the browser.
+#+begin_src bash
+find -maxdepth 1 -type d -empty -exec spc pull {} \+
+find -maxdepth 1 -type d -empty -exec spc meta -u --browser {} \+
+#+end_src
+
+# temp fix for summary making folders when it should skip
+#+CAPTION: clean up empty directories
+#+BEGIN_SRC bash :results none
+find -maxdepth 1 -type d -empty -exec rmdir {} \;
+#+END_SRC
+
+#+caption: copy sparse for full clone
+#+begin_src bash
+find -maxdepth 1 -type d -exec getfattr -n user.bf.id \;
+#+end_src
+
+Pull local copy of data to a new computer. Note the double escape needed for the space.
+#+BEGIN_SRC bash :results none :eval never
+rsync -X -u -v -r -e ssh ${REMOTE_HOST}:/home/${DATA_USER}/files/blackfynn_local/SPARC\\\ Consortium ~/files/blackfynn_local/
+#+END_SRC
+=-X= copy extended attributes
+=-u= update files
+=-v= verbose
+=-r= recursive
+=-e= remote shell to use
+*** COMMENT Fetch missing files
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+fetching a whole dataset or a subset of a dataset
+=spc ** -f=
+*** COMMENT Export
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+#+CAPTION: export everything
+#+BEGIN_SRC bash
+pushd ${SPARCDATA}
+spc export
+popd
+#+END_SRC
+
+Setup as root
+#+begin_src bash :eval never
+mkdir -p /var/www/sparc/sparc/archive/exports/
+chown -R nginx:nginx /var/www/sparc
+#+end_src
+
+#+name: &sparc-export-to-server-function
+#+CAPTION: copy export to server location, run as root
+#+BEGIN_SRC bash :eval never
+# export vs exports, no wonder this is so confusing >_<
+function sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    EXPORT_BASE=${SPARCUR_EXPORTS}/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/integrated/
+    FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
+    FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
+    pushd /var/www/sparc/sparc
+    cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
+    popd
+    echo Export complete. Check results at:
+    echo fill-in-the-url-here
+}
+#+END_SRC
+*** COMMENT Export v3
+#+begin_src bash
+function preview-sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    EXPORT_BASE=${SPARCUR_EXPORTS}/618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0/integrated/
+    FOLDERNAME=$(readlink ${EXPORT_BASE}/LATEST)
+    FULLPATH=${EXPORT_BASE}/${FOLDERNAME}
+    pushd /var/www/sparc/sparc/preview
+    cp -a "${FULLPATH}" archive/exports/ && chown -R nginx:nginx archive && unlink exports ; ln -sT "archive/exports/${FOLDERNAME}" exports
+    popd
+    echo Export complete. Check results at:
+    echo https://cassava.ucsd.edu/sparc/preview/archive/exports/${FOLDERNAME}
+}
+#+end_src
+
+The shared information on the file system is evil because there may be multiple processes.
+The way to mitigate the issue is to run everything locally with a read only local cache for certain files.
+# FIXME this can fail if files aren't quite where we expect them
+#+begin_src bash :eval never
+function preview-export-rest () {
+    local DATE1=${1} # 2021-03-09T17\:26\:54\,980772-08\:00  # from spc export
+    local DATE2=${2} # 2021-03-09T164046,487692-0800  # from the path created by sparc-get-all-remote-data
+    cp -a /var/lib/sparc/.local/share/sparcur/export/protcur/LATEST/protcur.ttl /var/www/sparc/sparc/preview/archive/exports/${DATE1}/  # this may not update and should be versioned independently
+    cp -a /var/lib/sparc/files/${DATE2}/exports/datasets /var/www/sparc/sparc/preview/archive/exports/${DATE1}/path-metadata  # NOTE these will not change unless the files or the code/format change
+    chown -R nginx:nginx /var/www/sparc/sparc/preview/archive/exports/${DATE1}/
+}
+#+end_src
+
+#+begin_src bash :dir "/ssh:cassava-sparc:" :eval never
+# git repos are in ~/files/venvs/sparcur-dev/git
+# use the development pull code
+source ~/files/venvs/sparcur-dev/bin/activate
+source ~/files/venvs/sparcur-dev/git/sparc-curation/bin/pipeline-functions.sh
+export PYTHONBREAKPOINT=0  # ensure that breakpoints do not hang export
+pushd ~/files/
+PARENT_PATH=$(sparc-time-friendly)
+sparc-get-all-remote-data \
+    --symlink-objects-to ~/files/blackfynn_local/SPARC\ Consortium_20200601/.operations/objects/ \
+    --parent-path "${PARENT_PATH}"
+pushd "${PARENT_PATH}/SPARC Consortium"
+spc export
+find -maxdepth 1 -type d -not -path '.operations*' -not -path '.' -print0 | \
+     xargs -0 -I{} -P8 -r -n 1 python -m sparcur.simple.path_metadata_validate --export-path ../exports/ {}
+pushd ~/.local/share/sparcur/export/618*/integrated/LATEST/; python -m sparcur.export.published; popd
+echo "${PARENT_PATH}"
+unset PARENT_PATH
+#+end_src
+
+An example. Get =DATE1= from =spc export= or from the output of
+=preview-sparc-export-to-server=. Get =DATE2= from the file system
+path created by the initial call to =sparc-get-all-remote-data=.
+Export time is usually later than parent time.
+#+begin_src bash :dir /ssh:cassava|sudo:cassava :eval never
+preview-sparc-export-to-server
+preview-export-rest ${EXPORT_PATH_TIME} ${PARENT_PATH_TIME}
+#+end_src
+*** COMMENT Export published
+Generate =curation-export-published.ttl= for existing exports.
+
+#+begin_src bash
+pushd /var/www/sparc/sparc/preview/archive/exports
+find -maxdepth 1 -type d -exec sudo chown $UID:$UID {} \;
+find -name curation-export.ttl -execdir python -m sparcur.export.published \;
+find -maxdepth 1 -type d -exec sudo chown -R nginx:nginx {} \;
+popd
+#+end_src
+
+*** Export v4
+:PROPERTIES:
+:CUSTOM_ID: export-v4
+:END:
+
+#+begin_src bash
+source ~/files/venvs/sparcur-dev/bin/activate
+python -m sparcur.simple.combine &&
+python -m sparcur.simple.disco ~/.local/share/sparcur/export/summary/618*/LATEST/curation-export.json &&
+echo Export complete. Check results at: ;
+echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/share/sparcur/export/summary/618*/LATEST)
+#+end_src
+
+**** COMMENT deprecated
+Then as root run =combine-sparc-export-to-server=, which is defined as
+follows and should be in =~/.bashrc=.
+#+begin_src bash
+# THIS IS NO LONGER NEEDED DO NOT USE IT
+function combine-sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    FULLPATH=$(readlink -f ${SPARCUR_EXPORTS}/summary/618*/LATEST)
+    FOLDERNAME=$(basename "${FULLPATH}")
+    pushd /var/www/sparc/sparc/preview
+    ln -s "${FULLPATH}" "archive/exports/${FOLDERNAME}" \
+    && unlink exports \
+    ; ln -s "archive/exports/${FOLDERNAME}" exports
+    popd
+    echo Export complete. Check results at:
+    echo https://cassava.ucsd.edu/sparc/preview/archive/exports/${FOLDERNAME}
+}
+#+end_src
+*** Report
+#+begin_src bash :eval never
+function fetch-and-run-reports () {
+    local FN="/tmp/curation-export-$(date -Is).json"
+    curl https://cassava.ucsd.edu/sparc/preview/exports/curation-export.json -o "${FN}"
+    spc sheets update Organs --export-file "${FN}"
+    spc report all --sort-count-desc --to-sheets --export-file "${FN}"
+}
+fetch-and-run-reports
+#+end_src
+**** COMMENT deprecated
+You can't run this directly because the venvs create their own subshell.
+#+begin_src bash :dir "/ssh:cassava-sparc:~/files/test2/SPARC Curation" :eval never
+# git repos are in ~/files/venvs/sparcur-dev/git
+# use the development pull code
+source ~/files/venvs/sparcur-dev/bin/activate
+spc pull
+# switch to the production export pipeline
+source ~/files/venvs/sparcur-1/bin/activate
+spc export
+#+end_src
+
+#+begin_src bash :dir /ssh:cassava|sudo:cassava
+<<&sparc-export-to-server-function>>
+sparc-export-to-server
+#+end_src
+*** Reporting
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+turtle diff
+#+begin_src bash
+spc report changes \
+--ttl-file https://cassava.ucsd.edu/sparc/preview/archive/exports/2021-05-25T125039,817048-0700/curation-export.ttl \
+--ttl-compare https://cassava.ucsd.edu/sparc/preview/archive/exports/2021-05-24T141309,920776-0700/curation-export.ttl
+#+end_src
+#+CAPTION: reports
+#+BEGIN_SRC bash
+spc report completeness
+#+END_SRC
+
+#+CAPTION: reporting dashboard
+#+BEGIN_SRC bash
+spc server --latest --count
+#+END_SRC
+
+#+begin_src python
+keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
+                       for k in d['meta']['keywords']]))
+#+end_src
+*** Queries
+**** Human datasets queries
+#+name: human-datasets-queries
+#+begin_src python :results output drawer :exports both :eval no-export
+import rdflib
+from pyontutils.core import OntResIri
+from pyontutils.namespaces import sparc, TEMP, dc, rdfs
+
+ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl')
+g = ori.graph
+gns = g.namespace_manager
+
+def fmt(s, u):
+    return f'[[{u}][{s.n3(gns)}]]'
+
+species = set([fmt(do, urih) for s, p, o in g
+              if isinstance(o, rdflib.Literal) and
+              ('human' in o.lower() or 'homo' in o.lower()) and
+              p == sparc.animalSubjectIsOfSpecies
+              for do in g[s:TEMP.hasDerivedInformationAsParticipant]
+              for urih in g[do:TEMP.hasUriHuman]])
+
+hlabel = set([fmt(s, urih) for s, p, o in g
+             if isinstance(o, rdflib.Literal) and
+             ('human' in o.lower() or 'homo' in o.lower()) and
+             p == rdfs.label
+             for urih in g[s:TEMP.hasUriHuman]])
+
+htitle = set([fmt(s, urih) for s, p, o in g
+              if isinstance(o, rdflib.Literal) and
+              ('human' in o.lower() or 'homo' in o.lower()) and
+              p == dc.title
+              for urih in g[s:TEMP.hasUriHuman]])
+
+htd = set([fmt(s, urih) for s, p, o in g
+           if isinstance(o, rdflib.Literal) and
+           ('human' in o.lower() or 'homo' in o.lower()) and
+           (p == dc.title or p == dc.description)
+           for urih in g[s:TEMP.hasUriHuman]])
+
+counts = dict(species=len(human),
+              label=len(hlabel),
+              title=len(htitle),
+              title_and_desc=len(htd))
+
+[print(_ + r' \\') for _ in ['species n= ' + str(counts['species'])] +
+sorted(species) +
+['label n= ' + str(counts['label'])] +
+sorted(hlabel) +
+['title n= ' + str(counts['title'])] +
+sorted(htitle) +
+['td n= ' + str(counts['title_and_desc'])] +
+sorted(htd)]
+#+end_src
+*** Archiving files with xattrs
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+=tar= is the only one of the 'usual' suspects for file archiving that
+supports xattrs, =zip= cannot.
+
+#+CAPTION: archive
+#+begin_src bash
+tar --force-local --xattrs -cvzf 2019-07-17T10\:44\:16\,457344.tar.gz '2019-07-17T10:44:16,457344/'
+#+end_src
+
+#+CAPTION: extract
+#+begin_src bash
+tar --force-local --xattrs -xvzf 2019-07-17T10\:44\:16\,457344.tar.gz
+#+end_src
+
+#+CAPTION: test
+#+begin_src bash
+find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
+#+end_src
+*** Archiving releases
+**** in place
+Manually remove the echo after checking that you are removing what you expect.
+#+begin_src bash
+pushd /var/www/sparc/sparc/
+    pushd archive/exports
+        find -maxdepth 1 -not -path '.' -type d -exec tar -cvJf '{}.tar.xz' '{}' \;
+        chown nginx:nginx *.tar.xz
+        # remove all but the one currently symlinked to exports
+        find -maxdepth 1 -not -path '.' -not -path "*$(basename $(readlink ../../exports))*" -type d -exec echo rm -r '{}' \;
+    popd
+
+    pushd preview/archive/exports
+        find -maxdepth 1 -not -path '.' -type d -newer $(ls -At *.tar.xz | head -n 1) -exec tar -cvJf '{}.tar.xz' '{}' \;
+        chown nginx:nginx *.tar.xz
+        # remove previous years
+        find -maxdepth 1 -not -path '.' -not -path "*$(date +%Y)-*" -type d -exec echo rm -r '{}' \+
+        # remove all the but most recent 8 folders
+        find -maxdepth 1 -not -path '.' -type d | sort -u | head -n -8 | xargs echo rm -r
+    popd
+#+end_src
+**** elsewhere
+#+begin_src bash
+pushd /path/to/backup
+rsync -z -v -r -e ssh cassava:/var/www/sparc sparc-$(date -I)
+#+end_src
+
+#+begin_src bash
+pushd /path/to/backup
+pushd sparc-*/sparc/archive/exports
+find -maxdepth 1 -not -path '.' -type d -exec tar -cvJf '{}.tar.xz' '{}' \;
+find -maxdepth 1 -not -path '.' -type d -exec rm -r '{}' \;
+popd
+pushd sparc-*/sparc/preview/archive/exports
+find -maxdepth 1 -not -path '.' -type d -exec tar -cvJf '{}.tar.xz' '{}' \;
+find -maxdepth 1 -not -path '.' -type d -exec rm -r '{}' \;
+popd
+#+end_src
+
+*** Other random commands
+**** Duplicate top level and ./.operations/objects
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+# TODO upgrade this into backup and duplication
+#+begin_src bash
+function sparc-copy-pull () {
+    : ${SPARC_PARENT:=${HOME}/files/blackfynn_local/}
+    local TODAY=$(date +%Y%m%d)
+    pushd ${SPARC_PARENT} &&
+        mv SPARC\ Consortium "SPARC Consortium_${TODAY}" &&
+        rsync -ptgo -A -X -d --no-recursive --exclude=* "SPARC Consortium_${TODAY}/"  SPARC\ Consortium &&
+        mkdir SPARC\ Consortium/.operations &&
+        mkdir SPARC\ Consortium/.operations/trash &&
+        rsync -X -u -v -r "SPARC Consortium_${TODAY}/.operations/objects" SPARC\ Consortium/.operations/ &&
+        pushd SPARC\ Consortium &&
+        spc pull || echo "spc pull failed"
+    popd
+    popd
+}
+#+end_src
+**** Simplified error report
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+#+CAPTION: simplified error report
+#+begin_src bash
+jq -r '[ .datasets[] |
+         {id: .id,
+          name: .meta.folder_name,
+          se: [ .status.submission_errors[].message ] | unique,
+          ce: [ .status.curation_errors[].message   ] | unique } ]' curation-export.json
+#+end_src
+**** File extensions
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+***** List all file extensions
+Get a list of all file extensions.
+#+begin_src bash
+find -type l -o -type f | grep -o '\(\.[a-zA-Z0-9]\+\)\+$' | sort -u
+#+end_src
+***** Get ids with files matching a specific extension
+Arbitrary information about a dataset with files matching a pattern.
+The example here gives ids for all datasets that contain xml files.
+Nesting =find -exec= does not work so the first pattern here uses shell
+globing to get the datasets.
+#+begin_src bash
+function datasets-matching () {
+    for d in */; do
+        find "$d" \( -type l -o -type f \) -name "*.$1" \
+        -exec getfattr -n user.bf.id --only-values "$d" \; -printf '\n' -quit ;
+    done
+}
+#+end_src
+***** Fetch files matching a specific pattern
+Fetch files that have zero size (indication that fetch is broken).
+#+begin_src bash
+find -type f -name '*.xml' -empty -exec spc fetch {} \+
+#+end_src
+**** Sort of manifest generation
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+This is slow, but prototypes functionality useful for the curators.
+#+begin_src bash
+find -type d -not -name 'ephys' -name 'ses-*' -exec bash -c \
+'pushd $1 1>/dev/null; pwd >> ~/manifest-stuff.txt; spc report size --tab-table ./* >> ~/manifest-stuff.txt; popd 1>/dev/null' _ {} \;
+#+end_src
+**** Path ids
+This one is fairly slow, but is almost certainly i/o limited due to having to read the xattrs.
+Maintaining the backup database of the mappings would make this much faster.
+#+begin_src bash
+# folders and files
+find . -not -type l -not -path '*operations*' -exec getfattr -n user.bf.id --only-values {} \; -print
+# broken symlink format, needs work, hard to parse
+find . -type l -not -path '*operations*' -exec readlink -n {} \; -print
+#+end_src
+**** Path counts per dataset
+#+begin_src bash
+for d in */; do printf "$(find "${d}" -print | wc -l) "; printf "$(getfattr --only-values -n user.bf.id "${d}") ${d}\n" ; done | sort -n
+#+end_src
+**** Debug units serialization
+Until we fix compound units parsing for the round trip we might
+accidentally encounter and error along the lines of
+=ValueError: Unit expression cannot have a scaling factor.=
+#+begin_src bash
+jq -C '.. | .units? // empty' /tmp/curation-export-*.json | sort -u
+#+end_src
+**** protocols cache
+#+begin_src bash
+pushd ~/.cache/idlib
+mv protocol_json protocol_json-old
+# run export
+find protocol_json -size -2 -exec cat {} \+
+# check to make sure that there weren't any manually provided caches
+find protocol_json -size -2 -execdir cat ../protocol_json-old/{} \;
+#+end_src
+**** clean up org folders
+:PROPERTIES:
+:CREATED:  [2022-06-22 Wed 21:52]
+:END:
+THIS COMMAND IS DANGEROUS ONLY RUN IT IN =SPARC Consortium= folders that you want to nuke.
+#+begin_src bash :eval never
+find -maxdepth 1 -type d -not -name '.operations' -not -name '.' -exec rm -r {} \;
+#+end_src
+**** clean up broken symlinks in temp-upstream
+:PROPERTIES:
+:CREATED:  [2022-06-22 Wed 21:52]
+:END:
+Unfortunately keeping these around causes inode exhaustion issues.
+Very slow, but only needs to be run once per system since the code has
+been updated to do this during the transitive unsymlink.
+#+begin_src python
+from sparcur.paths import Path
+here = Path.cwd()
+here = Path('/var/lib/sparc/files/sparc-datasets-test')
+bs = [
+    rc
+    for c in here.children
+    for rd in (c / 'SPARC Consortium' / '.operations' / 'temp-upstream').rchildren_dirs
+    for rc in rd.children
+    if rc.is_broken_symlink()]
+_ = [b.unlink() for b in bs]
+#+end_src
+*** datasets causing issues with fetching files
+:PROPERTIES:
+:CREATED:  [2022-02-08 Tue 13:58]
+:END:
+#+name: datasets-with-fetch-errors
+#+begin_src bash :dir ~/files/sparc-datasets-test
+find */SPARC\ Consortium/.operations/temp-upstream/ -type d -name '*-ERROR' | cut -d'/' -f 1 | sort -u
+#+end_src
+
+#+call: datasets-with-fetch-errors() :dir ~/files/sparc-datasets
+
+#+begin_src bash
+python -m sparcur.simple.retrieve --jobs 1 --sparse-limit -1 --parent-parent-path . --dataset-id $1
+pushd $1
+spc export 
+#+end_src
+*** viewing single dataset logs
+#+begin_src bash
+pushd ~/.cache/log/sparcur/datasets
+find -name stdout.log -printf "%T@ %Tc %p\n" | sort -n
+less -R $_some_path
+#+end_src
+*** fixing feff issues
+#+begin_src python
+from sparcur.datasets import Tabular
+from sparcur.paths import Path
+p = Path('dataset_description.xlsx')
+t = Tabular(p)
+hrm1 = list(t.xlsx1())
+hrm2 = list(t.xlsx2())
+#+end_src
+look for =\ufeff= at the start of strings and then use e.g. vim to
+open and edit the file removing it from the offending strings
+*** View logs for failed single dataset exports
+Run the function, paste in the ids under failed and hit enter.
+#+begin_src bash
+function review-failed () {
+    local paths _id
+    paths=()
+    while read _id; do
+        paths+=(~/.cache/log/sparcur/datasets/${_id}/LATEST/stdout.log)
+        if [ -z $_id ]; then break; fi
+    done
+    less -R ${paths[@]}
+}
+#+end_src
+** SODA
+Have to clone [[https://github.com/bvhpatel/SODA][SODA]] and fetch the files for testing.
+#+header: :var parent_folder="~/files/blackfynn_local/"
+#+header: :var path="./SPARC Consortium/The effect of gastric stimulation location on circulating blood hormone levels in fasted anesthetized rats/source/pool-r1009"
+#+begin_src python :dir ~/git/SODA/src/pysoda :results drawer output
+from pprint import pprint
+import pysoda
+from sparcur.paths import Path
+p = Path(parent_folder, path).expanduser().resolve()
+children = list(p.iterdir())
+blob = pysoda.create_folder_level_manifest(
+    {p.resolve().name: children},
+    {k.name + '_description': ['some description'] * len(children)
+     for k in [p] + list(p.iterdir())})
+manifest_path = Path(blob[p.name][-1])
+manifest_path.xopen()
+pprint(manifest_path)
+#+end_src
+** Developer
+See also the [[file:./developer-guide.org][sparcur developer guild]]
+*** Releases
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+**** DatasetTemplate
+Commit any changes and push to master.
+
+#+begin_src bash
+make-template-zip () {
+    local CLEANROOM=/tmp/cleanroom/
+    mkdir ${CLEANROOM} || return 1
+    pushd ${CLEANROOM}
+    git clone https://github.com/SciCrunch/sparc-curation.git &&
+    pushd ${CLEANROOM}/sparc-curation/resources
+    zip -x '*.gitkeep' -r DatasetTemplate.zip DatasetTemplate
+    mv DatasetTemplate.zip ${CLEANROOM}
+    popd
+    rm -rf ${CLEANROOM}/sparc-curation
+    popd
+}
+make-template-zip
+#+end_src
+
+Once that is done open /tmp/cleanroom/DatasetTemplate.zip in =file-roller= or similar
+and make sure everything is as expected.
+
+Create the GitHub release. The tag name should have the format =dataset-template-1.1= where
+the version number should match the metadata version embedded in
+[[file:../resources/DatasetTemplate/dataset_description.xlsx][dataset_description.xlsx]].
+Minor versions such as =dataset-template-1.2.1= are allowed.
+
+Attach =${CLEANROOM}/DatasetTemplate.zip= as a release asset.
+
+Inform curation so they can notify the community.
+*** Getting to know the codebase
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+Use =inspect.getclasstree= along with =pyontutils.utils.subclasses=
+to display hierarchies of classes.
+#+begin_src python :results output verbatim org
+      from inspect import getclasstree
+      from pyontutils.utils import subclasses
+      from IPython.lib.pretty import pprint
+
+      # classes to inspect
+      import pathlib
+      from sparcur import paths
+
+      def class_tree(root):
+          return getclasstree(list(subclasses(root)))
+
+      pprint(class_tree(pathlib.PurePosixPath))
+#+end_src
+
+#+RESULTS:
+#+begin_src org
+    [(pathlib.Path, (pathlib.PurePath,)),
+     [(pathlib.PosixPath, (pathlib.Path, pathlib.PurePosixPath)),
+      [(AugmentedPath, (pathlib.PosixPath,)),
+       [(CachePath, (AugmentedPath,)),
+        [(PrimaryCache, (CachePath,)),
+         [(BlackfynnCache,
+           (PrimaryCache, XattrCache)),
+          (SshCache,
+           (PrimaryCache, XattrCache))],
+         (SqliteCache, (CachePath,)),
+         (SymlinkCache, (CachePath,)),
+         (XattrCache,
+          (CachePath, XattrPath)),
+         [(BlackfynnCache,
+           (PrimaryCache, XattrCache)),
+          (SshCache,
+           (PrimaryCache, XattrCache))]],
+        (XattrPath, (AugmentedPath,)),
+        [(LocalPath, (XattrPath,)),
+         [(Path, (LocalPath,))],
+         (XattrCache,
+          (CachePath, XattrPath)),
+         [(BlackfynnCache,
+           (PrimaryCache, XattrCache)),
+          (SshCache,
+           (PrimaryCache, XattrCache))]]]]],
+     (pathlib.PurePosixPath, (pathlib.PurePath,)),
+     [(pathlib.PosixPath, (pathlib.Path, pathlib.PurePosixPath)),
+      [(AugmentedPath, (pathlib.PosixPath,)),
+       [(CachePath, (AugmentedPath,)),
+        [(PrimaryCache, (CachePath,)),
+         [(BlackfynnCache,
+           (PrimaryCache, XattrCache)),
+          (SshCache,
+           (PrimaryCache, XattrCache))],
+         (SqliteCache, (CachePath,)),
+         (SymlinkCache, (CachePath,)),
+         (XattrCache,
+          (CachePath, XattrPath)),
+         [(BlackfynnCache,
+           (PrimaryCache, XattrCache)),
+          (SshCache,
+           (PrimaryCache, XattrCache))]],
+        (XattrPath, (AugmentedPath,)),
+        [(LocalPath, (XattrPath,)),
+         [(Path, (LocalPath,))],
+         (XattrCache,
+          (CachePath, XattrPath)),
+         [(BlackfynnCache,
+           (PrimaryCache, XattrCache)),
+          (SshCache,
+           (PrimaryCache, XattrCache))]]]]]]
+#+end_src
+*** Viewing logs
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+View the latest log file with colors using =less=.
+#+begin_src bash
+less -R $(ls -d ~sparc/files/blackfynn_local/export/log/* | tail -n 1)
+#+end_src
+For a permanent fix for =less= add
+#+begin_src bash
+alias less='less -R'
+#+end_src
+*** Debugging terminal pipeline errors
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+You have an error!
+#+begin_src python
+maybe_size = c.cache.meta.size  # << AttributeError here
+#+end_src
+
+Modify to wrap code
+#+begin_src python
+try:
+    maybe_size = c.cache.meta.size
+except AttributeError as e:
+    breakpoint()  # << investigate error
+#+end_src
+
+Temporary squash by logging as an exception with optional explanation
+#+begin_src python
+try:
+    maybe_size = c.cache.meta.size
+except AttributeError as e:
+    log.exception(e)
+    log.error(f'explanation for error and local variables {c}')
+#+end_src
+*** Dataset removed
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+If a dataset is removed, just move it manually to trash IF it is clear that it
+was supposed to be removed, otherwise to consult the curation team. You can confirm
+that it was actually removed by checking Pennsieve directly using DATASETID from
+the error trace.
+#+begin_example bash
+spc meta -u "$(spc goto ${DATASETID})"
+#+end_example
+
+Example trace.
+#+begin_example
+Future exception was never retrieved
+future: <Future finished exception=Exception("No dataset matching name or ID 'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053'.",)>
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/concurrent/futures/thread.py", line 56, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/var/lib/sparc/git/pyontutils/pyontutils/utils.py", line 416, in <lambda>
+    generator = (lambda:list(limited_gen(chunk, smooth_offset=(i % lc)/lc, time_est=time_est, debug=debug, thread=i))  # this was the slowdown culpret
+  File "/var/lib/sparc/git/pyontutils/pyontutils/utils.py", line 455, in limited_gen
+    yield element()
+  File "/var/lib/sparc/git/pyontutils/pyontutils/utils.py", line 376, in inner
+    return function(*args, **kwargs)
+  File "/var/lib/sparc/git/sparc-curation/sparcur/paths.py", line 1156, in refresh
+    size_limit_mb=size_limit_mb)
+  File "/var/lib/sparc/git/sparc-curation/sparcur/backends.py", line 816, in refresh
+    old_meta = self.meta
+  File "/var/lib/sparc/git/sparc-curation/sparcur/backends.py", line 872, in meta
+    return PathMeta(size=self.size,
+  File "/var/lib/sparc/git/sparc-curation/sparcur/backends.py", line 603, in size
+    if isinstance(self.bfobject, File):
+  File "/var/lib/sparc/git/sparc-curation/sparcur/backends.py", line 401, in bfobject
+    bfobject = self._api.get(self._seed)
+  File "/var/lib/sparc/git/sparc-curation/sparcur/blackfynn_api.py", line 795, in get
+    thing = self.bf.get_dataset(id)  # heterogenity is fun!
+  File "/var/lib/sparc/.local/lib/python3.6/site-packages/blackfynn/client.py", line 231, in get_dataset
+    raise Exception("No dataset matching name or ID '{}'.".format(name_or_id))
+Exception: No dataset matching name or ID 'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053'.
+sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc goto 'N:dataset:83e0ebd2-dae2-4ca0-ad6e-81eb39cfc053'
+Hackathon Team Materials
+sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ mv Hackathon\ Team\ Materials ../.trash/
+sparc@cassava:~/files/blackfynn_local/SPARC Consortium$ spc pull
+#+end_example
