@@ -177,6 +177,59 @@ WHERE {
 } ORDER BY DESC(?ut)
 #+end_src
 
+*** Human dataset queries
+#+name: human-datasets-queries
+#+begin_src python :results output drawer :exports both :eval no-export
+import rdflib
+from pyontutils.core import OntResIri
+from pyontutils.namespaces import sparc, TEMP, dc, rdfs
+
+ori = OntResIri('https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl')
+g = ori.graph
+gns = g.namespace_manager
+
+def fmt(s, u):
+    return f'[[{u}][{s.n3(gns)}]]'
+
+species = set([fmt(do, urih) for s, p, o in g
+              if isinstance(o, rdflib.Literal) and
+              ('human' in o.lower() or 'homo' in o.lower()) and
+              p == sparc.animalSubjectIsOfSpecies
+              for do in g[s:TEMP.hasDerivedInformationAsParticipant]
+              for urih in g[do:TEMP.hasUriHuman]])
+
+hlabel = set([fmt(s, urih) for s, p, o in g
+             if isinstance(o, rdflib.Literal) and
+             ('human' in o.lower() or 'homo' in o.lower()) and
+             p == rdfs.label
+             for urih in g[s:TEMP.hasUriHuman]])
+
+htitle = set([fmt(s, urih) for s, p, o in g
+              if isinstance(o, rdflib.Literal) and
+              ('human' in o.lower() or 'homo' in o.lower()) and
+              p == dc.title
+              for urih in g[s:TEMP.hasUriHuman]])
+
+htd = set([fmt(s, urih) for s, p, o in g
+           if isinstance(o, rdflib.Literal) and
+           ('human' in o.lower() or 'homo' in o.lower()) and
+           (p == dc.title or p == dc.description)
+           for urih in g[s:TEMP.hasUriHuman]])
+
+counts = dict(species=len(human),
+              label=len(hlabel),
+              title=len(htitle),
+              title_and_desc=len(htd))
+
+[print(_ + r' \\') for _ in ['species n= ' + str(counts['species'])] +
+sorted(species) +
+['label n= ' + str(counts['label'])] +
+sorted(hlabel) +
+['title n= ' + str(counts['title'])] +
+sorted(htitle) +
+['td n= ' + str(counts['title_and_desc'])] +
+sorted(htd)]
+#+end_src
 *** Test
 Originally from =sparcur.reports.SparqlQueries=.
 **** Dataset about
@@ -4187,7 +4240,6 @@ UBERON:0002441 l: "cervicothoracic ganglion"; e: FMA:6469; syn: "stellate gangli
 :PROPERTIES:
 :CREATED:  [2021-09-17 Fri 14:33]
 :END:
-
 
 *** neuron population by organ
 

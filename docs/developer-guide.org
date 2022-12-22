@@ -1189,6 +1189,9 @@ process is decouple, and mediated via git:36a749b5c321cdb81ba81f9d35e050ceb84799
 *** Reporting
 After a release
 ** SCKAN
+:PROPERTIES:
+:CUSTOM_ID: sckan
+:END:
 *** Overview
 #+name: sckan-ideal-run
 #+header: :wrap "src dot :file ./images/sckan-ideal-run.png :cmdline -Kdot -Tpng :exports results :cache yes"
