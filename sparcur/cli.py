@@ -388,17 +388,20 @@ class Dispatcher(clif.Dispatcher):
             export_source_path = self.cwd
 
         export_source_path = self.cwd  # XXX note the override
-        export = export_class(self.options.export_path,
-                              export_source_path,
-                              self._folder_timestamp,
-                              self._timestamp,
-                              self.options.latest,
-                              self.options.partial,
-                              (self.options.open
-                               if self.options.open else
-                               self.options.show),
-                              org_id,
-                              self.options.export_protcur_base,)
+        export = export_class(
+            self.options.export_path,
+            export_source_path,
+            self._folder_timestamp,
+            self._timestamp,
+            self.options.latest,
+            self.options.partial,
+            (self.options.open
+             if self.options.open else
+             self.options.show),
+            org_id,
+            self.options.export_protcur_base,
+            no_network=(self.options.no_network or self.options.no_google),
+        )
         return export
 
     def _print_table(self, rows, title=None, align=None, ext=None):
@@ -1159,7 +1162,10 @@ done"""
             ex.core.export_schemas(self.options.export_schemas_path)
 
         elif self.options.protcur or self.options.protocols:
-            export = self._export(ex.Export, org_id=self.options.project_id)  # FIXME org_id not needed ...
+            export = self._export(
+                ex.Export,
+                org_id=self.options.project_id,  # FIXME org_id not needed ...
+                no_network=self.no_google,)
             # FIXME dump_path shouldn't need to be passed explicitly
             dump_path = (self.options.export_protcur_base /
                          self._folder_timestamp)
@@ -1167,7 +1173,6 @@ done"""
             blob_protcur = export.export_protcur(dump_path,
                                                  hgn,
                                                  rerun_protcur_export=self.options.force,
-                                                 no_network=self.options.no_google,
                                                  direct=True)
             # NOTE --latest will also pull from latest protcur export
             # if it exists I think, the issue is with repeated export

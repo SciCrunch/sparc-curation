@@ -95,7 +95,10 @@ class ExportBase:
                  open_when_done=False,
                  org_id=None,
                  export_protcur_base=None,
-                 export_base=None,):
+                 export_base=None,
+                 # FIXME no_network passed here is still dumb though
+                 # not quite as dump as passing it to the methods
+                 no_network=False,):
         if org_id is None:
             self.export_source_path = export_source_path
             id = export_source_path.cache.anchor.identifier.uuid
@@ -112,6 +115,7 @@ class ExportBase:
         self.timestamp = timestamp
         self.open_when_done = open_when_done
         self.export_protcur_base = export_protcur_base  # pass in as export_base
+        self.no_network = no_network
 
         self._args = dict(export_path=export_path,
                           export_source_path=export_source_path,
@@ -122,7 +126,8 @@ class ExportBase:
                           open_when_done=open_when_done,
                           org_id=org_id,
                           export_protcur_base=export_protcur_base,
-                          export_base=export_base,)
+                          export_base=export_base,
+                          no_network=no_network,)
 
     @staticmethod
     def make_dump_path(dump_path):
@@ -472,8 +477,6 @@ class Export(ExportBase):
                        dump_path,
                        *hypothesis_groups,
                        rerun_protcur_export=False,
-                       # FIXME no_network passed in here is dumb
-                       no_network=False,
                        # FIXME direct= is a hack
                        direct=False):
         if not direct and self.export_base != self.export_protcur_base:
@@ -483,10 +486,10 @@ class Export(ExportBase):
             export = ExportProtcur(**nargs)
             return export.export_protcur(export.dump_path,
                                          *hypothesis_groups,
-                                         no_network=no_network), export
+                                         no_network=self.no_network), export
 
         pipeline = pipes.ProtcurPipeline(*hypothesis_groups,
-                                         no_network=no_network)
+                                         no_network=self.no_network)
         annos, lsus = pipeline.load()
         if not annos:
             msg = ('No annos. Did you remember to run\n'
