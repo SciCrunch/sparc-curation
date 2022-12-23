@@ -9,7 +9,7 @@ from pyontutils.core import OntResIri, OntGraph, OntResPath, OntId
 from pyontutils.namespaces import UBERON, NIFSTD, asp, TEMP, TEMPRAW, tech
 from sparcur.paths import Path
 from sparcur.reports import SparqlQueries
-from .common import skipif_no_net
+from .common import skipif_no_net, log
 
 
 @skipif_no_net
@@ -82,11 +82,15 @@ class TestCurationExportTtl(unittest.TestCase):
         for award, affil in res:
             award = self.nsm._qhrm(award)
             if isinstance(affil, rdflib.URIRef):
+                log.debug(affil)
                 try:
                     ror = idlib.Ror(affil)
                     affil = f'{ror.identifier.curie} ({ror.label})'
                 except idlib.exceptions.IdDoesNotExistError:
                     affil = f'{affil} (DOES NOT EXIST ERROR)'
+                except idlib.Ror._id_class.RorMalformedError:
+                    affil = f'{affil} (probably switched orcid and affil)'
+
             else:
                 continue  # skip these for now
                 affil = affil.toPython()

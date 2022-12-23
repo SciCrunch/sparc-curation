@@ -69,6 +69,7 @@ class SparqlQueries:
         self.prefixes.update(
             {
                 'protcur': 'https://uilx.org/tgbugs/u/protcur/',
+                'ilxtr': str(ilxtr),  # apparently we cleaned up the dangling usages
              },)
 
     def dataset_about(self):

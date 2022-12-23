@@ -546,7 +546,10 @@ class Derives:
                       ((done_specs | inter_perf), '*'),)
                      for s in ss])
                 for d in not_done_dirs}
-            align = {d: max([len(s) for _, s, _ in dss]) for d, dss in dists.items()}
+            align = {
+                d: (lambda l: max(l) if l else -1)(
+                    [len(s) for _, s, _ in dss])
+                for d, dss in dists.items()}
             report = '\n\n'.join(
                 [f'{" ".join([e[1].as_posix() for e in dirs[d]])}\n  0 {d}\n' + '\n'.join(
                     [f'{dist:>3} {s:<{align[d]}} {source}' for dist, s, source in

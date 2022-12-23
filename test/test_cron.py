@@ -8,7 +8,8 @@ class TestCron(unittest.TestCase):
 
     def test_import(self):
         from sparcur import sparcron
+        from sparcur.sparcron import core
 
     def test_sheet_update(self):
-        from sparcur import sparcron
+        from sparcur.sparcron import core as sparcron
         sparcron.check_sheet_updates()
