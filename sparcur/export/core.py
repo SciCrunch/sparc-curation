@@ -485,8 +485,7 @@ class Export(ExportBase):
             nargs['export_base'] = self.export_protcur_base
             export = ExportProtcur(**nargs)
             return export.export_protcur(export.dump_path,
-                                         *hypothesis_groups,
-                                         no_network=self.no_network), export
+                                         *hypothesis_groups), export
 
         pipeline = pipes.ProtcurPipeline(*hypothesis_groups,
                                          no_network=self.no_network)

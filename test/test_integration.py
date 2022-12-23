@@ -18,7 +18,7 @@ def fake_setup(self, *args, **kwargs):
     # FIXME obviously the whole init process should be reworked to avoid the
     # utter insanity that cli.Main.__init__ is at the moment ...
 
-    if self.anchor.id != fake_organization:
+    if self.options.clone or self.anchor.id != fake_organization:
         self.Remote = self._remote_class._new(
             self._cache_class._local_class, self._cache_class)
         if (hasattr(self.Remote, '_api') and

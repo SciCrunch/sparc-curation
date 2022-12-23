@@ -581,6 +581,8 @@ class Main(Dispatcher):
               (self.options.find and not (self.options.fetch or self.options.refresh))):
             # short circuit since we don't know where we are yet
             self.Integrator.no_google = True
+            if self.options.clone:
+                self._setup_bfl()
             return
 
         elif (self.options.pull or
@@ -655,6 +657,25 @@ class Main(Dispatcher):
             Summary._debug = True
 
     def _setup_bfl(self):
+        if self.options.clone:
+            # special case where we may not have all the info
+            # needed to get self.anchor
+            project_id = self.options.project_id
+            if project_id is None:
+                print('no remote project id listed')
+                sys.exit(4)
+            # given that we are cloning it makes sense to _not_ catch a connection error here
+            # FIXME putting this here breaks testing because it hops outside
+            # the usual process for creating a new remote class in _setup_bfl
+            self.Remote = self._remote_class._new(Path, self._cache_class)
+            try:
+                self.Remote.init(project_id)
+            except exc.MissingSecretError:
+                print(f'missing api secret entry for {project_id}')
+                sys.exit(11)
+
+            return
+
         if not self.options.i_know_what_i_am_doing:
             self.Remote._setup()
             self.Remote.init(self.anchor.id)
@@ -924,18 +945,6 @@ class Main(Dispatcher):
         print('hypothes.is ok')
 
     def clone(self):
-        project_id = self.options.project_id
-        if project_id is None:
-            print('no remote project id listed')
-            sys.exit(4)
-        # given that we are cloning it makes sense to _not_ catch a connection error here
-        self.Remote = self._remote_class._new(Path, self._cache_class)
-        try:
-            self.Remote.init(project_id)
-        except exc.MissingSecretError:
-            print(f'missing api secret entry for {project_id}')
-            sys.exit(11)
-
         # make sure that we aren't in a project already
         existing_root = self.cwd.find_cache_root()
         if existing_root is not None and existing_root != self.cwd:
