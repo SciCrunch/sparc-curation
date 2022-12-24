@@ -604,8 +604,8 @@ class JSONPipeline(Pipeline):
     copies = []
     moves = []
     cleans = []  # FIXME should really be able to do cleans after derives too
-    derives = []
     updates = []
+    derives = []
     adds = []
 
     class SkipPipelineError(Exception):
@@ -1115,6 +1115,17 @@ class SDSPipeline(JSONPipeline):
     #)
 
     cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
+
+    updates = [
+        # normalize integer ids to strings to avoid errors comparing str to int
+        # due to mismatch with ancient excel use cases
+        *[[['samples', int, field], norm.number_identifiers_to_string] for field in
+          ('sample_id', 'subject_id', 'was_derived_from', 'pool_id', 'sample_experimental_group', 'member_of', 'laboratory_internal_id')],
+        *[[['subjects', int, field], norm.number_identifiers_to_string] for field in
+          ('subject_id', 'pool_id', 'subject_experimental_group', 'member_of', 'laboratory_internal_id')],
+        *[[['performances', int, field], norm.number_identifiers_to_string] for field in
+          ('performance_id',)],
+    ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
                  ['inputs', 'dataset_description_file', 'funding']],

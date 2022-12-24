@@ -17,6 +17,12 @@ BLANK_VALUE = object()
 NOT_APPLICABLE = object()
 
 
+def number_identifiers_to_string(identifier):
+    return (str(identifier)
+            if isinstance(identifier, numbers.Number)
+            else identifier)
+
+
 def related_identifiers(rids):
     for rid in rids:
         try:
