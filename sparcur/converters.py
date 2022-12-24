@@ -189,9 +189,12 @@ class TripleConverter(dat.HasErrors):
                             continue
 
                         if not isinstance(_o, rdflib.term.Node):
-                            msg = f'wat {_o}, {type(_o)}'
-                            log.critical(msg)
-                            _o = rdflib.Literal(str(_o))
+                            if hasattr(_o, '_sexp') and hasattr(_o._sexp, '_input'):
+                                _o = rdflib.Literal(_o._sexp._input)
+                            else:
+                                msg = f'wat {_o}, {type(_o)}'
+                                log.critical(msg)
+                                _o = rdflib.Literal(str(_o))
 
                         yield subject, TEMPRAW[field], _o
 
