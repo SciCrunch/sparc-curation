@@ -499,7 +499,7 @@ def diff_sheet(old_s, new_s):
         if did not in old_sheet_ids:
             log.debug(f'new dataset {did}')
             # pretend like it was already in the sheet
-            old_row, _dido = type('FakeRow', (object,), {'values', ['' for _ in new_row]}), did
+            old_row, _dido = type('FakeRow', (object,), {'values': ['' for _ in new_row]}), did
         else:
             old_row, _dido = old_s._row_from_index('id', did)
 
