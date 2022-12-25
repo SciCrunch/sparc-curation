@@ -954,7 +954,19 @@ class NormSubjectsFile(NormValues):
             return
 
         try:
-            pv = self.pyru.UnitsParser(value).asPython()
+            # FIXME this normalization should NOT be happening during initial spreadsheet
+            # parsing, it should happen in SDSPipeline so that we have the inputs section
+            # as a reference for bad conversions
+            pv = self.pyru.UnitsParser(value, rest_ok=False).asPython()
+        except self.pyru.UnitsParser.IncompleteParse as e:
+            caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
+            msg = f'Incomplete parse for "{value}" for {caller_name}'
+            if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline'):
+                log.error(msg)
+
+            yield value
+            return
+
         except self.pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
             msg = f'Unexpected and unhandled value "{value}" for {caller_name}'

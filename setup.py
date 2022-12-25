@@ -96,7 +96,7 @@ setup(name='sparcur',
           'openpyxl',
           'protcur>=0.0.10',
           'pyontutils>=0.1.31',
-          'pysercomb>=0.0.10',
+          'pysercomb>=0.0.11',
           'terminaltables',
           'xlsx2csv',
           # sparcur code doesn't directly use protobuf, we restrict protobuf versions from pennsieve
