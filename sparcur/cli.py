@@ -1187,7 +1187,7 @@ done"""
             export = self._export(
                 ex.Export,
                 org_id=self.options.project_id,  # FIXME org_id not needed ...
-                no_network=self.no_google,)
+                no_network=self.options.no_google,)
             # FIXME dump_path shouldn't need to be passed explicitly
             dump_path = (self.options.export_protcur_base /
                          self._folder_timestamp)
