@@ -320,6 +320,12 @@ class Options(clif.Options):
             return Path(pp).expanduser().resolve()
 
     @property
+    def export_file(self):
+        ef = self._args['--export-file']
+        if ef:
+            return Path(ef).expanduser().resolve()
+
+    @property
     def protcur_file(self):
         pf = self._args['--protcur-file']
         if pf:

@@ -1081,6 +1081,10 @@ class Report:
         cache_file = self.options.hypothesis_cache_file
         if cache_file is None:
             group_id = auth.get('hypothesis-group')
+            if group_id is None:
+                # FIXME better error message and add an
+                # orthognoal check on stuff like this
+                raise ValueError('no hypothesis group')
             cache_file = Path(hyp.group_to_memfile(group_id + 'sparcur'))
             get_annos = hyp.Memoizer(memoization_file=cache_file, group=group_id)
             get_annos.api_token = auth.get('hypothesis-api-key')
