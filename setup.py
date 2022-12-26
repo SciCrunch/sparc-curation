@@ -99,8 +99,6 @@ setup(name='sparcur',
           'pysercomb>=0.0.11',
           'terminaltables',
           'xlsx2csv',
-          # sparcur code doesn't directly use protobuf, we restrict protobuf versions from pennsieve
-          'protobuf<3.20.0',
       ],
       extras_require={'dev': ['wheel'],
                       'filetypes': ['nibabel', 'pydicom', 'scipy'],
