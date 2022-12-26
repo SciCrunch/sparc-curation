@@ -249,7 +249,7 @@ Options:
 
     --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
 
-    --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: sparc-curation]
+    --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: {auth.get('hypothesis-group-name')}]
     --hypothesis-cache-file=PATH  path to hyputils json cache file
     --i-know-what-i-am-doing      don't use this unless you already know what it does
 """
@@ -900,6 +900,10 @@ class Main(Dispatcher):
                 yield p
 
     def configure(self):
+        self._configure(self.options.hypothesis_group_name)
+
+    @staticmethod
+    def _configure(hypothesis_group_name=None):
         # the order here is very precise so that the absolutely
         # required and easiest to get right creds go first
 
@@ -941,7 +945,10 @@ class Main(Dispatcher):
         # hypothesis
         print('hypothes.is starting')
         from hyputils import hypothesis as hyp
-        group_name = self.options.hypothesis_group_name
+        group_name = (
+            hypothesis_group_name
+            if hypothesis_group_name else
+            auth.get('hypothesis-group-name'))
         print('hypothesis group_name', group_name)
         group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
         get_annos = hyp.Memoizer(group=group_id)

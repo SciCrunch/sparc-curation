@@ -40,6 +40,7 @@
       'environment-variables': 'BLACKFYNN_BACKOFF_FACTOR'},
   'google-api-service-account-file-readonly': None,
   'google-api-service-account-file-rw': None,
+  'hypothesis-group-name': {'environment-variables': 'HYP_GROUP_NAME'},
   'hypothesis-api-key': {'environment-variables': 'HYP_API_KEY HYP_API_TOKEN'},
   'hypothesis-group': {'environment-variables': 'HYP_GROUP'},
   'hypothesis-user': {'environment-variables': 'HYP_USER'},
