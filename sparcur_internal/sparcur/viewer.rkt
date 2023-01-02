@@ -1220,9 +1220,18 @@ switch to that"
 (define menu-edit (new menu% [label "Edit"] [parent menu-bar-main]))
 (define menu-item-preferences (new menu-item%
                                    [label "Preferences..."]
+                                   ; XXX we cannot show the shortcut here because there is
+                                   ; no sane way to have a menu based shortcut and a keymap
+                                   ; shortcut share the same binding because it is impossible
+                                   ; to tell whether a menu specified shortcut was actually
+                                   ; triggered by a keypress event or by a mouse click on the
+                                   ; menu ... SIGH
+                                   #;
                                    [shortcut #\;] ; shortcut here for discoverability only
+                                   #;
                                    [shortcut-prefix '(ctl)]
-                                   [callback (λ (o e) #f)] ; see `cb-toggle-prefs' above
+                                   [callback cb-toggle-prefs]
+                                   [help-string "Shortcut is C-;"]
                                    [parent menu-edit]))
 
 (define panel-holder (new panel:horizontal-dragable%
