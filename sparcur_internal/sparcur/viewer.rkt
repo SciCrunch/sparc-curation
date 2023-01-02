@@ -41,6 +41,7 @@
 (define current-datasets (make-parameter #f))
 (define current-datasets-view (make-parameter #f))
 (define current-jview (make-parameter #f))
+(define current-mode-panel (make-parameter #f)) ; TODO read from config/history
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
 (define python-interpreter
@@ -974,7 +975,7 @@
 (define (cb-open-dataset-lastest-log obj event)
   (xopen-dataset-latest-log (current-dataset)))
 
-(define (cb-download-everything obj event)
+(define (cb-download-all-files obj event)
   (let ([argv (argv-download-everything (current-dataset))])
     (when argv
       ; FIXME bad use of thread
@@ -1085,6 +1086,16 @@ switch to that"
         (if (power-user?)
             panel-ds-actions
             frame-helper)))
+
+(define (cb-viewer-mode o e)
+  (let* ([mode (send o get-item-plain-label (send o get-selection))]
+         [panel-to-show (cond [(string=? mode "Validate") panel-validate-mode]
+                              [(string=? mode "Convert") panel-convert-mode]
+                              [else panel-validate-mode])])
+    ; we rereparent power-user so that it is always on the right
+    (when (power-user?) (send panel-power-user reparent frame-helper))
+    (set-current-mode-panel! panel-to-show)
+    (when (power-user?) (send panel-power-user reparent panel-ds-actions))))
 
 ;; keymap keybind
 
@@ -1290,55 +1301,89 @@ switch to that"
                               [stretchable-height #f]
                               [parent panel-right]))
 
+(define panel-validate-mode (new horizontal-panel%
+                              [stretchable-height #f]
+                              [parent frame-helper]))
+
+(define panel-convert-mode (new horizontal-panel%
+                              [stretchable-height #f]
+                              [parent frame-helper]))
+
+;; validate mode panel
+
 (define button-fexport (new (tooltip-mixin button%)
                             [label "Fetch+Export"]
                             [tooltip "Shortcut F5"] ; FIXME this should populate dynamically
                             [tooltip-delay 100]
                             [callback cb-fetch-export-dataset]
-                            [parent panel-ds-actions]))
+                            [parent panel-validate-mode]))
 
-(define button-open-dataset-folder (new button%
-                                        [label "Open Folder"]
-                                        [callback cb-open-dataset-folder]
-                                        [parent panel-ds-actions]))
+(define (make-button-open-dataset-folder parent)
+  (new button%
+       [label "Open Folder"]
+       [callback cb-open-dataset-folder]
+       [parent parent]))
+
+(make-button-open-dataset-folder panel-validate-mode)
 
 ; FIXME there is currently no way to go back to viewing the local
 ; export without running export or restarting
 (define button-load-remote-json (new button%
                                      [label "View Prod Export"]
                                      [callback cb-load-remote-json]
-                                     [parent panel-ds-actions]))
+                                     [parent panel-validate-mode]))
 
 (define button-open-dataset-sds-viewer (new button%
                                             [label "Viewer"]
                                             [callback cb-open-dataset-sds-viewer]
-                                            [parent panel-ds-actions]))
+                                            [parent panel-validate-mode]))
 
 (define button-manifest-report (new button%
                                     [label "Manifest Report"] ; used sometimes
                                     [callback cb-manifest-report]
-                                    [parent panel-ds-actions]))
+                                    [parent panel-validate-mode]))
 
 (define button-clean-metadata-files (new button%
                                          [label "Clean Metadata"] ; 5 star
                                          [callback cb-clean-metadata-files]
-                                         [parent panel-ds-actions]))
+                                         [parent panel-validate-mode]))
 
 #; ; too esoteric
 (define button-open-export-folder (new button%
                                        [label "Open Export"]
                                        [callback cb-open-export-folder]
-                                       [parent panel-ds-actions]))
+                                       [parent panel-validate-mode]))
 
 #; ; never used ; FXIME probably goes in the bottom row of a vertical panel
 (define button-toggle-expand (new button%
                                   [label "Expand All"]
                                   [callback cb-toggle-expand]
-                                  [parent panel-ds-actions]))
+                                  [parent panel-validate-mode]))
 #;
 (send button-toggle-expand enable #f) ; XXX remove when implementation complete
 #;
 (send button-toggle-expand show #f)
+
+;; convert mode panel
+
+(define (make-button-fetch parent)
+  (new (tooltip-mixin button%)
+       [label "Fetch"] ; curation does not use
+       [tooltip "Shortcut <not-set>"]
+       [tooltip-delay 100]
+       [callback cb-fetch-dataset]
+       [parent parent]))
+
+(make-button-fetch panel-convert-mode)
+
+(define button-download-everything (new (tooltip-mixin button%)
+                                        [label "Download"]
+                                        [tooltip "Download all files"]
+                                        [tooltip-delay 100]
+                                        [callback cb-download-all-files]
+                                        [parent panel-convert-mode]))
+
+(make-button-open-dataset-folder panel-convert-mode)
 
 ;; power user panel
 
@@ -1348,12 +1393,7 @@ switch to that"
 (when (power-user?)
   (send panel-power-user reparent panel-ds-actions))
 
-(define button-fetch (new (tooltip-mixin button%)
-                          [label "Fetch"] ; curation does not use
-                          [tooltip "Shortcut <not-set>"]
-                          [tooltip-delay 100]
-                          [callback cb-fetch-dataset]
-                          [parent panel-power-user]))
+(make-button-fetch panel-power-user)
 
 (define button-export-dataset (new (tooltip-mixin button%)
                                    [label "Export"] ; curation does not use
@@ -1396,11 +1436,6 @@ switch to that"
                                             [callback cb-open-dataset-lastest-log]
                                             [parent panel-power-user]
                                             ))
-
-(define button-download-everything (new button%
-                                        [label "Download Everything"]
-                                        [callback cb-download-everything]
-                                        [parent panel-power-user]))
 
 ;; manifest report
 
@@ -1472,6 +1507,13 @@ switch to that"
                                 ; TODO need a way to click button to open
                                 [parent panel-prefs-paths]))
 
+(define radio-box-viewer-mode
+  (new radio-box%
+       [label "Viewer Workflow"]
+       [choices '("Validate" "Convert")]
+       [callback cb-viewer-mode]
+       [parent panel-prefs-holder]))
+
 (define (toggle-show obj)
   (send obj show (not (send obj is-shown?))))
 
@@ -1503,9 +1545,17 @@ switch to that"
     (when running?
       (println "finished expanding dataset views")))))
 
+(define (set-current-mode-panel! panel)
+  (let ([cmp (current-mode-panel)])
+    (when cmp
+      (send cmp reparent frame-helper)))
+  (send panel reparent panel-ds-actions)
+  (current-mode-panel panel))
+
 (module+ main
   (init-paths!)
   (define result (populate-datasets))
+  (set-current-mode-panel! panel-validate-mode); TODO set from config
   (send frame-main show #t) ; show this first so that users know something is happening
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
   (send text-search-box focus)
