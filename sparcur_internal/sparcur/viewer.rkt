@@ -10,7 +10,11 @@
          gui-widget-mixins
          json
          json-view
-         net/url)
+         net/url
+         (prefix-in oa- orthauth/base)
+         orthauth/paths
+         orthauth/python-interop
+         )
 
 (define-runtime-path asdf "viewer.rkt")
 (define this-file (path->string asdf))
@@ -28,6 +32,7 @@
 (define selected-dataset #f) ; selected dataset is the global value across threads
 
 ;; parameters (yay dynamic variables)
+(define path-config (make-parameter #f))
 (define path-log-dir (make-parameter #f))
 (define path-cache-dir (make-parameter #f))
 (define path-cache-datasets (make-parameter #f))
@@ -44,18 +49,6 @@
 (define current-mode-panel (make-parameter #f)) ; TODO read from config/history
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
-(define python-interpreter
-  (make-parameter
-   (path->string
-    (let ([interp (find-executable-path
-                   (case (system-type)
-                     ((windows) "python.exe")
-                     ; osx is still stuck on 2.7 by default so need brew
-                     ; but for whatever reason find-executable-path is not brew aware
-                     ((macosx) "/usr/local/bin/python3")
-                     ((unix) (or #;(find-executable-path "pypy3") "python")) ; all of these should be >= 3.7 by this point
-                     (else (error "uhhhhh? beos is this you?"))))])
-      (or interp (error "no python interpreter found!"))))))
 
 ;; TODO add check to make sure that the python modules are accessible as well
 
@@ -110,40 +103,6 @@
   ; have to filter down due to bad performance in the viewer
   ; this is true even after other performance improvements
   '(id meta rmeta status prov submission))
-
-;; temporary orthauth extract
-
-(define (config-paths [os #f])
-  (case (or os (system-type))
-    ;; ucp udp uchp ulp
-    ((unix) (map
-             string->path
-             '("~/.config"
-               "~/.local/share"
-               "~/.cache"
-               "~/.cache/log")))
-    ((macosx) (map
-               string->path
-               '("~/Library/Application Support"
-                 "~/Library/Application Support"
-                 "~/Library/Caches"
-                 "~/Library/Logs")))
-    ((windows) (let ((ucp (build-path (find-system-path 'home-dir) "AppData" "Local")))
-                 (list ucp ucp ucp (build-path ucp "Logs"))))
-    (else (error (format "Unknown OS ~a" (or os (system-type)))))))
-
-(define *config-paths* (config-paths))
-
-(define (fcp position suffix-list)
-  (let ([base-path (position *config-paths*)])
-    (if suffix-list
-        (apply build-path base-path suffix-list)
-        base-path)))
-
-(define (user-config-path . suffix) (fcp first  suffix))
-(define (user-data-path   . suffix) (fcp second suffix))
-(define (user-cache-path  . suffix) (fcp third  suffix))
-(define (user-log-path    . suffix) (fcp fourth suffix))
 
 ;; python argvs
 
@@ -316,13 +275,29 @@
   ; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
   ; FIXME more cryptic errors if sparcur.simple isn't tangled
   ; FIXME it should be possible for the user to configure path-source-dir
-  (path-source-dir (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))
-  (path-log-dir (expand-user-path (user-log-path "sparcur" "datasets")))
-  (path-cache-dir (expand-user-path (user-cache-path "sparcur" "racket")))
-  (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
-  (path-cleaned-dir (expand-user-path (user-data-path "sparcur" "cleaned")))
-  (path-export-dir (expand-user-path (user-data-path "sparcur" "export")))
-  (path-export-datasets (build-path (path-export-dir) "datasets")))
+  (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")])
+    (define ac (oa-read-auth-config))
+    (path-config (build-path (expand-user-path (user-config-path "sparcur")) "viewer.rktd"))
+    ; FIXME sppsspps stupidity
+    (path-source-dir (or (oa-get-path ac 'data-path #:exists? #f)
+                         (build-path (find-system-path 'home-dir) "files" "sparc-datasets")))
+    (path-log-dir (or (oa-get-path ac 'log-path #:exists? #f)
+                      (expand-user-path (user-log-path "sparcur" "datasets"))))
+    (path-cache-dir (or (oa-get-path ac 'cache-path #:exists? #f)
+                        (expand-user-path (user-cache-path "sparcur" "racket"))))
+    (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
+    (path-cleaned-dir (or (oa-get-path ac 'cleaned-path #:exists? #f)
+                          (expand-user-path (user-data-path "sparcur" "cleaned"))))
+    (path-export-dir (or (oa-get-path ac 'export-path #:exists? #f)
+                         (expand-user-path (user-data-path "sparcur" "export"))))
+    (path-export-datasets (build-path (path-export-dir) "datasets"))))
+
+(define (load-config!)
+  ; TODO various configuration options
+  (with-input-from-file (path-config)
+    (λ ()
+      (read)
+      )))
 
 (define (manifest-report)
   ; FIXME this will fail if one of the keys isn't quite right
@@ -1554,6 +1529,7 @@ switch to that"
 
 (module+ main
   (init-paths!)
+  (load-config!)
   (define result (populate-datasets))
   (set-current-mode-panel! panel-validate-mode); TODO set from config
   (send frame-main show #t) ; show this first so that users know something is happening
