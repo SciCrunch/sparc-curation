@@ -973,12 +973,23 @@
 (define (xopen-path path)
   (let ([command (find-executable-path
                   (case (system-type 'os*)
-                    ((linux) "xdg-open")
+                    ((linux) "xdg-open") ; if firefox complains, make sure it matches firefox not firefox-bin xdg-settings get default-web-browser
                     ((macosx) "open")
-                    ;((windows) "start") ; XXX only works from powerhsell it seems "cmd" "/c" "start"
+                    ((windows) "explorer.exe") ; requires an associated file type
                     (else (error "don't know xopen command for this os"))))])
-    (subprocess #f #f #f command path)))
+    #; ; don't use subprocess for this, there is WAY too much cleanup required
+    (subprocess #f #f #f command path)
+    (thread
+     (thunk
+      (let ([cwd
+             (cond
+               [(directory-exists? path) path]
+               [(file-exists? path) (simple-form-path (build-path path 'up))]
+               [else (error 'xopen-path "path-does-not-exist: ~s" path)])])
+        (parameterize ([current-directory cwd])
+          (system* command path #:set-pwd? #t)))))))
 
+#; ; no longer needed
 (define (xopen-folder path)
   (case (system-type)
     ((windows)
@@ -1052,7 +1063,7 @@
       (let ([thread-clean (clean-metadata-files ds)])
         (thread-wait thread-clean)
         (let ([path (dataset-cleaned-latest-path ds)])
-          (xopen-folder path)))))))
+          (xopen-path path)))))))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
@@ -1063,7 +1074,7 @@
 
     (if (directory-exists? symlink)
         (let ([path (resolve-relative-path symlink)])
-          (xopen-folder path))
+          (xopen-path path))
         ; TODO gui visible logging
         (println msg-dataset-not-fetched))))
 
