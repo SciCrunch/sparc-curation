@@ -295,7 +295,11 @@
 (define (save-config!)
   (with-output-to-file (path-config)
     #:exists 'replace
-    (λ () (pretty-write (list (cons 'viewer-mode (send radio-box-viewer-mode get-selection)))))))
+    (λ () (pretty-write
+           (list
+            (cons 'viewer-mode viewer-mode-state)
+            (cons 'power-user? (power-user?))
+            )))))
 
 (define (*->string maybe-string)
   (cond
@@ -329,12 +333,16 @@
       (send text-prefs-path-config set-value (path->string (path-config)))
       (send text-prefs-path-user-config set-value (oa-user-config-path))
       (send text-prefs-path-secrets set-value (oa-secrets-path))
-      (let ([config-exists (assoc 'viewer-mode cfg)])
+      (let ([config-exists (assoc 'viewer-mode cfg)]
+            [power-user (assoc 'power-user? cfg)])
         (if config-exists
             (begin
               ; set-selection does not trigger the callback
               (send radio-box-viewer-mode set-selection (cdr config-exists))
-              (cb-viewer-mode radio-box-viewer-mode #f))
+              (cb-viewer-mode radio-box-viewer-mode #f)
+              (power-user? (not power-user))
+              ; cb does the toggle interinally so we set the opposite of what we want first
+              (cb-power-user check-box-power-user #f))
             (set-current-mode-panel! panel-validate-mode))))))
 
 (define (manifest-report)
@@ -1099,13 +1107,16 @@ switch to that"
         (cb-dataset-selection lview #f)))))
 
 (define (cb-power-user o e)
+  ; this can be triggered by keypress as well so cannot use o
   (power-user? (not (power-user?)))
   ; XXX these can get out of sync
   (send check-box-power-user set-value (power-user?))
   (send panel-power-user reparent
         (if (power-user?)
             panel-ds-actions
-            frame-helper)))
+            frame-helper))
+  (when e
+    (save-config!)))
 
 (define viewer-mode-state #f)
 (define (cb-viewer-mode o e)
@@ -1422,8 +1433,6 @@ switch to that"
 (define panel-power-user (new horizontal-panel%
                               [stretchable-height #f]
                               [parent frame-helper]))
-(when (power-user?)
-  (send panel-power-user reparent panel-ds-actions))
 
 (make-button-fetch panel-power-user)
 
