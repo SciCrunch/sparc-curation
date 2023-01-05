@@ -292,12 +292,50 @@
                          (expand-user-path (user-data-path "sparcur" "export"))))
     (path-export-datasets (build-path (path-export-dir) "datasets"))))
 
+(define (save-config!)
+  (with-output-to-file (path-config)
+    #:exists 'replace
+    (λ () (pretty-write (list (cons 'viewer-mode (send radio-box-viewer-mode get-selection)))))))
+
+(define (*->string maybe-string)
+  (cond
+    [(symbol? maybe-string) (symbol->string maybe-string)]
+    [(number? maybe-string) (number->string maybe-string)]
+    [(keyword? maybe-string) (keyword->string maybe-string)]
+    [(string? maybe-string) maybe-string]
+    [else (error '*->string "unknown object type ~s" maybe-string)]))
+
 (define (load-config!)
   ; TODO various configuration options
-  (with-input-from-file (path-config)
-    (λ ()
-      (read)
-      )))
+  (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")])
+    (let* ([pc (path-config)]
+           [cfg (if (and pc (file-exists? pc))
+                    (with-input-from-file pc
+                      (λ ()
+                        (read)))
+                    '())]
+          [org (oa-get (oa-read-auth-config) 'remote-organization)])
+      (define (obfus str [ends 4])
+        (let ([ls (string-length str)])
+          (string-append
+           (substring str 0 ends)
+           (make-string (- ls (* 2 ends)) #\*)
+           (substring str (- ls ends) ls))))
+      (send text-prefs-remote-organization set-value (*->string org))
+      (send text-prefs-api-key set-value (obfus (*->string (oa-get-sath 'pennsieve org 'key))))
+      (send text-prefs-api-sec set-value (obfus (*->string (oa-get-sath 'pennsieve org 'secret))))
+      #;
+      (send text-prefs-path-? set-value "egads")
+      (send text-prefs-path-config set-value (path->string (path-config)))
+      (send text-prefs-path-user-config set-value (oa-user-config-path))
+      (send text-prefs-path-secrets set-value (oa-secrets-path))
+      (let ([config-exists (assoc 'viewer-mode cfg)])
+        (if config-exists
+            (begin
+              ; set-selection does not trigger the callback
+              (send radio-box-viewer-mode set-selection (cdr config-exists))
+              (cb-viewer-mode radio-box-viewer-mode #f))
+            (set-current-mode-panel! panel-validate-mode))))))
 
 (define (manifest-report)
   ; FIXME this will fail if one of the keys isn't quite right
@@ -826,6 +864,10 @@
 
 ;; callbacks
 
+(define (make-cb-open-path text-field)
+  (λ (o e)
+    (xopen-path (send text-field get-value))))
+
 (define (cb-dataset-selection obj event)
   (define (set-button-status-for-dataset ds)
     (let* ([path (dataset-src-path ds)]
@@ -875,7 +917,10 @@
     result))
 
 (define (cb-toggle-prefs o e)
-  (send frame-preferences show (not (send frame-preferences is-shown?))))
+  (let ([do-show? (not (send frame-preferences is-shown?))])
+    (when do-show? ; resync with any external changes
+      (load-config!))
+    (send frame-preferences show do-show?)))
 
 (define (cb-refresh-dataset-metadata obj event)
   ; XXX requries python sparcur to be installed
@@ -1062,15 +1107,27 @@ switch to that"
             panel-ds-actions
             frame-helper)))
 
+(define viewer-mode-state #f)
 (define (cb-viewer-mode o e)
-  (let* ([mode (send o get-item-plain-label (send o get-selection))]
-         [panel-to-show (cond [(string=? mode "Validate") panel-validate-mode]
-                              [(string=? mode "Convert") panel-convert-mode]
+  ; XXX this callback is triggered twice on click so we have to use viewer-mode-state
+  ; as a stable reference to know whether something actually changed, events will also
+  ; trigger when the same button is clicked multiple times, so must ignore those as well
+  (let* ([event-state (send o get-selection)]
+         [change-event (or (not viewer-mode-state)
+                           (not (= viewer-mode-state event-state)))])
+    (when change-event
+      (set! viewer-mode-state event-state)
+      (let* ([mode (send o get-item-plain-label viewer-mode-state)]
+             [panel-to-show (case mode
+                              [("Validate") panel-validate-mode]
+                              [("Convert") panel-convert-mode]
                               [else panel-validate-mode])])
-    ; we rereparent power-user so that it is always on the right
-    (when (power-user?) (send panel-power-user reparent frame-helper))
-    (set-current-mode-panel! panel-to-show)
-    (when (power-user?) (send panel-power-user reparent panel-ds-actions))))
+        ; we rereparent power-user so that it is always on the right
+        (when (power-user?) (send panel-power-user reparent frame-helper))
+        (set-current-mode-panel! panel-to-show)
+        (when (power-user?) (send panel-power-user reparent panel-ds-actions))
+        (when e
+          (save-config!))))))
 
 ;; keymap keybind
 
@@ -1459,28 +1516,53 @@ switch to that"
 (define panel-prefs-right (new vertical-panel%
                          [parent panel-prefs-holder]))
 
-(define text-prefs-api-key (new text-field%
-                                [font (make-object font% 10 'modern)]
-                                [label "API Key   "]
-                                [init-value "fake-api-key-value"]
-                                [parent panel-prefs-holder]))
+(define text-prefs-remote-organization
+  (new text-field%
+       [font (make-object font% 10 'modern)]
+       [label "Remote Org "]
+       [enabled #f]
+       [init-value ""]
+       [parent panel-prefs-holder])
+  )
 
-(define text-prefs-api-sec (new text-field%
-                                [font (make-object font% 10 'modern)]
-                                [label "API Secret"]
-                                [init-value "fake-api-sec-value"]
-                                [parent panel-prefs-holder]))
+(define text-prefs-api-key
+  (new text-field%
+       [font (make-object font% 10 'modern)]
+       [label "API Key    "]
+       [enabled #f]
+       [init-value "no api key found"]
+       [parent panel-prefs-holder]))
 
-(define panel-prefs-paths (new horizontal-panel%
-                               [parent panel-prefs-holder]
-                               ))
-(define text-prefs-path-? (new text-field%
-                                [font (make-object font% 10 'modern)]
-                                [label "Path ???"]
-                                [enabled #f]
-                                [init-value "/fake/path/to/thing/for/reference"]
-                                ; TODO need a way to click button to open
-                                [parent panel-prefs-paths]))
+(define text-prefs-api-sec
+  (new text-field%
+       [font (make-object font% 10 'modern)]
+       [label "API Secret "]
+       [enabled #f]
+       [init-value "no api secret found"]
+       [parent panel-prefs-holder]))
+
+(define (make-text-prefs-path label [init-value ""] #:enabled? [enabled #f])
+  (define panel-prefs-path (new horizontal-panel%
+                                [parent panel-prefs-holder]))
+  (define text-field
+    (new text-field%
+         [font (make-object font% 10 'modern)]
+         [label label]
+         [enabled enabled]
+         [init-value init-value]
+         ; TODO need a way to click button to open
+         [parent panel-prefs-path]))
+  (new button%
+       [label "Open Path"]
+       [callback (make-cb-open-path text-field)]
+       [parent panel-prefs-path])
+  text-field)
+
+#;
+(define text-prefs-path-? (make-text-prefs-path           "Path ???   " "/fake/path/to/thing/for/reference"))
+(define text-prefs-path-config (make-text-prefs-path      "config     "))
+(define text-prefs-path-user-config (make-text-prefs-path "user-config"))
+(define text-prefs-path-secrets (make-text-prefs-path     "secrets    "))
 
 (define radio-box-viewer-mode
   (new radio-box%
@@ -1496,12 +1578,6 @@ switch to that"
                                   [label "Power user?"]
                                   [callback cb-power-user]
                                   [parent panel-prefs-holder]))
-
-(define button-prefs-path
-  (new button%
-       [label "Open Path"]
-       ;[callback cb-toggle-expand]
-       [parent panel-prefs-paths]))
 
 (define (render-datasets)
   ; run hierlist open in the background since I can't figure out how to construct them open by default
@@ -1531,7 +1607,6 @@ switch to that"
   (init-paths!)
   (load-config!)
   (define result (populate-datasets))
-  (set-current-mode-panel! panel-validate-mode); TODO set from config
   (send frame-main show #t) ; show this first so that users know something is happening
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
   (send text-search-box focus)
