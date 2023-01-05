@@ -811,7 +811,7 @@ Repository local roots. The ordering of the entries matters.
 #+NAME: py-roots
 | sxpyr augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
 #+NAME: rkt-roots
-| qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid sparc-curation/sparcur_internal/sparcur NIF-Ontology/ |
+| qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid orthauth/racket/orthauth sparc-curation/sparcur_internal/sparcur NIF-Ontology/ |
 # note that breadcrumb and json-view are not in this list due to the need to use raco pkg install --name
 
 ** Make repos
@@ -1333,6 +1333,7 @@ protc/protc-tools
 rkdf/rkdf-lib
 rkdf/rkdf
 rrid-metadata/rrid
+orthauth/racket/orthauth
 sparc-curation/sparcur_internal/sparcur
 NIF-Ontology/
 '
