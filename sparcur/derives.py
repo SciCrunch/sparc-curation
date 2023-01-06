@@ -532,6 +532,13 @@ class Derives:
                 logd.error(msg)
 
         if maybe_not_done_specs:
+            # FIXME producing incorrect error here when there is a folder but NOT metadata
+            # this is strange, this is happening because there is a reference to a subject
+            # in a samples sheet that is not in the subjects sheet, that is a separate error
+            # FIXME this also means that there is some asymmetry between matching folders
+            # and matching specimens because the samples only sheet accounts for the
+            # folder but the folder does not account for subjects appearing only in the
+            # samples sheet subject_id column
             msg = ('Warning. Unmarked metadata-only specimens that have no corresponding '
                    f'directory, but have children that do.\n{maybe_not_done_specs}')
             if he.addError(msg,
