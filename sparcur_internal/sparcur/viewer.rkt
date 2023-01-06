@@ -1092,7 +1092,9 @@
       (let ([thread-clean (clean-metadata-files ds)])
         (thread-wait thread-clean)
         (let ([path (dataset-cleaned-latest-path ds)])
-          (xopen-path path)))))))
+          (when path ; only open if the cleaning succeeded
+            ; the failure above will be logged
+            (xopen-path path))))))))
 
 (define (cb-open-dataset-folder obj event)
   (let* ([ds (current-dataset)]
