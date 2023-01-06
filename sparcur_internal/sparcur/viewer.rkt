@@ -335,8 +335,9 @@
       (send text-prefs-path-user-config set-value (oa-user-config-path))
       (send text-prefs-path-secrets set-value (oa-secrets-path))
       (send text-prefs-path-data set-value (path->string (path-source-dir)))
-      (let ([config-exists (assoc 'viewer-mode cfg)]
-            [power-user (assoc 'power-user? cfg)])
+      (let* ([config-exists (assoc 'viewer-mode cfg)]
+             [power-user-a (assoc 'power-user? cfg)]
+             [power-user (and power-user-a (cdr power-user-a))])
         (if config-exists
             (begin
               ; set-selection does not trigger the callback
