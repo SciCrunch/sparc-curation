@@ -345,17 +345,29 @@
               (cb-power-user check-box-power-user #f))
             (set-current-mode-panel! panel-validate-mode))))))
 
+(define (get-path-err)
+  (hash-ref
+   (hash-ref
+    (current-blob)
+    'status
+    (hash))
+   'path_error_report
+   #f))
+
+(define (paths-report)
+  (for-each (λ (m) (displayln (regexp-replace #rx"SPARC( Consortium)?/[^/]+/" m "\\0\n")) (newline))
+            ; FIXME use my hr function from elsewhere
+            (let ([ihr (get-path-err)])
+              (if ihr
+                  (hash-ref (hash-ref ihr '|#/specimen_dirs| #hash((messages . ()))) 'messages)
+                  '()))))
+
 (define (manifest-report)
   ; FIXME this will fail if one of the keys isn't quite right
   ; TODO displayln this into a text% I think?
-  (for-each (λ (m) (displayln (regexp-replace #rx"SPARC Consortium/[^/]+/" m "\\0\n")) (newline))
+  (for-each (λ (m) (displayln (regexp-replace #rx"SPARC( Consortium)?/[^/]+/" m "\\0\n")) (newline))
             ; FIXME use my hr function from elsewhere
-            (let ([ihr (hash-ref
-                        (hash-ref
-                         (current-blob)
-                         'status)
-                        'path_error_report
-                        #f)])
+            (let ([ihr (get-path-err)])
               (if ihr
                   (hash-ref (hash-ref ihr '|#/path_metadata/-1| #hash((messages . ()))) 'messages)
                   '()))))
@@ -1026,7 +1038,13 @@
 (define (cb-open-dataset-sds-viewer obj event)
   (xopen-path (uri-sds-viewer (current-dataset))))
 
-(define (cb-manifest-report obj event #:show [show #t])
+(define (cb-paths-report o e #:show [show #t])
+  (cb-x-report o e 'paths #:show show))
+
+(define (cb-manifest-report o e #:show [show #t])
+  (cb-x-report o e 'manifest #:show show))
+
+(define (cb-x-report obj event type #:show [show #t])
   (let ([lp (dataset-export-latest-path (current-dataset))])
     ; this was moved from the fast branch of dataset-jview!
     ; to avoid calls to disk for current-blob
@@ -1040,14 +1058,25 @@
         (cb-manifest-report 'dataset-jview! 'called #:show #f))))
   ; TODO populate the editor
   ; TODO implement this as a method on edcanv-man-rep ?
-  (let ((ed (send edcanv-man-rep get-editor)))
-    (send ed select-all)
-    ;; FIXME somehow select-all clear does not work if the cursor is moved manually?
-    (send ed clear)
-    (send ed insert (with-output-to-string (λ () (manifest-report))))
-    (send ed scroll-to-position 0))
-  (when show
-    (send frame-manifest-report show #t)))
+  (let-values ([(report-function
+                 report-frame
+                 report-edcanv)
+                (case type
+                  [(paths) (values paths-report frame-paths-report edcanv-path-rep)]
+                  [(manifest) (values manifest-report frame-manifest-report edcanv-man-rep)]
+                  [else (error 'cb-x-report "unknown report type ~s" type)])])
+    (let ([ed (send report-edcanv get-editor)])
+      ; select-all clear does not work if the cursor is moved manually, locking
+      ; the canvas prevents the issue and avoids other issues at the same time
+      (when (send ed is-locked?)
+        (send ed lock #f))
+      (send ed select-all)
+      (send ed clear)
+      (send ed insert (with-output-to-string (λ () (report-function))))
+      (send ed scroll-to-position 0)
+      (send ed lock #t))
+    (when show
+      (send report-frame show #t))))
 
 (define (cb-clean-metadata-files obj event)
   ; WARNING THIS IS A DESTRUCTIVE OPERATION
@@ -1392,10 +1421,17 @@ switch to that"
                                             [callback cb-open-dataset-sds-viewer]
                                             [parent panel-validate-mode]))
 
-(define button-manifest-report (new button%
-                                    [label "Manifest Report"] ; used sometimes
-                                    [callback cb-manifest-report]
-                                    [parent panel-validate-mode]))
+(define button-manifest-report
+  (new button%
+       [label "Manifest Rep"] ; used sometimes
+       [callback cb-manifest-report]
+       [parent panel-validate-mode]))
+
+(define button-paths-report
+  (new button%
+       [label "Paths Report"] ; used sometimes
+       [callback cb-paths-report]
+       [parent panel-validate-mode]))
 
 (define button-clean-metadata-files (new button%
                                          [label "Clean Metadata"] ; 5 star
@@ -1489,25 +1525,35 @@ switch to that"
                                             [parent panel-power-user]
                                             ))
 
-;; manifest report
+;; reports
 
-(define frame-manifest-report
-  (new (class frame% (super-new)
-         (rename-super [super-on-subwindow-char on-subwindow-char])
-         (define/override (on-subwindow-char receiver event)
-           (super-on-subwindow-char receiver event)
-           (send keymap handle-key-event receiver event))
-         #; ; show hide basically
-         (define/augment (on-close)
-           (displayln "prefs closed")))
-       [label "sparcur manifest report"]
-       [width 640]
-       [height 480]))
+(define (make-frame-report label)
+  (new
+   (class frame% (super-new)
+     (rename-super [super-on-subwindow-char on-subwindow-char])
+     (define/override (on-subwindow-char receiver event)
+       (super-on-subwindow-char receiver event)
+       (send keymap handle-key-event receiver event))
+     #; ; show hide basically
+     (define/augment (on-close)
+       (displayln "prefs closed")))
+   [label label]
+   [width 640]
+   [height 480]))
+
+(define frame-manifest-report (make-frame-report "sparcur report manifests"))
+
+(define frame-paths-report (make-frame-report "sparcur report paths"))
 
 (define edcanv-man-rep
   (new editor-canvas%
        [editor (new text%)]
        [parent frame-manifest-report]))
+
+(define edcanv-path-rep
+  (new editor-canvas%
+       [editor (new text%)]
+       [parent frame-paths-report]))
 
 ;; TODO preferences
 (define frame-preferences
