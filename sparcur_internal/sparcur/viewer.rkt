@@ -306,6 +306,7 @@
     [(symbol? maybe-string) (symbol->string maybe-string)]
     [(number? maybe-string) (number->string maybe-string)]
     [(keyword? maybe-string) (keyword->string maybe-string)]
+    [(path? maybe-string) (path->string maybe-string)]
     [(string? maybe-string) maybe-string]
     [else (error '*->string "unknown object type ~s" maybe-string)]))
 
@@ -333,6 +334,7 @@
       (send text-prefs-path-config set-value (path->string (path-config)))
       (send text-prefs-path-user-config set-value (oa-user-config-path))
       (send text-prefs-path-secrets set-value (oa-secrets-path))
+      (send text-prefs-path-data set-value (path->string (path-source-dir)))
       (let ([config-exists (assoc 'viewer-mode cfg)]
             [power-user (assoc 'power-user? cfg)])
         (if config-exists
@@ -1315,7 +1317,7 @@ switch to that"
                                      [parent menu-file]))
 (define menu-edit (new menu% [label "Edit"] [parent menu-bar-main]))
 (define menu-item-preferences (new menu-item%
-                                   [label "Preferences..."]
+                                   [label "Preferences...        C-;"]
                                    ; XXX we cannot show the shortcut here because there is
                                    ; no sane way to have a menu based shortcut and a keymap
                                    ; shortcut share the same binding because it is impossible
@@ -1631,6 +1633,7 @@ switch to that"
 (define text-prefs-path-config (make-text-prefs-path      "config     "))
 (define text-prefs-path-user-config (make-text-prefs-path "user-config"))
 (define text-prefs-path-secrets (make-text-prefs-path     "secrets    "))
+(define text-prefs-path-data (make-text-prefs-path        "data-path  "))
 
 (define radio-box-viewer-mode
   (new radio-box%
