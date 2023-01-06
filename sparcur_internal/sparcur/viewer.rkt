@@ -434,7 +434,10 @@
                           (dynamic-require 'compiler/commands/exe #f))
                         #;
                         (system* exec-file "-l-" "raco/main.rkt" "exe" "--vv" "--" this-file)))))
-             (println "Update complete!"))
+             (println "Update complete!")
+             #; ; TODO issue this only if the viewer itself was updated and there was a success
+             (println "Restart at your convenience.")
+             )
             (λ () (set! update-running? #f))))))))
 
 ;; json view
@@ -1476,12 +1479,15 @@ switch to that"
 
 (make-button-fetch panel-convert-mode)
 
-(define button-download-everything (new (tooltip-mixin button%)
-                                        [label "Download"]
-                                        [tooltip "Download all files"]
-                                        [tooltip-delay 100]
-                                        [callback cb-download-all-files]
-                                        [parent panel-convert-mode]))
+(define (make-button-download-all-files parent)
+  (new (tooltip-mixin button%)
+       [label "Download"]
+       [tooltip "Download all files"]
+       [tooltip-delay 100]
+       [callback cb-download-all-files]
+       [parent parent]))
+
+(make-button-download-all-files panel-convert-mode)
 
 (make-button-open-dataset-folder panel-convert-mode)
 
@@ -1499,6 +1505,8 @@ switch to that"
                                    [tooltip-delay 100]
                                    [callback cb-export-dataset]
                                    [parent panel-power-user]))
+
+(make-button-download-all-files panel-power-user)
 
 (define button-open-dataset-remote (new button%
                                         ; curation doesn't use this, flow is inverted
