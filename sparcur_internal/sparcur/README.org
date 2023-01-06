@@ -53,3 +53,11 @@ raco make viewer.rkt
 raco exe viewer.rkt
 popd
 #+end_src
+
+when adding a new local repo path e.g. orthauth
+run the following before update
+#+begin_src bash
+raco pkg install --batch --auto ~/git/orthauth/racket/orthauth
+#+end_src
+TODO maybe we can tangle the bits of =setup.org= that we need?
+or even run then via the shebang?
