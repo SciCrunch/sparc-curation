@@ -1030,10 +1030,15 @@
   (xopen-dataset-latest-log (current-dataset)))
 
 (define (cb-download-all-files obj event)
-  (let ([argv (argv-download-everything (current-dataset))])
+  (let* ([ds (current-dataset)]
+         [argv (argv-download-everything ds)])
     (when argv
       ; FIXME bad use of thread
-      (thread (thunk (apply system* argv))))))
+      (thread
+       (thunk
+        (println (format "dataset download starting for ~a" (dataset-id ds)))
+        (apply system* argv) ; TODO detect and report failure
+        (println (format "dataset download completed for ~a" (dataset-id ds))))))))
 
 (define (cb-open-dataset-remote obj event)
   (xopen-path (uri-human (current-dataset))))
