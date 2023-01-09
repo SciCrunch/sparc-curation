@@ -1008,7 +1008,7 @@ https://scicrunch.org/sawg/about/ApiNATOMY
             (progn
               (update-all-models-async)
               (let ((fails (cl-remove-if (lambda (l) (= (car l) 0)) apinat-process-results)))
-                (when apinat-process-results
+                (when fails
                   (message "some failures %S" fails)
                   (kill-emacs 1))))
           (update-models (list (intern model-id)))))
