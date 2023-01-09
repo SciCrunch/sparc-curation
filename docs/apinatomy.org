@@ -131,6 +131,9 @@ gsx:google-sheet-id
 (defvar-local apinat-converter-command "apinat-converter"
   "Command name or full path to javascript apinatomy converter.")
 
+(defvar-local apinat-exclude-models nil
+  "list of model ids is strings to exclude from `all-models'")
+
 (defvar-local apinat-converter-debug nil
   "Dynamic variable used to control debug behavior.")
 
@@ -361,6 +364,7 @@ gsx:google-sheet-id
     (cl-remove-if (lambda (p)
                     (or (not (file-directory-p p))
                         (string-prefix-p "." p)
+                        (member p apinat-exclude-models)
                         (not (file-exists-p (concat p "/source/" p ".json")))))
                   (directory-files default-directory))))
 
@@ -398,7 +402,7 @@ gsx:google-sheet-id
           (buf (process-buffer process))
           (cmd (process-command process)))
       (setq apinat-process-results
-            (cons (list ex (with-current-buffer buf (buffer-string)))
+            (cons (list ex (with-current-buffer buf (buffer-string) cmd))
                   apinat-process-results))
       (if (= ex 0)
         (message "completed: %S" process)
@@ -418,7 +422,7 @@ gsx:google-sheet-id
      ;; TODO consider whether we can somehow use invocation-name invocation-directory so that
      ;; specific versions of emacs are used to run the block instead of always the system version
      (ow-run-command-async "sh" :sentinel #'sentinel (buffer-file-name) "--model-id" model-id "--secrets" oa-secrets "--repo" apinat-model-repo
-                           (if apinat-converter-debug "--debug" "")))
+                           (if apinat-converter-debug "--debug" nil)))
     (while (< (length apinat-process-results) (length model-ids))
       (sleep-for 5)
       (message "complete: %s/%s" (length apinat-process-results) (length model-ids)))))
@@ -980,28 +984,35 @@ https://scicrunch.org/sawg/about/ApiNATOMY
        (:after-tag nil)
        (:all)
        (:model-id nil) ; the id of the model to build
+       (:exclude nil) ; FIXME handle more than one
        ((:repo apinat-model-repo) apinat-model-repo) ; path to the models repo
        ((:converter apinat-converter-command) apinat-converter-command) ; command or full path to converter
        ((:secrets oa-secrets) oa-secrets) ; path to secrets.sxpr file
        ((:debug) apinat-converter-debug)) ; enable debug mode
-    (cond
-     (tangle
-      (let (enable-local-eval)
-        ;; this pattern is required when tangling to avoid infinite loops
-        (revert-buffer nil t nil)
-        (setq-local find-file-literally nil))
-      (org-babel-tangle))
-     (deploy ; XXX TODO multiple models logic from diffs etc. XXX better yet, diff remote
-      (message "argv: %S ac: %S" argv after-commit)
+    (let ((apinat-exclude-models (or (and exclude (cons exclude apinat-exclude-models)) apinat-exclude-models)))
       (cond
-       (all (apinat-deploy-models (all-models)))
-       (model-id (apinat-deploy-models (list (intern model-id))))))
-     ((or all model-id)
-      (message "updating %s" (or model-id "all"))
-      (if all
-          (update-all-models-async)
-        (update-models (list (intern model-id)))))
-     )))
+       (tangle
+        (let (enable-local-eval)
+          ;; this pattern is required when tangling to avoid infinite loops
+          (revert-buffer nil t nil)
+          (setq-local find-file-literally nil))
+        (org-babel-tangle))
+       (deploy ; XXX TODO multiple models logic from diffs etc. XXX better yet, diff remote
+        (message "argv: %S ac: %S" argv after-commit)
+        (cond
+         (all (apinat-deploy-models (all-models)))
+         (model-id (apinat-deploy-models (list (intern model-id))))))
+       ((or all model-id)
+        (message "updating %s" (or model-id "all"))
+        (if all
+            (progn
+              (update-all-models-async)
+              (let ((fails (cl-remove-if (lambda (l) (= (car l) 0)) apinat-process-results)))
+                (when apinat-process-results
+                  (message "some failures %S" fails)
+                  (kill-emacs 1))))
+          (update-models (list (intern model-id)))))
+       ))))
 #+end_src
 
 #+begin_src elisp
@@ -1024,5 +1035,5 @@ block can be nowebbed for tangling.
 ** Local Variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (ignore-error error (org-set-visibility-according-to-property))) (warn "No orgstrap block."))))
 # End:
