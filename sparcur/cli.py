@@ -1192,6 +1192,8 @@ done"""
             dump_path = (self.options.export_protcur_base /
                          self._folder_timestamp)
             hgn = self.options.hypothesis_group_name  # FIXME when to switch public/secret?
+            if hgn is None:
+                raise ValueError('Missing hypothesis-group-name!')
             blob_protcur = export.export_protcur(dump_path,
                                                  hgn,
                                                  rerun_protcur_export=self.options.force,
@@ -1258,6 +1260,9 @@ done"""
 
     def annos(self):
         hgn = self.options.hypothesis_group_name
+        if hgn is None:
+            raise ValueError('Missing hypothesis-group-name!')
+
         if self.options.fetch:
             from hyputils import hypothesis as hyp
             group_id = auth.user_config.secrets('hypothesis', 'group', hgn)
