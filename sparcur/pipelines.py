@@ -2217,10 +2217,10 @@ class ProtcurPipeline(Pipeline):
 
         _annos = annos
         annos = [ptcdoc.Annotation(a) for a in annos]
-        #pool = ptcdoc.Pool(annos)
+        pool = ptcdoc.Pool(annos)
         #anno_counts = ptcdoc.AnnoCounts(pool)
         #idn = ptcdoc.IdNormalization(anno_counts.all())
-        idn = ptcdoc.IdNormalization(annos)
+        idn = ptcdoc.IdNormalization(pool)
         protc.reset(reset_annos_dict=True)  # sigh, yes we have to do this here
         #breakpoint()
         protcs = [protc(f, annos) for f in annos]
@@ -2232,7 +2232,8 @@ class ProtcurPipeline(Pipeline):
 
         if None in idints:
             nones = idints.pop(None)
-            nidn = ptcdoc.IdNormalization(nones)
+            npool = ptcdoc.Pool(nones)
+            nidn = ptcdoc.IdNormalization(npool)
             idints.update(nidn.normalized())
 
         pidints = {k:[protc.byId(a.id) for a in v] for k, v in idints.items()}
