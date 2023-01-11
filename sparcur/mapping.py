@@ -1,17 +1,8 @@
 # term mapping
 
 from functools import wraps
-from idlib.from_oq import OntTerm as iOT
-from .core import OntTerm as cOT
+from .core import OntTerm
 from .utils import log
-
-
-# reminder that ontquery is irretrievably broken if used directly and
-# should never be invoked at the top level because it hits the network
-# during __init__, this is a fix that uses the neurondm simple from_oq
-# implementation that defers retrieval until fetch is called
-class OntTerm(iOT, cOT):
-    skip_for_instrumentation = False
 
 
 def tos(f):
@@ -45,9 +36,9 @@ _species = {
 
 @tos
 def species(string, __species=dict(_species), __fetched=[False]):
-    if not __fetched[0]:  # SIGH
-        [v.fetch() for v in __species.values()]  # TODO parallel
-        __fetched[0] = True
+    #if not __fetched[0]:  # SIGH
+        #[v.fetch() for v in __species.values()]  # TODO parallel
+        #__fetched[0] = True
 
     lstr = string.lower()
     if lstr in __species:
@@ -65,9 +56,9 @@ _sex = {
 
 @tos
 def sex(string, __sex=dict(_sex), __fetched=[False]):
-    if not __fetched[0]:  # SIGH
-        [v.fetch() for v in __sex.values()]  # TODO parallel
-        __fetched[0] = True
+    #if not __fetched[0]:  # SIGH
+        #[v.fetch() for v in __sex.values()]  # TODO parallel
+        #__fetched[0] = True
 
     lstr = string.lower()
     if lstr in __sex:

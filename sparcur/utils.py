@@ -649,7 +649,7 @@ def make_bf_id_regex(top_level_domain):
         zip((curie_regex, id_regex, uuid4_regex, uri_api_regex, uri_human_regex),
             ('curie', 'id', 'uuid', 'uri_api', 'uri_human'),)]
 
-    return (uuid4_regex, canonical_regex, curie_regex, id_regex,
+    return (re.compile(uuid4_regex), canonical_regex, curie_regex, id_regex,
             types, paths, path_elem_regex, uri_api_regex, org_pref,
             uri_human_regex, compiled)
 

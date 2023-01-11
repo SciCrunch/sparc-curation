@@ -93,7 +93,14 @@ class TripleConverter(dat.HasErrors):
         def protocol_stuff():
             nonlocal _v
             nonlocal s
-            d = _v.asDict()  # FIXME this is a silly way to do this, use Stream.triples_gen
+
+            nofetch = OntTerm._nofetch
+            OntTerm._nofetch = False  # XXX FIXME temporary hack around network sandbox
+            # all of this should be completed as a final step on the json ir probably
+            try:
+                d = _v.asDict()  # FIXME this is a silly way to do this, use Stream.triples_gen
+            finally:
+                OntTerm._nofetch = nofetch
             _o = (owl.Class
                     if isinstance(v, OntTerm) else  # FIXME not really accurate
                     owl.NamedIndividual)
@@ -123,7 +130,7 @@ class TripleConverter(dat.HasErrors):
                     #log.debug(f'{field} {v} {convert}')
                     if isinstance(v, oq.OntId):
                         _old_v = v
-                        v = v.asInstrumented()
+                        v = v.asInstrumented()  # XXX this will induce a network sandbox violation
                     try:
                         p, o = convert(v)
                     except exc.NoTripleError as e:

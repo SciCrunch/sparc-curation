@@ -4,7 +4,7 @@ import csv
 import json
 from socket import gethostname
 from itertools import chain
-from collections import Counter
+from collections import Counter, defaultdict
 import idlib
 #import requests  # import time hog
 from pyontutils.core import OntGraph, populateFromJsonLd
@@ -473,12 +473,20 @@ class Export(ExportBase):
 
         return blob_protocols
 
-    def export_protcur(self,
-                       dump_path,
-                       *hypothesis_groups,
-                       rerun_protcur_export=False,
-                       # FIXME direct= is a hack
-                       direct=False):
+    def export_protcur(self, *args, **kwargs):
+        nofetch = OntTerm._nofetch
+        OntTerm._nofetch = True
+        try:
+            return self._export_protcur(*args, **kwargs)
+        finally:
+            OntTerm._nofetch = nofetch
+
+    def _export_protcur(self,
+                        dump_path,
+                        *hypothesis_groups,
+                        rerun_protcur_export=False,
+                        # FIXME direct= is a hack
+                        direct=False):
         if not direct and self.export_base != self.export_protcur_base:
             # workaround to set the correct export base path
             nargs = {**self._args}
@@ -508,6 +516,67 @@ class Export(ExportBase):
 
         # FIXME NOTE this does not do the identifier expansion pass
         protcur = pipeline._make_blob(annos=annos)
+
+        def fetchterms(blob):
+            # at this point we should be able to recursively find an fetch all the ids
+            collect = set()
+            seen = set()
+            ddt = defaultdict(list)
+            ddot = defaultdict(list)
+            from pysercomb.pyr import units as pyru  # FIXME SIGH
+            from sparcur.utils import is_list_or_tuple
+            def rfetch(thing):
+                if is_list_or_tuple(thing):
+                    [rfetch(t) for t in thing]
+                elif isinstance(thing, dict):
+                    [rfetch(t) for t in thing.values()]
+                elif isinstance(thing, OntTerm):
+                    ddot[thing.curie].append(thing)
+                    #collect.add(thing)
+                elif isinstance(thing, pyru.Term):
+                    # there's nothing in here right now
+                    tc = thing.curie
+                    if isinstance(tc, OntTerm):
+                        # these come from normalize_node in ProtcurPipeline
+                        # when there is a mapping in the sheet lookup
+                        tc = tc.curie
+                        ddot[tc].append(thing.curie)
+
+                    ddt[tc].append(thing)
+                    #collect.add(thing)
+                    #[rfetch(t) for t in thing._term_cache.values()]
+                elif hasattr(thing, 'asJson') and thing not in seen:
+                    seen.add(thing)
+                    [rfetch(t) for t in thing.__dict__.values()]
+                elif type(thing) in (str, int):
+                    pass
+                else:
+                    pass
+                    #print('WAT', type(thing))
+
+            rfetch(blob)
+            curies = set(ddot) | set(ddt)
+            def ft(c): return c, OntTerm(c).fetch()
+            _fetched = Async(rate=40)(deferred(ft)(c) for c in curies)
+            fetched = {c:t for c, t in _fetched}
+            return fetched, ddt, ddot
+
+        def popterms(fetched, ddt, ddot):
+            for curie in set(ddot) | set(ddt):
+                ots = ddot[curie]
+                ts = ddt[curie]
+                t = fetched[curie]
+                for ot in ots:
+                    ot.__dict__ = t.__dict__
+
+                if ts:
+                    ts[0]._term_cache[curie] = t
+
+        OntTerm._nofetch = False
+        fetched, ddt, ddot = _fdd = fetchterms(protcur)
+        OntTerm._nofetch = True
+        popterms(*_fdd)
+
         context = {**sc.base_context,
                    **sc.protcur_context,
                    }

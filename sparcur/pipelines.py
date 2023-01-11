@@ -1,3 +1,4 @@
+import re
 import copy
 import json
 import pathlib
@@ -85,8 +86,8 @@ class MapPathsCombinator:
         if self.debug or self.n_jobs == 1:
             return [p.data for p in self.pipes]
         else:
-            return Parallel(n_jobs=self.n_jobs)(delayed(lambda :p.data)()
-                                                for p in self.pipes)
+            return Parallel(n_jobs=self.n_jobs)(
+                delayed(lambda _p=p: _p.data)() for p in self.pipes)
 
 
 class Pipeline:
@@ -138,6 +139,8 @@ class RemoteDatasetDataPipeline(DatasourcePipeline):
         try:
             return bdd.fromCache()
         except FileNotFoundError as e:
+            # FIXME technically not a NSE, it would be but we don't
+            # actually attempt
             raise exc.NetworkSandboxError from e
 
 
@@ -1827,10 +1830,25 @@ class IrToExportJsonPipeline(JSONPipeline):
     def augmented(self):
         data_in = self.blob_ir
         # XXX NOTE JApplyRecursive is actually functional
-        data = JApplyRecursive(json_identifier_expansion,
-                               data_in,
-                               skip_keys=('errors',),
-                               preserve_keys=('inputs', 'id'))
+        # XXX network sandbox violation
+        # TODO this is however the correct place to make use of
+        # the recursive machinery implemented for protcur export
+        # FIXME identifier resolution sould be done in bulk on
+        # the Ir itself, not just on the export here, and in fact
+        # the resolution of OntTerms embedded in this json should
+        # propagate from here, but we need something that runs
+        # before conversion to ttl as well, which this does not
+        # gurantee
+        nofetch = OntTerm._nofetch
+        OntTerm._nofetch = False
+        try:
+            data = JApplyRecursive(json_identifier_expansion,
+                                   data_in,
+                                   skip_keys=('errors',),
+                                   preserve_keys=('inputs', 'id'))
+        finally:
+            OntTerm._nofetch = nofetch
+
         return data
 
     @hasSchema(sc.DatasetOutExportSchema)
@@ -2078,7 +2096,14 @@ class ProtcurPipeline(Pipeline):
         def lift_urls_raw(a):
             t = lift_urls(a)
             if t is not None:
-                return t.label
+                # we don't fetch, and since we no longer map to uberon
+                # in the previous step it is safe to return curie we
+                # encounter here as raw, because they were indeed the
+                # raw form
+                return t.curie
+                #if not hasattr(t, 'label'):
+                    #t.fetch()  # XXX FIXME need some sligh of hand here to do the fetch on access
+                #return t.label
 
         def clean(v):
             if isinstance(v, str) and not isinstance(v, OntId):  # sigh, yep, idlib has the better design
@@ -2180,7 +2205,11 @@ class ProtcurPipeline(Pipeline):
 
             _traw = predicate.startswith('TEMPRAW:')
             if _traw and tag == 'sparc:AnatomicalLocation':
-                norm = lift_urls_raw  # XXX avoid putting uberon urls in raw output
+                # XXX avoid putting uberon urls in raw output ???
+                # no? they should be there if that is what was provided
+                # now that we don't run the alignment before this step
+                # if we hit UBERON tags they are indeed raw
+                norm = lift_urls_raw
 
             normed = [norm(a) for a in annos if tag in a.tags]
             # FIXME not at all clear that these should be sorted
@@ -2329,9 +2358,11 @@ class ProtcurPipeline(Pipeline):
                 # TODO embed error status
                 pass
 
-            data['datasets'] = sorted(set([PennsieveId(fixbf(t)) for p in pannos if p._anno.is_page_note
+            page_notes = [p for p in pannos if p._anno.is_page_note()]
+            data['datasets'] = sorted(set([PennsieveId(fixbf(t)) for p in page_notes
                                            for t in p.tags if 'dataset:' in t
                                            and t not in bad_tags]))
+            self._process_tags(data, page_notes)
 
             from pysercomb.pyr.units import Term
             extras = list(self._annos_to_json(data, pannos, sheets_lookup, Term))
@@ -2340,6 +2371,39 @@ class ProtcurPipeline(Pipeline):
             out.extend(extras)
 
         return out
+
+    @staticmethod
+    def _process_tags(data, page_notes):
+        known_bad = 'anatomy',  # XXX nuke these
+        keys = (
+            'sparc-anatomy',
+            'sparc-approach',
+            'sparc-taxon',
+            'sparc-other',)
+        for k in keys:
+            data[k] = []
+
+        for p in page_notes:
+            for t in sorted(p.tags):
+                if (t.startswith('dataset:') or
+                    t.startswith('N:dataset:') or
+                    t.startswith('BF:N:dataset:') or
+                    re.match(PennsieveId.uuid4_regex, t)):
+                    pass
+                elif t.startswith('anat:'): data['sparc-anatomy'].append(t)
+                elif t.startswith('mod:'): data['sparc-approach'].append(t.replace('mod:', 'apro:'))
+                elif t.startswith('org:'): data['sparc-taxon'].append(t.replace('org:', 'tax:'))
+                elif t.startswith('ilxtr:'):
+                    data['sparc-other'].append(t)
+                elif t in known_bad:
+                    pass
+                else:
+                    log.warning(f'unhandled tag? {t}')
+                    breakpoint()
+
+        for k in keys:
+            if not data[k]:
+                data.pop(k)
 
     @property
     def data(self):

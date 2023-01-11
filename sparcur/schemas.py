@@ -82,6 +82,12 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
 
     'spjl': {'@id': 'https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/', '@prefix': True},
 
+    # simple page note prefixes
+    'sparc-spn': {'@id': 'https://uilx.org/tgbugs/u/sparc/spn/', '@prefix': True},
+    'anat': {'@id': 'https://uilx.org/tgbugs/u/sparc/spn/anatomy/', '@prefix': True},
+    'apro': {'@id': 'https://uilx.org/tgbugs/u/sparc/spn/approach/', '@prefix': True},
+    'tax': {'@id': 'https://uilx.org/tgbugs/u/sparc/spn/taxon/', '@prefix': True},
+
     # XXX FIXME annoying context collisions
     'unt': {'@id': str(unit), '@prefix': True},
 
@@ -144,6 +150,12 @@ protcur_context = {  # FIXME how is the protcur -> mis related to a native protc
     'protcur_black-box': {'@id': 'TEMP:protocolInvolvesBlackBox', '@type': '@id'},
     'protcur_black-box-component': {'@id': 'TEMP:protocolInvolvesBlackBoxComponent', '@type': '@id'},
     'protcur_objective': {'@id': 'TEMP:protocolInvolvesObjective', '@type': '@id'},
+
+    # sparc simple page note curation workflow
+    'sparc-anatomy': {'@id': 'sparc-spn:anatomy', '@type': '@id'},
+    'sparc-approach': {'@id': 'sparc-spn:approach', '@type': '@id'},
+    'sparc-taxon': {'@id': 'sparc-spn:taxon', '@type': '@id'},
+    'sparc-other': {'@id': 'sparc-spn:other', '@type': '@id'},
 
     #TODO aspects of subjects vs reagents: {'@id': primary particiant in the
     #core protocols vs subprotocols
@@ -259,7 +271,7 @@ def update_include_paths(obj, *args, path=None, key='jsonld_include', moves=tupl
 
         for key, value in obj[key].items():
             path.append(key)
-            collect.append((path, lambda _: value))  # note that collect is really a list
+            collect.append((path, lambda _, _v=value: _v))  # note that collect is really a list
             # note also that lambda _: value is because pipeline adds currently calls into lifters
 
     return obj  # have to return this otherwise somehow everything is turned to None?

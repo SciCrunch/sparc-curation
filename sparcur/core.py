@@ -78,6 +78,10 @@ class OntId(OIDB):
         #return hfn.atag(self.iri, self.curie, **kwargs)
 
 
+# reminder that ontquery is irretrievably broken if used directly and
+# should never be invoked at the top level because it hits the network
+# during __init__, this is a fix that uses the neurondm simple from_oq
+# implementation that defers retrieval until fetch is called
 class OntTerm(OTB, OntId):
     _known_no_label = 'dataset', 'pio.private'
 
@@ -85,6 +89,29 @@ class OntTerm(OTB, OntId):
         #return hfn.atag(self.iri, self.curie if curie else self.label, **kwargs)  # TODO schema.org ...
 
     _logged = set()
+
+    # from neurondm.simple
+    def __new__(cls, *args, **kwargs):
+        try:
+            self = OntId.__new__(cls, *args, **kwargs)
+        except:
+            breakpoint()
+            raise
+        self._args = args
+        self._kwargs = kwargs
+        return self
+
+    _nofetch = False  # default to False so unsuspecting users don't hurt themselves
+
+    def fetch(self):
+        if self._nofetch:
+            msg = f'network sandbox violation {self.curie}'
+            raise exc.NetworkSandboxError(msg)
+
+        newself = super().__new__(self.__class__, *self._args, **self._kwargs)
+        log.info(f'fetching {self.curie}')
+        self.__dict__ = newself.__dict__
+        return self
 
     @classmethod
     def fromJson(cls, blob):
@@ -112,6 +139,10 @@ class OntTerm(OTB, OntId):
                 asType(self.iri))
 
     def asDict(self):
+        # XXX looks like this is the only path we hit during export ???
+        if not hasattr(self, 'label'):
+            self.fetch()
+
         out = {
             'type': 'identifier',
             'system': self.__class__.__name__,

@@ -16,6 +16,7 @@
 - bugfixes
 - maybe :: more connections from NLP
 * DEV 2023-01-10
+- protcur.ttl now includes values from the sparc simple page note curation workflow
 * PROD 2022-12-02
 CLOSED: <2022-12-20 Tue>
 - ApiNATOMY add model wbrcm for real this time

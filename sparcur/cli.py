@@ -1170,6 +1170,7 @@ done"""
             raise FileNotFoundError(f'The following do not exist!\n{bads}')
 
     def export(self):
+        OntTerm._nofetch = True  # enable network sandbox for all export activity
         # FIXME no_google couples network and behavior, we need a decoupled version now that we have caching
         from sparcur import export as ex  # FIXME very slow to import
         from sparcur import schemas as sc
