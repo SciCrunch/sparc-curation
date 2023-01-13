@@ -459,7 +459,7 @@ class DatasetStructure:
         self.embedErrors(out)
         return out
 
-    xattr_prefix = BlackfynnCache.xattr_prefix
+    xattr_prefix = PennsieveCache.xattr_prefix
     cache_meta = aug.EatCache.meta
 
     def data_dir_structure(self):
