@@ -14,7 +14,7 @@ from . import raw_json as rj
 from . import exceptions as exc
 from . import normalization as nml
 from .core import log, logd, HasErrors
-from .paths import Path, BlackfynnCache
+from .paths import Path, PennsieveCache
 from .utils import is_list_or_tuple
 
 
