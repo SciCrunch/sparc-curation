@@ -497,20 +497,17 @@ class Derives:
         maybe_not_done_specs = maybe_done_specs_all - set(done_specs)
 
         usamps = set(v['primary_key'] for vs in samps.values() for v in vs)
-        # FIXME _udirs is quite broken I think
-        # presumably udirs -> union of dirs should be identical to dirs in all cases?
-        # however the issue is that it is not because you can have the same folder
-        # name appear in multiple places, I'm not entirely sure but I think what I
-        # may have been trying to do was to create pairs for samples in cases where
-        # in 1.2.3 we have to use the composite primary key to identify the samples
-        # however we only ever compare dirs to dirs here, so this is not helpful
+        # udirs is a set of strings and tuples, strings for top level
+        # folders that are not nested and tuples for samples folders,
+        # matching how done_dirs is populated above
         _udirs = set(
-            nv for path_name, subpaths in dirs.items()
-            for nv in ((*(subpath[-1][1] for subpath in subpaths), path_name)
-                       # -1 rpaths 1 parent  # XXX FIXME clearly wrong ???
-                       if path_name in samps else
-                       (path_name,)))
-        udirs = set(dirs)
+            nv for path_name, matched_subpaths in dirs.items() for nv in
+            (((subject, path_name) for subject in
+              set(element for depth, path, elements in matched_subpaths
+                  for element in elements if element.startswith('sub-')))
+             if path_name in samps else
+             (path_name,)))
+        udirs = _udirs  # set(dirs)
         not_done_specs = (set(subs) | usamps) - set(done_specs)
         not_done_dirs = set(udirs) - set(done_dirs)
 
