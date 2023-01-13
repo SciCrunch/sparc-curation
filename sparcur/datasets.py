@@ -477,6 +477,8 @@ class DatasetStructure:
         # metadata but ultimately we will need _cache_jsonMetadata or similar
         # that uses xattrs to avoid the overhead of constructing the cache class
         # XXX yep, _cache_jsonMetadata is needed especially for standalone validation
+        # XXX note that this does NOT solve the issue where there are files without
+        # cached metadata in a dataset that was derived from a remote source
         jsonMeta = jmc if self.cache is not None else jml
         instpath = self._cache_class._local_class  # XXXXXXXXXXX FIXME oof inheritance :/
         return {d.dataset_relative_path:{
