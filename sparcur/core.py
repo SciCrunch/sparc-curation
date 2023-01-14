@@ -97,8 +97,13 @@ class OntTerm(OTB, OntId):
         except:
             breakpoint()
             raise
+        self._fetched = False
         self._args = args
         self._kwargs = kwargs
+        if 'label' in kwargs:
+            # make it possible to avoid fetch for simple things
+            self.label = kwargs['label']
+
         return self
 
     _nofetch = False  # default to False so unsuspecting users don't hurt themselves
@@ -109,8 +114,9 @@ class OntTerm(OTB, OntId):
             raise exc.NetworkSandboxError(msg)
 
         newself = super().__new__(self.__class__, *self._args, **self._kwargs)
-        log.info(f'fetching {self.curie}')
+        log.debug(f'fetching {self.curie}')
         self.__dict__ = newself.__dict__
+        self._fetched = True
         return self
 
     @classmethod
@@ -118,7 +124,13 @@ class OntTerm(OTB, OntId):
         assert blob['system'] == cls.__name__
         identifier = blob['id']
         if isinstance(identifier, cls):
-            return identifier
+            # only short circuit class construction of the identifier
+            # we are working with is fully formed and has had remote
+            # data fetched
+            if self._fetched:
+                return identifier
+            else:
+                return cls(identifier.iri, label=blob['label'])
         else:
             return cls(identifier, label=blob['label'])  # FIXME need the .fetch() impl
 
@@ -140,7 +152,7 @@ class OntTerm(OTB, OntId):
 
     def asDict(self):
         # XXX looks like this is the only path we hit during export ???
-        if not hasattr(self, 'label'):
+        if not self._fetched:
             self.fetch()
 
         out = {
@@ -159,6 +171,10 @@ class OntTerm(OTB, OntId):
         return out
 
     def asCell(self, sep='|'):
+        if not hasattr(self, 'label') or not self.label:
+            if not self._fetched:
+                self.fetch()
+
         if self.label is None:
             _id = self.curie if self.curie else self.iri
             if self.prefix not in self._known_no_label:

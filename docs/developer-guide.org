@@ -3422,6 +3422,8 @@ def main(project_id=None, export_path=None, time_now=None,
          disco=False, **kwargs):
     from sparcur.paths import Path
     from sparcur.config import auth
+    from sparcur.core import OntTerm
+    OntTerm._nofetch = True
 
     if project_id is None:
         from sparcur.config import auth

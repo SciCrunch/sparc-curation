@@ -29,14 +29,8 @@ def xml(dataset_blobs):
             # XXX NOTE these days this will only happen if someone
             # supplies us with a uri in a field where we aren't
             # expecting one, in which case we should just return it
-            try:
-                v = OntTerm(v)
-                return v.asCell()
-            except Exception as e:
-                loge.error(f'something went wrong with {v}')
-                loge.exception(e)
-                return v
-                #raise e
+            # for example if someone switches protocol_title and protocol_url_or_doi
+            return v
         elif isinstance(v, rdflib.URIRef):  # FIXME why is this getting converted early?
             ot = OntTerm(v)
             return ot.asCell()
