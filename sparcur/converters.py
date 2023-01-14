@@ -391,7 +391,10 @@ class MetaConverter(TripleConverter):
 
             if data:
                 yield s, rdfs.label, rdflib.Literal(pioid.label)
-                nsteps = len(data['steps'])
+                if 'steps' not in data or not data['steps']:
+                    nsteps = 0
+                else:
+                    nsteps = len(data['steps'])
                 yield s, TEMP.protocolHasNumberOfSteps, rdflib.Literal(nsteps)
 
             # XXX removed as deprecated, content now exported via protcur.ttl
