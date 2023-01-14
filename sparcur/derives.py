@@ -559,7 +559,9 @@ class Derives:
                      (((def_not_done_specs | not_done_perfs), ' '),
                       ((done_specs | inter_perf), '*'),)
                      for s in ss])
-                for d in not_done_dirs}
+                for d in (sot[-1] if isinstance(sot, tuple) else sot
+                          for sot in not_done_dirs)
+            }
             align = {
                 d: (lambda l: max(l) if l else -1)(
                     [len(s) for _, s, _ in dss])
@@ -570,8 +572,8 @@ class Derives:
                      # unfortunately we can't limit the total number of entries because
                      [(dist, s, so) for dist, s, so in dists[d]
                       if dist < 10 or so == ' ' and dist < 15]])
-                 for d in sorted(not_done_dirs)])
-
+                 for d in sorted(sot[-1] if isinstance(sot, tuple) else sot
+                                 for sot in not_done_dirs)])
             msg = ('There are directories that have no corresponding '
                    f'metadata record!\n{not_done_dirs}')
             msg_report = msg + f'\nreport:\n{report}'
