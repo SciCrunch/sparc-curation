@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: f8365b82b3759ef55f67f3165a3d3881c0354c4ee13fa1a49afd0ff18dba00bb; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3c2b170c08e0351752c6bdcce498e31935fd10b62a0ccfac79ba64aabd07ab0b; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -654,11 +654,14 @@ popd
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'f6781f2175f506283d3bea8673b60071a5dd2c01d68e8b33e5a15e20600f02f8
-           (concat ghost "16f96cdeb74391ca3eaa0f6f48e21aefb10764d1" "/ow.el"))))
+    (reval 'sha256 'd0409be6411e779109fca0919ab1747176957384891e109817477a984c95e7be
+           (concat ghost "7608ce426bce54e953253fece4bb10ea215255d5" "/ow.el"))))
 
 (unless (fboundp #'run-command)
-  (defalias 'run-command #'ow-run-command))
+  ;; XXX `ow-run-command' is HORRIBLY broken due to the emacs xgselect bugs >_<
+  ;; (defalias 'run-command #'ow-run-command)
+  ;; use the 24 variant for now because the infinite hangs are beyond belief
+  (defalias 'run-command#'ow-run-command-24))
 
 (when ow-do-packages-emacs
   (ow-enable-use-package)
