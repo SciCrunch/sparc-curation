@@ -15,7 +15,8 @@
 * PLAN 2023-02-10 :future:
 - bugfixes
 - maybe :: more connections from NLP
-* DEV 2023-01-10
+* RC 2023-01-17
+- ApiNATOMY wbrcm new layers in certain lyphs and corrected hosting regions
 - protcur.ttl now includes values from the sparc simple page note curation workflow
 * PROD 2022-12-02
 CLOSED: <2022-12-20 Tue>
