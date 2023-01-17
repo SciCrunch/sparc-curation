@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3c2b170c08e0351752c6bdcce498e31935fd10b62a0ccfac79ba64aabd07ab0b; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 9ae85ba3eee913bfeaee686b4b7844ac8cfa9baeabe00504a4897a40581094ef; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -654,8 +654,8 @@ popd
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'd0409be6411e779109fca0919ab1747176957384891e109817477a984c95e7be
-           (concat ghost "7608ce426bce54e953253fece4bb10ea215255d5" "/ow.el"))))
+    (reval 'sha256 'e31b36840f4e707a90e2b723f8f5a15e98fb15cc51e6b9f7c84de2327d0ddad3
+           (concat ghost "ee0ebe5452cdbd48f9b95890abcc10fa5e14998b" "/ow.el"))))
 
 (unless (fboundp #'run-command)
   ;; XXX `ow-run-command' is HORRIBLY broken due to the emacs xgselect bugs >_<
