@@ -3701,6 +3701,14 @@ RETURN ae
 #+end_src
 
 * ApiNATOMY competency queries
+** wbrcm ontology terms
+All ontology terms currently used by the whole body reference connectivity model.
+#+name: cyres-wbrcm-classes
+#+begin_src cypher :limit 9999
+MATCH (term:Class)-[:isDefinedBy]-(ont:Ontology{iri: "https://apinatomy.org/uris/models/wbrcm"})
+RETURN term
+#+end_src
+
 ** expected counts per model
 Expected number of somas and neupops.
 
