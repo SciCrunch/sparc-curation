@@ -3666,6 +3666,40 @@ cypherResources:
       <<cypher-apinat-model-pops-and-refs>>
 
 #+end_src
+* NPO competency queries
+** npo species
+# :results drawer
+#+header: :var id="ilxtr:neuron-type-keast-5"
+#+begin_src cypher :limit 9999
+MATCH (neupop:Class{iri: $id})
+-[dimension:ilxtr:hasInstanceInSpecies!]->(taxon)
+WHERE NOT EXISTS(dimension.owlType) OR dimension.owlType = "subClassOf" OR dimension.owlType = "operand"
+RETURN taxon
+#+end_src
+
+** npo phenotypes
+# :results drawer
+#+begin_src cypher
+MATCH (neupop)
+-[dimension:ilxtr:hasPhenotype!]->(phenotype)
+WHERE NOT EXISTS(dimension.owlType) OR dimension.owlType = "subClassOf" OR dimension.owlType = "operand"
+RETURN phenotype
+#+end_src
+
+** npo locations
+TODO in order for this to work we have to be able to collapse the
+graph or customize the return value so we get dimension ae pairs
+# :results drawer
+#+begin_src cypher :limit 999
+MATCH (neupop)
+-[dimension:ilxtr:hasLocationPhenotype!]->(phenotype)
+-[:property]->(prop:ObjectProperty{iri: "BFO:0000050"})
+,
+(phenotype)-[:filler]->(ae)
+WHERE NOT EXISTS(dimension.owlType) OR dimension.owlType = "subClassOf" OR dimension.owlType = "operand"
+RETURN ae
+#+end_src
+
 * ApiNATOMY competency queries
 ** expected counts per model
 Expected number of somas and neupops.
