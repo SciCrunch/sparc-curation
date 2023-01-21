@@ -35,7 +35,8 @@ OntCuries({'orcid':'https://orcid.org/',
            'ORCID':'https://orcid.org/',
            'DOI':'https://doi.org/',
            'ror':'https://ror.org/',
-           'pio.api': 'https://www.protocols.io/api/v3/protocols/',
+           'pio.api': 'https://www.protocols.io/api/v4/protocols/',
+           'pio.api3': 'https://www.protocols.io/api/v3/protocols/',
 
            # FIXME -> pennsieve.io XXX and that is why you always embed the expansion rule
            'dataset':'https://api.pennsieve.io/datasets/N:dataset:',

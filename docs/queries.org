@@ -81,7 +81,8 @@ exit
 #+link: NLXINV http://uri.neuinfo.org/nif/nifstd/nlx_inv_
 #+link: SAO http://uri.neuinfo.org/nif/nifstd/sao
 #+link: NLX http://uri.neuinfo.org/nif/nifstd/nlx_
-#+link: pio.api https://www.protocols.io/api/v3/protocols/
+#+link: pio.api https://www.protocols.io/api/v4/protocols/
+#+link: pio.api3 https://www.protocols.io/api/v3/protocols/
 #+link: pio.view https://www.protocols.io/view/
 #+link: ror https://ror.org/
 #+link: SCR http://scicrunch.org/resolver/SCR_
