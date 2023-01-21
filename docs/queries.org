@@ -3038,6 +3038,64 @@ WHERE
 ALL(e IN part_of WHERE NOT EXISTS(e.owlType) OR e.owlType = "subClassOf" OR e.owlType = "operand")
 RETURN phenotype
 #+end_src
+
+**** phenotypeAnatomy
+this is super slow and scigraph does not support value arrays for queries right now
+so will have to work through how to implement that
+# id='("HP:0010883" "HP:0033734" "HP:0033735")
+#+header: :var id="HP:0010883"
+#+name: cyres-phenotype-anatomy
+#+begin_src cypher :limit 100
+MATCH (anatomical_entity:Class)
+<-[part_of:BFO:0000050|RO:0002433*0..4]-
+(subclass_part_ctmo)
+<-[inheres_in:RO:0000052|RO:0002314!]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
+<-[has_process_part:BFO:0000051]-() // has part (process)
+<-[:subClassOf*0..]-(phenotype:Class{iri: $id}) // phenotype and all subclasses
+WHERE phenotype.iri IN $id
+RETURN part_of
+#+end_src
+
+**** direct hpo count
+#+header: :var id="UBERON:0001062"
+#+name: cyres-anatomy-phenotypes-stats
+#+begin_src cypher :limit 100
+MATCH (anatomical_entity:Class{iri: $id})
+<-[part_of:subClassOf*0..40]-(subclass_part_ctmo)
+<-[inheres_in:RO:0000052|RO:0002314!]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
+<-[has_process_part:BFO:0000051]-(direct_phen) // has part (process)
+WHERE
+// filter out partOf/hasPart cases that induce circularity
+ALL(e IN part_of WHERE NOT EXISTS(e.owlType) OR e.owlType = "subClassOf" OR e.owlType = "operand")
+// RETURN count(distinct direct_phen)
+// RETURN count(distinct subclass_part_ctmo)
+RETURN subclass_part_ctmo
+#+end_src
+
+distinct direct phenotypes 3638
+
+#+begin_example
++-----------------------------+
+| count(distinct direct_phen) |
++-----------------------------+
+| 3658                        |
++-----------------------------+
+#+end_example
+
+#+begin_example
++------------------------------------+
+| count(distinct subclass_part_ctmo) |
++------------------------------------+
+| 1056                               |
++------------------------------------+
+#+end_example
+
+**** hpo count
+XXX need cypher normal json results so we can use count
+#+begin_src cypher :limit 20 :var start="HP:0000001"
+MATCH (c)-[:subClassOf*0..]->(b:Class{iri: $start}) RETURN c
+#+end_src
+
 *** shortestSimple
 # FIXME TODO make sure this actuall works as expected, I think it will?
 #+header: :var start_id=(or)
