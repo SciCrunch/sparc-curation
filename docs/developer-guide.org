@@ -1,3 +1,5 @@
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3e39d9916c28b07e30954e053bdfceb1c869ddb18a94ece5c6c63dd0efc20a5e; -*-
+# [[orgstrap][jump to the orgstrap block for this file]]
 #+TITLE: sparcur developer guide
 #+AUTHOR: Tom Gillespie
 #+OPTIONS: num:nil ^:nil h:7 broken-links:t
@@ -7,6 +9,18 @@
 
 # [[file:developer-guide.pdf]]
 # [[file:developer-guide.html]]
+
+#+name: orgstrap-shebang
+#+begin_src bash :eval never :results none :exports none
+set -e "-C" "-e" "-e"
+{ null=/dev/null;} > "${null:=/dev/null}"
+{ args=;file=;MyInvocation=;__p=$(mktemp -d);touch ${__p}/=;chmod +x ${__p}/=;__op=$PATH;PATH=${__p}:$PATH;} > "${null}"
+$file = $MyInvocation.MyCommand.Source
+{ file=$0;PATH=$__op;rm ${__p}/=;rmdir ${__p};} > "${null}"
+emacs -batch -no-site-file -eval "(let (vc-follow-symlinks) (defun orgstrap--confirm-eval (l _) (not (memq (intern l) '(elisp emacs-lisp)))) (let ((file (pop argv)) enable-local-variables) (find-file-literally file) (end-of-line) (when (eq (char-before) ?\^m) (let ((coding-system-for-read 'utf-8)) (revert-buffer nil t t)))) (let ((enable-local-eval t) (enable-local-variables :all) (major-mode 'org-mode)) (require 'org) (org-set-regexps-and-options) (hack-local-variables)))" "${file}" -- ${args} "${@}"
+exit
+<# powershell open
+#+end_src
 
 * Demos
 ** Remote only connection
@@ -1436,7 +1450,10 @@ Use [[~/ni/sparc/prrequaestor.el]] with [[~/ni/sparc/sync-specs.el]]
 once they are published (still trying to figure out the best way to do
 that ... orgstrap repo? new repo? here?).
 **** Blazegraph and SciGraph builds
+#+name: build-sckan-release
 #+begin_src bash
+set -e
+
 ### make sure all code is up-to-date
 
 # scigraph/README.org
@@ -4590,3 +4607,92 @@ subgraphs should be specified using vertext properties or edge properties"
    )
   )
 #+end_src
+
+* Bootstrap :noexport:
+#+name: test-fail-block
+#+begin_src bash
+set -e
+echo prepare for FAIL
+echo ERROR 1>&2
+false
+echo this should not print
+echo ERROR ERROR 1>&2
+#+end_src
+
+#+name: orgstrap
+#+begin_src elisp :results none :exports none :lexical yes :noweb yes
+<<reval-setup>>
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ `((python . t)
+   (shell . t)
+   ,@org-babel-load-languages))
+(when noninteractive
+  (let ((tangle  (member "tangle" argv))
+        (sckan-release (member "sckan-release" argv)))
+    (message "%S" sckan-release)
+    (condition-case err
+        (progn
+          (when tangle
+            (let (enable-local-eval)
+              ;; this pattern is required when tangling to avoid infinite loops
+              (revert-buffer nil t nil)
+              (setq-local find-file-literally nil))
+            (org-babel-tangle))
+          (when sckan-release
+            (message "running fail block expecting fail")
+            (ow-babel-eval
+             ;; "test-fail-block"
+             "build-sckan-release"
+             nil 'error-on-fail)))
+      (error (message "%s" (cadr err)) (kill-emacs 1)))))
+#+end_src
+
+#+name: reval-setup
+#+begin_src elisp
+;; minimal reval
+
+(unless (featurep 'reval)
+  (defvar reval-cache-directory (concat user-emacs-directory "reval/cache/"))
+  (defun reval-minimal (cypher checksum path-or-url &rest alternates)
+    "Simplified and compact implementation of reval."
+    (let* (done (o url-handler-mode) (csn (symbol-name checksum))
+                (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
+                                    "-" (file-name-nondirectory path-or-url))))
+      (url-handler-mode)
+      (unwind-protect
+          (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
+                   do (when (file-exists-p path-or-url)
+                        (let* ((buffer (find-file-noselect path-or-url))
+                               (buffer-checksum (intern (secure-hash cypher buffer))))
+                          (if (eq buffer-checksum checksum)
+                              (progn
+                                (unless (string= path-or-url cache-path)
+                                  (let ((parent-path (file-name-directory cache-path))
+                                        make-backup-files)
+                                    (unless (file-directory-p parent-path)
+                                      (make-directory parent-path t))
+                                    (with-current-buffer buffer
+                                      (write-file cache-path))))
+                                (eval-buffer buffer)
+                                (setq done t))
+                            (kill-buffer buffer) ; kill so cannot accidentally evaled
+                            (error "reval: checksum mismatch! %s" path-or-url))))
+                   until done)
+        (unless o
+          (url-handler-mode 0)))))
+  (defalias 'reval #'reval-minimal)
+  (reval 'sha256 '3620321396c967395913ff19ce507555acb92335b0545e4bd05ec0e673a0b33b
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/300b1d5518af53d76d950097bcbcd7046cfa2285/reval.el"))
+
+(let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
+  (unless (featurep 'ow)
+    (reval 'sha256 '80afb53022128e53d8e5948f65255aba7279fc1c3853f45ff45d548a5af1bb08
+           (concat ghost "0a5a7624fd52353973840696e54463e9604806fb" "/ow.el"))))
+#+end_src
+
+** Local Variables :ARCHIVE:
+# close powershell comment #>
+# Local Variables:
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# End:
