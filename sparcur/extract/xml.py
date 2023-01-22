@@ -83,8 +83,10 @@ class XmlSource(HasErrors):
         if etree.__name__ == 'lxml.etree':
             # FIXME this version is much faster but on a completely run of the
             # mill workload uses 4 gigs of memory vs 360mb for pure python
-            # possibly relevant
+            # +possibly+ definitely relevant
             # https://benbernardblog.com/tracking-down-a-freaky-python-memory-leak-part-2/
+            # https://www.reddit.com/r/Python/comments/j0gl8t/psa_pythonlxml_memory_leaks_and_a_solution/
+            # https://news.ycombinator.com/item?id=13123995
             try:
                 self.e = etree.parse(self.path.as_posix(), parser=parser)
                 self._isXml = True

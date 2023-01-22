@@ -1,7 +1,9 @@
 import re
+import sys
 import copy
 import json
 import pathlib
+import subprocess
 from socket import gethostname
 from itertools import chain
 from collections import deque, defaultdict
@@ -12,7 +14,7 @@ from joblib import Parallel, delayed
 from dateutil import parser as dateparser
 from hyputils import hypothesis as hyp
 from pyontutils.core import OntRes, OntGraph
-from pyontutils.utils import utcnowtz, isoformat, subclasses
+from pyontutils.utils import utcnowtz, isoformat, subclasses, Async, deferred
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from protcur import document as ptcdoc
@@ -535,6 +537,21 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
 
         return metadata
 
+    @staticmethod
+    def _do_subprocess(path):
+        # hooray for lazy devlopers and lxml leaking memory like wild
+        argv = sys.executable, '-c', (
+            'import json;from sparcur import pipelines as p, core;'
+            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}));'
+            'print(json.dumps(m, cls=core.JEncode))')
+        p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate()
+        if not out and err:
+            log.error(f'xml pipeline failures for {path!r}')
+            raise Exception(err.decode())
+
+        return json.loads(out.decode())
+
     @classmethod
     def do_xml_metadata(cls, local, id):
         # FIXME this is extremely inefficient to run on all datasets
@@ -550,7 +567,7 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         blob = {'type': 'all-xml-files',  # FIXME not quite correct use of type here
                 'dataset_id': id,
                 'xml': tuple()}
-        blob['xml'] = [cls._path_to_json_meta(path) for path in local_xmls]
+        blob['xml'] = Async()(deferred(cls._do_subprocess)(path) for path in local_xmls)
         return blob
 
 
