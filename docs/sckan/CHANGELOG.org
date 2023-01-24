@@ -17,7 +17,7 @@
 - bugfixes
 - ApiNATOMY wbrcm ontology mapping refinement
 - maybe :: more connections from NLP
-* DEV 2023-01-23
+* RC 2023-01-23
 - curation-export fix protocols.io api v3 v4
 - sparc-community-terms sync from dashboard terms, avoid duplicate ontology class definitions
 * RC 2023-01-17
