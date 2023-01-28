@@ -1407,15 +1407,22 @@ class MetadataFile(HasErrors):
 class SubmissionFile(MetadataFile):
     __internal_id_1 = object()
     default_record_type = COLUMN_TYPE
-    renames_alt = {'submission_item': __internal_id_1}
+    renames_alt = {
+        'submission_item': __internal_id_1,
+        'sparc_award_number': 'award_number',}
     renames_header = {'definition': 'definition_header'}
     record_type_key_alt = __internal_id_1
     record_type_key_header = 'submission_item'
-    groups_alt = {'submission': ('sparc_award_number', 'milestone_achieved', 'milestone_completion_date')}
+    groups_alt = {'submission': (
+        'consortium_data_standard', 'funding_consortium', 'award_number',
+        'milestone_achieved', 'milestone_completion_date')}
     ignore_alt = __internal_id_1,
     ignore_header = 'definition_header',
     raw_json_class = rj.RawJsonSubmission
     normalization_class = nml.NormSubmissionFile
+
+    normalize_mismatch_ok = 'submission_item',
+    normalize_alt_mismatch_ok = normalize_mismatch_ok
 
     @property
     def data(self):

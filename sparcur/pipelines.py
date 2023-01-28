@@ -1147,7 +1147,7 @@ class SDSPipeline(JSONPipeline):
           ('performance_id',)],
     ]
 
-    derives = ([[['inputs', 'submission_file', 'submission', 'sparc_award_number'],
+    derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
                  ['inputs', 'dataset_description_file', 'funding']],
                 DT.BOX(De.award_number),
                 [['meta', 'award_number']]],

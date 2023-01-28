@@ -1382,17 +1382,32 @@ class SubmissionSchema(JSONSchema):
         'additionalProperties': False,
         'properties': {
             'errors': ErrorSchema.schema,
-            'submission': {
-                'type': 'object',
-                'required': ['sparc_award_number',
-                             'milestone_achieved',
-                             'milestone_completion_date'],
-                # TODO allOf?
-                'properties': {'sparc_award_number': {'type': 'string'},
-                               'milestone_achieved': {'type': 'string'},
-                               'milestone_completion_date': {'type': 'string',
-                                                             'context_value': 'TEMP:milestoneCompletionDate',
-                                                             'pattern': iso8601datepattern,},}}}}
+            'submission': {'allOf':[
+                {'type': 'object',
+                 'required': ['consortium_data_standard',
+                              'funding_consortium',],
+                 'properties': {'consortium_data_standard': {'type': 'string',
+                                                             'enum': ('SPARC',),},
+                                'funding_consortium': {'type': 'string'},
+                                'award_number': {'type': 'string'},
+                                'milestone_achieved': {'type': 'string'},
+                                'milestone_completion_date': {'type': 'string',
+                                                              'context_value': 'TEMP:milestoneCompletionDate',
+                                                              'pattern': iso8601datepattern,},}},
+                {'oneOf': [ # confusing error message, but nearly always means missing required field
+                    {'type': 'object',
+                     'properties': {'funding_consortium': {'type': 'string',
+                                                           'enum': ('EXTERNAL',),}}
+                     },
+                    {'type': 'object',
+                     'required': ['award_number',
+                                  'milestone_achieved',
+                                  'milestone_completion_date',],
+                     'properties': {'funding_consortium': {'type': 'string',
+                                                           'not': {'enum': ('EXTERNAL',)},}}
+                     },
+                ]}
+            ]}}}
 
 
 class UnitSchema(JSONSchema):

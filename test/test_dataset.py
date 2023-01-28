@@ -141,6 +141,25 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         pprint.pprint(value)
         assert not [k for k in value if not isinstance(k, str)]
 
+    def test_sm_210(self):
+        expect_error = (
+            'sm-210-sparc-na.csv',
+        )
+        tfs = list(examples_root.glob('sm-210*.csv'))
+        out = []
+        bads = []
+        for tf in tfs:
+            obj = self.metadata_file_class(tf)
+            value = obj.data
+            pipeline = self.pipe(tf, None, None)
+            data = pipeline.data
+            out.append((tf, value, data))
+            if ('errors' in data and tf.name not in expect_error or
+                'errors' not in data and tf.name in expect_error):
+                bads.append((tf, value, data))
+
+        assert not bads, bads
+
     def test_versions(self):
         self._versions()
 

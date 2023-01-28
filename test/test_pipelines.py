@@ -23,6 +23,8 @@ class PipelineHelper:
     def setUpClass(cls):
         cls.project_path = project_path
         cls.datasets = list(cls.project_path.children)
+        if not hasattr(cls, 'test_datasets'):
+            cls.test_datasets = cls.datasets
 
     def _path_to_pipe(self, dataset_path):
         """ FIXME TODO this needs to be simplified """
@@ -81,7 +83,7 @@ class PipelineHelper:
         assert not bads, bads
 
 
-class TestPipelines(unittest.TestCase):
+class TestPipelines(PipelineHelper, unittest.TestCase):
     pass
 
 

@@ -92,7 +92,8 @@ def mk_required_files(path, suffix='.csv'):
     # FIXME because empty files get treated as non-existent
     # we either need to treat them as a different category of error
     # OR we need to fill in some fake values when testing
-    for globpath in ('submission.*', 'dataset_description.*',  'subjects.*'):
+    for globpath in ('submission.*', 'dataset_description.*',
+                     'subjects.*', 'samples.*', 'performances.*',):
         for template_file in template_root.glob(globpath):
             file_name = template_file.name
             file_path = path / file_name
