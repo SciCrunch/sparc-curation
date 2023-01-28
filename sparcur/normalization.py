@@ -57,7 +57,7 @@ def related_identifier_record(rid):
     if rel == 'HasProtocol':
         try:
             nid = NormDatasetDescriptionFile._protocol_url_or_doi(id)
-            id, = protocol_url_or_doi((nid,))
+            id, = protocol_url_or_doi((nid,))  # XXX network sandbox violation
         except Exception as e:
             # XXX we are missing the required context to produce an
             # understanable error here however the result will filter

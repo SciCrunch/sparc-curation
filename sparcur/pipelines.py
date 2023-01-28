@@ -1204,8 +1204,11 @@ class SDSPipeline(JSONPipeline):
                [[['meta', 'related_identifiers']],
                 # FIXME need to process and resolve all related identifiers
                 # FIXME this needs a filter failures in front of it for structure
+                # XXX we should not resolve identifiers here, we need to parse them
+                # into our internal idlib representation but then defer resolution and
+                # validation to the designated point that allows network access
                 DT.BOX(lambda rids: tuple(
-                    rid['related_identifier'] for rid in norm.related_identifiers(rids)
+                    rid['related_identifier'] for rid in norm.related_identifiers(rids)  # XXX network sandbox violation
                     if 'relation_type' in rid and rid['relation_type'] == 'HasProtocol'
                     and 'related_identifier' in rid)),
                 [['meta', 'protocol_url_or_doi']]],
