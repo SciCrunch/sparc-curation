@@ -32,6 +32,7 @@ class Helper:
             'dataset-template-1.2.2',
             'dataset-template-1.2.3',
             'dataset-template-2.0.0',
+            'dataset-template-2.1.0',
             'HEAD',)
 
     def setUp(self):
