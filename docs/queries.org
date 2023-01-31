@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 214759152ee9a1e8ea8744b82f85d874f4bed3417e487f180d2bad711cde135b; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 8dcea5d091d5c7a56d310de35d82a6d02c37674c23fe52586b7009ecc38269f9; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5584,6 +5584,7 @@ RETURN p1, p2, p3, p4, p5, p6
        'org-babel-load-languages
        `((cypher . t)
          (sparql . t)
+         (shell . t)
          (python . t)
          ,(when gt26 '(jupyter . t))))))))
 
