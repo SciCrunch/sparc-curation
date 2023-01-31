@@ -1463,6 +1463,8 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 
 # TODO prepare all ontology files first up here
 
+# TODO add success steps for each of these probably?
+
 # release.org to retrieve
 ~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --no-load
 # XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc

@@ -1,5 +1,21 @@
 #lang racket
 
+; TODO need to add a warning for files that are not accounted for in
+; any manifest even though it is not technically an error in the same
+; way that we do for folders
+
+; TODO missing biophsyics as a general appraoch
+
+; TODO remote-organization is currently read-only and is not easy to change/switch
+
+; TODO make manifest report and paths report work from view prod export
+
+; TODO protocols.io renew credientials workflow
+
+; TODO reminder for download to avoid caching probably
+
+; TODO need to refresh when fetch finishes
+
 (require racket/gui
          racket/generic
          racket/pretty
@@ -397,6 +413,7 @@
                     (parameterize ()
                       (apply system* argv-simple-git-repos-update))])
                   ; TODO pull changes for racket dependent repos as well
+                  ; TODO raco pkg install local git derived packages as well
                   (println (format "running raco make -v ~a" this-file))
                   (let ([mtime-before (file-or-directory-modify-seconds
                                        this-file-compiled
@@ -1586,7 +1603,10 @@ switch to that"
        [label "sparcur preferences"]
        [width 640]
        [height 480]))
-
+; power user
+; fetch mode
+; curation mode
+; persistance
 ; api keys
 ; paths
 (define panel-prefs-holder (new vertical-panel%

@@ -111,6 +111,21 @@ tar --force-local --xattrs -xvzf 2019-07-17T10\:44\:16\,457344.tar.gz
 find 2019-07-17T10\:44\:16\,457344 -exec getfattr -d {} \;
 #+end_src
 ** Archiving releases
+*** TODO consider zstd vs xz?
+:PROPERTIES:
+:CREATED:  [2023-01-18 Wed 16:01]
+:END:
+#+begin_src bash
+tar -cvf --zstd asdf.zst asdf
+#+end_src
+#+begin_example
+-rw-r--r--  1 sparc sparc  95M Jan 21 19:50 2023-01-20T123933,576391-0800.tar.gz
+-rw-r--r--  1 sparc sparc  60M Jan 21 19:43 2023-01-20T123933,576391-0800.tar.xz
+-rw-r--r--  1 sparc sparc  82M Jan 21 19:49 2023-01-20T123933,576391-0800.tar.zst
+#+end_example
+so ... zstd is faster than gzip by a wide margin ... like ... way faster
+xz still wins on the ratio though, for background stuff that isn't time
+sensitive, better to go higher ratio
 *** in place
 Manually remove the echo after checking that you are removing what you expect.
 #+begin_src bash
@@ -123,7 +138,7 @@ pushd /var/www/sparc/sparc/
     popd
 
     pushd preview/archive/exports
-        find -maxdepth 1 -not -path '.' -type d -newer $(ls -At *.tar.xz | head -n 1) -exec tar -cvJf '{}.tar.xz' '{}' \;
+        find -maxdepth 1 -not -path '.' -type d -newer $(ls -At *.tar.xz | head -n 1) -exec echo tar -cvJf '{}.tar.xz' '{}' \;
         chown nginx:nginx *.tar.xz
         # remove previous years
         find -maxdepth 1 -not -path '.' -not -path "*$(date +%Y)-*" -type d -exec echo rm -r '{}' \+

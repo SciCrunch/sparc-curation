@@ -184,6 +184,8 @@ class OntTerm(OTB, OntId):
 
             return _id
 
+        if self.label is None or self.curie is None:
+            breakpoint()
         return self.label + sep + self.curie
 
     def asCellHyperlink(self):
@@ -418,6 +420,12 @@ def json_identifier_expansion(obj, *args, path=None, **kwargs):
                'errors': [{'message': msg, 'path': path}]}
         return out
     except Exception as e:
+        raise e
+        if isinstance(e, ConnectionError):
+            debug = True
+            if debug:
+                raise e
+
         oops = json_export_type_converter(obj)
         msg = f'Unhandled exception {e} in {path}'
         out = {'id': obj,

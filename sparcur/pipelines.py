@@ -2073,6 +2073,7 @@ class ProtcurPipeline(Pipeline):
                     aligned = sheets_lookup[key].map(a)
                     if aligned is not None:
                         # TODO label
+                        # FIXME this is _insanely_ slow !??!!?! looks like it is interlex ???
                         alt = Term(aligned, None, ast._value)  # None to avoid mismatch in OntTerm
                         nast = ast.__class__(alt, *ast.body, prov=ast.prov)
                         return nast

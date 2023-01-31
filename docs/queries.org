@@ -34,6 +34,7 @@ exit
 
 <<cypher-settings>>
 # #+property: header-args:cypher :scigraph https://scicrunch.org/api/1/sparc-scigraph :api-key (and (fboundp 'get-scicrunch-api-key) (get-scicrunch-api-key))
+# #+property: header-args:cypher :scigraph https://scicrunch.org/api/1/sckan-scigraph :api-key (and (fboundp 'get-scicrunch-api-key) (get-scicrunch-api-key))
 #+property: header-args:cypher :scigraph http://localhost:9000/scigraph
 #+property: header-args:cypher+ :limit 10
 #+end:
@@ -412,11 +413,16 @@ order by desc(bound(?datasetx)) asc(?hasUri) desc(?n)
 [[file:./reports/protocol-report.csv]]
 
 *** Total protocols
+XXX FIXME producing complete nonsense right now
 #+name: sparql-count-protocols
 #+begin_src sparql
-SELECT (COUNT(DISTINCT ?protocol) AS ?count)
+SELECT
+(COUNT(DISTINCT ?protocol) AS ?count)
+#DISTINCT ?protocol
 WHERE { ?protocol a sparc:Protocol . }
+#order by str(?protocol)
 #+end_src
+
 *** Total protocols with at least one protcur annotation
 #+name: sparql-count-protocols-at-least-one-protc
 #+begin_src sparql :noweb no-export
@@ -2026,6 +2032,26 @@ config.write_python()
 * SciGraph cypher queries
 These can be tested against the execute endpoint as well (if the
 SciGraph server is running the patch to align the behavior).
+** sigh
+#+begin_src cypher
+#+end_src
+
+#+begin_src cypher :limit 999
+// :results drawer
+// :var hello="there"
+match
+(o:Ontology{iri: "http://uri.interlex.org/sparc/ontologies/ilx_0793177"})
+<-[:isDefinedBy]-(t)
+// this shit is fucked ... those labels should be in sparc community terms because it is being loaded ... nah just the known FMA -> ILX change and use case issue
+return t
+// (o:Ontology{iri: "https://cassava.ucsd.edu/sparc/ontologies/published/N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"})
+#+end_src
+
+#+RESULTS:
+| id | label |
+|----+-------|
+
+
 ** neru
 *** neru-7
 Switch over to =apinat:inheritedOntologyTerms=.
@@ -3025,7 +3051,8 @@ RETURN t
 **** anatomyPhenotypes
 #+name: desc-anatomy-phenotypes
 Return phenotypes that inhere in some part of an anatomical entity.
-#+header: :var id="UBERON:0001556"
+# #+header: :var id="UBERON:0001556"
+#+header: :var id="UBERON:0000948"
 #+name: cyres-anatomy-phenotypes
 #+begin_src cypher :limit 100
 MATCH (anatomical_entity:Class{iri: $id})
@@ -5481,7 +5508,7 @@ RETURN p1, p2, p3, p4, p5, p6
 # TODO use the context menus branch to make right click context sensitive in buffer
 
 #+name: orgstrap
-#+begin_src elisp :results none :exports none :lexical yes
+#+begin_src elisp :results none :exports none :lexical yes :noweb yes
 (defvar ow-do-packages-emacs t "Install Emacs packages.")
 (defvar ow-do-config-emacs t "Run code that modifies the Emacs configuration.")
 
@@ -5510,59 +5537,22 @@ RETURN p1, p2, p3, p4, p5, p6
       (string= lang "elisp")
       (string= body "(string-trim (replace-regexp-in-string \"\\n\" \"\" paragraph))"))))))
 
-(setq-local org-confirm-babel-evaluate-cell nil)
-
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)
 ;;  (compactify-current-buffer default-curies))
 
 ;;(advice-add #'sparql-execute-query :after #'orgstrap---advise-sparql-execute-query)
 
-(unless (featurep 'reval)
-  (defvar reval-cache-directory (concat user-emacs-directory "reval/cache/"))
-  (defun reval-minimal (cypher checksum path-or-url &rest alternates)
-    "Simplified and compact implementation of reval."
-    (let* (done (o url-handler-mode) (csn (symbol-name checksum))
-           (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
-                               "-" (file-name-nondirectory path-or-url))))
-      (url-handler-mode)
-      (unwind-protect
-          (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
-                   do (when (file-exists-p path-or-url)
-                        (let* ((buffer (find-file-noselect path-or-url))
-                               (buffer-checksum (intern (secure-hash cypher buffer))))
-                          (if (eq buffer-checksum checksum)
-                              (progn
-                                (unless (string= path-or-url cache-path)
-                                  (let ((parent-path (file-name-directory cache-path))
-                                        make-backup-files)
-                                    (unless (file-directory-p parent-path)
-                                      (make-directory parent-path t))
-                                    (with-current-buffer buffer
-                                      (write-file cache-path))))
-                                (eval-buffer buffer)
-                                (setq done t))
-                            (kill-buffer buffer) ; kill so cannot accidentally evaled
-                            (error "reval: checksum mismatch! %s" path-or-url))))
-                   until done)
-        (unless o
-          (url-handler-mode 0)))))
-  (defalias 'reval #'reval-minimal)
-  (reval 'sha256 '3620321396c967395913ff19ce507555acb92335b0545e4bd05ec0e673a0b33b
-         "https://raw.githubusercontent.com/tgbugs/orgstrap/300b1d5518af53d76d950097bcbcd7046cfa2285/reval.el"))
-
-(let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
-  (unless (featurep 'ow)
-    (reval 'sha256 'b3b26172d8e54abd0d3c4503d1b5438e0fc29d05fb6275a6da17d4d1b628a38a
-           ;;"~/git/orgstrap/ow.el"
-           (concat ghost "f4df67e94926f9d389f4a456a9cbf721c9b22b89" "/ow.el")))
-  (unless (featurep 'blazegraph)
-    (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
-           ;;"~/git/orgstrap/services/blazegraph.el"
-           (concat ghost "abb93f698d3cfeeea607856bec98ae1d6cfe39c9" "/services/blazegraph.el"))))
+(load "~/git/orgstrap/ow.el") ; SIGH
+<<reval-setup>>
 
 (when ow-do-packages-emacs
-  (ow-enable-use-package)
+  (setq font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
+  (setq-local font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
+  (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
+    (ow-enable-use-package)
+    (message "FUCK YOU AAAAAAAAAAAAA"))
+
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
      csv-mode
@@ -5589,7 +5579,8 @@ RETURN p1, p2, p3, p4, p5, p6
          ,(when gt26 '(jupyter . t))))))))
 
 (unless (fboundp #'ob-cypher/scigraph/query)
-  (reval 'sha256 '30fd7742d7b00bd963310b4af9e505f07f981ff8b26f9b6315baa14574348e88 "https://raw.githubusercontent.com/tgbugs/ob-cypher/7778fa42ae3a49b9370939b14a3e9cefbd884a51/ob-cypher.el"))
+  (reval 'sha256 '30fd7742d7b00bd963310b4af9e505f07f981ff8b26f9b6315baa14574348e88 
+         "https://raw.githubusercontent.com/tgbugs/ob-cypher/7778fa42ae3a49b9370939b14a3e9cefbd884a51/ob-cypher.el"))
 
 (unless (fboundp #'org-babel-sparql--table-replace-curies)
   (reval 'sha256 '62bdbaf3d54f16b5019715f1dd175ecda8b37de420d14bcb8a469ef6820c5386
@@ -5685,6 +5676,55 @@ matched strings in man buffer."
 ;; run the orgstrap elvs again so that that ocbe doesn't get klobbered
 (setq-local enable-local-eval nil)
 #+end_src
+
+#+name: reval-setup
+#+begin_src elisp
+;; minimal reval
+
+(unless (featurep 'reval)
+  (defvar reval-cache-directory (concat user-emacs-directory "reval/cache/"))
+  (defun reval-minimal (cypher checksum path-or-url &rest alternates)
+    "Simplified and compact implementation of reval."
+    (let* (done (o url-handler-mode) (csn (symbol-name checksum))
+                (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
+                                    "-" (file-name-nondirectory path-or-url))))
+      (url-handler-mode)
+      (unwind-protect
+          (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
+                   do (when (file-exists-p path-or-url)
+                        (let* ((buffer (find-file-noselect path-or-url))
+                               (buffer-checksum (intern (secure-hash cypher buffer))))
+                          (if (eq buffer-checksum checksum)
+                              (progn
+                                (unless (string= path-or-url cache-path)
+                                  (let ((parent-path (file-name-directory cache-path))
+                                        make-backup-files)
+                                    (unless (file-directory-p parent-path)
+                                      (make-directory parent-path t))
+                                    (with-current-buffer buffer
+                                      (write-file cache-path))))
+                                (eval-buffer buffer)
+                                (setq done t))
+                            (kill-buffer buffer) ; kill so cannot accidentally evaled
+                            (error "reval: checksum mismatch! %s" path-or-url))))
+                   until done)
+        (unless o
+          (url-handler-mode 0)))))
+  (defalias 'reval #'reval-minimal)
+  (reval 'sha256 '3620321396c967395913ff19ce507555acb92335b0545e4bd05ec0e673a0b33b
+         "https://raw.githubusercontent.com/tgbugs/orgstrap/300b1d5518af53d76d950097bcbcd7046cfa2285/reval.el"))
+
+(let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
+  (unless (featurep 'ow)
+    (reval 'sha256 '80afb53022128e53d8e5948f65255aba7279fc1c3853f45ff45d548a5af1bb08
+           ;;"~/git/orgstrap/ow.el"
+           (concat ghost "0a5a7624fd52353973840696e54463e9604806fb" "/ow.el")))
+  (unless (featurep 'blazegraph)
+    (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
+           ;;"~/git/orgstrap/services/blazegraph.el"
+           (concat ghost "abb93f698d3cfeeea607856bec98ae1d6cfe39c9" "/services/blazegraph.el"))))
+#+end_src
+
 
 Tangle helper for bare paragraphs.
 #+name: nonl

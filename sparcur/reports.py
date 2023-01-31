@@ -6,7 +6,7 @@ import pprint
 from pathlib import PurePath
 from itertools import chain, zip_longest
 from collections import Counter, defaultdict
-import idlib
+import idlib, idlib.utils
 import htmlfn as hfn
 import augpathlib as aug
 from hyputils import hypothesis as hyp

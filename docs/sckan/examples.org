@@ -3,6 +3,8 @@
 # inherit configuration from queries.org
 #+setupfile: ./queries.org
 
+* Basic metadata
+how to know which version of SCKAN you are working with
 * Regions with processes from neuron population
 Show all regions that contain some part of a given neuron population.
 Here, [[ilxtr:neuron-type-keast-5][Neuron type keast 5]]

@@ -2,7 +2,7 @@ import io
 import csv
 import copy
 from types import GeneratorType
-from itertools import chain
+from itertools import chain, zip_longest
 from collections import Counter, defaultdict
 #import openpyxl  # import time hog
 import augpathlib as aug
@@ -836,7 +836,8 @@ class Tabular(HasErrors):
         #if any(not(c) for c in rows[0]):  # doesn't work because generators
 
         error = exc.EncodingError(f"encoding feff error in '{self.path}'")
-        cleaned_rows = zip(*(t for t in zip(*rows) if not all(not(e) for e in t)))  # TODO check perf here
+        cleaned_rows = zip(*(t for t in zip_longest(*rows, fillvalue='')
+                             if not all(not(e) for e in t)))  # TODO check perf here
         for row in cleaned_rows:
             n_row = [c.strip().replace('\ufeff', '') if c and isinstance(c, str) else c
                      for c in row

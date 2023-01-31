@@ -1234,6 +1234,8 @@ popd
 #+END_SRC
 
 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX WARNING --user may be COMPLETELY BROKEN on macos !??!?!
+# FIXME python3 is now broken on windows AAAAAAAAAAAAA
+# FIXME fail if repo has not been cloned
 #+NAME: python-setup
 #+CAPTION: Set up all python repositories so that they can be used from git.
 #+CAPTION: This also installs missing python dependencies to =~/.local/lib*/python*/site-packages=.

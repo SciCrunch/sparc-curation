@@ -557,7 +557,7 @@ class Export(ExportBase):
             rfetch(blob)
             curies = set(ddot) | set(ddt)
             def ft(c): return c, OntTerm(c).fetch()
-            _fetched = Async(rate=40)(deferred(ft)(c) for c in curies)
+            _fetched = Async(rate=None)(deferred(ft)(c) for c in curies)
             fetched = {c:t for c, t in _fetched}
             return fetched, ddt, ddot
 
