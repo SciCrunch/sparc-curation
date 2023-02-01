@@ -3795,6 +3795,21 @@ MATCH (term:Class)-[:isDefinedBy]-(ont:Ontology{iri: "https://apinatomy.org/uris
 RETURN term
 #+end_src
 
+#+begin_src jupyter-python :session pys :noweb yes :results none
+from pyontutils.utils import Async, deferred
+q = """
+<<cyres-wbrcm-classes>>
+"""
+res = sgc.execute(q, limit=99999, output='application/json')
+ilxn = [n for n in res['nodes'] if n['id'].startswith('ILX:')]
+out = Async()(deferred(IlxTerm)(i['id']) for i in ilxn)
+sus = [o for o in out if 'ilxtr:hasExistingId' in o.predicates and
+       not isinstance(o.predicates['ilxtr:hasExistingId'], tuple)]
+csvstr = '\n'.join([','.join((s.iri, s.label)) for s in sus])
+with open('/tmp/sus-wbrcm-ilx-terms-2023-02-01.csv', 'wt') as f:
+    f.write(csvstr)
+#+end_src
+
 ** expected counts per model
 Expected number of somas and neupops.
 
