@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 8dcea5d091d5c7a56d310de35d82a6d02c37674c23fe52586b7009ecc38269f9; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: f3003b2b69386443012ac31d1587104c67283ceb5e84adaad31c3479b9c58c9e; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -4174,6 +4174,7 @@ expand into triples using arrays or something like that."
 
 #+name: py-ttl-subjects
 #+begin_src python :noweb yes :var input=(and (fboundp 'orgstrap--with-block) (orgstrap--with-block "ttl-organs" body)) :results code :wrap src ttl
+# py-safe-block
 from pyontutils.core import OntGraph
 
 g = OntGraph().parse(data=input, format='ttl')
@@ -5550,8 +5551,7 @@ RETURN p1, p2, p3, p4, p5, p6
   (setq font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
   (setq-local font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
   (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
-    (ow-enable-use-package)
-    (message "FUCK YOU AAAAAAAAAAAAA"))
+    (ow-enable-use-package))
 
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
