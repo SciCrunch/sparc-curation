@@ -1179,8 +1179,16 @@ class SDSPipeline(JSONPipeline):
                 [['meta', 'contributor_count']]],
 
                [[['subjects']],
-                DT.BOX(De.dataset_species),
-                [['meta', 'species']]],
+                DT.BOX(De.dataset_subject_species),
+                [['meta', 'collected_from_species']]],
+
+               [[['inputs', 'manifest_file']],  # FIXME check that we are a scaffold
+                DT.BOX(De.dataset_manifest_species),
+                [['meta', 'model_of_species']]],
+
+               [[['inputs', 'manifest_file']],  # FIXME check that we are a scaffold
+                DT.BOX(De.dataset_manifest_organ),
+                [['meta', 'model_of_organ']]],
 
                # TODO this is what we have to do to fix the issue with external types, but the blast radius will be quite large
                # so we have to do it in a way such that all the different parts of the code will be upgraded at the same time
@@ -1424,7 +1432,12 @@ class PipelineExtras(JSONPipeline):
         #[__mr_path + ['software_rrid'], norm.rrid],  # FIXME how do we handle errors here?
 
         # TODO ... this isn't really norm at this point, more mapping.species
-        [['meta', 'species'], mapping.species],
+        #[['meta', 'species'], mapping.species],
+        [['meta', 'model_of_species'], OntTerm._loc_to_lot],
+        [['meta', 'model_of_organ'], OntTerm._loc_to_lot],
+
+        [['meta', 'model_of_species'], mapping.species],
+        [['meta', 'collected_from_species'], mapping.species],
         [['samples', int, 'species'], mapping.species],
         [['samples', int, 'sex'], mapping.sex],
         # we update here since the pipelines are inflexib about deriving
@@ -1436,6 +1449,11 @@ class PipelineExtras(JSONPipeline):
     ]
 
     derives = (
+        [[['meta', 'collected_from_species'], ['meta', 'model_of_species']],
+         DT.BOX(De.dataset_species),
+         [['meta', 'species']],
+         lambda p: tuple()],
+
         [[['inputs', 'remote_dataset_metadata', 'doi']],
          # FIXME doi should never be able to be None here AAAAAA
          DT.BOX(De.doi),

@@ -143,6 +143,20 @@ class OntTerm(OTB, OntId):
 
         return case
 
+    @classmethod
+    def _loc_to_lot(cls, list_of_curies):
+        out = []
+        for maybe_curie in list_of_curies:
+            try:
+                t = cls(maybe_curie)
+            except Exception as e:
+                t = maybe_curie
+                logd.exception(e)
+
+            out.append(t)
+
+        return out
+
     def asType(self, _class):
         return _class(self.iri)
 

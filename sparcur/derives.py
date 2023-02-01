@@ -75,14 +75,48 @@ class Derives:
         return pointers
 
     @staticmethod
-    def dataset_species(subjects) -> Tuple[tuple]:
+    def dataset_species(collected=tuple(), model=tuple()) -> Tuple[tuple]:
+        out = set(collected) | set(model)
+        if len(out) == 1:  # FIXME legacy support just make this a list
+            return next(iter(out))
+
+        return tuple(out)
+
+    @staticmethod
+    def dataset_subject_species(subjects) -> Tuple[tuple]:
         out = set()
         for subject in subjects:
             if 'species' in subject:
+                # FIXME virtual species ... yeah bad design keep users happy oops
+                # XXX probably this means we should filter virtual subjects from
+                # subjects and keep them in a separate list
                 out.add(subject['species'])
 
-        if len(out) == 1:
-            return next(iter(out))
+        return tuple(out)
+
+    @staticmethod
+    def dataset_manifest_organ(manifest_file) -> Tuple[tuple]:
+        return Derives.dataset_manifest_thing(manifest_file, field='organ')
+
+    @staticmethod
+    def dataset_manifest_species(manifest_file) -> Tuple[tuple]:
+        return Derives.dataset_manifest_thing(manifest_file, field='species')
+
+    @staticmethod
+    def dataset_manifest_thing(manifest_file, field) -> Tuple[tuple]:
+        out = set()
+        for mf in manifest_file:
+            if 'contents' in mf:
+                contents = mf['contents']
+                if 'manifest_records' in contents:
+                    for record in contents['manifest_records']:
+                        if field in record:
+                            # FIXME break if we don't find it so we don't search every row probably
+                            # FIXME do we drop empty keys for manifests?
+                            # FIXME should we keep the header as a schema?
+                            out.add(record[field])
+
+                out.add
 
         return tuple(out)
 

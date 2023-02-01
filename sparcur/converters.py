@@ -266,8 +266,11 @@ class MetaConverter(TripleConverter):
         ['title', dc.title],
         ['protocol_url_or_doi', TEMP.hasProtocol],
         #['award_number', TEMP.hasAwardNumber],
-        ['species', isAbout],
         ['organ', isAbout],
+        ['species', isAbout],
+        ['model_of_organ', TEMP.organModelOf],
+        ['model_of_species', TEMP.speciesModelOf],
+        ['collected_from_species', TEMP.speciesCollectedFrom],
         ['modality', TEMP.hasExperimentalApproach],
         ['approach', TEMP.hasExperimentalApproach],
         ['techniques', TEMP.protocolEmploysTechnique],
@@ -435,7 +438,7 @@ DatasetConverter.setup()
 
 
 class SubmissionConverter(TripleConverter):
-    known_skipped = 'milestone_achieved', 'sparc_award_number'
+    known_skipped = 'milestone_achieved', 'award_number'
     mapping = [
         ['milestone_completion_date', TEMP.milestoneCompletionDate],
     ]
