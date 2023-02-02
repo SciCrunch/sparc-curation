@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0eb1a3ef2bd99a44ef49e2797facf1803aa9ecc5612d84c3bd0208e577145719; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 5e37c8ee711073b000ecda2a5e7c02f013465bd852fd02d8b90fab45f178f12a; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -19,18 +19,18 @@ exit
 * Release workflow
 For a development release run
 #+begin_src bash
-./release.org --build
+./release.org build
 #+end_src
 
 For a SCKAN release run
 #+begin_src bash
-./release.org --build --sckan --no-blaze
+./release.org build --sckan --no-blaze
 #+end_src
 
 If something breaks part way through the pipeline and you need to
 rerun you can use the =--resume= option. For example:
 #+begin_src bash
-./release.org --build --sckan --no-blaze --resume
+./release.org build --sckan --no-blaze --resume
 #+end_src
 
 To build the SciGraph portion of the release you need to have
@@ -643,7 +643,7 @@ popd
 (when noninteractive
   (ow-cli-gen
       ((:install) ; install this command
-       (:build)
+       (build)
        (:resume)
        ((:sckan) sckan-release)
        ;; FIXME it should be possible to build a dev and sckan release
@@ -678,23 +678,23 @@ popd
       (url-handler-mode)
       (unwind-protect
           (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
-                   do (when (file-exists-p path-or-url)
-                        (let* ((buffer (find-file-noselect path-or-url))
-                               (buffer-checksum (intern (secure-hash cypher buffer))))
-                          (if (eq buffer-checksum checksum)
-                              (progn
-                                (unless (string= path-or-url cache-path)
-                                  (let ((parent-path (file-name-directory cache-path))
-                                        make-backup-files)
-                                    (unless (file-directory-p parent-path)
-                                      (make-directory parent-path t))
-                                    (with-current-buffer buffer
-                                      (write-file cache-path))))
-                                (eval-buffer buffer)
-                                (setq done t))
-                            (kill-buffer buffer) ; kill so cannot accidentally evaled
-                            (error "reval: checksum mismatch! %s" path-or-url))))
-                   until done)
+           do (when (file-exists-p path-or-url)
+                (let* ((buffer (find-file-noselect path-or-url))
+                       (buffer-checksum (intern (secure-hash cypher buffer))))
+                  (if (eq buffer-checksum checksum)
+                      (progn
+                        (unless (string= path-or-url cache-path)
+                          (let ((parent-path (file-name-directory cache-path))
+                                make-backup-files)
+                            (unless (file-directory-p parent-path)
+                              (make-directory parent-path t))
+                            (with-current-buffer buffer
+                              (write-file cache-path))))
+                        (eval-buffer buffer)
+                        (setq done t))
+                    (kill-buffer buffer) ; kill so cannot accidentally evaled
+                    (error "reval: checksum mismatch! %s" path-or-url))))
+           until done)
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
@@ -703,12 +703,12 @@ popd
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '80afb53022128e53d8e5948f65255aba7279fc1c3853f45ff45d548a5af1bb08
-           (concat ghost "0a5a7624fd52353973840696e54463e9604806fb" "/ow.el"))))
+    (reval 'sha256 'cc8cfa015e1f3413a5fb0587f5090602604f631fee365233e1b418d83ab4333f
+           (concat ghost "f01ec0c0601e1c03e1496e1f3cba2f2a7386bdeb" "/ow.el"))))
 #+end_src
 
 ** Local variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (ignore-errors (org-set-visibility-according-to-property))) (warn "No orgstrap block."))))
 # End:

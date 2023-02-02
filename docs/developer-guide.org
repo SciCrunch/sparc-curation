@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3e39d9916c28b07e30954e053bdfceb1c869ddb18a94ece5c6c63dd0efc20a5e; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: f16a0e03ebc4c0119fb3a62a275a011ea2b9aecf4a8dc351fc3a855bcf05d5a9; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+TITLE: sparcur developer guide
 #+AUTHOR: Tom Gillespie
@@ -1457,7 +1457,7 @@ set -e
 ### make sure all code is up-to-date
 
 # scigraph/README.org
-sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
+sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 
 ### release artifacts
 
@@ -1466,7 +1466,7 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 # TODO add success steps for each of these probably?
 
 # release.org to retrieve
-~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --no-load
+~/git/sparc-curation/docs/release.org build --sckan --no-blaze --no-load
 # XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
 
 # we have a circular dependency issue here, which is that
@@ -1478,7 +1478,7 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org --tangle
 # at which you usually want to deploy to dev scigraph and test
 
 # release.org
-~/git/sparc-curation/docs/release.org --build --sckan --no-blaze --resume
+~/git/sparc-curation/docs/release.org build --sckan --no-blaze --resume
 # XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
 
 ### testing phase 1, probably move to docker
@@ -4659,28 +4659,28 @@ echo ERROR ERROR 1>&2
   (defun reval-minimal (cypher checksum path-or-url &rest alternates)
     "Simplified and compact implementation of reval."
     (let* (done (o url-handler-mode) (csn (symbol-name checksum))
-                (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
-                                    "-" (file-name-nondirectory path-or-url))))
+           (cache-path (concat reval-cache-directory (substring csn 0 2) "/" csn
+                               "-" (file-name-nondirectory path-or-url))))
       (url-handler-mode)
       (unwind-protect
           (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
-                   do (when (file-exists-p path-or-url)
-                        (let* ((buffer (find-file-noselect path-or-url))
-                               (buffer-checksum (intern (secure-hash cypher buffer))))
-                          (if (eq buffer-checksum checksum)
-                              (progn
-                                (unless (string= path-or-url cache-path)
-                                  (let ((parent-path (file-name-directory cache-path))
-                                        make-backup-files)
-                                    (unless (file-directory-p parent-path)
-                                      (make-directory parent-path t))
-                                    (with-current-buffer buffer
-                                      (write-file cache-path))))
-                                (eval-buffer buffer)
-                                (setq done t))
-                            (kill-buffer buffer) ; kill so cannot accidentally evaled
-                            (error "reval: checksum mismatch! %s" path-or-url))))
-                   until done)
+           do (when (file-exists-p path-or-url)
+                (let* ((buffer (find-file-noselect path-or-url))
+                       (buffer-checksum (intern (secure-hash cypher buffer))))
+                  (if (eq buffer-checksum checksum)
+                      (progn
+                        (unless (string= path-or-url cache-path)
+                          (let ((parent-path (file-name-directory cache-path))
+                                make-backup-files)
+                            (unless (file-directory-p parent-path)
+                              (make-directory parent-path t))
+                            (with-current-buffer buffer
+                              (write-file cache-path))))
+                        (eval-buffer buffer)
+                        (setq done t))
+                    (kill-buffer buffer) ; kill so cannot accidentally evaled
+                    (error "reval: checksum mismatch! %s" path-or-url))))
+           until done)
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
@@ -4689,12 +4689,12 @@ echo ERROR ERROR 1>&2
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '80afb53022128e53d8e5948f65255aba7279fc1c3853f45ff45d548a5af1bb08
-           (concat ghost "0a5a7624fd52353973840696e54463e9604806fb" "/ow.el"))))
+    (reval 'sha256 'cc8cfa015e1f3413a5fb0587f5090602604f631fee365233e1b418d83ab4333f
+           (concat ghost "f01ec0c0601e1c03e1496e1f3cba2f2a7386bdeb" "/ow.el"))))
 #+end_src
 
 ** Local Variables :ARCHIVE:
 # close powershell comment #>
 # Local Variables:
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "9.3.8") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap--confirm-eval-minimal (lang body) (not (and (member lang '("elisp" "emacs-lisp")) (eq orgstrap-block-checksum (intern (secure-hash orgstrap-cypher (orgstrap-norm body))))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-minimal)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (ignore-errors (org-set-visibility-according-to-property))) (warn "No orgstrap block."))))
 # End:
