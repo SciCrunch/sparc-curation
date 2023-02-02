@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: bfa1bce25383365bf027885a29d454f32ff632acc0dfea1b6c2cb61be730cf6c; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: a9a7e6e4fe4825dbab626c744f1049b1002d4d51537598a54ed9a62621fe2454; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5528,6 +5528,8 @@ RETURN p1, p2, p3, p4, p5, p6
 (defvar ow-do-packages-emacs t "Install Emacs packages.")
 (defvar ow-do-config-emacs t "Run code that modifies the Emacs configuration.")
 
+(setq org-agenda-file-menu-enabled nil) ; SIGH
+
 (unless (symbol-function 'org-assert-version) ;; sigh
   (defmacro org-assert-version () 't))
 
@@ -5677,6 +5679,8 @@ matched strings in man buffer."
       ((edit) (visit) (file) (find-file)
        (tangle)
        (run) ; blockname
+       (list)
+        (blocks)
        (test)
         (config)
         (query)
@@ -5700,6 +5704,31 @@ matched strings in man buffer."
       (when apinat (report-apinat))
       (when organs (report-apinat))
       )
+     (list
+      (cond
+       (blocks
+        (let (blocks (lmax 0))
+          (org-babel-map-executables nil
+            (let* ((elem (nth 1 (org-element-at-point)))
+                   (name (cl-getf elem :name))
+                   (lang (cl-getf elem :language)) ; TODO #+call:
+                   (ll (length lang))
+                   )
+              (when (> ll lmax) (setq lmax ll))
+              (when (and name (not (member name '("orgstrap" "orgstrap-shebang"))))
+                (setq blocks (cons (list lang ll name) blocks)))))
+          (setq lmax (1+ lmax))
+          (let ((padded (cl-loop for (l . (ll . (n . _))) in blocks
+                         collect (format "%s%s%s" l (make-string (- lmax ll) ?\s) n))))
+            (message "\n:blocks\n%s\n" (string-join (sort padded #'string<) "\n")))))))
+     (run
+      (let ((blocks (cdr (member "run" argv))))
+        (message ":blocks %s" blocks)
+        (cl-loop for block in blocks
+         unless (member block '("orgstrap" "orgstrap-shebang")) ; no recurse
+         ;; TODO FIXME we don't error on block name does not exist?
+         ;; TODO forward output to stdout or something if an option is set?
+         do (ow-babel-exec block nil 'error-on-fail))))
      (test
       (cond
        (config (test-config))
