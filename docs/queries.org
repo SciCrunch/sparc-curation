@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: b6ab134ef970060e7e058c0a0a293800e08195455813f0eb956abfde536a7a77; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: bfa1bce25383365bf027885a29d454f32ff632acc0dfea1b6c2cb61be730cf6c; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5539,19 +5539,22 @@ RETURN p1, p2, p3, p4, p5, p6
 
 ;; somehow this gets around lexical scope FIXME no not really have to
 ;; modify the elvs
-(setq-local
- org-confirm-babel-evaluate
- (lambda (lang body)
-   ;;(message "%S" body)
-   (not
-    (or
-     (member lang '("cypher" "sparql"))
-     (and
-      (string= lang "python") ; XXX THIS IS TO MAKE AUDITING EASIER YOU SHOULD AUDIT ALL safe-block declarations like this
-      (string-prefix-p "# py-safe-block" body))
-     (and
-      (string= lang "elisp")
-      (string= body "(string-trim (replace-regexp-in-string \"\\n\" \"\" paragraph))"))))))
+(defun fix-ocbe ()
+  (setq-local
+   org-confirm-babel-evaluate
+   (lambda (lang body)
+     ;;(message "%S" body)
+     (not
+      (or
+       (member lang '("cypher" "sparql"))
+       (and
+        (string= lang "python") ; XXX THIS IS TO MAKE AUDITING EASIER YOU SHOULD AUDIT ALL safe-block declarations like this
+        (string-prefix-p "# py-safe-block" body))
+       (and
+        (string= lang "elisp")
+        (string= body "(string-trim (replace-regexp-in-string \"\\n\" \"\" paragraph))")))))))
+
+(fix-ocbe)
 
 ;; TODO
 ;;(defun orgstrap---advise-sparql-execute-query (&rest args)
@@ -5665,22 +5668,54 @@ matched strings in man buffer."
             (set-window-point window point)
             (set-window-start window point)))))))
 
+<<tests>>
+<<reports>>
+
 ;; command line interface
 (when noninteractive
   (ow-cli-gen
-      ((:tangle)
-       (:visit) ; FIXME better name
-       (:report-apinat)
-       (:report-organs))
-    (when tangle (org-babel-tangle))
-    (when report-apinat)
-    (when report-organs)))
+      ((edit) (visit) (file) (find-file)
+       (tangle)
+       (run) ; blockname
+       (test)
+        (config)
+        (query)
+         (neurons)
+         (datasets)
+         (protocols)
+       (report)
+        (organs)
+        (apinat))
+    (cond
+     ((or visit edit file find-file)
+      (ow-find-file-new-process (buffer-file-name)))
+     (tangle
+      (let (enable-local-eval)
+        ;; this pattern is required when tangling to avoid infinite loops
+        (revert-buffer nil t nil)
+        (setq-local find-file-literally nil))
+      (fix-ocbe)
+      (org-babel-tangle))
+     (report
+      (when apinat (report-apinat))
+      (when organs (report-apinat))
+      )
+     (test
+      (cond
+       (config (test-config))
+       (query
+        (when neurons (test-neurons))
+        (when datasets (test-datasets))
+        (when protocols (test-protocols))
+        )))
+     )))
 
 ;; note that we had to remove the call to `org-set-startup-visibility'
 ;; from the elvs in order to get this to work
 (when enable-local-eval ; FIXME HACK how to know when this was called
   ;; by the elvs? we don't want this running on a manual trigger
-  (ow-hide-section-0-blocks)
+  (ignore-errors ; silence `org-fold-core-region' missing SPEC error
+    (ow-hide-section-0-blocks))
   (when ow-do-config-emacs
     (ow--rainy-day)
     (add-hook 'emacs-lisp-mode-hook #'rainbow-delimiters-mode)
@@ -5689,6 +5724,35 @@ matched strings in man buffer."
 ;; if we make it all the way through the block make sure that we don't
 ;; run the orgstrap elvs again so that that ocbe doesn't get klobbered
 (setq-local enable-local-eval nil)
+#+end_src
+
+#+name: reports
+#+begin_src elisp
+(defun report-apinat ()
+(message "TODO apinat report")
+)
+(defun report-organs ()
+(message "TODO organs report")
+)
+#+end_src
+
+#+name: tests
+#+begin_src elisp
+(defun test-config ()
+(message "TODO test config")
+  )
+
+(defun test-neurons ()
+(message "TODO test neurons")
+  )
+
+(defun test-datasets ()
+(message "TODO test datasets")
+  )
+
+(defun test-protocols ()
+(message "TODO test protocols")
+  )
 #+end_src
 
 #+name: reval-setup
@@ -5705,23 +5769,23 @@ matched strings in man buffer."
       (url-handler-mode)
       (unwind-protect
           (cl-loop for path-or-url in (cons cache-path (cons path-or-url alternates))
-                   do (when (file-exists-p path-or-url)
-                        (let* ((buffer (find-file-noselect path-or-url))
-                               (buffer-checksum (intern (secure-hash cypher buffer))))
-                          (if (eq buffer-checksum checksum)
-                              (progn
-                                (unless (string= path-or-url cache-path)
-                                  (let ((parent-path (file-name-directory cache-path))
-                                        make-backup-files)
-                                    (unless (file-directory-p parent-path)
-                                      (make-directory parent-path t))
-                                    (with-current-buffer buffer
-                                      (write-file cache-path))))
-                                (eval-buffer buffer)
-                                (setq done t))
-                            (kill-buffer buffer) ; kill so cannot accidentally evaled
-                            (error "reval: checksum mismatch! %s" path-or-url))))
-                   until done)
+           do (when (file-exists-p path-or-url)
+                (let* ((buffer (find-file-noselect path-or-url))
+                       (buffer-checksum (intern (secure-hash cypher buffer))))
+                  (if (eq buffer-checksum checksum)
+                      (progn
+                        (unless (string= path-or-url cache-path)
+                          (let ((parent-path (file-name-directory cache-path))
+                                make-backup-files)
+                            (unless (file-directory-p parent-path)
+                              (make-directory parent-path t))
+                            (with-current-buffer buffer
+                              (write-file cache-path))))
+                        (eval-buffer buffer)
+                        (setq done t))
+                    (kill-buffer buffer) ; kill so cannot accidentally evaled
+                    (error "reval: checksum mismatch! %s" path-or-url))))
+           until done)
         (unless o
           (url-handler-mode 0)))))
   (defalias 'reval #'reval-minimal)
@@ -5730,9 +5794,9 @@ matched strings in man buffer."
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '3d407d213bb7c8a2b7c6e7957e3b0e2802e447b22776af242d400f804d8f3acf
+    (reval 'sha256 'cc8cfa015e1f3413a5fb0587f5090602604f631fee365233e1b418d83ab4333f
            ;;"~/git/orgstrap/ow.el"
-           (concat ghost "0c9a0129941a7d412f41707a1a1e35318638a636" "/ow.el")))
+           (concat ghost "f01ec0c0601e1c03e1496e1f3cba2f2a7386bdeb" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
@@ -5752,5 +5816,5 @@ Tangle helper for bare paragraphs.
 # org-adapt-indentation: nil
 # org-edit-src-content-indentation: 0
 # org-hide-emphasis-markers: t
-# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (org-set-visibility-according-to-property)) (warn "No orgstrap block."))))
+# eval: (progn (setq-local orgstrap-min-org-version "8.2.10") (let ((a (org-version)) (n orgstrap-min-org-version)) (or (fboundp #'orgstrap--confirm-eval) (not n) (string< n a) (string= n a) (error "Your Org is too old! %s < %s" a n))) (defun orgstrap-norm-func--dprp-1-0 (body) (let ((p (read (concat "(progn\n" body "\n)"))) (m '(defun defun-local defmacro defvar defvar-local defconst defcustom)) print-quoted print-length print-level) (cl-labels ((f (b) (cl-loop for e in b when (listp e) do (or (and (memq (car e) m) (let ((n (nthcdr 4 e))) (and (stringp (nth 3 e)) (or (cl-subseq m 3) n) (f n) (or (setcdr (cddr e) n) t)))) (f e))) p)) (prin1-to-string (f p))))) (unless (boundp 'orgstrap-norm-func) (defvar-local orgstrap-norm-func orgstrap-norm-func-name)) (defun orgstrap-norm-embd (body) (funcall orgstrap-norm-func body)) (unless (fboundp #'orgstrap-norm) (defalias 'orgstrap-norm #'orgstrap-norm-embd)) (defun orgstrap-org-src-coderef-regexp (_fmt &optional label) (let ((fmt org-coderef-label-format)) (format "\\([:blank:]*\\(%s\\)[:blank:]*\\)$" (replace-regexp-in-string "%s" (if label (regexp-quote label) "\\([-a-zA-Z0-9_][-a-zA-Z0-9_ ]*\\)") (regexp-quote fmt) nil t)))) (unless (fboundp #'org-src-coderef-regexp) (defalias 'org-src-coderef-regexp #'orgstrap-org-src-coderef-regexp)) (defun orgstrap--expand-body (info) (let ((coderef (nth 6 info)) (expand (if (org-babel-noweb-p (nth 2 info) :eval) (org-babel-expand-noweb-references info) (nth 1 info)))) (if (not coderef) expand (replace-regexp-in-string (org-src-coderef-regexp coderef) "" expand nil nil 1)))) (defun orgstrap--confirm-eval-portable (lang _body) (not (and (member lang '("elisp" "emacs-lisp")) (let* ((body (orgstrap--expand-body (org-babel-get-src-block-info))) (body-normalized (orgstrap-norm body)) (content-checksum (intern (secure-hash orgstrap-cypher body-normalized)))) (eq orgstrap-block-checksum content-checksum))))) (unless (fboundp #'orgstrap--confirm-eval) (defalias 'orgstrap--confirm-eval #'orgstrap--confirm-eval-portable)) (let (enable-local-eval) (vc-find-file-hook)) (let ((ocbe org-confirm-babel-evaluate) (obs (org-babel-find-named-block "orgstrap"))) (if obs (unwind-protect (save-excursion (setq-local orgstrap-norm-func orgstrap-norm-func-name) (setq-local org-confirm-babel-evaluate #'orgstrap--confirm-eval) (goto-char obs) (org-babel-execute-src-block)) (when (eq org-confirm-babel-evaluate #'orgstrap--confirm-eval) (setq-local org-confirm-babel-evaluate ocbe)) (ignore-errors (org-set-visibility-according-to-property))) (warn "No orgstrap block."))))
 # End:
