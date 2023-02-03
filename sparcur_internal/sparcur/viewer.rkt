@@ -1020,6 +1020,7 @@
              (cond
                [(directory-exists? path) path]
                [(file-exists? path) (simple-form-path (build-path path 'up))]
+               [(regexp-match #rx"^https?" path) (current-directory)]
                [else (error 'xopen-path "path-does-not-exist: ~s" path)])])
         (parameterize ([current-directory cwd])
           (system* command path #:set-pwd? #t)))))))
