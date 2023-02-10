@@ -16,6 +16,7 @@ titles:
   Developer docs: Developer docs
   sparc-curation/docs/setup.html: 'Developer and curator setup (START HERE!)'
   sparc-curation/docs/developer-guide.html: Developer guide
+  sparc-curation/docs/user-guide.html: User guide
   docstrings.html: Command line programs
   Background: Background
   sparc-curation/docs/background.html: SPARC curation background

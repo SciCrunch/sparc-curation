@@ -1,0 +1,28 @@
+#+title: User guide for SPARC knowledge resources
+* SPARC knowledge graph
+Nearly all SPARC knowledge resources are made available as part of the
+unified SPARC knowledge graph (SKG).
+
+See [[./sckan/overview.org][the SCKAN overview]] for a more on the full contents of the SKG.
+
+The SKG is referred to by a number of names depending on the audience
+for a particular piece of documentation. For example it is referred to
+as a =SCKAN release=, or sometimes as =SCKAN= in general. You may also
+see it referred to as the =NIF-Ontology= or =NIFSTD=.
+
+* SPARC vocabularies
+SPARC vocabularies are part of the SKG.
+
+The easiest way to use the SPARC vocabularies is through our SciGraph [[https://scicrunch.org/api/1/sckan-scigraph/docs/?url=https://scicrunch.org/api/1/sckan-scigraph/swagger.json][REST API]].
+
+You will need a SciCunch API key.
+You can get one by [[https://scicrunch.org/register][registering for a SciCrunch account]] and then [[https://scicrunch.org/account/developer][creating an api key]].
+
+See the [[https://scicrunch.org/api/1/sckan-scigraph/docs/?url=https://scicrunch.org/api/1/sckan-scigraph/swagger.json][API documentation]] for more. If you get a 401 error you can
+open https://scicrunch.org in another tab an refresh the page.
+
+Examples of query results can be seen at http://ontology.neuinfo.org/trees/examples.
+
+The call to SciGraph that generated a given tree visualization of a
+result can be seen in the html header of the page under link rel
+=http://www.w3.org/ns/prov#wasGeneratedBy=.
