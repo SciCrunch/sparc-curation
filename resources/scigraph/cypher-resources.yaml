@@ -1,4 +1,25 @@
 cypherResources:
+  - path: /dynamic/prod/sparc/phenotypeAnatomy/{id}
+    operations: &phenotypeAnatomy-ops
+      - summary: Return anatomical entities associated with a given phenotype.
+        parameters:
+          - name: id
+            description: HPO id of the phenotype to search from
+            paramType: path
+    query: &phenotypeAnatomy |
+      MATCH (anatomical_entity:Class)
+      <-[part_of:BFO:0000050|RO:0002433*0..4]-
+      (subclass_part_ctmo)
+      <-[inheres_in:RO:0000052|RO:0002314!]-(intersection_of_quality_and_anatomy) // inheres in (anon intersection of)
+      <-[has_process_part:BFO:0000051]-() // has part (process)
+      <-[:subClassOf*0..]-(phenotype:Class{iri: $id}) // phenotype and all subclasses
+      WHERE phenotype.iri IN $id
+      RETURN part_of
+
+  - path: /dynamic/test/sparc/phenotypeAnatomy/{id}
+    operations: *phenotypeAnatomy-ops
+    query: *phenotypeAnatomy
+
   - path: /dynamic/prod/sparc/anatomyPhenotypes/{id}
     operations: &anatomyPhenotypes-ops
       - summary: Return phenotypes that inhere in some part of an anatomical entity.
@@ -1062,3 +1083,16 @@ cypherResources:
       -[:apinatomy:references]->(pub)
       -[e:type]->(:Class{iri: "https://apinatomy.org/uris/elements/Reference"})
       RETURN e
+
+  - path: /dynamic/prod/npo/hasTaxon/{id}
+    operations:
+      - summary: Return any taxon associated with a neuron type.
+        parameters:
+          - name: id
+            description: the identifier of a neuron type
+            paramType: path
+    query: |
+      MATCH (neupop:Class{iri: $id})
+      -[dimension:ilxtr:hasInstanceInSpecies!]->(taxon)
+      WHERE NOT EXISTS(dimension.owlType) OR dimension.owlType = "subClassOf" OR dimension.owlType = "operand"
+      RETURN taxon
