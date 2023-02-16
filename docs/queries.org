@@ -359,6 +359,23 @@ ORDER BY ASC(?award) ASC(?al)
 LIMIT ?limit
 #+end_src
 
+*** Connectivity datasets
+#+begin_src sparql
+select distinct
+?published_uri
+?isDescBy
+#?dataset
+#?connectivity
+where {
+?dataset a sparc:Dataset .
+?dataset TEMP:hasExperimentalApproach ?connectivity .
+?dataset TEMP:hasUriPublished ?published_uri .
+filter contains(str(?connectivity), "connectivity")
+optional { ?dataset TEMP:isDescribedBy ?isDescBy }
+} order by ?published_id
+
+#+end_src
+
 ** Protocols
 *** Protocol general report
 # TODO (make-directory "./reports/")
@@ -3068,6 +3085,9 @@ RETURN phenotype
 #+end_src
 
 **** phenotypeAnatomy
+#+name: desc-phenotype-anatomy
+Return anatomical entities associated with a given phenotype.
+
 this is super slow and scigraph does not support value arrays for queries right now
 so will have to work through how to implement that
 # id='("HP:0010883" "HP:0033734" "HP:0033735")
@@ -3431,8 +3451,22 @@ cypherResources:
 #+end_src
 
 #+name: cypher-resources
-#+begin_src yaml :noweb yes :tangle ../resources/scigraph/cypher-resources.tangled.yaml
+#+begin_src yaml :noweb yes :tangle ../resources/scigraph/cypher-resources.yaml
 cypherResources:
+  - path: /dynamic/prod/sparc/phenotypeAnatomy/{id}
+    operations: &phenotypeAnatomy-ops
+      - summary: <<nonl(desc-phenotype-anatomy())>>
+        parameters:
+          - name: id
+            description: HPO id of the phenotype to search from
+            paramType: path
+    query: &phenotypeAnatomy |
+      <<cyres-phenotype-anatomy>>
+
+  - path: /dynamic/test/sparc/phenotypeAnatomy/{id}
+    operations: *phenotypeAnatomy-ops
+    query: *phenotypeAnatomy
+
   - path: /dynamic/prod/sparc/anatomyPhenotypes/{id}
     operations: &anatomyPhenotypes-ops
       - summary: <<nonl(desc-anatomy-phenotypes())>>
@@ -3751,11 +3785,23 @@ cypherResources:
     query: |
       <<cypher-apinat-model-pops-and-refs>>
 
+  - path: /dynamic/prod/npo/hasTaxon/{id}
+    operations:
+      - summary: <<nonl(desc-npo-taxon())>>
+        parameters:
+          - name: id
+            description: the identifier of a neuron type
+            paramType: path
+    query: |
+      <<npo-taxon>>
 #+end_src
 * NPO competency queries
 ** npo species
+#+name: desc-npo-taxon
+Return any taxon associated with a neuron type.
 # :results drawer
 #+header: :var id="ilxtr:neuron-type-keast-5"
+#+name: npo-taxon
 #+begin_src cypher :limit 9999
 MATCH (neupop:Class{iri: $id})
 -[dimension:ilxtr:hasInstanceInSpecies!]->(taxon)
