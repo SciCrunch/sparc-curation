@@ -323,6 +323,7 @@
     [(number? maybe-string) (number->string maybe-string)]
     [(keyword? maybe-string) (keyword->string maybe-string)]
     [(path? maybe-string) (path->string maybe-string)]
+    [(boolean? maybe-string) (format "~a" maybe-string)]
     [(string? maybe-string) maybe-string]
     [else (error '*->string "unknown object type ~s" maybe-string)]))
 
@@ -1258,7 +1259,8 @@ switch to that"
   (add-function "copy-value" (λ (obj event)
                                ; TODO proper chaining
                                (when (is-a? obj json-hierlist%)
-                                 (let ([value (node-data-value (send (send obj get-selected) user-data))])
+                                 (let* ([raw-value (node-data-value (send (send obj get-selected) user-data))]
+                                        [value (*->string raw-value)])
                                    (send the-clipboard set-clipboard-string value (current-milliseconds))))))
   (add-function "backward-kill-word" backward-kill-word)
   (add-function "next-thing" k-next-thing)
