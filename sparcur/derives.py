@@ -611,7 +611,7 @@ class Derives:
             msg = ('There are directories that have no corresponding '
                    f'metadata record!\n{not_done_dirs}')
             msg_report = msg + f'\nreport:\n{report}'
-            if he.addError(msg + msg_report,
+            if he.addError(msg_report,
                            blame='submission',
                            path=path):
                 logd.error(msg)
