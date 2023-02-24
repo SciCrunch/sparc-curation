@@ -27,7 +27,7 @@ If you *don't* have the username and password to access our Stardog server, plea
 2. Set up a new connection on the Stardog Cloud main dashboard.
    * Click on the '**+ New Connection'** button and then on **Connect to Stardog** window, select **New Connection**
    * Enter the following information:
-     * Enter the **username** and **password** given to you by SPARC K-Core
+     * Enter the **Username** and **Password** given to you by SPARC K-Core
      * **Endpoint:** https://stardog.scicrunch.io:5821
      * Enter a name for your connection (e.g., SPARC-User)
    * Click on the '**Connect**' button to get connected with our server
