@@ -14,7 +14,7 @@ What do we mean by **Simple SCKAN**? Simple SCKAN refers to an extension of the 
 * We recommend using [Stardog Studio](https://www.stardog.com/studio/) as the SPARQL query interface for Simple SCKAN. A Stardog endpoint is set up by the [FDI Lab](https://www.fdilab.org/) to provide access to the SCKAN connectivity knowledge via Stardog Studio.
   * We have a set of predefined 'canned' query patterns avialable via Stardog Studio that we think would be useful for the users like SPARC's NLP curators, anatomical experts, and other interested users.
 * What to expect in the future:
-  * Have the Simple SCKAN graph available via [SciGraph](https://github.com/SciCrunch/SciGraph) so that the SciGraph users can utilize the benifits of Simple SCKAN while writing queries relevant to their tools and apps.
+  * Have Simple SCKAN graph available via [SciGraph](https://github.com/SciCrunch/SciGraph) so that the SciGraph users can utilize the benifits of Simple SCKAN while writing queries relevant to their tools and apps.
   * We will consider setting up a publicly available SPARQL endpoint for the Simple SCKAN.
 
 # Running Simple SCKAN Queries in Stardog
@@ -27,8 +27,7 @@ If you *don't* have the username and password to access our Stardog server, plea
 2. Set up a new connection on the Stardog Cloud main dashboard.
    * Click on the '**+ New Connection'** button and then on **Connect to Stardog** window, select **New Connection**
    * Enter the following information:
-     * Username: Your username
-     * Password: Your password
+     * Enter the **username** and **password** given to you by SPARC K-Core
      * **Endpoint:** https://stardog.scicrunch.io:5821
      * Enter a name for your connection (e.g., SPARC-User)
    * Click on the '**Connect**' button to get connected with our server
