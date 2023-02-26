@@ -2403,8 +2403,9 @@ Fetch files by extension.
 #+name: fetch_files.py
 #+begin_src python :tangle ../sparcur/simple/fetch_files.py
 import os
+from functools import wraps
 from sparcur.paths import Path
-from sparcur.utils import _find_command
+from sparcur.utils import _find_command, log
 from sparcur.simple.utils import fetch_paths_parallel
 
 
@@ -2428,8 +2429,24 @@ done"""
 
 def _from_path_fetch_files_simple(path, filter_function, fetch=True):
     files = filter_function(path)
+    errors = []
+    def _collect_errors(f, file):
+        @wraps(f)
+        def inner(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                errors.append((file, e))
+
+        return inner
+
     if fetch:
-        [f.fetch(size_limit_mb=None) for f in files if not f.exists()]
+        # FIXME keep an eye on the gc here
+        [_collect_errors(f.cache.fetch, f)(size_limit_mb=None) for f in files
+         if not f.exists() or f.size == 0 or f.size != f.cache.meta.size]
+        if errors:
+            msg = f'{len(errors)} errors:\n{errors}'
+            log.error(msg)
         #Async(rate=5)(deferred(f.fetch)(size_limit_mb=None)
                       #for f in files if not f.exists())
 
@@ -2454,10 +2471,12 @@ def filter_extensions(extensions):
         else:  # dataset_path
             paths = path,
 
+        # FIXME exclude folders, some people put . in a folder name
         files = [matching  # FIXME stream ?
-                for path in paths
-                for ext in extensions
-                for matching in path.rglob(f'*.{ext}')]
+                 for path in paths
+                 for ext in extensions
+                 for matching in path.rglob(f'*.{ext}')
+                 if not matching.is_dir()]
         return files
 
     return filter_function
@@ -3975,11 +3994,16 @@ def _fetch(cache):  # sigh joblib multiprocessing pickling
         else:
             raise exc.StopTheWorld(cache) from e
 
-    return cache.fetch(size_limit_mb=size_mb + 1)  # FIXME somehow this is not working !?
+    return cache.fetch(size_limit_mb=None)  # FIXME somehow this is not working !?
 
 
 def _fetch_path(path):  # sigh joblib multiprocessing pickling
     path = Path(path)
+    if path.is_dir():
+        msg = f'trying to fetch a directory: {path}'
+        log.error(msg)
+        return
+
     cache = path.cache
     if cache is None:
         raise exc.NoCachedMetadataError(path)
