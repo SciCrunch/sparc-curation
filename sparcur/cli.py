@@ -332,6 +332,12 @@ class Options(clif.Options):
             return Path(pf).expanduser().resolve()
 
     @property
+    def hypothesis_cache_file(self):
+        hcf = self._args['--hypothesis-cache-file']
+        if hcf:
+            return Path(hcf).expanduser().resolve()
+
+    @property
     def jobs(self):
         return int(self._args['--jobs'])
 
@@ -903,7 +909,7 @@ class Main(Dispatcher):
         self._configure(self.options.hypothesis_group_name)
 
     @staticmethod
-    def _configure(hypothesis_group_name=None):
+    def _configure(hypothesis_group_name=None, sideload_annos=False):
         # the order here is very precise so that the absolutely
         # required and easiest to get right creds go first
 
@@ -943,19 +949,20 @@ class Main(Dispatcher):
         print('google sheets readwrite ok')
 
         # hypothesis
-        print('hypothes.is starting')
-        from hyputils import hypothesis as hyp
-        group_name = (
-            hypothesis_group_name
-            if hypothesis_group_name else
-            auth.get('hypothesis-group-name'))
-        print('hypothesis group_name', group_name)
-        group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
-        get_annos = hyp.Memoizer(group=group_id)
-        get_annos.api_token = auth.get('hypothesis-api-key')
-        values = get_annos.get_annos_from_api(max_results=1)
-        assert values, 'no values means api_token or group_id are wrong'
-        print('hypothes.is ok')
+        if not sideload_annos:
+            print('hypothes.is starting')
+            from hyputils import hypothesis as hyp
+            group_name = (
+                hypothesis_group_name
+                if hypothesis_group_name else
+                auth.get('hypothesis-group-name'))
+            print('hypothesis group_name', group_name)
+            group_id = auth.user_config.secrets('hypothesis', 'group', group_name)
+            get_annos = hyp.Memoizer(group=group_id)
+            get_annos.api_token = auth.get('hypothesis-api-key')
+            values = get_annos.get_annos_from_api(max_results=1)
+            assert values, 'no values means api_token or group_id are wrong'
+            print('hypothes.is ok')
 
     def clone(self):
         # make sure that we aren't in a project already
