@@ -251,6 +251,7 @@ Options:
 
     --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: {auth.get('hypothesis-group-name')}]
     --hypothesis-cache-file=PATH  path to hyputils json cache file
+    --hypothesis-use-name         use hypothesis group name instead of group id for checks
     --i-know-what-i-am-doing      don't use this unless you already know what it does
 """
 
@@ -336,6 +337,14 @@ class Options(clif.Options):
         hcf = self._args['--hypothesis-cache-file']
         if hcf:
             return Path(hcf).expanduser().resolve()
+
+    @property
+    def hypothesis_group_name(self):
+        return self._args['--hypothesis-group-name']
+
+    @property
+    def hypothesis_use_name(self):
+        return self._args['--hypothesis-use-name']
 
     @property
     def jobs(self):

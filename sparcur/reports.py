@@ -1091,8 +1091,11 @@ class Report:
             annos = get_annos()
         else:
             group_name = self.options.hypothesis_group_name  # there is a default value
-            group_id = (auth.user_config.secrets('hypothesis', 'group', group_name)
-                if group_name else auth.get('hypothesis-group'))
+            if self.options.hypothesis_use_name:
+                group_id = group_name
+            else:
+                group_id = (auth.user_config.secrets('hypothesis', 'group', group_name)
+                            if group_name else auth.get('hypothesis-group'))
             get_annos = hyp.AnnoReader(memoization_file=cache_file, group=group_id)
             annos, last_sync_updated = get_annos.get_annos_from_file()
 
