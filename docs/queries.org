@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0cd4ac6966e6a882851cccd6d3e2dce9ef61b61325592b8756bee7694bf8427e; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: b799a699a616d8a1523f3c90e7220f0b4798b108fd7efb37baa959658033a682; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5617,7 +5617,6 @@ RETURN p1, p2, p3, p4, p5, p6
   (setq-local font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
   (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
     (ow-enable-use-package))
-
   (cl-loop
    for pkg in '(vterm zmq) do
    (add-to-list 'ow-site-packages pkg))
@@ -5873,9 +5872,9 @@ matched strings in man buffer."
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '310e9a6f0d70a4757b1f40c3d20d3ded022e4163aefb415696d10f353d07f58f
+    (reval 'sha256 '65b0a3d5ab18ddfe84b0aa04bdb1c81fd0cfc2f7bcfa9df1622f59cf4105a5d9
            ;;"~/git/orgstrap/ow.el"
-           (concat ghost "d370ded6b78fd7d438e0a4147c952888d2cf59a6" "/ow.el")))
+           (concat ghost "df6208869b46aee24df4891403e9798dfc1f682b" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
