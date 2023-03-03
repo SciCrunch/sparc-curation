@@ -5615,12 +5615,11 @@ RETURN p1, p2, p3, p4, p5, p6
 (when ow-do-packages-emacs
   (setq font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
   (setq-local font-lock-unfontify-region-function (lambda (a b))) ; FIXME un-org issues
-  (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
-    (ow-enable-use-package))
   (cl-loop
    for pkg in '(vterm zmq) do
    (add-to-list 'ow-site-packages pkg))
-  (ow-populate-site-packages)
+  (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
+    (ow-enable-use-package nil t))
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
      csv-mode
@@ -5872,9 +5871,9 @@ matched strings in man buffer."
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '65b0a3d5ab18ddfe84b0aa04bdb1c81fd0cfc2f7bcfa9df1622f59cf4105a5d9
+    (reval 'sha256 'bbd6b415953b283ce18a3ce56736c8345bf094e6a5e0b549abe27fb940c1584d
            ;;"~/git/orgstrap/ow.el"
-           (concat ghost "df6208869b46aee24df4891403e9798dfc1f682b" "/ow.el")))
+           (concat ghost "54392e3f0748348a79afe4a59524dd9f13b2f1f8" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
