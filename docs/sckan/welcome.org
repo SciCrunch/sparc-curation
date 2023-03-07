@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 087bc07694763650335941593bf488ea9037fb2de64d4f87bc3892486c646d9f; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 7e4baf9e6272248fbb746830727d5ed6ce05520930244cae35b1355c536a0b70; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Welcome
 
@@ -89,8 +89,8 @@ emacs -eval "(find-file-noselect (pop argv))" welcome.org
         `((".*" ,emacs-tmp-dir t)))
   (setq auto-save-list-file-prefix
         emacs-tmp-dir)
-
-  (find-file-noselect "./queries.org")
+  (with-current-buffer (find-file-noselect "./queries.org")
+    (kill-buffer (current-buffer)))
   (global-set-key (kbd "C-q") #'save-buffers-kill-terminal)
   (global-unset-key (kbd "C-w")) ; cut is too dangerous, a user wouldn't know what they have done
   (advice-add #'save-buffers-kill-terminal :around #'advise--sbkt)
@@ -134,6 +134,7 @@ emacs -eval "(find-file-noselect (pop argv))" welcome.org
     (set-process-query-on-exit-flag (get-process "vterm") nil)
     (unless (and (desktop-owner) (= (desktop-owner) (emacs-pid)))
       ;; XXX this is a bit evil if you were to try to naievely `find-file-noselect' this file
+      (let (enable-local-eval) (org-mode)) ; restore rendering after reloading org FIXME somehow do this in `ow-reload-org'?
       (pop-to-buffer-same-window buffer))))
 #+end_src
 
