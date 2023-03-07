@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 7e4baf9e6272248fbb746830727d5ed6ce05520930244cae35b1355c536a0b70; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 76aced98eaea5510ae5b2b0483c7363579714c64bbb9ca746864f5698d3c7236; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Welcome
 
@@ -124,6 +124,7 @@ emacs -eval "(find-file-noselect (pop argv))" welcome.org
   (setq desktop-save t)
   (desktop-save-mode 1)
   (let ((buffer (current-buffer)))
+    (let (enable-local-eval) (org-mode)) ; restore rendering after reloading org FIXME somehow do this in `ow-reload-org'?
     (desktop-read)
     (let ((have-vterm-tab
            (cl-loop for tab in (tab-bar-tabs) when (string= (cdr (assq 'name tab)) "*vterm*") return t)))
@@ -134,7 +135,6 @@ emacs -eval "(find-file-noselect (pop argv))" welcome.org
     (set-process-query-on-exit-flag (get-process "vterm") nil)
     (unless (and (desktop-owner) (= (desktop-owner) (emacs-pid)))
       ;; XXX this is a bit evil if you were to try to naievely `find-file-noselect' this file
-      (let (enable-local-eval) (org-mode)) ; restore rendering after reloading org FIXME somehow do this in `ow-reload-org'?
       (pop-to-buffer-same-window buffer))))
 #+end_src
 

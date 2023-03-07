@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: d99bd8d3d6311d21ea02ff4ad82114be6cf97f859b49f3e248345944490c2f50; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 955261602248081d5cf4bb309158d3cf077185fe945a7689e82fd8aa75c799c3; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5613,11 +5613,7 @@ RETURN p1, p2, p3, p4, p5, p6
 <<reval-setup>>
 
 (when ow-do-packages-emacs
-  (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e)))
-            ((symbol-function 'outline-mode) (lambda ()))
-            ;; set `outline-mode' to nothing since `cl-letf' fails to
-            ;; rebind `unload--set-major-mode' (a native-comp issue?)
-            )
+  (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
     (ow-enable-use-package nil '(vterm zmq)))
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
@@ -5870,9 +5866,9 @@ matched strings in man buffer."
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'c27d3e298365d1482b80e53b3cb181e960c4a51755d9a48ba9726b1da70c488f
+    (reval 'sha256 'e02e876e394c1252b1ccca275ee14041b3254e69224b47102092e39109ba9371
            ;;"~/git/orgstrap/ow.el"
-           (concat ghost "9d6e343def3e5acc3debfe59b64fe30edc897311" "/ow.el")))
+           (concat ghost "8488954fb8dede1a15d1d9754f16aa0c760a8b76" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
