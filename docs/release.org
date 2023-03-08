@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 338c305fdcef44b285987646fd5e1cba0bf67bd9f1e6d32c751f5f82bed3dde3; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 5c1c911560d834efb7c578bed044ecb050be6c7de525332789f344a4e5f5d6f7; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -602,6 +602,7 @@ chown blazegraph:blazegraph blazegraph.jnl
 /etc/init.d/blazegraph start
 popd
 #+end_src
+
 * Bootstrap :noexport:
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes :noweb yes
@@ -703,8 +704,8 @@ popd
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'bdff9001e59af3e4cf9a09ee3b36f2a92034e841fc0ce23e15dd7849810d98b7
-           (concat ghost "582f0f9230ddf290cb3f02c4d62d5e13f610534c" "/ow.el"))))
+    (reval 'sha256 '551ca404495410ed6c9a08d6b50f7bed15a3600e1035f0796025ea98e02e182f
+           (concat ghost "6ea5235ed5e3ca5ad2aec26298691c6358024bd3" "/ow.el"))))
 #+end_src
 
 ** Local variables :ARCHIVE:
