@@ -1,4 +1,4 @@
-# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 35e6548885f08f3e0ff7e21d4269d582ca7f3dbb15081cfbb964c909a6e01483; -*-
+# -*- mode: org; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: b6f7e5aaf71bf1d6dcc7d51a1c680e011bb18858a08938865632a77002358079; -*-
 #+title: ApiNATOMY model RDF export and deployment
 # [[orgstrap][jump to the orgstrap block for this file]]
 # reminder that num:nil breaks table of contents so if one is nil both should probably be nil
@@ -932,8 +932,8 @@ https://scicrunch.org/sawg/about/ApiNATOMY
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '230f8cff6da6aa6514f333e1f0263653d6d8c5f7d633d4a33aa9d9b46598f427
-           (concat ghost "c761da3d5e9d4761335b74cfb43c75df7336f067" "/ow.el"))))
+    (reval 'sha256 'bdff9001e59af3e4cf9a09ee3b36f2a92034e841fc0ce23e15dd7849810d98b7
+           (concat ghost "582f0f9230ddf290cb3f02c4d62d5e13f610534c" "/ow.el"))))
 
 (unless (fboundp 'run-command)
   ;; ow.el doesn't set the alias because it is doubles as a real package

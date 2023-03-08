@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: f16a0e03ebc4c0119fb3a62a275a011ea2b9aecf4a8dc351fc3a855bcf05d5a9; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 08929e2dcd491a76b24584d88dee8958404dd5485c7521e58d1f939e6f2fe5a2; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+TITLE: sparcur developer guide
 #+AUTHOR: Tom Gillespie
@@ -4713,8 +4713,8 @@ echo ERROR ERROR 1>&2
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 'cc8cfa015e1f3413a5fb0587f5090602604f631fee365233e1b418d83ab4333f
-           (concat ghost "f01ec0c0601e1c03e1496e1f3cba2f2a7386bdeb" "/ow.el"))))
+    (reval 'sha256 'bdff9001e59af3e4cf9a09ee3b36f2a92034e841fc0ce23e15dd7849810d98b7
+           (concat ghost "582f0f9230ddf290cb3f02c4d62d5e13f610534c" "/ow.el"))))
 #+end_src
 
 ** Local Variables :ARCHIVE:
