@@ -2427,18 +2427,22 @@ done"""
     return datasets
 
 
-def _from_path_fetch_files_simple(path, filter_function, fetch=True):
+def _from_path_fetch_files_simple(path, filter_function, fetch=True, _ce=False):
     files = filter_function(path)
-    errors = []
-    def _collect_errors(f, file):
-        @wraps(f)
-        def inner(*args, **kwargs):
-            try:
-                return f(*args, **kwargs)
-            except Exception as e:
-                errors.append((file, e))
+    if _ce:
+        errors = []
+        def _collect_errors(f, file):
+            @wraps(f)
+            def inner(*args, **kwargs):
+                try:
+                    return f(*args, **kwargs)
+                except Exception as e:
+                    errors.append((file, e))
 
-        return inner
+            return inner
+    else:
+        def _collect_errors(f, file):
+            return f
 
     if fetch:
         # FIXME keep an eye on the gc here
@@ -4005,6 +4009,9 @@ def _fetch_path(path):  # sigh joblib multiprocessing pickling
         return
 
     cache = path.cache
+    if path.exists() and path.size == cache.meta.size:
+        return  # already got this one
+
     if cache is None:
         raise exc.NoCachedMetadataError(path)
 
