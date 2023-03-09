@@ -405,15 +405,14 @@ class ApiWrapper:
     @classmethod
     def _get_connection(cls, project_id):#, retry=10):
         try:
-            return cls._api_class(
-                api_token=auth.user_config.secrets(
-                    cls._sec_remote, project_id, 'key'),
-                api_secret=auth.user_config.secrets(
-                    cls._sec_remote, project_id, 'secret'))
+            _tok = auth.user_config.secrets(cls._sec_remote, project_id, 'key')
+            _sec = auth.user_config.secrets(cls._sec_remote, project_id, 'secret')
         except KeyError as e:
             msg = (f'need record in secrets for {cls._sec_remote} '
                    f'organization {project_id}')
             raise exc.MissingSecretError(msg) from e
+
+        return cls._api_class(api_token=_tok, api_secret=_sec)
 
         #except Exception as e:  # was absent dsn caching + rate limits
             #from time import sleep
