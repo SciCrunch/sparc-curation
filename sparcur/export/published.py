@@ -38,9 +38,9 @@ def _populate_published(curation_export, graphs):
 
     # datasets = [list(g[:rdf.type:sparc.Dataset]) for g in graphs]
     published_graphs = [
-        g for g, doi in [(g, list(g[ds:TEMP.hasDoi]))
+        g for g, uripub in [(g, list(g[ds:TEMP.hasUriPublished]))
                         for g in graphs for ds in g[:rdf.type:sparc.Dataset]]
-        if doi]
+        if uripub]
 
     merged = _merge_graphs(published_graphs)
     _fix_for_pub(curation_export, merged)

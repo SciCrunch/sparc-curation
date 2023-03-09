@@ -2521,6 +2521,11 @@ def main(path=Path.cwd(), n_jobs=12, extensions=('xml',), **kwargs):
 
     filter_function = filter_extensions(extensions)
 
+    # remote init outside async to avoid race condition in boto3 on windows
+    # from sparcur.paths.BFPNCacheBase.data
+    if not hasattr(path.cache._remote_class, '_api'):
+        path.cache._remote_class.anchorToCache(cache.anchor)
+
     from_path_fetch_files(path, filter_function, n_jobs=n_jobs)
     return path
 
@@ -3364,10 +3369,10 @@ def from_snapshot_path_summary_ttl(snapshot_path, project_id, time_now, blob):
 
     graphs_all = [o.graph for o in orps]
     graphs_pub = [
-        g for g, doi in [(g, list(g[ds:TEMP.hasDoi]))
-                         for g in graphs_all
-                         for ds in g[:rdf.type:sparc.Dataset]]
-        if doi]
+        g for g, uripub in [(g, list(g[ds:TEMP.hasUriPublished]))
+                            for g in graphs_all
+                            for ds in g[:rdf.type:sparc.Dataset]]
+        if uripub]
     merged_all = _merge_graphs(graphs_all)
     merged_all.populate_from_triples(tes.triples_header)
     merged_pub = _merge_graphs(graphs_pub)
@@ -3391,9 +3396,10 @@ def from_snapshot_path_summary_ttl_BAD(snapshot_path, project_id, time_now, blob
     # propagated at the moment
     graphs_pub = []
     graphs_nop = []
-    for g, doi in [(g, list(g[ds:TEMP.hasDoi]))
-                   for g in graphs for ds in g[:rdf.type:sparc.Dataset]]:
-        if doi:
+    for g, uripub in [(g, list(g[ds:TEMP.hasUriPublished]))
+                      for g in graphs
+                      for ds in g[:rdf.type:sparc.Dataset]]:
+        if uripub:
             graphs_pub.append(g)
         else:
             graphs_nop.add(g)

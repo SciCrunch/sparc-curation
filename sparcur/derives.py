@@ -127,6 +127,9 @@ class Derives:
             raise TypeError('WHAT HAVE YOU DONE!?')
 
         doi = idlib.Doi(doi_string)
+        return doi
+        # XXX old network check below, causes numerous issues when datasets
+        # are published because their latest metadata has no doi
         try:
             metadata = doi.metadata()  # FIXME network sandbox violation
             if metadata is not None:
