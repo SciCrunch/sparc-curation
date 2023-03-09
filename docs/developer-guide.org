@@ -2524,7 +2524,7 @@ def main(path=Path.cwd(), n_jobs=12, extensions=('xml',), **kwargs):
     # remote init outside async to avoid race condition in boto3 on windows
     # from sparcur.paths.BFPNCacheBase.data
     if not hasattr(path.cache._remote_class, '_api'):
-        path.cache._remote_class.anchorToCache(cache.anchor)
+        path.cache._remote_class.anchorToCache(path.cache.anchor)
 
     from_path_fetch_files(path, filter_function, n_jobs=n_jobs)
     return path
