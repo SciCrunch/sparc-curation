@@ -2429,8 +2429,8 @@ done"""
 
 def _from_path_fetch_files_simple(path, filter_function, fetch=True, _ce=False):
     files = filter_function(path)
+    errors = []
     if _ce:
-        errors = []
         def _collect_errors(f, file):
             @wraps(f)
             def inner(*args, **kwargs):
