@@ -1411,12 +1411,18 @@ class SubmissionSchema(JSONSchema):
 
 
 class UnitSchema(JSONSchema):
-    schema = {'oneOf': [{'type': ['number', 'string']},
-                        {'type': 'object',
-                         # TODO enum on the allowed values here
-                         'properties': {'type': {'type': 'string'},
-                                        'value': {'type': 'number'},
-                                        'unit': {'type': 'string'}}}]}
+    __schema = {'oneOf': [
+        {'type': ['number', 'string']},
+        {'type': 'object',
+         # TODO enum on the allowed values here
+         'properties': {'type': {'type': 'string'},
+                        'value': {'type': 'number'},
+                        'unit': {'type': 'string'}}}]}
+    schema = copy.deepcopy(__schema)
+    schema['oneOf'][1]['properties']['value'] = {'oneOf':[
+        {'type': 'number'},
+        __schema,
+    ]}
 
 
 _software_schema = {'type': 'array',
