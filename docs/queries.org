@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 76e5332acd489f2e07f1f8695b63b9910fb3ffe767aaf6781a780b2e4110ef20; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3d6d927c045317c82f1ff97487fe523c98790ab4629c07cafcb8216f64fb26be; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5615,6 +5615,8 @@ RETURN p1, p2, p3, p4, p5, p6
 (when ow-do-packages-emacs
   (cl-letf (((symbol-function 'org-unfontify-region) (lambda (b e))))
     (ow-enable-use-package nil '(vterm zmq)))
+  (let ((no-byte-compile t)) ; prevent byte compile when builtin org defines the macros
+    (use-package org))
   (let ((gt26 (>= emacs-major-version 26)))
     (ow-use-packages
      csv-mode
