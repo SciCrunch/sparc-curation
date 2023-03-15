@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 3d6d927c045317c82f1ff97487fe523c98790ab4629c07cafcb8216f64fb26be; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 5480309179b87eb34fa090255ac22a30f90ad89e129c807ae554875d443ab122; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5868,9 +5868,9 @@ matched strings in man buffer."
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '253f6bb207993efb2dbc982ba43892ad1cd305b0c27b551fd1e2c8f117cd055c
+    (reval 'sha256 '551ca404495410ed6c9a08d6b50f7bed15a3600e1035f0796025ea98e02e182f
            ;;"~/git/orgstrap/ow.el"
-           (concat ghost "682454fa8d1125ce92771df213d203bca04f4026" "/ow.el")))
+           (concat ghost "6ea5235ed5e3ca5ad2aec26298691c6358024bd3" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
