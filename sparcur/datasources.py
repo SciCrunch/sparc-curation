@@ -85,6 +85,8 @@ class OrganData:
         self._BeautifulSoup = BeautifulSoup
         self.path = path
         if not self.cache.exists():
+            if not self.cache.parent.exists():
+                self.cache.parent.mkdir(parents=True, exist_ok=True)
             self.overview()
             with open(self.cache, 'wt') as f:
                 json.dump(self.normalized, f)
