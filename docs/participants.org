@@ -19,9 +19,9 @@
       subjects.
     - BFO object.
   - =population=
-    - Populations are collective participants that are opaque to their
-      individual members but still have relations to generated data
-      and sample/specimen derivation chains. [fn:nomen]
+    - Populations are collective participants that may be opaque to
+      their individual members but still have relations to generated
+      data and sample/specimen derivation chains. [fn:nomen]
     - Populations can have identified members and are useful for
       reporting aggregate statistics or as a fallback when the exact
       relations between specimens are unknown or unreported.
