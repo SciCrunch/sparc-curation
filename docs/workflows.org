@@ -336,6 +336,24 @@ function review-failed () {
     less -R ${paths[@]}
 }
 #+end_src
+
+From curl instead of paste.
+#+begin_src bash
+function review-failed-curl () {
+    local paths
+    paths=()
+    for _id in ${@} ; do
+        paths+=(~/.cache/log/sparcur/datasets/${_id}/LATEST/stdout.log)
+        if [ -z $_id ]; then break; fi
+    done
+    less -R ${paths[@]}
+}
+#+end_src
+
+Usage.
+#+begin_src bash
+review-failed-curl $(curl https://cassava.ucsd.edu/sparc/pipelines/failed | jq -r '.failed[]' | sed 's/N:dataset://')
+#+end_src
 ** COMMENT Get data
 :PROPERTIES:
 :CUSTOM_ID: get-data
