@@ -377,6 +377,15 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
     latest.symlink_to(timestamp)
 
     try:
+        # FIXME urllib3.exceptions.MaxRetryError and requests.exceptions.RetryError
+        # can happen, those cases currently return as failed and they are usually correlated
+        # the follow command shows the times
+        # cat <(grep -L 'docopt args' $(grep -rl RetryError ~/.cache/log/sparcur/datasets/)) | awk 'BEGIN { FS = "/" } ; { print $(NF-1) }' | sort
+        # this one shows the logs
+        # less -R $(grep -L 'docopt args' $(grep -rl RetryError ~/.cache/log/sparcur/datasets/))
+        # ideally these cases should not be marked as failures of the local process
+        # but instead stuck back into the queue after some wait period, not entirely
+        # clear how to do this though ... exponential backoff etc.
         with open(logfile, 'wt') as logfd:
             if fetch:
                 try:
