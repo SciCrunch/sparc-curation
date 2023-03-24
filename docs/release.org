@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 5c1c911560d834efb7c578bed044ecb050be6c7de525332789f344a4e5f5d6f7; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: be36301896b2da94f9bbce38337819f447aba9bc2d0245aee9a539f582547ec5; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -704,8 +704,8 @@ popd
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '551ca404495410ed6c9a08d6b50f7bed15a3600e1035f0796025ea98e02e182f
-           (concat ghost "6ea5235ed5e3ca5ad2aec26298691c6358024bd3" "/ow.el"))))
+    (reval 'sha256 '670c68e5649987fb64a93a7b5610ace0f18a0b71f376faf7499de933247931f2
+           (concat ghost "021b66c8f1dd4bf55714a4de889f31741f8460f6" "/ow.el"))))
 #+end_src
 
 ** Local variables :ARCHIVE:
