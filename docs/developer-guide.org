@@ -1481,6 +1481,9 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 ~/git/sparc-curation/docs/release.org build --sckan --no-blaze --resume
 # XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
 
+# source.org build docker images
+~/git/dockerfiles/source.org build-image run:sckan-build-save-image
+
 ### testing phase 1, probably move to docker
 
 # XXX manual
@@ -1640,6 +1643,12 @@ result = dewit(SCICRUNCH_STAGING)
 
 Future: similar for NPO
 **** Build docker images
+This has now been integrated into ref:build-sckan-release by using
+[[../../dockerfiles/source.org]] to run the block(s) directly.
+#+begin_src bash
+~/git/dockerfiles/source.org build-image run:sckan-build-save-image
+#+end_src
+***** old :noexport:
 # TODO we can absolutely automate this, but bash is a bad top level to
 # try to express what needs to be done wrt nowebbing blocks in from
 # other files using the library of babel and also setting the
@@ -4416,6 +4425,8 @@ for more direct mapping of graphviz functionality but one that is also way more 
 #+header: :prologue "#lang racket/base" :comments link
 #+begin_src racket :lang racket/base :exports none
 (require graph ; raco pkg install graph
+         ;(only-in graph/adjlist-utils rename-vertex@) ; THIS IS WHAT HAPPENS WHEN YOU MAKE THINGS PRIVATE THAT SHOULD NOT BE
+         (only-in racket/unsafe/ops unsafe-struct*-ref) ; THIS TOO
          racket/pretty
          racket/set
          racket/list
@@ -4446,6 +4457,26 @@ You can use a colon : at the start of a line to preserve spacing."
                            (map list-to-pairs
                                 (syntax->datum #'((left right ...) ...)))))
      #'(unweighted-graph/directed (quote (pairs ...)))]))
+
+(define (rename-vertex@ adj old new)
+  "an implementation of rename-vertex! that correctly handles renamings that merge two verticies"
+  (hash-set! adj new (set-union
+                      (hash-ref adj old)
+                      (set-remove (hash-ref adj new (set)) new)))
+  (hash-remove! adj old)
+  (for ([(u vs) (in-hash adj)] #:when (set-member? vs old))
+    (hash-set! adj u (set-add (set-remove vs old) new))))
+
+(define (collapse-clusters! g clusters #:only [only-these #f])
+  ; prepare clusters
+  ; string->symbol cluster invert mapping to get replacement table
+  ; rename-vertex! for each vertex in the cluster to the cluster name
+  (for ([cluster clusters])
+    (when (or (not only-these) (member (cluster-label cluster) only-these))
+      (let ((sym-label (string->symbol (cluster-label cluster))))
+        (for ([vert (cluster-members cluster)])
+          ;(with-output-to-file "/tmp/col-clu.rktd" #:exists 'append (λ () (pretty-print (list vert sym-label))))
+          (rename-vertex@ (unsafe-struct*-ref g 0) vert sym-label))))))
 
 (define (subgraph->graphviz subgraph->hash)
   (let ([members (for/list ([(k v) (in-hash (subgraph->hash))] #:when v) k)]
@@ -4488,9 +4519,17 @@ subgraphs should be specified using vertext properties or edge properties"
              (λ () (pretty-print name))))]))
 
 (define (graphviz-2 g
-                    #:clusters [clusters '()]
+                    #:clusters [clusters-in '()]
+                    #:collapse-clusters [collapse #f]
                     #:colors [colors #f]
                     #:output [port #f])
+  (when collapse
+    (collapse-clusters! g clusters-in #:only (and (list? collapse) (not (null? collapse)) collapse)))
+  (define clusters (if collapse
+                       (if (and (list? collapse) (not (null? collapse)))
+                           (for/list ([c clusters-in] #:unless (member (cluster-label c) collapse)) c)
+                           '())
+                       clusters-in))
   (define (generate-graph)
     (parameterize ([current-output-port (or port (current-output-port))])
       (define weighted? (weighted-graph? g))
@@ -4590,6 +4629,8 @@ subgraphs should be specified using vertext properties or edge properties"
   (define gg (graphviz-2 g #:clusters (list (new-cluster "test" #f '(b c d)))))
   (display gg)
 
+  (define ggc (graphviz-2 g #:collapse-clusters #t #:clusters (list (new-cluster "test" #f '(b c d)))))
+  (display ggc)
   )
 
 #;
