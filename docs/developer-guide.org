@@ -3738,7 +3738,7 @@ Options:
     --invariant-local-path=PATH     path relative to parent path for dataset [default: dataset]
     --export-local                  set export-parent-path to {{:parent-path}}/exports/
     --export-path=PATH              base export path containing the standard path structure [default: {auth.get_path('export-path')}]
-    --cleaned-parent-path=PATH      direct parent path into which cleaned paths will be placed
+    --cleaned-output-path=PATH      directory path into which cleaned paths will be placed
     --cleaned-path=PATH             base cleaned path containing the standard path structure [default: {auth.get_path('cleaned-path')}]
     --export-parent-path=PATH       direct parent path into which exports will be placed
     --extension=<EXT>...            one or more file extensions to fetch
@@ -3913,19 +3913,24 @@ class Options(clif.Options):
     @property
     def cleaned_path(self):
         cp = self._args['--cleaned-path']
-        cpp = self.export_parent_path
-        if cp and cpp:
-            raise TypeError('Only one of --cleaned-path and --cleaned-parent-path may be set.')
+        cop = self.cleaned_output_path
+        if cp and cop and cp != self._defaults['--cleaned-path']:
+            # XXX NOTE if the default path is passed as the cleaned path this will not error
+            # that is the cost of showing the user the default value in cli, we can't tell
+            # whether the user set the option in that case, probably a good tradeoff
+            # the alternative is to detect that the value is None and set it later, which
+            # is done routinely here, but is somewhat opaque
+            raise TypeError('Only one of --cleaned-path and --cleaned-output-path may be set.')
         elif cp:
             return Path(cp).expanduser().resolve()
         else:
             raise Exception('should not happen')
 
     @property
-    def cleaned_parent_path(self):
-        cpp = self._args['--cleaned-parent-path']
-        if cpp:
-            return Path(cpp).expanduser().resolve()
+    def cleaned_output_path(self):
+        cop = self._args['--cleaned-output-path']
+        if cop:
+            return Path(cop).expanduser().resolve()
 
     @property
     def extensions(self):
@@ -4326,7 +4331,7 @@ from sparcur.paths import Path
 from sparcur import datasets as dat
 from sparcur.utils import symlink_latest
 from sparcur.config import auth
-from sparcur.simple.utils import rglob
+from sparcur.simple.utils import rglob, log
 
 
 def prepare_dataset_cleaned(dataset_path, cleaned_path=None, time_now=None):
@@ -4337,14 +4342,14 @@ def prepare_dataset_cleaned(dataset_path, cleaned_path=None, time_now=None):
     identifier = PennsieveId(dataset_path.cache.id)
     uuid = identifier.uuid
     cleaned_dataset_folder = cleaned_path / uuid
-    cleaned_parent = cleaned_dataset_folder / time_now.START_TIMESTAMP_LOCAL_FRIENDLY
-    if not cleaned_parent.exists():
-        cleaned_parent.mkdir(parents=True)
+    cleaned_output_path = cleaned_dataset_folder / time_now.START_TIMESTAMP_LOCAL_FRIENDLY
+    if not cleaned_output_path.exists():
+        cleaned_output_path.mkdir(parents=True)
 
     cleaned_latest = cleaned_dataset_folder / 'LATEST'
     # FIXME do we symlink before we know things have succeeded ???
-    symlink_latest(cleaned_parent, cleaned_latest)
-    return cleaned_parent
+    symlink_latest(cleaned_output_path, cleaned_latest)
+    return cleaned_output_path
 
 
 def from_dataset_path_metadata_file_paths(dataset_path):
@@ -4372,14 +4377,14 @@ def from_file_paths_objects(paths):
             yield None
 
 
-def from_dataset_path_cleaned_files(dataset_path, cleaned_parent):
+def from_dataset_path_cleaned_files(dataset_path, cleaned_output_path):
     "NOTE this actually does the cleaning"
 
     paths = from_dataset_path_metadata_file_paths(dataset_path)
     for path, obj in zip(paths, from_file_paths_objects(paths)):
         if obj is not None:
-            drp = path.dataset_relative_path
-            target = cleaned_parent / drp
+            drp = path.relative_path_from(dataset_path)
+            target = cleaned_output_path / drp
             if not target.parent.exists():
                 target.parent.mkdir(parents=True)
 
@@ -4389,7 +4394,8 @@ def from_dataset_path_cleaned_files(dataset_path, cleaned_parent):
 def main(path=Path.cwd(), id=None, time_now=None,
          parent_path=None, invariant_local_path='dataset',
          parent_parent_path=Path.cwd(),
-         cleaned_path=None, cleaned_parent_path=None, **kwargs):
+         cleaned_path=None, cleaned_output_path=None, **kwargs):
+    # note that cleaned_path is better though of as cleaned_base_path
     # setup taken from path_metadata.py::main so check the notes there
     if path == Path.cwd() and (id is not None or parent_path is not None):
         if parent_path is None:
@@ -4403,17 +4409,26 @@ def main(path=Path.cwd(), id=None, time_now=None,
 
     path = Path(path)
     cache = path.cache
-    if not cache.is_dataset():
-        raise TypeError('can only run on a single dataset')
 
-    cleaned_parent = prepare_dataset_cleaned(path, cleaned_path, time_now)
-    from_dataset_path_cleaned_files(path, cleaned_parent)
+    if cache is None:
+        if cleaned_output_path is None:
+            raise ValueError(
+                'No remote cached data and cleaned_output_path not set. Pass'
+                '--cleaned-output-path=path/to/cleaned-for-this-dataset')
+        log.warning('running in the wild without cached metadata')
+        cleaned_output_path.mkdir(parents=True, exist_ok=True)
+    elif not cache.is_dataset():
+        raise TypeError('can only run on a single dataset')
+    else:
+        cleaned_output_path = prepare_dataset_cleaned(path, cleaned_path, time_now)
+
+    from_dataset_path_cleaned_files(path, cleaned_output_path)
 
 
 if __name__ == '__main__':
     import pprint
     from sparcur.simple.utils import pipe_main
-    pipe_main(main, after=pprint.pprint)
+    pipe_main(main)
 #+end_src
 * Code :noexport:
 See also https://docs.racket-lang.org/graphviz/index.html =raco pkg install racket-graphviz=
