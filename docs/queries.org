@@ -492,7 +492,7 @@ where {
 #+begin_src sparql :noweb no-export
 SELECT (COUNT(*) as ?count) {
   <<sparql-complex-protocols>>
-}
+}}
 #+end_src
 
 #+name: sparql-complex-protocols-published-count
@@ -626,6 +626,7 @@ LIMIT ?limit
 #+end_src
 
 **** Protocol species dose
+#+name: sparql-species-dose
 #+begin_src sparql
 SELECT DISTINCT
 ?dataset
