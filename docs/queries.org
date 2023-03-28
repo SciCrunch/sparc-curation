@@ -4211,10 +4211,10 @@ select distinct ?o where {
 :CUSTOM_ID: apinat-models
 :END:
 From [[cypher-apinat-graphs]]
+now includes the external stable model id in the results as well
 #+begin_src cypher :results drawer
-MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g) RETURN g
+MATCH path = ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)<-[]-(o:Ontology) RETURN path
 #+end_src
-
 * Use cases
 ** Connectivity dashboard
 *** organs
