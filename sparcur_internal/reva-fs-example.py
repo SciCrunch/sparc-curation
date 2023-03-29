@@ -39,7 +39,7 @@ type_example_files = {
 }
 
 # conventions for padding identifiers can be discussed, right now they are unpadded
-def make_tree(path, pdo, lat_seg, lat_seg_site):
+def make_tree(path, pdo, subject, lat_seg, lat_seg_site):
     primary = pdo == 'primary'
     derived = pdo == 'derived'
     other = not primary and not derived
@@ -89,19 +89,19 @@ def make_tree(path, pdo, lat_seg, lat_seg_site):
                         pass
 
     tld = 'primary' if primary else ('derivative' if derived else 'wat')
-    path_dirs = [path / tld / d for d in dirs]
-    path_files = [path / tld / f for f in files]
+    path_dirs = [path / tld / subject / d for d in dirs]
+    path_files = [path / tld / subject / f for f in files]
     return path_dirs, path_files
 
 
-def main():
+def main(subject='sub-f001'):
     from pathlib import Path
 
     #path = Path('.').expanduser()
-    path = Path('~/git/sparc-curation/resources/examples/reva-3/').expanduser()
+    path = Path('~/git/sparc-curation/resources/examples/reva-4/').expanduser()
     dirs, files = [], []
     for tld in ('primary', 'derived'):
-        ds, fs = make_tree(path, tld, lat_seg, lat_seg_site)
+        ds, fs = make_tree(path, tld, subject, lat_seg, lat_seg_site)
         dirs.extend(ds)
         files.extend(fs)
 
