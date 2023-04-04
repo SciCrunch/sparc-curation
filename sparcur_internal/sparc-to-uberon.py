@@ -1,10 +1,21 @@
+"""sparc-to-uberon
+
+Usage:
+    sparc-to-uberon [options]
+
+Options:
+    -u --uberon-edit=PATH
+    -d --debug
+"""
+
 import idlib
 import rdflib
 import ontquery as oq
 import augpathlib as aug
 from github import Github
-from pyontutils import obo_io as oio
 from pyontutils import sheets
+from pyontutils import obo_io as oio
+from pyontutils import clifun as clif
 from pyontutils.core import OntResIri, OntId
 from pyontutils.utils import log
 from pyontutils.config import auth
@@ -280,7 +291,23 @@ class UpstreamTermRequests(sheets.Sheet):
         breakpoint()
 
 
+class Options(clif.Options):
+    @property
+    def uberon_edit(self):
+        p = self._args['--uberon-edit']
+        if p:
+            return aug.RepoPath(p)
+
+
 def main():
+    options, *ad = Options.setup(__doc__, version='sparc-to-uberon 0.0.0')
+    if options.debug:
+        log.setLevel('DEBUG')
+        oio.log.setLevel('DEBUG')
+    else:
+        log.setLevel('INFO')
+        oio.log.setLevel('INFO')
+
     #ori = OntResIri('https://alt.olympiangods.org/sparc/ontologies/community-terms.ttl')
     #ori = OntResIri('http://localhost:8515/sparc/ontologies/community-terms.ttl')
     #ori = OntResIri('http://localhost:8515/interlex/own/sparc/ontologies/community-terms.ttl')
@@ -288,7 +315,7 @@ def main():
     rdfl = oq.plugin.get('rdflib')(ori.graph, OntId)
     OntTerm.query_init(rdfl)
     utr = UpstreamTermRequests()
-    _todo(utr)
+    _todo(utr, options.uberon_edit)
     return
 
     # test output
@@ -302,10 +329,12 @@ def main():
     return
 
 
-def _todo(utr):
+def _todo(utr, uberon_edit=None):
     # real output
-    glb = auth.get_path('git-local-base')
-    uberon_edit = aug.RepoPath(glb) / 'NOFORK/uberon/src/ontology/uberon-edit.obo'
+    if uberon_edit is None:
+        glb = auth.get_path('git-local-base')
+        uberon_edit = aug.RepoPath(glb) / 'NOFORK/uberon/src/ontology/uberon-edit.obo'
+
     of = oio.OboFile(path=uberon_edit, strict=False)
     utr.submit_to_obofile(of, 'UBERON', uberon_id_range)
     of.write(overwrite=True,
