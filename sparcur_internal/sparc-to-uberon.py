@@ -1,12 +1,14 @@
 import idlib
+import rdflib
 import ontquery as oq
 import augpathlib as aug
 from github import Github
 from pyontutils import obo_io as oio
 from pyontutils import sheets
 from pyontutils.core import OntResIri, OntId
+from pyontutils.utils import log
 from pyontutils.config import auth
-from pyontutils.namespaces import ilxtr
+from pyontutils.namespaces import ilxtr, rdfs
 
 # for reference see
 # https://github.com/obophenotype/uberon/blob/master/uberon-idranges.owl
@@ -38,8 +40,8 @@ class Hrm(OntResIri):
 
 class OntTerm(idlib.from_oq.OntTerm):
 
-    def asOboTerm(self, *args, id='tgbugsTODO'):
-        graph = self.query.services[0].graph
+    def asOboTerm(self, *args, id='tgbugsTODO', ilx_uberon=None):
+        graph = self.query.services[0].graph  # FIXME what an awful hack
         ilx_id = OntId(self).u
         s = list(graph[:ilxtr.hasIlxId:ilx_id])[0]
         if s != ilx_id:
@@ -50,6 +52,42 @@ class OntTerm(idlib.from_oq.OntTerm):
             term = oio.Term(id=id, name=self.label)
             if not self.definition:
                 raise ValueError(f'{self} is misisng a definition!')
+
+            for sc_id in graph[s:rdfs.subClassOf:]:
+                # FIXME not so simple to invert the id remapping
+                #sigh = sorted(graph[sc_id:ilxtr.hasIlxId])[0]
+                #csigh = OntId(sigh).curie
+                tid = OntId(sc_id).curie
+                #if csigh != tid: log.debug((csigh, tid))
+                existing_uberons = [i for i in graph[sc_id:ilxtr.hasExistingId]
+                                    if 'UBERON_' in i]
+                if not existing_uberons:
+                    # TODO find the mapping in the terms we are about to submit
+                    if ilx_uberon and tid in ilx_uberon:
+                        ilx_tid = tid
+                        tid = ilx_uberon[tid]
+                    else:
+                        msg = f'no uberon for {tid}'
+                        raise ValueError(msg)
+                elif len(existing_uberons) == 1:
+                    ilx_tid = tid
+                    tid = OntId(existing_uberons[0]).curie
+                else:
+                    msg = ('ilx term mapped to more than one '
+                           f'uberon term: {tid} -> {existing_uberons}')
+                    raise ValueError(msg)
+
+                #log.info((id, 'sco', tid))
+                # the callback structure handles out of order insertions
+                # so we don't have to worry about insertion order, just
+                # that all the terms will be inserted in one batch
+                type_od = {term.id_.value: term}
+                try:
+                    term.add(oio.TVPair(tag='is_a', target_id=tid, type_od=type_od))
+                except AttributeError as e:
+                    breakpoint()
+                    log.error(e)
+                    raise e
 
             defxrefs = list(graph[s:OntId('ilx.anno.hasDefinitionSource:').u:])
             term.add(oio.TVPair(tag='def', text=self.definition, xrefs=defxrefs))
@@ -77,6 +115,36 @@ class OntTerm(idlib.from_oq.OntTerm):
             raise ValueError(self) from e
 
         return term
+
+
+def toposort(graph, predicate=rdfs.subClassOf):  # XXX currently unused but keeping around for the record
+    # adapted from protcur.document
+    marked = set()
+    temp = set()
+    qq = sorted(set(e for s, p, o in graph for e in (s, p) if isinstance(e, rdflib.URIRef)))
+    out = []
+    def visit(n):
+        if n in marked:
+            return
+        if n in temp:
+            import pprint
+            raise Exception(f'oops you have a cycle {n}\n{pprint.pformat(n._row)}')
+
+        temp.add(n)
+        for m in graph[n:predicate]:
+            if isinstance(m, rdflib.URIRef):
+                visit(m)
+
+        temp.remove(n)
+        marked.add(n)
+        qq.remove(n)
+        out.append(n)
+
+    while qq:
+        n = qq[0]
+        visit(n)
+
+    return out
 
 
 class Row(sheets.Row):
@@ -165,27 +233,58 @@ class UpstreamTermRequests(sheets.Sheet):
 
     def submit_to_obofile(self, of, prefix, id_range):
         terms = [ro.id for ro in self.to_submit()]
+        curies = [t.curie for t in terms]
         [t.fetch() for t in terms]
-        #obo_terms = [t.asOboTerm(id=f'tgbugsTODO{i}') for i, t in enumerate(terms)]
         id_min, id_max = id_range
         over_under = [
-            int(b.id_.value.suffix)
-            for b in of.Terms.values()
+            b for b in of.Terms.values()
             if not isinstance(b, list) and ':' in b.id_.value
             and id_min < int(OntId(b.id_.value).suffix) < id_max]
+        existing = {
+            [x for x in b.xref if x.value in curies][0].value:b.id_.value
+            for b in over_under if b.xref
+            and [x for x in b.xref if x.value in curies]}
+
         if over_under:
-            id_start = max(over_under) + 1
+            ints = [int(OntId(b.id_.value).suffix) for b in over_under]
+            id_start = max(ints) + 1
         else:
             id_start = id_min
 
         # TODO padding and prefix detect etc.
-        obo_terms = [t.asOboTerm(id=f'{prefix}:{id_start + i}') for i, t in enumerate(terms)]
-        of.add(*obo_terms)
+        # FIXME detect existing mappings
+        new_terms = [t for t in terms if t.curie not in existing]
+        # FIXME generate the ids first so that they are are all known beforehand
+        # so that subClassOf can be populated correctly
+        #graph = new_terms[0].query.services[0].graph
+        #topord = [str(u) for u in toposort(graph)]
+        #def topokey(id_t):
+            #id, t = id_t
+            #return - topord.index(t.iri)
+        # dance to make sure that we insert in the right order for sub class of
+        # but also that the ids are deterministic XXX don't actually need this
+        id_term = [(f'{prefix}:{id_start + i}', t) for i, t in enumerate(terms)]
+        ilx_uberon = {t.curie:id for id, t in id_term}
+        obo_new_terms = [t.asOboTerm(id=id, ilx_uberon=ilx_uberon) for id, t in
+                         #sorted(id_term, key=topokey)  # don't need toposort
+                         id_term]
+        #obo_new_terms = [
+            #t.asOboTerm(id=f'{prefix}:{id_start + i}')
+            #for i, t in enumerate(new_terms)]
+        of.add(*obo_new_terms)
+        update_terms = [t for t in terms if t.curie in existing]
+        missing_sco = [t for t in obo_new_terms if not hasattr(t, 'is_a') or not t.is_a]
+        if missing_sco:
+            msg = f'{len(missing_sco)} missing subClassOf:\n{missing_sco}'
+            log.warning(msg)
+        breakpoint()
 
 
 def main():
     #ori = OntResIri('https://alt.olympiangods.org/sparc/ontologies/community-terms.ttl')
-    ori = OntResIri('http://localhost:8515/sparc/ontologies/community-terms.ttl')
+    #ori = OntResIri('http://localhost:8515/sparc/ontologies/community-terms.ttl')
+    #ori = OntResIri('http://localhost:8515/interlex/own/sparc/ontologies/community-terms.ttl')
+    ori = OntResIri('http://localhost:8515/interlex/ontologies/ilx_0793177.ttl')
     rdfl = oq.plugin.get('rdflib')(ori.graph, OntId)
     OntTerm.query_init(rdfl)
     utr = UpstreamTermRequests()
