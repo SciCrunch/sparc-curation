@@ -770,7 +770,8 @@ class Export(ExportBase):
 
         return blob_jsonld
 
-    def _dataset_export_jsonld(self, blob_dataset):
+    @staticmethod
+    def _dataset_export_jsonld(blob_dataset):
         pipe = pipes.ToJsonLdPipeline(blob_dataset)
         return pipe.data
 
