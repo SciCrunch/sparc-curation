@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: fe3c5b9edb2d23c291a64ca21f2514a632e090742e1e62bc0dc55d899ce07a65; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 60774e77a09ed34f4d4b71a08a91f5ee6182d4fee8f187dec18172e286aa4cab; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -286,7 +286,7 @@ Yes this is make."
          (path-tar (concat path ".tgz")))
     (securl cypher checksum url path-tar) ;; FIXME should this error on mismatch?
     ;; FIXME test untar from different folder will put it in that folder not the location of the tar
-    (unless (file-directory-p path)
+    (unless (file-directory-p path) ; XXX FIXME if bin/blazegraph-runner gets removed for some reason this check is insufficient
       (run-command "tar" "xvzf" path-tar))
     (file-name-as-directory (concat default-directory path))))
 
@@ -311,7 +311,7 @@ Yes this is make."
            "%S" ; TODO check if we can safely strip out the group at this stage
            '(FIXME TODO replace the group id with some garbage so that it doesn't leak))))
       ;; 6 FIXME TODO this requires scigraph to be running FIXME this is a very slow step
-      (run-command (py-x) "-m" "protcur.cli" "convert" "-f" "prot" hypothesis-annos protcur-path))))
+      (run-command (py-x) "-m" "protcur.cli" "convert" "-t" "prot" hypothesis-annos protcur-path))))
 
 (defun step-load-store (path-br-bin &optional no-load)
   "download latest ttl files and load into blazegraph"
