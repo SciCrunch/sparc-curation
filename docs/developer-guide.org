@@ -1423,6 +1423,11 @@ SCKAN release process. In most cases manual intervention is needed to
 ensure that various component sources are up to date.
 ***** SPARC curation export
 See [[./setup.org::#export-v4]] for the most recent workflow for batch release.
+***** SPARC protcur
+#+begin_src bash
+python -m sparcur.simple.fetch_annotations
+python -m sparcur.cli export protcur
+#+end_src
 ***** NPO
 #+begin_src bash
 python -m neurondm.build release
@@ -1440,16 +1445,24 @@ apinat-build --deploy  # XXX manual and not fully implemented
 #+end_src
 For new ApiNATOMY models also update [[../resources/scigraph/sparc-data.ttl]].
 ***** NIF-Ontology dev branch
-Maybe update sparc community terms (sparc community termset now).
-#+begin_src bash
-# sh ~/git/pyontutils/nifstd/scigraph/README.org --sct  # XXX old use prrequaestor.el approach instead
-#+end_src
-+Currently, run [[../../pyontutils/nifstd/scigraph/README.org::sparc-community-terms-update]], review, merge, push to NIF-Ontology+
+Use [[~/git/prrequaestor/prcl.lisp]] with [[~/ni/sparc/sync-specs.lisp]].
+=prcl.lisp= is now published, still figuring out how to put all the
+cross-cutting processes that I oversee in one place, =sync-specs.lisp=
+will live wherever that is.
 
-Use [[~/ni/sparc/prrequaestor.el]] with [[~/ni/sparc/sync-specs.el]]
-once they are published (still trying to figure out the best way to do
-that ... orgstrap repo? new repo? here?).
+#+begin_src bash
+pushd ~/git/prrequaestor
+./prcl-build.lisp
+
+bin/prcl --specs ~/ni/sparc/sync-specs.lisp --fun nif-sct
+bin/prcl --specs ~/ni/sparc/sync-specs.lisp --fun nif-scr
+bin/prcl --specs ~/ni/sparc/sync-specs.lisp --fun nif-slim
+#+end_src
+
+For now manually pull the changes to the working repo.
+
 **** Blazegraph and SciGraph builds
+# SIGH set -e vs putting things in functions ... bash why are you so bad
 #+name: build-sckan-release
 #+begin_src bash
 set -e
@@ -1544,6 +1557,7 @@ neurons is the list from some other query
 #+begin_src python :noweb yes :python-path (expand-file-name "~/git/NOFORK/map-knowledge:")
 #import sys
 #return [[p] for p in sys.path]
+import random
 from mapknowledge import KnowledgeStore
 from mapknowledge.scicrunch import SCICRUNCH_PRODUCTION, SCICRUNCH_STAGING, SciCrunch
 from pyontutils.scigraph_codegen import moduleDirect
@@ -1670,7 +1684,7 @@ dump the docker image for the zenodo release
 [[../../dockerfiles/source.org::&sckan-save-image]]
 
 **** Archive release artifacts
-#+begin_src bash
+#+begin_src bash :results drawer
 # archive all publication artifacts at one of the usual locations e.g. ~/nas/data
 # FIXME hardcoded paths
 # FIXME need to set -e on ALL of these blocks I think?
