@@ -13,10 +13,12 @@
 - NPO partial orders
 - vagus round 1
 - ApiNATOMY models use wbrcm
-* PLAN 2023-02-10 :future:
-- bugfixes
-- ApiNATOMY wbrcm ontology mapping refinement
-- maybe :: more connections from NLP
+- NPO additional connections from NLP
+* RC 2023-04-12
+- NPO add populations from NLP mmset4
+- NPO partial orders for NPO populations
+- NPO add forwardConnectionPhenotype axioms (synaptic connectivity) to ApiNATOMY populations
+- NPO add hasTargetOrgan annotations for sanity check competency queries to ApiNATOMY populations
 * PROD 2023-01-23
 CLOSED: <2023-02-16 Thu>
 - curation-export fix protocols.io api v3 v4
