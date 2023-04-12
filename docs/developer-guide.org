@@ -1494,6 +1494,9 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 ~/git/sparc-curation/docs/release.org build --sckan --no-blaze --resume
 # XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
 
+
+### docker image build
+
 # source.org build docker images
 ~/git/dockerfiles/source.org build-image run:sckan-build-save-image
 
@@ -1502,6 +1505,33 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 # XXX manual
 echo manual step waiting for signal from human to start next automated portion
 #+end_src
+
+**** Build docker images
+This has now been integrated into ref:build-sckan-release by using
+[[../../dockerfiles/source.org]] to run the block(s) directly.
+#+begin_src bash
+~/git/dockerfiles/source.org build-image run:sckan-build-save-image
+#+end_src
+***** old :noexport:
+# TODO we can absolutely automate this, but bash is a bad top level to
+# try to express what needs to be done wrt nowebbing blocks in from
+# other files using the library of babel and also setting the
+# directory (pushd popd likely ok)
+run the docker build blocks in [[../../dockerfiles/source.org]] for the sckan release that
+do all the copying of the build state to the requisite locations
+order is bottom to top (maybe use ob-lob)
+[[../../dockerfiles/source.org::&musl-build-sckan-base]]
+[[../../dockerfiles/source.org::&musl-build-sckan-services]]
+
+# FIXME we should be able to defer dumping the images until after
+# testing however the current docker build process expects the
+# temporary build dirs to still exist, so we can't clean them up and
+# can't run the dump independently, which is bad, need two paths, one
+# for if the build directory exists, another for if it does not, but
+# and artifact has been specified
+
+dump the docker image for the zenodo release
+[[../../dockerfiles/source.org::&sckan-save-image]]
 
 **** Initial testing
 Deploy to dev scigraph.
@@ -1521,6 +1551,22 @@ critical checks:
 
 4. future run the [[file:queries.org::#npo-dashboard][NPO dashboard]]
 
+**** Archive release artifacts
+#+begin_src bash :results drawer
+# archive all publication artifacts at one of the usual locations e.g. ~/nas/data
+# FIXME hardcoded paths
+# FIXME need to set -e on ALL of these blocks I think?
+_archive=~/"nas/data/"
+_sckanrz="$(ls -d /tmp/build/release-*-sckan.zip | sort -u | tail -n 1)"
+_sckansz=/tmp/scigraph-build/sparc-sckan/$(readlink /tmp/scigraph-build/sparc-sckan/LATEST)
+_sckandz="$(ls -d /tmp/docker-sckan-data-*Z.tar.gz | sort -u | tail -n 1)"
+declare -a _arts=(${_sckanrz} ${_sckansz} ${_sckandz})
+for _art in "${_arts[@]}"; do
+echo $(basename ${_art})
+rsync -a ${_art} ${_archive}
+done
+#+end_src
+
 **** Deploy to staging
 #+begin_src bash
 ### deploy to sparc-scigraph
@@ -1528,9 +1574,9 @@ critical checks:
 # sparc-scigraph and then once that passes we do the release
 ~/git/pyontutils/nifstd/scigraph/bin/run-deploy-graph-sparc-sckan
 
-### docker image build
+### update services as needed
+# ~/git/pyontutils/nifstd/scigraph/bin/run-deploy-services-sparc
 
-echo manual step waiting for signal from human to start next automated portion
 #+end_src
 
 **** Test staging
@@ -1656,55 +1702,13 @@ result = dewit(SCICRUNCH_STAGING)
 #+end_src
 
 Future: similar for NPO
-**** Build docker images
-This has now been integrated into ref:build-sckan-release by using
-[[../../dockerfiles/source.org]] to run the block(s) directly.
-#+begin_src bash
-~/git/dockerfiles/source.org build-image run:sckan-build-save-image
-#+end_src
-***** old :noexport:
-# TODO we can absolutely automate this, but bash is a bad top level to
-# try to express what needs to be done wrt nowebbing blocks in from
-# other files using the library of babel and also setting the
-# directory (pushd popd likely ok)
-run the docker build blocks in [[../../dockerfiles/source.org]] for the sckan release that
-do all the copying of the build state to the requisite locations
-order is bottom to top (maybe use ob-lob)
-[[../../dockerfiles/source.org::&musl-build-sckan-base]]
-[[../../dockerfiles/source.org::&musl-build-sckan-services]]
-
-# FIXME we should be able to defer dumping the images until after
-# testing however the current docker build process expects the
-# temporary build dirs to still exist, so we can't clean them up and
-# can't run the dump independently, which is bad, need two paths, one
-# for if the build directory exists, another for if it does not, but
-# and artifact has been specified
-
-dump the docker image for the zenodo release
-[[../../dockerfiles/source.org::&sckan-save-image]]
-
-**** Archive release artifacts
-#+begin_src bash :results drawer
-# archive all publication artifacts at one of the usual locations e.g. ~/nas/data
-# FIXME hardcoded paths
-# FIXME need to set -e on ALL of these blocks I think?
-_archive=~/"nas/data/"
-_sckanrz="$(ls -d /tmp/build/release-*-sckan.zip | sort -u | tail -n 1)"
-_sckansz=/tmp/scigraph-build/sparc-sckan/$(readlink /tmp/scigraph-build/sparc-sckan/LATEST)
-_sckandz="$(ls -d /tmp/docker-sckan-data-*Z.tar.gz | sort -u | tail -n 1)"
-declare -a _arts=(${_sckanrz} ${_sckansz} ${_sckandz})
-for _art in "${_arts[@]}"; do
-echo $(basename ${_art})
-rsync -a ${_art} ${_archive}
-done
-#+end_src
-
 **** GitHub release
 Create a new pre-release at https://github.com/SciCrunch/NIF-Ontology/releases
-tag: =sckan-%Y-%m-pre-{n}=
+Tag ymd should match the results of the release version query from the embedded provenance record.
+tag: =sckan-%Y-%m-$d=
 target: =dev=
-title: =SCKAN %Y-%m-pre-{n}=
-Upload the blazegraph and scigraph zips.
+title: =sckan-%Y-%m-$d=
+Upload the blazegraph, scigraph, and docker archives.
 
 **** Push docker images
 #+begin_src bash
@@ -1714,6 +1718,7 @@ docker push tgbugs/sckan:$(docker image ls tgbugs/sckan:data-*Z | sort | tail -n
 docker push tgbugs/sckan:base-latest
 docker push tgbugs/sckan:latest
 #+end_src
+
 **** Test docker images
 Most of the testing at this stage is of the functionality in
 tgbugs/musl:kg-release-user so it is ok to push the data images first.
