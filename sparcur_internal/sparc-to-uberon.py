@@ -100,7 +100,15 @@ class OntTerm(idlib.from_oq.OntTerm):
                     log.error(e)
                     raise e
 
-            defxrefs = list(graph[s:OntId('ilx.anno.hasDefinitionSource:').u:])
+            refdefxrefs = list(graph[s:OntId('ilx.hasDefinitionSource:').u:])
+            convxrefs = [e for u in refdefxrefs
+                         if list(graph[u:ilxtr.hasIlxPreferredId:])
+                         for e in graph[u:ilxtr.hasIlxPreferredId:]]
+            apxrefs = list(graph[s:OntId('ilx.anno.hasDefinitionSource:').u:])
+            defxrefs = sorted(set(convxrefs + apxrefs))
+            # XXX sigh, idiotic http://uri.interlex.org/ilx_ form strikes again
+            #if len(defxrefs) > 1 and [x for x in defxrefs if 'ilx_' in x]:
+                #breakpoint()
             term.add(oio.TVPair(tag='def', text=self.definition, xrefs=defxrefs))
 
             for synonym in (self.synonyms
