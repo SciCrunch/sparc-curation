@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0e860025383316f2e1bdecb7b92c129fd6352573a74d747a90e71970e8e3670b; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 795c30d02c1668b72c6d3f446970a45a26bd621f238aecafa51e9ee4d9e2989f; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -136,6 +136,15 @@ Yes this is make."
    "-m"
    (if sckan-release "pyontutils.qnamefix" "ttlser.ttlfmt")
    merged-path))
+
+(defun get-ontology-py (iri merged-path)
+  (run-command ; FIXME HACK passing the iri and the merged path is a mess
+   (py-x) "-c" (format "
+from pyontutils.core import OntResIri, cull_prefixes
+ori = OntResIri(\"%s\")
+merged = ori.import_closure_graph()
+culled = cull_prefixes(merged).g
+culled.write(\"%s\")" iri merged-path)))
 
 (defun reason-ontology (ontology-path reasoned-path)
   (run-command
@@ -332,12 +341,14 @@ Yes this is make."
         (em-path "data/emapa.ttl")
         (ap-path "data/approach.ttl")
         (me-path "data/methods.ttl") ; FIXME ideally we want to pull in the near import closure for this
-        (npo-path "data/npo.ttl")
+        (npo-path "data/npo.ttl") ; XXX deprecated
+        (npo-merged-path "data/npo-merged.ttl")
 
         (em-r-path "data/emapa-reasoned.ttl")
         (ub-r-path "data/uberon-reasoned.ttl")
         (me-r-path "data/methods-reasoned.ttl")
         (npo-r-path "data/npo-reasoned.ttl")
+        (npo-merged-r-path "data/npo-merged-reasoned.ttl")
 
         (rguc "https://raw.githubusercontent.com/")
         (ont-git-ref "dev")
@@ -422,10 +433,10 @@ Yes this is make."
     (unless-file-exists-p me-r-path
       (reason-ontology me-path me-r-path))
     ;; npo
-    (unless-file-exists-p npo-path
-      (get-ontology (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/npo.ttl") npo-path))
-    (unless-file-exists-p npo-r-path ; FIXME (npo-path npo-r-path) ?? npo newer than npo-r issues sigh make
-      (reason-ontology npo-path npo-r-path))
+    (unless-file-exists-p npo-merged-path
+      (get-ontology-py (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/npo.ttl") npo-merged-path))
+    (unless-file-exists-p npo-merged-r-path ; FIXME (npo-path npo-r-path) ?? npo newer than npo-r issues sigh make
+      (reason-ontology npo-merged-path npo-merged-r-path))
 
     ;; 7
     (unless (or no-load (file-exists-p journal-path))
@@ -442,14 +453,16 @@ Yes this is make."
            ,ub-path
            ,ap-path
            ,me-path
-           ,npo-path
+           ;;,npo-path
+           ,npo-merged-path
            ,mis-path
            ,sct-path
 
            ,em-r-path
            ,ub-r-path
            ,me-r-path
-           ,npo-r-path
+           ;;,npo-r-path
+           ,npo-merged-r-path
            ,mis-r-path
 
            ,@(mapcar (lambda (p) (concat "data/" p)) apinat-paths)
@@ -604,6 +617,38 @@ chown blazegraph:blazegraph blazegraph.jnl
 popd
 #+end_src
 
+** Get ontology with partial order support
+=robot merge= does not work for partial orders because it fails to roundtrip rdf lists.
+The code below is mostly an example, the process is simple enough to
+run inline (e.g. see the implementation of =get-ontology-py= above).
+#+name: merge-ontology-imports
+#+begin_src jupyter-python :session pys :results none
+import rdflib
+from pyontutils.core import OntResGit, OntResIri, OntResPath, OntGraph, cull_prefixes
+from pyontutils.config import auth
+from pyontutils.namespaces import owl
+import augpathlib as aug
+
+
+def main(path_in=None, iri_in=None, path_out='/tmp/npo-merged.ttl'):
+    if path_in is None and iri_in is None:
+        olr = aug.RepoPath(auth.get('ontology-local-repo'))
+        ont = olr / 'ttl' / 'npo.ttl'
+        org = OntResGit(ont, 'neurons')
+    elif path_in and iri_in:
+        raise TypeError('only one of path_in or iri_in is allowed')
+    elif iri_in:
+        org = OntResIri(iri_in)
+    else:
+        org = OntResPath(path_in)
+
+    merged = org.import_closure_graph()
+    culled = cull_prefixes(merged).g
+    culled.write(path_out)
+
+
+main()
+#+end_src
 * Bootstrap :noexport:
 #+name: orgstrap
 #+begin_src elisp :results none :lexical yes :noweb yes
