@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 60774e77a09ed34f4d4b71a08a91f5ee6182d4fee8f187dec18172e286aa4cab; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0e860025383316f2e1bdecb7b92c129fd6352573a74d747a90e71970e8e3670b; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -283,10 +283,11 @@ Yes this is make."
          (url (format url-template version path))
          (cypher 'sha256)
          (checksum "4f2c01d6d75093361f75d8671c6d426fea3273a04168bcd0beea880527111271")
-         (path-tar (concat path ".tgz")))
+         (path-tar (concat path ".tgz"))
+         (path-bin (expand-file-name "bin/blazegraph-runner" path)))
     (securl cypher checksum url path-tar) ;; FIXME should this error on mismatch?
     ;; FIXME test untar from different folder will put it in that folder not the location of the tar
-    (unless (file-directory-p path) ; XXX FIXME if bin/blazegraph-runner gets removed for some reason this check is insufficient
+    (unless (and (file-directory-p path) (file-exists-p path-bin))
       (run-command "tar" "xvzf" path-tar))
     (file-name-as-directory (concat default-directory path))))
 
