@@ -3770,6 +3770,12 @@ cypherResources:
     query: |
       <<cypher-neru-7>>
 
+  - path: /dynamic/demos/apinat/graphList
+    operations:
+      - summary: <<nonl(desc-cypher-apinat-graphs())>>
+    query: |
+      <<cypher-apinat-graphs>>
+
   - path: /dynamic/demos/apinat/modelList
     operations:
       - summary: <<nonl(desc-cypher-apinat-models())>>
@@ -4210,11 +4216,11 @@ select distinct ?o where {
 :PROPERTIES:
 :CUSTOM_ID: apinat-models
 :END:
-From [[cypher-apinat-graphs]]
-now includes the external stable model id in the results as well
+From [[cypher-apinat-graphs]] now includes the external stable model id in the results as well
 #+begin_src cypher :results drawer
-MATCH path = ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)<-[]-(o:Ontology) RETURN path
+MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)<-[e:apinatomy:hasGraph]-(o:Ontology) RETURN g, e, o
 #+end_src
+
 * Use cases
 ** Connectivity dashboard
 *** organs
@@ -5035,9 +5041,12 @@ WHERE {
 # sparql unfortunately that is a larger engineering undertaking the
 # requires modifying scigraph again
 
+#+name: desc-cypher-apinat-graphs
+Return ApiNATOMY Graph resources and their associated Ontology resource.
+
 #+name: cypher-apinat-graphs
 #+begin_src cypher
-MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g) RETURN g
+MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)<-[e:apinatomy:hasGraph]-(o:Ontology) RETURN g, e, o
 #+end_src
 
 #+name: desc-cypher-apinat-models
