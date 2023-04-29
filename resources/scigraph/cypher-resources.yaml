@@ -1051,6 +1051,12 @@ cypherResources:
 
       RETURN a, b, c, d, null AS e, null AS f, null AS g, null AS h, null AS i, null AS path, p2, null as x, null as layer_ext, more
 
+  - path: /dynamic/demos/apinat/graphList
+    operations:
+      - summary: Return ApiNATOMY Graph resources and their associated Ontology resource.
+    query: |
+      MATCH ({iri: "https://apinatomy.org/uris/elements/Graph"})<-[:type]-(g)<-[e:apinatomy:hasGraph]-(o:Ontology) RETURN g, e, o
+
   - path: /dynamic/demos/apinat/modelList
     operations:
       - summary: Return the list of all ApiNATOMY models in the database.
