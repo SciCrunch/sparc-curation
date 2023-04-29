@@ -14,6 +14,18 @@
 - vagus round 1
 - ApiNATOMY models use wbrcm
 - NPO additional connections from NLP
+- TODO NPO aacar pig dog human, not mouse not rat
+- TODO NPO partial orders for apinatomy populations
+* RC 2023-04-29
+- NPO add missing axioms so that aacar 7 and 8 are not inferred to be equivalent
+- NPO add missing axioms so that sdcol j and l are not inferred to be equivalent
+- NPO add missing axioms so that kblad 1 and 2 are not inferred to be equivalent
+  note that the full location phenotype axiomatization including layers is distinct, however we have not added the layers yet
+- NPO huang 2017 remove duplicate axioms
+- NPO clean up npo.ttl generation process
+- parcellation schemes now use atom.ttl as their base import
+- ApiNATOMY add SciGraph model provenance endpoint
+  https://scicrunch.org/api/1/sparc-scigraph/dynamic/demos/apinat/graphList.json
 * RC 2023-04-12
 - NPO add populations from NLP mmset4
 - NPO partial orders for NPO populations
