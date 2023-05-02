@@ -3839,6 +3839,112 @@ WHERE NOT EXISTS(dimension.owlType) OR dimension.owlType = "subClassOf" OR dimen
 RETURN ae
 #+end_src
 
+** npo partial orders
+Can't use cypher atm because owlapi doesn't know what to do with nested lists.
+The same issue forced us to use pyontutils/rdflib to merge npo.ttl.
+#+begin_src cypher :limit 9999
+match path = //(Class:{iri: "mmset2:1"})
+(s)-[:ilxtr:neuronPartialOrder]->(blank)
+-[:rdf:rest|rdf:first*0..100]->(hrm)
+return blank, hrm
+#+end_src
+Potential solution is to reserialize the nested list to output with something other than
+rdf:first and rdf:rest so that owlapi will parse it as blanknodes and allow it to load.
+The following seems to work and owlapi will preserve the nesting.
+#+begin_src ttl
+@prefix : <file:///ERROR/EMPTY/PREFIX/BANNED/> .
+
+:asdf a owl:Class ;
+    rdfs:label "AAAAAAAAAAAAAAAAAAAAAAA" ;
+:neuronPartialOrder
+[ :first :a ;
+  :rest [
+    :first :b ;
+    :rest [
+     :first :c
+] ] ] .
+#+end_src
+
+SPARQL works with a bit of a dance to ensure that each individual pair is extracted.
+To reconstruct the nested list tree structure start from nil and cons up iirc.
+#+name: sparql-npo-query-raw-partial-order
+#+begin_src sparql
+select distinct
+?s
+?r
+?v
+where
+{
+VALUES ?s { mmset1:1 }
+?s ilxtr:neuronPartialOrder ?o .
+?o (rdf:rest|rdf:first)* ?r .
+?r rdf:rest|rdf:first ?v .
+} order by ?s ?r ?v limit 900
+#+end_src
+
+Extract the adjacency list directly.
+Will need a bit more when we go to layers, but for now it is ok.
+#+name: sparql-npo-query-adj-list
+#+begin_src sparql
+select distinct
+?s
+?v1
+?v2
+where
+{
+VALUES ?s {
+#mmset1:1
+mmset1:11
+#mmset4:2
+#mmset4:7
+#mmset4:8
+}
+?s ilxtr:neuronPartialOrder ?o .
+?o (rdf:rest|rdf:first)* ?r1 .
+?o (rdf:rest|rdf:first)* ?r2 .
+?r1 rdf:rest|rdf:first ?v1 .
+?r2 rdf:rest|rdf:first ?v2 .
+?v1 rdf:type owl:Class .
+?mediator rdf:first ?v1 .  # car
+?mediator rdf:rest*/rdf:first/rdf:first ?v2 .  # caadr
+} order by ?s ?v1 ?v2 limit 900
+#+end_src
+
+#+begin_src python :noweb yes
+import io
+import csv
+import requests
+from urllib.parse import quote as url_quote
+
+blazegraph_endpoint = 'http://localhost:9999/blazegraph/sparql'
+
+
+def procq(res):
+   _, (str_count,) = res
+   return int(str_count)
+
+
+def query(query, *, endpoint=blazegraph_endpoint, **kwargs):
+    qq = url_quote(query, safe='')
+    url = f'{endpoint}?query={qq}'
+    headers = {'Accept': 'text/csv'}
+    resp = requests.get(url, headers=headers)
+    return list(csv.reader(io.StringIO(resp.text)))
+
+q = """
+<<sparql-npo-query-raw-partial-order>>
+"""
+
+
+out = query(q)
+mms1_1 = [o for o in out if o[0].endswith('mmset1/1')]
+ends = []
+for _, f, r in mms1_1:  # TODO actually finish this
+    if r.endswith('#nil'):
+        ends.append(f)
+return mms1_1
+#+end_src
+
 * ApiNATOMY competency queries
 ** wbrcm ontology terms
 All ontology terms currently used by the whole body reference connectivity model.
