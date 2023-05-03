@@ -605,14 +605,18 @@ prefixes_path.data = (_ for _ in (prefixes.encode(),))
 str(prefixes_path)
 #+end_src
 
-** Deploy journal to local server
+** Deploy journal and prefixes to local server
 #+begin_src bash :dir /su:: :eval never
 _sckanl="$(ls -d /tmp/build/release-*-sckan | sort -u | tail -n 1)"
 pushd /var/lib/blazegraph
 /etc/init.d/blazegraph stop
-mv blazegraph.jnl blazegraph.jnl.$(date +%s)
-cp -a ${_sckanl}/data/blazegraph.jnl .
-chown blazegraph:blazegraph blazegraph.jnl
+declare -a _files=("blazegraph.jnl" "prefixes.conf")
+_date=$(date +%s)
+for _file in ${_files[@]}; do
+  mv ${_file} ${_file}.${_date}
+  cp -a ${_sckanl}/data/${_file} .
+  chown blazegraph:blazegraph ${_file}
+done
 /etc/init.d/blazegraph start
 popd
 #+end_src
