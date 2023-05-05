@@ -1451,6 +1451,7 @@ def find_region(blob, edge):
 
 
 def find_region_layer(blob, edge, bindex):
+    _nonelayer = False
     collect = []
     layers = []
     layers_iots = []
@@ -1460,11 +1461,12 @@ def find_region_layer(blob, edge, bindex):
         if sub(e, m):
             pprint(e)
             if (pred(e, onts)
+                or pred(e, iot)
                 or pred(e, iots)):
                 layer = obj(e)
                 if layer not in donel:
                     donel.add(layer)
-                    if pred(e, iots):
+                    if pred(e, iot) or pred(e, iots):
                         layers_iots.append(bindex[layer])
                     else:
                         layers.append(bindex[layer])
@@ -1488,8 +1490,12 @@ def find_region_layer(blob, edge, bindex):
     ematch(blob, select, sub(edge))
     if collect and not layers and not layers_iots:
         layers = [None]
+        _nonelayer = True
     elif layers_iots and not layers:
         layers = layers_iots
+
+    if not layers and (_nonelayer or layers_iots):
+        layers = [None]
 
     if len(collect) != len(layers):
         raise ValueError(f'len not matched {len(collect)} {len(layers)}')
@@ -1644,7 +1650,7 @@ def reclr(blob, start_link):
 def lay_reg(blob, start):
     direct = [obj(t) for t in
               ematch(blob, (lambda e, m: sub(e, m)
-                            and (pred(e, intIn) or  # XXX why isn't this getting pulled in correctly for somas? answer: missing somas in starts? surely not, ARGH a lyph internalIn a layer
+                            and (pred(e, intIn) or  # XXX why isn't this getting pulled in correctly for somas? answer: missing somas in starts? surely not, ARGH a lyph internalIn a layer  # FIXME this is the interneuron case FIXME axon terminal in same region case even if leaves region
                                  pred(e, endIn) or
                                  pred(e, fasIn))),
                      start)]
@@ -1734,9 +1740,15 @@ sgc = scigraphd.Cypher(cache=True, verbose=True)
 q_neru_6 = """
 <<cypher-neru-6>>
 """
+q_neru_7 = """
+<<cypher-neru-7>>
+"""
+q_cnap = """
+<<cy-neru-all-pop>>
+"""
 def neupop_blob(neupop_id):
     # XXX requires a patch to Cypher and CypherBase to support arbitrary kwargs
-    blob = sgc.execute(query=q_neru_6, limit=None, neupop_id=neupop_id, output='application/json')
+    blob = sgc.execute(query=q_neru_7, limit=None, neupop_id=neupop_id, output='application/json')
     return blob
 
 def sigh():
@@ -1762,7 +1774,7 @@ def rendlab(pairs):
                #(*tend, eid, fbid(eid), fbids(easdf)) if eid else (*tend, eid, fbids(easdf)))
 #+end_src
 
-#+begin_src jupyter-python :session pys
+#+begin_src jupyter-python :session pys :results none
 from copy import deepcopy
 
 blobs = [neupop_blob(f"ilxtr:neuron-type-keast-{npid}") for npid in range(1, 21)]
@@ -1782,6 +1794,71 @@ sigh = [s for n, si in enumerate(simples)  for s in ((f'--------- {n + 1}','----
 #pprint(simples[0])
 #sigh[:200]
 sigh
+#+end_src
+
+#+header: :depends py-nbr-1
+#+begin_src jupyter-python :session pys :results none
+from neurondm import orders
+from neurondm.models.nlp import add_partial_orders
+from pyontutils.core import OntId, OntGraph
+from pyontutils.utils import log
+from pyontutils.config import auth
+from pyontutils.namespaces import ilxtr
+
+def apinat_to_raw_adj(blob):
+    cpairs = render_blob(blob)
+    cpairs_bad = [c for c in cpairs if not (c[0][1] and c[1][1])]
+    if cpairs_bad:
+        log.error(f'cpairs_bad: {cpairs_bad}')
+    cpairs_ok = [c for c in cpairs if c[0][1] and c[1][1]]
+    raw_adj = [((r1, l1), (r2, l2)) for  # region first since neurondm.orders.rl.__init__(self, region, layer=None)
+               ((link1, ((l1, r1), *housing1)), (link2, ((l2, r2), *housing2)))  # FIXME housing ...
+               # FIXME no projections case ... do we link to self for soma?
+               in cpairs_ok]
+    return raw_adj
+
+def all_nst(ids, blobs):
+    pos = {}
+    for id, blob in zip(ids, blobs):
+        #print(id)
+        raw_adj = apinat_to_raw_adj(blob)
+        adj = raw_adj_to_nst(raw_adj)
+        pos[OntId(id).u] = adj
+
+    return pos
+
+def raw_adj_to_nst(raw_adj):
+    adj = tuple(tuple(orders.rl(*(a if a is None else OntId(a).u for a in rl)) for rl in rls) for rls in raw_adj)
+    nst = orders.adj_to_nst(adj)
+    return nst
+
+def get_apinat_blobs():
+    d = sgc.execute(query=q_cnap, limit=99999, output='application/json')
+    ids = [n['id'] for n in d['nodes']]
+    for id in ids:
+        blob = sgd.demos_apinat_neru_7_neupop_id(neupop_id=id)  # FIXME slow, TODO parallize
+
+#issue = 3  # 'ilxtr:neuron-type-splen-2'
+issue = ids.index('ilxtr:neuron-type-aacar-6')
+#issue = 101  # 'ilxtr:neuron-type-pancr-2'
+iblob = blobs[issue]
+oof = render_blob(iblob)
+owie = ids[issue]
+
+# oh boy, somas are missing housing entirely in some cases
+ematch(iblob, sub, 'aacar:ac-atrial-epi-term-6_lnk_1')
+ematch(iblob, obj, 'aacar:ac-atrial-epi-term-6_lnk_1')
+
+ouch = apinat_to_raw_adj(iblob)
+hrm = raw_adj_to_nst(ouch)
+# wat = anst[OntId('ilxtr:neuron-type-aacar-6').u]
+anst = all_nst(ids, blobs)
+olr = auth.get_path('ontology-local-repo')
+og = OntGraph().parse(olr / 'ttl/generated/neurons/apinat-simple-sheet.ttl')
+g = OntGraph()
+g.namespace_manager.populate_from(og)
+add_partial_orders(g, anst)
+g.write(olr / 'ttl/generated/neurons/apinat-partial-orders.ttl')
 #+end_src
 
 ** asdf
@@ -1806,9 +1883,6 @@ select distinct ?s ?p where {
 #+begin_src jupyter-python :session pys :noweb yes :results none :var remove=(and "sigh")
 <<py-neupop-helper>>
 from collections import defaultdict
-q_cnap = """
-<<cy-neru-all-pop>>
-"""
 
 def get_label(region):
     return id_label[region]
