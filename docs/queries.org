@@ -1806,7 +1806,8 @@ from pyontutils.config import auth
 from pyontutils.namespaces import ilxtr
 
 def apinat_to_raw_adj(blob):
-    cpairs = render_blob(blob)
+    dblob, *_ = apinat_deblob(blob)
+    cpairs = render_blob(dblob)
     cpairs_bad = [c for c in cpairs if not (c[0][1] and c[1][1])]
     if cpairs_bad:
         log.error(f'cpairs_bad: {cpairs_bad}')
@@ -1828,7 +1829,8 @@ def all_nst(ids, blobs):
     return pos
 
 def raw_adj_to_nst(raw_adj):
-    adj = tuple(tuple(orders.rl(*(a if a is None else OntId(a).u for a in rl)) for rl in rls) for rls in raw_adj)
+    # dupes aren't an issue but removing them produces a slight performance improvement
+    adj = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).u for a in rl)) for rl in rls) for rls in raw_adj))
     nst = orders.adj_to_nst(adj)
     return nst
 
@@ -1842,12 +1844,17 @@ def get_apinat_blobs():
 issue = ids.index('ilxtr:neuron-type-aacar-6')
 #issue = 101  # 'ilxtr:neuron-type-pancr-2'
 iblob = blobs[issue]
-oof = render_blob(iblob)
+idb, *_ = apinat_deblob(iblob)
+oof = render_blob(idb)
 owie = ids[issue]
 
 # oh boy, somas are missing housing entirely in some cases
-ematch(iblob, sub, 'aacar:ac-atrial-epi-term-6_lnk_1')
-ematch(iblob, obj, 'aacar:ac-atrial-epi-term-6_lnk_1')
+#ematch(iblob, sub, 'aacar:ac-atrial-epi-term-6_lnk_1')
+#ematch(iblob, obj, 'aacar:ac-atrial-epi-term-6_lnk_1')
+
+# lol forgot to deblob
+#ematch(iblob, sub, 'aacar:ac-sn-sgt3_6_lnk_2')
+#ematch(iblob, obj, 'aacar:ac-sn-sgt3_6_lnk_2')
 
 ouch = apinat_to_raw_adj(iblob)
 hrm = raw_adj_to_nst(ouch)
