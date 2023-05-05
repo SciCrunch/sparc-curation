@@ -1346,7 +1346,7 @@ class SDSPipeline(JSONPipeline):
             # sentinel value to detect cases where the pipeline
             # should not try to continue and should simply fail
             log.critical(lj(data))
-            raise exc.StopTheWorld(f'Something has gone VERY wrong {data["id"]}')
+            raise exc.StopTheWorld(f'Something has gone VERY wrong check logs above {data["id"]}')
 
         # dereference should happen here not at the end of PiplineStart
         # though harder to work backwards to the offending file right now

@@ -1,3 +1,4 @@
+import uuid
 import logging
 import hashlib
 import pathlib
@@ -85,6 +86,20 @@ class BFPNCacheBase(PrimaryCache, EatCache):
     cypher = hashlib.sha256  # set the remote hash cypher on the cache class
 
     _suffix_mimetypes = suffix_mimetypes
+
+    _local_xattr = b'sparcur.from_local'
+
+    @classmethod
+    def fromLocal(cls, path):
+        meta = path.meta
+        meta.__dict__['id'] = 'N:package:' + uuid.uuid4().urn[9:]
+        self = cls(path, meta=meta)
+        self.setxattr(cls._local_xattr, b'1')
+        return self
+
+    def meta_from_local(self):
+        value = self.getxattr(self._local_xattr)
+        return bool(value)
 
     @classmethod
     def decode_value(cls, field, value):

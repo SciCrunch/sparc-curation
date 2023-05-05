@@ -81,6 +81,8 @@ Commands:
                        : --browser  navigate to the human uri for this file
                        : --human
                        : --context  include context, e.g. dataset
+                       : --fake     make fake metadata to keep pipeline happy
+                       : --meta-from-local   check if cached metadata from local
 
     rmeta       retrieve metadata about files/folders from the remote
 
@@ -241,6 +243,8 @@ Options:
     --no-network            do not make any network requests (incomplete impl)
     --mbf                   fetch/export mbf related metadata
     --unique                return a unique set of values without additional info
+    --fake                  make fake file system metadata to keep pipelines happy
+    --meta-from-local       check if cached metadata from local
 
     --log-level=LEVEL       set python logging log level
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
@@ -1533,8 +1537,16 @@ done"""
                     webbrowser.open(uri)
 
             try:
+                if path.cache is None and path.is_file():
+                    if self.options.fake:
+                        path._cache = path._cache_class.fromLocal(path)
+
                 cmeta = path.cache.meta
                 if cmeta is not None:
+                    mfl = (self.options.meta_from_local
+                           and path.cache.meta_from_local())
+                    title = (path.relative_to(path.cwd()).as_posix() + ' *mfl*'
+                             if mfl else None)
                     if self.options.diff:
                         if path.is_dir():
                             print('It is not meaningful to diff directory metadata.')
@@ -1550,9 +1562,11 @@ done"""
                         setattr(lmeta, 'id', None)
                         setattr(lmeta, 'file_id', None)
                         print(lmeta.as_pretty_diff(cmeta, pathobject=path,
+                                                   title=title,
                                                    human=self.options.human))
                     else:
                         print(cmeta.as_pretty(pathobject=path,
+                                              title=title,
                                               human=self.options.human))
 
                     if self.options.context:
