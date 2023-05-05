@@ -1815,7 +1815,9 @@ def apinat_to_raw_adj(blob):
     raw_adj = [((r1, l1), (r2, l2)) for  # region first since neurondm.orders.rl.__init__(self, region, layer=None)
                ((link1, ((l1, r1), *housing1)), (link2, ((l2, r2), *housing2)))  # FIXME housing ...
                # FIXME no projections case ... do we link to self for soma?
-               in cpairs_ok]
+               in cpairs_ok
+               # FIXME have to exclude cycles like this for now because neurondm.orders.adj_to_nst breaks if there are cycles like this
+               if (r1, l1) != (r2, l2)]
     return raw_adj
 
 def all_nst(ids, blobs):
@@ -1841,7 +1843,8 @@ def get_apinat_blobs():
         blob = sgd.demos_apinat_neru_7_neupop_id(neupop_id=id)  # FIXME slow, TODO parallize
 
 #issue = 3  # 'ilxtr:neuron-type-splen-2'
-issue = ids.index('ilxtr:neuron-type-aacar-6')
+#issue = ids.index('ilxtr:neuron-type-aacar-6')
+issue = ids.index('ilxtr:neuron-type-aacar-7v')
 #issue = 101  # 'ilxtr:neuron-type-pancr-2'
 iblob = blobs[issue]
 idb, *_ = apinat_deblob(iblob)
@@ -1857,6 +1860,7 @@ owie = ids[issue]
 #ematch(iblob, obj, 'aacar:ac-sn-sgt3_6_lnk_2')
 
 ouch = apinat_to_raw_adj(iblob)
+souch = sorted(set(ouch))
 hrm = raw_adj_to_nst(ouch)
 # wat = anst[OntId('ilxtr:neuron-type-aacar-6').u]
 anst = all_nst(ids, blobs)
