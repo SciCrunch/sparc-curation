@@ -15,7 +15,11 @@
 - ApiNATOMY models use wbrcm
 - NPO additional connections from NLP
 - TODO NPO aacar pig dog human, not mouse not rat
-- TODO NPO partial orders for apinatomy populations
+* RC 2023-05-05
+- ApiNATOMY aacar-6 fix missing A in A74 that generated a lyph with no metadata
+- ApiNATOMY pancr-2 fix incorrect housing lyph pancreatic vasculature to wbkg pancreatic acinus
+- ApiNATOMY splen-2 fix incorrect housing layer for nts and dmv
+- NPO first pass at partial orders for ApiNATOMY populations
 * RC 2023-04-29
 - NPO add missing axioms so that aacar 7 and 8 are not inferred to be equivalent
 - NPO add missing axioms so that sdcol j and l are not inferred to be equivalent
