@@ -707,7 +707,7 @@ class BlackfynnRemote(aug.RemotePath):
             if state != 'UPLOADED':
                 self._errors.append(f'State not READY and not UPLOADED is {state}')
 
-            if state == 'DELETING' or state == 'PARENT-DELETING':
+            if state == 'DELETING' or state == 'PARENT-DELETING' or state == 'DELETED':
                 deleted.append(child)
                 return
             if exclude_uploaded and state == 'UPLOADED':

@@ -215,6 +215,7 @@ def bind_packages_File(File):
                     f'includeSourceFiles={str(includeSourceFiles).lower()}'
                     f'{filename_args}'
                     f'{cursor_args}')
+                log.log(9, f'wat:\n{resp.url}')
             except requests.exceptions.RetryError as e:
                 log.exception(e)
                 # sporadic 504 errors that we probably need to sleep on
@@ -225,6 +226,7 @@ def bind_packages_File(File):
             if resp.ok:
                 j = resp.json()
                 packages = j['packages']
+                #log.log(9, f'what is going on 0\n{packages!r}')
                 if raw:
                     yield from packages
                     if latest_only:
@@ -299,8 +301,11 @@ def bind_packages_File(File):
                                 if not bfobject.state == 'DELETING':
                                     bfobject.state = 'PARENT-DELETING'
 
+                            log.log(9, f'what is going on 1 {bfobject}')
+                            #breakpoint()
                             yield bfobject  # only yield if we can get a parent
                         elif out_of_order is None:  # filename case
+                            log.log(9, f'what is going on 2 {bfobject}')
                             yield bfobject
                         elif bfobject.parent is None:
                             # both collections and packages can be at the top
@@ -310,6 +315,7 @@ def bind_packages_File(File):
                                 log.debug('No parent no dataset\n' +
                                           json.dumps(bfobject._json, indent=2))
                             index[bfobject.id] = bfobject
+                            log.log(9, f'what is going on 3 {bfobject}')
                             yield bfobject
                         else:
                             out_of_order.append(bfobject)
