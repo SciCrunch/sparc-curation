@@ -684,7 +684,7 @@
      (let ([cwd-2 (build-path (dataset-src-path ds)
                               ; FIXME dataset here is hardcoded
                               "dataset")]
-           [argv-3 argv-spc-export])
+           [argv-3 (append argv-spc-export '("--fill-cache-metadata"))]) ; fill cache metadata in case a file was modified and xattrs were lost
        (thread
         (thunk
          (let ([status-3 #f]

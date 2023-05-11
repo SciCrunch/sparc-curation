@@ -245,6 +245,7 @@ Options:
     --unique                return a unique set of values without additional info
     --fake                  make fake file system metadata to keep pipelines happy
     --meta-from-local       check if cached metadata from local
+    --fill-cache-metadata   fill missing cache metadata from local to avoid errors
 
     --log-level=LEVEL       set python logging log level
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
@@ -1258,6 +1259,9 @@ done"""
             return blob_ir
 
         elif self.cwd.cache.is_dataset():
+            if self.options.fill_cache_metadata:
+                self.cwd.transitive_fix_missing_metadata()
+
             export = self._export(ex.Export)
             blob_ir, intr, dump_path, latest_path = export.export_single_dataset()
             return blob_ir, intr, dump_path, latest_path
@@ -1540,6 +1544,10 @@ done"""
                 if path.cache is None and path.is_file():
                     if self.options.fake:
                         path._cache = path._cache_class.fromLocal(path)
+                    else:
+                        # have to raise here since cache None means that
+                        # cache can't raise the error itself
+                        raise exc.NoCachedMetadataError(path)
 
                 cmeta = path.cache.meta
                 if cmeta is not None:

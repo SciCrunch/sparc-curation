@@ -11,7 +11,7 @@ from augpathlib import RepoPath, LocalPath
 from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
-from sparcur.utils import transitive_dirs, transitive_paths, is_list_or_tuple
+from sparcur.utils import transitive_dirs, transitive_files, transitive_paths, is_list_or_tuple
 from sparcur.utils import levenshteinDistance
 from sparcur.utils import BlackfynnId, LocId, PennsieveId
 from sparcur.config import auth
@@ -1117,6 +1117,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
             # in the even that the current folder is empty
             updated = self.getxattr('bf.updated').decode()
             return aug.PathMeta(updated=updated).updated
+
+    def transitive_fix_missing_metadata(self):
+        # beware this will compute checksums for any files missing metadata
+        nometa = [f for f in transitive_files(self) if not f.xattrs()]
+        [f._cache_class.fromLocal(f) for f in nometa]
 
     def _upload_raw(self):
         remote, old_remote = (

@@ -346,7 +346,7 @@ def symlink_latest(dump_path, path, relative=True):
     path.symlink_to(dump_path)
 
 
-def _transitive_(path, command):
+def _transitive_(path, command, skip_first=False):
     safe_command = command + ' -print0'
     with path:
         with os.popen(safe_command) as p:
@@ -355,7 +355,10 @@ def _transitive_(path, command):
     path_strings = string.split('\x00')
     # XXXXXXXXXXXXXXXXXXX REMINDER THAT THIS IS NOT SORTED
     # https://doi.org/10.1021/acs.orglett.9b03216
-    paths = [path / s for s in path_strings if s][1:]  # leave out the parent folder itself
+    paths = [path / s for s in path_strings if s]
+    if skip_first:
+        paths = paths[1:]  # leave out the parent folder itself
+
     return paths
 
 
@@ -370,7 +373,7 @@ def transitive_paths(path, exclude_patterns=tuple()):
         hrm = ' ' + hrm
     command = f"""{_find_command} -not -path '.operations*'{hrm}"""
     # TODO failover to builtin rglob
-    return _transitive_(path, command)
+    return _transitive_(path, command, skip_first=True)
 
 
 def transitive_dirs(path):
@@ -381,6 +384,17 @@ def transitive_dirs(path):
         return [path / t[0] for t in gen]
 
     command = f"""{_find_command} -type d"""
+    # TODO failover to builtin rglob + filter
+    return _transitive_(path, command, skip_first=True)
+
+
+def transitive_files(path):
+    """Fast list of all child directories using unix find."""
+    if sys.platform == 'win32':  # no findutils
+        gen = os.walk(path)
+        return [p for t in gen for f in t[2] for p in (path.__class__(t[0]) / f,) if p.is_file()]
+
+    command = f"""{_find_command} -type f"""
     # TODO failover to builtin rglob + filter
     return _transitive_(path, command)
 
