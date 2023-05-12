@@ -507,8 +507,9 @@ class Derives:
                 yield blob['subject_id']
                 if 'was_derived_from' in blob:  # TODO member_of works backward with populations, so may need to deal with that case as well
                     parent = blob['was_derived_from']
-                    if parent in _combined_index:
-                        yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
+                    parent_pkey = blob['subject_id'] + '_' + parent
+                    if parent_pkey in _combined_index:
+                        yield from getmaybe(_combined_index[parent_pkey])  # XXX watch out for bad circular refs here
                     else:
                         if parent.startswith('='):
                             msg = f'Sample was_derived_from specified as a formula. We do not currently support this.'
