@@ -1007,24 +1007,26 @@
     (xopen-path path)))
 
 (define (xopen-path path)
-  (let ([command (find-executable-path
+  (let* ([is-win? #f]
+         [command (find-executable-path
                   (case (system-type 'os*)
                     ((linux) "xdg-open") ; if firefox complains, make sure it matches firefox not firefox-bin xdg-settings get default-web-browser
                     ((macosx) "open")
-                    ((windows) "explorer.exe") ; requires an associated file type
+                    ((windows) (set! is-win? #t) "explorer.exe") ; requires an associated file type
                     (else (error "don't know xopen command for this os"))))])
     #; ; don't use subprocess for this, there is WAY too much cleanup required
     (subprocess #f #f #f command path)
     (thread
      (thunk
-      (let ([cwd
+      (let* ([is-dir? #f]
+             [cwd
              (cond
-               [(directory-exists? path) path]
+               [(directory-exists? path) (set! is-dir? #t) path]
                [(file-exists? path) (simple-form-path (build-path path 'up))]
                [(regexp-match #rx"^https?" path) (current-directory)]
                [else (error 'xopen-path "path-does-not-exist: ~s" path)])])
         (parameterize ([current-directory cwd])
-          (system* command path #:set-pwd? #t)))))))
+          (system* command (if (and is-win? is-dir?) "." path) #:set-pwd? #t)))))))
 
 #; ; no longer needed
 (define (xopen-folder path)
