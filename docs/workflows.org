@@ -8,36 +8,15 @@
    *INSTEAD* use =rsync -X -u -v=. \\
    =cp= does not remove absent fields from xattrs of the file previously
    occupying that name! OH NO (is this a =cp= bug!?)
-** Export v4
+** Export v5
 :PROPERTIES:
-:CUSTOM_ID: export-v4
+:CUSTOM_ID: export-v5
 :END:
-
 #+begin_src bash
 source ~/files/venvs/sparcur-dev/bin/activate
-python -m sparcur.simple.combine &&
-python -m sparcur.simple.disco ~/.local/share/sparcur/export/summary/618*/LATEST/curation-export.json &&
-echo Export complete. Check results at: ;
+python -m sparcur.simple.combine
+echo Export complete. Check results at:
 echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/share/sparcur/export/summary/618*/LATEST)
-#+end_src
-
-*** COMMENT deprecated
-Then as root run =combine-sparc-export-to-server=, which is defined as
-follows and should be in =~/.bashrc=.
-#+begin_src bash
-# THIS IS NO LONGER NEEDED DO NOT USE IT
-function combine-sparc-export-to-server () {
-    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
-    FULLPATH=$(readlink -f ${SPARCUR_EXPORTS}/summary/618*/LATEST)
-    FOLDERNAME=$(basename "${FULLPATH}")
-    pushd /var/www/sparc/sparc/preview
-    ln -s "${FULLPATH}" "archive/exports/${FOLDERNAME}" \
-    && unlink exports \
-    ; ln -s "archive/exports/${FOLDERNAME}" exports
-    popd
-    echo Export complete. Check results at:
-    echo https://cassava.ucsd.edu/sparc/preview/archive/exports/${FOLDERNAME}
-}
 #+end_src
 ** Report
 #+begin_src bash :eval never
@@ -356,6 +335,11 @@ Usage.
 #+begin_src bash
 review-failed-curl $(curl https://cassava.ucsd.edu/sparc/pipelines/failed | jq -r '.failed[]' | sed 's/N:dataset://')
 #+end_src
+** fixing missing file metadata
+#+begin_src bash
+find -type f -exec sh -c '[[ "$(getfattr -d $1)" = "" ]] || exit 1' _ {} \; -exec python -m sparcur.cli meta --fake --meta-from-local {} \+
+#+end_src
+
 ** COMMENT Get data
 :PROPERTIES:
 :CUSTOM_ID: get-data
@@ -508,6 +492,37 @@ Export time is usually later than parent time.
 #+begin_src bash :dir /ssh:cassava|sudo:cassava :eval never
 preview-sparc-export-to-server
 preview-export-rest ${EXPORT_PATH_TIME} ${PARENT_PATH_TIME}
+#+end_src
+** COMMENT Export v4
+:PROPERTIES:
+:CUSTOM_ID: export-v4
+:END:
+
+#+begin_src bash
+source ~/files/venvs/sparcur-dev/bin/activate
+python -m sparcur.simple.combine &&
+python -m sparcur.simple.disco ~/.local/share/sparcur/export/summary/618*/LATEST/curation-export.json &&
+echo Export complete. Check results at: ;
+echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/share/sparcur/export/summary/618*/LATEST)
+#+end_src
+
+*** COMMENT deprecated
+Then as root run =combine-sparc-export-to-server=, which is defined as
+follows and should be in =~/.bashrc=.
+#+begin_src bash
+# THIS IS NO LONGER NEEDED DO NOT USE IT
+function combine-sparc-export-to-server () {
+    : ${SPARCUR_EXPORTS:=/var/lib/sparc/.local/share/sparcur/export}
+    FULLPATH=$(readlink -f ${SPARCUR_EXPORTS}/summary/618*/LATEST)
+    FOLDERNAME=$(basename "${FULLPATH}")
+    pushd /var/www/sparc/sparc/preview
+    ln -s "${FULLPATH}" "archive/exports/${FOLDERNAME}" \
+    && unlink exports \
+    ; ln -s "archive/exports/${FOLDERNAME}" exports
+    popd
+    echo Export complete. Check results at:
+    echo https://cassava.ucsd.edu/sparc/preview/archive/exports/${FOLDERNAME}
+}
 #+end_src
 ** COMMENT Export published
 Generate =curation-export-published.ttl= for existing exports.
