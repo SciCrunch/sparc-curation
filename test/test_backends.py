@@ -74,11 +74,7 @@ class TestPennsieveDiscoverRemote(RemoteHelper, unittest.TestCase):
     _cache_class = PDFC
     _data_id = '292'
 
-    def test_pull_fetch(self):
-        r = self.Remote(self._data_id)
-        r.cache.pull_fetch()
-
-    def test_validate(self):
+    def test_pull_fetch_validate(self):
         r = self.Remote(self._data_id)
         r.cache.pull_fetch()
         path = r.local

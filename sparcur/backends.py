@@ -1786,7 +1786,9 @@ class PennsieveDiscoverRemote(aug.RemotePath):
             self._name = self._project_name
 
         self._id = str(id_published)
-        if self.id != self._project_id:
+        if self.id == self._project_id:
+            self.version = None
+        else:
             v = self._latest_version() if version is None else version
             self.version = str(v)
 
