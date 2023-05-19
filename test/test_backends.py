@@ -92,7 +92,7 @@ class TestPennsieveDiscoverRemote(RemoteHelper, unittest.TestCase):
         with path:
             oav = sys.argv
             try:
-                sys.argv = ['spc', 'export', '--discover']
+                sys.argv = ['spc', 'export', '--discover', '-N']
                 main()
             finally:
                 sys.argv = oav

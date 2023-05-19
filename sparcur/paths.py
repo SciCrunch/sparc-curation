@@ -530,6 +530,8 @@ class PennsieveDiscoverCache(PrimaryCache, EatCache):
     uri_human = backends.PennsieveDiscoverRemote.uri_human
     uri_api = backends.PennsieveDiscoverRemote.uri_api
 
+    _id_class = PDId
+
     _project_id = backends.PennsieveDiscoverRemote._project_id
     _uri_api_template = backends.PennsieveDiscoverRemote._uri_api_template
 
@@ -539,7 +541,7 @@ class PennsieveDiscoverCache(PrimaryCache, EatCache):
     @property
     def identifier(self):
         # FIXME TODO hack to keep _jsonMetadata happy
-        return PDId(self.id)
+        return self._id_class(self.id)
 
     @property
     def remote(self):
@@ -691,6 +693,9 @@ PennsieveDiscoverCache._bind_flavours()
 
 class PathHelper:
 
+    _xattr_meta = aug.EatCache.meta
+    _symlink_meta = aug.SymlinkCache.meta
+
     @property
     def dataset_relative_path(self):
         # FIXME broken for local validation
@@ -823,10 +828,115 @@ class PathHelper:
             updated = self.getxattr('bf.updated').decode()
             return aug.PathMeta(updated=updated).updated
 
+    @property
+    def cache_meta(self):
+        """ Access cached metadata without constructing the cache instance. """
+        if self.is_broken_symlink():
+            # NOTE check ibs first otherwise symlink meta could
+            # raise a NoCachedMetadataError, it may raise other
+            # errors if something goes wrong when reading the
+            # symlink, but not that particular error
+            return self._symlink_meta
+        else:
+            return self._xattr_meta
+
+    def _cache_jsonMetadata(self, do_expensive_operations=False):
+        blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
+        project_meta = project_path.cache_meta
+        meta = self.cache_meta  # FIXME this is very risky
+        # and is the reason why I made it impossible to contsturct
+        # cache classes when no cache was present, namely that if
+        # there is no cache then PathMeta will still return the
+        # correct structure, but it will be empty, which is bad
+        if meta is None:
+            log.critical(f'something is very wrong with path: {self}')
+            raise exc.NoCachedMetadataError(self)
+        elif meta.id is None:
+            raise exc.NoCachedMetadataError(self)
+
+        if self.xattr_prefix in ('bf', 'pn'):
+            _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
+            idc = self._cache_class._id_class
+            remote_id = (idc(bf_id, file_id=meta.file_id)
+                        if self.is_file() or self.is_broken_symlink() else
+                        idc(bf_id))
+        elif self.xattr_prefix in ('pd',):
+            remote_id = self.cache_identifier
+        else:
+            msg = f'unknown xattr prefix {self.xattr_prefix!r}'
+            raise NotImplementedError(msg)
+
+        #identifier = self._cache_class._id_class('N:' + remote_id)
+        uri_api = remote_id.uri_api
+        uri_human = remote_id.uri_human(
+            organization=project_path.cache_identifier,
+            dataset=dsid)
+        blob['remote_id'] = remote_id
+        #blob['timestamp_created'] = meta.created  # leaving this out
+        blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
+        blob['uri_api'] = uri_api
+        blob['uri_human'] = uri_human
+
+        if meta.size is not None:
+            blob['size_bytes'] = meta.size
+
+        if (self.is_file() or self.is_broken_symlink()) and meta.checksum is not None:
+            # FIXME known checksum failures !!!!!!!
+            blob['checksums'] = [{'type': 'checksum',
+                                  # FIXME cypher should ALWAYS travel with checksum
+                                  # not be implicit and based on the implementation
+                                  'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
+                                  'hex': meta.checksum.hex(),}]
+
+        return blob
+
+    def _transitive_metadata(self):
+        def hrm(p):
+            try:
+                cjm = p._cache_jsonMetadata()
+            except exc.NoCachedMetadataError:
+                # FIXME TODO figure out when to log this
+                # probably only log when there is a dataset id
+                return
+            # this is not always needed so it is not included by default
+            # but we do need it here for when we generate the rdf export
+            p = cjm['dataset_relative_path'].parent
+            if p.name != '':  # we are at the root of the relative path aka '.'
+                cjm['parent_drp'] = p
+            return cjm
+
+        def sort_dirs_first(d):
+            # NOTE THAT mimetype IS NOT A REQUIRED FIELD
+            return ((not ('mimetype' in d and
+                          d['mimetype'] == 'inode/directory')),
+                    'mimetype' in d)
+
+        exclude_patterns = '*.~lock*#', '.DS_Store'  # TODO make this configurable
+        _tm = hrm(self)
+        _tm['dataset_relative_path'] = ''  # don't want . since it is ambiguous?
+        this_metadata = [_tm]  # close the transitive metadata under parent_id
+        # FIXME perf boost but not portable
+        rchildren = transitive_paths(self, exclude_patterns=exclude_patterns)
+        _rcm = [_ for _ in [hrm(c) for c in rchildren] if _ is not None]
+        rc_metadata = sorted(_rcm, key=sort_dirs_first)
+        metadata = this_metadata + rc_metadata
+        index = {b['dataset_relative_path']:b for b in metadata}
+        pid = this_metadata[0]['remote_id']
+        for m in metadata:
+            p = m.pop('parent_drp', None)
+            if p in index:
+                m['parent_id'] = index[p]['remote_id']
+            else:
+                m['parent_id'] = pid
+
+        return metadata
+
 
 class DiscoverPath(aug.XopenPath, aug.LocalPath, PathHelper):
 
     _cache_class = PennsieveDiscoverCache
+
+    xattr_prefix = PennsieveDiscoverCache.xattr_prefix
 
     # TODO factor out the common functionality between discover and
     # internal into a shared parent class, as it stands discover does
@@ -849,6 +959,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
     _dataset_cache = {}
 
     _suffix_mimetypes = suffix_mimetypes
+
+    xattr_prefix = BlackfynnCache.xattr_prefix
 
     @classmethod
     def fromJson(cls, blob):
@@ -914,22 +1026,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         return self._cache_class._id_class(
             self.cache_id, file_id=self.cache_file_id)
 
-    xattr_prefix = BlackfynnCache.xattr_prefix
-    _xattr_meta = aug.EatCache.meta
-    _symlink_meta = aug.SymlinkCache.meta
-
-    @property
-    def cache_meta(self):
-        """ Access cached metadata without constructing the cache instance. """
-        if self.is_broken_symlink():
-            # NOTE check ibs first otherwise symlink meta could
-            # raise a NoCachedMetadataError, it may raise other
-            # errors if something goes wrong when reading the
-            # symlink, but not that particular error
-            return self._symlink_meta
-        else:
-            return self._xattr_meta
-
     def manifest_record(self, manifest_parent_path):
         filename = self.relative_path_from(manifest_parent_path)
         description = None
@@ -968,90 +1064,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         else:
             return [c.manifest_record(self) for c in self.rchildren
                     if not c.is_dir()]
-
-    def _cache_jsonMetadata(self, do_expensive_operations=False):
-        blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
-        project_meta = project_path.cache_meta
-        meta = self.cache_meta  # FIXME this is very risky
-        # and is the reason why I made it impossible to contsturct
-        # cache classes when no cache was present, namely that if
-        # there is no cache then PathMeta will still return the
-        # correct structure, but it will be empty, which is bad
-        if meta is None:
-            log.critical(f'something is very wrong with path: {self}')
-            raise exc.NoCachedMetadataError(self)
-        elif meta.id is None:
-            raise exc.NoCachedMetadataError(self)
-
-        _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
-        idc = self._cache_class._id_class
-        remote_id = (idc(bf_id, file_id=meta.file_id)
-                     if self.is_file() or self.is_broken_symlink() else
-                     idc(bf_id))
-        #identifier = self._cache_class._id_class('N:' + remote_id)
-        uri_api = remote_id.uri_api
-        uri_human = remote_id.uri_human(
-            organization=project_path.cache_identifier,
-            dataset=dsid)
-        blob['remote_id'] = remote_id
-        #blob['timestamp_created'] = meta.created  # leaving this out
-        blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
-        blob['uri_api'] = uri_api
-        blob['uri_human'] = uri_human
-
-        if meta.size is not None:
-            blob['size_bytes'] = meta.size
-
-        if (self.is_file() or self.is_broken_symlink()) and meta.checksum is not None:
-            # FIXME known checksum failures !!!!!!!
-            blob['checksums'] = [{'type': 'checksum',
-                                  # FIXME cypher should ALWAYS travel with checksum
-                                  # not be implicit and based on the implementation
-                                  'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
-                                  'hex': meta.checksum.hex(),}]
-
-        return blob
-
-    def _transitive_metadata(self):
-        def hrm(p):
-            try:
-                cjm = p._cache_jsonMetadata()
-            except exc.NoCachedMetadataError:
-                # FIXME TODO figure out when to log this
-                # probably only log when there is a dataset id
-                return
-            # this is not always needed so it is not included by default
-            # but we do need it here for when we generate the rdf export
-            p = cjm['dataset_relative_path'].parent
-            if p.name != '':  # we are at the root of the relative path aka '.'
-                cjm['parent_drp'] = p
-            return cjm
-
-        def sort_dirs_first(d):
-            # NOTE THAT mimetype IS NOT A REQUIRED FIELD
-            return ((not ('mimetype' in d and
-                          d['mimetype'] == 'inode/directory')),
-                    'mimetype' in d)
-
-        exclude_patterns = '*.~lock*#', '.DS_Store'  # TODO make this configurable
-        _tm = hrm(self)
-        _tm['dataset_relative_path'] = ''  # don't want . since it is ambiguous?
-        this_metadata = [_tm]  # close the transitive metadata under parent_id
-        # FIXME perf boost but not portable
-        rchildren = transitive_paths(self, exclude_patterns=exclude_patterns)
-        _rcm = [_ for _ in [hrm(c) for c in rchildren] if _ is not None]
-        rc_metadata = sorted(_rcm, key=sort_dirs_first)
-        metadata = this_metadata + rc_metadata
-        index = {b['dataset_relative_path']:b for b in metadata}
-        pid = this_metadata[0]['remote_id']
-        for m in metadata:
-            p = m.pop('parent_drp', None)
-            if p in index:
-                m['parent_id'] = index[p]['remote_id']
-            else:
-                m['parent_id'] = pid
-
-        return metadata
 
     @classmethod
     def _file_type_status_lookup(cls):

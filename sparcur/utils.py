@@ -822,7 +822,11 @@ class PDId(idlib.Identifier):
         self.id = id
         self.curie = f'discover.api.dataset:{self.id}'
         self.uri_api = f'https://api.pennsieve.io/discover/datasets/{self.id}'
+        self._uri_human = f'https://discover.pennsieve.io/datasets/{self.id}'
         self._identifier = self.uri_api
+
+    def uri_human(self, *args, **kwargs):
+        return self._uri_human
 
 
 class LocId(idlib.Identifier):
