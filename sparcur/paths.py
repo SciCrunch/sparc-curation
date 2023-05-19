@@ -554,7 +554,7 @@ class PennsieveDiscoverCache(PrimaryCache, EatCache):
         # let's try this iteration using {:user-cache-path} ?
         # TODO see if we want to do the check here
         if not self.local_objects_dir.exists():
-            self.local_objects_dir.mkdir()
+            self.local_objects_dir.mkdir(parents=True)
 
     @property
     def version(self):
