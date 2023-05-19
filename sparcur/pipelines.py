@@ -108,6 +108,8 @@ class DatasourcePipeline(Pipeline):
 
 class RemoteDatasetDataPipeline(DatasourcePipeline):
 
+    _remote_type = None
+
     def __init__(self, previous_pipeline, lifters, runtime_context):
         # FIXME super convoluted and also just a bad way to detect if
         # there is no remote, but probably the best we can manage in
@@ -119,7 +121,9 @@ class RemoteDatasetDataPipeline(DatasourcePipeline):
             runtime_context.path.cache.meta.updated is None)
 
         self.dataset_id = previous_pipeline.data['id']
-        if not hasattr(self.__class__, 'RemoteDatasetData'):
+        nomatch = self._remote_type != lifters.remote
+        if not hasattr(self.__class__, 'RemoteDatasetData') or nomatch:
+            self._remote_type = lifters.remote
             if lifters.remote == 'pennsieve':
                 from sparcur.backends import PennsieveDatasetData as RDD
             elif lifters.remote == 'local':
