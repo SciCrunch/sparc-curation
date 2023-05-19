@@ -38,7 +38,7 @@ class _TestOperation:
         base.mkdir()
         base.pushd()
 
-        self.Remote = self._remote_class._new(LocalPath, Cache)
+        self.Remote = self._remote_class._new(Cache._local_class, Cache)
         self.Remote.init(test_organization)
         self.anchor = self.Remote.dropAnchor(base)
 

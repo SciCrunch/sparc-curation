@@ -316,7 +316,11 @@ class BlackfynnRemote(aug.RemotePath):
     @property
     def dataset_id(self):
         """ save a network transit if we don't need it """
-        dataset = self._bfobject.dataset
+        if self.is_dataset():
+            dataset = self
+        else:
+            dataset = self._bfobject.dataset
+
         if isinstance(dataset, str):
             return dataset
         else:
@@ -324,6 +328,9 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def dataset(self):
+        if self.is_dataset():
+            return self
+
         remote = self.__class__(self.dataset_id)
         remote.cache_init()
         return remote
@@ -1053,7 +1060,7 @@ class BlackfynnRemote(aug.RemotePath):
         
         return l / child.name
 
-    def __truediv__(self, other):  # XXX
+    def __truediv__(self, other, docache=True):  # XXX
         """ this is probably the we want to use for this at all
             it is kept around as a reminder NOT to do this
             however might revisit this at some point if we want
@@ -1111,7 +1118,9 @@ class BlackfynnRemote(aug.RemotePath):
                 else:
                     child = childs[0]
 
-                self.cache / child  # THIS SIDE EFFECTS TO UPDATE THE CHILD CACHE
+                if docache:
+                    self.cache / child  # THIS SIDE EFFECTS TO UPDATE THE CHILD CACHE
+
                 return child
 
             else:  # create an empty
@@ -1207,27 +1216,34 @@ class BlackfynnRemote(aug.RemotePath):
         # FIXME BAD forces us to read file twice
         checksum = local_path.checksum()
 
-        try:
-            old_remote = self / local_path.name
-        except NotImplementedError as e:
-            # well now this isn't failing ...
-            #breakpoint()
-            raise e
+        # must set docache False here to avoid automatically updating the local
+        # local when we know that 99% of the time the file has been modified
+        # and thus trying to retrieve the remote will fail with a LocalChangesError
+        # old_remote = self.__truediv__(local_path.name, docache=False)
+        # FIXME old_remote doesn't carry the checksum, have to get it from the dataset packages endpoint
+        matches = [self.__class__(b) for b in self.dataset.bfobject._packages(filename=local_path.name)
+                   if hasattr(b, 'package') and
+                   b.state not in ('DELETING', 'DELETED')]
+        sids = self.is_dataset()
+        sid = self.id
+        cands = [m for m in matches if m.name == local_path.name and
+                 m.checksum and m.parent == self]
+        scands = sorted(cands, key=lambda c:c.updated)
+        # TODO maybe deal with multiple package names ... ?? such is the life of no replace?
 
-        rchecksum = None
-        if old_remote is not None:
-            rchecksum = old_remote.checksum
-            if rchecksum is None and old_remote.cache is not None:
-                # has side effect of caching the object on the off chance that
-                # a local copy has not already been stashed (e.g. if we didn't
-                # upload it using this function)
-                rchecksum = old_remote.cache.checksum()
-
-        if checksum == rchecksum:
+        checksum_matches =[c for c in cands if c.checksum == checksum]
+        if checksum_matches:
             # TODO check to make sure nothing else has changed ???
             # also how does this interact with replace = true?
             raise exc.FileHasNotChangedError(
-                'no changes have been made, not uploading')
+                ('a file with the same name and checksum already exists, not uploading: '
+                f'{[c.meta for c in checksum_matches]}'))
+        elif scands:
+            # take the latest in the event that there are multiple
+            # e.g. because tests have been failing for ... years ... heh
+            old_remote = scands[-1]
+        else:
+            old_remote = None
 
         _ = cls._upload(local_path.as_posix(), self)
         # the agent now returns nothing, we use display progres in
