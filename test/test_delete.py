@@ -2,6 +2,7 @@ import os
 import secrets
 import unittest
 import augpathlib as aug
+from pyontutils.asyncd import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow
 from sparcur.paths import PennsieveCache, LocalPath, Path
@@ -227,16 +228,19 @@ class TestFilenames(_TestOperation, unittest.TestCase):
             test_folder = local / 'pandora'
             test_folder.mkdir_remote()
             test_folder.__class__.upload = Path.upload
-            results = []
             fsize = 1024  # needed for uniqueish hashes colloisions will still happen
             # FIXME this pretty clearly reveals a need for
             # batching to multiplex the fetch ... SIGH
-            for name in names:
-                name_a, name_b, name_i = self._op(test_folder, fsize, name)
-                results.append((name_a, name_b, name_i))
+            results = Async(rate=10)(deferred(self._op)(test_folder, fsize, name) for name in names)
+            #results = []
+            #for name in names:
+            #    name_a, name_b, name_i = self._op(test_folder, fsize, name)
+            #    results.append((name_a, name_b, name_i))
         finally:
-            remote.rmdir()
-            remote.cache.refresh()
+            remote.rmdir(force=True)
+            # FIXME crumple fails in refresh since we use rmdir
+            # instead of rmtree (for safety)
+            #remote.cache.refresh()  # FIXME
 
 
 @skipif_ci

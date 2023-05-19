@@ -95,6 +95,8 @@ Commands:
                        : --open=P   open the output file with specified command
                        : --show     open the output file using xopen
                        : --mbf      extract and export mbf embedded metadata
+                       : --fast     don't export path metadata
+                       : --fill-cache-metadata  cache metadata from local
 
     report      generate reports
 
@@ -242,6 +244,7 @@ Options:
     --local                 ignore network issues
     --no-network            do not make any network requests (incomplete impl)
     --mbf                   fetch/export mbf related metadata
+    --fast                  don't export path metadata
     --unique                return a unique set of values without additional info
     --fake                  make fake file system metadata to keep pipelines happy
     --meta-from-local       check if cached metadata from local
@@ -644,12 +647,20 @@ class Main(Dispatcher):
         else:
             try:
                 self._setup_bfl()
-            except BaseException as e:
+            except Exception as e:
                 if self.options.local:
                     from sparcur.pennsieve_api import FakeBFLocal
                     log.exception(e)
                     self.Remote._api = FakeBFLocal(self.anchor.id, self.anchor)
-                    self.Remote.anchorTo(self.anchor)
+                    try:
+                        self.Remote.anchorTo(self.anchor)
+                    except ValueError as e:
+                        # in some cases (e.g. when testing)
+                        # an error may happen after anchoring but
+                        # before a clean return, but cleaning that up
+                        # is not straight forward, so we test here instead
+                        if not hasattr(self.Remote._cache_anchor):
+                            raise e
                 else:
                     raise e
 

@@ -65,6 +65,8 @@ mains = {'cli-real': [['spc', 'clone', test_organization],
                       ['spc', 'pull'],
                       #['spc', 'refresh'],  # XXX insanely slow and no longer used due to brokeness
                       ['spc', 'fetch'],
+                      # nonsense with consistently incorrectly sized files in pandora
+                      # find objects/ -exec ls -al {} \+ | grep -v 1024 | grep -v 4096 | grep -v total | grep -v objects | grep tom
                       ['spc', 'fetch', '--mbf'],  # FIXME abstract --mbf
                       #['spc', 'report', 'access'],  # TODO no easy way to test this ...
                       ['spc', 'rmeta'],],

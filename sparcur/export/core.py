@@ -99,7 +99,8 @@ class ExportBase:
                  # FIXME no_network passed here is still dumb though
                  # not quite as dump as passing it to the methods
                  no_network=False,
-                 discover=False,):
+                 discover=False,
+                 fast=False,):
 
         # FIXME ugh the logic here for handling discover is aweful
         if discover:
@@ -124,6 +125,7 @@ class ExportBase:
         self.export_protcur_base = export_protcur_base  # pass in as export_base
         self.no_network = no_network
         self.discover = discover
+        self.fast = fast
 
         self._dsp = 'discover' if self.discover else 'datasets'  # FIXME hardcoded
         self._args = dict(export_path=export_path,
@@ -351,12 +353,12 @@ class Export(ExportBase):
             json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
         # path metadata
-        blob_path_transitive_metadata = pipes.PathTransitiveMetadataPipeline(
-            self.export_source_path, None, None).data  # FIXME timestamp etc.
-        # FIXME need top level object not just an array
-        with open(dump_path / 'path-metadata.json', 'wt') as f:
-            # TODO mongo
-            jdump(blob_path_transitive_metadata, f)
+        if not self.fast:
+            blob_path_transitive_metadata = pipes.PathTransitiveMetadataPipeline(
+                self.export_source_path, None, None).data  # FIXME timestamp etc.
+            # FIXME need top level object not just an array
+            with open(dump_path / 'path-metadata.json', 'wt') as f:
+                jdump(blob_path_transitive_metadata, f)
 
         # TODO a converter that doesn't care about higher level structure
         #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data
@@ -826,7 +828,8 @@ class Export(ExportBase):
         self.export_xml(filepath_json, dataset_blobs)
 
         # disco
-        self.export_disco(filepath_json, dataset_blobs, teds)
+        if False:  # deprecated and no longer used
+            self.export_disco(filepath_json, dataset_blobs, teds)
 
 
 class ExportProtcur(Export):

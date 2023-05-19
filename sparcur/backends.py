@@ -1178,12 +1178,12 @@ class BlackfynnRemote(aug.RemotePath):
         self._seed = bfobject
         self._bfobject = bfobject
 
-    def rmdir(self):
+    def rmdir(self, force=False):
         if self.is_organization():
             raise exc.SparCurError("can't remove organizations right now")
 
         elif self.is_dataset():
-            if list(self.children):  # FIXME super inefficient ...
+            if not force and list(self.children):  # FIXME super inefficient ...
                 raise exc.PathNotEmptyError(self)
 
             self.bfobject.delete()
@@ -1278,7 +1278,7 @@ class BlackfynnRemote(aug.RemotePath):
             # do a little dance to update the name back to what it is supposed to be
             stem_diff = local_path.stem != remote.bfobject.package.name
             if replace and stem_diff:
-                if old_remote.exists():  # FIXME nasty performance cost here ...
+                if old_remote and old_remote.exists():  # FIXME nasty performance cost here ...
                     # oh man the concurrency story for multiple people adding files with the same name
                     # wow ... in restrospect this comment was not nearly cynical enough
 
@@ -1322,7 +1322,7 @@ class BlackfynnRemote(aug.RemotePath):
                     finally:
                         rbp.__dict__ = _odict
 
-            elif not stem_diff and old_remote.exists():
+            elif not stem_diff and old_remote and old_remote.exists():
                 log.critical(f'YOU MAY HAVE FUNKY DATA IN {local_path.cache.parent.uri_human}')
 
         except Exception as e:

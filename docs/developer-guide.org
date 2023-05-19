@@ -2303,6 +2303,7 @@ materialize the pull as folders or symlinks.
 ***** Fetch
 #+caption: NOTE this block is unused!
 #+begin_src python :tangle ../sparcur/simple/fetch.py :exports none
+from sparcur.paths import Path
 from sparcur.simple.fetch_metadata_files import main as files
 from sparcur.simple.fetch_remote_metadata import main as rmeta
 
@@ -2768,8 +2769,8 @@ otkm = {ThingFilePath.obj:prefix + '_file' for prefix, ThingFilePath
         in dat.DatasetStructure.sections.items()}
 otkm[ManifestFiles] = 'manifest_file'
 otkm[PennsieveDatasetData] = 'remote_dataset_metadata'
-otkm[type(dat.DatasetStructure())] = 'structure'  # hack around Pathlib type mangling
-otkm[type(dat.DatasetMetadata())] = _TOP
+#otkm[type(dat.DatasetStructure(None))] = 'structure'  # hack around Pathlib type mangling
+#otkm[type(dat.DatasetMetadata(None))] = _TOP
 
 # stream of objects -> place in dataset blob
 
