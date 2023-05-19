@@ -2,7 +2,7 @@ import os
 import secrets
 import unittest
 import augpathlib as aug
-from pyontutils.asyncd import Async, deferred
+from pyontutils.utils import Async, deferred  # TODO -> asyncd in future
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow
 from sparcur.paths import PennsieveCache, LocalPath, Path
