@@ -13,7 +13,7 @@ from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_files, transitive_paths, is_list_or_tuple
 from sparcur.utils import levenshteinDistance
-from sparcur.utils import BlackfynnId, LocId, PennsieveId
+from sparcur.utils import BlackfynnId, LocId, PennsieveId, PDId
 from sparcur.config import auth
 
 
@@ -523,7 +523,324 @@ class PennsieveCache(BFPNCacheBase, PrimaryCache, EatCache):
 PennsieveCache._bind_flavours()
 
 
-class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack to keep everything consistent
+class PennsieveDiscoverCache(PrimaryCache, EatCache):
+
+    xattr_prefix = 'pd'
+
+    uri_human = backends.PennsieveDiscoverRemote.uri_human
+    uri_api = backends.PennsieveDiscoverRemote.uri_api
+
+    _project_id = backends.PennsieveDiscoverRemote._project_id
+    _uri_api_template = backends.PennsieveDiscoverRemote._uri_api_template
+
+    _jsonMetadata = BFPNCacheBase._jsonMetadata
+    populateJsonMetadata = BFPNCacheBase.populateJsonMetadata
+
+    @property
+    def identifier(self):
+        # FIXME TODO hack to keep _jsonMetadata happy
+        return PDId(self.id)
+
+    @property
+    def remote(self):
+        if self.is_file():
+            # only dataset level folder has a remote
+            return None
+
+        return super().remote
+
+    def local_data_dir_init(self):
+        # local data dir was always something of a tenuous idea
+        # let's try this iteration using {:user-cache-path} ?
+        # TODO see if we want to do the check here
+        if not self.local_objects_dir.exists():
+            self.local_objects_dir.mkdir()
+
+    @property
+    def version(self):
+        return str(self.meta.file_id)
+
+    @property
+    def local_objects_dir(self):
+        cache_path = self._local_class(auth.get_path('cache-path'))
+        return cache_path / 'discover' / 'datasets'  # FIXME hardcoded
+
+    @property
+    def anchor(self):
+        if hasattr(self, '_anchor'):
+            return self._anchor
+        elif self.id == self._remote_class._project_id:
+            self.__class__._cache_anchor = self
+            return self
+        elif self == self.parent:
+            # we hit root and found nothing
+            return
+        else:
+            return self.parent.anchor
+
+    @property
+    def cache_key(self):
+        return pathlib.PurePath(self.id) / self.version / 'data.zip'
+
+    def is_organization(self):
+        # FIXME not meaningful on discover but needed by update_cache_transitive
+        return self.id == self._remote_class._project_id
+
+    def is_dataset(self):
+        return self.parent == self.anchor
+
+    @property
+    def dataset(self):
+        if self.anchor is None:
+            # FIXME possible to have datasets without
+            # an explicit anchor in the future?
+            raise ValueError('no anchor so no dataset')
+        if self.is_dataset():
+            return self
+        else:
+            return self.parent.dataset
+
+    def _ds_only_check(self):
+        if not self.is_dir():
+            # can't pull/fetch individual files for this backend
+            msg = 'can only pull from top level of dataset'
+            raise NotImplementedError(msg)
+
+    def pull_fetch(self):
+        self._ds_only_check()
+        # there is only a single operation for the dataset level
+        # which combines pull and fetch (for now) switching versions
+        # etc. will be a bit more work
+        zip_path = self.local_object_cache_path
+        size_mismatch = False  # TODO
+        if not zip_path.exists():
+            zip_path.parent.mkdir(parents=True, exist_ok=True)
+            zip_path.data = self.remote.data
+        elif size_mismatch:
+            # TODO fix partial fetchs
+            msg = 'TODO'
+            raise NotImplementedError(msg)
+        else:
+            pass
+
+        self.unpack()
+
+    def unpack(self):
+        """ unpack cached zip to folder structure and add the path meta that we do have """
+        self._ds_only_check()
+        import json
+        zip_path = self.local_object_cache_path
+        zp = aug.ZipPath(zip_path)
+        zi = zp.asInternal()
+        discover_root = next(zi.children)
+        # FIXME using discover_root / 'manifest.json' results in missing zip info
+        discover_manifest = [c for c in discover_root.children if c.name == 'manifest.json'][0]
+        try:
+            with discover_manifest.open() as f:
+                manifest = json.load(f)
+        finally:
+            discover_manifest.close()
+
+        sds_root = discover_root / 'files'
+        # iterate and make directories
+        real_dirs = [self.local / c.relative_to(sds_root) for c in sds_root.rchildren if c.is_dir()]
+        [d.mkdir(parents=True, exist_ok=True) for d in real_dirs]
+        # XXX FIXME needed to avoid issues in export for time being
+        dcaches = [r.cache_init(aug.PathMeta(id='discover-meta-has-no-id-sigh')) for r in real_dirs]
+
+        # iterate and create files
+        # TODO package ids probably
+        def unzip(f):
+            target = self.local / f.relative_to(sds_root)
+            target.data = f.data
+            return target
+
+        targets = [unzip(c) for c in sds_root.rchildren if not c.is_dir()]
+        # XXX we are kind of doing this out of order metadata should
+        # usually be written first but not a big deal in this case
+        path_metas = {d['path'].split('/', 1)[-1]:
+         aug.PathMeta(
+             id=d['sourcePackageId'],
+             size=d['size'],
+         )
+         for d in manifest['files'] if 'files/' in d['path']}
+        reals = set((t.relative_to(self)).as_posix() for t in targets)
+        metas = set(path_metas)
+        reme = reals - metas
+        mere = metas - reals
+        if reme:
+            log.error(f'extra real paths {reme}')
+
+        if mere:
+            log.error(f'missing real paths {mere}')
+
+        def add_path_meta(f):
+            path_meta = path_metas[f.relative_to(self).as_posix()]
+            cache = f.cache_init(path_meta)
+            return cache
+
+        caches = [add_path_meta(t) for t in targets]
+
+    def fetch(self):
+        msg = 'you probably want pull_fetch for discover'
+        raise NotImplementedError(msg)
+
+
+PennsieveDiscoverCache._bind_flavours()
+
+
+class PathHelper:
+
+    @property
+    def dataset_relative_path(self):
+        # FIXME broken for local validation
+        # update: I'm pretty sure this works for total local validation
+        # because we use CacheL, so the fix here is all we need to cover
+        # the file changed case
+        try:
+            if self.cache is None and self.parent.cache is not None:
+                # file has been modified case
+                return self.relative_path_from(self.parent.cache.dataset.local)
+            else:
+                return self.relative_path_from(self.cache.dataset.local)
+        except AttributeError as e:
+            raise exc.NoCachedMetadataError(self) from e
+
+    @property
+    def rchildren_dirs(self):
+        # FIXME windows support if find not found
+        if self.is_dir():
+            yield from transitive_dirs(self)
+
+    def populateJsonMetadata(self, blob):
+        """ populate a json blob with file system metadata"""
+        # FIXME TODO implement this without resolving .cache
+        if self.cache is not None:
+            return self.cache.populateJsonMetadata(blob)
+        else:
+            return self._jsonMetadata()
+
+    def _jm_common(self, do_expensive_operations=False):
+        # FIXME WARNING resolution only works if we were relative to
+        # the current working directory
+        if self.is_broken_symlink():
+            self = self.absolute()
+        else:
+            self = self.resolve()  # safety since we have to go hunting paths
+
+        project_path = self.find_cache_root()
+
+        if project_path is None:
+            # FIXME TODO I think we used dataset_description as a hint?
+            project_path = self.__class__('/')  # FIXME FIXME
+            log.critical(f'No dataset path found for {self}!')
+            #raise NotImplementedError('current implementation cant anchor with current info')
+
+        dataset_path = [p for p in chain((self,), self.parents) if p.parent == project_path][0]
+        drp = self.relative_path_from(dataset_path)  # FIXME ...
+
+        dsid = dataset_path.cache_identifier
+
+        blob = {
+            'type': 'path',
+            'dataset_id': dsid.curie,
+            'dataset_relative_path': drp,
+            'basename': self.name,  # for sanity's sake
+        }
+
+        mimetype = self.mimetype
+        if mimetype:
+            blob['mimetype'] = mimetype
+
+        if do_expensive_operations:
+            blob['magic_mimetype'] = self._magic_mimetype
+
+        if not (self.is_broken_symlink() or self.exists()):
+            # TODO search for closest match
+            cands = self._closest_existing_matches()
+            msg = f'Path does not exist!\n{self}'
+            # FIXME check manifest to see whether candidates are already in the
+            if cands:
+                _fcands = [(r, n) for r, n in cands if r < 10]
+                fcands = _fcands if _fcands else cands
+                msg += f'\n{0: <4} {self.name}\n'
+                msg += '\n'.join([f'{r: <4} {n}' for r, n in fcands])
+            # do not log the error here, we won't have
+            # enough context to know where we got a bad
+            # path, but the caller should, maybe a case for
+            # inversion of control here
+            blob['errors'] = [{'message': msg,
+                               'blame': 'submissions',  # FIXME maybe should be pipeline?
+                               'pipeline_stage': 'sparcur.path._jm_common',
+                               'candidates': cands,}]
+
+        return blob, project_path, dsid
+
+    def _closest_existing_matches(self):
+        if self.parent.exists():
+            # we probably don't need this, the numbers
+            # should usually be small enough
+            #childs = [c for c in self.parent.children
+                      #if c.is_file() or c.is_broken_symlink()]
+            name = self.name
+            cands = sorted(
+                [(levenshteinDistance(c.name, name), c.name)
+                 for c in self.parent.children])
+            return cands
+
+    def _jsonMetadata(self, do_expensive_operations=False):
+        blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
+        return blob
+
+    def updated_cache_transitive(self):
+        """ fast get the date for the most recently updated cached path """
+        if self.cache.is_organization():
+            gen = (rc for c in self.children for rc in c.rchildren)
+        elif self.cache.is_dataset():
+            gen = self.rchildren
+        else:
+            gen = chain((self,), self.rchildren)
+
+        def updated_hierarchy(local):
+            """ try to get the cache updated time, if the cache doesn't exist,
+                e.g. because the file has been overwritten and there are no
+                xattrs, then use the local updated time """
+            try:
+                updated = local.getxattr('bf.updated').decode()
+                return aug.PathMeta(updated=updated)
+            except exc.NoStreamError:
+                return local.meta_no_checksum
+
+
+        simple_meta = [updated_hierarchy(c)
+                       if not c.is_broken_symlink() else
+                       aug.PathMeta.from_symlink(c)
+                       for c in gen]
+        if simple_meta:
+            return max(m.updated for m in simple_meta)
+        else:
+            # in the even that the current folder is empty
+            updated = self.getxattr('bf.updated').decode()
+            return aug.PathMeta(updated=updated).updated
+
+
+class DiscoverPath(aug.XopenPath, aug.LocalPath, PathHelper):
+
+    _cache_class = PennsieveDiscoverCache
+
+    # TODO factor out the common functionality between discover and
+    # internal into a shared parent class, as it stands discover does
+    # not and should not use many of the things we need for curation
+
+    @property
+    def cache_identifier(self):
+        return self.cache.identifier
+
+
+DiscoverPath._bind_flavours()
+
+
+class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this is a hack to keep everything consistent
     """ An augmented path for all the various local
         needs of the curation process. """
 
@@ -561,21 +878,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
         return self.relative_path_from(self._cache_class._anchor.local)
 
     @property
-    def dataset_relative_path(self):
-        # FIXME broken for local validation
-        # update: I'm pretty sure this works for total local validation
-        # because we use CacheL, so the fix here is all we need to cover
-        # the file changed case
-        try:
-            if self.cache is None and self.parent.cache is not None:
-                # file has been modified case
-                return self.relative_path_from(self.parent.cache.dataset.local)
-            else:
-                return self.relative_path_from(self.cache.dataset.local)
-        except AttributeError as e:
-            raise exc.NoCachedMetadataError(self) from e
-
-    @property
     def cache_id(self):
         """ fast way to get cache.id terrifyingly this has roughly
         an order of magnitude less overhead than self.cache.id """
@@ -611,20 +913,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
     def cache_identifier(self):
         return self._cache_class._id_class(
             self.cache_id, file_id=self.cache_file_id)
-
-    @property
-    def rchildren_dirs(self):
-        # FIXME windows support if find not found
-        if self.is_dir():
-            yield from transitive_dirs(self)
-
-    def populateJsonMetadata(self, blob):
-        """ populate a json blob with file system metadata"""
-        # FIXME TODO implement this without resolving .cache
-        if self.cache is not None:
-            return self.cache.populateJsonMetadata(blob)
-        else:
-            return self._jsonMetadata()
 
     xattr_prefix = BlackfynnCache.xattr_prefix
     _xattr_meta = aug.EatCache.meta
@@ -722,77 +1010,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                                   'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
                                   'hex': meta.checksum.hex(),}]
 
-        return blob
-
-    def _jm_common(self, do_expensive_operations=False):
-        # FIXME WARNING resolution only works if we were relative to
-        # the current working directory
-        if self.is_broken_symlink():
-            self = self.absolute()
-        else:
-            self = self.resolve()  # safety since we have to go hunting paths
-
-        project_path = self.find_cache_root()
-
-        if project_path is None:
-            # FIXME TODO I think we used dataset_description as a hint?
-            project_path = self.__class__('/')  # FIXME FIXME
-            log.critical(f'No dataset path found for {self}!')
-            #raise NotImplementedError('current implementation cant anchor with current info')
-
-        dataset_path = [p for p in chain((self,), self.parents) if p.parent == project_path][0]
-        drp = self.relative_path_from(dataset_path)  # FIXME ...
-
-        dsid = dataset_path.cache_identifier
-
-        blob = {
-            'type': 'path',
-            'dataset_id': dsid.curie,
-            'dataset_relative_path': drp,
-            'basename': self.name,  # for sanity's sake
-        }
-
-        mimetype = self.mimetype
-        if mimetype:
-            blob['mimetype'] = mimetype
-
-        if do_expensive_operations:
-            blob['magic_mimetype'] = self._magic_mimetype
-
-        if not (self.is_broken_symlink() or self.exists()):
-            # TODO search for closest match
-            cands = self._closest_existing_matches()
-            msg = f'Path does not exist!\n{self}'
-            if cands:
-                _fcands = [(r, n) for r, n in cands if r < 10]
-                fcands = _fcands if _fcands else cands
-                msg += f'\n{0: <4} {self.name}\n'
-                msg += '\n'.join([f'{r: <4} {n}' for r, n in fcands])
-            # do not log the error here, we won't have
-            # enough context to know where we got a bad
-            # path, but the caller should, maybe a case for
-            # inversion of control here
-            blob['errors'] = [{'message': msg,
-                               'blame': 'submissions',  # FIXME maybe should be pipeline?
-                               'pipeline_stage': 'sparcur.path._jm_common',
-                               'candidates': cands,}]
-
-        return blob, project_path, dsid
-
-    def _closest_existing_matches(self):
-        if self.parent.exists():
-            # we probably don't need this, the numbers
-            # should usually be small enough
-            #childs = [c for c in self.parent.children
-                      #if c.is_file() or c.is_broken_symlink()]
-            name = self.name
-            cands = sorted(
-                [(levenshteinDistance(c.name, name), c.name)
-                 for c in self.parent.children])
-            return cands
-
-    def _jsonMetadata(self, do_expensive_operations=False):
-        blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
         return blob
 
     def _transitive_metadata(self):
@@ -1087,37 +1304,6 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath):  # NOTE this is a hack t
                 if remove_circular and c.is_broken_symlink():
                     c.unlink()
 
-    def updated_cache_transitive(self):
-        """ fast get the date for the most recently updated cached path """
-        if self.cache.is_organization():
-            gen = (rc for c in self.children for rc in c.rchildren)
-        elif self.cache.is_dataset():
-            gen = self.rchildren
-        else:
-            gen = chain((self,), self.rchildren)
-
-        def updated_hierarchy(local):
-            """ try to get the cache updated time, if the cache doesn't exist,
-                e.g. because the file has been overwritten and there are no
-                xattrs, then use the local updated time """
-            try:
-                updated = local.getxattr('bf.updated').decode()
-                return aug.PathMeta(updated=updated)
-            except exc.NoStreamError:
-                return local.meta_no_checksum
-
-
-        simple_meta = [updated_hierarchy(c)
-                       if not c.is_broken_symlink() else
-                       aug.PathMeta.from_symlink(c)
-                       for c in gen]
-        if simple_meta:
-            return max(m.updated for m in simple_meta)
-        else:
-            # in the even that the current folder is empty
-            updated = self.getxattr('bf.updated').decode()
-            return aug.PathMeta(updated=updated).updated
-
     def transitive_fix_missing_metadata(self):
         # beware this will compute checksums for any files missing metadata
         nometa = [f for f in transitive_files(self) if not f.xattrs()]
@@ -1311,15 +1497,20 @@ class StashPath(Path):
 
 # assign defaults
 
-def bind_defaults(Remote, Cache):
+def bind_defaults(Remote, Cache, Path=Path):
     Cache._local_class = Path
     Remote._new(Path, Cache)
-    Remote.cache_key = Cache.cache_key
-    Remote._sparse_stems = Cache._sparse_stems
-    Remote._sparse_exts = Cache._sparse_exts
-    Remote._sparse_include = Cache._sparse_include
+    if hasattr(Cache, 'cache_key'):
+        Remote.cache_key = Cache.cache_key
+    if hasattr(Cache, '_sparse_stems'):
+        Remote._sparse_stems = Cache._sparse_stems
+    if hasattr(Cache, '_sparse_exts'):
+        Remote._sparse_exts = Cache._sparse_exts
+    if hasattr(Cache, '_sparse_exts'):
+        Remote._sparse_include = Cache._sparse_include
 
 
 bind_defaults(backends.BlackfynnRemote, BlackfynnCache)
 # XXX supersedes the binding on BlackfynnRemote
 bind_defaults(backends.PennsieveRemote, PennsieveCache)
+bind_defaults(backends.PennsieveDiscoverRemote, PennsieveDiscoverCache, Path=DiscoverPath)

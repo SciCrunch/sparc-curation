@@ -254,6 +254,8 @@ Options:
 
     --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
 
+    --discover              work with pennsieve discover remote
+
     --hypothesis-group-name=NAME  hypothesis group name for protcur  [default: {auth.get('hypothesis-group-name')}]
     --hypothesis-cache-file=PATH  path to hyputils json cache file
     --hypothesis-use-name         use hypothesis group name instead of group id for checks
@@ -289,7 +291,7 @@ from sparcur.core import OntId, OntTerm, adops
 from sparcur.utils import GetTimeNow  # top level
 from sparcur.utils import log, logd, loge, bind_file_handler
 from sparcur.utils import register_type, fromJson
-from sparcur.paths import Path, StashPath
+from sparcur.paths import Path, StashPath, DiscoverPath
 from sparcur.state import State
 from sparcur.protocols import ProtocolData
 
@@ -304,16 +306,20 @@ stop = time()
 class Options(clif.Options):
 
     @property
+    def _Path(self):
+        return DiscoverPath if self.discover else Path
+
+    @property
     def export_schemas_path(self):
-        return Path(self.export_path) / 'schemas'  # FIXME not sure if correct
+        return self._Path(self.export_path) / 'schemas'  # FIXME not sure if correct
 
     @property
     def export_protcur_base(self):
-        return Path(self.export_path) / 'protcur'  # FIXME not sure if correct
+        return self._Path(self.export_path) / 'protcur'  # FIXME not sure if correct
 
     @property
     def export_protocols_base(self):
-        return Path(self.export_path) / 'protocols'  # FIXME not sure if correct
+        return self._Path(self.export_path) / 'protocols'  # FIXME not sure if correct
 
     @property
     def project_id(self):
@@ -323,25 +329,25 @@ class Options(clif.Options):
     def project_path(self):
         pp = self._args['--project-path']
         if pp:
-            return Path(pp).expanduser().resolve()
+            return self._Path(pp).expanduser().resolve()
 
     @property
     def export_file(self):
         ef = self._args['--export-file']
         if ef:
-            return Path(ef).expanduser().resolve()
+            return self._Path(ef).expanduser().resolve()
 
     @property
     def protcur_file(self):
         pf = self._args['--protcur-file']
         if pf:
-            return Path(pf).expanduser().resolve()
+            return self._Path(pf).expanduser().resolve()
 
     @property
     def hypothesis_cache_file(self):
         hcf = self._args['--hypothesis-cache-file']
         if hcf:
-            return Path(hcf).expanduser().resolve()
+            return self._Path(hcf).expanduser().resolve()
 
     @property
     def hypothesis_group_name(self):
@@ -427,6 +433,7 @@ class Dispatcher(clif.Dispatcher):
             org_id,
             self.options.export_protcur_base,
             no_network=(self.options.no_network or self.options.no_google),
+            discover=self.options.discover,
         )
         return export
 
@@ -549,16 +556,24 @@ class Main(Dispatcher):
         if self.options.configure:
             return
 
+        self._local_class = self.options._Path
+
         if self.options.project_path:
-            self.cwd = Path(self.options.project_path).resolve()
+            self.cwd = self._local_class(self.options.project_path).resolve()
         else:
-            self.cwd = Path.cwd()
+            self.cwd = self._local_class.cwd()
 
         # bind paths
-        from sparcur.backends import PennsieveRemote
-        from sparcur.paths import PennsieveCache
-        self._cache_class = PennsieveCache
-        self._remote_class = PennsieveRemote
+        if self.options.discover:
+            from sparcur.backends import PennsieveDiscoverRemote
+            from sparcur.paths import PennsieveDiscoverCache
+            self._cache_class = PennsieveDiscoverCache
+            self._remote_class = PennsieveDiscoverRemote
+        else:
+            from sparcur.backends import PennsieveRemote
+            from sparcur.paths import PennsieveCache
+            self._cache_class = PennsieveCache
+            self._remote_class = PennsieveRemote
 
         # setup integrator
         from sparcur.curation import Integrator
@@ -1006,7 +1021,7 @@ class Main(Dispatcher):
         self.project_path = self.anchor.local
         with anchor:
             # update self.cwd so pull sees the right thing
-            self.cwd = Path.cwd()
+            self.cwd = self._local_class.cwd()
             self._clone_pull()
 
     def _clone_pull(self):
@@ -1519,7 +1534,8 @@ done"""
         if self.options.browser:
             import webbrowser
 
-        self._cache_class._local_class = Path  # since we skipped _setup
+        self._local_class = self.options._Path
+        self._cache_class._local_class = self._local_class  # since we skipped _setup
         Path._cache_class = self._cache_class
         paths = self.paths
         if not paths:

@@ -815,6 +815,16 @@ class PennsieveId(BlackfynnId):
      uri_human_regex, compiled) = make_bf_id_regex(top_level_domain)
 
 
+class PDId(idlib.Identifier):
+    # discover dataset id
+
+    def __init__(self, id):
+        self.id = id
+        self.curie = f'discover.api.dataset:{self.id}'
+        self.uri_api = f'https://api.pennsieve.io/discover/datasets/{self.id}'
+        self._identifier = self.uri_api
+
+
 class LocId(idlib.Identifier):
 
     def __init__(self, id, type):

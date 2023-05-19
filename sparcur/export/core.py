@@ -98,11 +98,18 @@ class ExportBase:
                  export_base=None,
                  # FIXME no_network passed here is still dumb though
                  # not quite as dump as passing it to the methods
-                 no_network=False,):
+                 no_network=False,
+                 discover=False,):
+
+        # FIXME ugh the logic here for handling discover is aweful
+        if discover:
+            id = 'pennsieve-discover'  # FIXME hard coded and SUPER opaque
+
         if org_id is None:
             self.export_source_path = export_source_path
-            id = export_source_path.cache.anchor.identifier.uuid
-        else:
+            if not discover:
+                id = export_source_path.cache.anchor.identifier.uuid
+        elif not discover:
             # do not set export_source_path, to prevent accidental export
             id = BlackfynnId(org_id).uuid
 
@@ -116,7 +123,9 @@ class ExportBase:
         self.open_when_done = open_when_done
         self.export_protcur_base = export_protcur_base  # pass in as export_base
         self.no_network = no_network
+        self.discover = discover
 
+        self._dsp = 'discover' if self.discover else 'datasets'  # FIXME hardcoded
         self._args = dict(export_path=export_path,
                           export_source_path=export_source_path,
                           folder_timestamp=folder_timestamp,
@@ -127,7 +136,8 @@ class ExportBase:
                           org_id=org_id,
                           export_protcur_base=export_protcur_base,
                           export_base=export_base,
-                          no_network=no_network,)
+                          no_network=no_network,
+                          discover=discover,)
 
     @staticmethod
     def make_dump_path(dump_path):
@@ -320,7 +330,7 @@ class Export(ExportBase):
 
     @property
     def latest_datasets_path(self):
-        return self.base_path / 'datasets'
+        return self.base_path / self._dsp
 
     def latest_export_ttl_populate(self, graph):
         # intentionally fail if the ttl export failed
@@ -329,11 +339,12 @@ class Export(ExportBase):
 
     def export_single_dataset(self):
         intr = cur.Integrator(self.export_source_path)  # FIXME implicit state set by cli
-        id = intr.path.cache.identifier.uuid
-        dump_path = self.export_path / 'datasets' / id / self.folder_timestamp
-        latest_path = self.export_path / 'datasets' / id / 'LATEST'
-        latest_partial_path = self.export_path / 'datasets' / id / 'LATEST_PARTIAL'
+        id = intr.path.cache.id if self.discover else intr.path.cache.identifier.uuid  # FIXME
+        dump_path = self.export_path / self._dsp / id / self.folder_timestamp
+        latest_path = self.export_path / self._dsp / id / 'LATEST'
+        latest_partial_path = self.export_path / self._dsp / id / 'LATEST_PARTIAL'
         if not dump_path.exists():
+            # FIXME if dump_path is not fully resolved then mkdir parents=True will fail
             dump_path.mkdir(parents=True)
 
         def jdump(blob, f):
@@ -404,7 +415,7 @@ class Export(ExportBase):
         return blob_data, intr, dump_path, latest_path
 
     def export_rdf(self, dump_path, latest_path, dataset_blobs):
-        dataset_dump_path = dump_path / 'datasets'
+        dataset_dump_path = dump_path / self._dsp
         dataset_dump_path.mkdir()
         suffix = '.ttl'
         mode = 'wb'

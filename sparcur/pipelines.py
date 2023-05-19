@@ -126,6 +126,9 @@ class RemoteDatasetDataPipeline(DatasourcePipeline):
                 from sparcur.backends import LocalDatasetData as RDD
             elif lifters.remote == 'blackfynn':  # deprecated but kept just in case
                 from sparcur.backends import BlackfynnDatasetData as RDD
+            elif lifters.remote == 'pennsieve-discover':
+                RDD = None
+                self._no_remote = True  # FIXME maybe do this above too?
             else:
                 raise ValueError(f'unknown remote type {lifters.remote}')
 

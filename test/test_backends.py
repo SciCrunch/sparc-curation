@@ -1,15 +1,18 @@
 import os
+import sys
 import unittest
 import pytest
-from sparcur.paths import Path, BlackfynnCache as BFC, PennsieveCache as PFC
-from sparcur.backends import BlackfynnRemote, PennsieveRemote
-from .common import test_organization, project_path_real
+from sparcur.paths import Path, BlackfynnCache as BFC, PennsieveCache as PFC, PennsieveDiscoverCache as PDFC
+from sparcur.backends import BlackfynnRemote, PennsieveRemote, PennsieveDiscoverRemote
+from .common import test_organization, project_path_real as ppr
 
 
 class RemoteHelper:
 
+    _prr = None
     _remote_class = None
     _cache_class = None
+    _data_id = None
 
     # FIXME skip in CI?
     def setUp(self):
@@ -18,9 +21,10 @@ class RemoteHelper:
 
         Cache._bind_flavours()
 
-        self.Remote = self._remote_class._new(Path, Cache)
+        self.Remote = self._remote_class._new(Cache._local_class, Cache)
         self.Remote.init(test_organization)
-        if not project_path_real.exists():
+        project_path_real = Cache._local_class(self._ppr.as_posix())
+        if not project_path_real.exists():  # FIXME this is something of an insane toggle ??
             self.anchor = self.Remote.dropAnchor(project_path_real.parent)
         else:
             self.anchor = project_path_real.cache
@@ -38,7 +42,11 @@ class RemoteHelper:
 
     def test_data(self):
         #dat = list(next(next(self.project_path.remote.children).children).data)
-        dat = list(next(self.project_path.remote.children).data)
+        if self._data_id is None:
+            dat = list(next(self.project_path.remote.children).data)
+        else:
+            data_test = [c for c in self.project_path.remote.children if c.id == self._data_id][0]
+            dat = list(data_test.data)
         #list(dd.data) == list(dd.remote.data)
 
     def test_children(self):
@@ -54,5 +62,37 @@ class RemoteHelper:
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class TestPennsieveRemote(RemoteHelper, unittest.TestCase):
 
+    _ppr = ppr
     _remote_class = PennsieveRemote
     _cache_class = PFC
+
+
+class TestPennsieveDiscoverRemote(RemoteHelper, unittest.TestCase):
+
+    _ppr = ppr.parent / PennsieveDiscoverRemote._project_name
+    _remote_class = PennsieveDiscoverRemote
+    _cache_class = PDFC
+    _data_id = '292'
+
+    def test_pull_fetch(self):
+        r = self.Remote(self._data_id)
+        r.cache.pull_fetch()
+
+    def test_validate(self):
+        r = self.Remote(self._data_id)
+        r.cache.pull_fetch()
+        path = r.local
+        from sparcur.cli import main
+        # avoid duplicate anchoring attempt since cli expects that it
+        # is always the top level entry point, must weigh anchor on
+        # both remote and cache
+        # FIXME pretty sure we shouldn't have to weight anchor on both ...
+        self.Remote.weighAnchor()
+        self.Remote._cache_class.weighAnchor()
+        with path:
+            oav = sys.argv
+            try:
+                sys.argv = ['spc', 'export', '--discover']
+                main()
+            finally:
+                sys.argv = oav

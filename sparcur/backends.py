@@ -12,6 +12,43 @@ from sparcur.config import auth
 from urllib.parse import urlparse
 
 
+def base_get_file_by_url(cls, url, ranges=tuple()):
+    """ NOTE THAT THE FIRST YIELD IS HEADERS
+    valid ranges are (start,) (-start,) (start, end)
+    """
+
+    kwargs = {}
+    if ranges:
+        # TODO validate probably
+        range_spec = ', '.join(
+            (str(r[0]) if r[0] < 0 else f'{r[0]}-')
+            if len(r) == 1 else '-'.join(str(se) for se in r)
+            for r in ranges)
+        kwargs['headers'] = {'Range': f'bytes={range_spec}'}
+
+    resp = cls._requests.get(url, stream=True, **kwargs)
+    headers = resp.headers
+    yield headers
+    log.log(9, f'reading from {url}')  # too much for debug
+    for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
+        if chunk:
+            yield chunk
+
+
+def base_data(self):
+    uri_file = self._uri_file()
+    if uri_file is None:
+        return
+
+    gen = self.get_file_by_url(uri_file)
+    try:
+        self.data_headers = next(gen)
+    except exc.NoRemoteFileWithThatIdError as e:
+        raise FileNotFoundError(f'{self}') from e
+
+    yield from gen
+
+
 class BlackfynnRemote(aug.RemotePath):
 
     _remote_type = 'blackfynn'
@@ -117,28 +154,7 @@ class BlackfynnRemote(aug.RemotePath):
         log.debug(f'file-api-mapping: {id} {file_id} {url}')
         yield from cls.get_file_by_url(url, ranges=ranges)
 
-    @classmethod
-    def get_file_by_url(cls, url, ranges=tuple()):
-        """ NOTE THAT THE FIRST YIELD IS HEADERS
-        valid ranges are (start,) (-start,) (start, end)
-        """
-
-        kwargs = {}
-        if ranges:
-            # TODO validate probably
-            range_spec = ', '.join(
-                (str(r[0]) if r[0] < 0 else f'{r[0]}-')
-                if len(r) == 1 else '-'.join(str(se) for se in r)
-                for r in ranges)
-            kwargs['headers'] = {'Range': f'bytes={range_spec}'}
-
-        resp = cls._requests.get(url, stream=True, **kwargs)
-        headers = resp.headers
-        yield headers
-        log.log(9, f'reading from {url}')  # too much for debug
-        for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
-            if chunk:
-                yield chunk
+    get_file_by_url = classmethod(base_get_file_by_url)
 
     def __init__(self, id_bfo_or_bfr, *, file_id=None, cache=None, local_only=False):
         self._seed = id_bfo_or_bfr
@@ -991,19 +1007,7 @@ class BlackfynnRemote(aug.RemotePath):
         if file is not None:
             return file.url
 
-    @property
-    def data(self):
-        uri_file = self._uri_file()
-        if uri_file is None:
-            return
-
-        gen = self.get_file_by_url(uri_file)
-        try:
-            self.data_headers = next(gen)
-        except exc.NoRemoteFileWithThatIdError as e:
-            raise FileNotFoundError(f'{self}') from e
-
-        yield from gen
+    data = property(base_data)
 
     @data.setter
     def data(self):
@@ -1731,3 +1735,168 @@ class PennsieveDatasetData(RemoteDatasetData):
         PennsieveDatasetData._setup(*args, **kwargs)
         PennsieveDatasetData.__new__ = PennsieveDatasetData._renew
         return super().__new__(cls)
+
+
+class PennsieveDiscoverRemote(aug.RemotePath):
+    # only for datasets less than 5 gigs, come down as a zip
+    # does not handle children and parents directly because that can
+    # only be answered from the cache, the remote itself is dataset
+    # level only, the s3 version probably can
+    _remote_type = 'pennsieve-discover'
+    'https://api.pennsieve.io/discover/datasets/292/versions/1/download?downloadOrigin=SPARC'
+    's3://prd-sparc-discover-use1/292/1/'
+
+    _uri_api_template = 'https://api.pennsieve.io/discover/datasets/{identifier}/versions/{version}/metadata'
+    _uri_api_template = (
+        'https://api.pennsieve.io/discover/datasets/'
+        '{id}/versions/{version}')
+
+    #_project_id = f'pennsieve-discover-root-{id(object())}'  # not parent so make one
+    _project_id = 'https://api.pennsieve.io/discover/datasets'
+    _project_name = 'Pennsieve-Discover'
+
+    class _api_class:  # fake out super()._init behavior
+        class organization:  # fake out lifters
+            members = []
+        def __init__(self, *args, **kwargs):
+            self.root = self._project_id
+
+    _api_class._project_id = _project_id
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        import requests  # XXX SIGH
+        PennsieveDiscoverRemote._requests = requests
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        cls._setup(*args, **kwargs)
+        return super().__new__(cls)
+
+    def __init__(self, id_published, version=None, cache=None):
+        if cache is not None:
+            #breakpoint()
+            pass
+
+        if id_published == self._project_id:
+            self._name = self._project_name
+
+        self._id = str(id_published)
+        if self.id != self._project_id:
+            v = self._latest_version() if version is None else version
+            self.version = str(v)
+
+    @property
+    def meta(self):
+        return aug.PathMeta(
+            id=self.id,
+            # XXX note, we don't have a filed called version in the current
+            # path meta spec, but we don't use it for folders so we reuse it
+            # here to hold the version of the dataset, since the cache has
+            # a different xattr_prefix the semantics are clear
+            file_id=self.version,
+        )
+
+    def _meta_d(self):
+        if not hasattr(self, '_cache_meta_d'):
+            uri = f'https://api.pennsieve.io/discover/datasets/{self.id}'
+            resp = self._requests.get(uri)
+            self._cache_meta_d = resp.json()
+
+        return self._cache_meta_d
+
+    def is_file(self): return False  # top level directory only no remote listings available
+    def is_dir(self): return True  # to is always a dir, but technically a zip
+
+    def _impl__cache(self):  # have I mentioned by undying hatred of properties lately?
+        if hasattr(self, '_c_cache'):
+            return self._c_cache
+
+        if self == self.parent:
+            return self._cache_anchor
+
+        parent_cache = self.parent.cache
+        lp = parent_cache.local / self.name
+        self._c_cache = self._cache_class(lp, remote=self)
+        return self.cache
+
+    @property
+    def parent(self):
+        if not hasattr(self.__class__, '_ds_parent'):
+        # FIXME if we implement semi remote hierarchy
+        # then the will need to handle other levels
+            self._ds_parent = self.__class__(self._project_id)
+            self._ds_parent._cache = self._cache_anchor
+
+        return self._ds_parent
+
+    @property
+    def children(self):
+        if self.id == self._project_id:
+            j = self._meta()
+            for d in j['datasets']:
+                yield self.__class__(d['id'], d['version'])
+        else:
+            # TODO /metadata will list the files but we have to
+            # reconstruct the directories if we want to list from
+            # manifest without pulling the zip
+            breakpoint()
+
+    @property
+    def name(self):
+        if not hasattr(self, '_name'):
+            j = self._meta_d()
+            self._name = j['name']
+
+        return self._name
+
+    def _latest_version(self):
+        j = self._meta_d()
+        return j['version']
+
+    @property
+    def uri_api(self):
+        if self.id == self._project_id:
+            return self.id
+        else:
+            return self._uri_api_template.format(
+                id=self.id,
+                version=self.version)
+
+    @property
+    def uri_human(self):
+        return f'https://discover.pennsieve.io/datasets/{self.id}/version/{self.version}'
+
+    def _meta(self):
+        if not hasattr(self, '_cache_meta'):
+            if self.id == self._project_id:
+                uri = self.uri_api + '?limit=9999'  # FIXME will eventually need to paginate
+            else:
+                uri = self.uri_api + '/metadata'
+
+            resp = self._requests.get(uri)
+            self._cache_meta = resp.json()
+
+        return self._cache_meta
+
+    def _uri_file(self):
+        #uri_file = self.uri_api + '/download?downloadOrigin=sparcur-backend'
+        # XXX anything other than SPARC causes an internal server error
+        # https://github.com/Pennsieve/discover-service/issues/46
+        uri_file = self.uri_api + '/download?downloadOrigin=SPARC'
+        return uri_file
+
+    get_file_by_url = classmethod(base_get_file_by_url)
+
+    data = property(base_data)
+
+
+class S3Remote(aug.RemotePath):
+    _remote_type = 's3'
+    sigh = 's3://prd-sparc-discover-use1/301/1/'
+
+

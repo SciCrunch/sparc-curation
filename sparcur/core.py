@@ -44,6 +44,8 @@ OntCuries({'orcid':'https://orcid.org/',
            'package':'https://api.pennsieve.io/packages/N:package:',
            'user':'https://api.pennsieve.io/users/N:user:',
 
+           'discover.api.dataset': 'https://api.pennsieve.io/discover/datasets/',
+
            'bibo': 'http://purl.org/ontology/bibo/',  # crossref
            'prism.basic': 'http://prismstandard.org/namespaces/basic/2.1/',  # crossref
 
