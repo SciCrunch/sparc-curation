@@ -4167,8 +4167,13 @@ def main(id=None, **kwargs):
 
     if ik('for_racket'):
         import json
-        _dsmeta = '\n'.join([f"({json.dumps(d.id)} {json.dumps(d.name)})"
-                             for d in datasets])
+        key = lambda d: d.updated
+        _dsmeta = '\n'.join([(f"({json.dumps(d.id)} "
+                              f"{json.dumps(d.name)} "
+                              f"{json.dumps(d.updated)} "
+                              f"{json.dumps(d.owner.name_or_email)}"
+                              ")")
+                             for d in sorted(datasets, key=key, reverse=True)])
         dsmeta = f"({_dsmeta})"
         # lab pi last name should be cached in some other way
         print(dsmeta)

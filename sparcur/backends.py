@@ -660,6 +660,30 @@ class BlackfynnRemote(aug.RemotePath):
             # This seems like an oversight ...
             return self.bfobject.owner_id
 
+    _member_cache = {}
+    @property
+    def owner(self):
+        class User:
+            def __init__(self, u):
+                self.__dict__.update(u.__dict__)
+
+            @property
+            def name_or_email(self):
+                if len(self.last_name) <= 1 and len(self.first_name) <= 1:
+                    return self.email.strip()
+                else:
+                    return (
+                        self.last_name.strip()
+                        + ', '
+                        + self.first_name.strip())
+
+        if not self._member_cache:
+            self._member_cache.update(
+                {m.id:User(m) for m in self.organization.bfobject.members})
+        oid = self.owner_id
+        if oid in self._member_cache:
+            return self._member_cache[oid]
+
     @property
     def parent(self):
         if hasattr(self, '_c_parent'):

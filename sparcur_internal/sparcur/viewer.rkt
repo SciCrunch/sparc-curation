@@ -27,6 +27,7 @@
          json
          json-view
          net/url
+         (except-in gregor date? date)
          (prefix-in oa- orthauth/base)
          orthauth/paths
          orthauth/python-interop
@@ -46,6 +47,8 @@
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
 (define update-running? #f)
 (define selected-dataset #f) ; selected dataset is the global value across threads
+(define *current-datasets* #f) ; same issue as with selected-dataset, it is global not thread local
+(define *current-datasets-view* #f)
 
 ;; parameters (yay dynamic variables)
 (define path-config (make-parameter #f))
@@ -58,11 +61,28 @@
 (define path-source-dir (make-parameter #f))
 (define url-prod-datasets (make-parameter "https://cassava.ucsd.edu/sparc/datasets"))
 (define current-blob (make-parameter #f))
-(define current-dataset (make-parameter #f))
-(define current-datasets (make-parameter #f))
-(define current-datasets-view (make-parameter #f))
-(define current-jview (make-parameter #f))
-(define current-mode-panel (make-parameter #f)) ; TODO read from config/history
+(define current-dataset
+  (case-lambda
+    [() selected-dataset]
+    [(value) (set! selected-dataset value)]))
+(define current-datasets
+  (case-lambda
+    [() *current-datasets*]
+    [(value) (set! *current-datasets* value)]))
+(define current-datasets-view
+  (case-lambda
+    [() *current-datasets-view*]
+    [(value) (set! *current-datasets-view* value)]))
+(define *current-jview* #f)
+(define current-jview
+  (case-lambda
+    [() *current-jview*]
+    [(value) (set! *current-jview* value)]))
+(define *current-mode-panel* #f)
+(define current-mode-panel ; TODO read from config/history
+  (case-lambda
+    [() *current-mode-panel*]
+    [(value) (set! *current-mode-panel* value)]))
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
 
@@ -166,10 +186,9 @@
         (begin (println msg-dataset-not-fetched) #f))))
 
 (define (xopen-dataset-latest-log ds)
-  (let ([path (dataset-log-path ds)])
-    (if (directory-exists? path)
-        (let ([latest-log-path (build-path path "LATEST/stdout.log")])
-          (xopen-path latest-log-path))
+  (let ([latest-log-path (dataset-latest-log-path ds)])
+    (if latest-log-path
+        (xopen-path latest-log-path)
         (begin (println msg-no-logs) #f))))
 
 (define (argv-download-everything ds)
@@ -297,10 +316,14 @@
     ; FIXME sppsspps stupidity
     (path-source-dir (or (oa-get-path ac 'data-path #:exists? #f)
                          (build-path (find-system-path 'home-dir) "files" "sparc-datasets")))
-    (path-log-dir (or (oa-get-path ac 'log-path #:exists? #f)
-                      (expand-user-path (user-log-path "sparcur" "datasets"))))
-    (path-cache-dir (or (oa-get-path ac 'cache-path #:exists? #f)
-                        (expand-user-path (user-cache-path "sparcur" "racket"))))
+    (path-log-dir (build-path
+                   (or (oa-get-path ac 'log-path #:exists? #f)
+                       (expand-user-path (user-log-path "sparcur")))
+                   "datasets"))
+    (path-cache-dir (build-path
+                     (or (oa-get-path ac 'cache-path #:exists? #f)
+                         (expand-user-path (user-cache-path "sparcur")))
+                     "racket"))
     (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
     (path-cleaned-dir (or (oa-get-path ac 'cleaned-path #:exists? #f)
                           (expand-user-path (user-data-path "sparcur" "cleaned"))))
@@ -364,6 +387,20 @@
               ; cb does the toggle interinally so we set the opposite of what we want first
               (cb-power-user check-box-power-user #f))
             (set-current-mode-panel! panel-validate-mode))))))
+
+(define (refresh-dataset-metadata)
+  ; XXX requries python sparcur to be installed
+  (let* ([result (get-dataset-list)]
+         [datasets (result->dataset-list result)]
+         [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
+    (current-datasets datasets)
+    (if unfiltered?
+        (set-datasets-view! lview (current-datasets)) ; FIXME lview is a free variable here
+        (cb-search-dataset text-search-box #f))
+    (println "dataset metadata has been refreshed") ; TODO gui viz on this (beyond updating the number)
+    (with-output-to-file (path-cache-datasets)
+      #:exists 'replace ; yes if you run multiple of these you could have a data race
+      (λ () (pretty-write result)))))
 
 (define (get-path-err)
   (hash-ref
@@ -599,12 +636,14 @@
   (populate-list ds list-box)
   (lb-cols ds)
   (lb-data ds)
+  (updated-short ds)
   (id-short ds)
   (id-uuid ds)
   (uri-human ds)
   (uri-sds-viewer ds)
   (dataset-src-path ds)
   (dataset-log-path ds)
+  (dataset-latest-log-path ds)
   (dataset-export-latest-path ds)
   (dataset-cleaned-latest-path ds)
   (fetch-export-dataset ds)
@@ -613,20 +652,24 @@
   (load-remote-json ds)
   (export-dataset ds))
 
-(struct dataset (id title pi-last-name)
+(struct dataset (id title updated pi-name-lf)
   #:methods gen:ds
   [(define (populate-list ds list-box)
      ; FIXME annoyingly it looks like these things need to be set in
      ; batch in order to get columns to work
      (send list-box append
-           (list (dataset-pi-last-name ds)
-                 (dataset-title ds)
-                 (id-short ds))
+           (list
+            (dataset-pi-name-lf ds)
+            (dataset-title ds)
+            (id-short ds)
+            (updated-short ds))
            ds))
    (define (lb-cols ds)
-     (list (dataset-pi-last-name ds)
-           (dataset-title ds)
-           (id-short ds)))
+     (list
+      (dataset-pi-name-lf ds)
+      (dataset-title ds)
+      (id-short ds)
+      (updated-short ds)))
    (define (lb-data ds)
      ; TODO we may want to return more stuff here
      ds)
@@ -652,6 +695,9 @@
    (define (dataset-log-path ds)
      (let ([uuid (id-uuid ds)])
        (build-path (path-log-dir) uuid)))
+   (define (dataset-latest-log-path ds)
+     (define lp (build-path (dataset-log-path ds) "LATEST/stdout.log"))
+     (and (file-exists? lp) (resolve-path lp)))
    (define (fetch-dataset ds)
      (println (format "dataset fetch starting for ~a" (dataset-id ds))) ; TODO gui and/or log
      (let ([cwd-1 (path-source-dir)]
@@ -673,7 +719,7 @@
                                                  (apply system* argv-2 #:set-pwd? #t)))))
            (if (and status-1 status-2)
                (begin
-                 (when (equal? ds selected-dataset)
+                 (when (equal? ds (current-datasets))
                    (send button-export-dataset enable #t)
                    (send button-open-dataset-shell enable #t)
                    (send button-clean-metadata-files enable #t))
@@ -706,11 +752,11 @@
            [cwd-2 (build-path (dataset-src-path ds)
                               ; FIXME dataset here is hardcoded
                               "dataset")]
-           [dataset-log-path (build-path (path-log-dir) (id-uuid ds) (datetime-for-path-now) "stdout.log")]
+           [dataset-log-path-now (build-path (dataset-log-path ds) (datetime-for-path-now) "stdout.log")]
            [argv-1 (argv-simple-retrieve ds)]
            [argv-2 argv-spc-find-meta]
            [argv-3 argv-spc-export])
-       (let*-values ([(date-path _ __) (split-path dataset-log-path)]
+       (let*-values ([(date-path _ __) (split-path dataset-log-path-now)]
                      [(uuid-path local-date-path __) (split-path date-path)]
                      [(latest-path) (build-path uuid-path "LATEST")])
          (ensure-directory! uuid-path)
@@ -728,7 +774,7 @@
              #;
              (println (string-join argv-1 " "))
              (with-output-to-file
-               dataset-log-path
+               dataset-log-path-now
                (thunk
                 (parameterize (#;[current-error-port (current-output-port)]) ; TODO
                   (set! status-1
@@ -738,13 +784,15 @@
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
                  (parameterize ([current-directory cwd-2-resolved])
                    (with-output-to-file
-                     dataset-log-path
+                     dataset-log-path-now
                      (thunk (set! status-2
                                   (apply system* argv-2 #:set-pwd? #t)))
                      #:exists 'append)
-                   ; TODO figure out if we need to condition this run on status-2 #t
+                   ; TODO figure out if we need to condition further steps to run on status-2 #t
+                   (println (format "dataset fetch for export completed for ~a" (dataset-id ds)))
+                   (set-button-status-for-dataset ds)
                    (with-output-to-file
-                     dataset-log-path
+                     dataset-log-path-now
                      (thunk (set! status-3
                                   (apply system* argv-3 #:set-pwd? #t)))
                      #:exists 'append))
@@ -753,7 +801,7 @@
                      (begin
                        ; now that we have 1:1 jview:json we can automatically update the jview for
                        ; this dataset in the background thread and it shouldn't block the ui
-                       (when (equal? ds selected-dataset)
+                       (when (equal? ds (current-dataset))
                          (send button-export-dataset enable #t)
                          (send button-open-dataset-shell enable #t)
                          (send button-clean-metadata-files enable #t))
@@ -817,12 +865,14 @@
      ; find the current row based on data ??? and then change color ?
      (println "TODO set color") ; pretty sure this cannot be done with this gui widgit
      )
+   (define (updated-short ds)
+     (let* ([momnt-z (iso8601->moment (dataset-updated ds))]
+            [momnt-l (adjust-timezone momnt-z (current-timezone))])
+       (~t momnt-l "YY-MM-dd  hh:mm")))
    (define (id-short ds)
      (let-values ([(N type uuid)
                    (apply values (string-split (dataset-id ds) ":"))])
        (string-append
-        type
-        ":"
         (substring uuid 0 4)
         " ... "
         (let ([slu (string-length uuid)])
@@ -843,14 +893,47 @@
      ; FIXME hardcoded
      (string-append "https://metacell.github.io/sds-viewer/?id=" (id-uuid ds)))])
 
+(define *current-lview-column* 3)
+(define *current-lview-ascending* #f)
+(define (set-lview-column-state! column-number)
+  (if (= *current-lview-column* column-number)
+      (set! *current-lview-ascending* (not *current-lview-ascending*))
+      (begin
+        (set! *current-lview-column* column-number)
+        #; ; TODO see what behavior we need
+        (set! *current-lview-ascending* #t)
+        )))
+
+(define (make-sort-datasets column ascending)
+  (define operator
+    (if ascending string<? string>?))
+  (define selector
+    (case column
+      [(0) dataset-pi-name-lf]
+      [(1) dataset-title]
+      [(2) id-uuid]
+      [(3) dataset-updated]))
+  (lambda (ds1 ds2)
+    (operator (selector ds1) (selector ds2))))
+
+(define (current-dataset-sort)
+  (make-sort-datasets *current-lview-column* *current-lview-ascending*))
+
 (define (set-datasets-view! list-box datasets)
-  (send/apply list-box set (apply map list (map lb-cols datasets)))
+  (define selected (current-dataset))
+  (current-datasets-view datasets)
+  (define sorted (sort datasets (current-dataset-sort)))
+  (send/apply list-box set (apply map list (map lb-cols sorted)))
   (for ([ds datasets]
         [n (in-naturals)])
     (send list-box set-data n (lb-data ds)))
   (send button-refresh-datasets set-label
         (format lbt-refresh-datasets (length datasets))) ; XXX free variable on the button in question
-  )
+  (let ([current-dataset-index (index-of sorted selected
+                                         (lambda (element target) ; struct id changes so eq? by itself fails
+                                           (and element target (string=? (id-uuid element) (id-uuid target)))))])
+    (when current-dataset-index
+      (send list-box set-selection current-dataset-index))))
 
 (define (set-datasets-view*! list-box . datasets)
   (set-datasets-view! list-box datasets))
@@ -906,6 +989,36 @@
                  ; especially given that it is dynamically typed :/
                  #f))))))
 
+(define (set-button-status-for-dataset ds)
+  (let* ([path (dataset-src-path ds)]
+         [symlink (build-path path "dataset")])
+    ; performance is a little bit better, but wow this seems like a bad way to
+    ; say "wait and see if the current dataset is actually the current dataset"
+    ; I think what needs to happen is that there is a parameter for the
+    ; current-dataset which is static per thread, and then selected-dataset is
+    ; the module variable that transcends threads, compare the two to see if we
+    ; do anything, yep, this seems to work
+    (thread
+     (thunk
+      (if (equal? ds (current-dataset))
+          (let ([enable? (link-exists? symlink)]
+                [logs-enable? (dataset-latest-log-path (current-dataset))]
+                [export-enable? (dataset-export-latest-path (current-dataset))])
+            ; source data folder
+            (for ([button (in-list all-button-open-dataset-folder)]) (send button enable enable?))
+            (send button-export-dataset enable enable?)
+            (send button-open-dataset-shell enable enable?)
+            (send button-clean-metadata-files enable enable?)
+            ; export
+            (send button-open-export-json enable export-enable?)
+            (send button-open-export-ipython enable export-enable?)
+            ; logs
+            (send button-open-dataset-latest-log enable logs-enable?)
+            )
+          (void)
+          #; ; yep, this case does happen :)
+          (println "TOO FAST! dataset no longer selected"))))))
+
 ;; callbacks
 
 (define (make-cb-open-path text-field)
@@ -913,41 +1026,28 @@
     (xopen-path (send text-field get-value))))
 
 (define (cb-dataset-selection obj event)
-  (define (set-button-status-for-dataset ds)
-    (let* ([path (dataset-src-path ds)]
-           [symlink (build-path path "dataset")])
-      ; performance is a little bit better, but wow this seems like a bad way to
-      ; say "wait and see if the current dataset is actually the current dataset"
-      ; I think what needs to happen is that there is a parameter for the
-      ; current-dataset which is static per thread, and then selected-dataset is
-      ; the module variable that transcends threads, compare the two to see if we
-      ; do anything, yep, this seems to work
-      (thread
-       (thunk
-        (if (equal? selected-dataset (current-dataset))
-            (let ([enable? (link-exists? symlink)])
-              (send button-export-dataset enable enable?)
-              (send button-open-dataset-shell enable enable?)
-              (send button-clean-metadata-files enable enable?))
-            (void)
-            #; ; yep, this case does happen :)
-            (println "TOO FAST! dataset no longer selected"))))))
-  (for ([index (send obj get-selections)])
-    (let ([dataset (send obj get-data index)]
-          [cd (current-dataset)])
-      ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
-      (when (not (equal? dataset cd))
-        (set! selected-dataset dataset)
-        (current-dataset dataset) ; FIXME multiple selection case
-        (get-jview! dataset)
-        (set-button-status-for-dataset dataset)))))
+  (let ([event-type (if event (send event get-event-type) #f)])
+    (case event-type
+      [(list-box-column)
+       (let ([column (send event get-column)])
+         (set-lview-column-state! column)
+         (set-datasets-view! lview (current-datasets-view)))]
+      [else
+       (for ([index (send obj get-selections)])
+         (let ([dataset (send obj get-data index)]
+               [cd (current-dataset)])
+           ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
+           (when (not (equal? dataset cd))
+             (current-dataset dataset) ; FIXME multiple selection case
+             (get-jview! dataset)
+             (set-button-status-for-dataset dataset))))])))
 
 (define (result->dataset-list result)
-  (map (λ (ti)
-         #;
-         (pretty-print ti)
-         (apply dataset (append ti (list "???"))))
-       result))
+  (let ([nargs (procedure-arity dataset)])
+    (map (λ (ti)
+           (let ([pad (for/list ([i (in-range (- nargs (length ti)))]) "???")])
+             (apply dataset (append ti pad))))
+         result)))
 
 (define (get-dataset-list)
   (let* ([argv argv-simple-for-racket]
@@ -967,15 +1067,7 @@
     (send frame-preferences show do-show?)))
 
 (define (cb-refresh-dataset-metadata obj event)
-  ; XXX requries python sparcur to be installed
-  (let* ([result (get-dataset-list)]
-         [datasets (result->dataset-list result)])
-    (current-datasets datasets)
-    (set-datasets-view! lview (current-datasets)) ; FIXME lview is a free variable here
-    (println "dataset metadata has been refreshed") ; TODO gui viz on this
-    (with-output-to-file (path-cache-datasets)
-      #:exists 'replace ; yes if you run multiple of these you could have a data race
-      (λ () (pretty-write result)))))
+  (refresh-dataset-metadata))
 
 (define (cb-update-viewer obj event)
   (update-viewer))
@@ -1145,7 +1237,8 @@
   "given text return datasets whose title or identifier matches"
   (if text
       (if (string-contains? text "dataset:")
-          (let* ([m (last (string-split text "dataset:"))]
+          (let* ([hrm (string-split text "dataset:")]
+                 [m (if (null? hrm) "" (last hrm))]
                  [uuid (if (string-contains? m "/")
                            (car (string-split m "/"))
                            m)]
@@ -1157,11 +1250,14 @@
             (if (null? matches)
                 datasets
                 matches))
-          (let ([matches (for/list ([d datasets]
-                                    #:when (or (string-contains? (id-uuid d) text)
-                                               (string-contains? (string-downcase (dataset-title d))
-                                                                 (string-downcase text))))
-                           d)])
+          (let* ([downcased-text (string-downcase text)]
+                 [matches (for/list ([d datasets]
+                                     #:when (or (string-contains? (id-uuid d) text)
+                                                (string-contains? (string-downcase (dataset-title d))
+                                                                  downcased-text)
+                                                (string-contains? (string-downcase (dataset-pi-name-lf d))
+                                                                  downcased-text)))
+                            d)])
             (if (null? matches)
                 datasets
                 matches)))
@@ -1171,14 +1267,29 @@
   "callback for text field that should highlight filter sort matches in
 the list to the top and if there is only a single match select and
 switch to that"
-  (let* ([text (send obj get-value)]
-         [matching (match-datasets text (current-datasets))])
-    (unless (or (null? matching) (eq? matching (or (current-datasets-view) (current-datasets))))
-      (current-datasets-view matching)
-      (set-datasets-view! lview matching) ; FIXME lview free variable
-      (when (= (length matching) 1)
-        (send lview set-selection 0)
-        (cb-dataset-selection lview #f)))))
+  (define text (string-trim (send obj get-value)))
+  (thread
+   (thunk
+    ; 0.05 is too low and race conditions will appear and
+    ; cause errors, 0.1 seems pretty good perceptually and
+    ; I haven't hit any race conditions with my 70hz key repeat nor typing
+    ; FALSE: hit an issue with 0.1 so bumped it to 0.15
+    (sleep 0.15) ; should be long enough to resolve order issues?
+    (let ([wat (string-trim (send obj get-value))])
+      ; don't run this if the text has changed in the other thread
+      ; without this you get non deterministic behavior when typing
+      ; and sometimes the shorter result will supplant the long
+      (if (= 0 (string-length text))
+          (when (not (equal? (current-datasets) (current-datasets-view)))
+            (set-datasets-view! lview (current-datasets)))
+          (let ([matching (match-datasets text (current-datasets))])
+            (when (string=? text wat)
+              (unless (or (null? matching)
+                          (eq? matching (or (current-datasets-view) (current-datasets))))
+                (set-datasets-view! lview matching) ; FIXME lview free variable
+                (when (= (length matching) 1)
+                  (send lview set-selection 0)
+                  (cb-dataset-selection lview #f))))))))))
 
 (define (cb-power-user o e)
   ; this can be triggered by keypress as well so cannot use o
@@ -1273,7 +1384,7 @@ switch to that"
   (add-function "open-export-json" cb-open-export-json)
   (add-function "open-export-ipython" cb-open-export-ipython)
   (add-function "open-dataset-shell" cb-open-dataset-shell)
-  (add-function "open-dataset-lastest-log" cb-open-dataset-lastest-log)
+  (add-function "open-dataset-latest-log" cb-open-dataset-lastest-log)
   (add-function "toggle-prefs" cb-toggle-prefs)
   )
 
@@ -1293,7 +1404,9 @@ switch to that"
   (map-function "f5"      "fetch-export-dataset")
   (map-function "c:t"     "fetch-dataset")
   (map-function "c:f"     "focus-search-box") ; XXX bad overlap with find
-  (map-function "c:l"     "focus-search-box") ; this makes more sense
+  #; ; overlaps with open logs
+  (map-function "c:l"     "focus-search-box")
+  (map-function "c:k"     "focus-search-box") ; this makes more sense given browser binds
   #;
   (map-function "c:c;c:e" "fetch-export-dataset") ; XXX cua intersection
   (map-function "c:x"     "export-dataset")
@@ -1401,7 +1514,7 @@ switch to that"
                    [label ""]
                    [font (make-object font% 10 'modern)]
                    [choices '()]
-                   [columns '("Lab" "Folder Name" "Identifier")]
+                   [columns '("Owner" "Folder Name" "Identifier" "Updated")]
                    ; really is single selection though we want to be
                    ; able to highlight and reorder multiple
                    [style '(single column-headers clickable-headers)]
@@ -1413,7 +1526,9 @@ switch to that"
 (send* lview
   (set-column-width 0 50 50 100)
   (set-column-width 1 120 60 300)
-  (set-column-width 2 120 60 9999))
+  (set-column-width 2 120 60 300)
+  (set-column-width 3 120 60 9999)
+  )
 
 (define panel-ds-actions (new horizontal-panel%
                               [stretchable-height #f]
@@ -1436,11 +1551,14 @@ switch to that"
                             [callback cb-fetch-export-dataset]
                             [parent panel-validate-mode]))
 
+(define all-button-open-dataset-folder '()) ; we do it this way since these should enable/disable as a group
 (define (make-button-open-dataset-folder parent)
-  (new button%
-       [label "Open Folder"]
-       [callback cb-open-dataset-folder]
-       [parent parent]))
+  (define butt
+    (new button%
+         [label "Open Folder"]
+         [callback cb-open-dataset-folder]
+         [parent parent]))
+  (set! all-button-open-dataset-folder (cons butt all-button-open-dataset-folder)))
 
 (make-button-open-dataset-folder panel-validate-mode)
 
@@ -1491,23 +1609,30 @@ switch to that"
 
 ;; convert mode panel
 
+(define all-button-fetch '())
 (define (make-button-fetch parent)
-  (new (tooltip-mixin button%)
-       [label "Fetch"] ; curation does not use
-       [tooltip "Shortcut <not-set>"]
-       [tooltip-delay 100]
-       [callback cb-fetch-dataset]
-       [parent parent]))
+  (define butt
+    (new (tooltip-mixin button%)
+         [label "Fetch"] ; curation does not use
+         [tooltip "Shortcut <not-set>"]
+         [tooltip-delay 100]
+         [callback cb-fetch-dataset]
+         [parent parent]))
+  (set! all-button-fetch (cons butt all-button-fetch)))
 
 (make-button-fetch panel-convert-mode)
 
+(define all-button-download-all-files '())
 (define (make-button-download-all-files parent)
-  (new (tooltip-mixin button%)
-       [label "Download"]
-       [tooltip "Download all files"]
-       [tooltip-delay 100]
-       [callback cb-download-all-files]
-       [parent parent]))
+  (define butt
+    (new (tooltip-mixin button%)
+         [label "Download"]
+         [tooltip "Download all files"]
+         [tooltip-delay 100]
+         [callback cb-download-all-files]
+         [parent parent]))
+  ; TODO this would have to be a macro because we need the exact name for the list
+  (set! all-button-download-all-files (cons butt all-button-download-all-files)))
 
 (make-button-download-all-files panel-convert-mode)
 
@@ -1716,12 +1841,13 @@ switch to that"
 (module+ main
   (init-paths!)
   (load-config!)
-  (define result (populate-datasets))
+  (define result (populate-datasets)) ; slow if not cached, but thus only on the very first run
   (send frame-main show #t) ; show this first so that users know something is happening
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (cb-dataset-selection lview #f)
+  (void (thread (thunk (refresh-dataset-metadata)))) ; refresh datasets in a separate thread to avoid delaying startup
   (unless (eq? (system-type) 'unix)
     ; do NOT run this when gtk is the windowing toolkit it will eat up
     ; tens of gigs of memory, windows and macos don't have the issue
