@@ -132,6 +132,7 @@
 (define msg-dataset-not-fetched "Dataset has not been fetched yet!")
 (define msg-dataset-not-exported "Dataset has not been exported yet!")
 (define msg-no-logs "Dataset has no logs.")
+(define missing-var "???")
 
 ;; other variables
 
@@ -866,9 +867,11 @@
      (println "TODO set color") ; pretty sure this cannot be done with this gui widgit
      )
    (define (updated-short ds)
-     (let* ([momnt-z (iso8601->moment (dataset-updated ds))]
-            [momnt-l (adjust-timezone momnt-z (current-timezone))])
-       (~t momnt-l "YY-MM-dd  hh:mm")))
+     (if (string=? (dataset-updated ds) missing-var)
+         (dataset-updated ds)
+         (let* ([momnt-z (iso8601->moment (dataset-updated ds))]
+                [momnt-l (adjust-timezone momnt-z (current-timezone))])
+           (~t momnt-l "YY-MM-dd  hh:mm"))))
    (define (id-short ds)
      (let-values ([(N type uuid)
                    (apply values (string-split (dataset-id ds) ":"))])
@@ -1045,7 +1048,7 @@
 (define (result->dataset-list result)
   (let ([nargs (procedure-arity dataset)])
     (map (λ (ti)
-           (let ([pad (for/list ([i (in-range (- nargs (length ti)))]) "???")])
+           (let ([pad (for/list ([i (in-range (- nargs (length ti)))]) missing-var)])
              (apply dataset (append ti pad))))
          result)))
 
