@@ -5,6 +5,7 @@
 (define deps '("base"
                "gui-lib"
                "gui-widget-mixins"
+               "gregor"
                "json-view"
                "orthauth"))
 
