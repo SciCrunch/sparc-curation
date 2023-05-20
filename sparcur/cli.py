@@ -83,6 +83,7 @@ Commands:
                        : --context  include context, e.g. dataset
                        : --fake     make fake metadata to keep pipeline happy
                        : --meta-from-local   check if cached metadata from local
+                       : --for-racket    format output as sepr
 
     rmeta       retrieve metadata about files/folders from the remote
 
@@ -249,6 +250,7 @@ Options:
     --fake                  make fake file system metadata to keep pipelines happy
     --meta-from-local       check if cached metadata from local
     --fill-cache-metadata   fill missing cache metadata from local to avoid errors
+    --for-racket            format output as sepr
 
     --log-level=LEVEL       set python logging log level
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
@@ -1599,6 +1601,28 @@ done"""
                         print(lmeta.as_pretty_diff(cmeta, pathobject=path,
                                                    title=title,
                                                    human=self.options.human))
+                    elif self.options.for_racket:
+                        from augpathlib import meta as apmeta
+                        out = '('
+                        rest = False
+                        ebf = apmeta._EncodeByField()
+                        for field in apmeta._PathMetaAsXattrs.fields:
+                            v = getattr(cmeta, field)
+                            if v or v == 0:
+                                if rest:
+                                    out += '\n '
+                                else:
+                                    rest = True
+
+                                if field == 'checksum':
+                                    v = v.hex()  # bytes are annoying to port
+                                elif field in ('updated', 'created'):
+                                    v = ebf._datetime(v)
+
+                                out += f':{field} {json.dumps(v)}'
+
+                        out += ')'
+                        print(out)
                     else:
                         print(cmeta.as_pretty(pathobject=path,
                                               title=title,

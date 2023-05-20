@@ -3732,6 +3732,7 @@ Usage:
     sparcur-simple get-uuid  <remote-id>...
     sparcur-simple datasets
     sparcur-simple for-racket
+    sparcur-simple for-racket meta [options] [<path> ...]
     sparcur-simple check-names
     sparcur-simple git-repos [update] [options]
     sparcur-simple [options] [<path>...]
@@ -4167,16 +4168,42 @@ def main(id=None, **kwargs):
 
     if ik('for_racket'):
         import json
-        key = lambda d: d.updated
-        _dsmeta = '\n'.join([(f"({json.dumps(d.id)} "
-                              f"{json.dumps(d.name)} "
-                              f"{json.dumps(d.updated)} "
-                              f"{json.dumps(d.owner.name_or_email)}"
-                              ")")
-                             for d in sorted(datasets, key=key, reverse=True)])
-        dsmeta = f"({_dsmeta})"
-        # lab pi last name should be cached in some other way
-        print(dsmeta)
+        from augpathlib import meta as apmeta
+        if ik('meta'):
+            paths = kwargs['paths'] if kwargs['paths'] else [kwargs['path']]
+            for path in paths:
+                cmeta = Path(path).cache_meta
+                out = '('
+                rest = False
+                ebf = apmeta._EncodeByField()
+                for field in apmeta._PathMetaAsXattrs.fields:
+                    v = getattr(cmeta, field)
+                    if v or v == 0:
+                        if rest:
+                            out += '\n '
+                        else:
+                            rest = True
+
+                        if field == 'checksum':
+                            v = v.hex()  # bytes are annoying to port
+                        elif field in ('updated', 'created'):
+                            v = ebf._datetime(v)
+
+                        out += f':{field} {json.dumps(v)}'
+
+                out += ')'
+                print(out)
+        else:
+            key = lambda d: d.updated
+            _dsmeta = '\n'.join([(f"({json.dumps(d.id)} "
+                                f"{json.dumps(d.name)} "
+                                f"{json.dumps(d.updated)} "
+                                f"{json.dumps(d.owner.name_or_email)}"
+                                ")")
+                                for d in sorted(datasets, key=key, reverse=True)])
+            dsmeta = f"({_dsmeta})"
+            # lab pi last name should be cached in some other way
+            print(dsmeta)
 
     if ik('check_names'):
         # you will want to run sparcur.simple.fetch_remote_metadata_all

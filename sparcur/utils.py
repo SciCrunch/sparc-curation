@@ -6,13 +6,14 @@ import warnings
 import idlib
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
-from pyontutils.utils import (makeSimpleLogger,
-                              python_identifier,  # FIXME update imports
-                              TZLOCAL,
-                              utcnowtz,
-                              isoformat,
-                              isoformat_safe,
-                              timeformat_friendly)
+from pyontutils.utils_fast import (
+    makeSimpleLogger,
+    python_identifier,  # FIXME update imports
+    TZLOCAL,
+    utcnowtz,
+    isoformat,
+    isoformat_safe,
+    timeformat_friendly)
 from . import exceptions as exc
 from .config import auth
 

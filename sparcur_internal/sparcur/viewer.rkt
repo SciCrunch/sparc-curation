@@ -146,7 +146,14 @@
 (define (python-mod-args module-name . args)
   (cons (python-interpreter) (cons "-m" (cons module-name args))))
 
-(define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "for-racket"))
+(define argv-simple-for-racket (python-mod-args "sparcur.simple.utils" "for-racket")) ; FIXME needs --project-id probably
+(define (argv-simple-for-racket-meta path-string)
+  ; this is peak LOL PYTHON for slowness on startup which makes this completely non-viable
+  (parameterize ([python-interpreter
+                  (if (string=? (python-interpreter) "pypy3") ; bad startup time ??? no just LOL PYTHON everywhere
+                      "python"
+                      (python-interpreter))])
+    (python-mod-args "sparcur.simple.utils" "for-racket" "meta" path-string)))
 (define argv-simple-git-repos-update (python-mod-args "sparcur.simple.utils" "git-repos" "update"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
 (define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1" "--dataset-id" (dataset-id ds)))
@@ -216,6 +223,9 @@
                              "-i" "-c"
                              python-code))))
         (begin (println msg-dataset-not-exported) #f))))
+
+(define path-getfattr (find-executable-path "getfattr"))
+(define (argv-getfattr path-string) (list path-getfattr "-d" path-string))
 
 ;; utility functions
 
@@ -640,6 +650,7 @@
   (updated-short ds)
   (id-short ds)
   (id-uuid ds)
+  (id-project ds)
   (uri-human ds)
   (uri-sds-viewer ds)
   (dataset-src-path ds)
@@ -718,13 +729,9 @@
            (parameterize ([current-directory (resolve-relative-path cwd-2)])
              (with-output-to-string (thunk (set! status-2
                                                  (apply system* argv-2 #:set-pwd? #t)))))
+           (when status-1 (set-button-status-for-dataset ds))
            (if (and status-1 status-2)
-               (begin
-                 (when (equal? ds (current-datasets))
-                   (send button-export-dataset enable #t)
-                   (send button-open-dataset-shell enable #t)
-                   (send button-clean-metadata-files enable #t))
-                 (println (format "dataset fetch completed for ~a" (dataset-id ds))))
+               (println (format "dataset fetch completed for ~a" (dataset-id ds)))
                (println (format "dataset fetch FAILED for ~a" (dataset-id ds)))))))))
    (define (export-dataset ds)
      (println (format "dataset export starting for ~a" (dataset-id ds))) ; TODO gui and/or log
@@ -871,7 +878,7 @@
          (dataset-updated ds)
          (let* ([momnt-z (iso8601->moment (dataset-updated ds))]
                 [momnt-l (adjust-timezone momnt-z (current-timezone))])
-           (~t momnt-l "YY-MM-dd  hh:mm"))))
+           (~t momnt-l "YY-MM-dd  HH:mm"))))
    (define (id-short ds)
      (let-values ([(N type uuid)
                    (apply values (string-split (dataset-id ds) ":"))])
@@ -888,8 +895,26 @@
        ; values if you want like in elisp or common lisp
        uuid))
    (define (id-project ds)
-     ; FIXME derive from file system
-     "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0")
+     ; TODO cache these, and probably derive from org list, include in dataset struct
+     ; etc. so that we don't have to read from the file system at all
+     (let* ([symlink (build-path (dataset-src-path ds) "dataset")]
+            [resolved (and (link-exists? symlink)
+                           (path->complete-path ; resolve-relative-path
+                            (resolve-path symlink)
+                            (simplify-path (build-path symlink 'up) #f)))]
+            [project-path (simplify-path (build-path resolved 'up) #f)]
+            #;; XXX this is hideously slow
+            [meta (and resolved (get-path-meta project-path))])
+       #;
+       (cadr (member ':id meta))
+       (let* ([status-1 #f]
+              [sigh (with-output-to-string (thunk (set! status-1 (apply system* (argv-getfattr project-path)))))]
+              [lines (string-split sigh)]
+              [m (for/list ([l (in-list lines)] #:when (string-prefix? l "user.bf.id")) (last (string-split l "=")))]
+              [i (read (open-input-string (car m)))])
+         i)
+       #;
+       "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"))
    (define (uri-human ds)
      (string-append "https://app.pennsieve.io/" (id-project ds) "/datasets/N:dataset:" (id-uuid ds)))
    (define (uri-sds-viewer ds)
@@ -912,8 +937,8 @@
     (if ascending string<? string>?))
   (define selector
     (case column
-      [(0) dataset-pi-name-lf]
-      [(1) dataset-title]
+      [(0) (compose string-downcase dataset-pi-name-lf)]
+      [(1) (compose string-downcase dataset-title)]
       [(2) id-uuid]
       [(3) dataset-updated]))
   (lambda (ds1 ds2)
@@ -1061,6 +1086,18 @@
          [result (read (open-input-string result-string))])
     (unless status
       (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
+    result))
+
+(define (get-path-meta path)
+  (let* ([path-string (path->string path)]
+         [argv (argv-simple-for-racket-meta path-string)]
+         [status #f]
+         [result-string
+          (parameterize ()
+            (with-output-to-string (λ () (set! status (apply system* argv)))))]
+         [result (read (open-input-string result-string))])
+    (unless status
+      (error "Failed to get dataset cache meta! ~a" (string-join argv " ")))
     result))
 
 (define (cb-toggle-prefs o e)
@@ -1527,7 +1564,7 @@ switch to that"
 ; FIXME TODO scale these based on window size
 ; and remove the upper limit when if/when someone is dragging
 (send* lview
-  (set-column-width 0 50 50 100)
+  (set-column-width 0 50 50 300)
   (set-column-width 1 120 60 300)
   (set-column-width 2 120 60 300)
   (set-column-width 3 120 60 9999)
