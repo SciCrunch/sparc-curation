@@ -4158,10 +4158,15 @@ def main(id=None, **kwargs):
             pass  # project_id from command line
         else:
             project_id = auth.get('remote-organization')
+            project_ids = auth.get_list('remote-organizations')
+            if not project_ids:
+                project_ids = [project_id]
 
-        PennsieveRemote = backend_pennsieve(project_id)
-        root = PennsieveRemote(project_id)
-        datasets = list(root.children)
+        datasets = []
+        for project_id in project_ids:
+            PennsieveRemote = backend_pennsieve(project_id)
+            root = PennsieveRemote(project_id)
+            datasets.extend(root.children)
 
     if ik('datasets'):
         print('\n'.join([d.id for d in datasets]))
@@ -4195,14 +4200,15 @@ def main(id=None, **kwargs):
                 print(out)
         else:
             key = lambda d: d.updated
-            _dsmeta = '\n'.join([(f"({json.dumps(d.id)} "
-                                f"{json.dumps(d.name)} "
-                                f"{json.dumps(d.updated)} "
-                                f"{json.dumps(d.owner.name_or_email)}"
-                                ")")
+            _dsmeta = '\n'.join([("("
+                                  f"{json.dumps(d.id)} "
+                                  f"{json.dumps(d.name)} "
+                                  f"{json.dumps(d.updated)} "
+                                  f"{json.dumps(d.owner.name_or_email)} "
+                                  f"{json.dumps(d.parent_id)}"
+                                  ")")
                                 for d in sorted(datasets, key=key, reverse=True)])
             dsmeta = f"({_dsmeta})"
-            # lab pi last name should be cached in some other way
             print(dsmeta)
 
     if ik('check_names'):

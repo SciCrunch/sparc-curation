@@ -35,6 +35,7 @@
       # idlib.exceptions.MalformedIdentifierError: b'None' matched no known pattern
       'environment-variables':
       'BLACKFYNN_ORGANIZATION PENNSIEVE_ORGANIZATION REMOTE_ORGANIZATION'},
+  'remote-organizations': None,  # a list, handled like e.g. datasets-test
   'remote-backoff-factor': {
       'default': 1,
       'environment-variables': 'BLACKFYNN_BACKOFF_FACTOR'},

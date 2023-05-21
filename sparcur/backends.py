@@ -661,6 +661,7 @@ class BlackfynnRemote(aug.RemotePath):
             return self.bfobject.owner_id
 
     _member_cache = {}
+    _known_orgs = set()
     @property
     def owner(self):
         class User:
@@ -677,7 +678,8 @@ class BlackfynnRemote(aug.RemotePath):
                         + ', '
                         + self.first_name.strip())
 
-        if not self._member_cache:
+        if not self._member_cache or self.organization.id not in self._known_orgs:
+            self._known_orgs.add(self.organization.id)
             self._member_cache.update(
                 {m.id:User(m) for m in self.organization.bfobject.members})
         oid = self.owner_id

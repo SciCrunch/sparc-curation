@@ -617,7 +617,11 @@
                        [json (if lp (path->json lp)
                                  (hash
                                   'id (dataset-id dataset)
-                                  'meta (hash 'folder_name (dataset-title dataset))))]
+                                  'meta (hash
+                                         'id-project (id-project dataset)
+                                         'folder_name (dataset-title dataset)
+                                         'owner (dataset-pi-name-lf dataset)
+                                         'updated (dataset-updated dataset))))]
                        [jhash (for/hash ([(k v) (in-hash json)]
                                          ; FIXME I think we don't need include keys anymore
                                          ; XXX false, there are still performance issues
@@ -664,7 +668,7 @@
   (load-remote-json ds)
   (export-dataset ds))
 
-(struct dataset (id title updated pi-name-lf)
+(struct dataset (id title updated pi-name-lf id-project)
   #:methods gen:ds
   [(define (populate-list ds list-box)
      ; FIXME annoyingly it looks like these things need to be set in
@@ -897,6 +901,8 @@
    (define (id-project ds)
      ; TODO cache these, and probably derive from org list, include in dataset struct
      ; etc. so that we don't have to read from the file system at all
+     (dataset-id-project ds)
+     #;
      (let* ([symlink (build-path (dataset-src-path ds) "dataset")]
             [resolved (and (link-exists? symlink)
                            (path->complete-path ; resolve-relative-path
