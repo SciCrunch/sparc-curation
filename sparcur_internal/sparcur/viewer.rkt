@@ -655,14 +655,17 @@
                   jview-inner)))])
     jview))
 
-(define (get-jview! dataset)
+(define (unset-current-jview)
   (let ([old-jview (current-jview)])
     ; always unparent the old jview when we call get-jview! because
     ; the jview for this dataset or some other dataset will replace
     ; this one so we always want to remove the old jview
     (when old-jview
       (send old-jview reparent frame-helper)
-      (current-jview #f)))
+      (current-jview #f))))
+
+(define (get-jview! dataset)
+  (unset-current-jview)
   (thread
    (thunk
     (let ([jview (dataset-jview! dataset)])
@@ -670,6 +673,10 @@
       ; and the user might have moved on so only set it if the ui is
       ; still focused on the same dataset we started with
       (when (string=? (id-uuid dataset) (id-uuid (current-dataset)))
+        ; there is a chance that another thread snuck in and set itself while this one was working
+        ; e.g. if you have a fast loading dataset followed by a slow loading dataset, so we unset
+        ; the current jview again here just in case otherwise we get two views
+        (unset-current-jview)
         (send jview reparent panel-right)
         (current-jview jview)
         jview)))))
