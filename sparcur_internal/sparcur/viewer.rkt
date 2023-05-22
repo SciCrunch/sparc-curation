@@ -383,8 +383,7 @@
                       (with-input-from-file pc
                         (λ ()
                           (read)))
-                      '())]
-             )
+                      '())])
         (define (obfus str [ends 4])
           (let ([ls (string-length str)])
             (string-append
@@ -657,15 +656,23 @@
     jview))
 
 (define (get-jview! dataset)
-  (let ([jview (dataset-jview! dataset)])
-    ; FIXME deal with parents and visibility
-    ; FIXME unparent the current jview
-    (let ([old-jview (current-jview)])
-      (when old-jview
-          (send old-jview reparent frame-helper)))
-    (send jview reparent panel-right)
-    (current-jview jview)
-    jview))
+  (let ([old-jview (current-jview)])
+    ; always unparent the old jview when we call get-jview! because
+    ; the jview for this dataset or some other dataset will replace
+    ; this one so we always want to remove the old jview
+    (when old-jview
+      (send old-jview reparent frame-helper)
+      (current-jview #f)))
+  (thread
+   (thunk
+    (let ([jview (dataset-jview! dataset)])
+      ; getting the jview for a dataset can take a while sometimes,
+      ; and the user might have moved on so only set it if the ui is
+      ; still focused on the same dataset we started with
+      (when (string=? (id-uuid dataset) (id-uuid (current-dataset)))
+        (send jview reparent panel-right)
+        (current-jview jview)
+        jview)))))
 
 ;; dataset struct and generic functions
 
@@ -951,14 +958,34 @@
 
 (define *current-lview-column* 3)
 (define *current-lview-ascending* #f)
-(define (set-lview-column-state! column-number)
-  (if (= *current-lview-column* column-number)
-      (set! *current-lview-ascending* (not *current-lview-ascending*))
-      (begin
-        (set! *current-lview-column* column-number)
-        #; ; TODO see what behavior we need
-        (set! *current-lview-ascending* #t)
-        )))
+(define (col-lab-base list-box column-number)
+  (car (string-split (list-ref (send list-box get-column-labels) column-number))))
+(define (col-lab-updn list-box column-number asc)
+  (send list-box set-column-label column-number
+        (string-append
+         (col-lab-base list-box column-number)
+         " "
+         ; arrow points toward bigger seems clearer?
+         ; up and down arrows are too small and hard to read ↓↑
+         (if asc "v" "^"))))
+(define (set-lview-column-state! list-box column-number #:view-only? [view-only? #f])
+  ; FIXME ick bad convention on #:view-only ugh
+  (let ([old-column *current-lview-column*])
+    ; FIXME should probably retain a hash table or something because if there was ever
+    ; more than one list box in the ui only lview itself would have its state change ...
+    (if (= *current-lview-column* column-number)
+        (begin
+          (unless view-only?
+            (set! *current-lview-ascending* (not *current-lview-ascending*)))
+          (col-lab-updn list-box column-number *current-lview-ascending*))
+        (begin
+          (when view-only? (error 'duh "should never be called this way"))
+          (set! *current-lview-column* column-number)
+          ; after experimenting with the ux, preserving the asc/desc when changing
+          ; columns provides a much nicer experience than always resetting to something
+          ; therefor we do not set *current-lview-ascending*
+          (send list-box set-column-label old-column (col-lab-base list-box old-column))
+          (col-lab-updn list-box column-number *current-lview-ascending*)))))
 
 (define (make-sort-datasets column ascending)
   (define operator
@@ -1086,8 +1113,8 @@
     (case event-type
       [(list-box-column)
        (let ([column (send event get-column)])
-         (set-lview-column-state! column)
-         (set-datasets-view! lview (current-datasets-view)))]
+         (set-lview-column-state! obj column)
+         (set-datasets-view! obj (current-datasets-view)))]
       [else
        (for ([index (send obj get-selections)])
          (let ([dataset (send obj get-data index)]
@@ -1595,7 +1622,7 @@ switch to that"
 ; FIXME TODO scale these based on window size
 ; and remove the upper limit when if/when someone is dragging
 (send* lview
-  (set-column-width 0 50 50 300)
+  (set-column-width 0 70 70 300)
   (set-column-width 1 120 60 300)
   (set-column-width 2 120 60 300)
   (set-column-width 3 120 60 9999)
@@ -1925,6 +1952,7 @@ switch to that"
   (define result (populate-datasets)) ; slow if not cached, but thus only on the very first run
   (send frame-main show #t) ; show this first so that users know something is happening
   (send lview set-selection 0) ; first time to ensure current-dataset always has a value
+  (set-lview-column-state! lview *current-lview-column* #:view-only? #t)
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (cb-dataset-selection lview #f)
