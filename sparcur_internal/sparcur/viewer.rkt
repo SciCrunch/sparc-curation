@@ -481,47 +481,47 @@
                    [status
                     (parameterize ()
                       (apply system* argv-simple-git-repos-update))])
-                  ; TODO pull changes for racket dependent repos as well
-                  ; TODO raco pkg install local git derived packages as well
-                  (println (format "running raco make -v ~a" this-file))
-                  (let ([mtime-before (file-or-directory-modify-seconds
-                                       this-file-compiled
-                                       #f
-                                       (λ () -1))])
-                    (parameterize ()
-                      (system* raco-exe "pkg" "update" "--batch" this-package-path)
-                      #;
-                      (system* raco-exe "make" "-v" this-file))
-                    #; ; raco exe issues ... i love it when abstractions break :/
-                    (parameterize ([current-command-line-arguments
-                                    (vector "--vv" this-file)])
-                      (dynamic-require 'compiler/commands/make #f))
-                    #;
-                    (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" "--" this-file)
-                    (let ([mtime-after (file-or-directory-modify-seconds
-                                        this-file-compiled
-                                        #f
-                                        (λ () -2))])
-                      (when (not (= mtime-before mtime-after))
-                        (println (format "running raco exe -v -o ~a ~a "
-                                         this-file-exe this-file))
-                        (parameterize ()
-                          (when (file-exists? this-file-exe)
-                            (rename-file-or-directory this-file-exe this-file-exe-tmp))
-                          (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
-                          (unless (file-exists? this-file-exe) ; restore the old version on failure
-                            (when (file-exists? this-file-exe-tmp)
-                              (rename-file-or-directory this-file-exe-tmp this-file-exe))))
-                        #; ; this is super cool but an eternal pain for raco exe
-                        (parameterize ([current-command-line-arguments
-                                        (vector
-                                         "++lib" "compiler/commands/make"
-                                         "++lib" "compiler/commands/exe"
-                                         "++lib" "racket/lang/reader"
-                                         "--vv" this-file)])
-                          (dynamic-require 'compiler/commands/exe #f))
-                        #;
-                        (system* exec-file "-l-" "raco/main.rkt" "exe" "--vv" "--" this-file)))))
+               ; TODO pull changes for racket dependent repos as well
+               ; TODO raco pkg install local git derived packages as well
+               (println (format "running raco pkg update ~a" this-package-path))
+               (let ([mtime-before (file-or-directory-modify-seconds
+                                    this-file-compiled
+                                    #f
+                                    (λ () -1))])
+                 (parameterize ()
+                   (system* raco-exe "pkg" "update" "--batch" this-package-path)
+                   #;
+                   (system* raco-exe "make" "-v" this-file))
+                 #; ; raco exe issues ... i love it when abstractions break :/
+                 (parameterize ([current-command-line-arguments
+                                 (vector "--vv" this-file)])
+                   (dynamic-require 'compiler/commands/make #f))
+                 #;
+                 (system* exec-file "-l-" "raco/main.rkt" "make" "--vv" "--" this-file)
+                 (let ([mtime-after (file-or-directory-modify-seconds
+                                     this-file-compiled
+                                     #f
+                                     (λ () -2))])
+                   (when (not (= mtime-before mtime-after))
+                     (println (format "running raco exe -v -o ~a ~a "
+                                      this-file-exe this-file))
+                     (parameterize ()
+                       (when (file-exists? this-file-exe)
+                         (rename-file-or-directory this-file-exe this-file-exe-tmp))
+                       (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
+                       (unless (file-exists? this-file-exe) ; restore the old version on failure
+                         (when (file-exists? this-file-exe-tmp)
+                           (rename-file-or-directory this-file-exe-tmp this-file-exe))))
+                     #; ; this is super cool but an eternal pain for raco exe
+                     (parameterize ([current-command-line-arguments
+                                     (vector
+                                      "++lib" "compiler/commands/make"
+                                      "++lib" "compiler/commands/exe"
+                                      "++lib" "racket/lang/reader"
+                                      "--vv" this-file)])
+                       (dynamic-require 'compiler/commands/exe #f))
+                     #;
+                     (system* exec-file "-l-" "raco/main.rkt" "exe" "--vv" "--" this-file)))))
              (println "Update complete!")
              #; ; TODO issue this only if the viewer itself was updated and there was a success
              (println "Restart at your convenience.")
