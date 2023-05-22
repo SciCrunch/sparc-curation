@@ -47,8 +47,9 @@
 
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
 (define update-running? #f)
-(define selected-dataset #f) ; selected dataset is the global value across threads
-(define *current-datasets* #f) ; same issue as with selected-dataset, it is global not thread local
+; true global variables that should not be thread local
+(define *current-dataset* #f)
+(define *current-datasets* #f)
 (define *current-datasets-view* #f)
 
 ;; parameters (yay dynamic variables)
@@ -61,11 +62,15 @@
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
 (define url-prod-datasets (make-parameter "https://cassava.ucsd.edu/sparc/datasets"))
-(define current-blob (make-parameter #f))
+(define *current-blob* #f)
+(define current-blob
+  (case-lambda
+    [() *current-blob*]
+    [(value) (set! *current-blob* value)]))
 (define current-dataset
   (case-lambda
-    [() selected-dataset]
-    [(value) (set! selected-dataset value)]))
+    [() *current-dataset*]
+    [(value) (set! *current-dataset* value)]))
 (define current-datasets
   (case-lambda
     [() *current-datasets*]
@@ -556,7 +561,7 @@
                            )))))
      (send item open))))
 
-(define (set-jview! jview json)
+(define (set-jview-json! jview json)
   "set the default state for jview"
   (define jhl (get-field json-hierlist jview))
   (define old-root (get-field root jhl))
@@ -648,42 +653,56 @@
                                          ; XXX false, there are still performance issues
                                          #:when (member k include-keys))
                                 (values k v))])
-                  (when-not background
+                  (unless (or background (not (is-current? dataset)))
                     (current-blob json)) ; FIXME this will go stale
-                  (set-jview! jview-inner jhash)
+                  (set-jview-json! jview-inner jhash)
                   (hash-set! jviews uuid jview-inner)
                   jview-inner)))])
     jview))
 
 (define (unset-current-jview)
   (let ([old-jview (current-jview)])
-    ; always unparent the old jview when we call get-jview! because
-    ; the jview for this dataset or some other dataset will replace
-    ; this one so we always want to remove the old jview
     (when old-jview
       (send old-jview reparent frame-helper)
       (current-jview #f))))
 
 (define jviews-loading (set))
-(define (get-jview! dataset)
-  (unless (set-member? jviews-loading (id-uuid dataset))
-    (set! jviews-loading (set-add jviews-loading (id-uuid dataset)))
+(define jview-semaphore (make-semaphore 1))
+(define (set-jview! dataset)
+  (let ([uuid (id-uuid dataset)])
+    ; unset-current-jview is safe to call unconditionally because even
+    ; if we can't draw the jview for the new dataset we definitely should
+    ; stop drawing the jview for the most recently deselected dataset
     (unset-current-jview)
-    (thread
-     (thunk
-      ; getting the jview for a dataset can take a while sometimes,
-      ; and the user might have moved on so only set it if the ui is
-      ; still focused on the same dataset we started with
-      (let ([jview (dataset-jview! dataset)])
-        (set! jviews-loading (set-remove jviews-loading (id-uuid dataset)))
-        (when (string=? (id-uuid dataset) (id-uuid (current-dataset)))
-          ; there is a chance that another thread snuck in and set itself while this one was working
-          ; e.g. if you have a fast loading dataset followed by a slow loading dataset, so we unset
-          ; the current jview again here just in case otherwise we get two views
-          (unset-current-jview)
-          (send jview reparent panel-right)
-          (current-jview jview)
-          jview))))))
+    ; when scrolling fast back and forth don't try to load the same jview multiple times
+    (unless (set-member? jviews-loading uuid)
+      (set! jviews-loading (set-add jviews-loading uuid))
+      ; setting current dataset must be called in the main thread so that
+      ; curent-dataset is always guranteed to be synchronized with the gui view ...
+      (current-dataset dataset) ; XXX this is the only place current-dataset should ever be set
+      (thread
+       (thunk ; we thread because dataset-jview! can be quite slow for large json blobs
+        (let ([jview (dataset-jview! dataset)])
+          ; we're done loading so if you want to load again knock yourself out
+          (set! jviews-loading (set-remove jviews-loading uuid))
+          ; we must use a semaphore here because if you have two consecutive events
+          ; that are very close together in time the exact orderin of the threads
+          ; they spawn can result in a case where (is-current? a) will be called and
+          ; return true before (current-dataset b) is called and (reparent a) is called
+          ; after (b-unparent) is called, said another way, the call to unset-current-jview
+          ; in in main thread for b can fall between the call (is-current? a) and (reparent a)
+          ; in the a subthread, the semaphore ensures that even if this happens that the call
+          ; to unset-current-jview in b will unparent a because b's reparent cannot start until
+          ; after a's finishes in the case where b's unset has been called between ica and ra (confusing I know)
+          (call-with-semaphore
+           jview-semaphore
+           (thunk
+            (when (string=? uuid (id-uuid (current-dataset)))
+              ; even with the semaphore there is a chance that another thread snuck in and set itself while
+              ; this one was working so we unset the current jview again here otherwise we periodically get two jviews
+              (unset-current-jview)
+              (send jview reparent panel-right)
+              (current-jview jview))))))))))
 
 ;; dataset struct and generic functions
 
@@ -706,7 +725,8 @@
   (fetch-dataset ds)
   (clean-metadata-files ds)
   (load-remote-json ds)
-  (export-dataset ds))
+  (export-dataset ds)
+  (is-current? ds))
 
 (struct dataset (id title updated pi-name-lf id-project)
   #:methods gen:ds
@@ -910,7 +930,7 @@
                               #:when (member k include-keys))
                      (values k v))])
        (current-blob json) ; FIXME this will go stale
-       (set-jview! jview-inner jhash)
+       (set-jview-json! jview-inner jhash)
        (hash-set! jviews uuid jview-inner)
        jview-inner))
    (define (set-lview-item-color lview ds)
@@ -938,6 +958,10 @@
        ; must always be bound together so you can't just ignore later
        ; values if you want like in elisp or common lisp
        uuid))
+   (define (is-current? ds)
+     ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
+     (let ([cd (current-dataset)])
+       (and cd (string=? (id-uuid ds) (id-uuid cd)))))
    (define (id-project ds)
      ; TODO cache these, and probably derive from org list, include in dataset struct
      ; etc. so that we don't have to read from the file system at all
@@ -1083,6 +1107,7 @@
                  ; especially given that it is dynamically typed :/
                  #f))))))
 
+(define set-button-semaphore (make-semaphore 1))
 (define (set-button-status-for-dataset ds)
   (let* ([path (dataset-src-path ds)]
          [symlink (build-path path "dataset")])
@@ -1094,24 +1119,28 @@
     ; do anything, yep, this seems to work
     (thread
      (thunk
-      (if (equal? ds (current-dataset))
-          (let ([enable? (link-exists? symlink)]
-                [logs-enable? (dataset-latest-log-path (current-dataset))]
-                [export-enable? (dataset-export-latest-path (current-dataset))])
-            ; source data folder
-            (for ([button (in-list all-button-open-dataset-folder)]) (send button enable enable?))
-            (send button-export-dataset enable enable?)
-            (send button-open-dataset-shell enable enable?)
-            (send button-clean-metadata-files enable enable?)
-            ; export
-            (send button-open-export-json enable export-enable?)
-            (send button-open-export-ipython enable export-enable?)
-            ; logs
-            (send button-open-dataset-latest-log enable logs-enable?)
-            )
-          (void)
-          #; ; yep, this case does happen :)
-          (println "TOO FAST! dataset no longer selected"))))))
+      (call-with-semaphore
+       set-button-semaphore
+       (thunk
+        (if (is-current? ds)
+            (let ([enable? (link-exists? symlink)]
+                  [logs-enable? (dataset-latest-log-path (current-dataset))]
+                  [export-enable? (dataset-export-latest-path (current-dataset))])
+              ; source data folder
+              (for ([button (in-list all-button-open-dataset-folder)]) (send button enable enable?))
+              (send button-export-dataset enable enable?)
+              (send button-open-dataset-shell enable enable?)
+              (send button-clean-metadata-files enable enable?)
+              ; export
+              (send button-open-export-json enable export-enable?)
+              (send button-open-export-ipython enable export-enable?)
+              ; logs
+              (send button-open-dataset-latest-log enable logs-enable?)
+              )
+            (void)
+            #; ; yep, this case does happen :)
+            (println "TOO FAST! dataset no longer selected")))))))
+  (void))
 
 ;; callbacks
 
@@ -1127,14 +1156,11 @@
          (set-lview-column-state! obj column)
          (set-datasets-view! obj (current-datasets-view)))]
       [else
-       (for ([index (send obj get-selections)])
-         (let ([dataset (send obj get-data index)]
-               [cd (current-dataset)])
-           ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
-           (when (not (equal? dataset cd))
-             (current-dataset dataset) ; FIXME multiple selection case
-             (get-jview! dataset)
-             (set-button-status-for-dataset dataset))))])))
+       (let* ([index (car (send obj get-selections))] ; we don't deal with multi-selection here
+              [dataset (send obj get-data index)])
+         (unless (is-current? dataset)
+           (set-jview! dataset)
+           (set-button-status-for-dataset dataset)))])))
 
 (define (result->dataset-list result)
   (let ([nargs (procedure-arity dataset)])
@@ -1369,6 +1395,7 @@
                 matches)))
       datasets))
 
+(define search-semaphore (make-semaphore 1))
 (define (cb-search-dataset obj event)
   "callback for text field that should highlight filter sort matches in
 the list to the top and if there is only a single match select and
@@ -1376,26 +1403,28 @@ switch to that"
   (define text (string-trim (send obj get-value)))
   (thread
    (thunk
-    ; 0.05 is too low and race conditions will appear and
-    ; cause errors, 0.1 seems pretty good perceptually and
-    ; I haven't hit any race conditions with my 70hz key repeat nor typing
-    ; FALSE: hit an issue with 0.1 so bumped it to 0.15
-    (sleep 0.15) ; should be long enough to resolve order issues?
-    (let ([wat (string-trim (send obj get-value))])
-      ; don't run this if the text has changed in the other thread
-      ; without this you get non deterministic behavior when typing
-      ; and sometimes the shorter result will supplant the long
-      (if (= 0 (string-length text))
-          (when (not (equal? (current-datasets) (current-datasets-view)))
-            (set-datasets-view! lview (current-datasets)))
-          (let ([matching (match-datasets text (current-datasets))])
-            (when (string=? text wat)
-              (unless (or (null? matching)
-                          (eq? matching (or (current-datasets-view) (current-datasets))))
-                (set-datasets-view! lview matching) ; FIXME lview free variable
-                (when (= (length matching) 1)
-                  (send lview set-selection 0)
-                  (cb-dataset-selection lview #f))))))))))
+    ; adding this helps reduce the number of calls to set-datasets-view!
+    ; and the semaphore allows the sleep time to be short enough that we
+    ; don't have to worry about weird ordering issues
+    (sleep 0.08)
+    (call-with-semaphore
+     search-semaphore
+     (thunk
+      (let ([wat (string-trim (send obj get-value))])
+        ; don't run this if the text has changed in the other thread
+        ; without this you get non deterministic behavior when typing
+        ; and sometimes the shorter result will supplant the long
+        (if (= 0 (string-length text))
+            (when (not (equal? (current-datasets) (current-datasets-view)))
+              (set-datasets-view! lview (current-datasets)))
+            (let ([matching (match-datasets text (current-datasets))])
+              (when (string=? text wat)
+                (unless (or (null? matching)
+                            (eq? matching (or (current-datasets-view) (current-datasets))))
+                  (set-datasets-view! lview matching) ; FIXME lview free variable
+                  (when (= (length matching) 1)
+                    (send lview set-selection 0)
+                    (cb-dataset-selection lview #f))))))))))))
 
 (define (cb-power-user o e)
   ; this can be triggered by keypress as well so cannot use o
