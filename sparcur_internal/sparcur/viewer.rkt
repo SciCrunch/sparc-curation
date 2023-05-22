@@ -38,6 +38,7 @@
 (define this-file-compiled (with-handlers ([exn? (λ (e) this-file)]) (get-compilation-bytecode-file this-file)))
 (define this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file "") #f))
 (define this-file-exe-tmp (path-add-extension this-file-exe "tmp"))
+(define this-package-path (let-values ([(parent name dir?) (split-path this-file)]) parent))
 
 (when (and this-file-exe-tmp (file-exists? this-file-exe-tmp))
   ; windows can't remove a running exe ... but can rename it ... and then delete the old
@@ -85,6 +86,13 @@
     [(value) (set! *current-mode-panel* value)]))
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
+
+(define *allow-update* #f)
+(define allow-update?
+  ; "don't set this, it should only be used to keep things in sync with the config"
+  (case-lambda
+    [() *allow-update*]
+    [(value) (set! *allow-update* value)]))
 
 ;; TODO add check to make sure that the python modules are accessible as well
 
@@ -364,40 +372,46 @@
 (define (load-config!)
   ; TODO various configuration options
   (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")])
-    (let* ([pc (path-config)]
-           [cfg (if (and pc (file-exists? pc))
-                    (with-input-from-file pc
-                      (λ ()
-                        (read)))
-                    '())]
-          [org (oa-get (oa-read-auth-config) 'remote-organization)])
-      (define (obfus str [ends 4])
-        (let ([ls (string-length str)])
-          (string-append
-           (substring str 0 ends)
-           (make-string (- ls (* 2 ends)) #\*)
-           (substring str (- ls ends) ls))))
-      (send text-prefs-remote-organization set-value (*->string org))
-      (send text-prefs-api-key set-value (obfus (*->string (oa-get-sath 'pennsieve org 'key))))
-      (send text-prefs-api-sec set-value (obfus (*->string (oa-get-sath 'pennsieve org 'secret))))
-      #;
-      (send text-prefs-path-? set-value "egads")
-      (send text-prefs-path-config set-value (path->string (path-config)))
-      (send text-prefs-path-user-config set-value (oa-user-config-path))
-      (send text-prefs-path-secrets set-value (oa-secrets-path))
-      (send text-prefs-path-data set-value (path->string (path-source-dir)))
-      (let* ([config-exists (assoc 'viewer-mode cfg)]
-             [power-user-a (assoc 'power-user? cfg)]
-             [power-user (and power-user-a (cdr power-user-a))])
-        (if config-exists
-            (begin
-              ; set-selection does not trigger the callback
-              (send radio-box-viewer-mode set-selection (cdr config-exists))
-              (cb-viewer-mode radio-box-viewer-mode #f)
-              (power-user? (not power-user))
-              ; cb does the toggle interinally so we set the opposite of what we want first
-              (cb-power-user check-box-power-user #f))
-            (set-current-mode-panel! panel-validate-mode))))))
+    (define config (oa-read-auth-config))
+    (let ([org (oa-get config 'remote-organization)]
+          [orgs (oa-get config 'remote-organizations)] ; TODO
+          [never-update (oa-get config 'never-update)])
+      (allow-update? (not never-update))
+      (send menu-item-update-viewer enable (allow-update?))
+      (let* ([pc (path-config)]
+             [cfg (if (and pc (file-exists? pc))
+                      (with-input-from-file pc
+                        (λ ()
+                          (read)))
+                      '())]
+             )
+        (define (obfus str [ends 4])
+          (let ([ls (string-length str)])
+            (string-append
+             (substring str 0 ends)
+             (make-string (- ls (* 2 ends)) #\*)
+             (substring str (- ls ends) ls))))
+        (send text-prefs-remote-organization set-value (*->string org))
+        (send text-prefs-api-key set-value (obfus (*->string (oa-get-sath 'pennsieve org 'key))))
+        (send text-prefs-api-sec set-value (obfus (*->string (oa-get-sath 'pennsieve org 'secret))))
+        #;
+        (send text-prefs-path-? set-value "egads")
+        (send text-prefs-path-config set-value (path->string (path-config)))
+        (send text-prefs-path-user-config set-value (oa-user-config-path))
+        (send text-prefs-path-secrets set-value (oa-secrets-path))
+        (send text-prefs-path-data set-value (path->string (path-source-dir)))
+        (let* ([config-exists (assoc 'viewer-mode cfg)]
+               [power-user-a (assoc 'power-user? cfg)]
+               [power-user (and power-user-a (cdr power-user-a))])
+          (if config-exists
+              (begin
+                ; set-selection does not trigger the callback
+                (send radio-box-viewer-mode set-selection (cdr config-exists))
+                (cb-viewer-mode radio-box-viewer-mode #f)
+                (power-user? (not power-user))
+                ; cb does the toggle interinally so we set the opposite of what we want first
+                (cb-power-user check-box-power-user #f))
+              (set-current-mode-panel! panel-validate-mode)))))))
 
 (define (refresh-dataset-metadata)
   ; XXX requries python sparcur to be installed
@@ -446,8 +460,14 @@
   "stash and pull all git repos, rebuild the viewer"
   ;; FIXME the menu option should be disabled if on a system where this is broken/banned
   ; find the git repos
-  (if update-running?
-      (println "Update is already running!")
+  ;; XXX for upgrading python/racket from setup.org we need PYROOTS and RKTROOTS
+  ;; and then REPOS, see specifically clone-repos and python-setup
+  ;; XXX also bug where git@github.com:org/repo.git was used but no key is available
+  (if (or update-running? (not (allow-update?)))
+      (println
+       (if update-running?
+           "Update is already running!"
+           "User config is set to never allow update (e.g. because this is a development system)."))
       (begin
         (set! update-running? #t)
         (thread
@@ -469,6 +489,8 @@
                                        #f
                                        (λ () -1))])
                     (parameterize ()
+                      (system* raco-exe "pkg" "update" "--batch" this-package-path)
+                      #;
                       (system* raco-exe "make" "-v" this-file))
                     #; ; raco exe issues ... i love it when abstractions break :/
                     (parameterize ([current-command-line-arguments
@@ -1349,6 +1371,9 @@ switch to that"
   (when e
     (save-config!)))
 
+(define (cb-reload-config o e)
+  (load-config!))
+
 (define viewer-mode-state #f)
 (define (cb-viewer-mode o e)
   ; XXX this callback is triggered twice on click so we have to use viewer-mode-state
@@ -1855,10 +1880,20 @@ switch to that"
 (define (toggle-show obj)
   (send obj show (not (send obj is-shown?))))
 
+(define panel-prefs-bottom (new horizontal-panel%
+                                [parent panel-prefs-holder]
+                                [alignment '(center center)]))
 (define check-box-power-user (new check-box%
                                   [label "Power user?"]
                                   [callback cb-power-user]
-                                  [parent panel-prefs-holder]))
+                                  [parent panel-prefs-bottom]))
+
+; yes toggling validate and convert will reload the config as well, but that is a side effect
+; so we have and explicit button for it here as well
+(define button-reload-config (new button%
+                                  [label "Reload Config"]
+                                  [callback cb-reload-config]
+                                  [parent panel-prefs-bottom]))
 
 (define (render-datasets)
   ; run hierlist open in the background since I can't figure out how to construct them open by default
