@@ -664,22 +664,26 @@
       (send old-jview reparent frame-helper)
       (current-jview #f))))
 
+(define jviews-loading (set))
 (define (get-jview! dataset)
-  (unset-current-jview)
-  (thread
-   (thunk
-    (let ([jview (dataset-jview! dataset)])
+  (unless (set-member? jviews-loading (id-uuid dataset))
+    (set! jviews-loading (set-add jviews-loading (id-uuid dataset)))
+    (unset-current-jview)
+    (thread
+     (thunk
       ; getting the jview for a dataset can take a while sometimes,
       ; and the user might have moved on so only set it if the ui is
       ; still focused on the same dataset we started with
-      (when (string=? (id-uuid dataset) (id-uuid (current-dataset)))
-        ; there is a chance that another thread snuck in and set itself while this one was working
-        ; e.g. if you have a fast loading dataset followed by a slow loading dataset, so we unset
-        ; the current jview again here just in case otherwise we get two views
-        (unset-current-jview)
-        (send jview reparent panel-right)
-        (current-jview jview)
-        jview)))))
+      (let ([jview (dataset-jview! dataset)])
+        (set! jviews-loading (set-remove jviews-loading (id-uuid dataset)))
+        (when (string=? (id-uuid dataset) (id-uuid (current-dataset)))
+          ; there is a chance that another thread snuck in and set itself while this one was working
+          ; e.g. if you have a fast loading dataset followed by a slow loading dataset, so we unset
+          ; the current jview again here just in case otherwise we get two views
+          (unset-current-jview)
+          (send jview reparent panel-right)
+          (current-jview jview)
+          jview))))))
 
 ;; dataset struct and generic functions
 
