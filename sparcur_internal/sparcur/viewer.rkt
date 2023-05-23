@@ -417,14 +417,14 @@
                 (cb-power-user check-box-power-user #f))
               (set-current-mode-panel! panel-validate-mode)))))))
 
-(define (refresh-dataset-metadata)
+(define (refresh-dataset-metadata text-search-box)
   ; XXX requries python sparcur to be installed
   (let* ([result (get-dataset-list)]
          [datasets (result->dataset-list result)]
          [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
     (current-datasets datasets)
     (if unfiltered?
-        (set-datasets-view! lview (current-datasets)) ; FIXME lview is a free variable here
+        (set-datasets-view! (send text-search-box list-box) (current-datasets))
         (cb-search-dataset text-search-box #f))
     (println "dataset metadata has been refreshed") ; TODO gui viz on this (beyond updating the number)
     (with-output-to-file (path-cache-datasets)
@@ -1058,7 +1058,7 @@
                                          (lambda (element target) ; struct id changes so eq? by itself fails
                                            (and element target (string=? (id-uuid element) (id-uuid target)))))])
     (when current-dataset-index
-      (send list-box set-selection current-dataset-index))))
+      (send list-box select current-dataset-index))))
 
 (define (set-datasets-view*! list-box . datasets)
   (set-datasets-view! list-box datasets))
@@ -1205,7 +1205,7 @@
     (send frame-preferences show do-show?)))
 
 (define (cb-refresh-dataset-metadata obj event)
-  (refresh-dataset-metadata))
+  (refresh-dataset-metadata text-search-box)) ; FIXME text-search-box is a free variable
 
 (define (cb-update-viewer obj event)
   (update-viewer))
@@ -1407,6 +1407,7 @@
 the list to the top and if there is only a single match select and
 switch to that"
   (define text (string-trim (send obj get-value)))
+  (define list-box (send obj list-box))
   (thread
    (thunk
     ; adding this helps reduce the number of calls to set-datasets-view!
@@ -1422,15 +1423,15 @@ switch to that"
         ; and sometimes the shorter result will supplant the long
         (if (= 0 (string-length text))
             (when (not (equal? (current-datasets) (current-datasets-view)))
-              (set-datasets-view! lview (current-datasets)))
+              (set-datasets-view! list-box (current-datasets)))
             (let ([matching (match-datasets text (current-datasets))])
               (when (string=? text wat)
                 (unless (or (null? matching)
                             (eq? matching (or (current-datasets-view) (current-datasets))))
-                  (set-datasets-view! lview matching) ; FIXME lview free variable
+                  (set-datasets-view! list-box matching)
                   (when (= (length matching) 1)
-                    (send lview set-selection 0)
-                    (cb-dataset-selection lview #f))))))))))))
+                    (send list-box set-selection 0)
+                    (cb-dataset-selection list-box #f))))))))))))
 
 (define (cb-power-user o e)
   ; this can be triggered by keypress as well so cannot use o
@@ -1636,7 +1637,12 @@ switch to that"
 (define text-search-box
   ; text box to make it easier to paste in identifiers or titles and
   ; find a match and view it
-  (new text-field%
+  (new (class text-field% (super-new)
+         (define *list-box* #f)
+         (define/public list-box
+           (case-lambda
+             [() *list-box*]
+             [(value) (set! *list-box* value)])))
        [label ""]
        [callback cb-search-dataset]
        [parent panel-left]))
@@ -1665,13 +1671,14 @@ switch to that"
                    [callback cb-dataset-selection]
                    [parent panel-left]))
 
+(send text-search-box list-box lview)
 ; FIXME TODO scale these based on window size
 ; and remove the upper limit when if/when someone is dragging
 (send* lview
   (set-column-width 0 70 70 300)
   (set-column-width 1 120 60 300)
   (set-column-width 2 120 60 300)
-  (set-column-width 3 120 60 9999)
+  (set-column-width 3 140 60 9999)
   )
 
 (define panel-ds-actions (new horizontal-panel%
@@ -1997,12 +2004,12 @@ switch to that"
   (load-config!)
   (define result (populate-datasets)) ; slow if not cached, but thus only on the very first run
   (send frame-main show #t) ; show this first so that users know something is happening
-  (send lview set-selection 0) ; first time to ensure current-dataset always has a value
+  (send lview select 0) ; first time to ensure current-dataset always has a value
   (set-lview-column-state! lview *current-lview-column* #:view-only? #t)
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (cb-dataset-selection lview #f)
-  (void (thread (thunk (refresh-dataset-metadata)))) ; refresh datasets in a separate thread to avoid delaying startup
+  (void (thread (thunk (refresh-dataset-metadata text-search-box)))) ; refresh datasets in a separate thread to avoid delaying startup
   (unless (eq? (system-type) 'unix)
     ; do NOT run this when gtk is the windowing toolkit it will eat up
     ; tens of gigs of memory, windows and macos don't have the issue
