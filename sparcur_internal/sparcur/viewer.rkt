@@ -679,7 +679,14 @@
       (set! jviews-loading (set-add jviews-loading uuid))
       ; setting current dataset must be called in the main thread so that
       ; curent-dataset is always guranteed to be synchronized with the gui view ...
-      (current-dataset dataset) ; XXX this is the only place current-dataset should ever be set
+      ; setting current dataset is called with a semaphore becuase I have seen one freak case
+      ; where a hang resulted in the double jview behavior, I have tested with this and not
+      ; seen it happen again, however that doesn't mean much, in principle this should block
+      ; the main thread from proceeding until the fast part of the thread below is done which
+      ; in principle should ensure fully sequential behavior, but that's just the theory
+      (call-with-semaphore
+       jview-semaphore
+       (thunk (current-dataset dataset))) ; XXX this is the only place current-dataset should ever be set
       (thread
        (thunk ; we thread because dataset-jview! can be quite slow for large json blobs
         (let ([jview (dataset-jview! dataset)])
@@ -1056,11 +1063,11 @@
 (define (set-datasets-view*! list-box . datasets)
   (set-datasets-view! list-box datasets))
 
-(define (get-current-dataset)
-  ; FIXME lview free variable
-  (car (for/list ([index (send lview get-selections)])
-         (let ([dataset (send lview get-data index)])
-           dataset))))
+(define (get-selected-dataset list-box)
+  (let ([indexes (send list-box get-selections)])
+    (if (null? indexes)
+        #f
+        (send list-box get-data (car indexes)))))
 
 (define (fetch-current-dataset)
   (fetch-dataset (current-dataset)))
@@ -1156,9 +1163,8 @@
          (set-lview-column-state! obj column)
          (set-datasets-view! obj (current-datasets-view)))]
       [else
-       (let* ([index (car (send obj get-selections))] ; we don't deal with multi-selection here
-              [dataset (send obj get-data index)])
-         (unless (is-current? dataset)
+       (let ([dataset (get-selected-dataset obj)])
+         (unless (or (not dataset) (is-current? dataset))
            (set-jview! dataset)
            (set-button-status-for-dataset dataset)))])))
 
