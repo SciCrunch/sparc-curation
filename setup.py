@@ -86,7 +86,7 @@ setup(name='sparcur',
       python_requires='>=3.6',
       tests_require=tests_require,
       install_requires=[
-          'augpathlib>=0.0.26',
+          'augpathlib>=0.0.27',
           'beautifulsoup4',
           'pennsieve',
           'dicttoxml',

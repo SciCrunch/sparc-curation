@@ -1007,6 +1007,11 @@ class BlackfynnRemote(aug.RemotePath):
                     # we embed the object instead of just the id now
                     # so we have to handle that case
                     return ds.id
+            else:
+                if isinstance(pid, str):
+                    return pid
+                else:
+                    return pid.id
 
     def _on_cache_move_error(self, error, cache):
         if self.bfobject.package.name != self.bfobject.name:
@@ -1462,12 +1467,14 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def meta(self):
-        return PathMeta(size=self.size,
+        return PathMeta(name=self.name,
+                        size=self.size,
                         created=self.created,
                         updated=self.updated,
                         checksum=self.checksum,
                         etag=self.etag,
                         chunksize=self.chunksize,
+                        parent_id=self.parent_id,
                         id=self.id,
                         file_id=self.file_id,
                         old_id=None,

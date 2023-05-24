@@ -8,11 +8,12 @@ import augpathlib as aug
 from dateutil import parser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
+from pyontutils.utils_fast import TZLOCAL, timeformat_friendly
 from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_files, transitive_paths, is_list_or_tuple
-from sparcur.utils import levenshteinDistance
+from sparcur.utils import levenshteinDistance, symlink_latest
 from sparcur.utils import BlackfynnId, LocId, PennsieveId, PDId
 from sparcur.config import auth
 
@@ -108,6 +109,18 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             # struct packing of timestamp vs isoformat are fighting
             # in xattrs pathmeta helper
             return value.decode()  # path meta handles decoding for us
+
+    @property
+    def local_index_dir(self):
+        # FIXME TODO probably move this to augpathlib?
+        return self.local_data_dir / 'index'
+
+    def local_data_dir_init(self, *args, **kwargs):
+        super().local_data_dir_init(*args, **kwargs)
+        lid = self.local_index_dir
+        lid.mkdir(exist_ok=True)
+        for type in ('pull',):
+            (self.local_index_dir / type).mkdir(exist_ok=True)
 
     @property
     def anchor(self):
@@ -1221,16 +1234,64 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         finally:
             cache._remote_class._exclude_uploaded = _old_eu
 
+    def _index_file_key(self, dataset):
+        dsu_zulu = dataset.cache.meta.updated
+        dsu_local = dsu_zulu.astimezone(TZLOCAL())
+        friendly_dsu_local = timeformat_friendly(dsu_local)
+        return friendly_dsu_local
+
+    _noindex = False
+    def _generate_pull_index(self, dataset, caches):
+        if self._noindex:
+            # the index is only needed for human curation workflows
+            # for the automated pipelines, that said they could be
+            # useful for generating simple diffs
+            return
+
+        # all the remotes are already in memory
+        duuid = dataset.cache_identifier.uuid
+        id_name, parent_children = {duuid: dataset.name}, {}
+        # TODO do we need file_id ?
+        for c in caches:
+            id = c._remote.id
+            # needed for lost metadata case since we are putting name in xattrs
+            id_name[id] = c._remote._name
+            pid = c._remote.parent_id
+            if pid not in parent_children:
+                parent_children[pid] = []
+
+            parent_children[pid].append(id)
+
+        ifkey = self._index_file_key(dataset)
+        to_write = ('v01', ifkey, id_name, parent_children)
+        base = self.cache.local_index_dir / 'pull' / duuid
+        if not base.exists():
+            base.mkdir()
+        index = base / ifkey
+        latest = base / 'LATEST'
+        with open(index, 'wt') as f:
+            # read with ast.literal_eval
+            # TODO compression probably
+            f.write(repr(to_write).replace(': ', ':\n'))  # FIXME slow ?
+
+        symlink_latest(index, latest)
+
     def _pull_dataset_internal(self, time_now):
         cache = self.cache
         if cache.is_organization():
-            raise TypeError('can\' use this method on organizations')
+            raise TypeError('can\'t use this method on organizations')
         elif not cache.is_dataset():
             return self.dataset._pull_dataset_internal(time_now)
 
         children = list(self.children)
         if not children:
-            return list(self.cache.rchildren)  # XXX actual pull happens here
+            # note that there is a second marker for actuall pull below
+            working_c_children = list(self.cache.rchildren)  # XXX actual pull happens here
+            #working_children = [c.local.relative_to(parent)
+                                #for c in caches]
+            self._generate_pull_index(self, working_c_children)
+            # not sure why we return something here we don't return anything below
+            return working_c_children  # XXX FIXME inconsistent return value
 
         # instantiate a temporary staging area for pull
         ldd = cache.local_data_dir
@@ -1264,12 +1325,14 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
         # pull and prep for comparison of relative paths
         upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
-        upstream_children = [c.local.relative_to(upstream)
-                                for c in upstream_c_children]
-        working_children = [c.relative_to(working)
-                            for c in working.rchildren]
+        self._generate_pull_index(upstream, upstream_c_children)
+        #upstream_children = [c.local.relative_to(upstream)
+                             #for c in upstream_c_children]
+        #working_children = [c.relative_to(working)
+                            #for c in working.rchildren]
 
         # FIXME TODO comparison/diff and support for non-curation workflows
+        # materialize existing files that we have donwloaded but not changed
 
         # replace the working tree with the upstream
         # FIXME this has nasty and confusing consequences if
@@ -1320,6 +1383,125 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # beware this will compute checksums for any files missing metadata
         nometa = [f for f in transitive_files(self) if not f.xattrs()]
         [f._cache_class.fromLocal(f) for f in nometa]
+
+    def _read_indexes(self):
+        # TODO this should be straight forward for DiscoverPath since they never change?
+
+        ifkey = self._index_file_key(self.cache.dataset.local)
+        pull_base = self.cache.local_index_dir / 'pull' / dataset.cache_id
+        pull_index = base / ifkey
+        with open(index, 'rt') as f:
+            s = f.read()
+
+        (version, friendly_dsu_local, id_name, parent_children
+         ) = ast.literal_eval(s)
+
+        # TODO FIXME fetch is concurrent and we don't actually care whether
+        # things are deleted because we have all the package ids via parent_child
+        # XXX we're going with name in xattrs because aws maxes out at 1024 chars
+        # linux is 255 and the smallest xattrs we have to deal with are 4k
+        # we do still want the name index so we can recover from lost xattrs
+        #fetch_base = self.cache.local_index_dir / 'fetch' / dataset.cache_id
+        #fetch_index = base / ifkey
+        #if fetch_index.exists():
+        #    with open(fetch_index, 'rt') as f:
+        #        s = f.read()
+
+        #('v01', friendly_dsu_local, file_id_name) = ast.literal_eval(s)
+
+        return id_name, parent_children
+
+    def _transitive_changes(self, do_expensive_operations=False):
+        #tm = self._transitive_metadata(do_expensive_operations=do_expensive_operations)
+        id_name, parent_children = self._read_indexes()
+        nindex, cindex = self._version_indexes()  # TODO from ops
+        rchildren = transitive_paths(self)
+        nochange = []
+        # move is ambiguous, it could be reparent or rename
+        reparent = []  # parent id different
+        renames = []  # parent id same but name is different
+        changes = []  # usually missing metadata but name exists or size mismatch or checksum mismatch (expensive)
+        adds = []  # missing metadata and name does not exist, might be a rename and a change rolled into one
+        new_dirs = []  # cases where a new folder is not in the index (will probably error elsewhere first)
+        removes = []  # name that was in index for latest pull is now missing
+        rows = []
+        #d = self.cache.dataset.local
+        for c in rchildren:
+            # TODO make this its own function probably
+            ops = []  # this is probably dumb
+            local_pid = c.parent.cache_id
+
+            if c.is_broken_symlink():
+                # TODO we have the original name embedded
+                rl = c.readlink()  # TODO consider whether raw=True helps here
+                cache_name, id, rest = rl.parts
+                fields = rest.split('.')
+                cache_pid = fields[9]
+                cache_size = fields[3]
+                cache_checksum = fields[6]
+                if c.name != cache_name:
+                    ops.append('rename')
+                    renames.append(c)
+            else:
+                xattrs = c.xattrs()
+                if xattrs:
+                    cache_name = [b'bf.name'].decode()
+                    id = xattrs[b'bf.id'].decode()
+                    cache_pid = xattrs[b'bf.parent_id'].decode()
+                    if c.is_file():
+                        cache_size = int(xattrs[b'bf.size'].decode())
+                        cache_checksum = xattrs[b'bf.checksum']
+
+                if not xattrs or id not in id_name:
+                    # id not in id_name is the
+                    # XXX case where we might have materialized local metadata prior to running this
+                    # or if we had a failure before writing to disk ... which we can detect by
+                    # having our index use the dataset modified time or transitive modified time
+                    # for the file name
+                    if local_pid not in parent_children:
+                        # the parent is a new folder, so cross reference this
+                        new_dirs.append(c.parent)
+                        ops.append('add-or-rename+reparent')
+                        adds.append(c)
+                    elif c.name in parent_children[local_pid]:
+                        ops.append('change')
+                        changes.append(c)
+                    else:
+                        ops.append('add-or-rename+reparent')
+                        adds.append(c)
+                        # TODO at the end we have to check to see if we have anything missing
+                        # from the index and then we can resolve whether this is a true add or
+                        # a rename move based on user input (probably)
+                    if not xattrs:
+                        continue
+                elif c.name != id_name[id]:
+                    ops.append('rename')
+                    renames.append(c)
+                else:
+                    # name matches name in index so do nothing
+                    pass
+
+            # common
+
+            if local_pid != cache_pid:
+                ops.append('reparent')
+                reparent.append(c)
+
+            if c.is_file():
+                size = aug.FileSize(c.size)
+                if (size != cache_size or
+                    ((do_expensive_operations or size.mb < 2) and
+                    c.checksum() != cache_checksum)):
+                    ops.append('change')
+                    changes.append(c)
+
+            if not ops:
+                ops.append('nochange')  # lol
+                nochange.append(c)
+
+            rows.append((c, ops))
+
+        breakpoint()
 
     def _upload_raw(self):
         remote, old_remote = (
