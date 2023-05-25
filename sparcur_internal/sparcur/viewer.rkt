@@ -1300,6 +1300,11 @@
 (define (cb-open-dataset-sds-viewer obj event)
   (xopen-path (uri-sds-viewer (current-dataset))))
 
+(define (cb-upload-button o e #:show [show #t])
+  (send frame-upload update)
+  (when show
+    (send frame-upload show #t)))
+
 (define (cb-paths-report o e #:show [show #t])
   (cb-x-report o e 'paths #:show show))
 
@@ -1742,6 +1747,13 @@ switch to that"
                                          [callback cb-clean-metadata-files]
                                          [parent panel-validate-mode]))
 
+(define button-upload-metadata-files
+  (new button%
+       [label "Upload"]
+       [callback cb-upload-button]
+       ; TODO separate button for the convert use case?
+       [parent panel-validate-mode]))
+
 #; ; too esoteric
 (define button-open-export-folder (new button%
                                        [label "Open Export"]
@@ -1841,6 +1853,33 @@ switch to that"
                                             [parent panel-power-user]
                                             ))
 
+;; upload
+
+(define frame-upload
+  (new
+   (class frame% (super-new)
+     (rename-super [super-on-subwindow-char on-subwindow-char])
+     (define/override (on-subwindow-char receiver event)
+       (super-on-subwindow-char receiver event)
+       (send keymap handle-key-event receiver event))
+     (define list-box (new
+                       list-box%
+                       [label ""]
+                       [font (make-object font% 10 'modern)]
+                       [choices '()]
+                       [columns '("Path" "updated" "previous id")]
+                       [parent this]
+                           ))
+     (define/public (update)
+       (let ([cd (current-dataset)])
+         "TODO set listbox data"
+         #;
+         (send list-box set-data)
+         )
+       )
+     )
+   [label "upload"]))
+
 ;; reports
 
 (define (make-frame-report label)
@@ -1871,7 +1910,7 @@ switch to that"
        [editor (new text%)]
        [parent frame-paths-report]))
 
-;; TODO preferences
+;; preferences
 (define frame-preferences
   (new (class frame% (super-new)
          (rename-super [super-on-subwindow-char on-subwindow-char])
