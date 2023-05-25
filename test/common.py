@@ -20,7 +20,7 @@ from sparcur.pennsieve_api import FakeBFLocal
 this_file = Path(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
-print(template_root)
+log.debug(template_root)
 _pid = os.getpid()
 path_project_container = this_file.parent / f'test_local-{_pid}'
 project_path = PathL(path_project_container) / 'test_project'
@@ -137,7 +137,7 @@ for root in ds_roots:
             folder.mkdir()
             folder.setxattrs(mk_fldr_meta(folder))
 
-    print(rp)
+    log.debug(rp)
     mk_required_files(rp)  # TODO all variants of missing files
 
 

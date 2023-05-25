@@ -585,6 +585,8 @@ class BlackfynnRemote(aug.RemotePath):
         try:
             bfo = self.bfobject
             return not isinstance(bfo, self._File) and not isinstance(bfo, self._DataPackage)
+        except exc.NoRemoteFileWithThatIdError as e:
+            raise e
         except Exception as e:
             breakpoint()
             raise e

@@ -1,3 +1,4 @@
+import ast
 import uuid
 import logging
 import hashlib
@@ -92,8 +93,26 @@ class BFPNCacheBase(PrimaryCache, EatCache):
 
     @classmethod
     def fromLocal(cls, path):
+        existing = path.xattrs()
+        if existing:
+            msg = f'Cache exists! Not seeting fromLocal for {path}'
+            # calling cls(path, meta=meta) below in a case where
+            # there is existing metadata is extremely dangerous and
+            # can result in the file being irreversably deleted !!!
+            # due to the aweful design of the default _meta_updater
+            raise exc.CacheExistsError(msg)
+
         meta = path.meta
-        meta.__dict__['id'] = 'N:package:' + uuid.uuid4().urn[9:]
+        if path.is_dir():
+            if path.parent.cache.is_organization():
+                type = 'dataset'
+            else:
+                type = 'collection'
+        else:
+            type = 'package'
+
+        meta.__dict__['id'] = f'N:{type}:' + uuid.uuid4().urn[9:]
+        meta.__dict__['parent_id'] = path.parent.cache_id
         self = cls(path, meta=meta)
         self.setxattr(cls._local_xattr, b'1')
         return self
@@ -142,6 +161,8 @@ class BFPNCacheBase(PrimaryCache, EatCache):
     def crumple(self):
         """Avoid creating massive numbers of inodes by trashing paths during
            sync of old datasets."""
+        # FIXME PrimaryCache._meta_updater needs a return value
+        # and yes _meta_updater is a disaster zone
         if self.__class__._actually_crumple:
             super().crumple()
         else:
@@ -245,10 +266,18 @@ class BFPNCacheBase(PrimaryCache, EatCache):
 
     @property
     def cache_key(self):
-        # FIXME file system safe
         id = self.identifier
         uuid = id.uuid
-        return f'{uuid[:2]}/{uuid}-{self.file_id}'
+        file_id = self.file_id
+        return self._cache_key(uuid, file_id)
+
+    @staticmethod
+    def _cache_key(uuid, file_id):
+        if file_id is None:
+            # FIXME not sure if want?
+            file_id = ''  # needed to simplify globing e.g. from indexes
+
+        return f'{uuid[:2]}/{uuid}-{file_id}'
 
     def _dataset_metadata(self, force_cache=False):
         """ get metadata about a dataset from the remote metadata store """
@@ -1252,15 +1281,35 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         duuid = dataset.cache_identifier.uuid
         id_name, parent_children = {duuid: dataset.name}, {}
         # TODO do we need file_id ?
-        for c in caches:
-            id = c._remote.id
-            # needed for lost metadata case since we are putting name in xattrs
-            id_name[id] = c._remote._name
-            pid = c._remote.parent_id
-            if pid not in parent_children:
-                parent_children[pid] = []
+        if hasattr(caches[0], '_remote'):
+            for c in caches:
+                id = c._remote.id
+                if not c.is_dir():
+                    id = id, c._remote.file_id
 
-            parent_children[pid].append(id)
+                # needed for lost metadata case since we are putting name in xattrs
+                id_name[id] = c._remote._name
+                pid = c._remote.parent_id
+
+                if pid not in parent_children:
+                    parent_children[pid] = []
+
+                parent_children[pid].append(id)
+        else:  # in the event that we need to regenerate indexes for some reason
+            for c in caches:
+                # TODO avoid meta overhead
+                cmeta = c.meta  # c.local.cache_meta ?
+                id = c.id
+                if not c.is_dir():
+                    id = id, cd.file_id
+
+                id_name[id] = cmeta.name
+                pid = cmeta.parent_id
+
+                if pid not in parent_children:
+                    parent_children[pid] = []
+
+                parent_children[pid].append(id)
 
         ifkey = self._index_file_key(dataset)
         to_write = ('v01', ifkey, id_name, parent_children)
@@ -1386,71 +1435,88 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
     def _read_indexes(self):
         # TODO this should be straight forward for DiscoverPath since they never change?
-
-        ifkey = self._index_file_key(self.cache.dataset.local)
-        pull_base = self.cache.local_index_dir / 'pull' / dataset.cache_id
-        pull_index = base / ifkey
+        dataset = self.cache.dataset.local
+        ifkey = self._index_file_key(dataset)
+        base = self.cache.local_index_dir / 'pull' / dataset.cache_identifier.uuid
+        index = base / ifkey
         with open(index, 'rt') as f:
             s = f.read()
 
         (version, friendly_dsu_local, id_name, parent_children
          ) = ast.literal_eval(s)
 
-        # TODO FIXME fetch is concurrent and we don't actually care whether
-        # things are deleted because we have all the package ids via parent_child
-        # XXX we're going with name in xattrs because aws maxes out at 1024 chars
-        # linux is 255 and the smallest xattrs we have to deal with are 4k
-        # we do still want the name index so we can recover from lost xattrs
-        #fetch_base = self.cache.local_index_dir / 'fetch' / dataset.cache_id
-        #fetch_index = base / ifkey
-        #if fetch_index.exists():
-        #    with open(fetch_index, 'rt') as f:
-        #        s = f.read()
+        name_id = {}
+        for id, name in id_name.items():
+            if name not in name_id:
+                name_id[name] = []
 
-        #('v01', friendly_dsu_local, file_id_name) = ast.literal_eval(s)
+            name_id[name].append(id)
 
-        return id_name, parent_children
+        return id_name, parent_children, name_id
 
     def _transitive_changes(self, do_expensive_operations=False):
+        def changedp(c, cache_size, cache_checksum):
+            size = aug.FileSize(c.size)
+            return (size != cache_size or
+                    ((do_expensive_operations or size.mb < 2) and
+                     c.checksum() != cache_checksum))
+
         #tm = self._transitive_metadata(do_expensive_operations=do_expensive_operations)
-        id_name, parent_children = self._read_indexes()
-        nindex, cindex = self._version_indexes()  # TODO from ops
+        id_name, parent_children, name_id = self._read_indexes()
         rchildren = transitive_paths(self)
         nochange = []
         # move is ambiguous, it could be reparent or rename
-        reparent = []  # parent id different
+        reparents = []  # parent id different
         renames = []  # parent id same but name is different
         changes = []  # usually missing metadata but name exists or size mismatch or checksum mismatch (expensive)
         adds = []  # missing metadata and name does not exist, might be a rename and a change rolled into one
         new_dirs = []  # cases where a new folder is not in the index (will probably error elsewhere first)
         removes = []  # name that was in index for latest pull is now missing
+        missing_metadata = []
+        ambig = []
+        noindex = []
+        _others = reparents, renames, changes, adds, new_dirs, removes, missing_metadata, ambig, noindex
         rows = []
         #d = self.cache.dataset.local
         for c in rchildren:
             # TODO make this its own function probably
             ops = []  # this is probably dumb
             local_pid = c.parent.cache_id
+            local_name = c.name
 
             if c.is_broken_symlink():
-                # TODO we have the original name embedded
-                rl = c.readlink()  # TODO consider whether raw=True helps here
-                cache_name, id, rest = rl.parts
+                raw_symlink = c.readlink(raw=True)
+                symlink = pathlib.PurePosixPath(raw_symlink)
+
+                # XXX hard coded to symlink cache mdv3
+                expected_local_name, id, rest = symlink.parts
                 fields = rest.split('.')
                 cache_pid = fields[9]
+                # don't need file_id for symlinks since they can't loose xattrs
+                # but DO need it to detect if a new symlink appeared which would
+                # be weird, but can happen if the index is not regenerated
+                cache_file_id = int(fields[2])
+                id = id, cache_file_id
                 cache_size = fields[3]
                 cache_checksum = fields[6]
-                if c.name != cache_name:
+                cache_name = fields[14].replace('|', '.')
+                if local_name != cache_name:
                     ops.append('rename')
                     renames.append(c)
+                if id not in id_name:
+                    ops.append('noindex')
+                    noindex.append(c)
             else:
                 xattrs = c.xattrs()
                 if xattrs:
-                    cache_name = [b'bf.name'].decode()
+                    cache_name = xattrs[b'bf.name'].decode()
                     id = xattrs[b'bf.id'].decode()
                     cache_pid = xattrs[b'bf.parent_id'].decode()
                     if c.is_file():
                         cache_size = int(xattrs[b'bf.size'].decode())
                         cache_checksum = xattrs[b'bf.checksum']
+                        cache_file_id = int(xattrs[b'bf.file_id'].decode())
+                        id = id, cache_file_id
 
                 if not xattrs or id not in id_name:
                     # id not in id_name is the
@@ -1458,17 +1524,58 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     # or if we had a failure before writing to disk ... which we can detect by
                     # having our index use the dataset modified time or transitive modified time
                     # for the file name
+                    ops.append('missing-metadata')
+                    missing_metadata.append(c)
                     if local_pid not in parent_children:
                         # the parent is a new folder, so cross reference this
                         new_dirs.append(c.parent)
-                        ops.append('add-or-rename+reparent')
-                        adds.append(c)
-                    elif c.name in parent_children[local_pid]:
-                        ops.append('change')
-                        changes.append(c)
-                    else:
-                        ops.append('add-or-rename+reparent')
-                        adds.append(c)
+                        if c.parent.name in name_id:
+                            pcands = name_id[c.parent.name]
+
+                        if local_name in name_id:
+                            cands = name_id[local_name]
+
+                        ops.append('add-or-rename')
+                        ambig.append(c)
+                        #adds.append(c)
+                    elif old_id := [id for id in parent_children[local_pid] if id_name[id] == local_name]:
+                        if len(old_id) > 1:
+                            msg = f'multiple files with the same name and parent? {old_id}'
+                            log.warning()
+
+                        id, file_id = old_id[0]
+                        uuid = self._cache_class._id_class(id).uuid
+                        ck = self._cache_class._cache_key(uuid, file_id)
+                        ocp = self.cache.local_objects_dir / ck
+                        if (noe := not ocp.exists()) or changedp(c, cache_size, cache_checksum):
+                            if noe:
+                                log.warning(f'old_id found but no object cache? {c} {old_id}')
+                            ops.extend(('change', ':old-id', old_id[0]))
+                            changes.append(c)
+                        else:
+                            ops.append('nochange')
+                            nochange.append(c)
+
+                        continue
+                        #if ocp.exists():  # XXX note that this does not exist in our current testing setup
+                        #    # might have lost metadata by accident but without real changes
+                        #    # TODO checksum
+                        #    if changedp(c, cache_size, cache_checksum):
+                        #    else:
+                        #        ops.append('missing_metadata')
+                        #else:
+                        #    log.warning(f'old_id found but no object cache? {c} {old_id}')
+                        #    ops.extend(('change', ':old-id', old_id[0]))
+                        #    changes.append(c)
+
+                    else:  # local pid is known but no old id with a matching name
+                        # note: missing-metadata + add could mean missing-metadata + rename
+                        # so we do still have to check at the end to see if there are files
+                        # in the index that are unaccounted for
+                        ops.append('add-or-rename')
+                        ambig.append(c)
+                        #adds.append(c)  # can't say this for sure yet
+                        pass
                         # TODO at the end we have to check to see if we have anything missing
                         # from the index and then we can resolve whether this is a true add or
                         # a rename move based on user input (probably)
@@ -1485,7 +1592,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
             if local_pid != cache_pid:
                 ops.append('reparent')
-                reparent.append(c)
+                reparents.append(c)
 
             if c.is_file():
                 size = aug.FileSize(c.size)
@@ -1501,7 +1608,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
             rows.append((c, ops))
 
-        breakpoint()
+        return rows, _others
 
     def _upload_raw(self):
         remote, old_remote = (

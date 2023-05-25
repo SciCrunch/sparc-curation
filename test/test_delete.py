@@ -1,10 +1,11 @@
 import os
 import secrets
 import unittest
+from functools import wraps
 import augpathlib as aug
 from pyontutils.utils import Async, deferred  # TODO -> asyncd in future
 from sparcur import exceptions as exc
-from sparcur.utils import GetTimeNow
+from sparcur.utils import GetTimeNow, log
 from sparcur.paths import PennsieveCache, LocalPath, Path
 from sparcur.backends import PennsieveRemote
 from .common import test_organization, test_dataset, _pid
@@ -102,7 +103,7 @@ def make_rand(n, width=80):
     hexstart = width % 2  # almost there fails on 71
     # also fails len(make_rand(102, 101)) - 102
 
-    print(adiff, ldiff, missing, diff)
+    log.debug((adiff, ldiff, missing, diff))
     string = '\n'.join([secrets.token_hex(hex_lw)[hexstart:]
                         for i in range(n_lines)]
                        + [secrets.token_hex(hex_missing)[diff:-1] + '\n'])
@@ -410,9 +411,246 @@ class TestMkdirRemote(_TestOperation, unittest.TestCase):
 
 
 
-class TestRenameFolder:
-    # TODO
-    pass
+class TestChanges(_TestOperation, unittest.TestCase):
+
+    def _make_ops(self):
+        ops = tuple()
+        # dirs
+        dataset = 'project/dataset'
+        ops += (
+        #(0, 'mkdir', 'project'),  # don't actually need this since we replace it when building paths
+        (0, 'mkdir', dataset),
+        (0, 'mkdir', 'project/dataset/dire-1'),
+        (0, 'mkdir', 'project/dataset/dire-2'),
+        (0, 'mkdir', 'project/dataset/dire-6'),
+        )
+
+        # sources
+        d3_1 = 'project/dataset/dire-1/dire-3-1-rn'
+        d3_2 = 'project/dataset/dire-1/dire-3-2-rp'
+        d3_3 = 'project/dataset/dire-1/dire-3-3-np'
+
+        f1_0 = 'project/dataset/dire-1/file-1-0.ext'
+        f1_1 = 'project/dataset/dire-1/file-1-1-rn.ext'
+        f1_2 = 'project/dataset/dire-1/file-1-2-rp.ext'
+        f1_3 = 'project/dataset/dire-1/file-1-3-np.ext'
+
+        l1_0 = 'project/dataset/dire-1/link-1-0.ext'
+        l1_1 = 'project/dataset/dire-1/link-1-1-rn.ext'
+        l1_2 = 'project/dataset/dire-1/link-1-2-rp.ext'
+        l1_3 = 'project/dataset/dire-1/link-1-3-np.ext'
+
+        # targets
+        # TODO need variants of all of these where we lose the metadata probably?
+
+        ops += (
+        (0, 'mkdir', d3_1),
+        (0, 'mkdir', d3_2),
+        (0, 'mkdir', d3_3),
+
+        (0, 'mkfile', f1_0),  # nochange
+        (0, 'mkfile', f1_1),
+        (0, 'mkfile', f1_2),
+        (0, 'mkfile', f1_3),
+
+        (0, 'mklink', l1_0),  # nochange
+        (0, 'mklink', l1_1),
+        (0, 'mklink', l1_2),
+        (0, 'mklink', l1_3),
+
+        # moves: renames, reparents, rename_reparent
+        (1, 'rename', d3_1, 'project/dataset/dire-1/dire-3-1-rn-r'),  # rn
+        (1, 'rename', d3_2, 'project/dataset/dire-2/dire-3-2-rp'),  # rp
+        (1, 'rename', d3_3, 'project/dataset/dire-2/dire-3-3-np-r'),  # rnp
+
+        (1, 'rename', f1_1, 'project/dataset/dire-1/file-1-1-rn-r.ext'),  # rn
+        (1, 'rename', f1_2, 'project/dataset/dire-2/file-1-2-rp.ext'),  # rp
+        (1, 'rename', f1_3, 'project/dataset/dire-2/file-1-3-np-r.ext'),  # rnp
+
+        (1, 'rename', l1_1, 'project/dataset/dire-1/link-1-1-rn-r.ext'),  # rn
+        (1, 'rename', l1_2, 'project/dataset/dire-2/link-1-2-rp.ext'),  # rp
+        (1, 'rename', l1_3, 'project/dataset/dire-2/link-1-3-np-r.ext'),  # rnp
+
+        # add
+        (1, 'mkdir',  'project/dataset/dire-6/dire-7-add'),
+        (1, 'mkfile', 'project/dataset/dire-6/file-4-add.ext'),
+        (1, 'mklink', 'project/dataset/dire-6/link-4-add.ext'),
+        )
+
+        # change (only applies to files)
+        f5_1 = 'project/dataset/dire-6/file-5-1-cd_.ext'
+        f5_2 = 'project/dataset/dire-6/file-5-2-c_m.ext'
+        f5_3 = 'project/dataset/dire-6/file-5-3-c_x.ext'
+        f5_4 = 'project/dataset/dire-6/file-5-4-cdm.ext'
+        f5_5 = 'project/dataset/dire-6/file-5-5-cdx.ext'
+        # file_id change ? should be impossible ...
+        ops += (
+        (0, 'mkfile', f5_1),
+        (0, 'mkfile', f5_2),
+        (0, 'mkfile', f5_3),
+        (0, 'mkfile', f5_4),
+        (0, 'mkfile', f5_5),
+
+        # TODO probably also change size
+        (1, 'change', f5_1, True, False),  # data
+        (1, 'change', f5_2, False, True),  # metadata
+        (1, 'change', f5_3, False, None),  # no metadata # can handle this from objects cache
+        (1, 'change', f5_4, True, True),  # data metadata
+        (1, 'change', f5_5, True, None),  # data no metadata
+        )
+
+        # remove
+        d9 = 'project/dataset/dire-6/dire-9-rem'
+        f6 = 'project/dataset/dire-6/file-6-rem.ext'
+        l6 = 'project/dataset/dire-6/link-6-rem.ext'
+        ops += (
+        (0, 'mkdir', d9),
+        (0, 'mkfile', f6),
+        (0, 'mklink', l6),
+
+        (1, 'remove', d9),
+        (1, 'remove', f6),
+        (1, 'remove', l6),
+        )
+
+        # build the indexes so we can do the diff
+        ops += (
+            (0.5, 'index', dataset),
+        )
+        return ops
+
+    def setUp(self):
+        # TODO construct the template we need
+        super().setUp()
+        self.Path = self.Remote._local_class
+
+        # TODO expected outcome after stage probably
+
+        def mkdir(d):
+            d.mkdir()
+            d._cache_class.fromLocal(d)
+
+        def mkfile(f):
+            f.data = iter((make_rand(100),))
+            f._cache_class.fromLocal(f)
+
+        def mklink(l):
+            try:
+                l.data = iter((make_rand(100),))
+                # issue with id and parent_id not being set so use fromLocal since it does it correctly
+                #meta = f.meta  # TODO checksum probably?
+                #symlink = meta.as_symlink(local_name=l.name)
+                cache = l._cache_class.fromLocal(l)
+                symlink = cache.meta.as_symlink(local_name=l.name)
+            finally:
+                l.unlink()
+
+            l.symlink_to(symlink)
+
+        def rename(path, target):
+            path.rename(target)
+
+        def change(f, data, metadata):
+            if data:
+                f.data = iter((make_rand(100),))
+
+            if metadata is None or metadata:
+                # must set xattrs to nothing if
+                # we want to change metadata otherwise
+                # PrimaryCache._meta_updater will go haywire and
+                # ... try to delete the file ... and it will
+                # actually delete it instead of crumpling it
+                # so definitely a FIXME very dangerous lose your work
+                # kind of scenario between that _meta_updater and
+                # BFPNCache._actually_crumple and change of BFPNCache.crumple
+                [f.delxattr(k) for k in f.xattrs()]
+                if f.xattrs():
+                    breakpoint()
+
+            if metadata:
+                if not f.exists():
+                    raise FileNotFoundError(f)
+
+                try:
+                    f._cache_class.fromLocal(f)
+                except Exception as e:
+                    breakpoint()
+                    raise e
+
+        def remove(path):
+            if path.is_dir():
+                path.rmdir()
+            else:
+                path.unlink()
+
+        def index(ds):
+            caches = [l.cache for l in ds.rchildren]  # XXX reminder, NEVER use ds.cache.rchildren that will pull
+            class fakeremote:
+                def __init__(self, id, name, parent_id, file_id, local):
+                    self.id = id
+                    self.name = name
+                    self._name = name
+                    self.parent_id = parent_id
+                    self._lol_local = local
+
+                    if file_id is not None:
+                        self.file_id = file_id
+
+                def is_dir(self):
+                    return self._lol_local.is_dir()
+
+            for c in caches:
+                # FIXME causes other issues ... even while trying to avoid init issues
+                # we should not have to do this
+                cmeta = c.meta
+                c._remote = fakeremote(cmeta.id, cmeta.name, cmeta.parent_id, cmeta.file_id, c.local)
+
+            ds._generate_pull_index(ds, caches)
+
+        fops = {
+            'mkdir': mkdir,
+            'mkfile': mkfile,
+            'mklink': mklink,
+            'rename': rename,
+            'change': change,
+            'remove': remove,
+            'index': index,
+        }
+
+        def make_closure(op, obj, args):
+            f = fops[op]
+            @wraps(f)
+            def inner():
+                f(path, *args)
+            return inner
+
+        def cargs(args):
+            for a in args:
+                if isinstance(a, str) and a.startswith('project/'):
+                    yield self.project_path / a.replace('project/', '')
+                else:
+                    yield a
+
+        ops = self._make_ops()
+        pops = [(stage, op, self.project_path / s.replace('project/', ''), *cargs(args)) for stage, op, s, *args in ops]
+        init = set([path for stage, op, path, *args in pops if stage == 0])
+        test = set([p for stage, op, path, *args in pops if stage >= 1 for p in (path, *args) if isinstance(p, self.project_path.__class__)])
+        nochange = init - test
+        add_rename_reparent = test - init
+        change_remove = test - add_rename_reparent
+
+        cs = [(stage, path, make_closure(op, path, args)) for stage, op, path, *args in pops]
+        scs = sorted(cs, key=(lambda abc: (abc[0], len(abc[1].parts))))
+        for stage, path, fun in scs:
+            fun()
+
+        self.dataset = pops[0][-1]
+
+    def test_changes(self):
+        dataset = self.dataset
+        id_name, parent_children, name_id = dataset._read_indexes()
+        tc = dataset._transitive_changes()
+        breakpoint()
 
 
 class TestMoveFolder:
@@ -475,5 +713,3 @@ class TestRemote(_TestOperation, unittest.TestCase):
         fake = Fake('lol', 'double lol')
 
         self.anchor / fake
-
-
