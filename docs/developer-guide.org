@@ -2360,6 +2360,8 @@ fetch_prefixes = (
     ('dataset_description', 'glob'),
     ('subjects',            'glob'),
     ('samples',             'glob'),
+    ('sites',               'glob'),
+    ('performances',        'glob'),
     ('submission',          'glob'),
     ('manifest',           'rglob'),  # XXX NOTE the rglob here
 )

@@ -180,6 +180,7 @@
    "--name" "dataset_description*"
    "--name" "subjects*"
    "--name" "samples*"
+   "--name" "sites*"
    "--name" "performances*"
    "--name" "manifest*"
    "--name" "resources*"
@@ -1300,8 +1301,9 @@
 (define (cb-open-dataset-sds-viewer obj event)
   (xopen-path (uri-sds-viewer (current-dataset))))
 
-(define (cb-upload-button o e #:show [show #t])
-  (send frame-upload update)
+(define (cb-upload-button o e #:show [show #f]) ; TODO switch show to #t when ready
+  (when #f ; not ready
+    (send frame-upload update))
   (when show
     (send frame-upload show #t)))
 
