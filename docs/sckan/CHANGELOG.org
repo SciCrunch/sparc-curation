@@ -12,8 +12,7 @@
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
 - if-needed :: vagus round 2
 * DEV 2023-06-??
-- NPO add citations for ApiNATOMY populations
-- TODO NPO add citations for NLP populations
+- NPO add citations for NLP and ApiNATOMY populations
 - NPO various bugfixes for NLP populations
 - NPO use hasAnatomicalSystemPhenotype, hasCircuitRolePhenotype, and hasClassificationPhenotype instead of hasPhenotype where appropriate
 - TODO NPO aacar pig dog human, not mouse not rat
