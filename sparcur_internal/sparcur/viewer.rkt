@@ -1205,6 +1205,13 @@
       (load-config!))
     (send frame-preferences show do-show?)))
 
+(define (cb-toggle-upload o e)
+  (let ([do-show? (not (send frame-upload is-shown?))])
+    (when do-show?
+      ; TODO see if we need to set anything?
+      #f)
+    (send frame-upload show do-show?)))
+
 (define (cb-refresh-dataset-metadata obj event)
   (refresh-dataset-metadata text-search-box)) ; FIXME text-search-box is a free variable
 
@@ -1301,8 +1308,8 @@
 (define (cb-open-dataset-sds-viewer obj event)
   (xopen-path (uri-sds-viewer (current-dataset))))
 
-(define (cb-upload-button o e #:show [show #f]) ; TODO switch show to #t when ready
-  (when #f ; not ready
+(define (cb-upload-button o e #:show [show #t]) ; TODO switch show to #t when ready
+  (when #t ; not ready
     (send frame-upload update))
   (when show
     (send frame-upload show #t)))
@@ -1538,6 +1545,7 @@ switch to that"
   (add-function "open-dataset-shell" cb-open-dataset-shell)
   (add-function "open-dataset-latest-log" cb-open-dataset-lastest-log)
   (add-function "toggle-prefs" cb-toggle-prefs)
+  (add-function "toggle-upload" cb-toggle-upload)
   )
 
 (define (fox key-string)
@@ -1549,6 +1557,8 @@ switch to that"
   (map-function "m:backspace" "backward-kill-word")
   (map-function "tab" "next-thing")
   (map-function "c:semicolon" "toggle-prefs")
+  (map-function "c:u" "toggle-upload") ; u for Upload
+  (map-function "c:y" "toggle-upload") ; y for sYnc ; FIXME pick one?
   #;
   (map-function "c:r"     "refresh-datasets")
   (map-function (fox "c:c")     "copy-value") ; FIXME osx cmd:c
@@ -1750,9 +1760,10 @@ switch to that"
                                          [parent panel-validate-mode]))
 
 (define button-upload-metadata-files
-  (new button%
+  (new (tooltip-mixin button%)
        [label "Upload"]
-       [callback cb-upload-button]
+       [callback cb-toggle-upload]
+       [tooltip "Shortcut C-u"]
        ; TODO separate button for the convert use case?
        [parent panel-validate-mode]))
 
@@ -1864,14 +1875,64 @@ switch to that"
      (define/override (on-subwindow-char receiver event)
        (super-on-subwindow-char receiver event)
        (send keymap handle-key-event receiver event))
-     (define list-box (new
-                       list-box%
-                       [label ""]
-                       [font (make-object font% 10 'modern)]
-                       [choices '()]
-                       [columns '("Path" "updated" "previous id")]
-                       [parent this]
-                           ))
+     (define list-box
+       (new
+        list-box%
+        [label ""]
+        [font (make-object font% 10 'modern)]
+        [choices
+         (if 'test
+             '("path/to/test/1"
+               "path/to/test/2"
+               "path/to/test/3"
+               "path/to/test/4"
+               "path/to/test/5")
+             '())]
+        [columns '("path" "action" "previous id")]
+        [style '(extended column-headers clickable-headers)]
+        [callback (λ (o e)
+                    (cb-confirm #f #f #:force-off? #t)
+                    (println "TODO frame-upload list-box callback"))]
+        [parent this]
+        ))
+     (send* list-box
+       (set-column-width 0 240 120 1200)
+       (set-column-width 1 120 60 1200)
+       (set-column-width 2 120 60 1200))
+
+     (define hp
+       (new horizontal-panel%
+            [stretchable-height #f]
+            [alignment '(right center)]
+            [parent this]))
+     (define *confirmed* #f)
+     (define confirmed?
+       (case-lambda
+         [() *confirmed*]
+         [(value) (set! *confirmed* value)]))
+     (define (cb-confirm o e #:force-off? [force-off? #f])
+       (confirmed? (if force-off? #f (not (confirmed?))))
+       ; TODO save the list of paths to push to a file at this point
+       ; in case something goes wrong, and because we need it to kick
+       ; off the push, NOTE the actual change log (needed for undo functionality)
+       ; and successful change accounting for resume will be all on the python side
+       (send check-box-confirm set-value (confirmed?))
+       (send button-push enable (confirmed?)))
+     (define check-box-confirm
+       (new check-box%
+            [label "Confirm selection?"]
+            [callback cb-confirm]
+            [parent hp]))
+     (define (cb-upload-to-remote o e)
+       ; TODO probably disable clicking the button again until the process finishes or fails?
+       ; 1. confirm pass the manifest of changes
+       (println "Upload is not implemented yet."))
+     (define button-push
+       (new button%
+            [label "Push selected changes to remote"]
+            [callback cb-upload-to-remote]
+            [enabled #f]
+            [parent hp]))
      (define/public (update)
        (let ([cd (current-dataset)])
          "TODO set listbox data"
@@ -1880,7 +1941,9 @@ switch to that"
          )
        )
      )
-   [label "upload"]))
+   [width 640]
+   [height 480]
+   [label "upload for {dataset}"]))
 
 ;; reports
 
