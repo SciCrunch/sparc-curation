@@ -3734,7 +3734,9 @@ Usage:
     sparcur-simple get-uuid  <remote-id>...
     sparcur-simple datasets
     sparcur-simple for-racket
-    sparcur-simple for-racket meta [options] [<path> ...]
+    sparcur-simple for-racket (meta|diff) [options] [<path> ...]
+    sparcur-simple for-racket make-push-manifest <dataset-id> <updated> <push-id> [options] [<path> ...]
+    sparcur-simple for-racket push <dataset-id> <updated> <push-id> [options] [<path> ...]
     sparcur-simple check-names
     sparcur-simple git-repos [update] [options]
     sparcur-simple [options] [<path>...]
@@ -3775,6 +3777,8 @@ Options:
     --show                          show file with xopen
     --pretend                       show what would be done for update
 """
+
+# XXX FIXME --dataset-id=<ID>... breaks the use of [options] ???
 
 import os
 import sys
@@ -4152,7 +4156,9 @@ def main(id=None, **kwargs):
 
         return
 
-    if (ik('datasets') or ik('for_racket') or ik('check_names')):
+    if (ik('datasets') or
+        ik('for_racket') and not ik('diff') or
+        ik('check_names')):
         log.setLevel(60)  # logging.CRITICAL = 50
         from sparcur.config import auth
         from sparcur.simple.utils import backend_pennsieve
@@ -4200,6 +4206,42 @@ def main(id=None, **kwargs):
 
                 out += ')'
                 print(out)
+
+        elif ik('diff'):  # FIXME own file?
+            from pprint import pprint
+            from sxpyr import sxpyr
+            from pyontutils.utils_fast import isoformat
+            # FIXME TODO based on dataset-id
+            path = kwargs['path']
+            dataset_id, updated_transitive, diff = path.diff()
+            blob = {
+                'dataset-id': dataset_id.id,
+                'updated-transitive': isoformat(updated_transitive),
+                'diff': diff,
+            }
+            pl = sxpyr.python_to_sxpr(blob, str_as_string=True)
+            sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
+            print(sxpr)
+
+        elif ik('make_push_manifest'):  # FIXME own file?
+            # this is separate from push because checking confim is a separate action from pushing
+            from sxpyr import sxpyr
+            from sparcur.config import auth
+            dataset_id = kwargs['dataset_id']
+            updated = kwargs['updated']
+            push_id = kwargs['push_id']
+            path = kwargs['path']
+            path.make_push_manifest(dataset_id, updated, push_id)
+
+            # read list of files + expected ops to change
+            # generate the full change manifest
+        elif ik('push'):  # FIXME own file?
+            dataset_id = kwargs['dataset_id']
+            updated = kwargs['updated']
+            push_id = kwargs['push_id']
+            # TODO error handling and retry or resume
+            path.push_from_manifest(dataset_id, updated, push_id)
+
         else:
             key = lambda d: d.updated
             _dsmeta = '\n'.join([("("

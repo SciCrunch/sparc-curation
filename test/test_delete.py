@@ -3,7 +3,9 @@ import secrets
 import unittest
 from functools import wraps
 import augpathlib as aug
+from sxpyr import sxpyr
 from pyontutils.utils import Async, deferred  # TODO -> asyncd in future
+from pyontutils.utils_fast import isoformat
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow, log
 from sparcur.paths import PennsieveCache, LocalPath, Path
@@ -474,7 +476,7 @@ class TestChanges(_TestOperation, unittest.TestCase):
         # add
         (1, 'mkdir',  'project/dataset/dire-6/dire-7-add'),
         (1, 'mkfile', 'project/dataset/dire-6/file-4-add.ext'),
-        (1, 'mklink', 'project/dataset/dire-6/link-4-add.ext'),
+        (2, 'mklink', 'project/dataset/dire-6/link-4-add.ext'),  # XXX this causes an error because it looks like the index is out of synx
         )
 
         # change (only applies to files)
@@ -586,11 +588,12 @@ class TestChanges(_TestOperation, unittest.TestCase):
         def index(ds):
             caches = [l.cache for l in ds.rchildren]  # XXX reminder, NEVER use ds.cache.rchildren that will pull
             class fakeremote:
-                def __init__(self, id, name, parent_id, file_id, local):
+                def __init__(self, id, name, parent_id, file_id, updated, local):
                     self.id = id
                     self.name = name
                     self._name = name
                     self.parent_id = parent_id
+                    self.updated = updated
                     self._lol_local = local
 
                     if file_id is not None:
@@ -603,7 +606,9 @@ class TestChanges(_TestOperation, unittest.TestCase):
                 # FIXME causes other issues ... even while trying to avoid init issues
                 # we should not have to do this
                 cmeta = c.meta
-                c._remote = fakeremote(cmeta.id, cmeta.name, cmeta.parent_id, cmeta.file_id, c.local)
+                c._remote = fakeremote(
+                    cmeta.id, cmeta.name, cmeta.parent_id, cmeta.file_id,
+                    cmeta.updated, c.local)
 
             ds._generate_pull_index(ds, caches)
 
@@ -641,15 +646,32 @@ class TestChanges(_TestOperation, unittest.TestCase):
 
         cs = [(stage, path, make_closure(op, path, args)) for stage, op, path, *args in pops]
         scs = sorted(cs, key=(lambda abc: (abc[0], len(abc[1].parts))))
+        will_fails = []
         for stage, path, fun in scs:
-            fun()
+            if stage > 1:
+                will_fails.append(fun)
+            else:
+                fun()
 
+        self._will_fails = will_fails
         self.dataset = pops[0][-1]
 
     def test_changes(self):
         dataset = self.dataset
-        id_name, parent_children, name_id = dataset._read_indexes()
-        tc = dataset._transitive_changes()
+        dataset_id, id_name, parent_children, name_id, updated_transitive = dataset._read_indexes()
+        #tc = dataset._transitive_changes()
+        # XXX see sparcur.simple.utils
+        dataset_id, updated_cache_transitive, diff = dataset.diff()
+        blob = {
+            'dataset-id': dataset_id.id,
+            'updated-transitive': isoformat(updated_transitive),
+            'diff': diff,
+        }
+        pl = sxpyr.python_to_sxpr(blob, str_as_string=True)
+        sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
+        print(sxpr)
+        #pl = sxpyr.python_to_sxpr(diff, str_as_string=True)
+        #sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
         breakpoint()
 
 

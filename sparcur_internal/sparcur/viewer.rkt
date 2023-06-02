@@ -31,6 +31,7 @@
          (prefix-in oa- orthauth/base)
          orthauth/paths
          orthauth/python-interop
+         orthauth/utils
          )
 
 (define-runtime-path asdf "viewer.rkt")
@@ -56,6 +57,7 @@
 (define path-config (make-parameter #f))
 (define path-log-dir (make-parameter #f))
 (define path-cache-dir (make-parameter #f))
+(define path-cache-push (make-parameter #f))
 (define path-cache-datasets (make-parameter #f))
 (define path-cleaned-dir (make-parameter #f))
 (define path-export-dir (make-parameter #f))
@@ -167,6 +169,12 @@
                       "python"
                       (python-interpreter))])
     (python-mod-args "sparcur.simple.utils" "for-racket" "meta" path-string)))
+(define (argv-simple-diff ds)
+  (python-mod-args "sparcur.simple.utils" "for-racket" "diff" (path->string (dataset-working-dir-path ds))))
+(define (argv-simple-make-push-manifest ds updated-transitive push-id)
+  (python-mod-args "sparcur.simple.utils" "for-racket" "make-push-manifest" (dataset-id ds) updated-transitive push-id))
+(define (argv-simple-push ds updated-transitive push-id)
+  (python-mod-args "sparcur.simple.utils" "for-racket" "push" (dataset-id ds) updated-transitive push-id))
 (define argv-simple-git-repos-update (python-mod-args "sparcur.simple.utils" "git-repos" "update"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
 (define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1" "--dataset-id" (dataset-id ds)))
@@ -199,12 +207,7 @@
 (define (argv-open-dataset-shell ds)
   (let ([path (dataset-src-path ds)])
     (if (directory-exists? path)
-        (let ([dpath (resolve-relative-path (build-path path "dataset"))])
-          (vt-at-path dpath)
-          #;
-          (cons terminal-emulator ; FIXME find the right terminal emulator
-                (cons "-cd"
-                      (list dpath))))
+        (vt-at-path (dataset-working-dir-path ds))
         (begin (println msg-dataset-not-fetched) #f))))
 
 (define (xopen-dataset-latest-log ds)
@@ -217,7 +220,7 @@
   (python-mod-args
    "sparcur.simple.fetch_files"
    "--extension" "*"
-   (resolve-relative-path (build-path (path-source-dir) (id-uuid ds) "dataset"))))
+   (dataset-working-dir-path ds)))
 
 (define (argv-open-export-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
@@ -243,8 +246,17 @@
 
 ;; utility functions
 
+(define --sigh (gensym))
+(define (py-system* exe #:set-pwd? [set-pwd? --sigh] . args)
+  (call-with-environment
+   (λ ()
+     (if (symbol=? set-pwd? --sigh)
+         (apply system* exe args)
+         (apply system* exe args #:set-pwd? set-pwd?)))
+   '(("PYTHONBREAKPOINT" . "0"))))
+
 (define (datetime-file-system-safe inexact-seconds)
-  "Y-M-DTHMS,6Z"
+  "Y-M-DTHMS,6Z" ; FIXME this is producing garbages results with weird and bad padding
   (let ([d (seconds->date inexact-seconds #f)])
     (string-join
      (map (λ (e) (format "~a" e))
@@ -264,9 +276,13 @@
            ))
      "")))
 
+#; ; broken due to padding issues above
 (define (datetime-for-path-now)
   (datetime-file-system-safe
    (/ (current-inexact-milliseconds) 1e3)))
+
+(define (datetime-for-path-now)
+  (string-append (~t (posix->moment (/ (current-inexact-milliseconds) 1e3) "Etc/UTC") "YYYY-MM-dd'T'HHmmss,SSSSSSX")))
 
 #; ; sigh
 (define (in-cwd-thread argv cwd)
@@ -349,6 +365,11 @@
                      (or (oa-get-path ac 'cache-path #:exists? #f)
                          (expand-user-path (user-cache-path "sparcur")))
                      "racket"))
+    (path-cache-push
+     (build-path ; must match python or sparcur.simple.utils won't be able to find {push-id}/paths.sxpr
+      (or (oa-get-path ac 'cache-path #:exists? #f)
+          (expand-user-path (user-cache-path "sparcur")))
+      "push"))
     (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
     (path-cleaned-dir (or (oa-get-path ac 'cleaned-path #:exists? #f)
                           (expand-user-path (user-data-path "sparcur" "cleaned"))))
@@ -418,19 +439,27 @@
                 (cb-power-user check-box-power-user #f))
               (set-current-mode-panel! panel-validate-mode)))))))
 
+(define refresh-dataset-metadata-semaphore (make-semaphore 1))
 (define (refresh-dataset-metadata text-search-box)
   ; XXX requries python sparcur to be installed
-  (let* ([result (get-dataset-list)]
-         [datasets (result->dataset-list result)]
-         [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
-    (current-datasets datasets)
-    (if unfiltered?
-        (set-datasets-view! (send text-search-box list-box) (current-datasets))
-        (cb-search-dataset text-search-box #f))
-    (println "dataset metadata has been refreshed") ; TODO gui viz on this (beyond updating the number)
-    (with-output-to-file (path-cache-datasets)
-      #:exists 'replace ; yes if you run multiple of these you could have a data race
-      (λ () (pretty-write result)))))
+  (call-with-semaphore
+   refresh-dataset-metadata-semaphore
+   (thunk
+    (dynamic-wind
+      (thunk (send button-refresh-datasets enable #f))
+      (thunk
+       (let* ([result (get-dataset-list)]
+              [datasets (result->dataset-list result)]
+              [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
+         (current-datasets datasets)
+         (if unfiltered?
+             (set-datasets-view! (send text-search-box list-box) (current-datasets))
+             (cb-search-dataset text-search-box #f))
+         (println "dataset metadata has been refreshed") ; TODO gui viz on this (beyond updating the number)
+         (with-output-to-file (path-cache-datasets)
+           #:exists 'replace ; yes if you run multiple of these you could have a data race
+           (λ () (pretty-write result)))))
+      (thunk (send button-refresh-datasets enable #t))))))
 
 (define (get-path-err)
   (hash-ref
@@ -485,7 +514,7 @@
                    [raco-exe (path->string (find-executable-path "raco"))] ; XXX SIGH
                    [status
                     (parameterize ()
-                      (apply system* argv-simple-git-repos-update))])
+                      (apply py-system* argv-simple-git-repos-update))])
                ; TODO pull changes for racket dependent repos as well
                ; TODO raco pkg install local git derived packages as well
                (println (format "running raco pkg update ~a" this-package-path))
@@ -725,6 +754,7 @@
   (uri-human ds)
   (uri-sds-viewer ds)
   (dataset-src-path ds)
+  (dataset-working-dir-path ds)
   (dataset-log-path ds)
   (dataset-latest-log-path ds)
   (dataset-export-latest-path ds)
@@ -776,6 +806,11 @@
    (define (dataset-src-path ds)
      (let ([uuid (id-uuid ds)])
        (build-path (path-source-dir) uuid)))
+   (define (dataset-working-dir-path ds)
+     (let ([path (dataset-src-path ds)])
+       (if (directory-exists? path)
+           (resolve-relative-path (build-path path "dataset"))
+           (error msg-dataset-not-fetched))))
    (define (dataset-log-path ds)
      (let ([uuid (id-uuid ds)])
        (build-path (path-log-dir) uuid)))
@@ -797,10 +832,10 @@
            (ensure-directory! cwd-1)
            (parameterize ([current-directory cwd-1])
              (with-output-to-string (thunk (set! status-1
-                                                 (apply system* argv-1 #:set-pwd? #t)))))
+                                                 (apply py-system* argv-1 #:set-pwd? #t)))))
            (parameterize ([current-directory (resolve-relative-path cwd-2)])
              (with-output-to-string (thunk (set! status-2
-                                                 (apply system* argv-2 #:set-pwd? #t)))))
+                                                 (apply py-system* argv-2 #:set-pwd? #t)))))
            (when status-1 (set-button-status-for-dataset ds))
            (if (and status-1 status-2)
                (println (format "dataset fetch completed for ~a" (dataset-id ds)))
@@ -817,7 +852,7 @@
                [cwd-2-resolved (resolve-relative-path cwd-2)])
            (parameterize ([current-directory cwd-2-resolved])
              (with-output-to-string (thunk (set! status-3
-                                                 (apply system* argv-3 #:set-pwd? #t)))
+                                                 (apply py-system* argv-3 #:set-pwd? #t)))
                ))
            (if status-3
                (begin
@@ -858,7 +893,7 @@
                (thunk
                 (parameterize (#;[current-error-port (current-output-port)]) ; TODO
                   (set! status-1
-                        (apply system* argv-1 #:set-pwd? #t))))
+                        (apply py-system* argv-1 #:set-pwd? #t))))
                #:exists 'append))
            (if status-1
                (let ([cwd-2-resolved (resolve-relative-path cwd-2)])
@@ -866,7 +901,7 @@
                    (with-output-to-file
                      dataset-log-path-now
                      (thunk (set! status-2
-                                  (apply system* argv-2 #:set-pwd? #t)))
+                                  (apply py-system* argv-2 #:set-pwd? #t)))
                      #:exists 'append)
                    ; TODO figure out if we need to condition further steps to run on status-2 #t
                    (println (format "dataset fetch for export completed for ~a" (dataset-id ds)))
@@ -874,7 +909,7 @@
                    (with-output-to-file
                      dataset-log-path-now
                      (thunk (set! status-3
-                                  (apply system* argv-3 #:set-pwd? #t)))
+                                  (apply py-system* argv-3 #:set-pwd? #t)))
                      #:exists 'append))
                  ; TODO gui indication
                  (if (and status-2 status-3)
@@ -913,7 +948,7 @@
                [cwd-resolved (resolve-relative-path cwd)])
            (parameterize ([current-directory (path-source-dir)])
              (with-output-to-string (thunk (set! status-1
-                                                 (apply system* argv-1 #:set-pwd? #t)))
+                                                 (apply py-system* argv-1 #:set-pwd? #t)))
                ))
            (if status-1
                (begin
@@ -1181,7 +1216,7 @@
          [status #f]
          [result-string
           (parameterize ()
-            (with-output-to-string (λ () (set! status (apply system* argv)))))]
+            (with-output-to-string (λ () (set! status (apply py-system* argv)))))]
          [result (read (open-input-string result-string))])
     (unless status
       (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
@@ -1193,7 +1228,7 @@
          [status #f]
          [result-string
           (parameterize ()
-            (with-output-to-string (λ () (set! status (apply system* argv)))))]
+            (with-output-to-string (λ () (set! status (apply py-system* argv)))))]
          [result (read (open-input-string result-string))])
     (unless status
       (error "Failed to get dataset cache meta! ~a" (string-join argv " ")))
@@ -1206,14 +1241,20 @@
     (send frame-preferences show do-show?)))
 
 (define (cb-toggle-upload o e)
-  (let ([do-show? (not (send frame-upload is-shown?))])
-    (when do-show?
-      ; TODO see if we need to set anything?
-      #f)
-    (send frame-upload show do-show?)))
+  ; TODO detect when an actual quite is run
+  ; FIXME toggling this via button when the window is open is extremely confusing
+  ; it should probably raise the window in that case?
+  (let*-values
+      ([(new? frame-upload) (get-frame-upload! (current-dataset))]
+       [(do-show?) (not (send frame-upload is-shown?))])
+    (send frame-upload show do-show?)
+    (when (and do-show? (or new? (not (send frame-upload updated-once?))))
+      (send frame-upload update))))
 
 (define (cb-refresh-dataset-metadata obj event)
-  (refresh-dataset-metadata text-search-box)) ; FIXME text-search-box is a free variable
+  (thread
+   (thunk ; FIXME text-search-box is a free variable
+    (refresh-dataset-metadata text-search-box))))
 
 (define (cb-update-viewer obj event)
   (update-viewer))
@@ -1299,7 +1340,7 @@
       (thread
        (thunk
         (println (format "dataset download starting for ~a" (dataset-id ds)))
-        (apply system* argv) ; TODO detect and report failure
+        (apply py-system* argv) ; TODO detect and report failure
         (println (format "dataset download completed for ~a" (dataset-id ds))))))))
 
 (define (cb-open-dataset-remote obj event)
@@ -1308,6 +1349,7 @@
 (define (cb-open-dataset-sds-viewer obj event)
   (xopen-path (uri-sds-viewer (current-dataset))))
 
+#; ; now cb-toggle-upload
 (define (cb-upload-button o e #:show [show #t]) ; TODO switch show to #t when ready
   (when #t ; not ready
     (send frame-upload update))
@@ -1868,82 +1910,291 @@ switch to that"
 
 ;; upload
 
-(define frame-upload
-  (new
-   (class frame% (super-new)
-     (rename-super [super-on-subwindow-char on-subwindow-char])
-     (define/override (on-subwindow-char receiver event)
-       (super-on-subwindow-char receiver event)
-       (send keymap handle-key-event receiver event))
-     (define list-box
-       (new
-        list-box%
-        [label ""]
-        [font (make-object font% 10 'modern)]
-        [choices
-         (if 'test
-             '("path/to/test/1"
-               "path/to/test/2"
-               "path/to/test/3"
-               "path/to/test/4"
-               "path/to/test/5")
-             '())]
-        [columns '("path" "action" "previous id")]
-        [style '(extended column-headers clickable-headers)]
-        [callback (λ (o e)
-                    (cb-confirm #f #f #:force-off? #t)
-                    (println "TODO frame-upload list-box callback"))]
-        [parent this]
-        ))
-     (send* list-box
-       (set-column-width 0 240 120 1200)
-       (set-column-width 1 120 60 1200)
-       (set-column-width 2 120 60 1200))
+(define frame-upload%
+  ; upload frames are scoped per dataset which is a much better
+  ; and clearer affordance for what is going on
+  (class frame%
+    (init dataset)
+    ;(define dataset dataset)
+    (define update-semaphore (make-semaphore 1)) ; must come before super new I think?
+    (super-new)
+    (rename-super [super-on-subwindow-char on-subwindow-char])
+    (define/override (on-subwindow-char receiver event)
+      (super-on-subwindow-char receiver event)
+      (send keymap handle-key-event receiver event))
+    (define previous-selection
+      ; FIXME issues with reordering as a result of soring columns
+      '())
+    (define list-box
+      (new
+       list-box%
+       [label ""]
+       [font (make-object font% 10 'modern)]
+       [choices
+        (if #f ;'test
+            '("path/to/test/1"
+              "path/to/test/2"
+              "path/to/test/3"
+              "path/to/test/4"
+              "path/to/test/5")
+            '())]
+       [columns '(" " "path" "previous id" "actions")]
+       [style '(extended column-headers clickable-headers)]
+       [callback (λ (o e)
+                   (let ([s (send list-box get-selections)])
+                     (unless (set=? previous-selection s)
+                       (cb-confirm #f #f #:force-off? #t))
+                     (set! previous-selection s))
+                   (send check-box-confirm enable
+                         (and (not locked-in?) ; duh
+                              (not (null? (send list-box get-selections)))))
+                   (println "TODO frame-upload list-box callback"))]
+       [parent this]
+       ))
+    (send* list-box
+      (set-column-width 0 20 20 40)
+      (set-column-width 1 300 120 1200)
+      (set-column-width 2 120 60 1200)
+      (set-column-width 3 220 60 1200))
 
-     (define hp
-       (new horizontal-panel%
-            [stretchable-height #f]
-            [alignment '(right center)]
-            [parent this]))
-     (define *confirmed* #f)
-     (define confirmed?
-       (case-lambda
-         [() *confirmed*]
-         [(value) (set! *confirmed* value)]))
-     (define (cb-confirm o e #:force-off? [force-off? #f])
-       (confirmed? (if force-off? #f (not (confirmed?))))
-       ; TODO save the list of paths to push to a file at this point
-       ; in case something goes wrong, and because we need it to kick
-       ; off the push, NOTE the actual change log (needed for undo functionality)
-       ; and successful change accounting for resume will be all on the python side
-       (send check-box-confirm set-value (confirmed?))
-       (send button-push enable (confirmed?)))
-     (define check-box-confirm
-       (new check-box%
-            [label "Confirm selection?"]
-            [callback cb-confirm]
-            [parent hp]))
-     (define (cb-upload-to-remote o e)
-       ; TODO probably disable clicking the button again until the process finishes or fails?
-       ; 1. confirm pass the manifest of changes
-       (println "Upload is not implemented yet."))
-     (define button-push
-       (new button%
-            [label "Push selected changes to remote"]
-            [callback cb-upload-to-remote]
-            [enabled #f]
-            [parent hp]))
-     (define/public (update)
-       (let ([cd (current-dataset)])
-         "TODO set listbox data"
-         #;
-         (send list-box set-data)
-         )
-       )
-     )
-   [width 640]
-   [height 480]
-   [label "upload for {dataset}"]))
+    (define hp
+      (new horizontal-panel%
+           [stretchable-height #f]
+           [alignment '(right center)]
+           [parent this]))
+
+    #;
+    (define dataset
+      (case-lambda
+        [() *dataset*]
+        [(value) (error "cannot set dataset after construction")
+                 #;(set! *dataset* value)]))
+
+    (define *updated-transitive* #f)
+    (define updated-transitive ; FIXME TODO
+      (case-lambda
+        [() *updated-transitive*]
+        [(value) (set! *updated-transitive* value)]))
+
+    (define *push-id* #f)
+    (define push-id
+      (case-lambda
+        [() *push-id*]
+        [(value) (set! *push-id* value)]))
+    (define (new-push-id)
+      #; ; uuids have a nasty property that they don't sort well
+      (push-id (uuid-string))
+      (push-id (datetime-for-path-now)))
+
+    (define *confirmed* #f)
+    (define confirmed?
+      (case-lambda
+        [() *confirmed*]
+        [(value) (set! *confirmed* value)]))
+
+    (define (push-dir)
+      ; XXX this must always match the python conventions
+      (build-path (path-cache-push) (id-uuid dataset) (updated-transitive) (push-id)))
+    (define (write-push-paths)
+      (ensure-directory! (push-dir))
+      (define paths (build-path (push-dir) "paths.sxpr"))
+      (with-output-to-file paths
+        #:exists 'error ; any rewrite should change
+        (λ () (pretty-write
+               ; TODO data from selected rows
+               (selected)
+               ))))
+    (define (paths-to-manifest)
+      (argv-simple-make-push-manifest dataset (updated-transitive) (push-id))
+      )
+    (define (unfinished-push?)
+      (define path-dut-latest (build-path (path-cache-push) (id-uuid dataset) (updated-transitive) "LATEST"))
+      (define cands '("done.sxpr" "completed.sxpr" "manifest.sxpr" "paths.sxpr"))
+      (define first-present (for/or [(cand cands) #:when (file-exists? (build-path path-dut-latest cand))] cand))
+      (and first-present
+           (not (string=? first-present "done.sxpr"))
+           ; FIXME pretty sure I need to inverte the order of build-path and resolve-relative-path
+           (resolve-relative-path (build-path path-dut-latest first-present))))
+
+    (define button-select-all "TODO") ; much easier than having to click scroll shift click etc. for thouands of files
+    (define (cb-refresh o e)
+      ; TODO make sure we restore the selection! otherwise lost work v annoying
+      (update))
+    (define button-diff
+      (new button%
+           [label "Refresh"]
+           [callback cb-refresh]
+           [parent hp])
+      )
+    (define locked-in? #f)
+    (define (cb-confirm o e #:force-off? [force-off? #f])
+      (confirmed? (if force-off? #f (not (confirmed?))))
+      ; TODO save the list of paths to push to a file at this point
+      ; in case something goes wrong, and because we need it to kick
+      ; off the push, NOTE the actual change log (needed for undo functionality)
+      ; and successful change accounting for resume will be all on the python side
+      (when (confirmed?)
+        (send check-box-confirm enable #f) ; lock in changes and avoid reconfirm unless selection changes
+        (set! locked-in? #t)
+        (new-push-id) ; TODO see if this is actually the right place to set this and whether we need to unset it at some point as well?
+        (write-push-paths)
+        (paths-to-manifest))
+      (when force-off?
+        ; reset lockin in the force-off case
+        (set! locked-in? #f))
+      (send check-box-confirm set-value (confirmed?))
+      (send button-push enable (confirmed?)))
+    (define check-box-confirm
+      (new check-box%
+           [label "Confirm selection?"]
+           [callback cb-confirm]
+           [parent hp]))
+    (define (push-from-manifest)
+      (unless (confirmed?)
+        (error "not confirmed? how did you manage this?"))
+      #f)
+    (define (cb-push-to-remote o e)
+      ; TODO probably disable clicking the button again until the process finishes or fails?
+      ; 1. confirm pass the manifest of changes
+      (println "Upload is not implemented yet.")
+      (push-from-manifest))
+    (define button-push
+      (new button%
+           [label "Push selected changes to remote"]
+           [callback cb-push-to-remote]
+           [enabled #f]
+           [parent hp]))
+    (define (get-diff)
+      ; FIXME FIXME figure out how we are passing updated-transitive
+      (let* ([argv (argv-simple-diff dataset)]
+             [status-1 #f]
+             [result-string (parameterize ()
+                              (println "aaaieeeeeeeeeeeeeeeeeeeee")
+                              (println (string-join argv " "))
+                              (with-output-to-string
+                                (thunk
+                                 (set! status-1 (apply py-system* argv)))))])
+        (unless status-1
+          (error "diff failed with ~a for ~a" status-1 (string-join argv " ")))
+        (let ([sport (open-input-string result-string)]
+              [diff #f])
+          (set! diff (read sport))
+          diff
+          )))
+    (define (result->updated-transitive+diff-list result)
+      (pretty-write (list 'oops: result))
+      (define h (plist->hash result))
+      #; ; nothing to do with this one right now I think?
+      (hash-ref h 'dataset-id)
+      (values (hash-ref h 'updated-transitive) (hash-ref h 'diff)))
+    (define (diff-list-to-columns record)
+      (println (list 'diff-list-to-columns-wat? record))
+      (define type
+        (case (hash-ref record 'type)
+          [("dir")  "d"]
+          [("file") "f"]
+          [("link") "l"]))
+      (define raw-ops (hash-ref record 'ops))
+      (define-values (old-id ops)
+        (if (member "change" raw-ops)
+            (let* ((rrops (reverse raw-ops))
+                   (old-meta (car rrops))
+                   (old-id (let ([hr (hash-ref old-meta 'old-id)])
+                             (let-values ([(N type uuid)
+                                           (apply values (string-split (car hr) ":"))])
+                               (string-append
+                                (substring uuid 0 4)
+                                " ... "
+                                (let ([slu (string-length uuid)])
+                                  (substring uuid (- slu 4) slu))))))
+                   (ops (reverse (cdr rrops))))
+              (values old-id ops))
+            (values "" raw-ops)))
+      #; ; TODO determine whether do display this maybe for use in sorting?
+      (hash-ref record 'updated)
+      (list
+       type
+       (hash-ref record 'path)
+       old-id
+       (string-join ops " ")
+       ))
+    (define (set-rows diff-list)
+      (unless (null? diff-list)
+        (send/apply list-box set (apply map list (map diff-list-to-columns diff-list)))
+        (for ([diff (in-list diff-list)]
+              [n (in-naturals)])
+          (send list-box set-data n diff))))
+    (define updated-once #f)
+    (define/public (updated-once?) updated-once)
+    (define (selected)
+      ; TODO will need a separate hash table or something to do rapid lookup via uuid
+      ; to restore the state
+      (for/list ([i (in-list (send list-box get-selections))])
+        (send list-box get-data i)))
+    (define (do-update)
+      (define diff (get-diff))
+      (println (list 'diff-hash? diff))
+      (define-values (updated-trans diff-list) (result->updated-transitive+diff-list diff)) ; FIXME need updated-transitive from here
+      (updated-transitive updated-trans)
+      ; FIXME yeah ... here comes the synchronization issues
+      (let ([ufp? (unfinished-push?)] ; FIXME not sure if this is actually the right place to handle this?
+            )
+        (if ufp?
+            (begin
+              (println "TODO TODO TODO handle unfinished push case")
+              )
+            (begin
+              (set-rows diff-list)
+              )))
+        )
+    (define/public (update)
+      ; FIXME all sorts of issues with transitive updated if someone changes the most recently updated file !!!
+      ; XXX I think this has to be handled in dataset xattrs during pull and we would still have to traverse
+      ; the tree on the off chance that someone did something stupid such as pulling a subtree (yeah, these
+      ; synchornization and consistency issues were always going to come back to haunt us :/)
+      ; FIXME further issues given that this will be called in a thread
+      ; FIXME lots of background activity here
+      (thread
+       (thunk
+        (call-with-semaphore
+         update-semaphore
+         (thunk
+          (dynamic-wind
+            (thunk
+             (send button-diff enable #f)
+             (send check-box-confirm enable #f))
+            (thunk
+             (do-update)
+             (unless updated-once
+               (set! updated-once #t)))
+            (thunk
+             (send button-diff enable #t)
+             (send check-box-confirm enable (and (not locked-in?) (not (null? (send list-box get-selections))))))))))))))
+
+#; ; debug helper
+(define fu (hash-ref frame-uploads (id-uuid (current-dataset))))
+(define frame-uploads (make-hash))
+(define (get-frame-upload! dataset)
+  ; FIXME TODO the design of this does not correctly decouple the ui from the workflow state per dataset
+  ; so if you change datasets for whatever reason you will lose the state, which seems wrong
+  ; the correct factoring moves upload workflow state to its own class probably?
+  ; for now just warn that this is a known issue or better maybe just check the state of the latest push?
+  ; XXX a bit better now
+  (let* ([uuid (id-uuid dataset)]
+         [hr-frame-upload (hash-ref frame-uploads uuid #f)]
+         [frame-upload
+          (if hr-frame-upload
+              hr-frame-upload
+              (let ([fu
+                     (new frame-upload%
+                          [dataset dataset]
+                          [width 640]
+                          [height 480]
+                          [label (format "upload for ~a" (id-uuid dataset))])])
+                (hash-set! frame-uploads (id-uuid dataset) fu)
+                fu))])
+    ; TODO remove from hash on close probably? the workflow is a bit different
+    (values (not hr-frame-upload) frame-upload)))
 
 ;; reports
 

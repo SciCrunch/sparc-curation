@@ -6,10 +6,10 @@ import pathlib
 from functools import wraps
 from itertools import chain
 import augpathlib as aug
-from dateutil import parser
+from dateutil import parser as dateparser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
-from pyontutils.utils_fast import TZLOCAL, timeformat_friendly
+from pyontutils.utils_fast import TZLOCAL, timeformat_friendly, isoformat
 from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
@@ -750,6 +750,13 @@ class PathHelper:
                 return self.relative_path_from(self.parent.cache.dataset.local)
             else:
                 return self.relative_path_from(self.cache.dataset.local)
+        except exc.CircularSymlinkNameError as e:
+            if self.parent.cache is not None:
+                return self.relative_path_from(self.parent.cache.dataset.local)
+            else:
+                msg = 'symlink name error and parent also missing cache'
+                log.error(msg)
+                raise e
         except AttributeError as e:
             raise exc.NoCachedMetadataError(self) from e
 
@@ -1263,11 +1270,17 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         finally:
             cache._remote_class._exclude_uploaded = _old_eu
 
-    def _index_file_key(self, dataset):
-        dsu_zulu = dataset.cache.meta.updated
-        dsu_local = dsu_zulu.astimezone(TZLOCAL())
-        friendly_dsu_local = timeformat_friendly(dsu_local)
-        return friendly_dsu_local
+    def _index_file_key_read(self):
+        return 'LATEST'
+
+    def _index_file_key_write(self, updated_cache_transitive):
+        # we must use transitive updated for this NOT datasetup updated
+        # because datasetup updated can change when no paths have changed
+        # leading to aliasing in the index
+        tu_zulu = updated_cache_transitive
+        tu_local = tu_zulu.astimezone(TZLOCAL())
+        friendly_tu_local = timeformat_friendly(tu_local)
+        return friendly_tu_local
 
     _noindex = False
     def _generate_pull_index(self, dataset, caches):
@@ -1281,20 +1294,25 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         duuid = dataset.cache_identifier.uuid
         id_name, parent_children = {duuid: dataset.name}, {}
         # TODO do we need file_id ?
+        updated_cache_transitive = None
         if hasattr(caches[0], '_remote'):
             for c in caches:
-                id = c._remote.id
+                r = c._remote
+                id = r.id
                 if not c.is_dir():
-                    id = id, c._remote.file_id
+                    id = id, r.file_id
 
                 # needed for lost metadata case since we are putting name in xattrs
-                id_name[id] = c._remote._name
-                pid = c._remote.parent_id
+                id_name[id] = r._name
+                pid = r.parent_id
 
                 if pid not in parent_children:
                     parent_children[pid] = []
 
                 parent_children[pid].append(id)
+                if updated_cache_transitive is None or r.updated >= updated_cache_transitive:
+                    updated_cache_transitive = r.updated
+
         else:  # in the event that we need to regenerate indexes for some reason
             for c in caches:
                 # TODO avoid meta overhead
@@ -1311,13 +1329,22 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
                 parent_children[pid].append(id)
 
-        ifkey = self._index_file_key(dataset)
-        to_write = ('v01', ifkey, id_name, parent_children)
+                if updated_cache_transitive is None or cmeta.updated >= updated_cache_transitive:
+                    updated_cache_transitive = cmeta.updated
+
+        if isinstance(updated_cache_transitive, str):
+            # we don't always parse remote dates for performance reasons
+            # so convert here if the date is still a string
+            updated_cache_transitive = dateparser.parse(updated_cache_transitive)
+
+        ifkey = self._index_file_key_write(updated_cache_transitive)
+        _ucts = isoformat(updated_cache_transitive)
+        to_write = ('v02', ifkey, _ucts, id_name, parent_children)
         base = self.cache.local_index_dir / 'pull' / duuid
         if not base.exists():
             base.mkdir()
         index = base / ifkey
-        latest = base / 'LATEST'
+        latest = base / self._index_file_key_read()
         with open(index, 'wt') as f:
             # read with ast.literal_eval
             # TODO compression probably
@@ -1436,14 +1463,33 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
     def _read_indexes(self):
         # TODO this should be straight forward for DiscoverPath since they never change?
         dataset = self.cache.dataset.local
-        ifkey = self._index_file_key(dataset)
-        base = self.cache.local_index_dir / 'pull' / dataset.cache_identifier.uuid
-        index = base / ifkey
+        dataset_id = dataset.cache_identifier
+        ifkey = self._index_file_key_read()
+        base = self.cache.local_index_dir / 'pull' / dataset_id.uuid
+        index = (base / ifkey).resolve()
+        if not base.exists():
+            msg = ('index does not exist! you should probably pull '
+                   'this dataset again using the newest version of sparcur: '
+                   f'{base}')
+            raise FileNotFoundError(msg)
+
         with open(index, 'rt') as f:
             s = f.read()
 
-        (version, friendly_dsu_local, id_name, parent_children
-         ) = ast.literal_eval(s)
+        version, *rest = ast.literal_eval(s)
+        if version == 'v01':
+            (friendly_dsu_local, id_name, parent_children) = rest
+            # FIXME TODO maybe parse back from friendly_dsu_local? XXX it more or less works, except
+            # that we don't actually need this because anything with the old format almost certainly
+            # needs to be pulled again, also side thought ... we probably want to check that the
+            # remote hasn't changed? oh dear, yeah, that isn't going to work out very well
+            #hrm = dateparser.parse(friendly_dsu_local)
+            msg = f'index version {version} too old, pull the dataset'
+            log.warning(msg)
+            updated_transitive = None
+        elif version == 'v02':
+            (friendly_dsu_local, updated_transitive, id_name, parent_children,
+             ) = rest
 
         name_id = {}
         for id, name in id_name.items():
@@ -1452,7 +1498,127 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
             name_id[name].append(id)
 
-        return id_name, parent_children, name_id
+        return dataset_id, id_name, parent_children, name_id, updated_transitive
+
+    def diff(self):
+        (rows, _others, updated_cache_transitive, updated_transitive, dataset_id
+         ) = self._transitive_changes()
+
+        if updated_cache_transitive > updated_transitive:
+            msg = ('index out of sync with files! '
+                   f'{updated_cache_transitive} > {updated_transitive}')
+            raise ValueError(msg)  # FIXME error type
+
+        blobs = [dict(path=p.dataset_relative_path.as_posix(),
+                      type=path_type,
+                      updated=updated,
+                      ops=ops) for p, path_type, updated, ops in
+                 # sort so we can quickly get transitive changes
+                 sorted(rows, key=lambda r: r[2])
+                 ]
+        # XXX we cannot blindly sort blobs to find the real updated time
+        # without discarding no-metadata and similar cases where the updated
+        # time comes from the local system instead of the remote
+        # XXX further, we have to use updated_transitive which comes from the
+        # because there are routine cases where the most recently updated file
+        # will itself be overwritten so updated_cache_transitive will wind up
+        # being less than updated_transitive from the index, and we use the
+        # value from the index in the identifier for the push folder
+
+        #latest = blobs[-1]
+        #updated = latest['updated']
+        #_iuct = isoformat(updated_cache_transitive)
+        #assert updated == _iuct, (breakpoint(), f'wat {updated!r} != {_iuct!r}')
+        fblobs = [b for b in blobs if 'no-change' not in b['ops']]
+
+        # XXX we must use updated_transitive here NOT dataset updated
+        # the use case is separate, if dataset metadata changes but no
+        # internal paths changed we don't want to bump the index
+        return dataset_id, updated_transitive, fblobs
+
+    def _push_cache_dir(self, push_id):
+        if not self.is_dataset():
+            raise TypeError('can only run this on datasets')
+
+        cache_path = self._local_class(auth.get_path('cache-path'))
+        uuid = self.identifier.uuid
+        updated_friendly = timeformat_friendly(self.updated)
+        return cache_path / 'push' / uuid / updated_friendly / push_id
+
+    def _ensure_push_match(self, dataset_id, updated_transitive, updated_cache_transitive):
+        if self.identifier.uuid != dataset_id.uuid:
+            msg = f'{self.cache_identifier.uuid} != {dataset_id.uuid}'
+            raise ValueError(msg)  # FIXME error type?
+
+        if updated_transitive != updated_cache_transitive:
+            f'{updated} != {updated_cache_transitive} for: {self.cache_identifier.uuid}'
+            raise ValueError(msg)  # FIXME error type?
+
+    def _push_list_and_diff_to_manifest(self, diff, push_list):
+        return manifest
+
+    def _push_manifest_(self, diff, push_list):
+        return manifest
+
+    def make_push_manifest(self, dataset_id, updated_transitive, push_id):
+        pcd = self._push_cache_dir(push_id)
+        paths = pcd / 'paths.sxpr'
+        manifest = pcd / 'manifest.sxpr'
+        if not paths.exists():
+            raise FileNotFoundError(paths)
+
+        if manifest.exists():
+            # if you encounter this error it usually means that you have a duplicate
+            # push-id and should check how they are being generated
+            msg = f'Manifest already exists: {manifest}'
+            raise exc.PathExistsError(msg)
+
+        id, updated_cache_transitive, diff = self.diff()
+
+        self._ensure_push_match(dataset_id, updated_transitive, updated_cache_transitive)
+
+        # XXX yes we call diff every time and yes it is slow but we
+        # have to make sure nothing changed and even then if someone
+        # is mucking about we might get in trouble
+        with open(paths, 'rt') as f:
+            push_list = sxpyr.sxpr_to_python(f.read())
+
+        manifest = self._make_push_manifest(diff, push_list)
+
+        def serialize_manifest(manifest):
+            serialized_manifest = manifest  # TODO
+            return serialized_manifest
+
+        serialized_manifest = serialize_manifest(manifest)
+        with open(manifest, 'wt') as f:
+            f.write(serialized_manifest)
+
+    def push_from_manifest(self, dataset_id, updated_transitive, push_id):
+        pcd = self._push_cache_dir(push_id)
+        paths = pcd / 'paths.sxpr'
+        manifest = pcd / 'manifest.sxpr'
+        complete = pcd / 'complete.sxpr'
+        done = pcd / 'done.sxpr'
+        # pcdz = pcd.with_suffix('.xz')  # TODO ? XXX no, we can do cleanup and compression for these folders on pull when updated changes
+        if done.exists():
+            # FIXME TODO compress when done? XXX no, because we might want to make it possible to run multiple sync operations ? or no?
+            # that is tricky because we download to confirm as well
+            msg = f'Push was already completed: {done}'
+            raise ValueError(msg)  # FIXME error type
+
+        if completed.exists():
+            # check the match between complete and manifest to see if we are done
+            raise NotImplementedError('TODO push from manifest and partial completed')
+
+        id, updated_cache_transitive, diff = self.diff()  # FIXME may be able to skip this (see checking > updated below)
+
+        self._ensure_push_match(dataset_id, updated_transitive, updated_cache_transitive)
+
+        # ensure manifest matches diff subset
+        # make a copy of all new files to a safe directory ???? maybe ??? XXX NO
+
+        # TODO as we iterate through the files if we ever detect a file with
+        # modified time greater than updated_cache_transtivie
 
     def _transitive_changes(self, do_expensive_operations=False):
         def changedp(c, cache_size, cache_checksum):
@@ -1461,10 +1627,21 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     ((do_expensive_operations or size.mb < 2) and
                      c.checksum() != cache_checksum))
 
+        _lattr = self._cache_class._local_xattr
         #tm = self._transitive_metadata(do_expensive_operations=do_expensive_operations)
-        id_name, parent_children, name_id = self._read_indexes()
+        #dataset = self.cache.dataset.local
+        #updated_cache_transitive = dataset.updated_cache_transitive  # FIXME horribly inefficient
+        # FIXME if someone happens to overwrite the most recently changed file (which could easily happen when working on metadata files)
+        # then we are hosed and will not be able to find updated_cache_transitive at all ... should probably come from the index itself
+        # and we should probably symlink to latest and then if we hit an updated date greater than that we bail out with a warning that
+        # the index and the cache are out of sync
+        dataset_id, id_name, parent_children, name_id, updated_transitive = self._read_indexes()
+        if updated_transitive is None:
+            msg = 'index version too old, please pull dataset again'
+            raise ValueError(msg)  # FIXME error type
+
         rchildren = transitive_paths(self)
-        nochange = []
+        nochanges = []
         # move is ambiguous, it could be reparent or rename
         reparents = []  # parent id different
         renames = []  # parent id same but name is different
@@ -1474,14 +1651,20 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         removes = []  # name that was in index for latest pull is now missing
         missing_metadata = []
         ambig = []
-        noindex = []
-        _others = reparents, renames, changes, adds, new_dirs, removes, missing_metadata, ambig, noindex
+        noindexes = []
+        _others = reparents, renames, changes, adds, new_dirs, removes, missing_metadata, ambig, noindexes
         rows = []
+        # rewrite = missing metadata probably?
+        add, reparent, rename, remove, change, nometa, noindex, nochange = (
+            'add', 'reparent', 'rename', 'remove', 'change', 'no-metadata', 'no-index', 'no-change')
         #d = self.cache.dataset.local
+        updated_cache_transitive = ''
         for c in rchildren:
             # TODO make this its own function probably
             ops = []  # this is probably dumb
-            local_pid = c.parent.cache_id
+            toend = False
+            meta_from_local = False
+            local_parent_id = c.parent.cache_id
             local_name = c.name
 
             if c.is_broken_symlink():
@@ -1491,7 +1674,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 # XXX hard coded to symlink cache mdv3
                 expected_local_name, id, rest = symlink.parts
                 fields = rest.split('.')
-                cache_pid = fields[9]
+                cache_parent_id = fields[9]
+                cache_updated = fields[5]
                 # don't need file_id for symlinks since they can't loose xattrs
                 # but DO need it to detect if a new symlink appeared which would
                 # be weird, but can happen if the index is not regenerated
@@ -1501,22 +1685,38 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 cache_checksum = fields[6]
                 cache_name = fields[14].replace('|', '.')
                 if local_name != cache_name:
-                    ops.append('rename')
+                    ops.append(rename)
                     renames.append(c)
                 if id not in id_name:
-                    ops.append('noindex')
-                    noindex.append(c)
+                    # we cannot to assume meta from local in this case because no sane person
+                    # should be creating symlinks like the ones we use to store metadata
+                    ops.append(noindex)
+                    noindexes.append(c)
             else:
                 xattrs = c.xattrs()
                 if xattrs:
-                    cache_name = xattrs[b'bf.name'].decode()
+                    try:
+                        cache_name = xattrs[b'bf.name'].decode()
+                    except KeyError as e:
+                        msg = (
+                            'transitive changes requires bf.name field '
+                            'you need to pull the dataset using a newer '
+                            'version of sparcur that includes name in meta')
+                        log.error(msg)
+                        raise e
+
                     id = xattrs[b'bf.id'].decode()
-                    cache_pid = xattrs[b'bf.parent_id'].decode()
+                    cache_parent_id = xattrs[b'bf.parent_id'].decode()
+                    cache_updated = xattrs[b'bf.updated'].decode()
+                    meta_from_local = bool(xattrs[_lattr]) if _lattr in xattrs else False
                     if c.is_file():
                         cache_size = int(xattrs[b'bf.size'].decode())
                         cache_checksum = xattrs[b'bf.checksum']
                         cache_file_id = int(xattrs[b'bf.file_id'].decode())
                         id = id, cache_file_id
+
+                else:
+                    cache_updated = ''
 
                 if not xattrs or id not in id_name:
                     # id not in id_name is the
@@ -1524,9 +1724,9 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     # or if we had a failure before writing to disk ... which we can detect by
                     # having our index use the dataset modified time or transitive modified time
                     # for the file name
-                    ops.append('missing-metadata')
+                    ops.append(nometa)
                     missing_metadata.append(c)
-                    if local_pid not in parent_children:
+                    if local_parent_id not in parent_children:
                         # the parent is a new folder, so cross reference this
                         new_dirs.append(c.parent)
                         if c.parent.name in name_id:
@@ -1538,7 +1738,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                         ops.append('add-or-rename')
                         ambig.append(c)
                         #adds.append(c)
-                    elif old_id := [id for id in parent_children[local_pid] if id_name[id] == local_name]:
+                    elif old_id := [id for id in parent_children[local_parent_id] if id_name[id] == local_name]:
                         if len(old_id) > 1:
                             msg = f'multiple files with the same name and parent? {old_id}'
                             log.warning()
@@ -1550,13 +1750,13 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                         if (noe := not ocp.exists()) or changedp(c, cache_size, cache_checksum):
                             if noe:
                                 log.warning(f'old_id found but no object cache? {c} {old_id}')
-                            ops.extend(('change', ':old-id', old_id[0]))
+                            ops.extend(('change', {'old-id': old_id[0]}))
                             changes.append(c)
                         else:
-                            ops.append('nochange')
-                            nochange.append(c)
+                            ops.append(nochange)
+                            nochanges.append(c)
 
-                        continue
+                        toend = True
                         #if ocp.exists():  # XXX note that this does not exist in our current testing setup
                         #    # might have lost metadata by accident but without real changes
                         #    # TODO checksum
@@ -1580,9 +1780,9 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                         # from the index and then we can resolve whether this is a true add or
                         # a rename move based on user input (probably)
                     if not xattrs:
-                        continue
+                        toend = True
                 elif c.name != id_name[id]:
-                    ops.append('rename')
+                    ops.append(rename)
                     renames.append(c)
                 else:
                     # name matches name in index so do nothing
@@ -1590,25 +1790,47 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
             # common
 
-            if local_pid != cache_pid:
-                ops.append('reparent')
-                reparents.append(c)
+            if not toend:
+                if not meta_from_local:
+                    if cache_updated >= updated_cache_transitive:
+                        updated_cache_transitive = cache_updated
 
-            if c.is_file():
-                size = aug.FileSize(c.size)
-                if (size != cache_size or
-                    ((do_expensive_operations or size.mb < 2) and
-                    c.checksum() != cache_checksum)):
-                    ops.append('change')
-                    changes.append(c)
+                    if cache_updated > updated_transitive:
+                        # we have to double test here because there will surely be cases where
+                        # paths are traversed not in updated order, in which case any older paths
+                        # will not produce a warning if we were to run this additional test only
+                        # in cases where cache_updated > updated_cache_transitive
+                        # FIXME must also check to see if this is local meta
+                        msg = f'Newer than index latest! {c}'
+                        # the error will be raised at the end, need this for debug
+                        log.warning(msg)
+
+                if local_parent_id != cache_parent_id:
+                    ops.append(reparent)
+                    reparents.append(c)
+
+                if c.is_file():
+                    size = aug.FileSize(c.size)
+                    if (size != cache_size or
+                        ((do_expensive_operations or size.mb < 2) and
+                        c.checksum() != cache_checksum)):
+                        ops.append(change)
+                        changes.append(c)
 
             if not ops:
-                ops.append('nochange')  # lol
-                nochange.append(c)
+                ops.append(nochange)  # lol
+                nochanges.append(c)
 
-            rows.append((c, ops))
+            path_type = (
+                'dir' if c.is_dir() else ('link' if c.is_symlink() else 'file'))
+            rows.append((c, path_type, cache_updated, ops))
 
-        return rows, _others
+        return (
+            rows, _others,
+            dateparser.parse(updated_cache_transitive),
+            dateparser.parse(updated_transitive),
+            dataset_id,
+        )
 
     def _upload_raw(self):
         remote, old_remote = (
