@@ -19,6 +19,7 @@ args = {'server': True,
         '<path>': [],
         '--verbose': False,
         '--to-sheets': False,
+        '--discover': False,
 
         #'--export-path': auth.get_path('export-path'),
         '--export-path': None,  # don't leak this
