@@ -1174,6 +1174,7 @@
               (send button-export-dataset enable enable?)
               (send button-open-dataset-shell enable enable?)
               (send button-clean-metadata-files enable enable?)
+              (send button-upload-changes enable enable?)
               ; export
               (send button-open-export-json enable export-enable?)
               (send button-open-export-ipython enable export-enable?)
@@ -1240,16 +1241,27 @@
       (load-config!))
     (send frame-preferences show do-show?)))
 
-(define (cb-toggle-upload o e)
+(define iconize-hack (eq? 'unix (system-type)))
+(define (cb-toggle-upload o e #:show? [show? #f])
   ; TODO detect when an actual quite is run
   ; FIXME toggling this via button when the window is open is extremely confusing
   ; it should probably raise the window in that case?
   (let*-values
       ([(new? frame-upload) (get-frame-upload! (current-dataset))]
-       [(do-show?) (not (send frame-upload is-shown?))])
+       [(do-show?) (or show? (not (send frame-upload is-shown?)))])
+    #; ; not clear whether we actually ever want to close these even if the user hits the x on the window
+    ; it is unlikely to leak large amounts of memory and there is no reason to lose the state
+    (println (list 'cbtu: o e))
     (send frame-upload show do-show?)
+    ; iconize hack to get the frame to come to the front when using gtk
+    (when iconize-hack
+      (send frame-upload iconize #t)
+      (send frame-upload iconize #f))
     (when (and do-show? (or new? (not (send frame-upload updated-once?))))
       (send frame-upload update))))
+
+(define (cb-upload-button-show-and-raise o e)
+  (cb-toggle-upload o e #:show? #t))
 
 (define (cb-refresh-dataset-metadata obj event)
   (thread
@@ -1801,10 +1813,10 @@ switch to that"
                                          [callback cb-clean-metadata-files]
                                          [parent panel-validate-mode]))
 
-(define button-upload-metadata-files
+(define button-upload-changes
   (new (tooltip-mixin button%)
        [label "Upload"]
-       [callback cb-toggle-upload]
+       [callback cb-upload-button-show-and-raise]
        [tooltip "Shortcut C-u"]
        ; TODO separate button for the convert use case?
        [parent panel-validate-mode]))
@@ -2005,8 +2017,12 @@ switch to that"
                (selected)
                ))))
     (define (paths-to-manifest)
-      (argv-simple-make-push-manifest dataset (updated-transitive) (push-id))
-      )
+      (let ([argv (argv-simple-make-push-manifest dataset (updated-transitive) (push-id))]
+            [status-1 #f])
+        (parameterize () ; FIXME threading and probably semaphore?
+          (set! status-1 (apply py-system* argv)))
+        (unless status-1
+          (error "make-push-manifest failed with ~a for ~a" status-1 (string-join argv " ")))))
     (define (unfinished-push?)
       (define path-dut-latest (build-path (path-cache-push) (id-uuid dataset) (updated-transitive) "LATEST"))
       (define cands '("done.sxpr" "completed.sxpr" "manifest.sxpr" "paths.sxpr"))

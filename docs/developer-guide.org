@@ -3839,9 +3839,12 @@ class Options(clif.Options):
     def dataset_id(self):
         if not hasattr(self, '_cache_dataset_id'):
             ids = self._args['--dataset-id']
+            positional = self._args['<dataset-id>']
             if ids:
                 identifiers = [PennsieveId(id, type='dataset') for id in ids]
                 self._cache_dataset_id = identifiers
+            elif positional:
+                return [PennsieveId(positional, type='dataset')]
             else:
                 return ids
 
@@ -4181,7 +4184,10 @@ def main(id=None, **kwargs):
 
     if ik('for_racket'):
         import json
+        from sxpyr import sxpyr
         from augpathlib import meta as apmeta
+        from pyontutils.utils_fast import isoformat
+        from dateutil import parser as dateparser
         if ik('meta'):
             paths = kwargs['paths'] if kwargs['paths'] else [kwargs['path']]
             for path in paths:
@@ -4208,9 +4214,6 @@ def main(id=None, **kwargs):
                 print(out)
 
         elif ik('diff'):  # FIXME own file?
-            from pprint import pprint
-            from sxpyr import sxpyr
-            from pyontutils.utils_fast import isoformat
             # FIXME TODO based on dataset-id
             path = kwargs['path']
             dataset_id, updated_transitive, diff = path.diff()
@@ -4225,10 +4228,8 @@ def main(id=None, **kwargs):
 
         elif ik('make_push_manifest'):  # FIXME own file?
             # this is separate from push because checking confim is a separate action from pushing
-            from sxpyr import sxpyr
-            from sparcur.config import auth
-            dataset_id = kwargs['dataset_id']
-            updated = kwargs['updated']
+            dataset_id = id
+            updated = dateparser.parse(kwargs['updated'])
             push_id = kwargs['push_id']
             path = kwargs['path']
             path.make_push_manifest(dataset_id, updated, push_id)
@@ -4236,8 +4237,8 @@ def main(id=None, **kwargs):
             # read list of files + expected ops to change
             # generate the full change manifest
         elif ik('push'):  # FIXME own file?
-            dataset_id = kwargs['dataset_id']
-            updated = kwargs['updated']
+            dataset_id = id
+            updated = dateparser.parse(kwargs['updated'])
             push_id = kwargs['push_id']
             # TODO error handling and retry or resume
             path.push_from_manifest(dataset_id, updated, push_id)

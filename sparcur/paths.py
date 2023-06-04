@@ -5,6 +5,7 @@ import hashlib
 import pathlib
 from functools import wraps
 from itertools import chain
+import orthauth as oa
 import augpathlib as aug
 from dateutil import parser as dateparser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
@@ -1536,32 +1537,45 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # internal paths changed we don't want to bump the index
         return dataset_id, updated_transitive, fblobs
 
-    def _push_cache_dir(self, push_id):
-        if not self.is_dataset():
+    def _push_cache_dir(self, updated_transitive, push_id):
+        if not self.cache.is_dataset():
             raise TypeError('can only run this on datasets')
 
-        cache_path = self._local_class(auth.get_path('cache-path'))
-        uuid = self.identifier.uuid
-        updated_friendly = timeformat_friendly(self.updated)
+        cache_path = self.__class__(auth.get_path('cache-path'))
+        uuid = self.cache_identifier.uuid
+        updated_friendly = timeformat_friendly(updated_transitive)
         return cache_path / 'push' / uuid / updated_friendly / push_id
 
     def _ensure_push_match(self, dataset_id, updated_transitive, updated_cache_transitive):
-        if self.identifier.uuid != dataset_id.uuid:
-            msg = f'{self.cache_identifier.uuid} != {dataset_id.uuid}'
+        cuuid = self.cache_identifier.uuid
+        if cuuid != dataset_id.uuid:
+            msg = f'{cuuid} != {dataset_id.uuid}'
             raise ValueError(msg)  # FIXME error type?
 
         if updated_transitive != updated_cache_transitive:
-            f'{updated} != {updated_cache_transitive} for: {self.cache_identifier.uuid}'
+            f'{updated} != {updated_cache_transitive} for: {cuuid}'
             raise ValueError(msg)  # FIXME error type?
 
     def _push_list_and_diff_to_manifest(self, diff, push_list):
         return manifest
 
-    def _push_manifest_(self, diff, push_list):
+    def _push_manifest(self, diff, push_list):
+        drp = self.dataset_relative_path
+        index = {d['path']:d for d in diff}
+        bads = []
+        for p in push_list:
+            d = index[p['path']]
+            if d['ops'] != p['ops']:
+                bads.append((p, d))
+
+        if bads:
+            msg = f'ops mismatch! {bads!r}'
+            raise ValueError(msg)  # FIXME error type
+        # TODO more features than just copying ... checksums etc.
         return manifest
 
     def make_push_manifest(self, dataset_id, updated_transitive, push_id):
-        pcd = self._push_cache_dir(push_id)
+        pcd = self._push_cache_dir(updated_transitive, push_id)
         paths = pcd / 'paths.sxpr'
         manifest = pcd / 'manifest.sxpr'
         if not paths.exists():
@@ -1581,9 +1595,9 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # have to make sure nothing changed and even then if someone
         # is mucking about we might get in trouble
         with open(paths, 'rt') as f:
-            push_list = sxpyr.sxpr_to_python(f.read())
+            push_list = oa.utils.sxpr_to_python(f.read())
 
-        manifest = self._make_push_manifest(diff, push_list)
+        manifest = self._push_manifest(diff, push_list)
 
         def serialize_manifest(manifest):
             serialized_manifest = manifest  # TODO
@@ -1594,7 +1608,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             f.write(serialized_manifest)
 
     def push_from_manifest(self, dataset_id, updated_transitive, push_id):
-        pcd = self._push_cache_dir(push_id)
+        pcd = self._push_cache_dir(updated_transitive, push_id)
         paths = pcd / 'paths.sxpr'
         manifest = pcd / 'manifest.sxpr'
         complete = pcd / 'complete.sxpr'
