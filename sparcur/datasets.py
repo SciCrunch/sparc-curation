@@ -1633,6 +1633,23 @@ class SamplesFilePath(ObjectPath):
     obj = SamplesFile
 
 
+class SitesFile(SubjectsFile):
+    """ TODO ... """
+
+    renames_header = {'site_id': 'metadata_element',}
+    record_type_key_alt = 'site_id'
+    record_type_key_header = 'metadata_element'
+    groups_alt = {'sites': GROUP_ALL,}
+    ignore_alt = 'additional_fields_e_g__minds',
+    ignore_match = []
+    normalize_header = False
+    _expect_single = _nsffes
+
+
+class SitesFilePath(ObjectPath):
+    obj = SitesFile
+
+
 # TODO when we need them ?
 #_props = sc.ManifestFileSchema.schema['properties']['man']['items']['properties']
 #_nsman = [k for k, v in _props.items()
@@ -1712,6 +1729,7 @@ DatasetStructure.sections = {'submission': SubmissionFilePath,
                              'performances': PerformancesFilePath,
                              'subjects': SubjectsFilePath,
                              'samples': SamplesFilePath,
+                             'sites': SitesFilePath,
                              'manifest': ManifestFilePath,}
 
 DatasetStructure._bind_sections()

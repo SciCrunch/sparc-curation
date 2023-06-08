@@ -1711,6 +1711,52 @@ class SamplesFileSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(SamplesFileExportSchema.schema)
     schema = JApplyRecursive(EIS._to_pattern, __schema)
+    del __schema
+
+
+class SiteExportSchema(JSONSchema):
+    # TODO
+    schema = {
+        'type': 'object',
+        'jsonld_include': {'@type': ['sparc:Site', 'owl:NamedIndividual']},
+        '': [{'context_runtime': [
+                '#/meta/uri_api',
+                (lambda uri_api: uri_api + '/sites/'),
+                '#/sites/@context/@base']},
+             {'context_runtime': [
+                 '#/meta/uri_api',
+                 (lambda uri_api: {'@id': uri_api + '/sites/',
+                                   '@prefix': True}),
+                 '#/@context/sites']}],
+        'required': ['site_id', 'specimen_id'],
+        'properties': {
+            'site_id': {'type': 'string',
+                        'pattern': fs_safe_identifier_pattern,
+                        },
+            'specimen_id': {'type': 'string',
+                            'pattern': fs_safe_identifier_pattern,
+                           },
+        },
+    }
+
+
+class SitesFileExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'required': ['sites'],
+        'properties': {
+            'sites': {
+                'type': 'array',
+                'minItems': 1,
+                'items': SiteExportSchema.schema,},
+            'errors': ErrorSchema.schema,}}
+
+
+class SitesFileSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(SitesFileExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+    del __schema
 
 
 class ManifestRecordExportSchema(JSONSchema):

@@ -496,6 +496,17 @@ class SamplesFilePipeline(PathPipeline):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
+class SitesFilePipeline(PathPipeline):
+
+    data_transformer_class = dat.SitesFile
+
+    @hasSchema(sc.SitesFileSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class ManifestFilePipeline(PathPipeline):
 
     data_transformer_class = dat.ManifestFile
@@ -1071,6 +1082,11 @@ class SDSPipeline(JSONPipeline):
           [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          SamplesFilePipeline,
          ['samples_file']],
+
+        [[[['sites_file'], ['path']],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
+         SitesFilePipeline,
+         ['sites_file']],
 
         [[[['manifest_file'], ['paths']],
           [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
@@ -1708,6 +1724,12 @@ class PipelineEnd(JSONPipeline):
         'SamplesFilePipeline._transformer',
         'SamplesFilePipeline.transformer',
         'SamplesFilePipeline.data',
+
+        'SitesFile',
+
+        'SitesFilePipeline._transformer',
+        'SitesFilePipeline.transformer',
+        'SitesFilePipeline.data',
 
         'ManifestFilePipeline.transformer',
         'ManifestFilePipeline.data',
