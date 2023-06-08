@@ -7,6 +7,7 @@
 - NPO hasInstanceInTaxon
 - ApiNATOMY models use wbrcm
 - ApiNATOMY aacar new version
+- ApiNATOMY publication metadata
 - alpha :: NPO synaptic connectivity
 - maybe :: NPO connections from composer
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
@@ -16,7 +17,8 @@
 - NPO various bugfixes for NLP populations
 - NPO use hasAnatomicalSystemPhenotype, hasCircuitRolePhenotype, and hasClassificationPhenotype instead of hasPhenotype where appropriate
 - TODO NPO aacar pig dog human, not mouse not rat
-* RC 2023-05-05
+* PROD 2023-05-05
+CLOSED: <2023-06-08 Thu>
 - ApiNATOMY aacar-6 fix missing A in A74 that generated a lyph with no metadata
 - ApiNATOMY pancr-2 fix incorrect housing lyph pancreatic vasculature to wbkg pancreatic acinus
 - ApiNATOMY splen-2 fix incorrect housing layer for nts and dmv
