@@ -170,11 +170,14 @@
                       (python-interpreter))])
     (python-mod-args "sparcur.simple.utils" "for-racket" "meta" path-string)))
 (define (argv-simple-diff ds)
-  (python-mod-args "sparcur.simple.utils" "for-racket" "diff" (path->string (dataset-working-dir-path ds))))
+  (python-mod-args "sparcur.simple.utils" "for-racket" "diff"
+                   (path->string (dataset-working-dir-path ds))))
 (define (argv-simple-make-push-manifest ds updated-transitive push-id)
-  (python-mod-args "sparcur.simple.utils" "for-racket" "make-push-manifest" (dataset-id ds) updated-transitive push-id))
+  (python-mod-args "sparcur.simple.utils" "for-racket" "make-push-manifest"
+                   (dataset-id ds) updated-transitive push-id (path->string (dataset-working-dir-path ds))))
 (define (argv-simple-push ds updated-transitive push-id)
-  (python-mod-args "sparcur.simple.utils" "for-racket" "push" (dataset-id ds) updated-transitive push-id))
+  (python-mod-args "sparcur.simple.utils" "for-racket" "push" (dataset-id ds) updated-transitive push-id
+                   (path->string (dataset-working-dir-path ds))))
 (define argv-simple-git-repos-update (python-mod-args "sparcur.simple.utils" "git-repos" "update"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
 (define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1" "--dataset-id" (dataset-id ds)))
@@ -250,7 +253,7 @@
 (define (py-system* exe #:set-pwd? [set-pwd? --sigh] . args)
   (call-with-environment
    (λ ()
-     (if (symbol=? set-pwd? --sigh)
+     (if (eq? set-pwd? --sigh)
          (apply system* exe args)
          (apply system* exe args #:set-pwd? set-pwd?)))
    '(("PYTHONBREAKPOINT" . "0"))))
@@ -281,8 +284,9 @@
   (datetime-file-system-safe
    (/ (current-inexact-milliseconds) 1e3)))
 
+(define time-format-friendly "YYYY-MM-dd'T'HHmmss,SSSSSSX")
 (define (datetime-for-path-now)
-  (string-append (~t (posix->moment (/ (current-inexact-milliseconds) 1e3) "Etc/UTC") "YYYY-MM-dd'T'HHmmss,SSSSSSX")))
+  (~t (posix->moment (/ (current-inexact-milliseconds) 1e3) "Etc/UTC") time-format-friendly))
 
 #; ; sigh
 (define (in-cwd-thread argv cwd)
@@ -1982,11 +1986,14 @@ switch to that"
         [(value) (error "cannot set dataset after construction")
                  #;(set! *dataset* value)]))
 
-    (define *updated-transitive* #f)
-    (define updated-transitive ; FIXME TODO
+    (define *updated-transitive-moment* #f)
+    (define updated-transitive-moment ; FIXME TODO
       (case-lambda
-        [() *updated-transitive*]
-        [(value) (set! *updated-transitive* value)]))
+        [() *updated-transitive-moment*]
+        [(value) (set! *updated-transitive-moment* value)]))
+    (define (updated-transitive)
+      "file system friendly"
+      (~t (updated-transitive-moment) time-format-friendly))
 
     (define *push-id* #f)
     (define push-id
@@ -2014,8 +2021,9 @@ switch to that"
         #:exists 'error ; any rewrite should change
         (λ () (pretty-write
                ; TODO data from selected rows
-               (selected)
-               ))))
+               (for/list ([h (selected)])
+                 ; FIXME ops is wrong
+                 (list ':path (hash-ref h 'path) ':type (hash-ref h 'type) ':ops (hash-ref h 'ops)))))))
     (define (paths-to-manifest)
       (let ([argv (argv-simple-make-push-manifest dataset (updated-transitive) (push-id))]
             [status-1 #f])
@@ -2097,12 +2105,33 @@ switch to that"
           (set! diff (read sport))
           diff
           )))
-    (define (result->updated-transitive+diff-list result)
+    (define (result->updated-transitive-moment+diff-list result)
       (pretty-write (list 'oops: result))
       (define h (plist->hash result))
       #; ; nothing to do with this one right now I think?
       (hash-ref h 'dataset-id)
-      (values (hash-ref h 'updated-transitive) (hash-ref h 'diff)))
+      (values (iso8601->moment (hash-ref h 'updated-transitive))
+              (map better-diff-hash (hash-ref h 'diff))))
+    (define (better-diff-hash record)
+      (define raw-ops (hash-ref record 'ops))
+      (define-values (old-id ops)
+        (if (member "change" raw-ops)
+            (let* ((rrops (reverse raw-ops))
+                   (old-meta (car rrops))
+                   (old-id (let ([hr (hash-ref old-meta 'old-id)])
+                             (let-values ([(N type uuid)
+                                           (apply values (string-split (car hr) ":"))])
+                               (string-append
+                                (substring uuid 0 4)
+                                " ... "
+                                (let ([slu (string-length uuid)])
+                                  (substring uuid (- slu 4) slu))))))
+                   (ops (reverse (cdr rrops))))
+              (values old-id ops))
+            (values #f raw-ops)))
+      (set! record (hash-set record 'ops ops))
+      (set! record (hash-set record 'old-id old-id))
+      record)
     (define (diff-list-to-columns record)
       (println (list 'diff-list-to-columns-wat? record))
       (define type
@@ -2110,7 +2139,9 @@ switch to that"
           [("dir")  "d"]
           [("file") "f"]
           [("link") "l"]))
+      #;
       (define raw-ops (hash-ref record 'ops))
+      #;
       (define-values (old-id ops)
         (if (member "change" raw-ops)
             (let* ((rrops (reverse raw-ops))
@@ -2131,8 +2162,12 @@ switch to that"
       (list
        type
        (hash-ref record 'path)
+       (or (hash-ref record 'old-id) "")
+       #;
        old-id
+       #;
        (string-join ops " ")
+       (string-join (hash-ref record 'ops) " ")
        ))
     (define (set-rows diff-list)
       (unless (null? diff-list)
@@ -2150,8 +2185,8 @@ switch to that"
     (define (do-update)
       (define diff (get-diff))
       (println (list 'diff-hash? diff))
-      (define-values (updated-trans diff-list) (result->updated-transitive+diff-list diff)) ; FIXME need updated-transitive from here
-      (updated-transitive updated-trans)
+      (define-values (updated-trans-moment diff-list) (result->updated-transitive-moment+diff-list diff)) ; FIXME need updated-transitive from here
+      (updated-transitive-moment updated-trans-moment)
       ; FIXME yeah ... here comes the synchronization issues
       (let ([ufp? (unfinished-push?)] ; FIXME not sure if this is actually the right place to handle this?
             )
