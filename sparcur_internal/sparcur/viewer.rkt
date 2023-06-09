@@ -256,7 +256,9 @@
      (if (eq? set-pwd? --sigh)
          (apply system* exe args)
          (apply system* exe args #:set-pwd? set-pwd?)))
-   '(("PYTHONBREAKPOINT" . "0"))))
+   '(("PYTHONBREAKPOINT" . "0")
+     ; silence error logs during pennsieve top level import issue
+     ("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION" . "python"))))
 
 (define (datetime-file-system-safe inexact-seconds)
   "Y-M-DTHMS,6Z" ; FIXME this is producing garbages results with weird and bad padding
