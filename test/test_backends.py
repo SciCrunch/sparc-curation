@@ -5,6 +5,9 @@ import pytest
 from sparcur.paths import Path, BlackfynnCache as BFC, PennsieveCache as PFC, PennsieveDiscoverCache as PDFC
 from sparcur.backends import BlackfynnRemote, PennsieveRemote, PennsieveDiscoverRemote
 from .common import test_organization, project_path_real as ppr
+# for DatasetData
+from .common import RDHPN
+from sparcur.backends import PennsieveDatasetData
 
 
 class RemoteHelper:
@@ -92,3 +95,24 @@ class TestPennsieveDiscoverRemote(RemoteHelper, unittest.TestCase):
                 main()
             finally:
                 sys.argv = oav
+
+
+@pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
+class TestPennsieveDatasetData(RDHPN, unittest.TestCase):
+
+    _nofetch = True
+    examples = (
+        # int id know to be present in two different orgs
+        'N:dataset:ded103ed-e02d-41fd-8c3e-3ef54989da81',
+    )
+
+    def test_publishedMetadata(self):
+        # had an issue where int ids are not globally unique (duh)
+        # but are instead qualified by the org int id so this hits
+        # that codepath directly, have to use real data since there
+        # is no "fake publish" endpoint right now
+        org = self.anchor.remote.bfobject
+        iid = org.int_id  # what we need to filter search results by org int id on discover
+        datasets = list(self.anchor.remote.children)
+        examples = [d for d in datasets if d.id in self.examples]
+        derps = [e.bfobject.publishedMetadata for e in examples]

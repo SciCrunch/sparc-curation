@@ -402,7 +402,10 @@ def publishedMetadata(self):
         elif j['totalCount'] == 0:
             return
         else:
-            cands = [d for d in j['datasets'] if d['sourceDatasetId'] == self.int_id]
+            org_int_id = self._api._context.int_id
+            cands = [d for d in j['datasets'] if
+                     d['sourceDatasetId'] == self.int_id and
+                     d['organizationId'] == org_int_id]
             lc = len(cands)
             if lc == 1:
                 return cands[0]

@@ -149,6 +149,7 @@ State.bind_blackfynn(fbfl)
 @pytest.mark.skipif('CI' in os.environ, reason='Requires access to data')
 class RealDataHelper:
 
+    _nofetch = False
     _fetched = False
     _cache_class = None
     _remote_class = None
@@ -189,7 +190,7 @@ class RealDataHelper:
         datasets = list(cls.project_path.children)
         cls.test_datasets = [d for d in datasets if d.cache_id in test_datasets_real]
         [d.rmdir() for d in datasets if d.cache_id not in test_datasets_real]  # for sanity
-        if not RealDataHelper._fetched:
+        if not RealDataHelper._fetched and not cls._nofetch:
             RealDataHelper._fetched = True  # if we fail we aren't going to try again
             [d._mark_sparse() for d in cls.test_datasets if d.cache_id not in nosparse]  # keep pulls fastish
             pull.from_path_dataset_file_structure_all(cls.project_path, paths=cls.test_datasets)
