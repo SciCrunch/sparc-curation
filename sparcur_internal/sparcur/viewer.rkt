@@ -2078,12 +2078,26 @@ switch to that"
     (define (push-from-manifest)
       (unless (confirmed?)
         (error "not confirmed? how did you manage this?"))
-      #f)
+      (println (format "Starting push from manifest for ~a" (id-uuid dataset)))
+      (let* ([argv (argv-simple-push dataset (updated-transitive) (push-id))]
+             [status-1 #f]
+             [result-string
+              (parameterize ()
+                (println (string-join argv " "))
+                (with-output-to-string
+                  (thunk
+                   (set! status-1 (apply py-system* argv)))))])
+        ; TODO need a visual cue that this has succeeded
+        (unless status-1
+          (error "push failed with ~a for ~a" status-1 (string-join argv " ")))))
     (define (cb-push-to-remote o e)
       ; TODO probably disable clicking the button again until the process finishes or fails?
       ; 1. confirm pass the manifest of changes
+      ;#;
       (println "Upload is not implemented yet.")
-      (push-from-manifest))
+      (when #f ; almost there
+        (send button-push enable #f)
+        (push-from-manifest)))
     (define button-push
       (new button%
            [label "Push selected changes to remote"]

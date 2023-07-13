@@ -1180,6 +1180,32 @@ class BlackfynnRemote(aug.RemotePath):
         child._seed = tbfo
         return child
 
+    def rename(self, new_name):
+        # FIXME handle files vs folders vs datasets
+        # bfobject instead of _bfobject so that we populate in case bfobject is a stub
+        if self.bfobject.name != new_name:  # FIXME error here when trying to get/rename a package?
+            self._bfobject.name = new_name
+            self._bfobject.update()
+        else:
+            pass  # FIXME probably need to error or at least log?
+
+    def reparent(self, new_parent_id):
+        # TODO handle all the possible crazy possible values that new_parent could take on
+        # FIXME given the use case, we need to expect new_parent_id by default to avoid
+        # exploding the number of network calls, but the N:thing: checks are still annoying
+        if new_parent_id.startswith('N:dataset:'):
+            # pennsieve treats the root of a dataset as null with respect to parents
+            new_parent_id = None
+        elif new_parent.startswith('N:collection:'):
+            pass
+        else:
+            msg = f"don't know how to move to a {new_parent_id}"
+            raise NotImplementedError(msg)
+
+        # bfobject instead of _bfobject so that we populate in case bfobject is a stub
+        self.bfobject._api.data.move(new_parent_id, self.id)
+        self._bfobject.update()  # fetch the changes
+
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """
         if self.is_organization():

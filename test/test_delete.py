@@ -657,14 +657,19 @@ class TestChanges(_TestOperation, unittest.TestCase):
         self.dataset = pops[0][-1]
 
     def test_changes(self):
+        from dateutil import parser as dateparser
         dataset = self.dataset
         dataset_id, id_name, parent_children, name_id, updated_transitive = dataset._read_indexes()
+        # XXX updated_transitive from _read_indexes is a string because that is what
+        # _transitive_changes needs internally and then transforms to a datetime object
+        # when it returns, therefore we don't fiddle with the types here
+
         #tc = dataset._transitive_changes()
         # XXX see sparcur.simple.utils
         dataset_id, updated_cache_transitive, diff = dataset.diff()
         blob = {
             'dataset-id': dataset_id.id,
-            'updated-transitive': isoformat(updated_transitive),
+            'updated-transitive': updated_transitive,
             'diff': diff,
         }
         pl = sxpyr.python_to_sxpr(blob, str_as_string=True)
@@ -673,6 +678,61 @@ class TestChanges(_TestOperation, unittest.TestCase):
         #pl = sxpyr.python_to_sxpr(diff, str_as_string=True)
         #sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
         breakpoint()
+
+    def test_workflow(self):
+        # push button, receive bacon
+
+        # 0. asumme there are changes to a dataset
+
+        # 1. click upload button in main window (python get diff)
+        #    argv-simple-diff -> sparcur.simple.utils for-racket diff -> path_dataset.diff()
+
+        # 2. select specific paths for upload (python nothing)
+        #    racket side selects the list of files to push (push_list) that goes into paths.sxpr
+        #    which the python side then reads in the next step
+
+        # 3. click confirm selection checkbox (python generate manifest)
+        #    (ensure-directory! (push-dir)) -> updated_transitive push_id
+        #    write-push-paths -> {:user-cache-path}/{dataset-uuid}/{updated-transitive}/{push-id}/paths.sxpr -> push_list
+        #    argv-simple-make-push-manifest -> sparcur.simple.utils for-racket make-push-manifest -> path_dataset.make_mush_manifest()
+
+        # 4. click push selected to remote (python push from manifest)
+        #    argv-simple-push -> sparcur.simple.utils for-racket push -> path_dataset.push_from_manifest()
+
+        # 5. TODO I think that after remote changes are made we probably want to create
+        #    a modified index file that notes the changes so that incremental changes
+        #    do not have to be pulled again ... of course if upstream has changed we are
+        #    back in the usual world of pain ...
+        paths_to_add_1 = [
+            'dire-1/dire-3-1-rn-r',
+            'dire-2/dire-3-3-np-r',
+            'dire-1/file-1-1-rn-r.ext',
+            'dire-2/file-1-2-rp.ext',
+            'dire-2/link-1-3-np-r.ext',  # most important rename and reparent of links
+            ]
+        paths_to_add_2 = [
+            'dire-6/file-4-add.ext',  # should error for now
+        ]
+        self._do_workflow(paths_to_add_1)
+        try:
+            self._do_workflow(paths_to_add_2)
+            raise AssertionError('should have failed due to forbidden ops')
+        except ValueError:
+            pass
+
+
+    def _do_workflow(self, paths_to_add):
+        path_dataset = self.dataset  # given
+        dataset_id = path_dataset.cache.identifier
+        # 1
+        __dataset_id, updated_transitive, diff = path_dataset.diff()
+        # 2
+        # write the push_list to paths.sxpr
+        push_id = path_dataset._write_push_list(dataset_id, updated_transitive, diff, paths_to_add)
+        # 3
+        path_dataset.make_push_manifest(dataset_id, updated_transitive, push_id)
+        # 4
+        path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
 
 
 class TestMoveFolder:

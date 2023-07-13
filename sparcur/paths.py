@@ -7,10 +7,11 @@ from functools import wraps
 from itertools import chain
 import orthauth as oa
 import augpathlib as aug
+from sxpyr import sxpyr
 from dateutil import parser as dateparser
 from augpathlib import PrimaryCache, EatCache, SqliteCache, SymlinkCache
 from augpathlib import RepoPath, LocalPath
-from pyontutils.utils_fast import TZLOCAL, timeformat_friendly, isoformat
+from pyontutils.utils_fast import TZLOCAL, utcnowtz, timeformat_friendly, isoformat
 from sparcur import backends
 from sparcur import exceptions as exc
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
@@ -1570,8 +1571,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         drp = self.dataset_relative_path
         index = {d['path']:d for d in diff}
         bads = []
+        manifest = []
         for p in push_list:
             d = index[p['path']]
+            manifest.append(p)
             if d['ops'] != p['ops']:
                 bads.append((p, d))
 
@@ -1581,14 +1584,48 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # TODO more features than just copying ... checksums etc.
         return manifest
 
+    def _push_feature_check(self, manifest, allowed_ops):
+        # make sure that the changes to the dataset include only those
+        # that are supported at the moment e.g. only moves in first version
+        desired_ops = set(o for d in manifest for o in d['ops'])
+        bads = []
+        for d in manifest:
+            for o in d['ops']:
+                if o not in allowed_ops:
+                    bads.append((d['path'], o))
+
+        if bads:
+            msg = f'Forbidden ops among selected files!\n{bads}'
+            raise ValueError(msg)
+
+    def _write_push_list(self, dataset_id, updated_transitive, diff, paths_to_add):
+        # TODO ensure dataset_id matches probably
+        push_id = timeformat_friendly(utcnowtz())
+        pcd = self._push_cache_dir(updated_transitive, push_id)
+        paths = pcd / 'paths.sxpr'
+
+        index = {d['path']:d for d in diff}
+        push_list = [{
+            'path': p,
+            'type': index[p]['type'],
+            'ops': index[p]['ops'],  # apparently ops format is wrong according to note in viewer.rkt
+        } for p in paths_to_add]
+        pl = sxpyr.python_to_sxpr(push_list, str_as_string=True)
+        sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
+        pcd.mkdir(parents=True)
+        with open(paths, 'wt') as f:
+            f.write(sxpr)
+
+        return push_id
+
     def make_push_manifest(self, dataset_id, updated_transitive, push_id):
         pcd = self._push_cache_dir(updated_transitive, push_id)
         paths = pcd / 'paths.sxpr'
-        manifest = pcd / 'manifest.sxpr'
+        path_manifest = pcd / 'manifest.sxpr'
         if not paths.exists():
             raise FileNotFoundError(paths)
 
-        if manifest.exists():
+        if path_manifest.exists():
             # if you encounter this error it usually means that you have a duplicate
             # push-id and should check how they are being generated
             msg = f'Manifest already exists: {manifest}'
@@ -1605,41 +1642,68 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             push_list = oa.utils.sxpr_to_python(f.read())
 
         manifest = self._push_manifest(diff, push_list)
+        self._push_feature_check(manifest, ('rename', 'reparent'))
 
         def serialize_manifest(manifest):
-            serialized_manifest = manifest  # TODO
+            pl = sxpyr.python_to_sxpr(manifest, str_as_string=True)
+            serialized_manifest = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
             return serialized_manifest
 
         serialized_manifest = serialize_manifest(manifest)
-        with open(manifest, 'wt') as f:
+        with open(path_manifest, 'wt') as f:
             f.write(serialized_manifest)
 
     def push_from_manifest(self, dataset_id, updated_transitive, push_id):
         pcd = self._push_cache_dir(updated_transitive, push_id)
         paths = pcd / 'paths.sxpr'
-        manifest = pcd / 'manifest.sxpr'
+        path_manifest = pcd / 'manifest.sxpr'
         complete = pcd / 'complete.sxpr'
         done = pcd / 'done.sxpr'
         # pcdz = pcd.with_suffix('.xz')  # TODO ? XXX no, we can do cleanup and compression for these folders on pull when updated changes
         if done.exists():
             # FIXME TODO compress when done? XXX no, because we might want to make it possible to run multiple sync operations ? or no?
             # that is tricky because we download to confirm as well
-            msg = f'Push was already completed: {done}'
+            msg = f'Push already complete: {done}'
             raise ValueError(msg)  # FIXME error type
 
-        if completed.exists():
+        if complete.exists():
             # check the match between complete and manifest to see if we are done
-            raise NotImplementedError('TODO push from manifest and partial completed')
+            msg = 'TODO push from manifest and partial complete'
+            raise NotImplementedError(msg)
 
         id, updated_cache_transitive, diff = self.diff()  # FIXME may be able to skip this (see checking > updated below)
 
         self._ensure_push_match(dataset_id, updated_transitive, updated_cache_transitive)
+        with open(path_manifest, 'rt') as f:
+            manifest = oa.utils.sxpr_to_python(f.read())
+
+        # XXX additional features to be implemented in the future
 
         # ensure manifest matches diff subset
         # make a copy of all new files to a safe directory ???? maybe ??? XXX NO
 
         # TODO as we iterate through the files if we ever detect a file with
         # modified time greater than updated_cache_transtivie
+
+        # XXX FOR NOW ONLY rename and reparent (more strict checks come last)
+        self._push_feature_check(manifest, ('rename', 'reparent'))
+        d = manifest[0]
+        breakpoint()
+        for d in manifest:
+            local = self / d['path']
+            remote = local.remote
+            for op in d['ops']:
+                # FIXME this is bad, this is the kind of stuff that should
+                # probably go in the manifest directly so that the full record
+                # is there or something ???
+                if op == 'rename':
+                    remote.rename(local.name)
+                elif op == 'reparent':
+                    new_parent_id = local.parent.cache_id
+                    remote.reparent(new_parent_id)
+                else:
+                    msg = f'Most Impressive. {op}'
+                    raise ValueError(msg)
 
     def _transitive_changes(self, do_expensive_operations=False):
         def changedp(c, cache_size, cache_checksum):
@@ -1700,7 +1764,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 # don't need file_id for symlinks since they can't loose xattrs
                 # but DO need it to detect if a new symlink appeared which would
                 # be weird, but can happen if the index is not regenerated
-                cache_file_id = int(fields[2])
+                cache_file_id = int(fields[2]) if fields[2] != '#' else None  # '#' remote-unavailable error case
                 id = id, cache_file_id
                 cache_size = fields[3]
                 cache_checksum = fields[6]

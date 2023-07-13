@@ -4245,6 +4245,7 @@ def main(id=None, **kwargs):
             dataset_id = id
             updated = dateparser.parse(kwargs['updated'])
             push_id = kwargs['push_id']
+            path = kwargs['path']
             # TODO error handling and retry or resume
             path.push_from_manifest(dataset_id, updated, push_id)
 
