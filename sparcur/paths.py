@@ -1346,6 +1346,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             # so convert here if the date is still a string
             updated_cache_transitive = dateparser.parse(updated_cache_transitive)
 
+        self._write_pull_index(
+            duuid, updated_cache_transitive, id_name, parent_children)
+
+    def _write_pull_index(self, duuid, updated_cache_transitive, id_name, parent_children):
         ifkey = self._index_file_key_write(updated_cache_transitive)
         _ucts = isoformat(updated_cache_transitive)
         to_write = ('v02', ifkey, _ucts, id_name, parent_children)
@@ -1360,6 +1364,24 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             f.write(repr(to_write).replace(': ', ':\n'))  # FIXME slow ?
 
         symlink_latest(index, latest)
+
+    def _reindex_done_manifest(self, manifest, remotes):
+        # read indexes
+        # update cache metadata (I don't think we did this?) # XXX should be done in another function
+        # find and modify entries affected by manifest
+        # produce new id name and parent children mappings
+        dataset_id, id_name, parent_children, name_id, updated_transitive = self._read_indexes()
+        duuid = dataset_id.uuid
+        # I think the new remote info is already pulled after rename and reparent right now? yep!
+        # XXX ok, first issue, how do renames and reparents interact with update time?
+        # because a file that gets reparented does not have an updated event but the folder it was
+        # previously parented to might?
+        # FIXME hrm, a rename of a folder followed by a reparent that it is involved in could
+        # result in a stale updated time
+        updated_remote_transitive
+        breakpoint()
+        self._write_pull_index(
+            duuid, updated_cache_transitive, new_id_name, new_parent_children)
 
     def _pull_dataset_internal(self, time_now):
         cache = self.cache
@@ -1689,9 +1711,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         self._push_feature_check(manifest, ('rename', 'reparent'))
         #d = manifest[0]
         #breakpoint()
+        remotes = []
         for d in manifest:
             local = self / d['path']
             remote = local.remote
+            remotes.append(remote)
             for op in d['ops']:
                 # FIXME this is bad, this is the kind of stuff that should
                 # probably go in the manifest directly so that the full record
@@ -1704,6 +1728,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 else:
                     msg = f'Most Impressive. {op}'
                     raise ValueError(msg)
+
+        self._reindex_done_manifest(manifest, remotes)
 
     def _transitive_changes(self, do_expensive_operations=False):
         def changedp(c, cache_size, cache_checksum):

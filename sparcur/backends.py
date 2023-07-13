@@ -1180,19 +1180,34 @@ class BlackfynnRemote(aug.RemotePath):
         child._seed = tbfo
         return child
 
-    def rename(self, new_name):
+    def rename(self, new_name, update_cache=True):
         # FIXME handle files vs folders vs datasets
         # bfobject instead of _bfobject so that we populate in case bfobject is a stub
         if self.bfobject.name != new_name:  # FIXME error here when trying to get/rename a package?
             self._bfobject.name = new_name
-            self._bfobject.update()
+            self._bfobject.update()  # FIXME will surely fail on bfobjects from /files endpoint
+            if update_cache:
+                # in the case where a thing is renamed and its cache value is not changed
+                # when we then run rename one the remote, the cache will be stale, but the
+                # local and the remote will be synchronized, thus when we call update_cache
+                # the internal check that name and parent are consistent should pass without issue
+                # essentially change local then local -> remote and then remote -> cache ensures
+                # that everything will remain consistent at every step along the way
+                # and the push manifest is there for use cases that need a record of the changes
+                # TODO FIXME make sure that update_cache also updates the blob cache metadata probably?
+                # because that can definitely go stale? yes but only relevant in cases where there
+                # are files that have been pulled, not just symlinks
+                self.update_cache(cache=self.cache, fetch=False)
         else:
             pass  # FIXME probably need to error or at least log?
 
-    def reparent(self, new_parent_id):
+    def reparent(self, new_parent_id, update_cache=True):
         # TODO handle all the possible crazy possible values that new_parent could take on
         # FIXME given the use case, we need to expect new_parent_id by default to avoid
         # exploding the number of network calls, but the N:thing: checks are still annoying
+
+        # TODO opportunity here to detect when a manifest has been moved and automatically
+        # update the relative path references
         if new_parent_id.startswith('N:dataset:'):
             # pennsieve treats the root of a dataset as null with respect to parents
             new_parent_id = None
@@ -1214,6 +1229,13 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             self.bfobject._api.data.move(new_parent_id, self.id)
             self._bfobject.update()  # fetch the changes
+
+        if update_cache:
+            # FIXME we almost certainly need to update the old parent cache
+            # and the new parent cache because they should both have modified
+            # times (hopefully ...) that we want to record because the thing
+            # itself will appear to be unmodified
+            self.update_cache(cache=self.cache, fetch=False)
 
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """

@@ -4238,6 +4238,7 @@ def main(id=None, **kwargs):
             push_id = kwargs['push_id']
             path = kwargs['path']
             path.make_push_manifest(dataset_id, updated, push_id)
+            log.info(f'make push manifest finished for {dataset_id}')
 
             # read list of files + expected ops to change
             # generate the full change manifest
@@ -4248,6 +4249,11 @@ def main(id=None, **kwargs):
             path = kwargs['path']
             # TODO error handling and retry or resume
             path.push_from_manifest(dataset_id, updated, push_id)
+            log.info(f'push from manifest finished for {dataset_id}')
+            # FIXME TODO consider pulling incremental index entries
+            # for only the paths in the manifest so that the diff
+            # doesn't go stale, also need to pull the latest remote
+            # metadata for the updated files
 
         else:
             key = lambda d: d.updated
