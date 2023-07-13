@@ -1296,7 +1296,14 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         id_name, parent_children = {duuid: dataset.name}, {}
         # TODO do we need file_id ?
         updated_cache_transitive = None
-        if hasattr(caches[0], '_remote'):
+        if not caches:  # empty dataset case
+            if hasattr(dataset, '_remote'):
+                r = dataset._remote
+                updated_cache_transitive = r.updated
+            else:
+                updated_cache_transitive = dataset.cache.meta.updated
+
+        elif hasattr(caches[0], '_remote'):
             for c in caches:
                 r = c._remote
                 id = r.id
