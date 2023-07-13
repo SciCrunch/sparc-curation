@@ -412,6 +412,38 @@ class TestMkdirRemote(_TestOperation, unittest.TestCase):
             assert not lparent.exists(), f'should have been deleted {parent}'
 
 
+class TestMoveFolder(_TestOperation, unittest.TestCase):
+
+    def test_reparent(self):
+        # TODO this is nowhere near complete with respect to synchronization
+        # but it is sufficient to test the components needed for sync
+        now = GetTimeNow()
+        local = self.project_path / f'test-dataset-{now.START_TIMESTAMP_LOCAL_FRIENDLY}'
+        remote = local.mkdir_remote()
+
+        try:
+            # FIXME consider going back to self.test_base instead of local here
+            test_folder_1 = local / 'dire-1'
+            test_folder_1.mkdir_remote()
+            test_folder_2 = local / 'dire-2'
+            test_folder_2.mkdir_remote()
+            list(remote.cache.children)  # XXX populate with remote data
+
+            test_folder_2.remote.reparent(test_folder_1.cache_id)
+
+            test_folder_1.__class__.upload = Path.upload
+            fsize = 1024
+            test_file_1 = test_folder_1 / 'file-1.ext'
+            test_file_1.data = iter((make_rand(fsize),))
+            test_file_1.upload()
+            test_file_1.remote.reparent(test_folder_2.cache_id)
+
+        finally:
+            remote.rmdir(force=True)
+            # FIXME crumple fails in refresh since we use rmdir
+            # instead of rmtree (for safety)
+            #remote.cache.refresh()  # FIXME
+
 
 class TestChanges(_TestOperation, unittest.TestCase):
 
@@ -733,11 +765,6 @@ class TestChanges(_TestOperation, unittest.TestCase):
         path_dataset.make_push_manifest(dataset_id, updated_transitive, push_id)
         # 4
         path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
-
-
-class TestMoveFolder:
-    # TODO
-    pass
 
 
 class TestRemote(_TestOperation, unittest.TestCase):

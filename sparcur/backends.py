@@ -1196,15 +1196,24 @@ class BlackfynnRemote(aug.RemotePath):
         if new_parent_id.startswith('N:dataset:'):
             # pennsieve treats the root of a dataset as null with respect to parents
             new_parent_id = None
-        elif new_parent.startswith('N:collection:'):
+        elif new_parent_id.startswith('N:collection:'):
             pass
         else:
             msg = f"don't know how to move to a {new_parent_id}"
             raise NotImplementedError(msg)
 
         # bfobject instead of _bfobject so that we populate in case bfobject is a stub
-        self.bfobject._api.data.move(new_parent_id, self.id)
-        self._bfobject.update()  # fetch the changes
+        if self.is_file():
+            package = self.bfobject.package
+            package._api.data.move(new_parent_id, package.id)
+            # need to fetch so take this opportunity to get a real
+            # bfobject in the event the we are using a fake one from the files endpoint
+            _reup = self.__class__(self.id)
+            self._bfobject = _reup.bfobject
+            new_package = self._bfobject.package
+        else:
+            self.bfobject._api.data.move(new_parent_id, self.id)
+            self._bfobject.update()  # fetch the changes
 
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """

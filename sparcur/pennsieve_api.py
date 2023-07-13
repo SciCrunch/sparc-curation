@@ -15,7 +15,7 @@ for __pnlog in (_pnlog.get_logger(), _pnlog.get_logger("pennsieve.agent")):
 from pennsieve import Pennsieve, DataPackage, BaseNode
 from pennsieve import Organization, Dataset, Collection, File
 from pennsieve import base as pnb
-from pennsieve.api import agent
+from pennsieve.api import agent, transfers
 from pennsieve.api.data import PackagesAPI
 from sparcur import monkey
 from sparcur.utils import ApiWrapper, PennsieveId, make_bf_cache_as_classes
@@ -47,7 +47,7 @@ class PNLocal(ApiWrapper):
     _remotebase = pnb
 
 
-monkey.bind_agent_command(agent)
+monkey.bind_agent_command(agent, transfers)
 
 FakeBFile, _packages = monkey.bind_packages_File(File)
 

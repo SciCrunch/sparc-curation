@@ -4165,7 +4165,7 @@ def main(id=None, **kwargs):
         return
 
     if (ik('datasets') or
-        ik('for_racket') and not ik('diff') or
+        (ik('for_racket') and not (ik('diff') or ik('make_push_manifest') or ik('push'))) or
         ik('check_names')):
         log.setLevel(60)  # logging.CRITICAL = 50
         from sparcur.config import auth

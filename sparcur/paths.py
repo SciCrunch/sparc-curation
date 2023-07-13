@@ -271,7 +271,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         id = self.identifier
         uuid = id.uuid
         file_id = self.file_id
-        return self._cache_key(uuid, file_id)
+        return BFPNCacheBase._cache_key(uuid, file_id)
 
     @staticmethod
     def _cache_key(uuid, file_id):
@@ -1302,7 +1302,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 r = dataset._remote
                 updated_cache_transitive = r.updated
             else:
-                updated_cache_transitive = dataset.cache.meta.updated
+                updated_cache_transitive = dataset.cache_meta.updated
 
         elif hasattr(caches[0], '_remote'):
             for c in caches:
@@ -1687,8 +1687,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
         # XXX FOR NOW ONLY rename and reparent (more strict checks come last)
         self._push_feature_check(manifest, ('rename', 'reparent'))
-        d = manifest[0]
-        breakpoint()
+        #d = manifest[0]
+        #breakpoint()
         for d in manifest:
             local = self / d['path']
             remote = local.remote

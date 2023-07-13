@@ -1,5 +1,6 @@
 import os
 import io
+import sys
 import json
 from copy import deepcopy
 from future.utils import string_types
@@ -11,7 +12,7 @@ from .config import auth
 from sparcur.utils import log
 
 
-def bind_agent_command(agent_module):
+def bind_agent_command(agent_module, transfers_module, go=False):
     # FIXME this is a nearly perfect use case for orthauth wrapping
     default_agent_cmd = agent_module.agent_cmd
     def agent_cmd():
@@ -22,6 +23,28 @@ def bind_agent_command(agent_module):
             return rcp.as_posix()
 
     agent_module.agent_cmd = agent_cmd
+
+    if go:
+        def agent_env(settings):
+            env = {
+                #"PENNSIEVE_API_ENVIRONMENT": "local",
+                "PENNSIEVE_API_KEY": settings.api_token,
+                "PENNSIEVE_API_SECRET": settings.api_secret,
+                "PENNSIEVE_AGENT_PORT": '9191',
+                "HOME": "/dev/null",
+            }
+            if sys.platform in ["win32", "cygwin"]:
+                env["SYSTEMROOT"] = os.getenv("SYSTEMROOT")
+
+            breakpoint()
+            return env
+
+        agent_module.agent_env = agent_env
+
+        def validate_agent_installation(settings): pass
+
+        agent_module.validate_agent_installation = validate_agent_installation
+        transfers_module.validate_agent_installation = validate_agent_installation
 
 
 @property
