@@ -2249,6 +2249,7 @@ def main(path=Path.cwd(),
          sparse_limit:int=None,
          n_jobs=12,
          exclude_uploaded=False,
+         no_index=False,
          ,**kwargs):
     if path != path.resolve():
         raise ValueError(f'Path not resolved! {path}')
@@ -2275,6 +2276,9 @@ def main(path=Path.cwd(),
         # WARNING if rmeta failed you may get weirdness  # FIXME
         from sparcur.simple.clone import _from_project_path_top_level
         _from_project_path_top_level(project_path)
+
+    if no_index:
+        Path._noindex = True
 
     sparse_materialize(project_path,
                        sparse_limit=sparse_limit)
@@ -3771,6 +3775,7 @@ Options:
     -j --jobs=N                     number joblib jobs [default: 12]
     --exclude-uploaded              do not pull files from remote marked as uploaded
     --sparse-limit=N                package count that forces a sparse pull [default: {auth.get('sparse-limit')}]
+    --no-index                      do not generate index files e.g. on pull
     --symlink-objects-to=PATH       path to an existing objects directory
     --log-level=LEVEL               log level info [default: INFO]
     --open=PROGRAM                  show file with PROGRAM

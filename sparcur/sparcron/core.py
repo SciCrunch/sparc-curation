@@ -306,6 +306,7 @@ def argv_simple_retrieve(dataset_id):
         'sparcur.simple.retrieve',
         '--sparse-limit',
         '-1',
+        '--no-index',
         '--dataset-id',
         dataset_id,
         '--parent-parent-path',
