@@ -46,12 +46,18 @@
   ; file on next start
   (delete-file this-file-exe-tmp))
 
+(define (make-lexical-parameter [default #f])
+  "sometimes you want the parameter interface but don't want the thread local behavior
+note of course that you don't get dynamic binding with version since it is not thread local"
+  (let ([v default])
+    (case-lambda
+      [() v]
+      [(value) (set! v value)])))
+
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
 (define update-running? #f)
-; true global variables that should not be thread local
-(define *current-dataset* #f)
-(define *current-datasets* #f)
-(define *current-datasets-view* #f)
+
+(define debug-push (make-lexical-parameter #f))
 
 ;; parameters (yay dynamic variables)
 (define path-config (make-parameter #f))
@@ -64,42 +70,22 @@
 (define path-export-datasets (make-parameter #f))
 (define path-source-dir (make-parameter #f))
 (define url-prod-datasets (make-parameter "https://cassava.ucsd.edu/sparc/datasets"))
-(define *current-blob* #f)
-(define current-blob
-  (case-lambda
-    [() *current-blob*]
-    [(value) (set! *current-blob* value)]))
-(define current-dataset
-  (case-lambda
-    [() *current-dataset*]
-    [(value) (set! *current-dataset* value)]))
-(define current-datasets
-  (case-lambda
-    [() *current-datasets*]
-    [(value) (set! *current-datasets* value)]))
-(define current-datasets-view
-  (case-lambda
-    [() *current-datasets-view*]
-    [(value) (set! *current-datasets-view* value)]))
-(define *current-jview* #f)
-(define current-jview
-  (case-lambda
-    [() *current-jview*]
-    [(value) (set! *current-jview* value)]))
-(define *current-mode-panel* #f)
+
+; true global variables that should not be thread local
+(define current-blob (make-lexical-parameter))
+(define current-dataset (make-lexical-parameter))
+(define current-datasets (make-lexical-parameter)) ; FIXME check that default value ???
+(define current-datasets-view (make-lexical-parameter))
+(define current-jview (make-lexical-parameter))
 (define current-mode-panel ; TODO read from config/history
-  (case-lambda
-    [() *current-mode-panel*]
-    [(value) (set! *current-mode-panel* value)]))
+  (make-lexical-parameter))
+
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
 
-(define *allow-update* #f)
 (define allow-update?
   ; "don't set this, it should only be used to keep things in sync with the config"
-  (case-lambda
-    [() *allow-update*]
-    [(value) (set! *allow-update* value)]))
+  (make-lexical-parameter))
 
 ;; TODO add check to make sure that the python modules are accessible as well
 
@@ -842,7 +828,9 @@
            (parameterize ([current-directory (resolve-relative-path cwd-2)])
              (with-output-to-string (thunk (set! status-2
                                                  (apply py-system* argv-2 #:set-pwd? #t)))))
-           (when status-1 (set-button-status-for-dataset ds))
+           (when status-1
+             (set-button-status-for-dataset ds)
+             (post-fetch-for-dataset ds))
            (if (and status-1 status-2)
                (println (format "dataset fetch completed for ~a" (dataset-id ds)))
                (println (format "dataset fetch FAILED for ~a" (dataset-id ds)))))))))
@@ -912,6 +900,7 @@
                    ; TODO figure out if we need to condition further steps to run on status-2 #t
                    (println (format "dataset fetch for export completed for ~a" (dataset-id ds)))
                    (set-button-status-for-dataset ds)
+                   (post-fetch-for-dataset ds)
                    (with-output-to-file
                      dataset-log-path-now
                      (thunk (set! status-3
@@ -1155,6 +1144,13 @@
                  ; the lack of type-of in racket is really annoying :/
                  ; especially given that it is dynamically typed :/
                  #f))))))
+
+(define (post-fetch-for-dataset ds)
+  ; unconditional things that run regardless of whether the dataset is selected
+  (let ([frame-upload (hash-ref frame-uploads (id-uuid ds) #f)])
+    (when frame-upload
+      ; update runs in a background thread so calling post-fetch-for-datasets won't lag the ui
+      (send frame-upload update))))
 
 (define set-button-semaphore (make-semaphore 1))
 (define (set-button-status-for-dataset ds)
@@ -2032,7 +2028,8 @@ switch to that"
         (parameterize () ; FIXME threading and probably semaphore?
           (set! status-1 (apply py-system* argv)))
         (unless status-1
-          (error "make-push-manifest failed with ~a for ~a" status-1 (string-join argv " ")))))
+          (error "make-push-manifest failed with ~a for ~a" status-1 (string-join argv " ")))
+        (println (format "make-push-manifest completed for ~a" (dataset-id dataset)))))
     (define (unfinished-push?)
       (define path-dut-latest (build-path (path-cache-push) (id-uuid dataset) (updated-transitive) "LATEST"))
       (define cands '("done.sxpr" "completed.sxpr" "manifest.sxpr" "paths.sxpr"))
@@ -2080,24 +2077,28 @@ switch to that"
         (error "not confirmed? how did you manage this?"))
       (println (format "Starting push from manifest for ~a" (id-uuid dataset)))
       (let* ([argv (argv-simple-push dataset (updated-transitive) (push-id))]
-             [status-1 #f]
+             [_ (when (debug-push) (println (list "debug push argv:" (string-join argv " "))))]
+             [status-1 (debug-push)]
              [result-string
-              (parameterize ()
-                (println (string-join argv " "))
-                (with-output-to-string
-                  (thunk
-                   (set! status-1 (apply py-system* argv)))))])
+              (unless (debug-push)
+                (parameterize ()
+                  (println (string-join argv " "))
+                  (with-output-to-string
+                    (thunk
+                     (set! status-1 (apply py-system* argv))))))])
         ; TODO need a visual cue that this has succeeded
         (unless status-1
-          (error "push failed with ~a for ~a" status-1 (string-join argv " ")))))
+          (error "push failed with ~a for ~a" status-1 (string-join argv " ")))
+        (update) ; automatically run this now that we reindex
+        (unless (debug-push)
+          (println (format "push completed for ~a" (dataset-id dataset))))))
     (define (cb-push-to-remote o e)
       ; TODO probably disable clicking the button again until the process finishes or fails?
       ; 1. confirm pass the manifest of changes
-      ;#;
+      #;
       (println "Upload is not implemented yet.")
-      (when #f ; almost there
-        (send button-push enable #f)
-        (push-from-manifest)))
+      (send button-push enable #f)
+      (push-from-manifest))
     (define button-push
       (new button%
            [label "Push selected changes to remote"]
@@ -2108,12 +2109,13 @@ switch to that"
       ; FIXME FIXME figure out how we are passing updated-transitive
       (let* ([argv (argv-simple-diff dataset)]
              [status-1 #f]
-             [result-string (parameterize ()
-                              (println "aaaieeeeeeeeeeeeeeeeeeeee")
-                              (println (string-join argv " "))
-                              (with-output-to-string
-                                (thunk
-                                 (set! status-1 (apply py-system* argv)))))])
+             [result-string
+              (parameterize ()
+                #;
+                (println (string-join argv " "))
+                (with-output-to-string
+                  (thunk
+                   (set! status-1 (apply py-system* argv)))))])
         (unless status-1
           (error "diff failed with ~a for ~a" status-1 (string-join argv " ")))
         (let ([sport (open-input-string result-string)]
@@ -2122,6 +2124,7 @@ switch to that"
           diff
           )))
     (define (result->updated-transitive-moment+diff-list result)
+      #;
       (pretty-write (list 'oops: result))
       (define h (plist->hash result))
       #; ; nothing to do with this one right now I think?
@@ -2185,12 +2188,19 @@ switch to that"
        (string-join ops " ")
        (string-join (hash-ref record 'ops) " ")
        ))
+    #;
+    (define/public (get-list-box) list-box) ; the problem with private stuff is that it is extremely annoying to debug relative to normal
+    #; ; then you can use this in the repl ...
+    (define lb (send (let-values ([(x f) (get-frame-upload! (current-dataset))]) f) get-list-box))
     (define (set-rows diff-list)
-      (unless (null? diff-list)
-        (send/apply list-box set (apply map list (map diff-list-to-columns diff-list)))
-        (for ([diff (in-list diff-list)]
-              [n (in-naturals)])
-          (send list-box set-data n diff))))
+      ; TODO preserve existing selections I think?
+      (if (null? diff-list) ; null? check protects againsts empty map
+          (send list-box clear) ; oof non-homogenous
+          (begin
+            (send/apply list-box set (apply map list (map diff-list-to-columns diff-list)))
+            (for ([diff (in-list diff-list)]
+                  [n (in-naturals)])
+              (send list-box set-data n diff)))))
     (define updated-once #f)
     (define/public (updated-once?) updated-once)
     (define (selected)
@@ -2199,6 +2209,7 @@ switch to that"
       (for/list ([i (in-list (send list-box get-selections))])
         (send list-box get-data i)))
     (define (do-update)
+      (define currently-selected (selected))
       (define diff (get-diff))
       (println (list 'diff-hash? diff))
       (define-values (updated-trans-moment diff-list) (result->updated-transitive-moment+diff-list diff)) ; FIXME need updated-transitive from here
@@ -2213,7 +2224,13 @@ switch to that"
             (begin
               (set-rows diff-list)
               )))
-        )
+      (when (for/or ([diff currently-selected]) (not (member diff diff-list)))
+        ; we just fetched
+        ; and the selected files changed or are longer in the list
+        ; when selected is not in diff-list or it changed
+        ; if all currently selected are still members and unchanged then ok to keep
+        ; though we need to update the selection here I think? TODO
+        (cb-confirm #f #f #:force-off? #t)))
     (define/public (update)
       ; FIXME all sorts of issues with transitive updated if someone changes the most recently updated file !!!
       ; XXX I think this has to be handled in dataset xattrs during pull and we would still have to traverse
