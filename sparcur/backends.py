@@ -1180,12 +1180,21 @@ class BlackfynnRemote(aug.RemotePath):
         child._seed = tbfo
         return child
 
-    def rename(self, new_name, update_cache=True):
+    def rename(self, new_name, update_cache=True):  # FIXME TODO defer cache update to reduce roundtrips?
+        # TODO consider a fused rename_reparent that might be able to reduce network roundtrips?
         # FIXME handle files vs folders vs datasets
         # bfobject instead of _bfobject so that we populate in case bfobject is a stub
-        if self.bfobject.name != new_name:  # FIXME error here when trying to get/rename a package?
-            self._bfobject.name = new_name
-            self._bfobject.update()  # FIXME will surely fail on bfobjects from /files endpoint
+        if self.is_file():
+            bfobject = self.bfobject.package
+        elif self.is_dir():
+            bfobject = self.bfobject
+
+        if bfobject.name != new_name:  # FIXME error here when trying to get/rename a package?
+            bfobject.name = new_name
+            bfobject.update()  # FIXME will surely fail on bfobjects from /files endpoint?
+            _obfo = self._bfobject
+            self._bfobject = self.__class__(bfobject).bfobject  # filter package to file, for collections this shouldn't do anything, but it might?
+
             if update_cache:
                 # in the case where a thing is renamed and its cache value is not changed
                 # when we then run rename one the remote, the cache will be stale, but the
@@ -1197,11 +1206,21 @@ class BlackfynnRemote(aug.RemotePath):
                 # TODO FIXME make sure that update_cache also updates the blob cache metadata probably?
                 # because that can definitely go stale? yes but only relevant in cases where there
                 # are files that have been pulled, not just symlinks
-                self.update_cache(cache=self.cache, fetch=False)
-        else:
-            pass  # FIXME probably need to error or at least log?
 
-    def reparent(self, new_parent_id, update_cache=True):
+                # XXX nope, when we have a rename and a reparent at the same time then
+                # using Remote.update_cache will never work because for the first op
+                # either the parent doesn't match or the name doesn't match and there is
+                # no way around that, so we have to use the internal method
+                self.cache._meta_updater(self.meta, fetch=False)
+        else:
+            # FIXME likely going to need more info if we do actually hit this
+            # but ok for now probably
+            msg = f'tried to rename a file to its current name? {self}'
+            log.debug(msg)
+
+    def reparent(self, new_parent_id, update_cache=True):  # FIXME TODO defer cache update to reduce roundtrips?
+        # XXX if update_cache == True then this assumes that self.cache is not None
+
         # TODO handle all the possible crazy possible values that new_parent could take on
         # FIXME given the use case, we need to expect new_parent_id by default to avoid
         # exploding the number of network calls, but the N:thing: checks are still annoying
@@ -1229,13 +1248,32 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             self.bfobject._api.data.move(new_parent_id, self.id)
             self._bfobject.update()  # fetch the changes
+            if hasattr(self, '_c_parent'):
+                _op = self._c_parent
+                del self._c_parent
+                # ensure that the new parent actually propagates
+                # XXX yes this makes these objects mutable, but deal with it
+
+            # FIXME TODO check on updated time for old and new parent in case we need to
+            # add them to the manifest as being modified by side-effect and thus need to be fetched and checked
+            self.parent
+            # see if this is what was causing the "missing folder"
+            # I'm betting that the call to update_cache below results in the file
+            # being moved back to its old parent because of the stale metadata
+            # and indeed,
+            # [2023-07-13 18:23:16,893] -  WARNING -     augpathlib -        caches.py:926  - A parent of current file has changed location!
+            # /home/tom/git/sparc-curation/test/test-operation-25463/UCSD/test-dataset-2023-07-13T182111,820526-0700
+            # dire-2/dire-3-3-np-r
+            # dire-1/dire-3-3-np-r
+            # N:collection:cd41747d-749e-4c23-a2dc-bec61c07ff7e
+            # there it is in the logs, so this should be resolved now
 
         if update_cache:
             # FIXME we almost certainly need to update the old parent cache
             # and the new parent cache because they should both have modified
             # times (hopefully ...) that we want to record because the thing
             # itself will appear to be unmodified
-            self.update_cache(cache=self.cache, fetch=False)
+            self.cache._meta_updater(self.meta, fetch=False)  # can't use remote.update_cache
 
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """

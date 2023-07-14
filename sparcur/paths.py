@@ -253,7 +253,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             return self
 
         elif self.parent and self.parent != self:  # Path('.') issue
-            log.log(9, self.parent)
+            log.log(8, self.parent)  # even level 9 is too high for this
             return self.parent.dataset
 
     @property
@@ -1328,7 +1328,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 cmeta = c.meta  # c.local.cache_meta ?
                 id = c.id
                 if not c.is_dir():
-                    id = id, cd.file_id
+                    id = id, c.file_id
 
                 id_name[id] = cmeta.name
                 pid = cmeta.parent_id
@@ -1372,14 +1372,48 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # produce new id name and parent children mappings
         dataset_id, id_name, parent_children, name_id, updated_transitive = self._read_indexes()
         duuid = dataset_id.uuid
+        # XXX building the inverted index can be much faster when the manifest includes the remote ids
+        child_parent = {c:p for p, v in parent_children.items() for c in v}
+
         # I think the new remote info is already pulled after rename and reparent right now? yep!
         # XXX ok, first issue, how do renames and reparents interact with update time?
         # because a file that gets reparented does not have an updated event but the folder it was
         # previously parented to might?
         # FIXME hrm, a rename of a folder followed by a reparent that it is involved in could
         # result in a stale updated time
-        updated_remote_transitive
-        breakpoint()
+
+        # FIXME all the information to modify the index should already be in the manifest at this point
+        # we we don't have to recompute it here
+        new_id_name = {k:v for k, v in id_name.items()}
+        new_parent_children = {k:list(v) for k, v in parent_children.items()}
+        updated_cache_transitive = dateparser.parse(updated_transitive)
+        for d in manifest:
+            p = self / d['path']
+            meta = p.cache_meta
+            if meta.updated > updated_cache_transitive:
+                updated_cache_transitive = meta.updated
+
+            if meta.file_id is not None:
+                id = meta.id, meta.file_id
+            else:
+                id = meta.id
+
+            for o in d['ops']:
+                # FIXME issue with the reparent rename case losing metadata it seems?
+                # XXX looks like it actually just faild to reparent? and only renamed?
+                if o == 'rename':
+                    new_id_name[id] = meta.name  # should already have been updated at this point
+                elif o == 'reparent':
+                    old_parent_id = child_parent[id]
+                    new_parent_id = meta.parent_id
+                    new_parent_children[old_parent_id].remove(id)
+                    if new_parent_id not in new_parent_children:  # previously empty folder case
+                        new_parent_children[new_parent_id] = []
+                    new_parent_children[new_parent_id].append(id)
+                else:
+                    msg = f'NOT IMPLEMENTED BUT NOT ERROR HOW DID WE GET HERE? {d}'
+                    log.error(msg)
+
         self._write_pull_index(
             duuid, updated_cache_transitive, new_id_name, new_parent_children)
 
@@ -1531,6 +1565,28 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
         return dataset_id, id_name, parent_children, name_id, updated_transitive
 
+    def _debug_diff(self, update_cache_transitive, updated_cache):
+        rcs = list(self.rchildren)
+        sigh = [(r, r._cache_class._not_exists_cache(r)._meta_impl(r, match_name=False)
+                    if r.is_symlink()
+                    else (r.cache.meta
+                        if r.cache is not None
+                        else r.meta))
+                for r in rcs]
+        [(s, m.updated) for s, m in sigh if m.updated >= updated_cache_transitive]
+        [(s, m.updated) for s, m in sigh if m.updated >= updated_transitive]
+        hrm = [(s, m.updated) for s, m in sigh if m.updated in (updated_cache_transitive, updated_transitive)]
+        breakpoint()
+        # ok so it is clear that the way the test is working does not generate the index in the way we want
+        # ah, rather, this is because the command to add files generates fake cache data which is ... unrealistic
+        [print(r._cache_class._not_exists_cache(r)._meta_impl(r, match_name=False).as_pretty())
+            if r.is_symlink()
+            else (print(r.cache.meta.as_pretty())
+                if r.cache is not None
+                else print('likely new locally', r))
+            for r in rcs]
+        [c.cache_meta.updated for c in rcs]
+
     def diff(self):
         (rows, _others, updated_cache_transitive, updated_transitive, dataset_id
          ) = self._transitive_changes()
@@ -1538,6 +1594,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         if updated_cache_transitive > updated_transitive:
             msg = ('index out of sync with files! '
                    f'{updated_cache_transitive} > {updated_transitive}')
+            #self._debug_diff(update_cache_transitive, updated_cache)
             raise ValueError(msg)  # FIXME error type
 
         blobs = [dict(path=p.dataset_relative_path.as_posix(),
@@ -1712,9 +1769,12 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         #d = manifest[0]
         #breakpoint()
         remotes = []
+        # reparent first to avoid mismatched names on symlinks until  XXX not clear this actually matters at all ...
+        #operation_order = 'reparent', 'rename'
         for d in manifest:
             local = self / d['path']
-            remote = local.remote
+            remote = local.remote  # needs augpathlib 28
+
             remotes.append(remote)
             for op in d['ops']:
                 # FIXME this is bad, this is the kind of stuff that should
@@ -1991,7 +2051,17 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             # we already have the latest data (ignoring concurency)
             remote.update_cache(cache=self.cache, fetch=False) # FIXME fetch=False => different diff rule
 
+        # FIXME hitting remote-unavailable errors :/
         return remote
+
+    def create_remote(self):
+        if self.is_file():
+            return self.upload()
+        elif self.is_dir():
+            return self.mkdir_remote()
+        else:
+            msg = f"don't know how to create remote equivalent of {self}"
+            raise NotImplementedError(msg)
 
 
 Path._bind_flavours()

@@ -1,4 +1,5 @@
 import os
+import atexit
 import secrets
 import unittest
 from functools import wraps
@@ -445,7 +446,8 @@ class TestMoveFolder(_TestOperation, unittest.TestCase):
             #remote.cache.refresh()  # FIXME
 
 
-class TestChanges(_TestOperation, unittest.TestCase):
+class _ChangesHelper:
+    _local_only = True
 
     def _make_ops(self):
         ops = tuple()
@@ -558,15 +560,60 @@ class TestChanges(_TestOperation, unittest.TestCase):
         super().setUp()
         self.Path = self.Remote._local_class
 
+        #sigh = list(self.project_path.remote.children)
+        #[s.rmdir(force=True) for s in sigh if '2023' in s.name]
+        #breakpoint()
+        #raise ValueError('cleanup tearDown failure mess')
+
         # TODO expected outcome after stage probably
 
-        def mkdir(d):
-            d.mkdir()
-            d._cache_class.fromLocal(d)
+        if self._local_only:
+            def populate_cache(p, change=False):
+                # FIXME TODO change=True case may need special handling
+                # and probably represents a strange case of some kind
+                return p._cache_class.fromLocal(p)
 
-        def mkfile(f):
+            def norm_path(p):
+                return self.project_path / p.replace('project/', '')
+
+        else:
+            # XXX WARNING extremely slow due to sequentially creating each remote file
+            now = GetTimeNow()
+            local_dataset = self.project_path / f'test-dataset-{now.START_TIMESTAMP_LOCAL_FRIENDLY}'
+            remote_dataset = local_dataset.mkdir_remote()
+            #self._test_dataset = remote_dataset
+            # tearDown fails to trigger if failure happens in setUp which is useless
+            # so use atexit instead
+            atexit.register(lambda : remote_dataset.rmdir(force=True))
+            def populate_cache(p, change=False):
+                # FIXME TODO change=True case may need special handling
+                # and probably represents a strange case of some kind
+                if change:
+                    return
+
+                remote = p.create_remote()
+                return remote.cache
+
+            def norm_path(p):
+                return local_dataset / p.replace('project/dataset', '').strip('/')
+
+        def mkdir(d, add=False):
+            if not self._local_only and d == local_dataset:
+                # FIXME HACK
+                return
+
+            d.mkdir()
+            if not add:
+                cache = populate_cache(d)
+                d._cache = cache
+            #d._cache_class.fromLocal(d)
+
+        def mkfile(f, add=False):
             f.data = iter((make_rand(100),))
-            f._cache_class.fromLocal(f)
+            if not add:
+                cache = populate_cache(f)
+                f._cache = cache
+            #f._cache_class.fromLocal(f)
 
         def mklink(l):
             try:
@@ -574,7 +621,8 @@ class TestChanges(_TestOperation, unittest.TestCase):
                 # issue with id and parent_id not being set so use fromLocal since it does it correctly
                 #meta = f.meta  # TODO checksum probably?
                 #symlink = meta.as_symlink(local_name=l.name)
-                cache = l._cache_class.fromLocal(l)
+                #cache = l._cache_class.fromLocal(l)
+                cache = populate_cache(l)
                 symlink = cache.meta.as_symlink(local_name=l.name)
             finally:
                 l.unlink()
@@ -606,7 +654,8 @@ class TestChanges(_TestOperation, unittest.TestCase):
                     raise FileNotFoundError(f)
 
                 try:
-                    f._cache_class.fromLocal(f)
+                    populate_cache(f, change=True)
+                    #f._cache_class.fromLocal(f)
                 except Exception as e:
                     breakpoint()
                     raise e
@@ -618,29 +667,33 @@ class TestChanges(_TestOperation, unittest.TestCase):
                 path.unlink()
 
         def index(ds):
-            caches = [l.cache for l in ds.rchildren]  # XXX reminder, NEVER use ds.cache.rchildren that will pull
-            class fakeremote:
-                def __init__(self, id, name, parent_id, file_id, updated, local):
-                    self.id = id
-                    self.name = name
-                    self._name = name
-                    self.parent_id = parent_id
-                    self.updated = updated
-                    self._lol_local = local
+            if self._local_only:
+                caches = [l.cache for l in ds.rchildren]  # XXX reminder, NEVER use ds.cache.rchildren that will pull
+                class fakeremote:
+                    def __init__(self, id, name, parent_id, file_id, updated, local):
+                        self.id = id
+                        self.name = name
+                        self._name = name
+                        self.parent_id = parent_id
+                        self.updated = updated
+                        self._lol_local = local
 
-                    if file_id is not None:
-                        self.file_id = file_id
+                        if file_id is not None:
+                            self.file_id = file_id
 
-                def is_dir(self):
-                    return self._lol_local.is_dir()
+                    def is_dir(self):
+                        return self._lol_local.is_dir()
 
-            for c in caches:
-                # FIXME causes other issues ... even while trying to avoid init issues
-                # we should not have to do this
-                cmeta = c.meta
-                c._remote = fakeremote(
-                    cmeta.id, cmeta.name, cmeta.parent_id, cmeta.file_id,
-                    cmeta.updated, c.local)
+                for c in caches:
+                    # FIXME causes other issues ... even while trying to avoid init issues
+                    # we should not have to do this
+                    cmeta = c.meta
+                    c._remote = fakeremote(
+                        cmeta.id, cmeta.name, cmeta.parent_id, cmeta.file_id,
+                        cmeta.updated, c.local)
+            else:
+                # this is safe at this stage since everything should match upstream
+                caches = [c.cache for c in local_dataset.rchildren]
 
             ds._generate_pull_index(ds, caches)
 
@@ -654,29 +707,36 @@ class TestChanges(_TestOperation, unittest.TestCase):
             'index': index,
         }
 
-        def make_closure(op, obj, args):
+        def make_closure(stage, op, obj, args):
             f = fops[op]
+
+            if stage > 0 and op in ('mkdir', 'mkfile'):
+                kwargs=dict(add=True)
+            else:
+                kwargs = {}
+
             @wraps(f)
             def inner():
-                f(path, *args)
+                f(path, *args, **kwargs)
+
             return inner
 
         def cargs(args):
             for a in args:
                 if isinstance(a, str) and a.startswith('project/'):
-                    yield self.project_path / a.replace('project/', '')
+                    yield norm_path(a)
                 else:
                     yield a
 
         ops = self._make_ops()
-        pops = [(stage, op, self.project_path / s.replace('project/', ''), *cargs(args)) for stage, op, s, *args in ops]
+        pops = [(stage, op, norm_path(s), *cargs(args)) for stage, op, s, *args in ops]
         init = set([path for stage, op, path, *args in pops if stage == 0])
         test = set([p for stage, op, path, *args in pops if stage >= 1 for p in (path, *args) if isinstance(p, self.project_path.__class__)])
         nochange = init - test
         add_rename_reparent = test - init
         change_remove = test - add_rename_reparent
 
-        cs = [(stage, path, make_closure(op, path, args)) for stage, op, path, *args in pops]
+        cs = [(stage, path, make_closure(stage, op, path, args)) for stage, op, path, *args in pops]
         scs = sorted(cs, key=(lambda abc: (abc[0], len(abc[1].parts))))
         will_fails = []
         for stage, path, fun in scs:
@@ -687,6 +747,9 @@ class TestChanges(_TestOperation, unittest.TestCase):
 
         self._will_fails = will_fails
         self.dataset = pops[0][-1]
+
+
+class TestChanges(_ChangesHelper, _TestOperation, unittest.TestCase):
 
     def test_changes(self):
         from dateutil import parser as dateparser
@@ -711,7 +774,10 @@ class TestChanges(_TestOperation, unittest.TestCase):
         #sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
         breakpoint()
 
-    def test_workflow(self):
+
+class _WorkflowHelper:
+
+    def _do_workflow(self, paths_to_add):
         # push button, receive bacon
 
         # 0. asumme there are changes to a dataset
@@ -735,25 +801,7 @@ class TestChanges(_TestOperation, unittest.TestCase):
         #    a modified index file that notes the changes so that incremental changes
         #    do not have to be pulled again ... of course if upstream has changed we are
         #    back in the usual world of pain ...
-        paths_to_add_1 = [
-            'dire-1/dire-3-1-rn-r',
-            'dire-2/dire-3-3-np-r',
-            'dire-1/file-1-1-rn-r.ext',
-            'dire-2/file-1-2-rp.ext',
-            'dire-2/link-1-3-np-r.ext',  # most important rename and reparent of links
-            ]
-        paths_to_add_2 = [
-            'dire-6/file-4-add.ext',  # should error for now
-        ]
-        self._do_workflow(paths_to_add_1)
-        try:
-            self._do_workflow(paths_to_add_2)
-            raise AssertionError('should have failed due to forbidden ops')
-        except ValueError:
-            pass
 
-
-    def _do_workflow(self, paths_to_add):
         path_dataset = self.dataset  # given
         dataset_id = path_dataset.cache.identifier
         # 1
@@ -765,6 +813,45 @@ class TestChanges(_TestOperation, unittest.TestCase):
         path_dataset.make_push_manifest(dataset_id, updated_transitive, push_id)
         # 4
         path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
+
+
+class TestWorkflow(_ChangesHelper, _WorkflowHelper, _TestOperation, unittest.TestCase):
+
+    def test_workflow(self):
+        # splitting d r l lets us test incremental changes
+        paths_to_add_d = [
+            'dire-1/dire-3-1-rn-r',  # rn
+            'dire-2/dire-3-2-rp',  # rp
+            'dire-2/dire-3-3-np-r',  # rnp
+        ]
+        paths_to_add_r = [
+            'dire-1/file-1-1-rn-r.ext',  # rn
+            'dire-2/file-1-2-rp.ext',  # rp
+            'dire-2/file-1-3-np-r.ext',  # rnp
+        ]
+        paths_to_add_l = [
+            'dire-1/link-1-1-rn-r.ext',  # rn
+            'dire-2/link-1-2-rp.ext',  # rp
+            'dire-2/link-1-3-np-r.ext',  # rnp
+        ]
+
+        paths_to_add_2 = [
+            'dire-6/file-4-add.ext',  # should error for now
+        ]
+        self._do_workflow(paths_to_add_d)
+        self._do_workflow(paths_to_add_r)
+        self._do_workflow(paths_to_add_l)
+        try:
+            self._do_workflow(paths_to_add_2)
+            raise AssertionError('should have failed due to forbidden ops')
+        except ValueError:
+            pass
+
+
+class TestWithRemoteWorkflow(TestWorkflow):
+
+    _local_only = False
+
 
 
 class TestRemote(_TestOperation, unittest.TestCase):

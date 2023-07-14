@@ -17,6 +17,7 @@ from sparcur.utils import PennsieveId, log
 from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
 from sparcur.pennsieve_api import FakeBFLocal
+#log.setLevel(9)
 this_file = Path(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
