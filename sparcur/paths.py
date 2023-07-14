@@ -1882,7 +1882,10 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     meta_from_local = bool(xattrs[_lattr]) if _lattr in xattrs else False
                     if c.is_file():
                         cache_size = int(xattrs[b'bf.size'].decode())
-                        cache_checksum = xattrs[b'bf.checksum']
+                        cache_checksum = (
+                            xattrs[b'bf.checksum']
+                            if b'bf.checksum' in xattrs
+                            else None)
                         cache_file_id = int(xattrs[b'bf.file_id'].decode())
                         id = id, cache_file_id
 
