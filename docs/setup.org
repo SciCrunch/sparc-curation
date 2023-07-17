@@ -75,10 +75,12 @@ racket `
 rsync `
 vim `
 wsl2 `
-wsl-ubuntu-2004 `
+wsl-ubuntu-2204 `
 vcxsrv `
 docker-desktop `
-docker
+docker `
+imagej `
+powertoys
 
 #+end_src
 
@@ -700,13 +702,22 @@ like you did for the google json file.
 # FIXME tell users to run spc shell I think? idlib.Pio._setup()
 You will be prompted for your protocols.io email and password the first
 time you run.
-***** Refresh
+***** Refresh OLD DO NOT USE
 If you hit a refresh error because something expired, run the following block
 
+*DO NOT USE THIS WORKFLOW.*
+Use idlib auth-config =protocols-io-api-client-token= instead.
 #+begin_src bash
+# XXX THERE IS ALREADY A BETTER WAY
+pushd ~/git
+git clone https://github.com/tgbugs/robobrowser.git
+pushd robobrowser
+python3 -m pip install --user -e .
+popd
+python3 -m pip install --user pytest
 _file_name=$(python3 -c "from idlib.config import auth;print(auth.get_path('protocols-io-api-store-file').as_posix())")
 echo "${_file_name}"
-mv "${_file_name}" "${_file_name}.$(date -I)"
+mv "${_file_name}" "${_file_name}.$(date -Idate)"
 pushd ~/git/idlib
 # you will be promted for email and password for protocols.io after running this
 python3 -m pytest -k TestPio -s
