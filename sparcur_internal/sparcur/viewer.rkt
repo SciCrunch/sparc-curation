@@ -338,6 +338,10 @@ note of course that you don't get dynamic binding with version since it is not t
   (unless (directory-exists? path-dir)
     (make-directory* path-dir)))
 
+(define (python-module-user-config-path pymod)
+  (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path pymod)])
+    (oa-user-config-path)))
+
 (define (init-paths!)
   "initialize or reset the file system paths to cache, export, and source directories"
   ; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
@@ -416,6 +420,10 @@ note of course that you don't get dynamic binding with version since it is not t
         (send text-prefs-path-? set-value "egads")
         (send text-prefs-path-config set-value (path->string (path-config)))
         (send text-prefs-path-user-config set-value (oa-user-config-path))
+        (send text-prefs-path-idlib-cfg set-value (python-module-user-config-path "idlib"))
+        (send text-prefs-path-ontqu-cfg set-value
+              (python-module-user-config-path "ontquery.plugins.services"))
+        (send text-prefs-path-pyont-cfg set-value (python-module-user-config-path "pyontutils"))
         (send text-prefs-path-secrets set-value (oa-secrets-path))
         (send text-prefs-path-data set-value (path->string (path-source-dir)))
         (let* ([config-exists (assoc 'viewer-mode cfg)]
@@ -1176,7 +1184,7 @@ note of course that you don't get dynamic binding with version since it is not t
               (send button-export-dataset enable enable?)
               (send button-open-dataset-shell enable enable?)
               (send button-clean-metadata-files enable enable?)
-              (send button-upload-changes enable enable?)
+              (for ([button (in-list all-button-upload-changes)]) (send button enable enable?))
               ; export
               (send button-open-export-json enable export-enable?)
               (send button-open-export-ipython enable export-enable?)
@@ -1531,9 +1539,10 @@ switch to that"
       (let* ([mode (send o get-item-plain-label viewer-mode-state)]
              [panel-to-show (case mode
                               [("Validate") panel-validate-mode]
-                              [("Convert") panel-convert-mode]
+                              [("Convert" "Move") panel-convert-mode]
                               [else panel-validate-mode])])
         ; we rereparent power-user so that it is always on the right
+        (for ([button all-button-download-all-files]) (send button enable (not (string=? mode "Move"))))
         (when (power-user?) (send panel-power-user reparent frame-helper))
         (set-current-mode-panel! panel-to-show)
         (when (power-user?) (send panel-power-user reparent panel-ds-actions))
@@ -1815,13 +1824,18 @@ switch to that"
                                          [callback cb-clean-metadata-files]
                                          [parent panel-validate-mode]))
 
-(define button-upload-changes
-  (new (tooltip-mixin button%)
-       [label "Upload"]
-       [callback cb-upload-button-show-and-raise]
-       [tooltip "Shortcut C-u"]
-       ; TODO separate button for the convert use case?
-       [parent panel-validate-mode]))
+(define all-button-upload-changes '())
+(define (make-button-upload-changes parent)
+  (define butt
+    (new (tooltip-mixin button%)
+         [label "Upload"]
+         [callback cb-upload-button-show-and-raise]
+         [tooltip "Shortcut C-u"]
+         ; TODO separate button for the convert use case?
+         [parent parent]))
+  (set! all-button-upload-changes (cons butt all-button-upload-changes)))
+
+(make-button-upload-changes panel-validate-mode)
 
 #; ; too esoteric
 (define button-open-export-folder (new button%
@@ -1869,6 +1883,8 @@ switch to that"
 (make-button-download-all-files panel-convert-mode)
 
 (make-button-open-dataset-folder panel-convert-mode)
+
+(make-button-upload-changes panel-convert-mode)
 
 ;; power user panel
 
@@ -2387,12 +2403,15 @@ switch to that"
 (define text-prefs-path-config (make-text-prefs-path      "config     "))
 (define text-prefs-path-user-config (make-text-prefs-path "user-config"))
 (define text-prefs-path-secrets (make-text-prefs-path     "secrets    "))
+(define text-prefs-path-idlib-cfg (make-text-prefs-path   "idlib      "))
+(define text-prefs-path-ontqu-cfg (make-text-prefs-path   "ontquery   "))
+(define text-prefs-path-pyont-cfg (make-text-prefs-path   "pyontutils "))
 (define text-prefs-path-data (make-text-prefs-path        "data-path  "))
 
 (define radio-box-viewer-mode
   (new radio-box%
        [label "Viewer Workflow"]
-       [choices '("Validate" "Convert")]
+       [choices '("Validate" "Convert" "Move")]
        [callback cb-viewer-mode]
        [parent panel-prefs-holder]))
 
