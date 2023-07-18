@@ -1241,6 +1241,7 @@ class SDSPipeline(JSONPipeline):
                 DT.BOX(lambda rids: tuple(
                     rid['related_identifier'] for rid in norm.related_identifiers(rids)  # XXX network sandbox violation
                     if 'relation_type' in rid and rid['relation_type'] == 'HasProtocol'
+                    and 'related_identifier_type' in rid and rid['related_identifier']  # schema violation issue causing bug :/
                     and 'related_identifier' in rid)),
                 [['meta', 'protocol_url_or_doi']]],
 

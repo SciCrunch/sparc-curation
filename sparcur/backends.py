@@ -1686,7 +1686,6 @@ class RemoteDatasetData:
                 'id_int': cont['intId'],
                 'type': self.__class__.__name__,  # registered as IdentityJsonType in core
                 'name': cont['name'],  # title
-                'description': cont['description'],  # subtitle
                 'readme': self.bfobject.readme,
                 # 'banner': self.bfobject.banner,  # FIXME not persistent ...
                 'status-log': self.bfobject.status_log,  # FIXME most recent only?
@@ -1707,6 +1706,9 @@ class RemoteDatasetData:
                 # TODO consider whether to pull all the metadata so we don't have
                 # to update this here
         }
+
+        if 'description' in cont:
+            blob['description'] = cont['description']  # subtitle
 
         if 'license' in cont:
             blob['license'] = cont['license']
