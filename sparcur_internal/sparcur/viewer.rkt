@@ -2151,8 +2151,10 @@ switch to that"
       (define raw-ops (hash-ref record 'ops))
       (define-values (old-id ops)
         (if (member "change" raw-ops)
+            (values #f raw-ops) ; XXX TEMP FIX
+            #; ; TODO
             (let* ((rrops (reverse raw-ops))
-                   (old-meta (car rrops))
+                   (old-meta (car rrops)) ; FIXME I don' think this is actually included anymore?
                    (old-id (let ([hr (hash-ref old-meta 'old-id)])
                              (let-values ([(N type uuid)
                                            (apply values (string-split (car hr) ":"))])
