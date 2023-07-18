@@ -13,8 +13,9 @@ def dataset_status(conn, rawid):
     f = out['failed']
     out['failed'] = f.decode() if f else False
     out['sheet'] = int(out['sheet'])
-    out['pipeline_internal_version'] = int(out.pop('verpi'))
-    out['updated'] = out['updated'].decode()
+    out['pipeline_internal_version'] = None if out['verpi'] is None else int(out.pop('verpi'))
+    if out['updated'] is not None:
+        out['updated'] = out['updated'].decode()
     if out['failed'] and out['updated'] and out['failed'] < out['updated']:
         out['failed'] = False
 
