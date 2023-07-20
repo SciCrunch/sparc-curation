@@ -85,6 +85,7 @@ exit
 #+link: pio.api https://www.protocols.io/api/v4/protocols/
 #+link: pio.api3 https://www.protocols.io/api/v3/protocols/
 #+link: pio.view https://www.protocols.io/view/
+#+link: pio.html https://www.protocols.io/view/%s.html
 #+link: ror https://ror.org/
 #+link: SCR http://scicrunch.org/resolver/SCR_
 #+link: apinatomy https://apinatomy.org/uris/readable/
@@ -688,6 +689,219 @@ where {
   values ?role {CHEBI:38867 CHEBI:35480} .
 } order by ?l
 #+end_src
+
+*** exploration
+**** aspect counts
+#+begin_src sparql
+select distinct
+?val_asp
+(count(?val_asp) as ?ac)
+where {
+?ast_asp a protcur:aspect ;
+  TEMP:hasValue ?val_asp .
+} GROUP BY ?val_asp ORDER BY desc(?ac)
+#+end_src
+
+**** input counts
+#+begin_src sparql
+select distinct
+?val_inp
+?lbl_inp
+(count(?val_inp) as ?ic)
+where {
+  ?ast_inp a protcur:input ;
+    TEMP:hasValue ?val_inp .
+  OPTIONAL { ?val_inp rdfs:label ?lbl_inp }
+} GROUP BY ?val_inp ?lbl_inp ORDER BY desc(?ic) asc(str(?val_inp))
+#+end_src
+
+**** samples
+few have additional parameterize
+#+begin_src sparql
+select distinct
+?ast_in
+where {
+?ast_in TEMP:hasValue sparc:Sample ;
+  TEMP:protcurChildren ?ast_n .
+}
+#+end_src
+
+***** explore :noexport:
+#+begin_src sparql :var limit="999"
+select distinct
+?ast_in
+
+?next_type
+?next_value
+
+?nv_value
+?nv_unit
+?nv_rv
+
+?nn_type
+?nn_value
+
+?nnn_value
+?nnn_unit
+?nnn_rv
+where {
+  ?ast_in TEMP:hasValue sparc:Sample ;
+  TEMP:protcurChildren ?ast_n .
+  ?ast_n a ?next_type ;
+  TEMPRAW:hasValue ?nv_rv ;
+  TEMP:hasValue ?next_value .
+
+  optional {
+    ?next_value rdf:value ?nv_value .
+    ?next_value TEMP:hasUnit ?nv_unit .
+  }
+
+  optional {
+
+    ?ast_n  TEMP:protcurChildren+ ?ast_nn .
+    ?ast_nn a ?nn_type ;
+    TEMPRAW:hasValue ?nnn_rv ;
+    TEMP:hasValue ?nn_value .
+
+    optional {
+      ?nn_value rdf:value ?nnn_value .
+      ?nn_value TEMP:hasUnit ?nnn_unit .
+      #?nn_value TEMPRAW:hasValue ?nnn_rv .
+      #?nn_value rdf:value ?nnn_value ;
+      #ilxtr:hasUnit ?nnn_unit .
+
+      #?ast_nn TEMP:protcurChildren+ ?ast_nnn .
+      #?ast_nnn a ?nnn_type ;
+      #TEMP:hasValue ?nnn_value .
+    }
+  }
+} LIMIT ?limit
+#+end_src
+
+**** dilution
+the inputs that have dilation aspects associated are not normalized
+really need RRIDs for this part of the graph
+#+begin_src sparql
+select distinct
+#?val_inp
+?rv_inp
+#(count(distinct ?rv_inp) as ?crv)
+where {
+?ast_inp
+TEMPRAW:hasValue ?rv_inp ;
+# TEMP:hasValue ?val_inp ;
+TEMP:protcurChildren ?ast_asp .
+                     ?ast_asp TEMP:hasValue asp:dilution .
+} order by asc(str(?rv_inp))
+#+end_src
+
+**** techniques
+#+begin_src sparql
+select distinct
+#?protocol
+?tech
+(count(?tech) as ?ct)
+where {
+?protocol a sparc:Protocol ;
+   TEMP:protocolEmploysTechnique ?tech .
+} group by ?tech order by desc(?ct)
+#+end_src
+
+**** techniques raw
+here is the actual list of techniques that we have, however it definitely needs
+a further normalization pass than what we have here, very close to exverbs in
+terms of how it has been used as a catchall, and also because the annotations
+were targeting text with the expectation that we would normalize later and haven't
+#+begin_src sparql
+select distinct
+?trs
+(count(?trs) as ?ct)
+where {
+?protocol a sparc:Protocol ;
+   TEMPRAW:protocolEmploysTechnique ?tech_raw .
+bind (lcase(str(?tech_raw)) as ?trs)
+} group by ?trs order by desc(?ct)
+#+end_src
+
+**** microscopy
+as technique
+#+begin_src sparql
+select distinct
+?protocol
+#?trs
+#(count(?trs) as ?ct)
+where {
+?protocol a sparc:Protocol ;
+   TEMPRAW:protocolEmploysTechnique ?tech_raw .
+bind (lcase(str(?tech_raw)) as ?trs)
+filter regex(?trs, "microsc")
+}
+#group by ?trs
+order by desc(?ct)
+#+end_src
+
+datasets with protocols missing microscopy where there is no protocol associated with that dataset that does include microscopy
+#+begin_src sparql :noweb yes
+select distinct
+?dataset
+?protocol
+?na
+where
+{
+  filter (bound(?protocol))
+  filter (!bound(?somepred))
+  {
+    <<sparql-microscopy-check>>
+  }
+  MINUS {  # to get minus to work it needs to share a variable with the core query
+    ?dataset a sparc:Dataset ;
+    TEMP:hasExperimentalApproach ?approach .
+    ?dataset TEMP:hasProtocol ?protocol2 .
+    ?protocol2 TEMP:hasNumberOfProtcurAnnotations ?na2 .
+    filter (?na2 > 0)
+    ?protocol2 a sparc:Protocol ;
+    ?somepred2 ?somestr2 .
+    bind (lcase(str(?somestr2)) as ?lcs2)
+    filter (?somepred2 != <https://uilx.org/tgbugs/u/sparc/spn/approach>)
+    filter regex(?lcs2, "microsc")
+  }
+}
+order by desc(?na)
+#+end_src
+
+clearly we have an issue
+the number of datasets with protocols that do not have anything about microscopy ... isn't quit what this does, but it close
+#+name: sparql-microscopy-check
+#+begin_src sparql
+select distinct
+?dataset
+?protocol
+?na
+?somepred
+?lcs
+where {
+  VALUES ?appraoch { "microscopy" }
+  ?dataset a sparc:Dataset ;
+  TEMP:hasExperimentalApproach ?approach .
+
+  optional {
+    ?dataset TEMP:hasProtocol ?protocol .
+    ?protocol TEMP:hasNumberOfProtcurAnnotations ?na .  # must be in protcur.ttl basically
+    filter (?na > 0 )
+    optional {
+      ?protocol a sparc:Protocol ;
+      ?somepred ?somestr .
+      bind (lcase(str(?somestr)) as ?lcs)
+      filter (?somepred != <https://uilx.org/tgbugs/u/sparc/spn/approach>)
+      filter regex(?lcs, "microsc")
+    }
+  }
+} order by ?dataset ?protocol ?somepred ?lcs
+# TODO order datasets based on how many rows they have in this table?
+#+end_src
+
+[[pio.html:29990]] useless, is primarily a sparc curated protocol and just have RRID:Missing instead of identifying it as a slide scanner :/
+[[pio.html:22831]] a perfect example of the failure due to inconsistency in how inputs were tagged and are missing a type
 
 ** Datasets following same protocol with different subjects
 *** Completeness
