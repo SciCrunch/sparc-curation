@@ -417,7 +417,10 @@ select distinct
 where {
   ?protocol a sparc:Protocol .
   optional { ?protocol TEMP:hasNumberOfProtcurAnnotations ?n }
-  optional { ?dataset TEMP:hasProtocol ?protocol }
+  optional {
+    #?dataset TEMP:hasProtocol ?protocol
+    { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
+  }
   optional { ?protocol TEMP:hasDoi ?doi_protocol }
   optional { ?protocol TEMP:hasUriHuman ?urih_protocol }
   optional { ?protocol ?some_predicate ?annotation .
@@ -574,7 +577,8 @@ WHERE {
     # ?technique rdfs:label ?tl
   }
   UNION
-  { ?dataset TEMP:hasProtocol ?protocol .
+  { #?dataset TEMP:hasProtocol ?protocol .
+    { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
     ?protocol TEMP:protocolEmploysTechnique ?technique .
     # ?technique rdfs:label ?tl
   }
@@ -657,7 +661,10 @@ WHERE {
     ?ast_in_sp rdf:type protcur:input .
     ?ast_in_sp TEMP:hasValue ?species .
 
-    OPTIONAL { ?dataset TEMP:hasProtocol ?protocol } .
+    OPTIONAL {
+        # ?dataset TEMP:hasProtocol ?protocol
+        { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
+    }
 
 }
 ORDER BY ?label_input ?value_lt
@@ -841,6 +848,7 @@ order by desc(?ct)
 #+end_src
 
 datasets with protocols missing microscopy where there is no protocol associated with that dataset that does include microscopy
+#+name: sparql-microscopy-mismatch
 #+begin_src sparql :noweb yes
 select distinct
 ?dataset
@@ -856,7 +864,7 @@ where
   MINUS {  # to get minus to work it needs to share a variable with the core query
     ?dataset a sparc:Dataset ;
     TEMP:hasExperimentalApproach ?approach .
-    ?dataset TEMP:hasProtocol ?protocol2 .
+    { ?protocol2 TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol2 }
     ?protocol2 TEMP:hasNumberOfProtcurAnnotations ?na2 .
     filter (?na2 > 0)
     ?protocol2 a sparc:Protocol ;
@@ -880,12 +888,12 @@ select distinct
 ?somepred
 ?lcs
 where {
-  VALUES ?appraoch { "microscopy" }
   ?dataset a sparc:Dataset ;
   TEMP:hasExperimentalApproach ?approach .
+  filter (str(?approach) = "microscopy")
 
   optional {
-    ?dataset TEMP:hasProtocol ?protocol .
+    { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
     ?protocol TEMP:hasNumberOfProtcurAnnotations ?na .  # must be in protcur.ttl basically
     filter (?na > 0 )
     optional {
@@ -899,9 +907,6 @@ where {
 } order by ?dataset ?protocol ?somepred ?lcs
 # TODO order datasets based on how many rows they have in this table?
 #+end_src
-
-[[pio.html:29990]] useless, is primarily a sparc curated protocol and just have RRID:Missing instead of identifying it as a slide scanner :/
-[[pio.html:22831]] a perfect example of the failure due to inconsistency in how inputs were tagged and are missing a type
 
 ** Datasets following same protocol with different subjects
 *** Completeness
@@ -1109,7 +1114,8 @@ SELECT DISTINCT
 (str(?aes) as ?entity)
 WHERE {
   ?dataset a sparc:Dataset .
-  ?dataset TEMP:hasProtocol ?protocol .
+  #?dataset TEMP:hasProtocol ?protocol .
+  { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
   ?protocol TEMPRAW:involvesAnatomicalRegion ?aes .
   # ?ae rdfs:label ?l_ae .
 }
