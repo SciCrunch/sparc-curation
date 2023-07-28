@@ -83,7 +83,7 @@ Commands:
                        : --context  include context, e.g. dataset
                        : --fake     make fake metadata to keep pipeline happy
                        : --meta-from-local   check if cached metadata from local
-                       : --for-racket    format output as sepr
+                       : --for-racket    format output as sxpr
 
     rmeta       retrieve metadata about files/folders from the remote
 
@@ -250,7 +250,7 @@ Options:
     --fake                  make fake file system metadata to keep pipelines happy
     --meta-from-local       check if cached metadata from local
     --fill-cache-metadata   fill missing cache metadata from local to avoid errors
-    --for-racket            format output as sepr
+    --for-racket            format output as sxpr
 
     --log-level=LEVEL       set python logging log level
     --log-path=PATH         folder where logs are saved       [default: {auth.get_path('log-path')}]
