@@ -12,12 +12,14 @@
 - maybe :: NPO connections from composer
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
 - if-needed :: vagus round 2
-* DEV 2023-07-??
+* PLAN 2023-08-??
+- TODO NPO aacar pig dog human, not mouse not rat
+* RC 2023-07-28
 - NPO add populations from NLP semves and prostate
 - NPO add citations for NLP and ApiNATOMY populations
 - NPO various bugfixes for NLP populations
 - NPO use hasAnatomicalSystemPhenotype, hasCircuitRolePhenotype, and hasClassificationPhenotype instead of hasPhenotype where appropriate
-- TODO NPO aacar pig dog human, not mouse not rat
+- ApiNATOMY wbrcm updated with new regions
 * PROD 2023-05-05
 CLOSED: <2023-06-08 Thu>
 - ApiNATOMY aacar-6 fix missing A in A74 that generated a lyph with no metadata
