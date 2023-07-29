@@ -2016,7 +2016,7 @@ sigh = [s for n, si in enumerate(simples)  for s in ((f'--------- {n + 1}','----
 sigh
 #+end_src
 
-#+header: :depends py-nbr-1
+#+header: :depend py-nbr-1
 #+begin_src jupyter-python :session pys :results none
 from neurondm import orders
 from neurondm.models.nlp import add_partial_orders
@@ -2051,8 +2051,16 @@ def all_nst(ids, blobs):
     return pos
 
 def raw_adj_to_nst(raw_adj):
+    # apparently dupes ARE an issue on the input for some reason and produce
+    # really wild results and aren't culled by set ??? or rather there are
+    # issues with the stability of the rl sort which translate to unstable
+    # representations in the ttl, so that will need to get sorted out
+    def key(tt):
+        return tuple(tuple('' if e is None else e for e in t) for t in tt)
+
+    ss_adj = sorted(set(raw_adj), key=key)
     # dupes aren't an issue but removing them produces a slight performance improvement
-    adj = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).u for a in rl)) for rl in rls) for rls in raw_adj))
+    adj = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).u for a in rl)) for rl in rls) for rls in ss_adj))
     nst = orders.adj_to_nst(adj)
     return nst
 
@@ -2062,9 +2070,27 @@ def get_apinat_blobs():
     for id in ids:
         blob = sgd.demos_apinat_neru_7_neupop_id(neupop_id=id)  # FIXME slow, TODO parallize
 
+
+anst = all_nst(ids, blobs)
+olr = auth.get_path('ontology-local-repo')
+og = OntGraph().parse(olr / 'ttl/generated/neurons/apinat-simple-sheet.ttl')
+g = OntGraph()
+g.namespace_manager.populate_from(og)
+add_partial_orders(g, anst)
+g.write(olr / 'ttl/generated/neurons/apinat-partial-orders.ttl')
+#+end_src
+
+
+debug, looks like there are nasty issues with duplicate nodes on the
+input here to rl which is not good, like rl equality test is not working
+(this was indeed the case)
+#+begin_src jupyter-python :session pys :results none
+# wat = anst[OntId('ilxtr:neuron-type-aacar-6').u]
+
 #issue = 3  # 'ilxtr:neuron-type-splen-2'
 #issue = ids.index('ilxtr:neuron-type-aacar-6')
-issue = ids.index('ilxtr:neuron-type-aacar-7v')
+#issue = ids.index('ilxtr:neuron-type-aacar-7v')
+issue = ids.index('ilxtr:neuron-type-keast-11')
 #issue = 101  # 'ilxtr:neuron-type-pancr-2'
 iblob = blobs[issue]
 idb, *_ = apinat_deblob(iblob)
@@ -2082,14 +2108,16 @@ owie = ids[issue]
 ouch = apinat_to_raw_adj(iblob)
 souch = sorted(set(ouch))
 hrm = raw_adj_to_nst(ouch)
-# wat = anst[OntId('ilxtr:neuron-type-aacar-6').u]
-anst = all_nst(ids, blobs)
-olr = auth.get_path('ontology-local-repo')
-og = OntGraph().parse(olr / 'ttl/generated/neurons/apinat-simple-sheet.ttl')
-g = OntGraph()
-g.namespace_manager.populate_from(og)
-add_partial_orders(g, anst)
-g.write(olr / 'ttl/generated/neurons/apinat-partial-orders.ttl')
+wat1 = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).curie for a in rl)) for rl in rls) for rls in ouch))
+wat2 = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).curie for a in rl)) for rl in rls) for rls in souch))
+sigh1 = wat1 == wat2  # utoh
+
+wat3 = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).curie for a in rl)) for rl in rls) for rls in sorted(set(ouch))))
+wat4 = sorted(set(tuple(orders.rl(*(a if a is None else OntId(a).curie for a in rl)) for rl in rls) for rls in sorted(set(souch))))
+sigh2 = wat3 == wat4  # ok
+
+qq = orders.adj_to_nst(wat3)  # XXX no, this is what is broken
+# well that is concerning
 #+end_src
 
 ** asdf
