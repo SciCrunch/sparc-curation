@@ -802,6 +802,40 @@ TEMP:protcurChildren ?ast_asp .
 } order by asc(str(?rv_inp))
 #+end_src
 
+**** age
+#+begin_src sparql
+select distinct
+#?val_inp
+?rv_inp
+#(count(distinct ?rv_inp) as ?crv)
+?ast_value
+?unit
+?value
+?rbunit
+?rbvalue
+?reunit
+?revalue
+#?p
+#?o
+where {
+?ast_inp
+TEMPRAW:hasValue ?rv_inp ;
+# TEMP:hasValue ?val_inp ;
+TEMP:protcurChildren ?ast_asp .
+                     ?ast_asp TEMP:hasValue asp:age ; TEMP:protcurChildren ?ast_invpar .
+?ast_invpar TEMP:hasValue ?ast_value .
+?ast_value ?p ?o .
+optional {
+?ast_value TEMP:rangeStart ?rb . ?rb rdf:value ?rbvalue ; TEMP:hasUnit ?rbunit .
+?ast_value TEMP:rangeStop ?re . ?re rdf:value ?revalue ; TEMP:hasUnit ?reunit .
+}
+optional {
+?ast_value rdf:value ?value .
+?ast_value TEMP:hasUnit ?unit .
+}
+} order by asc(str(?rv_inp))
+#+end_src
+
 **** techniques
 #+begin_src sparql
 select distinct
@@ -831,6 +865,7 @@ bind (lcase(str(?tech_raw)) as ?trs)
 #+end_src
 
 **** microscopy
+***** explore
 as technique
 #+begin_src sparql
 select distinct
@@ -907,6 +942,205 @@ where {
 } order by ?dataset ?protocol ?somepred ?lcs
 # TODO order datasets based on how many rows they have in this table?
 #+end_src
+
+***** maybe example query
+#+begin_src sparql
+select distinct
+?species
+(count(distinct ?ast_in_sp) as ?cs)
+where {
+
+  ?protocol a sparc:Protocol ; ?sigh ?ast_asp ; TEMP:protocolInvolvesInput ?ast_in_sp .
+  ?ast_in_sp rdf:type protcur:input ; TEMP:hasValue ?species .
+  #filter contains(str(iri(?species)), "NCBITaxon")
+  ?species rdfs:subClassOf* NCBITaxon:1 .
+
+} group by ?species
+#+end_src
+
+another not-so-great attempt
+#+begin_src sparql
+select distinct
+?s0
+?s1
+where {
+
+?region (rdfs:subClassOf|owl:someValuesFrom)+ UBERON:0000010 .
+
+?s0 rdfs:subClassOf ?bn0 .
+?bn0 a owl:Restriction ;
+  owl:onProperty partOf: ;
+  owl:someValuesFrom ?region_p0 .
+
+filter (?region = ?s0)
+filter (?region = ?region_p0)
+#?s1 rdfs:subClassOf ?bn1 .
+#?bn1 a owl:Restriction ;
+#  owl:onProperty partOf: ;
+#  owl:someValuesFrom ?region_p1 .
+
+#?s2 rdfs:subClassOf ?bn2 .
+#?bn2 a owl:Restriction ;
+#  owl:onProperty partOf: ;
+#  owl:someValuesFrom ?region_p2 .
+#
+#?s3 rdfs:subClassOf ?bn3 .
+#?bn3 a owl:Restriction ;
+#  owl:onProperty partOf: ;
+#  owl:someValuesFrom ?region_p3 .
+#
+#?s4 rdfs:subClassOf ?bn4 .
+#?bn4 a owl:Restriction ;
+#  owl:onProperty partOf: ;
+#  owl:someValuesFrom ?region_p4 .
+
+#values ?region_pn { UBERON:0000010 } .
+#filter (?s0 = ?region_pn)
+#?s rdfs:subClassOf ?bn0; owl:someValuesFrom UBERON:0000010 .
+
+#?bn1 owl:someValuesFrom
+} limit 10
+#+end_src
+
+one approach to the part of query which doesn't filter properly :/
+#+begin_src sparql
+select distinct
+?region
+(str(?rl) as ?label)
+where {
+  ?region rdfs:subClassOf+ UBERON:0001062 ;  # with this it is 67 secons ???
+          (rdfs:subClassOf|owl:someValuesFrom)+ UBERON:0000010 ;  # 41 - 45 seconds :/
+          rdfs:label ?rl ;
+          rdfs:subClassOf ?rest .
+  ?rest a owl:Restriction ; owl:onProperty partOf: ; owl:someValuesFrom ?region2 .
+
+#  ?region rdfs:subClassOf ?rest ; rdfs:label ?rl .
+#  ?rest a owl:Restriction ; owl:onProperty partOf: ; owl:someValuesFrom ?region2 .
+#
+#  ?region2 rdfs:subClassOf+ UBERON:0001062 .
+#  ?region2 (rdfs:subClassOf|owl:someValuesFrom)+ UBERON:0000010 .
+  #?region2 UBERON:0000010 .
+  #?region2 (rdfs:subClassOf|owl:someValuesFrom)* UBERON:0000010 .
+  #{ }
+} limit 100
+#+end_src
+
+this one can be a little bit different
+
+show me the species and objective magnification for datasets with protocols that involve magnification and that involve +part of the peripheral nervous system the nodose ganglion+ nerves or ganglia
+
++as written this query is annoyingly slow+ the original ~partOf:~ based query was extremely slow
+#+begin_src sparql
+#asp:objective
+select distinct
+# ?val_asp
+?dataset
+?protocol
+#?val_raw_asp
+#?s
+#?type
+?species
+(str(?sl) as ?species_l)
+?region
+(str(?rl) as ?region_l)
+?value
+?unit
+#(str(?raw_in) as ?ris)
+where {
+  values ?val_asp {asp:magnification} # XXX spelling fix is on the way
+
+  ?protocol a sparc:Protocol ; ?sigh ?ast_asp ; TEMP:protocolInvolvesInput ?ast_in_sp .
+  ?ast_in_sp rdf:type protcur:input ; TEMP:hasValue ?species .
+  #?species rdfs:subClassOf+ NCBITaxon:1 .
+  ?species rdfs:subClassOf+NCBITaxon:33208 . # significantly restrict the search space to only those with nervous systems
+  ?species rdfs:label ?sl .
+  #filter contains(str(iri(?species)), "NCBITaxon")
+
+  ?ast_asp a protcur:aspect ;
+  TEMPRAW:hasValue ?val_raw_asp ;
+  TEMP:hasValue ?val_asp ;
+  TEMP:protcurChildren ?s .
+  ?s a ?type .
+  ?s TEMP:hasValue ?bn .
+  ?bn ?p unt:fold .
+  ?bn rdf:value ?value .
+  ?bn TEMP:hasUnit ?unit .
+
+  ?protocol ?pl ?ast_ebb .
+  ?ast_ebb TEMP:protcurChildren* ?bn1 .
+  ?bn1 TEMP:hasValue ?region . # UBERON:0005363 .  # nodose ganglion
+  # ?protocol TEMPRAW:protocolInvolvesInput ?raw_in .  # slow
+
+  values ?nerves_and_ganglia {
+    #UBERON:0010313  # neural crest-derived structure better than anatomical entity  # XXX not needed for this particular example
+    UBERON:0000122  # neuron projection bundle complex and not covered by ncds
+    UBERON:0000045  # ganglion also because it does not classify under the other two
+  }
+  #filter regex(str(iri(?region)), "(UBERON|ILX):")
+  #?region (rdfs:subClassOf|TEMP:partOf)* UBERON:0000010 .
+  #?region (rdfs:subClassOf|TEMP:partOf)+ UBERON:0001016 .  # XXX this has to be inserted otherwise it is far too slow
+  ?region rdfs:subClassOf+ ?nerves_and_ganglia .  # have to go * for ganglion? (actually no, it is almost certainly a dupe of nodose)
+  #?region rdfs:subClassOf+ UBERON:0001062 .  # XXX this is a not-so-great alternative
+  ?region rdfs:label ?rl .
+
+  #?region TEMP:partOf+ UBERON:0000010 .
+  #  ?region rdfs:subClassOf ?rest ; rdfs:label ?rl .
+  #  ?rest a owl:Restriction ; owl:onProperty partOf: ; owl:someValuesFrom ?region2 .
+  #
+  #  ?region2 rdfs:subClassOf+ UBERON:0001062 .
+  #  ?region2 (rdfs:subClassOf|owl:someValuesFrom)+ UBERON:0000010 .
+
+  optional {
+    { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
+  }
+} order by ?region_l ?dataset ?protocol limit 100
+#+end_src
+
+**** pressure
+:PROPERTIES:
+:CREATED:  [2023-07-26 Wed 23:47]
+:END:
+
+blood pressure might work maybe?
+#+begin_src sparql
+select distinct
+?protocol
+#?val_inp
+?ast_asp
+?in_type
+?rv_inp
+#(count(distinct ?rv_inp) as ?crv)
+?c_type
+?raw_invpar
+?ast_val_invpar
+where {
+  ?protocol TEMP:protocolInvolvesAspect ?ast_asp .
+
+  ?ast_asp TEMP:hasValue asp:pressure .
+
+  optional {
+    ?ast_inp a ?in_type ;
+    TEMPRAW:hasValue ?rv_inp ;
+    # TEMP:hasValue ?val_inp ;
+    TEMP:protcurChildren ?ast_asp .
+  }
+  optional {
+    ?ast_asp TEMP:protcurChildren ?c . ?c a ?c_type .
+  }
+  values ?invpar {protcur:invariant protcur:parameter} .
+  optional {
+    ?ast_asp TEMP:protcurChildren ?ast_invpar .
+    ?ast_invpar a ?invpar ;
+    TEMPRAW:hasValue ?raw_invpar ;
+    TEMP:hasValue ?ast_val_invpar .
+  }
+} order by ?protocol asc(str(?rv_inp))
+
+#+end_src
+
+[[pio.html:18655]] deleted ???
+[[pio.html:18786]] also del ???
+[[pio.html:22863]]
 
 ** Datasets following same protocol with different subjects
 *** Completeness
@@ -4575,6 +4809,48 @@ where
                                owl:onProperty ?p ;
                                owl:someValuesFrom ?o ]
   }}
+#+end_src
+
+** owl restriction over transitive properties issues
+sigh [[https://ceur-ws.org/Vol-749/paper19.pdf][Subqueries in SPARQL]]
+#+begin_src sparql :eval yes
+#PREFIX partOf: <http://purl.obolibrary.org/obo/BFO_0000050>
+#PREFIX owl: <http://www.w3.org/2002/07/owl#>
+#PREFIX TEMP: <http://uri.interlex.org/temp/uris/>
+#PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+insert
+{ ?region TEMP:partOf ?region2 }
+where {
+  ?region rdfs:subClassOf ?rest .
+  ?rest a owl:Restriction ; owl:onProperty partOf: ; owl:someValuesFrom ?region2 .
+}
+#+end_src
+
+*** sigh
+#+begin_src sparql
+select
+?region
+(str(?rl) as ?label)
+where {
+#?region (rdfs:subClassOf|TEMP:partOf)* UBERON:0001016 .
+#?region (rdfs:subClassOf|TEMP:partOf)* UBERON:0000010 .  # FIXME peripheral nervous system partonomy is utterly broken ???
+#?region TEMP:partOf+ UBERON:0000010 .
+optional {
+?region rdfs:label ?rl .
+}
+} limit 99
+#+end_src
+
+#+begin_src sparql
+select
+?region
+#TEMP:partOf
+?region2
+where {
+  ?region rdfs:subClassOf ?rest .
+  ?rest a owl:Restriction ; owl:onProperty partOf: ; owl:someValuesFrom ?region2 .
+} limit 10
 #+end_src
 
 * Sanity checks
