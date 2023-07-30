@@ -1030,71 +1030,63 @@ this one can be a little bit different
 show me the species and objective magnification for datasets with protocols that involve magnification and that involve +part of the peripheral nervous system the nodose ganglion+ nerves or ganglia
 
 +as written this query is annoyingly slow+ the original ~partOf:~ based query was extremely slow
+#+name: sparql-magnification
 #+begin_src sparql
-#asp:objective
-select distinct
-# ?val_asp
+SELECT DISTINCT
 ?dataset
 ?protocol
-#?val_raw_asp
-#?s
-#?type
+?id_species
 ?species
-(str(?sl) as ?species_l)
+?id_region
 ?region
-(str(?rl) as ?region_l)
 ?value
 ?unit
-#(str(?raw_in) as ?ris)
-where {
-  values ?val_asp {asp:magnification} # XXX spelling fix is on the way
-
-  ?protocol a sparc:Protocol ; ?sigh ?ast_asp ; TEMP:protocolInvolvesInput ?ast_in_sp .
-  ?ast_in_sp rdf:type protcur:input ; TEMP:hasValue ?species .
-  #?species rdfs:subClassOf+ NCBITaxon:1 .
-  ?species rdfs:subClassOf+NCBITaxon:33208 . # significantly restrict the search space to only those with nervous systems
-  ?species rdfs:label ?sl .
-  #filter contains(str(iri(?species)), "NCBITaxon")
+WHERE {
+  ?protocol a sparc:Protocol ;
+    TEMP:protocolInvolvesAspect ?ast_asp ;
+    TEMP:protocolInvolvesInput  ?ast_species ;
+    ?_                          ?ast_region .
 
   ?ast_asp a protcur:aspect ;
-  TEMPRAW:hasValue ?val_raw_asp ;
-  TEMP:hasValue ?val_asp ;
-  TEMP:protcurChildren ?s .
-  ?s a ?type .
-  ?s TEMP:hasValue ?bn .
-  ?bn ?p unt:fold .
-  ?bn rdf:value ?value .
-  ?bn TEMP:hasUnit ?unit .
+    TEMP:hasValue asp:magnification ;
+    TEMP:protcurChildren [ TEMP:hasValue [ rdf:value ?value ;
+                                           TEMP:hasUnit ?unit ] ] .
 
-  ?protocol ?pl ?ast_ebb .
-  ?ast_ebb TEMP:protcurChildren* ?bn1 .
-  ?bn1 TEMP:hasValue ?region . # UBERON:0005363 .  # nodose ganglion
-  # ?protocol TEMPRAW:protocolInvolvesInput ?raw_in .  # slow
+  ?ast_species rdf:type protcur:input ;
+    TEMP:hasValue ?id_species .
+                  ?id_species rdfs:subClassOf+ NCBITaxon:33208 ; # metazoa
+                              rdfs:label ?sl .
+  BIND (str(?sl) AS ?species)
 
-  values ?nerves_and_ganglia {
-    #UBERON:0010313  # neural crest-derived structure better than anatomical entity  # XXX not needed for this particular example
-    UBERON:0000122  # neuron projection bundle complex and not covered by ncds
-    UBERON:0000045  # ganglion also because it does not classify under the other two
+  ?ast_region TEMP:protcurChildren* ?ast_reg ;
+    TEMP:hasValue ?id_region .
+                  ?id_region rdfs:subClassOf+ ?nerves_and_ganglia ;
+                             rdfs:label ?rl .
+  BIND (str(?rl) AS ?region)
+
+  VALUES ?nerves_and_ganglia {
+    UBERON:0000122  # neuron projection bundle
+    UBERON:0000045  # ganglion
   }
-  #filter regex(str(iri(?region)), "(UBERON|ILX):")
-  #?region (rdfs:subClassOf|TEMP:partOf)* UBERON:0000010 .
-  #?region (rdfs:subClassOf|TEMP:partOf)+ UBERON:0001016 .  # XXX this has to be inserted otherwise it is far too slow
-  ?region rdfs:subClassOf+ ?nerves_and_ganglia .  # have to go * for ganglion? (actually no, it is almost certainly a dupe of nodose)
-  #?region rdfs:subClassOf+ UBERON:0001062 .  # XXX this is a not-so-great alternative
-  ?region rdfs:label ?rl .
 
-  #?region TEMP:partOf+ UBERON:0000010 .
-  #  ?region rdfs:subClassOf ?rest ; rdfs:label ?rl .
-  #  ?rest a owl:Restriction ; owl:onProperty partOf: ; owl:someValuesFrom ?region2 .
-  #
-  #  ?region2 rdfs:subClassOf+ UBERON:0001062 .
-  #  ?region2 (rdfs:subClassOf|owl:someValuesFrom)+ UBERON:0000010 .
-
-  optional {
-    { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
-  }
-} order by ?region_l ?dataset ?protocol limit 100
+  OPTIONAL {
+    { ?dataset TEMP:hasProtocol ?protocol } UNION
+    { ?protocol
+      TEMP:priorInformationalConstraintOnProcessThatGenerated
+      ?dataset }}
+}
+ORDER BY ?region ?dataset ?protocol
 #+end_src
+
+#+RESULTS: sparql-magnification
+| dataset                                      | protocol      | id_species      | species           | id_region      | region                    | value | unit      |
+|----------------------------------------------+---------------+-----------------+-------------------+----------------+---------------------------+-------+-----------|
+| dataset:d484110a-e6e3-4574-aab2-418703c978e2 | pio.api:22831 | NCBITaxon:10116 | Rattus norvegicus | UBERON:0005363 | inferior vagus X ganglion |    40 | unit:fold |
+| dataset:d484110a-e6e3-4574-aab2-418703c978e2 | pio.api:22831 | NCBITaxon:10116 | Rattus norvegicus | UBERON:0005363 | inferior vagus X ganglion |    63 | unit:fold |
+| dataset:e4bfb720-a367-42ab-92dd-31fd7eefb82e | pio.api:22831 | NCBITaxon:10116 | Rattus norvegicus | UBERON:0005363 | inferior vagus X ganglion |    40 | unit:fold |
+| dataset:e4bfb720-a367-42ab-92dd-31fd7eefb82e | pio.api:22831 | NCBITaxon:10116 | Rattus norvegicus | UBERON:0005363 | inferior vagus X ganglion |    63 | unit:fold |
+| dataset:6fa2666c-aa3d-4e27-a405-7848fc061b04 | pio.api:19131 | NCBITaxon:10116 | Rattus norvegicus | UBERON:0001759 | vagus nerve               |    20 | unit:fold |
+| dataset:ff6eb067-62d4-4bfb-b4b2-15ad65db0999 | pio.api:19143 | NCBITaxon:10090 | Mus musculus      | UBERON:0001759 | vagus nerve               |    20 | unit:fold |
 
 **** pressure
 :PROPERTIES:
