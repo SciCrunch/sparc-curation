@@ -12,8 +12,10 @@
 - maybe :: NPO connections from composer
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
 - if-needed :: vagus round 2
-* PLAN 2023-08-??
+* DEV 2023-08-??
 - TODO NPO aacar pig dog human, not mouse not rat
+* RC 2023-07-31
+- NPO fix partial orders for ApiNATOMY populations that include layers
 * RC 2023-07-28
 - NPO add populations from NLP semves and prostate
 - NPO add citations for NLP and ApiNATOMY populations
