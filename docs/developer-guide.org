@@ -1540,7 +1540,7 @@ Deploy to dev scigraph.
 #+end_src
 
 Deploy to local dev blazegraph.
-[[./release.org::*Deploy journal to local server]]
+[[./release.org::*Deploy journal and prefixes to local server]]
 
 critical checks:
 1. run the [[file:queries.org::#apinat-dashboard][ApiNATOMY dashboard]] queries and inspect the numbers
