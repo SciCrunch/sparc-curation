@@ -258,7 +258,11 @@ def bind_packages_File(File):
 
             #print(resp.url)
             if resp.ok:
-                j = resp.json()
+                try:
+                    j = resp.json()
+                except json.decoder.JSONDecodeError as e:
+                    log.critical(f'resp.ok but json malformed???\n{resp.text}')
+                    raise e
                 packages = j['packages']
                 #log.log(9, f'what is going on 0\n{packages!r}')
                 if raw:
