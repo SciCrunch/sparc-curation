@@ -232,13 +232,24 @@ def bind_packages_File(File):
         out_of_order = []
         while True:
             try:
-                resp = session.get(
+                _url = (
                     f'{self._api._host}/datasets/{self.id}/packages?'
                     f'pageSize={pageSize}&'
                     f'includeSourceFiles={str(includeSourceFiles).lower()}'
                     f'{filename_args}'
                     f'{cursor_args}')
+                resp = session.get(_url)
                 log.log(9, f'wat:\n{resp.url}')
+            except requests.exceptions.ChunkedEncodingError as e:
+                # this fails stochastically during pypy3 -m sparcur.simple.retrieve
+                # --sparse-limit -1 --no-index --parent-parent-path {} --dataset-id {}
+                #log.exception(e)
+                #breakpoint()
+                #raise e
+                log.critical('pennsieve connection broken causing ChunkedEncodingError')
+                # loop around and try again something has gone wrong on the remote
+                # at a point in the call where requests cannot retry
+                continue
             except requests.exceptions.RetryError as e:
                 log.exception(e)
                 # sporadic 504 errors that we probably need to sleep on
