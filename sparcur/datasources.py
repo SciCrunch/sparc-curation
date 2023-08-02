@@ -194,7 +194,7 @@ class MembersData:
     @property
     def members(self):
         if not hasattr(self.__class__, '_members'):
-            self.__class__._members = self._bfli.organization.members
+            self.__class__._members = self._bfli.organization.members  # XXX network sandbox violation
 
         return self._members
 
