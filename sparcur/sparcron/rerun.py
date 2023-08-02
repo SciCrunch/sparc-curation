@@ -1,9 +1,11 @@
 """ rerun all datasets """
 
+import sys
 from augpathlib.meta import isoformat
 from sparcur.sparcron import get_redis_conn
 from datetime import timedelta
 from dateutil import parser as dateparser
+from sparcur.utils import PennsieveId
 from sparcur.sparcron.core import (
     project_id,
     datasets_remote_from_project_id,
@@ -35,7 +37,14 @@ def rerun_dataset(conn, dataset):
 
 def main():
     conn = get_redis_conn()
-    datasets = datasets_remote_from_project_id(project_id)
+    all_datasets = datasets_remote_from_project_id(project_id)
+    args = sys.argv[1:]
+    if args:
+        to_run = [PennsieveId('dataset:' + rawid.split(':')[-1]) for rawid in args]
+        datasets = [d for d in all_datasets if d.identifier in to_run]
+    else:
+        datasets = all_datasets
+
     _ = [rerun_dataset(conn, dataset) for dataset in datasets]
 
 
