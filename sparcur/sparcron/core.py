@@ -672,7 +672,11 @@ def datasets_remote_from_project_id(project_id):
 
 
 def status_report():
-    datasets = datasets_remote_from_project_id(project_id)
+    try:
+        datasets = datasets_remote_from_project_id(project_id)
+    except Exception as e:
+        log.exception(e)
+        return
 
     todo = []
     fail = []
