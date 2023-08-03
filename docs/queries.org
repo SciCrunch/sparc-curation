@@ -2260,10 +2260,12 @@ def apinat_to_raw_adj(blob):
     cpairs_ok = [c for c in cpairs if c[0][1] and c[1][1]]
     raw_adj = [((r1, l1), (r2, l2)) for  # region first since neurondm.orders.rl.__init__(self, region, layer=None)
                ((link1, ((l1, r1), *housing1)), (link2, ((l2, r2), *housing2)))  # FIXME housing ...
-               # FIXME no projections case ... do we link to self for soma?
-               in cpairs_ok
-               # FIXME have to exclude cycles like this for now because neurondm.orders.adj_to_nst breaks if there are cycles like this
-               if (r1, l1) != (r2, l2)]
+               # FIXME no projections case ... do we link to self for soma? XXX yes, we link back to self
+               in cpairs_ok]
+    raw_adj = sorted(set(raw_adj), key=lambda tt: tuple(('' if t[0] is None else t[0], '' if t[1] is None else t[1]) for t in tt))
+    if len(raw_adj) > 1:  # non degenerate case
+        raw_adj = [(a, b) for a, b in raw_adj if a != b]  # soma cycles if there are other connections
+
     return raw_adj
 
 def all_nst(ids, blobs):
@@ -2271,8 +2273,9 @@ def all_nst(ids, blobs):
     for id, blob in zip(ids, blobs):
         #print(id)
         raw_adj = apinat_to_raw_adj(blob)
-        adj = raw_adj_to_nst(raw_adj)
-        pos[OntId(id).u] = adj
+        nst = raw_adj_to_nst(raw_adj)
+        if nst:
+            pos[OntId(id).u] = nst
 
     return pos
 
