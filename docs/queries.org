@@ -4704,6 +4704,7 @@ Expect
 
 * Simple blaze
 simple sckan queries over blazegraph
+https://github.com/smtifahim/Loading-Simple-SCKAN/tree/main/sckan-to-simple-sckan
 
 ** inserts
 :PROPERTIES:
@@ -4715,7 +4716,6 @@ simple sckan queries over blazegraph
 insert { ?s ?np ?o }
 <<simple-sckan-load-1-where>>
 #+end_src
-
 ** queries
 #+begin_src sparql
 #select (count(*) as ?c) {
@@ -4799,6 +4799,143 @@ where
   }}
 #+end_src
 
+** hackathon 2023
+*** inserts
+:PROPERTIES:
+:header-args:sparql: :url http://localhost:9889/blazegraph/namespace/kb/sparql
+:header-args: :eval never
+:END:
+requires port forwarding from aws-stardog =LocalForward 9889 localhost:9999=
+apparently need to paste it in for now or something
+#+begin_src sparql :noweb yes
+INSERT {?neuron_type ?npo_simple_prop ?object}
+<<simple-sckan-load-2-where>>
+#+end_src
+
+#+begin_src sparql :noweb yes
+INSERT { ?sub_region ilxtr:isPartOf ?super_region }
+<<simple-sckan-uberon-where>>
+#+end_src
+
+*** queries
+from https://github.com/smtifahim/Loading-Simple-SCKAN/blob/main/sckan-to-simple-sckan/sparql-query/simple-sckan-constructs.rq
+#+name: simple-sckan-load-2-where
+#+begin_src sparql :eval never
+WHERE
+{
+    VALUES (?npo_prop ?npo_simple_prop)
+    {
+      # mapping properties for locational phenotypes
+      (ilxtr:hasAxonPresynapticElementIn ilxtr:hasAxonTerminalLocation)
+      (ilxtr:hasSomaLocatedIn ilxtr:hasSomaLocation)
+      (ilxtr:hasSomaLocatedInLayer ilxtr:hasSomaLocation)
+      (ilxtr:hasAxonLocatedIn ilxtr:hasAxonLocation)
+      (ilxtr:hasDendriteLocatedIn ilxtr:hasDendriteLocation)
+      (ilxtr:hasAxonSensorySubcellularElementIn ilxtr:hasAxonSensoryLocation)
+
+          # treat all locational phenotype properties above as hasConnectedLocation in NPO-Simple/Simple SCKAN
+          (ilxtr:hasAxonPresynapticElementIn ilxtr:hasConnectedLocation)
+          (ilxtr:hasSomaLocatedInLayer ilxtr:hasConnectedLocation)
+          (ilxtr:hasSomaLocatedIn ilxtr:hasConnectedLocation)
+          (ilxtr:hasAxonLocatedIn ilxtr:hasConnectedLocation)
+          (ilxtr:hasDendriteLocatedIn ilxtr:hasConnectedLocation)
+          (ilxtr:hasAxonSensorySubcellularElementIn ilxtr:hasConnectedLocation)
+
+       # mapping properties for other phenotypes
+      (ilxtr:hasForwardConnectionPhenotype ilxtr:hasForwardConnection)
+      (ilxtr:hasFunctionalCircuitRolePhenotype ilxtr:hasFunctionalCircuitRole)
+      (ilxtr:hasAnatomicalSystemPhenotype ilxtr:hasNeuronalPhenotype)  #changed from ilxtr:hasPhenotype to ilxtr:hasAnatomicalSystemPhenotype
+      (ilxtr:hasProjectionPhenotype ilxtr:hasProjection)
+      (ilxtr:hasCircuitRolePhenotype ilxtr:hasCircuitRole)
+      (ilxtr:hasInstanceInTaxon ilxtr:isObservedInSpecies)
+      (ilxtr:hasBiologicalSex ilxtr:hasPhenotypicSex)
+    }
+    # For the neuron types with locational phenotypes specified withing the intersections of the equivalent axioms.
+    {
+    ?neuron_type a owl:Class;
+        (owl:equivalentClass | rdfs:subClassOf)
+                             [
+                               rdf:type owl:Class ;
+                               owl:intersectionOf ?bn0
+                              ] .
+    ?bn0 rdf:rest*/rdf:first [
+                               rdf:type owl:Restriction ;
+                               owl:onProperty ?npo_prop ;
+                               owl:someValuesFrom [
+                                                    a owl:Restriction ;
+                                                    owl:onProperty partOf: ;
+                                                    owl:someValuesFrom ?object
+                                                  ]
+                             ] .
+    }
+
+   UNION # For the neuron types with locational phenotype axioms as super classes e.g., http://uri.neuinfo.org/nif/nifstd/nlx_cell_20081201
+    {
+    ?neuron_type a owl:Class;
+		         (rdfs:subClassOf)
+                    [
+                    rdf:type owl:Restriction ;
+                             owl:onProperty ?npo_prop ;
+                             owl:someValuesFrom [rdf:type owl:Restriction ;
+                                                          owl:onProperty partOf: ;
+                                                          owl:someValuesFrom ?object
+                                                ]
+                    ] .
+    }
+
+  UNION # For neuron types with other phenotypes specified within the intersections of the eqivalent axioms.
+   {
+        ?neuron_type a owl:Class;
+                (owl:equivalentClass | rdfs:subClassOf)
+                            [
+                                rdf:type owl:Class ;
+                                owl:intersectionOf ?bn0
+                            ] .
+        ?bn0 rdf:rest*/rdf:first [
+                                  rdf:type owl:Restriction ;
+                                           owl:onProperty ?npo_prop ;
+                                           owl:someValuesFrom ?object
+                                 ]
+    }
+    UNION # For neuron types with other phenotypes axioms specified as superclasses.
+    {
+      ?neuron_type a owl:Class;
+                    (rdfs:subClassOf)
+                    [
+                       rdf:type owl:Restriction ;
+                                owl:onProperty ?npo_prop ;
+                                owl:someValuesFrom ?object
+                    ]
+    }
+
+FILTER (!isBLANK(?object))
+}
+#+end_src
+
+#+name: simple-sckan-uberon-where
+#+begin_src sparql
+# Select DISTINCT ?sub_region ?sub_region_label ?super_region ?super_region_label
+WHERE
+{
+   # Filter (?super_region_label = 'pancreas')
+
+    ?super_region rdfs:subClassOf+ <http://purl.obolibrary.org/obo/UBERON_0001062>. #subclass of 'anatomical entity'
+    ?sub_region rdfs:subClassOf+ <http://purl.obolibrary.org/obo/UBERON_0001062>.
+
+    ?sub_region rdfs:subClassOf+ [rdf:type owl:Restriction ;
+                                           owl:onProperty partOf: ;
+                                           owl:someValuesFrom ?super_region].
+
+   # ?sub_region ilxtr:isPartOf+ ?super_region.
+
+   ?sub_region rdfs:label ?sub_region_label.
+   ?super_region rdfs:label ?super_region_label.
+
+   Filter (!REGEX(str(?sub_region), "CL_")) #exclude CL classes
+   Filter (!REGEX(str(?super_region), "CL_")) #exclude CL classes
+  # FILTER (?sub_region != ?super_region)
+}
+#+end_src
 ** owl restriction over transitive properties issues
 sigh [[https://ceur-ws.org/Vol-749/paper19.pdf][Subqueries in SPARQL]]
 #+begin_src sparql :eval yes
