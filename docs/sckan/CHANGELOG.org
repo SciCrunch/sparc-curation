@@ -13,7 +13,12 @@
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
 - if-needed :: vagus round 2
 * DEV 2023-08-??
+- TODO mmset1:11 fix the combinatorial paths explosion currently ~(expt 5 4)~
 - TODO NPO aacar pig dog human, not mouse not rat
+* RC 2023-08-03
+- NPO fix partial orders for ApiNATOMY populations that have multiple branches and intrinsic neurons
+  *Note that the fix for intrinsic neurons means that partial orders now can and do contain cycles!*
+- ApiNATOMY wbrcm updated with new regions
 * RC 2023-07-31
 - NPO fix partial orders for ApiNATOMY populations that include layers
 * RC 2023-07-28
