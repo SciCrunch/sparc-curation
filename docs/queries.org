@@ -4452,23 +4452,16 @@ select distinct
 ?s
 ?v1
 ?v2
-where
-{
-VALUES ?s {
-#mmset1:1
-mmset1:11
-#mmset4:2
-#mmset4:7
-#mmset4:8
-}
+where {
 ?s ilxtr:neuronPartialOrder ?o .
 ?o (rdf:rest|rdf:first)* ?r1 .
-?o (rdf:rest|rdf:first)* ?r2 .
-?r1 rdf:rest|rdf:first ?v1 .
-?r2 rdf:rest|rdf:first ?v2 .
+?r1 (rdf:rest|rdf:first)* ?r2 .
+?r1 rdf:first ?v1 .
+?r2 rdf:first ?v2 .
 ?v1 rdf:type owl:Class .
+filter (?mediator = ?r1)  # draw only from the same partial order
 ?mediator rdf:first ?v1 .  # car
-?mediator rdf:rest*/rdf:first/rdf:first ?v2 .  # caadr
+?mediator rdf:rest+/rdf:first/rdf:first ?v2 .  # caadr
 } order by ?s ?v1 ?v2 limit 900
 #+end_src
 
