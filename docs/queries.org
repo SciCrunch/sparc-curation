@@ -4444,25 +4444,73 @@ VALUES ?s { mmset1:1 }
 } order by ?s ?r ?v limit 900
 #+end_src
 
+# XXX performance note
+# major performance hit/pathology if common is not duplicated?
+# it was including the filter in the common bit instead of the unioned bits
+# likewise putting the layer owl:Class in common instead of in the unioned bits
+# leads to a massive slowdown, as a matter of fact as does making region_1 and
+# region_2 common apparently
 Extract the adjacency list directly.
-Will need a bit more when we go to layers, but for now it is ok.
 #+name: sparql-npo-query-adj-list
 #+begin_src sparql
 select distinct
 ?s
-?v1
-?v2
+?region_1 ?layer_1
+?region_2 ?layer_2
 where {
-?s ilxtr:neuronPartialOrder ?o .
-?o (rdf:rest|rdf:first)* ?r1 .
-?r1 (rdf:rest|rdf:first)* ?r2 .
-?r1 rdf:first ?v1 .
-?r2 rdf:first ?v2 .
-?v1 rdf:type owl:Class .
-filter (?mediator = ?r1)  # draw only from the same partial order
-?mediator rdf:first ?v1 .  # car
-?mediator rdf:rest+/rdf:first/rdf:first ?v2 .  # caadr
-} order by ?s ?v1 ?v2 limit 900
+  # common
+  ?s ilxtr:neuronPartialOrder ?o .
+  ?o (rdf:rest|rdf:first)* ?r1 .
+  ?r1 (rdf:rest|rdf:first)* ?r2 .
+
+  { # region       region
+    ?region_1 a owl:Class .
+    ?region_2 a owl:Class .
+
+    ?r1 rdf:first ?region_1 .
+    ?r2 rdf:first ?region_2 .
+    filter (?mediator = ?r1)  # draw only from the same partial order
+    ?mediator rdf:first ?region_1 .  # car
+    ?mediator rdf:rest+/rdf:first/rdf:first ?region_2 .  # caadr
+  }
+  union
+  { # region layer region
+    ?region_1 a owl:Class .
+    ?layer_1 a owl:Class .
+    ?region_2 a owl:Class .
+
+    ?r1 rdf:first [ ?region_1 ?layer_1 ] .
+    ?r2 rdf:first ?region_2 .
+    filter (?mediator = ?r1)  # draw only from the same partial order
+    ?mediator rdf:first [ ?region_1 ?layer_1 ] .  # car
+    ?mediator rdf:rest+/rdf:first/rdf:first ?region_2 .  # caadr
+  }
+  union
+  { # region       region layer
+    ?region_1 a owl:Class .
+    ?region_2 a owl:Class .
+    ?layer_2 a owl:Class .
+
+    ?r1 rdf:first ?region_1 .
+    ?r2 rdf:first [ ?region_2 ?layer_2 ] .
+    filter (?mediator = ?r1)  # draw only from the same partial order
+    ?mediator rdf:first ?region_1 .  # car
+    ?mediator rdf:rest+/rdf:first/rdf:first [ ?region_2 ?layer_2 ] .  # caadr
+  }
+  union
+  { # region layer region layer
+    ?region_1 a owl:Class .
+    ?layer_1 a owl:Class .
+    ?region_2 a owl:Class .
+    ?layer_2 a owl:Class .
+
+    ?r1 rdf:first [ ?region_1 ?layer_1 ] .
+    ?r2 rdf:first [ ?region_2 ?layer_2 ] .
+    filter (?mediator = ?r1)  # draw only from the same partial order
+    ?mediator rdf:first [ ?region_1 ?layer_1 ] .  # car
+    ?mediator rdf:rest+/rdf:first/rdf:first [ ?region_2 ?layer_2 ] .  # caadr
+  }
+} order by ?s ?region_1 ?layer_1 ?region_2 ?layer_2 limit 900
 #+end_src
 
 #+begin_src python :noweb yes
