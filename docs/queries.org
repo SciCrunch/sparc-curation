@@ -4863,8 +4863,21 @@ where
 :header-args:sparql: :url http://localhost:9889/blazegraph/namespace/kb/sparql
 :header-args: :eval never
 :END:
-requires port forwarding from aws-stardog =LocalForward 9889 localhost:9999=
-apparently need to paste it in for now or something
+
+If you are running a local instance of blazegraph go to the update tab.
+For example at http://localhost:9999/blazegraph/#update.
+
+Under the =Type= dropdown select =RDF Data= and under the =Format=
+dropdown select =Turtle=. Download =simple-sckan-properties.ttl=
+linked below to a convenient location and then select it to upload.
+
+https://raw.githubusercontent.com/smtifahim/Loading-Simple-SCKAN/main/sckan-to-simple-sckan/input_ttl/simple-sckan-properties.ttl
+
+The switch the type to =SPARQL Update= and run the insert statements
+below (the corresponding queries are below).
+
+If on production requires port forwarding from aws-stardog =LocalForward 9889 localhost:9999=.
+Direct execution doesn't seem to be working right now via =ob-sparql=.
 #+begin_src sparql :noweb yes
 INSERT {?neuron_type ?npo_simple_prop ?object}
 <<simple-sckan-load-2-where>>
