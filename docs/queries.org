@@ -4402,48 +4402,6 @@ RETURN ae
 #+end_src
 
 ** npo partial orders
-Can't use cypher atm because owlapi doesn't know what to do with nested lists.
-The same issue forced us to use pyontutils/rdflib to merge npo.ttl.
-#+begin_src cypher :limit 9999
-match path = //(Class:{iri: "mmset2:1"})
-(s)-[:ilxtr:neuronPartialOrder]->(blank)
--[:rdf:rest|rdf:first*0..100]->(hrm)
-return blank, hrm
-#+end_src
-Potential solution is to reserialize the nested list to output with something other than
-rdf:first and rdf:rest so that owlapi will parse it as blanknodes and allow it to load.
-The following seems to work and owlapi will preserve the nesting.
-#+begin_src ttl
-@prefix : <file:///ERROR/EMPTY/PREFIX/BANNED/> .
-
-:asdf a owl:Class ;
-    rdfs:label "AAAAAAAAAAAAAAAAAAAAAAA" ;
-:neuronPartialOrder
-[ :first :a ;
-  :rest [
-    :first :b ;
-    :rest [
-     :first :c
-] ] ] .
-#+end_src
-
-SPARQL works with a bit of a dance to ensure that each individual pair is extracted.
-To reconstruct the nested list tree structure start from nil and cons up iirc.
-#+name: sparql-npo-query-raw-partial-order
-#+begin_src sparql
-select distinct
-?s
-?r
-?v
-where
-{
-VALUES ?s { mmset1:1 }
-?s ilxtr:neuronPartialOrder ?o .
-?o (rdf:rest|rdf:first)* ?r .
-?r rdf:rest|rdf:first ?v .
-} order by ?s ?r ?v limit 900
-#+end_src
-
 # XXX performance note
 # major performance hit/pathology if common is not duplicated?
 # it was including the filter in the common bit instead of the unioned bits
@@ -4511,6 +4469,49 @@ where {
     ?mediator rdf:rest+/rdf:first/rdf:first [ ?region_2 ?layer_2 ] .  # caadr
   }
 } order by ?s ?region_1 ?layer_1 ?region_2 ?layer_2 limit 900
+#+end_src
+
+*** old notes :noexport:
+Can't use cypher atm because owlapi doesn't know what to do with nested lists.
+The same issue forced us to use pyontutils/rdflib to merge npo.ttl.
+#+begin_src cypher :limit 9999
+match path = //(Class:{iri: "mmset2:1"})
+(s)-[:ilxtr:neuronPartialOrder]->(blank)
+-[:rdf:rest|rdf:first*0..100]->(hrm)
+return blank, hrm
+#+end_src
+Potential solution is to reserialize the nested list to output with something other than
+rdf:first and rdf:rest so that owlapi will parse it as blanknodes and allow it to load.
+The following seems to work and owlapi will preserve the nesting.
+#+begin_src ttl
+@prefix : <file:///ERROR/EMPTY/PREFIX/BANNED/> .
+
+:asdf a owl:Class ;
+    rdfs:label "AAAAAAAAAAAAAAAAAAAAAAA" ;
+:neuronPartialOrder
+[ :first :a ;
+  :rest [
+    :first :b ;
+    :rest [
+     :first :c
+] ] ] .
+#+end_src
+
+SPARQL works with a bit of a dance to ensure that each individual pair is extracted.
+To reconstruct the nested list tree structure start from nil and cons up iirc.
+#+name: sparql-npo-query-raw-partial-order
+#+begin_src sparql
+select distinct
+?s
+?r
+?v
+where
+{
+VALUES ?s { mmset1:1 }
+?s ilxtr:neuronPartialOrder ?o .
+?o (rdf:rest|rdf:first)* ?r .
+?r rdf:rest|rdf:first ?v .
+} order by ?s ?r ?v limit 900
 #+end_src
 
 #+begin_src python :noweb yes
