@@ -4387,6 +4387,15 @@ WHERE NOT EXISTS(dimension.owlType) OR dimension.owlType = "subClassOf" OR dimen
 RETURN phenotype
 #+end_src
 
+#+begin_src sparql
+select distinct ?p (count(distinct ?neuron) as ?count) where {
+?p rdfs:subPropertyOf* ilxtr:hasPhenotype .
+?neuron (rdfs:subClassOf|(owl:equivalentClass/owl:intersectionOf/(rdf:rest|rdf:first)*)) [ owl:onProperty ?p ] .
+?neuron rdfs:subClassOf* ?sckan_neuron .
+values ?sckan_neuron { ilxtr:NeuronSparcNlp ilxtr:NeuronApinatSimple }
+} group by ?p order by desc(?count)
+#+end_src
+
 ** npo locations
 TODO in order for this to work we have to be able to collapse the
 graph or customize the return value so we get dimension ae pairs
