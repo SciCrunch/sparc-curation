@@ -1,6 +1,6 @@
 # About Simple SCKAN
 
-What do we mean by **Simple SCKAN**? Simple SCKAN refers to an extension of the [SCKAN](https://zenodo.org/record/6369432#.YxkD5OzML0q) that allows writing queries about the [NPO&#39;s](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of Simple SCKAN is to support simplicity while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Simple SCKAN adds that query-friendly abstraction layer on top of the SCKAN.
+What do we mean by **Simple SCKAN**? Simple SCKAN refers to an extension of the [SCKAN](https://zenodo.org/record/6369432#.YxkD5OzML0q) that allows writing queries about [NPO&#39;s](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of Simple SCKAN is to support simplicity while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Simple SCKAN adds that query-friendly abstraction layer on top of the SCKAN.
 
 - [Accessing Simple SCKAN](#accessing-simple-sckan)
 - [Running Simple SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog)
@@ -9,8 +9,6 @@ What do we mean by **Simple SCKAN**? Simple SCKAN refers to an extension of the 
 
 # Accessing Simple SCKAN
 
-* You can download **Simple SCKAN** ontology from the following link and load it into any standard Graph Databese such as Stardog, Graph DB, or Neo4J.
-  * [Downlod Simple SCKAN in Turtle format from here](https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2022-08-pre-3/simple-sckan-merged-with-npo.ttl).
 * We recommend using [Stardog Studio](https://www.stardog.com/studio/) as the SPARQL query interface for Simple SCKAN. A Stardog endpoint is set up by the [FDI Lab](https://www.fdilab.org/) to provide access to the SCKAN connectivity knowledge via Stardog Studio.
   * We have a set of predefined 'canned' query patterns avialable via Stardog Studio that we think would be useful for the users like SPARC's NLP curators, anatomical experts, and other interested users.
 * What to expect in the future:
@@ -43,22 +41,38 @@ If you *don't* have the username and password to access our Stardog server, plea
 
 # SCKAN Vs. Simple SCKAN
 
-The underlying ontologies in SCKAN are developed using standard OWL-DL formalism. The ontology that formalizes the SCKAN's core connectivity knowledge, the [Neuron Phenotype Ontology](https://link.springer.com/article/10.1007/s12021-022-09566-7) (NPO), is also encoded in OWL-DL. When it comes to the NPO, the main reasons for choosing the OWL-DL formalism are the following: (a) explicitly specifying the neuronal phenotypes with precise logical axioms and quantifiers, and (b) utilizing standard ontology reasoners for automated classification of neuron types, and detecting inconsistencies within the asserted axioms of the neuron populations.
+The underlying ontologies in SCKAN are developed using standard OWL-DL formalism. The ontology that formalizes the SCKAN's core connectivity knowledge, the [Neuron Phenotype Ontology](https://link.springer.com/article/10.1007/s12021-022-09566-7) (NPO), is also encoded in OWL-DL. When it comes to the NPO, the main reasons for choosing the OWL-DL formalism are the following: (a) explicitly specifying the neuronal phenotypes with precise logical axioms and quantifiers, and (b) utilizing standard ontology reasoners for automated classification of neuron populations, and detecting inconsistencies within the asserted axioms of the neuron populations.
 
 * While OWL-DL supports automated reasoning and provides a rigorous formalism to specify the logical axioms of an ontology, it lacks support for quiring and retrieving those axiom-level specifications. We simply don't have enough tool support for complex axiom-level queries that one could use against the OWL ontologies.
 * While one can use SPARQL or CYPHER to retreive axiom-level knowledge from the OWL ontologies, it usually requires an extensive knowledge about the domain of the ontologies as well as the technical jargon of the OWL/RDF formalisms.
 * The standard graph-based query laguages like SPARQL and CYPHER are meant for writing data or individual-level queries against a knowledgebase. They are not very suitable for writing the class-level queries with complex ontological axioms. Writing and testing such class-level queries against an OWL ontology can become quite difficult and tedious.
-* Since the neuron types in SCKAN are defined based on a set of OWL logical axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies.
+* Since the neuron populations in SCKAN are defined based on a set of OWL logical axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies.
 
-The **Simple SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified subject-predicate-object relations about the core connectivity knowledge available in NPO. The key objective of the Simple SCKAN is to **support simplicity** while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Following is the list of simplified relational predicates available in Simple SCKAN to express the connectivity between a neuron type and its locational phenotypes:
+The **Simple SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified subject-predicate-object relations about the core connectivity knowledge available in NPO. The key objective of the Simple SCKAN is to **support simplicity** while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Following is the list of simplified relational predicates available in Simple SCKAN:
 
-* _**hasSomaLocation**_: a relation between a Neuron Type and its Soma Location
-* _**hasAxonLocation**_: a relation between a Neuron Type and its Axon Location
-* _**hasDendriteLocation**_: a relation between a Neuron Type and its Dendrite Location
-* _**hasAxonTerminalLocation**_: a relation between a Neuron type and its Axon Terminal Location (i.e., the location of the axon presynaptic element)
-* _**hasAxonSensoryLocation**_: a relation between a Neuron type and its Sensory Axon Terminal Location (i.e., the location of the axon sesory subcellular element)
+#### Locational Phenotypes
 
-The relational properties above in **Simple SCKAN** serve as the 'shortcuts' for the NPO's actaul ontological axioms about the locational phenotypes of the neuron populations. Essentially, Simple SCKAN encapsulates those complex OWL axioms relevant to the NPO's locational phenotypes into simpler RDF graph patterns. The sole purpose of this encapsulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. The next section provides an example as to how Simple SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
+| Phenotypic Relation               | Description                                                                                                                                           |
+| --------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **hasSomaLocation**         | Expresses a relation between a neuron population and its origin i.e., location of the cell body                                                       |
+| **hasAxonLocation**         | Expresses a relation between a neuron population and its axon location                                                                               |
+| **hasDendriteLocation**     | Expresses a relation between a neuron population and its dendrite location                                                                           |
+| **hasAxonTerminalLocation** | Expresses a relation between a neuron population and its axon terminal location<br />(i.e., the location of the axon presynaptic element)             |
+| **hasAxonSensoryLocation**  | Expresses a relation between a neuron population and its sensory axon terminal location (i.e., the location of the axon sensory subcellular element) |
+
+#### Other Phenotypes
+
+| Phenotypic Relation                | Description                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **hasNeuronalPhenotype**     | Expresses a relation between a neuron population and its ANS phenotype<br />- **Pre-Ganglionic or Post-Ganglionic**, **Sympathetic** or **Parasympathetic**<br />- Combinations like  **Sympathetic  Pre-Ganglionic** or **Parasympathetic Post-Ganglionic**                                    |
+| **hasFunctionalCircuitRole** | Expresses a relation between a neuron population and its immediate effect on postsynaptic cells<br />- **Excitatory** or **Inhibitory**                                                                                                                                                                           |
+| **hasCircuitRole**           | Expresses a relation between a neuron population and its circuit role phenotype<br />- Possible phenotypes are: **Intrinsic**, **Motor**, **Sensory**, or **Projection**                                                                                                                               |
+| **hasProjection**            | Expresses a relation between a neuron population and a brain region where the neuron population sends axons towards<br />- **Spinal cord descending projection**, **Spinal cord ascending projection**<br />- **Intestino fugal projection**, **Anterior projecting**, **Posterior projecting** |
+| **isObservedInSpecies**      | Expresses a relationship between a neuron type and a taxon. Used when a neuron population has een observed in a specific species.<br />- **Species from NCBI Taxonomy**                                                                                                                                                   |
+| **hasPhenotypicSex**         | Expresses a relationship between a neuron type and a biological sex. Used when a neuron population has been observed in a specific sex.<br />- **Male or **Female** from PATO**                                                                                                                                    |
+| **hasForwardConnection**     | Expresses a relationship to specify the synaptic forward connection from a pre-ganglionic neuron population to a post-ganglionic neuron population.                                                                                                                                                                             |
+
+The relational predicates above in **Simple SCKAN** serve as the 'shortcuts' for the actual OWL axioms used in NPO to represent the phenotypic properties of its neuron populations. Essentially, Simple SCKAN encapsulates those complex OWL axioms into a set of simpler RDF graph patterns. The sole purpose of this encapsulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. The next section provides an example as to how Simple SCKAN queries can be simpler to write than that of SCKAN using SPARQL.
 
 ## Query Example: SCKAN Vs. Simple SCKAN
 
@@ -157,5 +171,4 @@ LIMIT 999
 | neuron type aacar 11  | UBERON:0005363   | inferior vagus X ganglion              | UBERON:0002078       | right cardiac atrium                   |
 
 # More **Simple SCKAN** Example Queries
-
-    * Link will be posted here.
+* [Query examples in Jupyter Notebook](https://github.com/smtifahim/sckan-query-examples/)
