@@ -28,8 +28,9 @@ prefix_endswith = ['/', '#', '_', '-', ':', '=',
 base_context = {
     '@version': 1.1,
     'id': '@id',
-    'dataset': {'@id': 'https://api.pennsieve.io/datasets/N:dataset:', '@prefix': True},  # FIXME -> pennsieve
-    'package': {'@id': 'https://api.pennsieve.io/packages/N:package:', '@prefix': True},  # FIXME -> pennsieve
+    'organization': {'@id': 'https://api.pennsieve.io/organizations/N:organization:', '@prefix': True},
+    'dataset': {'@id': 'https://api.pennsieve.io/datasets/N:dataset:', '@prefix': True},
+    'package': {'@id': 'https://api.pennsieve.io/packages/N:package:', '@prefix': True},
     # @base and _bfc are added at runtime and are dataset:{dataset-id-suffix}
     'meta': '@graph',
     #'meta': 'TEMP:hasSubGraph',  #'_bfc:#meta-graph',  # FIXME I think the fragment is the right thing to do here ...
@@ -1976,6 +1977,7 @@ class MetaOutExportSchema(JSONSchema):
                       'timestamp_created',
                       'timestamp_updated',
                       'timestamp_updated_contents',
+                      #'id_organization',  # XXX not clear whether this is strictly required or not
                       #'subject_count',
                       #'sample_count',
     ]
@@ -2013,6 +2015,9 @@ class MetaOutExportSchema(JSONSchema):
                                        'pattern': iso8601pattern,
                                        'context_value': 'TEMP:contentsWereUpdatedAtTime',
                                        },
+        'id_organization': {
+            'type': 'string',  # XXX keeping it as simple as possible for now
+            'context_value': idtype('TEMP:hasOrganization'),},
         'uri_human': {'allOf': [  # FIXME this is absolutely not the right way to solve this problem
             {'type': 'string',
              'context_value': idtype('TEMP:hasUriHuman'),},

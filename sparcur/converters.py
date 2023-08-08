@@ -274,6 +274,7 @@ class MetaConverter(TripleConverter):
         ['modality', TEMP.hasExperimentalApproach],
         ['approach', TEMP.hasExperimentalApproach],
         ['techniques', TEMP.protocolEmploysTechnique],
+        ['id_organization', TEMP.hasOrganization],
         ['uri_api', TEMP.hasUriApi],
         ['uri_human', TEMP.hasUriHuman],
         ['keywords', isAbout],

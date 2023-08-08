@@ -134,8 +134,11 @@ class DatasetMetadata(HasErrors):
                     timestamp_updated=cmeta.updated,
                     # FIXME vs the dataset updated time now touched for transitive updates
                     timestamp_updated_contents=self.updated_cache_transitive(),
+                    # FIXME if we move to allow datasets at top level without enclosing org will
+                    # likely need to pull this from the xattrs
+                    id_organization=self._path.parent.cache_identifier,
                     sparse=self.cache.is_sparse(),
-                        ))
+                ))
         else:
             raise NotImplementedError('use CacheL instead')
             path = self._path
