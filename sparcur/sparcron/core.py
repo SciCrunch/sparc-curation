@@ -52,7 +52,7 @@ from celery.schedules import crontab
 import sparcur
 from sparcur.cli import Main, Options, __doc__ as clidoc
 from sparcur.utils import PennsieveId, GetTimeNow, log
-from sparcur.paths import Path
+from sparcur.paths import Path, PennsieveCache
 from sparcur.config import auth
 from sparcur.simple.utils import backend_pennsieve
 from sparcur.simple.retrieve import main as retrieve
@@ -85,7 +85,7 @@ args = {**defaults, 'export': True, '--jobs': 1, 'schemas': False, 'protcur': Fa
         'report': False, 'protocols': False,}  # FIXME separate args for protcur export
 options = Options(args, defaults)
 
-project_id = auth.get('remote-organization')
+project_ids = auth.get_list('remote-organizations')
 data_path = auth.get_path('data-path')
 path_source_dir = (
     Path('~/files/sparc-datasets-test').expanduser().resolve()
@@ -116,7 +116,7 @@ cel = Celery('sparcur-cron',)
 cel.conf.worker_hijack_root_logger = False
 cel.conf.worker_prefetch_multiplier = 1
 
-log.info(f'STATUS sparcur :id {project_id} :path {path_source_dir}')
+log.info(f'STATUS sparcur :ids {project_ids} :path {path_source_dir}')
 
 # FIXME needed a dedicated worker for the cron queue
 cel.conf.task_queues = (
@@ -256,7 +256,7 @@ heartbeat_interval = 5  # seconds
 def setup_periodic_tasks(sender, **kwargs):
     log.info('setting up periodic tasks ...')
     sender.add_periodic_task(sync_interval,
-                             check_for_updates.s(project_id),
+                             check_for_updates.s(project_ids),
                              name='check for updates',
                              expires=0.68333)
 
@@ -269,9 +269,9 @@ def setup_periodic_tasks(sender, **kwargs):
         # FIXME remove the heartbeat and dump a log status line after
         # begin/end of every dataset export
         sender.add_periodic_task(heartbeat_interval,
-                                    heartbeat.s(),
-                                    name='heartbeat',
-                                    expires=0.2)
+                                 heartbeat.s(),
+                                 name='heartbeat',
+                                 expires=0.2)
 
 
 
@@ -340,7 +340,7 @@ argv_spc_export = [
     # explicitly avoid joblib which induces absurd process overhead
     '--jobs', '1']
 
-pid = PennsieveId(project_id)
+
 def ret_val_exp(dataset_id, updated, time_now, fetch=True):
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     log.info(f'START {dataset_id} {timestamp}')
@@ -656,24 +656,55 @@ def check_single_dataset(dataset):
 
 
 @cel.task
-def check_for_updates(project_id):
-    datasets = datasets_remote_from_project_id(project_id)
-    #datasets = sorted(datasets, key=lambda r:r.id)[:3]
-    for dataset in datasets:
+def check_for_updates(project_ids):
+    # yes we want to pass project ids in here even though it means
+    # that in the current implementation that we have to restart
+    # to change the set of projects that we run over
+    for dataset in datasets_remote_from_project_ids(project_ids):
         check_single_dataset(dataset)
 
 
-PennsieveRemote = backend_pennsieve(project_id)
-root = PennsieveRemote(project_id)
-def datasets_remote_from_project_id(project_id):
-    datasets_no = auth.get_list('datasets-no')
+def get_roots(project_ids):
+    roots = {}
+    for project_id in project_ids:
+        # have to construct remote specific Local and Cache
+        # so that the mapping stays 1:1 otherwise we can get
+        # some really wonky behavior
+        class LPath(Path): pass
+        LPath._bind_flavours()
+        class Cache(PennsieveCache): pass
+        Cache._bind_flavours()
+
+        #pid = PennsieveId(project_id)
+        PennsieveRemote = backend_pennsieve(
+            project_id,
+            Local=LPath,
+            Cache=Cache,)
+        root = PennsieveRemote(project_id)
+        roots[project_id] = root
+
+    return roots
+
+
+roots = get_roots(project_ids)
+def datasets_remote_from_project_id(project_id, datasets_no):
+    root = roots[project_id]
     datasets = [c for c in root.children if c.id not in datasets_no]
+    return datasets
+
+
+def datasets_remote_from_project_ids(project_ids):
+    datasets_no = auth.get_list('datasets-no')
+    datasets = []
+    for project_id in project_ids:  # FIXME might want to spread these out in time?
+        datasets.extend(datasets_remote_from_project_id(project_id, datasets_no))
+
     return datasets
 
 
 def status_report():
     try:
-        datasets = datasets_remote_from_project_id(project_id)
+        datasets = datasets_remote_from_project_ids(project_ids)
     except Exception as e:
         log.exception(e)
         return
@@ -738,7 +769,7 @@ def test():
     reset_redis_keys(conn)
     populate_existing_redis(conn)
 
-    datasets = datasets_remote_from_project_id(project_id)
+    datasets = datasets_remote_from_project_ids(project_ids)
     datasets = sorted(datasets, key=lambda r:r.id)[:3]
     dataset = datasets[0] # 0, 1, 2 # ok, unfetched xml children, ok
     dataset_id = dataset.id
