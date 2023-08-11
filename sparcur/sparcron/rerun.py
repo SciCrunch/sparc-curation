@@ -7,8 +7,8 @@ from datetime import timedelta
 from dateutil import parser as dateparser
 from sparcur.utils import PennsieveId
 from sparcur.sparcron.core import (
-    project_id,
-    datasets_remote_from_project_id,
+    project_ids,
+    datasets_remote_from_project_ids,
     mget_all,
     export_single_dataset
 )
@@ -37,7 +37,7 @@ def rerun_dataset(conn, dataset):
 
 def main():
     conn = get_redis_conn()
-    all_datasets = datasets_remote_from_project_id(project_id)
+    all_datasets = datasets_remote_from_project_ids(project_ids)
     args = sys.argv[1:]
     if args:
         to_run = [PennsieveId('dataset:' + rawid.split(':')[-1]) for rawid in args]
