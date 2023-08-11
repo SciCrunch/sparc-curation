@@ -234,6 +234,21 @@ class OntTerm(OTB, OntId):
 OntTerm._sinit()
 OntTerm.set_repr_args('curie', 'label')
 
+class UnmappedTerm:
+
+    def __init__(self, value):
+        self._value = value
+
+    def asDict(self):
+        return {
+            'type': self.__class__.__name__,
+            'label': self._value,}
+
+    @classmethod
+    def fromJson(cls, blob):
+        assert blob['type'] == cls.__name__
+        return cls(blob['label'])
+
 
 class HasErrors:
     message_passing_key = 'keys_with_errors'
@@ -1666,7 +1681,7 @@ def resolve_context_runtime(specs, *blobs):
 
 # register idlib classes for fromJson
 [register_type(i, i.__name__) for i in
- (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm)]
+ (idlib.Ror, idlib.Doi, idlib.Orcid, idlib.Pio, idlib.Rrid, OntTerm, UnmappedTerm)]
 
 # register other types for fromJson
 register_type(IdentityJsonType, 'BlackfynnRemoteMetadata')  # legacy type string

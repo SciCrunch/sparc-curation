@@ -12,27 +12,60 @@ from sparcur.config import auth
 from urllib.parse import urlparse
 
 
-def base_get_file_by_url(cls, url, ranges=tuple()):
+def base_get_file_by_url(cls, url, ranges=tuple(), yield_headers=True):
     """ NOTE THAT THE FIRST YIELD IS HEADERS
     valid ranges are (start,) (-start,) (start, end)
     """
 
-    kwargs = {}
-    if ranges:
-        # TODO validate probably
-        range_spec = ', '.join(
+    def make_range_spec(ranges):
+        return ', '.join(
             (str(r[0]) if r[0] < 0 else f'{r[0]}-')
             if len(r) == 1 else '-'.join(str(se) for se in r)
             for r in ranges)
+
+    kwargs = {}
+    if ranges:
+        # TODO validate probably
+        range_spec = make_range_spec(ranges)
         kwargs['headers'] = {'Range': f'bytes={range_spec}'}
 
     resp = cls._requests.get(url, stream=True, **kwargs)
     headers = resp.headers
-    yield headers
+    if yield_headers:
+        yield headers
+
     log.log(9, f'reading from {url}')  # too much for debug
-    for chunk in resp.iter_content(chunk_size=4096):  # FIXME align chunksizes between local and remote
-        if chunk:
-            yield chunk
+    # FIXME the failure case for this is really bad because we cannot
+    # resume mid way and have to restart from scratch unless we count
+    # chunks and do math here
+    chunk_size = 4096  # FIXME align chunksizes between local and remote
+    try:
+        i = None  # if you fail on the first chunk and don't have i = 0, very bad time
+        for i, chunk in enumerate(resp.iter_content(chunk_size=chunk_size)):
+            if chunk:
+                yield chunk
+    except cls._requests.exceptions.ChunkedEncodingError as e:
+        log.critical('pennsieve connection broken causing ChunkedEncodingError')
+        bytes_read = 0 if i is None else chunk_size * (i + 1)
+        # XXX NOTE we DO NOT ADD 1 to the bytes_read when calculating
+        # the range because bytes read is alread 1 + the index of the
+        # last byte read, so using it directly starts at the right place
+        if ranges:
+            if len(ranges) == 1 and len(ranges[0]) == 1:
+                # a start only case
+                ((current_start,),) = ranges
+                ranges = ((current_start + bytes_read,),)
+            else:
+                # the full complexity is not straight forward to implement
+                # and requires requires couting the number of bytes in each
+                # range, making sure that the range starts are sequential
+                # which is not possible in the general case ... etc.
+                msg = 'TODO'
+                raise NotImplementedError(msg)
+        else:
+            ranges = ((bytes_read,),)
+
+        yield from cls.get_file_by_url(url, ranges, yield_headers=False)
 
 
 def base_data(self):
@@ -724,7 +757,14 @@ class BlackfynnRemote(aug.RemotePath):
         elif isinstance(self.bfobject, self._DataPackage):
             return  # we conflate data packages and files
         elif isinstance(self.bfobject, self._Organization):
-            for dataset in self.bfobject.datasets:
+            try:
+                datasets = self.bfobject.datasets
+            except self._requests.exceptions.ChunkedEncodingError as e:
+                log.critical('pennsieve connection broken causing ChunkedEncodingError')
+                yield from self._children(create_cache=create_cache)
+                return
+
+            for dataset in datasets:
                 child = self.__class__(dataset)
                 if create_cache:
                     self.cache / child  # construction will cause registration without needing to assign
@@ -2021,15 +2061,55 @@ class PennsieveDiscoverRemote(aug.RemotePath):
     def uri_human(self):
         return f'https://discover.pennsieve.io/datasets/{self.id}/version/{self.version}'
 
+    def _meta_project(self):
+        block = 200
+        offset = 0
+        datasets = []
+        while True:
+            uri = self.uri_api + f'?offset={offset}&limit={block}&orderBy=date'
+            resp = self._requests.get(uri)
+            if resp.ok:
+                try:
+                    blob = resp.json()
+                    total_count = blob['totalCount']
+                    datasets.extend(blob['datasets'])
+                    if len(blob['datasets']) < block:
+                        assert total_count == len(datasets)
+                        break  # we're at the end
+                except self._requests.exceptions.JSONDecodeError as e:
+                    # FIXME this needs to be wrapped at a global level
+                    # because everything is horribly broken
+                    msg = f'resp ok but json decode error?!\n{resp.text}'
+                    log.critical(msg)
+                    raise e
+            else:
+                resp.raise_for_status()
+
+            offset += block
+
+        return {'datasets': datasets,}
+
     def _meta(self):
         if not hasattr(self, '_cache_meta'):
             if self.id == self._project_id:
                 uri = self.uri_api + '?limit=9999'  # FIXME will eventually need to paginate
+                self._cache_meta = self._meta_project()
+                return self._cache_meta
             else:
                 uri = self.uri_api + '/metadata'
 
             resp = self._requests.get(uri)
-            self._cache_meta = resp.json()
+            if resp.ok:
+                try:
+                    self._cache_meta = resp.json()
+                except self._requests.exceptions.JSONDecodeError as e:
+                    # FIXME this needs to be wrapped at a global level
+                    # because everything is horribly broken
+                    msg = f'resp ok but json decode error?!\n{resp.text}'
+                    log.critical(msg)
+                    raise e
+            else:
+                resp.raise_for_status()
 
         return self._cache_meta
 

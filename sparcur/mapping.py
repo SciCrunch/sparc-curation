@@ -1,7 +1,7 @@
 # term mapping
 
 from functools import wraps
-from .core import OntTerm
+from .core import OntTerm, UnmappedTerm
 from .utils import log
 
 
@@ -45,7 +45,7 @@ def species(string, __species=dict(_species), __fetched=[False]):
         return __species[lstr]
     else:
         log.warning(f'No ontology mapping found for {string}')
-        return string
+        return UnmappedTerm(string)
 
 
 _sex = {
@@ -65,4 +65,4 @@ def sex(string, __sex=dict(_sex), __fetched=[False]):
         return __sex[lstr]
     else:
         log.warning(f'No ontology mapping found for {string}')
-        return string
+        return UnmappedTerm(string)
