@@ -13,11 +13,14 @@ from sparcur.paths import Path, PathL
 from sparcur.paths import LocalPath, PrimaryCache
 from sparcur.paths import SymlinkCache
 from sparcur.state import State
-from sparcur.utils import PennsieveId, log
+from sparcur.utils import PennsieveId, log, register_all_types
 from sparcur.datasets import DatasetDescriptionFile
 from sparcur.curation import PathData, Integrator
 from sparcur.pennsieve_api import FakeBFLocal
 #log.setLevel(9)
+# XXX calling register_all_types here will mask errors where we fail to call in
+# a certain context but not much we can do about that
+register_all_types()
 this_file = Path(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
@@ -141,6 +144,13 @@ for root in ds_roots:
     log.debug(rp)
     mk_required_files(rp)  # TODO all variants of missing files
 
+dpie_path = project_path / 'dataset-pie'
+if not dpie_path.exists():
+    dpie_path.mkdir()
+for source, target in (('dd-pie.csv', 'dataset_description.csv'),
+                      ('su-pie.csv', 'subjects.csv'),
+                      ('sa-pie.csv', 'samples.csv'),):
+    (examples_root / source).copy_to(dpie_path / target)
 
 fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
 State.bind_blackfynn(fbfl)

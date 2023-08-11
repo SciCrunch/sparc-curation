@@ -6,6 +6,7 @@ from .common import (examples_root,
                      project_path,
                      RDHPN,
                      )
+from sparcur.utils import log
 
 
 class TestDatasetDescription(unittest.TestCase):
@@ -64,9 +65,17 @@ class PipelineHelper:
         bads = []
         fails = []
         errors = []
+        sererr = []
         for p in pipelines:
             try:
                 d = p.data
+                if hasattr(self, 'ser_deser'):
+                    try:
+                        self.ser_deser(d)
+                    except Exception as e:
+                        log.exception(e)
+                        sererr.append(e)
+
                 if 'errors' in d:
                     errors.append(d.pop('errors'))
                     fails.append(d)
@@ -81,6 +90,7 @@ class PipelineHelper:
                 bads.append((e, p))
 
         assert not bads, bads
+        assert not sererr, sererr
 
 
 class TestPipelines(PipelineHelper, unittest.TestCase):

@@ -249,6 +249,9 @@ class UnmappedTerm:
         assert blob['type'] == cls.__name__
         return cls(blob['label'])
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self._value!r})'
+
 
 class HasErrors:
     message_passing_key = 'keys_with_errors'

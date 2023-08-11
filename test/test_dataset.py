@@ -14,7 +14,9 @@ from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
 from sparcur.core import JEncode
 from sparcur.utils import fromJson
-from .common import examples_root, template_root, project_path, temp_path
+from sparcur.paths import PathL
+from .common import examples_root, template_root, project_path, temp_path, dpie_path
+from .test_pipelines import PipelineHelper as PH
 
 template_root = aug.RepoPath(template_root)
 
@@ -23,8 +25,17 @@ def ser_deser(blob):
     # use to test roundtrip to and from json
     s = json.dumps(blob, cls=JEncode)
     reblob = json.loads(s)
-    ir = fromJson
-    return
+    ir = fromJson(reblob)
+
+
+class PipelineHelper(PH):
+
+    def ser_deser(self, blob):
+        ser_deser(blob)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.test_datasets = []
 
 
 class TestTabular(unittest.TestCase):
@@ -258,3 +269,10 @@ class TestSamplesFile(Helper, unittest.TestCase):
 
     def test_versions(self):
         self._versions()
+
+
+class TestDatasetPie(PipelineHelper, unittest.TestCase):
+
+    def setUp(self):
+        self.dataset = PathL(dpie_path)
+        self.test_datasets = [self.dataset]
