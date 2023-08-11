@@ -2062,7 +2062,7 @@ class PennsieveDiscoverRemote(aug.RemotePath):
         return f'https://discover.pennsieve.io/datasets/{self.id}/version/{self.version}'
 
     def _meta_project(self):
-        block = 200
+        block = 100
         offset = 0
         datasets = []
         while True:
