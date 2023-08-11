@@ -1,4 +1,5 @@
 import csv
+import json
 import pprint
 import unittest
 import pytest
@@ -11,9 +12,19 @@ from sparcur.datasets import (Tabular,
                               remove_rule,)
 from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
+from sparcur.core import JEncode
+from sparcur.utils import fromJson
 from .common import examples_root, template_root, project_path, temp_path
 
 template_root = aug.RepoPath(template_root)
+
+
+def ser_deser(blob):
+    # use to test roundtrip to and from json
+    s = json.dumps(blob, cls=JEncode)
+    reblob = json.loads(s)
+    ir = fromJson
+    return
 
 
 class TestTabular(unittest.TestCase):
@@ -109,6 +120,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         assert not [k for k in value if not isinstance(k, str)]
 
     def test_submission_multi_row_error_no_values(self):
@@ -116,6 +128,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         assert not [k for k in value if not isinstance(k, str)]
 
     def test_submission_data_in_definition(self):
@@ -123,6 +136,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         assert not [k for k in value if not isinstance(k, str)]
 
     def test_submission_matched_at_header(self):
@@ -139,6 +153,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         assert not [k for k in value if not isinstance(k, str)]
 
     def test_sm_210(self):
@@ -153,6 +168,7 @@ class TestSubmissionFile(Helper, unittest.TestCase):
             value = obj.data
             pipeline = self.pipe(tf, None, None)
             data = pipeline.data
+            # TODO ser_deser
             out.append((tf, value, data))
             if ('errors' in data and tf.name not in expect_error or
                 'errors' not in data and tf.name in expect_error):
@@ -179,12 +195,14 @@ class TestDatasetDescription(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
 
     def test_dd_pie_pipeline(self):
         tf = examples_root / 'dd-pie.csv'
         pipeline = self.pipe(tf, None, None)
         data = pipeline.data
         pprint.pprint(data)
+        ser_deser(data)
 
     def test_versions(self):
         self._versions()
@@ -200,6 +218,7 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         assert [s for s in value['subjects'] if 'subject_id' in s]
 
     def test_su_cry(self):
@@ -207,6 +226,7 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         assert [s for s in value['subjects'] if 'subject_id' in s]
 
     def test_versions(self):
@@ -232,6 +252,7 @@ class TestSamplesFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         value = obj.data
         pprint.pprint(value)
+        ser_deser(value)
         derp = list(value['samples'][0])
         assert 'same_header' in derp, derp
 
