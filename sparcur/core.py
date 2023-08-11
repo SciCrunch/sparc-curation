@@ -484,6 +484,8 @@ def json_export_type_converter(obj):
     elif isinstance(obj, oq.OntTerm):
         return obj.iri
         #return obj.asDict()  # FIXME need a no network/scigraph version
+    elif isinstance(obj, UnmappedTerm):
+        return obj.asDict()
     elif isinstance(obj, idlib.Stream) and hasattr(obj, '_id_class'):
         if obj._id_class is str:
             return obj.identifier
