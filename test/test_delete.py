@@ -812,7 +812,8 @@ class _WorkflowHelper:
         # 3
         path_dataset.make_push_manifest(dataset_id, updated_transitive, push_id)
         # 4
-        path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
+        if not self._local_only:  # this fails without remote
+            path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
 
 
 class TestWorkflow(_ChangesHelper, _WorkflowHelper, _TestOperation, unittest.TestCase):
