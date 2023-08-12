@@ -147,10 +147,15 @@ for root in ds_roots:
 dpie_path = project_path / 'dataset-pie'
 if not dpie_path.exists():
     dpie_path.mkdir()
+    dpie_path.setxattrs(mk_fldr_meta(dpie_path, 'dataset'))  # comment out to find .cache None issues
+
 for source, target in (('dd-pie.csv', 'dataset_description.csv'),
-                      ('su-pie.csv', 'subjects.csv'),
-                      ('sa-pie.csv', 'samples.csv'),):
-    (examples_root / source).copy_to(dpie_path / target)
+                       ('su-pie.csv', 'subjects.csv'),
+                       ('sa-pie.csv', 'samples.csv'),):
+    targ = dpie_path / target
+    (examples_root / source).copy_to(targ)
+    attrs = mk_file_meta(targ)
+    targ.setxattrs(attrs)  # comment out to find .cache None issues
 
 fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
 State.bind_blackfynn(fbfl)

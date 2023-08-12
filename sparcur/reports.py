@@ -815,7 +815,8 @@ class Report:
         else:
             pprint.pprint(
                 sorted([(d['meta']['folder_name'],
-                         [e['message'] for path, e in get_all_errors(d)])
+                         [e['message'] for path, e in
+                          get_all_errors(d, skip_keys=('submission_errors', 'curation_errors'))])
                         for d in datasets],
                        key=lambda ab: (bool(ab), -len(ab[-1]) if ab else 0)))
 

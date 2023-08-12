@@ -3,7 +3,7 @@ import idlib
 import rdflib
 import dicttoxml
 from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ as AsJson
-from sparcur.core import OntTerm, get_all_errors
+from sparcur.core import OntTerm, UnmappedTerm, get_all_errors
 from sparcur.utils import loge, is_list_or_tuple
 from sparcur import pipelines as pipes
 
@@ -44,6 +44,8 @@ def xml(dataset_blobs):
             return str(v)
         elif isinstance(v, idlib.Stream):
             return v.asCell()
+        elif isinstance(v, UnmappedTerm):
+            return v.asDict()
         #elif isinstance(v, list) or isinstance(v, str):
             #return v
         elif isinstance(v, BaseException):

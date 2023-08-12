@@ -1493,29 +1493,31 @@ def normalize_tabular_format(project_path):
                 log.warning(f'Sheet weirdness in {xf}\n{e}')
 
 
-def extract_errors(thing, path=None):
+def extract_errors(thing, path=None, skip_keys=tuple()):
     """ recursively extract errors """
     if path is None:
         path = []
 
     if isinstance(thing, dict):
         for k, v in thing.items():
-            if k == 'errors':
+            if k in skip_keys:  # e.g. curation_errors and submissions_errors
+                continue
+            elif k == 'errors':
                 for error in v:
                     yield tuple(path), error
             else:
-                yield from extract_errors(v, path + [k])
+                yield from extract_errors(v, path + [k], skip_keys)
 
     elif isinstance(thing, list):
         for i, v in enumerate(thing):
-            yield from extract_errors(v, path + [i])
+            yield from extract_errors(v, path + [i], skip_keys)
 
 
-def get_all_errors(_with_errors):
+def get_all_errors(_with_errors, skip_keys=tuple()):
     """ A better and easier to interpret measure of completeness. """
     # TODO deduplicate by tracing causes
     # TODO if due to a missing required report expected value of missing steps
-    return list(extract_errors(_with_errors))
+    return list(extract_errors(_with_errors, skip_keys=skip_keys))
 
 
 def get_by_invariant_path(errors):
