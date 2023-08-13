@@ -1038,7 +1038,12 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
     @property
     def project_relative_path(self):
-        return self.relative_path_from(self._cache_class._anchor.local)
+        try:
+            return self.relative_path_from(self._cache_class._anchor.local)
+        except Exception as e:
+            # _cache_class._anchor is an implementation detail which is not
+            # used in all cases, so try to fail over to the visible api
+            return self.relative_path_from(self.cache.anchor.local)
 
     @property
     def cache_id(self):
