@@ -426,6 +426,7 @@ note of course that you don't get dynamic binding with version since it is not t
         (send text-prefs-path-pyont-cfg set-value (python-module-user-config-path "pyontutils"))
         (send text-prefs-path-secrets set-value (oa-secrets-path))
         (send text-prefs-path-data set-value (path->string (path-source-dir)))
+        (send text-prefs-path-logs set-value (path->string (path-log-dir)))
         (let* ([config-exists (assoc 'viewer-mode cfg)]
                [power-user-a (assoc 'power-user? cfg)]
                [power-user (and power-user-a (cdr power-user-a))])
@@ -2409,6 +2410,7 @@ switch to that"
 (define text-prefs-path-ontqu-cfg (make-text-prefs-path   "ontquery   "))
 (define text-prefs-path-pyont-cfg (make-text-prefs-path   "pyontutils "))
 (define text-prefs-path-data (make-text-prefs-path        "data-path  "))
+(define text-prefs-path-logs (make-text-prefs-path        "logs       "))
 
 (define radio-box-viewer-mode
   (new radio-box%
