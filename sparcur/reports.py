@@ -1379,7 +1379,7 @@ class Report:
                                  title=f'Dataset milestone completion dates',
                                  ext=ext)
 
-    def _get_protocol_ids(self, blob_data, blob_protcur):
+    def _get_protocol_ids(self, graph_ttl, blob_protcur):
         def tp(i):
             """ not pio at all """
             try:
@@ -1407,6 +1407,7 @@ class Report:
             #log.exception(e)
 
         # dataset blob
+        """
         collect = []
         _ = JApplyRecursive(get_nested_by_key,
                             blob_data,
@@ -1417,6 +1418,26 @@ class Report:
         _ = None
         blob_dataset = None  # no longer needed and repr issues
         collect = sorted(set(collect), key=lambda i: str(i))
+        """
+
+        def to_id(s):
+            ss = str(s)
+            try:
+                id = idlib.Pio(ss)
+            except idlib.exceptions.MalformedIdentifierError:
+                try:
+                    id = idlib.Doi(ss)
+                except idlib.exceptions.MalformedIdentifierError:
+                    id = s
+
+            return id
+
+        prots = set(
+            protocol for pred in (
+                TEMP.hasProtocol, TEMP.participantInPerformanceOf)
+            for s, protocol in graph_ttl[:pred:])
+        collect = [to_id(p) for p in prots]
+
         dois = [c for c in collect if isinstance(c, idlib.Doi)]
         deref = Async()(deferred(do_deref)(d) for d in dois)
         dios = [ti(tp(u)) if u is not None else d for d, u in zip(dois, deref)]
@@ -1462,11 +1483,13 @@ class Report:
                 pass
 
         blob_protcur = self._protcur()
-        blob_data = self._data_ir(org_id=self.options.project_id)
+
+        #blob_data = self._data_ir(org_id=self.options.project_id)
+        graph_ttl = OntGraph().parse(self.options.ttl_file)
 
         (either, uios, dois, dios, deref, from_datasets,
          from_hypothesis, protocols) = self._get_protocol_ids(
-             blob_data, blob_protcur)
+             graph_ttl, blob_protcur)
 
         header = [['uri',
                    'uri_html',
@@ -1531,7 +1554,11 @@ class Report:
                 n_annos = protocol['anno_count']
                 n_protcur = protocol['protcur_anno_count']
                 if uri_human is None and 'uri_human' in protocol:
-                    uri_human = protocol['uri_human']
+                    _raw = protocol['uri_human']
+                    try:
+                        uri_human = idlib.Pio(_raw)
+                    except idlib.exceptions.MalformedIdentifierError:
+                        uri_human = idlib.Uri(i)
             else:
                 n_annos = 0
                 n_protcur = 0
