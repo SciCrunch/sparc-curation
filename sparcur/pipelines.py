@@ -301,6 +301,10 @@ class PathPipeline(PrePipeline):
         self.path = path
         self.template_schema_version = template_schema_version
 
+        # check that everything is configured as expected during init
+        if hasattr(self.path, 'project_relative_path'):
+            self.path.project_relative_path
+
     @property
     def _transformer(self):
         try:

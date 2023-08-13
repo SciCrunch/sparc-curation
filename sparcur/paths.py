@@ -616,7 +616,7 @@ class PennsieveDiscoverCache(PrimaryCache, EatCache):
         if hasattr(self, '_anchor'):
             return self._anchor
         elif self.id == self._remote_class._project_id:
-            self.__class__._cache_anchor = self
+            self.__class__._anchor = self
             return self
         elif self == self.parent:
             # we hit root and found nothing
@@ -2177,6 +2177,10 @@ class PathL(Path):
     @property
     def cache_identifier(self):
         return self.cache.identifier
+
+    @property
+    def project_relative_path(self):
+        return self.relative_path_from(self.cache.anchor.local)
 
 
 PathL._bind_flavours()

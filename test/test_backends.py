@@ -82,11 +82,9 @@ class TestPennsieveDiscoverRemote(RemoteHelper, unittest.TestCase):
         r.cache.pull_fetch()
         path = r.local
         from sparcur.cli import main
-        # avoid duplicate anchoring attempt since cli expects that it
-        # is always the top level entry point, must weigh anchor on
-        # both remote and cache
-        # FIXME pretty sure we shouldn't have to weight anchor on both ...
-        self.Remote.weighAnchor()
+        # we technically don't have to call weightAnchor here, but there are some asserts that I added
+        # in cli main setup to check to see if _anchor is already set on the way in, so to keep things
+        # simple weighAnchor here
         self.Remote._cache_class.weighAnchor()
         with path:
             oav = sys.argv

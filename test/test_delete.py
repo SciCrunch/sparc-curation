@@ -813,7 +813,12 @@ class _WorkflowHelper:
         path_dataset.make_push_manifest(dataset_id, updated_transitive, push_id)
         # 4
         if not self._local_only:  # this fails without remote
-            path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
+            import pennsieve.api.agent
+            try:
+                path_dataset.push_from_manifest(dataset_id, updated_transitive, push_id)
+            except pennsieve.api.agent.AgentError as e:
+                log.exception(e)
+                pytest.skip('pennsieve error')
 
 
 class TestWorkflow(_ChangesHelper, _WorkflowHelper, _TestOperation, unittest.TestCase):

@@ -477,6 +477,13 @@ class ApiWrapper:
         return self.bf._api.packages.create(pkg)
 
     def get(self, id, attempt=1, retry_limit=3):
+        try:
+            return self._get(id, attempt, retry_limit)
+        except self._requests.exceptions.ChunkedEncodingError:
+            log.critical('pennsieve connection broken causing ChunkedEncodingError')
+            return self.get(id, attempt + 1, retry_limit)
+
+    def _get(self, id, attempt=1, retry_limit=3):
         log.log(9, 'We have gone to the network!')  # too verbose for debug
         if isinstance(id, self._id_class):
             # FIXME inver this so the id form is internal or implement
@@ -522,7 +529,7 @@ class ApiWrapper:
                 msg = f'No remote object retrieved for {id}'
                 raise exc.NoMetadataRetrievedError(msg)
             else:
-                thing = self.get(id, attempt + 1)
+                thing = self._get(id, attempt + 1)
 
         return thing
 

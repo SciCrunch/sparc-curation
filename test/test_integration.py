@@ -33,7 +33,7 @@ def fake_setup(self, *args, **kwargs):
 
         self._old_setup_bfl()
     else:
-        self._cache_class._cache_anchor = self.anchor  # don't trigger remote lookup
+        self._cache_class._anchor = self.anchor  # don't trigger remote lookup
         self.bfl = self._remote_class._api = FakeBFLocal(self.anchor.id, self.anchor)
 
 
@@ -110,7 +110,7 @@ if 'CI' not in os.environ:
     if project_path_real.exists():
         project_path_real.rmtree(onerror=onerror)
 
-print(skip)
+log.info(skip)
 TestScripts.populate_tests(sparcur, working_dir, mains, skip=skip,
                            post_load=post_load, post_main=post_main,
                            only=only, do_mains=True)

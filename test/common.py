@@ -10,8 +10,6 @@ from augpathlib.utils import onerror_windows_readwrite_remove
 from sparcur import config
 from sparcur import exceptions as exc
 from sparcur.paths import Path, PathL
-from sparcur.paths import LocalPath, PrimaryCache
-from sparcur.paths import SymlinkCache
 from sparcur.state import State
 from sparcur.utils import PennsieveId, log, register_all_types
 from sparcur.datasets import DatasetDescriptionFile
@@ -21,7 +19,7 @@ from sparcur.pennsieve_api import FakeBFLocal
 # XXX calling register_all_types here will mask errors where we fail to call in
 # a certain context but not much we can do about that
 register_all_types()
-this_file = Path(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
+this_file = PathL(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 log.debug(template_root)
@@ -34,7 +32,7 @@ PennsieveId(fake_organization)  # canary
 project_path_real = path_project_container / 'UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:aa859fe9-02d0-4518-981b-012ef8f35c34'
-temp_path = Path(gettempdir(), f'.sparcur-testing-base-{_pid}')
+temp_path = PathL(gettempdir(), f'.sparcur-testing-base-{_pid}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
 
@@ -209,9 +207,13 @@ class RealDataHelper:
         if not RealDataHelper._fetched and not cls._nofetch:
             RealDataHelper._fetched = True  # if we fail we aren't going to try again
             [d._mark_sparse() for d in cls.test_datasets if d.cache_id not in nosparse]  # keep pulls fastish
-            pull.from_path_dataset_file_structure_all(cls.project_path, paths=cls.test_datasets)
-            fetch_metadata_files.main(cls.project_path)
-            fetch_files.main(cls.project_path)
+            try:
+                pull.from_path_dataset_file_structure_all(cls.project_path, paths=cls.test_datasets)
+                fetch_metadata_files.main(cls.project_path)
+                fetch_files.main(cls.project_path)
+            except Exception as e:
+                log.exception(e)
+                pytest.skip('error fetching test data')
 
 
 class RDHPN(RealDataHelper):

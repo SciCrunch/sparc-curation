@@ -183,8 +183,7 @@ class BlackfynnRemote(aug.RemotePath):
                 msg = f'url.path.name != expect.name: {pp.name} != {expect.name}'
                 log.critical(msg)
 
-        #log.log(9, f'file api mapping: {id} {file_id} {url}')
-        log.debug(f'file-api-mapping: {id} {file_id} {url}')
+        log.log(9, f'file-api-mapping: {id} {file_id} {url}')
         yield from cls.get_file_by_url(url, ranges=ranges)
 
     get_file_by_url = classmethod(base_get_file_by_url)

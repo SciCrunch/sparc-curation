@@ -343,6 +343,12 @@ class Options(clif.Options):
             return self._Path(ef).expanduser().resolve()
 
     @property
+    def ttl_file(self):
+        tf = self._args['--ttl-file']
+        if tf:
+            return self._Path(tf).expanduser().resolve()
+
+    @property
     def protcur_file(self):
         pf = self._args['--protcur-file']
         if pf:
@@ -569,16 +575,11 @@ class Main(Dispatcher):
             self.cwd = self._local_class.cwd()
 
         # bind paths
-        if self.options.discover:
-            from sparcur.backends import PennsieveDiscoverRemote
-            from sparcur.paths import PennsieveDiscoverCache
-            self._cache_class = PennsieveDiscoverCache
-            self._remote_class = PennsieveDiscoverRemote
-        else:
-            from sparcur.backends import PennsieveRemote
-            from sparcur.paths import PennsieveCache
-            self._cache_class = PennsieveCache
-            self._remote_class = PennsieveRemote
+        self._cache_class = self._local_class._cache_class
+        # use .__base__ since we use type(name, (cls), {}) to create the new remote instance
+        # if we were to do this some other way then anchor etc. are inherited and will
+        # polute things if we call self._remote_class._new
+        self._remote_class = self._local_class._remote_class.__base__
 
         # setup integrator
         from sparcur.curation import Integrator
@@ -661,7 +662,7 @@ class Main(Dispatcher):
                         # an error may happen after anchoring but
                         # before a clean return, but cleaning that up
                         # is not straight forward, so we test here instead
-                        if not hasattr(self.Remote._cache_anchor):
+                        if not hasattr(self.Remote, '_cache_anchor'):
                             raise e
                 else:
                     raise e
@@ -671,9 +672,13 @@ class Main(Dispatcher):
             #self._setup_ontquery()
 
     def _setup_local(self):
-        self.Remote = self._cache_class._remote_class
+        # note that self.Remote != self._remote_class because self.Remote
+        # is technically the subclassof self._remote_class that has been
+        # bound to _local_class and _cache_class
+        self.Remote = self._local_class._remote_class
         self.Remote._async_rate = self.options.rate
 
+        assert '_anchor' not in self._cache_class.__dict__, breakpoint()
         local = self.cwd
 
         # we have to start from the cache class so that
@@ -683,7 +688,8 @@ class Main(Dispatcher):
             if _cpath is None:
                 raise exc.NoCachedMetadataError  # FIXME somehow we decided not to raise this!??!
 
-            self.anchor = _cpath.anchor
+            assert '_anchor' not in _cpath.__class__.__dict__, breakpoint()
+            self.anchor = _cpath.anchor  # XXX reminder! DiscoverCache is self anchoring!
         except exc.NoCachedMetadataError as e:
             root = local.find_cache_root()
             if root is not None:
@@ -700,7 +706,9 @@ class Main(Dispatcher):
         # replace a bottom up anchoring rule with top down
         if self.options.i_know_what_i_am_doing:
             pass
-        else:
+        elif not isinstance(self.anchor, DiscoverPath._cache_class):
+            # discover cache is self anchoring so this will cause an error
+            # if it runs on a discover cache
             self.anchor.anchorClassHere(remote_init=False)
 
         self.project_path = self.anchor.local
@@ -1061,7 +1069,18 @@ class Main(Dispatcher):
     def pull(self):
         # FIXME this still isn't quite right because it does not correctly
         # deal dataset renaming, but it is much closer
-        from joblib import Parallel, delayed
+        _testing = False
+        if self.options.debug or _testing:
+            from pyontutils.asyncd import Async, deferred as delayed
+
+            def Parallel(*args, **kwargs):
+                return Async(rate=60)
+        else:
+            from joblib import Parallel, delayed
+
+        # XXX watch out using Parallel here, loky can and will fail
+        # to pickel SSLContext on requests.exceptions.ChunkedEncodingError
+        # which leaks out and breaks everything ...
         dirs = self.directories
         dirs = dirs if dirs else (self.cwd,)
         for d in dirs:
@@ -1440,13 +1459,14 @@ done"""
                       '=================================================='
                     '\n--------------------------------------------------\n'))]
 
-        def safe_repr(t):
+        def safe_print(t):
             try:
-                return repr(t)
+                v = t if isinstance(t, str) else repr(t)
+                print(v)
             except Exception as e:
                 log.exception(e)
 
-        [print(t if isinstance(t, str) else safe_repr(t)) for t in tables]  # FIXME _print_tables?
+        [safe_print(t) for t in tables]  # FIXME _print_tables?
 
     def find(self):
         _paths = set()  # set to avoid duplicate paths breaking fetch?
