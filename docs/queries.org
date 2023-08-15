@@ -481,9 +481,11 @@ where {
     TEMP:protocolInvolvesAction
     TEMP:protocolInvolvesAspect
     TEMP:protocolInvolvesBlackBox
+    TEMP:protocolInvolvesParameter
+    TEMP:protocolInvolvesInvariant
+    # these two are noisy because they also include tags converted from sparc:
     TEMP:protocolInvolvesBlackBoxComponent
     TEMP:protocolInvolvesInput
-    TEMP:protocolInvolvesInvariant
   }
   ?protocol a sparc:Protocol ;
     ?some_predicate ?annotation ;  # this line an the filter should wind up with the same number TODO add a test to check
