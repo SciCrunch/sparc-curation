@@ -12,6 +12,22 @@ from .config import auth
 from sparcur.utils import log
 
 
+def _get_json(self, url, *, retry_limit=3, retry_count=0):
+    session = self._api.session
+    resp = session.get(url)
+    if resp.ok:
+        try:
+            return resp.json()
+        except requests.exceptions.JSONDecodeError as e:
+            log.critical(f'resp.ok but json malformed???\n{resp.text}')
+            if retry_count >= retry_limit:
+                raise e
+            else:
+                return _get_json(self, url, retry_limit=retry_limit, retry_count=retry_count + 1)
+    else:
+        resp.raise_for_status()
+
+
 def bind_agent_command(agent_module, transfers_module, go=False):
     # FIXME this is a nearly perfect use case for orthauth wrapping
     default_agent_cmd = agent_module.agent_cmd
@@ -196,7 +212,8 @@ def bind_packages_File(File):
                   includeSourceFiles=True,
                   raw=False,
                   latest_only=False,
-                  filename=None):
+                  filename=None,
+                  retry_limit=3,):
         """ python implementation to make use of /dataset/{id}/packages """
         remapids = {}
 
@@ -230,6 +247,7 @@ def bind_packages_File(File):
         filename_args = f'&filename={filename}' if filename is not None else ''
         cursor_args = ''
         out_of_order = []
+        retry_count = 0
         while True:
             try:
                 _url = (
@@ -260,9 +278,16 @@ def bind_packages_File(File):
             if resp.ok:
                 try:
                     j = resp.json()
-                except json.decoder.JSONDecodeError as e:
+                    retry_count = 0
+                except requests.excpetions.JSONDecodeError as e:
                     log.critical(f'resp.ok but json malformed???\n{resp.text}')
-                    raise e
+                    if retry_count >= retry_limit:
+                        raise e
+                    else:
+                        retry_count += 1
+                        # try to fetch the exact same url again
+                        continue
+
                 packages = j['packages']
                 #log.log(9, f'what is going on 0\n{packages!r}')
                 if raw:
@@ -418,15 +443,8 @@ def packagesByName(self,
 
 @property
 def packageTypeCounts(self):
-    session = self._api.session
-    resp = session.get(
+    return _get_json(self,
         f'{self._api._host}/datasets/{self.id}/packageTypeCounts')
-    if resp.ok:
-        j = resp.json()
-        return j
-    else:
-        resp.raise_for_status()
-
 
 @property
 def publishedMetadata(self):
@@ -434,7 +452,12 @@ def publishedMetadata(self):
     resp = session.get(
         f'{self._api._host}/discover/search/datasets?query={self.int_id}')
     if resp.ok:
-        j = resp.json()
+        try:
+            j = resp.json()
+        except requests.exceptions.JSONDecodeError as e:
+            log.critical(f'resp.ok but json malformed???\n{resp.text}')
+            raise e  # FIXME retry
+
         if j['totalCount'] == 1:
             return j['datasets'][0]
         elif j['totalCount'] == 0:
@@ -459,29 +482,21 @@ def publishedMetadata(self):
 
 def publishedVersionMetadata(self, id_published, published_version):
     session = self._api.session
-    resp = session.get((
+    return _get_json(self, (
         f'{self._api._host}/discover/datasets/'
         f'{id_published}/versions/{published_version}/metadata'))
-    if resp.ok:
-        return resp.json()
-    else:
-        resp.raise_for_status()
 
 
 @property
 def Dataset_users(self):
-    session = self._api.session
-    resp = session.get(
+    return _get_json(self,
         f'{self._api._host}/datasets/{self.id}/collaborators/users')
-    return resp.json()
 
 
 @property
 def Dataset_teams(self):
-    session = self._api.session
-    resp = session.get(
+    return _get_json(self,
         f'{self._api._host}/datasets/{self.id}/collaborators/teams')
-    return resp.json()
 
 
 @property
@@ -490,7 +505,11 @@ def Dataset_doi(self):
     resp = session.get(
         f'{self._api._host}/datasets/{self.id}/doi')
     if resp.ok:
-        return resp.json()
+        try:
+            return resp.json()
+        except requests.exceptions.JSONDecodeError as e:
+            log.critical(f'resp.ok but json malformed???\n{resp.text}')
+            raise e  # FIXME retry
     else:
         if resp.status_code != 404:
             log.warning(f'{self} doi {resp.status_code}')
@@ -501,7 +520,11 @@ def Dataset_delete(self):
     session = self._api.session
     resp = session.delete(f'{self._api._host}/datasets/{self.id}')
     if resp.ok:
-        return resp.json()
+        try:
+            return resp.json()
+        except requests.exceptions.JSONDecodeError as e:
+            log.critical(f'resp.ok but json malformed???\n{resp.text}')
+            raise e  # FIXME retry
     else:
         if resp.status_code != 404:
             log.warning(f'{self} issue deleting {resp.status_code}')
@@ -509,41 +532,29 @@ def Dataset_delete(self):
 
 @property
 def Dataset_contributors(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/contributors')
-    return resp.json()
+    return _get_json(self, f'{self._api._host}/datasets/{self.id}/contributors')
 
 
 @property
 def Dataset_banner(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/banner')
-    return resp.json()
+    return _get_json(self, f'{self._api._host}/datasets/{self.id}/banner')
 
 
 @property
 def Dataset_readme(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/readme')
-    return resp.json()
+    return _get_json(self, f'{self._api._host}/datasets/{self.id}/readme')
 
 
 @property
 def Dataset_status_log(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}/status-log')
-    return resp.json()
+    return _get_json(self, f'{self._api._host}/datasets/{self.id}/status-log')
 
 
 @property
 def Dataset_meta(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/datasets/{self.id}')
-    return resp.json()
+    return _get_json(self, f'{self._api._host}/datasets/{self.id}')
 
 
 @property
 def Organization_teams(self):
-    session = self._api.session
-    resp = session.get(f'{self._api._host}/organizations/{self.id}/teams')
-    return resp.json()
+    return _get_json(self, f'{self._api._host}/organizations/{self.id}/teams')

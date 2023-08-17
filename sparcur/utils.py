@@ -533,11 +533,21 @@ class ApiWrapper:
 
         return thing
 
-    def get_file_url(self, id, file_id):
+    def get_file_url(self, id, file_id, *, retry_limit=3, retry_count=0):
         resp = self.bf._api.session.get(
             f'{self.bf._api._host}/packages/{id}/files/{file_id}')
         if resp.ok:
-            resp_json = resp.json()
+            try:
+                resp_json = resp.json()
+            except self._requests.exceptions.JSONDecodeError as e:
+                msg = f'resp ok but json decode error?!\n{resp.text}'
+                log.critical(msg)
+                if retry_count >= retry_limit:
+                    raise e
+                else:
+                    # try again
+                    return self.get_file_url(id, file_id, retry_limit=retry_limit, retry_count=retry_count + 1)
+
         elif resp.status_code == 404:
             msg = (f'{resp.status_code} {resp.reason!r} '
                    f'when fetching {resp.url}')
