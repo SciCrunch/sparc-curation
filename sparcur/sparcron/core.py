@@ -299,7 +299,9 @@ def heartbeat():  # FIXME this has to run in a separate priority queue with its 
         f.write(f':t {time_now.START_TIMESTAMP_LOCAL} :n {ln} :f {lf} :q {lq} :r {lr} :qr {lqr}\n')
 
 
+dataset_project = {}
 def argv_simple_retrieve(dataset_id):
+    project_id = dataset_project[dataset_id]
     return [
         sys.executable,
         '-m',
@@ -307,6 +309,8 @@ def argv_simple_retrieve(dataset_id):
         '--sparse-limit',
         '-1',
         '--no-index',
+        '--project-id',
+        project_id,
         '--dataset-id',
         dataset_id,
         '--parent-parent-path',
@@ -690,6 +694,9 @@ roots = get_roots(project_ids)
 def datasets_remote_from_project_id(project_id, datasets_no):
     root = roots[project_id]
     datasets = [c for c in root.children if c.id not in datasets_no]
+    for d in datasets:
+        dataset_project[d.id] = project_id
+
     return datasets
 
 
@@ -711,7 +718,7 @@ def status_report():
 
     todo = []
     fail = []
-    run = 0
+    run = []
     que = 0
     for dataset in datasets:
         dataset_id = dataset.id
@@ -738,10 +745,11 @@ def status_report():
         if failed:
             fail.append(dataset)
         if running:
-            run += 1
+            run.append(dataset)
         if queued:
             que += 1
 
+    runs  = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in run]))
     fails = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in fail]))
     todos = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in todo]))
     report = (
@@ -750,9 +758,10 @@ def status_report():
         f'Failed:   {len(fail)}\n'
         f'Todo:     {len(todo)}\n'
         #f'Done:     {}\n'
-        f'Running:  {run}\n'
+        f'Running:  {len(run)}\n'
         f'Queued:   {que}\n'
         '\n'
+        f'Running:\n  {runs}\n'
         f'Failed:\n  {fails}\n'
         f'Todo:\n  {todos}\n'
     )

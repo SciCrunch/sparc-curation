@@ -750,7 +750,7 @@ class BlackfynnRemote(aug.RemotePath):
     def children(self):
         yield from self._children()
 
-    def _children(self, create_cache=True):
+    def _children(self, create_cache=True, retry_limit=3, retry_count=0):
         if isinstance(self.bfobject, self._File):
             return
         elif isinstance(self.bfobject, self._DataPackage):
@@ -760,7 +760,26 @@ class BlackfynnRemote(aug.RemotePath):
                 datasets = self.bfobject.datasets
             except self._requests.exceptions.ChunkedEncodingError as e:
                 log.critical('pennsieve connection broken causing ChunkedEncodingError')
-                yield from self._children(create_cache=create_cache)
+                if retry_count >= retry_limit:
+                    raise e
+
+                yield from self._children(
+                    create_cache=create_cache,
+                    retry_limit=retry_limit,
+                    retry_count=retry_count + 1)
+                return
+            except TypeError as e:
+                log.error(e)
+                msg = ('likely internal error inside pennsieve '
+                       'client related to network issues')
+                log.critical(msg)
+                if retry_count >= retry_limit:
+                    raise e
+
+                yield from self._children(
+                    create_cache=create_cache,
+                    retry_limit=retry_limit,
+                    retry_count=retry_count + 1)
                 return
 
             for dataset in datasets:

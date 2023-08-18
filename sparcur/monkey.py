@@ -279,7 +279,7 @@ def bind_packages_File(File):
                 try:
                     j = resp.json()
                     retry_count = 0
-                except requests.excpetions.JSONDecodeError as e:
+                except requests.exceptions.JSONDecodeError as e:
                     log.critical(f'resp.ok but json malformed???\n{resp.text}')
                     if retry_count >= retry_limit:
                         raise e
