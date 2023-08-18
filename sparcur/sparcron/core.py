@@ -345,6 +345,10 @@ argv_spc_export = [
     '--jobs', '1']
 
 
+class SubprocessError(Exception):
+    """ something went wrong in a subprocess """
+
+
 def ret_val_exp(dataset_id, updated, time_now, fetch=True):
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     log.info(f'START {dataset_id} {timestamp}')
@@ -399,7 +403,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
                         stderr=subprocess.STDOUT, stdout=logfd)
                     out1 = p1.communicate()
                     if p1.returncode != 0:
-                        raise Exception(f'oops return code was {p1.returncode}')
+                        raise SubprocessException(f'oops retr return code was {p1.returncode}')
                 except KeyboardInterrupt as e:
                     p1.send_signal(signal.SIGINT)
                     raise e
@@ -412,7 +416,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
                         stderr=subprocess.STDOUT, stdout=logfd)
                     out2 = p2.communicate()
                     if p2.returncode != 0:
-                        raise Exception(f'oops return code was {p2.returncode}')
+                        raise SubprocessException(f'oops find return code was {p2.returncode}')
                 except KeyboardInterrupt as e:
                     p2.send_signal(signal.SIGINT)
                     raise e
@@ -425,7 +429,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
                                       stderr=subprocess.STDOUT, stdout=logfd)
                 out3 = p3.communicate()
                 if p3.returncode != 0:
-                    raise Exception(f'oops return code was {p3.returncode}')
+                    raise SubprocessException(f'oops expr return code was {p3.returncode}')
             except KeyboardInterrupt as e:
                 p3.send_signal(signal.SIGINT)
                 raise e
@@ -438,7 +442,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
         # in this process
         conn.set(vid, sparcur.__internal_version__)
         log.info(f'DONE: u: {uid} {updated}')
-    except Exception as e:
+    except SubprocessException as e:
         log.critical(f'FAIL: {fid} {updated}')
         conn.set(fid, updated)
         log.exception(e)
