@@ -345,7 +345,7 @@ argv_spc_export = [
     '--jobs', '1']
 
 
-class SubprocessError(Exception):
+class SubprocessException(Exception):
     """ something went wrong in a subprocess """
 
 
