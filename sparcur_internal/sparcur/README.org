@@ -38,9 +38,9 @@ brew install python3
 things_in_the_right_order=(pyontutils/clifn sxpyr augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils protc/protcur sparc-curation)
 pushd ~/git
 for folder in ${things_in_the_right_order[@]}; do
-echo pushd ${folder};
-echo pip install --user -e .;
-echo popd;
+pushd ${folder};
+pip install --user -e .;
+popd;
 done
 popd
 #+end_src
