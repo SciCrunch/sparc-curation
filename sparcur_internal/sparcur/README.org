@@ -35,11 +35,14 @@ bad news, don't forget to remove all the .egg-info folders first etc
 #+begin_src bash
 brew install python3
 # and then manually
-for folder in things_in_the_right_order; do
-pushd ${folder};
-pip install --user -e .;
-popd;
+things_in_the_right_order=(pyontutils/clifn sxpyr augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils protc/protcur sparc-curation)
+pushd ~/git
+for folder in ${things_in_the_right_order[@]}; do
+echo pushd ${folder};
+echo pip install --user -e .;
+echo popd;
 done
+popd
 #+end_src
 
 ** racket
