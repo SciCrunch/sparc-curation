@@ -378,7 +378,7 @@ note of course that you don't get dynamic binding with version since it is not t
     #:exists 'replace
     (λ () (pretty-write
            (list
-            (cons 'viewer-mode viewer-mode-state)
+            (cons 'viewer-mode (or viewer-mode-state 0)) ; avoid contract violation if saved when viewer-mode is #f
             (cons 'power-user? (power-user?))
             )))))
 
@@ -433,7 +433,9 @@ note of course that you don't get dynamic binding with version since it is not t
           (if config-exists
               (begin
                 ; set-selection does not trigger the callback
-                (send radio-box-viewer-mode set-selection (cdr config-exists))
+                (send radio-box-viewer-mode set-selection
+                      ; prevent contract violation of viewer-mode was somehow #f when config was written
+                      (or (cdr config-exists) 0))
                 (cb-viewer-mode radio-box-viewer-mode #f)
                 (power-user? (not power-user))
                 ; cb does the toggle interinally so we set the opposite of what we want first
