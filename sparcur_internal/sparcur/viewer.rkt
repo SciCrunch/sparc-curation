@@ -1773,7 +1773,6 @@ switch to that"
                    [fvi (get-first-visible-item)]
                    ; seems like nvi is off by 2 ???
                    [nvi (- (number-of-visible-items) 2)])
-               (println (list 'sigh new-sel fvi nvi))
                (if (< (+ fvi nvi) new-sel)
                    (set-first-visible-item (+ 1 (- new-sel nvi)))
                    (when (<= new-sel fvi) ; issues where fvi thinks it is zero but actually isn't
