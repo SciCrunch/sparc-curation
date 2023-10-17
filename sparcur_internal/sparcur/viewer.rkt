@@ -1204,6 +1204,9 @@ note of course that you don't get dynamic binding with version since it is not t
               ; export
               (send button-open-export-json enable export-enable?)
               (send button-open-export-ipython enable export-enable?)
+              ; export dependent reports
+              (send button-paths-report enable export-enable?)
+              (send button-manifest-report enable export-enable?)
               ; logs
               (send button-open-dataset-latest-log enable logs-enable?)
               )
@@ -1804,7 +1807,10 @@ switch to that"
                  (let ([sel (get-selection)])
                    (next-sel sel code))
                  (if released-this-time
-                     (set-jview! (current-dataset))
+                     (let ([dataset (current-dataset)]) ; we do not use cb-dataset-selection here because it assumes that
+                       ; current-dataset will be set inside the call it itself instead of before
+                       (set-jview! dataset)
+                       (set-button-status-for-dataset dataset))
                      (super-on-subwindow-char receiver event))))))
        [label ""]
        [font (make-object font% 10 'modern)]
