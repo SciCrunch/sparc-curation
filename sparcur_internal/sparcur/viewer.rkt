@@ -23,7 +23,7 @@
          framework
          compiler/compilation-path
          compiler/embed
-         gui-widget-mixins
+         (rename-in (only-in gui-widget-mixins tooltip-mixin) [tooltip-mixin tooltip-mixin-real])
          json
          json-view
          net/url
@@ -245,6 +245,14 @@ note of course that you don't get dynamic binding with version since it is not t
    '(("PYTHONBREAKPOINT" . "0")
      ; silence error logs during pennsieve top level import issue
      ("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION" . "python"))))
+
+(define (tooltip-mixin c)
+  (if (eq? (system-type 'os*) 'macosx)
+      (class c ; avoid issues on macos
+        (init-field [tooltip #f]
+                    [tooltip-delay 500])
+        (super-new))
+      (tooltip-mixin-real c)))
 
 (define (datetime-file-system-safe inexact-seconds)
   "Y-M-DTHMS,6Z" ; FIXME this is producing garbages results with weird and bad padding
