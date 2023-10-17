@@ -725,16 +725,18 @@ note of course that you don't get dynamic binding with version since it is not t
       ; seen it happen again, however that doesn't mean much, in principle this should block
       ; the main thread from proceeding until the fast part of the thread below is done which
       ; in principle should ensure fully sequential behavior, but that's just the theory
-      (call-with-semaphore
-       jview-semaphore
-       (thunk (current-dataset dataset))) ; XXX this is the only place current-dataset should ever be set
+      (unless (eq? dataset (current-dataset))
+        ; we also set current-dataset in the lview on-subwindow-char to keep lview state synced
+        (call-with-semaphore
+         jview-semaphore
+         (thunk (current-dataset dataset)))) ; XXX this is one of two places current-dataset should ever be set
       (thread
        (thunk ; we thread because dataset-jview! can be quite slow for large json blobs
         (let ([jview (dataset-jview! dataset)])
           ; we're done loading so if you want to load again knock yourself out
           (set! jviews-loading (set-remove jviews-loading uuid))
           ; we must use a semaphore here because if you have two consecutive events
-          ; that are very close together in time the exact orderin of the threads
+          ; that are very close together in time the exact ordering of the threads
           ; they spawn can result in a case where (is-current? a) will be called and
           ; return true before (current-dataset b) is called and (reparent a) is called
           ; after (b-unparent) is called, said another way, the call to unset-current-jview
@@ -1753,16 +1755,63 @@ switch to that"
                                   [callback cb-update-viewer]
                                   [parent panel-org-actions]))
 
-(define lview (new list-box%
-                   [label ""]
-                   [font (make-object font% 10 'modern)]
-                   [choices '()]
-                   [columns '("Owner" "Folder Name" "Identifier" "Updated")]
-                   ; really is single selection though we want to be
-                   ; able to highlight and reorder multiple
-                   [style '(single column-headers clickable-headers)]
-                   [callback cb-dataset-selection]
-                   [parent panel-left]))
+(define lview
+  (new (class list-box%
+         (rename-super [super-on-subwindow-char on-subwindow-char])
+         (inherit get-selection select get-number number-of-visible-items
+                  get-first-visible-item
+                  set-first-visible-item)
+         (super-new)
+         (define down-down #f)
+         (define up-down #f)
+         (define (next-sel sel code)
+           (unless (or ; do nothing cases
+                    (and (= sel 0) (eq? code 'up))
+                    (and (= (sub1 (get-number)) sel) (eq? code 'down)))
+             (select sel #f)
+             (let ([new-sel ((if (eq? code 'down) add1 sub1) sel)]
+                   [fvi (get-first-visible-item)]
+                   ; seems like nvi is off by 2 ???
+                   [nvi (- (number-of-visible-items) 2)])
+               (println (list 'sigh new-sel fvi nvi))
+               (if (< (+ fvi nvi) new-sel)
+                   (set-first-visible-item (+ 1 (- new-sel nvi)))
+                   (when (<= new-sel fvi) ; issues where fvi thinks it is zero but actually isn't
+                     (set-first-visible-item new-sel)))
+               (select new-sel)
+               (let ([dataset (get-selected-dataset this)])
+                 (call-with-semaphore
+                  jview-semaphore
+                  (thunk (current-dataset dataset)))))))
+         (define/override (on-subwindow-char receiver event)
+           (let ([code (send event get-key-code)]
+                 [release-code (send event get-key-release-code)]
+                 [released-this-time #f]
+                 )
+             (if (eq? code 'release)
+                 (cond
+                   [(and (eq? release-code 'up) up-down) (set! up-down #f) (set! released-this-time #t)]
+                   [(and (eq? release-code 'down) down-down) (set! down-down #f) (set! released-this-time #t)]
+                   [else #f])
+                 (cond
+                   [(and (eq? code 'up) (not up-down)) (set! up-down #t)]
+                   [(and (eq? code 'down) (not down-down)) (set! down-down #t)]
+                   [else #f]))
+             (if (or (eq? code 'down) (eq? code 'up))
+                 (let ([sel (get-selection)])
+                   (next-sel sel code))
+                 (if released-this-time
+                     (set-jview! (current-dataset))
+                     (super-on-subwindow-char receiver event))))))
+       [label ""]
+       [font (make-object font% 10 'modern)]
+       [choices '()]
+       [columns '("Owner" "Folder Name" "Identifier" "Updated")]
+       ; really is single selection though we want to be
+       ; able to highlight and reorder multiple
+       [style '(single column-headers clickable-headers)]
+       [callback cb-dataset-selection]
+       [parent panel-left]))
 
 (send text-search-box list-box lview)
 ; FIXME TODO scale these based on window size
