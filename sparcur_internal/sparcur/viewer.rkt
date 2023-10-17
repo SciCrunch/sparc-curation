@@ -464,7 +464,10 @@ note of course that you don't get dynamic binding with version since it is not t
               [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
          (current-datasets datasets)
          (if unfiltered?
-             (set-datasets-view! (send text-search-box list-box) (current-datasets))
+             (call-with-semaphore
+              jview-semaphore
+              (thunk ; needed to prevent attemts to modify an empty lview from on-subwindow-char
+               (set-datasets-view! (send text-search-box list-box) (current-datasets))))
              (cb-search-dataset text-search-box #f))
          (println "dataset metadata has been refreshed") ; TODO gui viz on this (beyond updating the number)
          (with-output-to-file (path-cache-datasets)
@@ -725,7 +728,7 @@ note of course that you don't get dynamic binding with version since it is not t
       ; seen it happen again, however that doesn't mean much, in principle this should block
       ; the main thread from proceeding until the fast part of the thread below is done which
       ; in principle should ensure fully sequential behavior, but that's just the theory
-      (unless (eq? dataset (current-dataset))
+      (unless (and (current-dataset) (string=? (id-uuid dataset) (id-uuid (current-dataset))))
         ; we also set current-dataset in the lview on-subwindow-char to keep lview state synced
         (call-with-semaphore
          jview-semaphore
@@ -1764,6 +1767,7 @@ switch to that"
          (super-new)
          (define down-down #f)
          (define up-down #f)
+         (define fvi-fix (if (eq? (system-type 'os*) 'macosx) add1 identity))
          (define (next-sel sel code)
            (unless (or ; do nothing cases
                     (and (= sel 0) (eq? code 'up))
@@ -1775,7 +1779,7 @@ switch to that"
                    [nvi (- (number-of-visible-items) 2)])
                (if (< (+ fvi nvi) new-sel)
                    (set-first-visible-item (+ 1 (- new-sel nvi)))
-                   (when (<= new-sel fvi) ; issues where fvi thinks it is zero but actually isn't
+                   (when (<= new-sel (fvi-fix fvi)) ; issues where fvi thinks it is zero but actually isn't
                      (set-first-visible-item new-sel)))
                (select new-sel)
                (let ([dataset (get-selected-dataset this)])
