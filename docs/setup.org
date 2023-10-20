@@ -291,36 +291,44 @@ test $(shasum -a 256 brew-install.sh | awk '{print $1}') = bcdaa4ade908e3766c748
 /bin/bash brew-install.sh
 rm brew-install.sh
 
+brew analytics off
+
 brew install --cask \
-docker \
 emacs \
 firefox \
 gimp \
 google-chrome \
 inkscape \
 krita \
-mactex \
 macvim \
 protege \
 racket
 
 brew install \
 coreutils \
+findutils \
 curl \
 git \
 htop \
-hunspell \
 libmagic \
+python \
+tree
+
+# additional packages
+
+brew install --cask \
+docker \
+mactex
+
+brew install \
+hunspell \
 pandoc \
 postgres \
 pyenv \
-python \
-python3 \
 redland \
 rxvt-unicode \
 sbcl \
 sqlite \
-tree \
 virtualbox \
 xquartz \
 imagemagick@6 \
@@ -822,7 +830,7 @@ Repository local roots. The ordering of the entries matters.
 #+NAME: py-roots
 | pyontutils/clifn sxpyr augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils pyontutils/nifstd pyontutils/neurondm protc/protcur sparc-curation scibot |
 #+NAME: rkt-roots
-| qrcode/ pda/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rkdf/rkdf-lib rkdf/rkdf rrid-metadata/rrid orthauth/racket/orthauth sparc-curation/sparcur_internal/sparcur NIF-Ontology/ |
+| qrcode/ pda/ rkdf/rkdf-lib rkdf/rkdf NIF-Ontology/ protc/protc-lib protc/protc-tools-lib protc/protc protc/protc-tools rrid-metadata/rrid orthauth/racket/orthauth sparc-curation/sparcur_internal/sparcur |
 # note that breadcrumb and json-view are not in this list due to the need to use raco pkg install --name
 
 ** Make repos
@@ -959,8 +967,8 @@ auth-stores:
 auth-variables:
   cache-path:
   log-path:
-  protocols-io-api-creds-file: protocols-io api creds-file
-  protocols-io-api-store-file: protocols-io api store-file
+  protocols-io-api-client-token:
+    path: protocols-io api client-token
 #+end_src
 
 =~/.config/pyontutils/config.yaml=
@@ -1009,10 +1017,14 @@ auth-variables:
   datasets-sparse:
   datasets-test:
   export-path:
-  google-api-service-account-file-readonly: google api saro
+  google-api-service-account-file-readonly:
+    path: google api saro
   google-api-service-account-file-rw:
-  hypothesis-api-key: hypothesis api default-user
-  hypothesis-group: hypothesis group sparc-curation
+  hypothesis-api-key:
+    path: hypothesis api default-user
+  hypothesis-group-name: &hgn sparc-curation
+  hypothesis-group:
+    path: [hypothesis, group, *hgn]
   hypothesis-user:
   log-path:
   never-update:
@@ -1020,6 +1032,9 @@ auth-variables:
   remote-backoff-factor:
   remote-cli-path:
   remote-organization: N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0
+  remote-organizations:
+    - N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0  # sparc
+    - N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f  # rejoin
   resources:
   sparse-limit:
 #+end_src
@@ -1054,8 +1069,7 @@ hypothesis:
     sparc-curation: *replace-me-with:sparc-curation-group-id*
 protocols-io:
   api:
-    creds-file: *replace-me-with:/path/to/creds-file.json*
-    store-file: protocols-io-api-token-rw.pickle
+    client-token: replace-with-token
 #+end_src
 
 Secrets template for minimal viewer setup.
