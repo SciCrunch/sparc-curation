@@ -22,6 +22,32 @@ but the switchover has not been completed yet.
 * Reminders
 Don't close the viewer terminal!
 
+* Install
+#+begin_src bash
+group_repo=(tgbugs/pyontutils tgbugs/sxpyr tgbugs/augpathlib tgbugs/idlib tgbugs/hyputils tgbugs/orthauth tgbugs/ontquery tgbugs/parsercomb tgbugs/protc SciCrunch/sparc-curation)
+pushd ~/git
+for _gr in ${group_repo[@]}; do
+git clone https://github.com/${_gr}.git;
+done
+popd;
+#+end_src
+
+#+begin_src bash
+raco pkg install --name breadcrumb --type git-url https://github.com/tgbugs/racket-breadcrumb.git
+raco pkg install --name json-view --type git-url https://github.com/tgbugs/racket-json-view.git
+raco pkg install git/orthauth/racket/orthauth
+
+pushd ~/git/sparc-curation/sparcur_internal
+raco pkg install --auto --batch sparcur/
+pushd sparcur
+raco make viewer.rkt
+raco exe viewer.rkt
+popd; popd
+
+# force creation of configuration files
+python3 -m sparcur.cli
+#+end_src
+
 * Upgrading across racket versions, upgrading across python versions
 Auto update mostly works until you get to a point where you have to update your racket version.
 Then we are out of luck because the update has to fully succeed without any errors otherwise
@@ -32,6 +58,7 @@ updating python versions is an even bigger nightmare due to the installation ord
 minimally it seems we need to install sparcur and pyontutils, but the ordering is still
 bad news, don't forget to remove all the .egg-info folders first etc
 
+on macos
 #+begin_src bash
 brew install python3
 # and then manually
@@ -39,7 +66,7 @@ things_in_the_right_order=(pyontutils/clifn sxpyr augpathlib idlib pyontutils/ht
 pushd ~/git
 for folder in ${things_in_the_right_order[@]}; do
 pushd ${folder};
-pip install --user -e .;
+pip3 install --user -e .;
 popd;
 done
 popd
