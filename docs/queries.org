@@ -3605,7 +3605,8 @@ WHERE n.iri IN [
         "http://purl.org/sig/ont/fma/fma50801", // brain
         "http://purl.org/sig/ont/fma/fma5889",  // autonomic ganglion
         "http://purl.org/sig/ont/fma/fma19667", // urethra
-        "http://purl.org/sig/ont/fma/fma7131"   // esophagus
+        "http://purl.org/sig/ont/fma/fma7131",   // esophagus
+        "http://uri.interlex.org/base/ilx_0793921" // REVA root
         ]
 RETURN n
 #+end_src
