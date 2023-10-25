@@ -1419,6 +1419,12 @@ class PipelineExtras(JSONPipeline):
         [['inputs', 'remote_dataset_metadata', 'readme', 'readme'],
          ['rmeta', 'readme']],
 
+        [['inputs', 'remote_dataset_metadata', 'publication', 'status'],
+         ['rmeta', 'publication_status']],
+
+        [['inputs', 'remote_dataset_metadata', 'publication', 'type'],
+         ['rmeta', 'publication_type']],
+
         # TODO grab ['inputs' , 'remote_dataset_metadata', 'contributors'] as well
 
         *copy_all(['inputs' , 'remote_dataset_metadata'], ['rmeta'],
