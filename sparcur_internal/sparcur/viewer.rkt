@@ -782,7 +782,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (export-dataset ds)
   (is-current? ds))
 
-(struct dataset (id title updated pi-name-lf id-project)
+(struct dataset (id title updated pi-name-lf id-project publication-status)
   #:methods gen:ds
   [(define (populate-list ds list-box)
      ; FIXME annoyingly it looks like these things need to be set in
@@ -792,14 +792,16 @@ note of course that you don't get dynamic binding with version since it is not t
             (dataset-pi-name-lf ds)
             (dataset-title ds)
             (id-short ds)
-            (updated-short ds))
+            (updated-short ds)
+            (dataset-publication-status ds))
            ds))
    (define (lb-cols ds)
      (list
       (dataset-pi-name-lf ds)
       (dataset-title ds)
       (id-short ds)
-      (updated-short ds)))
+      (updated-short ds)
+      (dataset-publication-status ds)))
    (define (lb-data ds)
      ; TODO we may want to return more stuff here
      ds)
@@ -1092,7 +1094,8 @@ note of course that you don't get dynamic binding with version since it is not t
       [(0) (compose string-downcase dataset-pi-name-lf)]
       [(1) (compose string-downcase dataset-title)]
       [(2) id-uuid]
-      [(3) dataset-updated]))
+      [(3) dataset-updated]
+      [(4) dataset-publication-status]))
   (lambda (ds1 ds2)
     (operator (selector ds1) (selector ds2))))
 
@@ -1815,7 +1818,7 @@ switch to that"
        [label ""]
        [font (make-object font% 10 'modern)]
        [choices '()]
-       [columns '("Owner" "Folder Name" "Identifier" "Updated")]
+       [columns '("Owner" "Folder Name" "Identifier" "Updated" "PubStat")]
        ; really is single selection though we want to be
        ; able to highlight and reorder multiple
        [style '(single column-headers clickable-headers)]

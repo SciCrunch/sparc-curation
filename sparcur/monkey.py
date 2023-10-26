@@ -558,3 +558,16 @@ def Dataset_meta(self):
 @property
 def Organization_teams(self):
     return _get_json(self, f'{self._api._host}/organizations/{self.id}/teams')
+
+def bind_dga(Dataset):
+    def insert_extra(ds, self):
+        d = Dataset.from_dict(ds, api=self.session)
+        d.publication_status = ds['publication']['status']
+        d.canPublish = ds['canPublish']
+        return d
+
+    def DatasetAPI_get_all(self):
+        resp = self._get(self._uri("/?includePublishedDataset=true"))
+        return [insert_extra(ds, self) for ds in resp]
+
+    return DatasetAPI_get_all

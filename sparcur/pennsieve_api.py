@@ -16,7 +16,7 @@ from pennsieve import Pennsieve, DataPackage, BaseNode
 from pennsieve import Organization, Dataset, Collection, File
 from pennsieve import base as pnb
 from pennsieve.api import agent, transfers
-from pennsieve.api.data import PackagesAPI
+from pennsieve.api.data import PackagesAPI, DatasetsAPI
 from sparcur import monkey
 from sparcur.utils import ApiWrapper, PennsieveId, make_bf_cache_as_classes
 
@@ -67,6 +67,7 @@ Dataset.status_log = monkey.Dataset_status_log  # XXX NOTE this overwrites a met
 Dataset.packages = monkey.packages
 Dataset._packages = _packages
 Pennsieve.get = monkey.Blackfynn_get
+DatasetsAPI.get_all = monkey.bind_dga(Dataset)
 #PackagesAPI.get = monkey.PackagesAPI_get
 
 

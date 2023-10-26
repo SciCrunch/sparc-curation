@@ -4262,7 +4262,8 @@ def main(id=None, **kwargs):
                                   f"{json.dumps(d.name)} "
                                   f"{json.dumps(d.updated)} "
                                   f"{json.dumps(d.owner.name_or_email)} "
-                                  f"{json.dumps(d.parent_id)}"
+                                  f"{json.dumps(d.parent_id)} "
+                                  f"{json.dumps(d.bfobject.publication_status)}"
                                   ")")
                                 for d in sorted(datasets, key=key, reverse=True)])
             dsmeta = f"({_dsmeta})"
