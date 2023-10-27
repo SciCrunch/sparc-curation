@@ -4376,6 +4376,9 @@ def main(id=None, **kwargs):
             print(rp.repo.git.pull())
         if ik('update'):
             for wd in wds:
+                if 'homebrew' in wd.as_posix():
+                    continue
+
                 doupdate(wd)
             # indescriminately run setup.py with --release set to tangle
             from importlib import util as imu
