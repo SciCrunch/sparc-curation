@@ -32,7 +32,7 @@ If you *don't* have the username and password to access our Stardog server, plea
    * Click on the '**+ New Connection'** button and then on **Connect to Stardog** window, select **New Connection**
    * Enter the following information:
      * Enter the **Username** and **Password** given to you by SPARC K-Core
-     * **Endpoint:** [https://sd-63f05fc2.stardog.cloud:5820](https://sd-63f05fc2.stardog.cloud:5820/)
+     * **Endpoint:** [https://sd-c1e74c63.stardog.cloud:5820](https://sd-c1e74c63.stardog.cloud:5820)
      * Enter a name for your connection (e.g., SPARC-User)
    * Click on the '**Connect**' button to get connected with our server
 3. Launch Stardog Studio on your browser.
