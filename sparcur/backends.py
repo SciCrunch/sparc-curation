@@ -719,6 +719,10 @@ class BlackfynnRemote(aug.RemotePath):
         oid = self.owner_id
         if oid in self._member_cache:
             return self._member_cache[oid]
+        else:
+            msg = f'owner no longer a member of organization? {self.owner_id}'
+            log.warning(msg)
+            return User(self.bfobject.owner())
 
     @property
     def parent(self):
