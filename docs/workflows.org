@@ -128,9 +128,9 @@ pushd /var/www/sparc/sparc/
 *** elsewhere
 #+begin_src bash
 pushd /path/to/backup
-rsync -z -v -r -e ssh cassava:/var/www/sparc sparc-$(date -I)
+rsync -z -v -r --links -e ssh cassava:/var/www/sparc sparc-$(date -I)
 # export is big, so probably only keep two of these around, current and previous, copy current locally and then rsync into it again
-rsync -z -v -r -e ssh cassava-sparc:/var/lib/sparc/.local/share/sparcur/export sparcur-export-$(date -I)
+rsync -z -v -r --links -e ssh cassava-sparc:/var/lib/sparc/.local/share/sparcur/export sparcur-export-$(date -I)
 #+end_src
 
 #+begin_src bash
