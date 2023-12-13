@@ -1981,6 +1981,18 @@ switch to that"
                                         [callback cb-open-dataset-remote]
                                         [parent panel-power-user]))
 
+(define button-open-dataset-pipeline-status
+  (new (tooltip-mixin button%)
+       [label "PPS"]
+       [tooltip "Production Pipeline Status"]
+       [tooltip-delay 100]
+       [callback
+        (λ (o e)
+          (xopen-path
+           (string-append "https://cassava.ucsd.edu/sparc/pipelines/status/" (id-uuid (current-dataset)))))]
+       [parent panel-power-user]
+       ))
+
 (define button-open-export-json (new (tooltip-mixin button%)
                                      [label "JSON"]
                                      [tooltip "Shortcut C-j"]
