@@ -1113,6 +1113,7 @@ class SDSPipeline(JSONPipeline):
               # shared
               *copy_all(['dataset_description_file'], ['meta'],
                         'template_schema_version',
+                        'dataset_type',  # 2.0.0
                         'species',  # TODO validate all source paths against schema
                         'organ',
                         'modality',
