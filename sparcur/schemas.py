@@ -1273,7 +1273,8 @@ class DatasetDescriptionExportSchema(JSONSchema):
                                 'Cites',
                                 'IsSupplementTo',
                                 'IsSupplementedBy',
-                                'IsContinuedByContinues',
+                                'IsContinuedBy',
+                                'Continues',
                                 'IsDescribedBy',
                                 'Describes',
                                 'HasMetadata',
@@ -1297,7 +1298,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
                                 'IsReviewedBy',
                                 'Reviews',
                                 'IsDerivedFrom',
-                                'IsSourceOf',
+                                'IsSourceOf',  # use for dataset pointing to computational source
                                 'IsRequiredBy',
                                 'Requires',
                                 'IsObsoletedBy',
