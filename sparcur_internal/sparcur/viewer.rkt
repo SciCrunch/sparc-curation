@@ -2260,9 +2260,7 @@ switch to that"
           [("dir")  "d"]
           [("file") "f"]
           [("link") "l"]))
-      #;
       (define raw-ops (hash-ref record 'ops))
-      #;
       (define-values (old-id ops)
         (if (member "change" raw-ops)
             (let* ((rrops (reverse raw-ops))
@@ -2277,18 +2275,14 @@ switch to that"
                                   (substring uuid (- slu 4) slu))))))
                    (ops (reverse (cdr rrops))))
               (values old-id ops))
-            (values "" raw-ops)))
-      #; ; TODO determine whether do display this maybe for use in sorting?
+            (values (or (hash-ref record 'old-id) "") raw-ops)))
+      #; ; TODO determine whether to display this maybe for use in sorting?
       (hash-ref record 'updated)
       (list
        type
        (hash-ref record 'path)
-       (or (hash-ref record 'old-id) "")
-       #;
        old-id
-       #;
        (string-join ops " ")
-       (string-join (hash-ref record 'ops) " ")
        ))
     #;
     (define/public (get-list-box) list-box) ; the problem with private stuff is that it is extremely annoying to debug relative to normal
