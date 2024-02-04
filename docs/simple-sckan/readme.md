@@ -2,24 +2,30 @@
 
 What do we mean by **Simple SCKAN**? Simple SCKAN refers to an extension of the [SCKAN](https://zenodo.org/record/6369432#.YxkD5OzML0q) that allows writing queries about [NPO&#39;s](https://link.springer.com/article/10.1007/s12021-022-09566-7) core connectivity knowledge in a simplified manner.  The key objective of Simple SCKAN is to support simplicity while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Simple SCKAN adds that query-friendly abstraction layer on top of the SCKAN.
 
+- [About Simple SCKAN](#about-simple-sckan)
 - [Accessing Simple SCKAN](#accessing-simple-sckan)
 - [Running Simple SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog)
 - [SCKAN Vs. Simple SCKAN](#sckan-vs-simple-sckan)
-- [Query Example: SCKAN Vs. Simple SCKAN](#query-example-sckan-vs-simple-sckan)
+- [Simple SCKAN Properties](#simple-sckan-properties)
+  * [Locational Phenotypes](#locational-phenotypes)
+  * [Other Phenotypes](#other-phenotypes)
+- [Query Example: SCKAN Vs. Simple SCKAN](#query-example--sckan-vs-simple-sckan)
+  * [Query Result (first few results)](#query-result--first-few-results-)
+- [More **Simple SCKAN** Example Queries](#more---simple-sckan---example-queries)
 - [Transforming SCKAN into Simple SCKAN](#transforming-sckan-into-simple-sckan)
 
 # Accessing Simple SCKAN
 
 * You can use [Stardog Studio](https://www.stardog.com/studio/) as the SPARQL query interface for Simple SCKAN. A Stardog endpoint is set up by the [FDI Lab](https://www.fdilab.org/) to provide access to SCKAN via Stardog Studio.
-  * We have a set of predefined 'canned' query patterns avialable via Stardog Studio that we think would be useful for the users like SPARC's NLP curators, anatomical experts, and other interested users.
+  * We have a set of predefined 'canned' query patterns available via Stardog Studio that we think would be useful for users like SPARC's NLP curators, anatomical experts, and other interested users.
   * Refer to the next section on [Running Simple SCKAN Queries in Stardog](#running-simple-sckan-queries-in-stardog).
 * We also have a publicly available Blazegraph SPARQL endpoint for both SCKAN and Simple SCKAN
   * Blazegraph Endpoint: [https://blazegraph.scicrunch.io/blazegraph/sparql](https://blazegraph.scicrunch.io/blazegraph/sparql)
-  * No username or password needed to access this endpoint.
+  * No username or password is needed to access this endpoint.
   * Check out the Notebook on [SCKAN Query Examples](https://github.com/smtifahim/sckan-query-examples/tree/main) using Simple SCKAN predicates.
 * If you simply want to search the key contents of the SCKAN without writing SPARQL queries, please use  [SCKAN Explorer](https://services.scicrunch.io/sckan/explorer/).
   * SCKAN Explorer is an intuitive, web-based search interface to explore the SPARC connectivity knowledge for non-technical domain experts.
-  * Behind the scene, SCKAN Explorer uses simplified SPARQL queries supported by Simple SCKAN.
+  * Behind the scenes, SCKAN Explorer uses simplified SPARQL queries supported by Simple SCKAN.
 
 # Running Simple SCKAN Queries in Stardog
 
@@ -36,7 +42,7 @@ If you *don't* have the username and password to access our Stardog server, plea
      * Enter a name for your connection (e.g., SPARC-User)
    * Click on the '**Connect**' button to get connected with our server
 3. Launch Stardog Studio on your browser.
-   * Click on the connection containg the endpoint above and navigate to the server's dashboard
+   * Click on the connection containing the endpoint above and navigate to the server's dashboard
    * Click on the **STARDOG STUDIO** section and launch the Stardog Studio interface
 4. Run **Simple SCKAN** queries using Stardog Studio.
    * Click on the **Workspace** icon from the left (the icon that looks like a tiny piece of paper folded in its corner)
@@ -50,11 +56,14 @@ If you *don't* have the username and password to access our Stardog server, plea
 The underlying ontologies in SCKAN are developed using standard OWL-DL formalism. The ontology that formalizes the SCKAN's core connectivity knowledge, the [Neuron Phenotype Ontology](https://link.springer.com/article/10.1007/s12021-022-09566-7) (NPO), is also encoded in OWL-DL. When it comes to the NPO, the main reasons for choosing the OWL-DL formalism are the following: (a) explicitly specifying the neuronal phenotypes with precise logical axioms and quantifiers, and (b) utilizing standard ontology reasoners for automated classification of neuron populations, and detecting inconsistencies within the asserted axioms of the neuron populations.
 
 * While OWL-DL supports automated reasoning and provides a rigorous formalism to specify the logical axioms of an ontology, it lacks support for quiring and retrieving those axiom-level specifications. We simply don't have enough tool support for complex axiom-level queries that one could use against the OWL ontologies.
-* While one can use SPARQL or CYPHER to retreive axiom-level knowledge from the OWL ontologies, it usually requires an extensive knowledge about the domain of the ontologies as well as the technical jargon of the OWL/RDF formalisms.
-* The standard graph-based query laguages like SPARQL and CYPHER are meant for writing data or individual-level queries against a knowledgebase. They are not very suitable for writing the class-level queries with complex ontological axioms. Writing and testing such class-level queries against an OWL ontology can become quite difficult and tedious.
-* Since the neuron populations in SCKAN are defined based on a set of OWL logical axioms, SCKAN suffers the exact same pitfalls above when it comes to retreiving the neuronal connectivity knowledge from its ontologies.
+* While one can use SPARQL or CYPHER to retrieve axiom-level knowledge from the OWL ontologies, it usually requires extensive knowledge about the domain of the ontologies as well as the technical jargon of the OWL/RDF formalisms.
+* The standard graph-based query languages like SPARQL and CYPHER are meant for writing data or individual-level queries against a knowledgebase. They are not very suitable for writing class-level queries with complex ontological axioms. Writing and testing such class-level queries against an OWL ontology can become quite difficult and tedious.
+* Since the neuron populations in SCKAN are defined based on a set of OWL logical axioms, SCKAN suffers the same pitfalls above when retrieving the neuronal connectivity knowledge from its ontologies.
 
-**Simple SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified subject-predicate-object relations about the core connectivity knowledge available in NPO. The key objective of the Simple SCKAN is to **support simplicity** while writing and testing the queries against NPO's complex, axiom-level connectivity statements. Following is the list of simplified relational predicates available in Simple SCKAN:
+**Simple SCKAN** refers to an extension of the SCKAN that incorporates a set of simplified subject-predicate-object relations about the core connectivity knowledge available in NPO. The key objective of the Simple SCKAN is to **support simplicity** while writing and testing the queries against NPO's complex, axiom-level connectivity statements. 
+
+# Simple SCKAN Properties
+Following is the list of simplified relational predicates or properties available in Simple SCKAN. These properties are specified as OWL annotation properties in [simple-sckan-properties.ttl](https://github.com/smtifahim/Loading-Simple-SCKAN/blob/main/sckan-to-simple-sckan/input_ttl/simple-sckan-properties.ttl) file. 
 
 #### Locational Phenotypes
 
@@ -74,15 +83,15 @@ The underlying ontologies in SCKAN are developed using standard OWL-DL formalism
 | **hasFunctionalCircuitRole** | Expresses a relation between a neuron population and its immediate effect on postsynaptic cells<br />- **Excitatory** or **Inhibitory**                                                                                                                                                                           |
 | **hasCircuitRole**           | Expresses a relation between a neuron population and its circuit role phenotype<br />- Possible phenotypes are: **Intrinsic**, **Motor**, **Sensory**, or **Projection**                                                                                                                               |
 | **hasProjection**            | Expresses a relation between a neuron population and a brain region where the neuron population sends axons towards<br />- **Spinal cord descending projection**, **Spinal cord ascending projection**<br />- **Intestino fugal projection**, **Anterior projecting**, **Posterior projecting** |
-| **isObservedInSpecies**      | Expresses a relationship between a neuron type and a taxon. Used when a neuron population has een observed in a specific species.<br />- **Species from NCBI Taxonomy**                                                                                                                                                   |
-| **hasPhenotypicSex**         | Expresses a relationship between a neuron type and a biological sex. Used when a neuron population has been observed in a specific sex.<br />- **Male or **Female** from PATO**                                                                                                                                    |
+| **isObservedInSpecies**      | Expresses a relationship between a neuron type and a taxon. Used when a neuron population has been observed in a specific species.<br />- **Species** from NCBI Taxonomy                                                                                                                                                   |
+| **hasPhenotypicSex**         | Expresses a relationship between a neuron type and a biological sex. Used when a neuron population has been observed in a specific sex.<br />- **Male** or **Female** from PATO                                                                                                                                    |
 | **hasForwardConnection**     | Expresses a relationship to specify the synaptic forward connection from a pre-ganglionic neuron population to a post-ganglionic neuron population.                                                                                                                                                                             |
 
-The relational predicates above in **Simple SCKAN** serve as 'shortcuts' for the actual OWL axioms used in NPO to represent the phenotypic properties of its neuron populations. Essentially, Simple SCKAN encapsulates those complex OWL axioms into a set of simpler RDF graph patterns. The sole purpose of this encapsulation is to allow querying and retrieiving SCKAN's connectivity knowledge in a simplified, managable manner. The next section provides an example as to how the queries can be simpler to write using Simple SCKAN predicates as compared to that of using full SCKAN. The example also demonstrates how the Simple SCKAN version of the query is easier to comprehend and more managable to edit.
+The relational predicates above in **Simple SCKAN** serve as 'shortcuts' for the actual OWL axioms used in NPO to represent the phenotypic properties of its neuron populations. Essentially, Simple SCKAN encapsulates those complex OWL axioms and transforms them into a set of simpler RDF graph patterns using SPARQL Construct queries. The sole purpose of this encapsulation is to allow querying and retrieving SCKAN's connectivity knowledge in a simplified, manageable manner. The next section provides an example of how the queries can be simpler to write using Simple SCKAN predicates as compared to those using full SCKAN. The example also demonstrates how the Simple SCKAN version of the query is easier to comprehend and more manageable to edit.
 
-## Query Example: SCKAN Vs. Simple SCKAN
+# Query Example: SCKAN Vs. Simple SCKAN
 
-* Here is an example query to find all the orgins (soma locations) and the termination regions of the neuronal connections specified in the [ApINATOMY](https://scicrunch.org/sawg/about/ApiNATOMY) models. In other words, this query asks where the origins of the ApINATOMY connections are and where do they terminate.
+* Here is an example query to find all the origins (soma locations) and the termination regions of the neuronal connections specified in the [ApINATOMY](https://scicrunch.org/sawg/about/ApiNATOMY) models. In other words, this query asks where the origins of the ApINATOMY connections are and where they terminate.
 
 ```SPARQL
 # This is the SCKAN Query Example in SPARQL.
@@ -178,12 +187,12 @@ LIMIT 999
 
 # More **Simple SCKAN** Example Queries
 
-We have compiled a set of query examples supported by Simple SCKAN (linked below). These examples were written to demonstrate how to use Simple SCKAN predicats to retreive the key contenets of SCKAN using SPARQL.
+We have compiled a set of query examples supported by Simple SCKAN (linked below). These examples were written to demonstrate how to use Simple SCKAN predicates to retrieve the key contents of SCKAN using SPARQL.
 
 * [Query examples in Jupyter Notebook](https://github.com/smtifahim/sckan-query-examples/)
 
 # Transforming SCKAN into Simple SCKAN
 
-The process of transforming SCKAN/NPO into Simple SCKAN is documented in the following link. The process is automated using a python script that takes care of generating all the necessary files needed for Simple SCKAN and loads them into the Stardog Server.
+The transformation process involves using the SPARQL Construct queries to create new RDF graphs from existing RDF statements. It allows specifying a pattern of data to be extracted from the input RDF statements and constructs new graph structures based on that pattern. The SPARQL Construct query allows for transforming complex RDF graph patterns into simplified patterns. The process of transforming SCKAN/NPO into Simple SCKAN is documented in the following link. The process is automated using a Python script that takes care of generating all the necessary files needed for Simple SCKAN and loads them into the Stardog Server. The generated files can also be loaded into any other rdf-based graph database as well.
 
 * [SCKAN to Simple SCKAN Transformation Process](https://github.com/smtifahim/Loading-Simple-SCKAN/tree/main/sckan-to-simple-sckan)
