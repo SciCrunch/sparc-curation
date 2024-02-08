@@ -1,0 +1,452 @@
+# gen-json-schema sparc.yaml
+id: https://sparc.olympiangods.org/sparcur/schemas/1/sparc
+title: sparc export schema
+name: sparc-linkml
+imports:
+  - linkml:types  # needed to avoid ValueError:  slot: id - unrecognized range (string)
+# default_range: Thing
+# either import linkml:types or define string myself
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  local: pass
+  BFO: http://purl.obolibrary.org/obo/BFO_
+  isAbout: http://purl.obolibrary.org/obo/IAO_0000136
+  rdfs: http://www.w3.org/2000/01/rdf-schema#
+  TEMP: http://uri.interlex.org/temp/uris/
+  sparc: http://uri.interlex.org/tgbugs/uris/readable/sparc/
+  dc: http://purl.org/dc/elements/1.1/
+  TEMPRAW: http://uri.interlex.org/temp/uris/raw/
+
+classes:
+  Thing:
+  Process:
+    exact_mappings: BFO:0000015
+  Performance:
+    is_a: Process
+
+  Organization:  # placeholder missing in owl to handle all the ror subclasses
+  FundedResearchProject:
+
+  Pool:
+  Participant:
+  Population:
+    # hasMember: Participant
+    is_a: Participant
+  PopulationPopulation:
+    # hasMember: Population
+    is_a: Population
+  ParticipantPopulation:
+    # owl:equivalentClass Population:
+
+  Specimen:
+    is_a: Participant
+  SpecimenPopulation:
+  Subject:
+    is_a: Specimen
+  Sample:
+    is_a: Specimen
+  SamplePopulation:
+
+  Site:
+
+  Person:
+  #Researcher:  # deprecated
+    #is_a: Person
+  Contributor:  # not currently defined in owl, more a data artifact version
+    is_a: Person
+    slots:
+      - first_name
+      - middle_name
+      - last_name
+      - contributorTo
+      - affiliation  # XXX vs contributor_affiliation
+
+  Resource:
+    slots:
+      - id
+      - label
+    slot_usage:
+      id:
+        required: true
+  Flatmap:
+    is_a: Resource
+  Scaffold:
+    is_a: Resource
+  Protocol:
+    is_a: Resource
+  Path:
+    is_a: Resource
+  File:
+    is_a: Path
+  Folder:
+    is_a: Path
+  Dataset:
+    is_a: Folder  # FIXME not 100% on this, because it is more folder + some non-fs metadata right now
+  dataset_out_export:
+    slot_usage:
+      id:
+        required: true
+      meta:
+        required: true
+      contributors:
+        required: true
+        multivalued: true
+        range: Contributor
+      path_metadata:
+        #required: true  # currently required but should not be
+      prov:
+        required: true
+      rmeta:
+      errors:
+      creators:
+      performances:
+      subjects: # FIXME conditional requred on meta number_of_subjects > 0
+        multivalued: true
+        range: Subject
+      samples: # FIXME conditional requred on meta number_of_samples > 0
+        multivalued: true
+        range: Sample
+      resources:
+        multivalued: true
+        range: Resource
+      submission:
+      specimen_dirs:
+      inputs:
+  dataset_meta:
+    slots:
+      - award_number
+      - principal_investigator
+      - species
+      - organ
+      - modality  # FIXME approach
+      - techniques
+      - contributor_count
+      - uri_human
+      - uri_api
+      - sparse
+      - files
+      - dirs
+      - size
+      - folder_name
+      - title
+      - template_schema_version
+      - number_of_subjects
+      - number_of_samples
+      - timestamp_created
+      - timestamp_updated
+      - timestamp_updated_contents
+      - errors
+      - doi
+      - id_organization  # FIXME should be required?
+      - protocol_url_or_doi  # FIXME required for subjects or samples > 0?
+      - additional_links  # deprecated
+      - model_of_organ
+      - collected_from_species
+      - performance_count
+      - subject_count
+      - sample_count
+      - description  # added back in 3.0
+
+    slot_usage:
+      award_number:
+        required: true
+      principal_investigator:
+        required: true
+      species:
+        required: true
+      organ:
+        required: true
+      modality:  # FIXME approach
+        required: true
+      techniques:
+        required: true
+      contributor_count:
+        required: true
+      uri_human:
+        required: true
+      uri_api:
+        required: true
+      sparse:
+        required: true
+      files:
+        required: true
+      dirs:
+        required: true
+      size:
+        required: true
+      folder_name:
+        required: true
+      title:
+        required: true
+      template_schema_version:
+        required: true
+      number_of_subjects:
+        required: true
+      number_of_samples:
+        required: true
+      timestamp_created:
+        required: true
+      timestamp_updated:
+        required: true
+      timestamp_updated_contents:
+        required: true
+
+  DatasetContribution:
+
+  Group:
+  Measurement:
+
+slots:
+  # manual
+  id:
+  label:
+    slot_uri: rdfs:label
+  errors:
+  contributorTo:
+    slot_uri: TEMP:contributorTo
+
+  # extracted
+  acknowledgements:
+    slot_uri: TEMP:acknowledgements
+  additional_links:
+    slot_uri: TEMP:hasAdditionalLinks
+  affiliation:
+    slot_uri: TEMP:hasAffiliation
+  age:
+    slot_uri: TEMP:hasAge
+  age_category:
+    slot_uri: TEMP:hasAgeCategory
+  age_range_max:
+    slot_uri: TEMP:hasAgeMax
+  age_range_min:
+    slot_uri: TEMP:hasAgeMin
+  age_years:
+    slot_uri: TEMP:hasAge
+  anesthesia:
+    slot_uri: TEMP:wasAdministeredAnesthesia
+  approach:
+    slot_uri: TEMP:hasExperimentalApproach
+  award_number:
+    slot_uri: TEMP:hasAwardNumber
+  blackfynn_user_id:
+    slot_uri: TEMP:hasBlackfynnUserId
+  body_mass:
+    slot_uri: sparc:animalSubjectHasWeight
+  body_mass_weight:
+    slot_uri: TEMP:subjectHasWeight
+  body_weight:
+    slot_uri: sparc:animalSubjectHasWeight
+  collected_from_species:
+    slot_uri: TEMP:speciesCollectedFrom
+  comment:
+    slot_uri: TEMP:providerNote
+  completeness_of_data_set:
+    slot_uri: TEMP:completenessOfDataset
+  contributor_affiliation:
+    slot_uri: TEMP:hasAffiliation
+  contributor_count:
+    slot_uri: TEMP:hasNumberOfContributors
+  contributor_orcid:
+    slot_uri: sparc:hasORCIDId
+  contributor_orcid_id:
+    slot_uri: sparc:hasORCIDId
+  contributor_role:
+    slot_uri: TEMP:hasRole
+  curation_index:
+    slot_uri: TEMP:curationIndex
+  data_remote_user_id:
+    slot_uri: TEMP:hasDataRemoteUserId
+  dataset_id:
+    slot_uri: TEMP:providerDatasetIdentifier
+  date_of_euthanasia:
+    slot_uri: TEMP:protocolPerformanceDate
+  date_of_experiment:
+    slot_uri: TEMP:protocolPerformanceDate
+  date_of_injection:
+    slot_uri: TEMP:protocolPerformanceDate
+  description:
+    slot_uri: dc:description
+  dirs:
+    slot_uri: TEMP:hasNumberOfDirectories
+  doi:
+    slot_uri: TEMP:hasDoi
+  ear_tag_number:
+    slot_uri: TEMP:localIdAlt
+  error_index:
+    slot_uri: TEMP:errorIndex
+  experiment_date:
+    slot_uri: TEMP:protocolPerformanceDate
+  experiment_number:
+    slot_uri: TEMP:localPerformanceNumber
+  experimental_group:
+    slot_uri: TEMP:hasAssignedGroup
+  experimental_log_file_name:
+    slot_uri: TEMPRAW:hasDigitalArtifactThatIsAboutIt
+  filename:
+    slot_uri: TEMPRAW:hasDigitalArtifactThatIsAboutIt
+  files:
+    slot_uri: TEMP:hasNumberOfFiles
+    #slot_uri: TEMP:numberOfFiles  # XXX
+  first_name:
+    slot_uri: sparc:firstName
+  folder_name:
+    slot_uri: rdfs:label
+  funding:
+    slot_uri: TEMP:hasAdditionalFundingInformation
+  gender:
+    slot_uri: sparc:hasGender
+  genotype:
+    slot_uri: TEMP:hasGenotype
+  genus:
+    slot_uri: sparc:animalSubjectIsOfGenus
+  group:
+    slot_uri: TEMP:hasAssignedGroup
+  handedness:
+    slot_uri: TEMP:hasHandedness
+  height_inches:
+    slot_uri: TEMP:subjectHasHeight
+  id_organization:
+    slot_uri: TEMP:hasOrganization
+  initial_weight:
+    slot_uri: sparc:animalSubjectHasWeight
+  injection_date:
+    slot_uri: TEMP:protocolPerformanceDate
+  is_contact_person:
+    slot_uri: sparc:isContactPerson
+  is_responsible_pi:
+    slot_uri: sparc:isContactPerson
+  keywords:
+    #slot_uri: isAbout  # FIXME bare curies
+  last_name:
+    slot_uri: sparc:lastName
+  license:
+    slot_uri: TEMP:hasLicense
+  mass:
+    slot_uri: sparc:animalSubjectHasWeight
+  middle_name:
+    slot_uri: TEMP:middleName
+  milestone_completion_date:
+    slot_uri: TEMP:milestoneCompletionDate
+  modality:
+    slot_uri: TEMP:hasExperimentalApproach
+    #slot_uri: TEMP:hasExperimentalModality
+  model_of_organ:
+    slot_uri: TEMP:organModelOf
+  model_of_species:
+    slot_uri: TEMP:speciesModelOf
+  nerve:
+    slot_uri: TEMPRAW:involvesAnatomicalRegion
+  note:
+    slot_uri: TEMP:providerNote
+  number_of_samples:
+    slot_uri: TEMP:hasExpectedNumberOfSamples
+  number_of_subjects:
+    slot_uri: TEMP:hasExpectedNumberOfSubjects
+  organ:
+    #slot_uri: isAbout
+    #slot_uri: isAbout:
+  organism_rrid:
+    #slot_uri: TEMP:TODO
+    slot_uri: TEMP:organismRRID
+  originating_article_doi:
+    slot_uri: TEMP:isDescribedBy
+  performance_count:
+    slot_uri: TEMP:hasNumberOfPerformances
+  performance_id:
+    #slot_uri: @id
+    slot_uri: TEMP:localId
+  pool_id:
+    slot_uri: TEMP:hasPoolId
+  previous_dois:
+    slot_uri: TEMP:hasDoiPrevious
+  primary_key:
+    #slot_uri: @id
+  principal_investigator:
+    slot_uri: TEMP:hasResponsiblePrincipalInvestigator
+  prior_batch_number:
+    slot_uri: TEMP:Continues
+  protocol_url_or_doi:
+    slot_uri: TEMP:hasProtocol  # FIXME dataset
+    #slot_uri: TEMP:participantInPerformanceOf  # FIXME subject/sample
+  published_revision:
+    slot_uri: TEMP:publishedRevision
+  published_version:
+    slot_uri: TEMP:publishedVersion
+  readme:
+    slot_uri: TEMP:readmeText
+  rrid_for_strain:
+    #slot_uri: TEMP:specimenRRID
+    slot_uri: sparc:specimenHasIdentifier
+  sample_count:
+    slot_uri: TEMP:hasNumberOfSamples
+  sample_description:
+    slot_uri: dc:description
+  sample_id:
+    slot_uri: TEMP:localId
+  sample_name:
+    slot_uri: rdfs:label
+  session:
+    slot_uri: TEMP:localPerformanceNumber
+  sex:
+    slot_uri: sparc:hasBiologicalSex
+  sha1:
+    slot_uri: TEMPRAW:hasDigitalArtifactThatIsAboutItWithHash
+  size:
+    slot_uri: TEMP:hasSizeInBytes
+  sparse:
+    slot_uri: TEMP:sparseClone
+  species:
+    #slot_uri: isAbout  # dataset
+    #slot_uri: isAbout:
+    slot_uri: sparc:animalSubjectIsOfSpecies  # subject
+  specimen_anatomical_location:
+    slot_uri: TEMPRAW:wasExtractedFromAnatomicalRegion
+  status_on_platform:
+    slot_uri: TEMP:remotePlatformStatus
+  stimulating_electrode_type:
+    slot_uri: sparc:stimulatorUtilized
+  stimulation_site:
+    slot_uri: sparc:spatialLocationOfModulator
+  stimulator:
+    slot_uri: sparc:stimulatorUtilized
+  strain:
+    slot_uri: sparc:animalSubjectIsOfStrain
+  subject_count:
+    slot_uri: TEMP:hasNumberOfSubjects
+  subject_id:
+    #slot_uri: @id
+    slot_uri: TEMP:localId
+  submission_index:
+    slot_uri: TEMP:submissionIndex
+  techniques:
+    slot_uri: TEMP:protocolEmploysTechnique
+  template_schema_version:
+    slot_uri: TEMP:hasDatasetTemplateSchemaVersion
+  timestamp_created:
+    slot_uri: TEMP:wasCreatedAtTime
+  timestamp_published_version:
+    slot_uri: TEMP:wasPublishedAtTime
+  timestamp_updated:
+    slot_uri: TEMP:wasUpdatedAtTime
+  timestamp_updated_contents:
+    slot_uri: TEMP:contentsWereUpdatedAtTime
+  title:
+    slot_uri: dc:title
+  title_for_complete_data_set:
+    slot_uri: TEMP:collectionTitle
+  treatment:
+    #slot_uri: TEMP:TODO
+    slot_uri: TEMP:hadExperimentalTreatmentApplied
+  unclassified_index:
+    slot_uri: TEMP:unclassifiedIndex
+  unclassified_stages:
+    slot_uri: TEMP:unclassifiedStages
+  upload_filename:
+    slot_uri: TEMPRAW:hasDigitalArtifactThatIsAboutIt
+  uri_api:
+    slot_uri: TEMP:hasUriApi
+  uri_human:
+    slot_uri: TEMP:hasUriHuman
+  weight:
+    slot_uri: sparc:animalSubjectHasWeight
