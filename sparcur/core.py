@@ -535,16 +535,22 @@ def JFixKeys(obj):
 
 
 def get_nested_by_key(obj, key, *args, path=None, asExport=True,
-                      join_lists=True, collect=tuple()):
+                      join_lists=True, collect_path=False, collect=tuple()):
     if isinstance(obj, dict) and key in obj:
         value = obj[key]
         if is_list_or_tuple(value) and join_lists:
             for v in value:
                 n = json_export_type_converter(v)
-                collect.append(n if n is not None and asExport else v)
+                if collect_path:
+                    collect.append((tuple(path), (n if n is not None and asExport else v)))
+                else:
+                    collect.append(n if n is not None and asExport else v)
         else:
             n = json_export_type_converter(value)
-            collect.append(n if n is not None and asExport else value)
+            if collect_path:
+                collect.append((tuple(path), (n if n is not None and asExport else value)))
+            else:
+                collect.append(n if n is not None and asExport else value)
 
     return obj  # have to return this otherwise somehow everything is turned to None?
 

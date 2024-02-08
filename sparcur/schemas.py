@@ -253,6 +253,27 @@ def get_runtime_context_specs():
     return specs
 
 
+def get_context_values():
+    from pyontutils.utils import subclasses
+    collect = []
+    for cls in subclasses(JSONSchema):
+        if cls == JsonLdHelperSchema:
+            continue
+
+        JApplyRecursive(get_nested_by_key,
+                        cls.schema,
+                        'context_value',
+                        join_lists=False,
+                        collect_path=True,
+                        collect=collect)
+
+    specs = tuple(set((l[0], tuple([(k, v) for k, v in l[1].items() if k != '@context'])
+                       if isinstance(l[1], dict) else
+                       (l[1] if isinstance(l[1], str) else
+                        print(f'wat: {l[1]!r}'))) for l in collect if not print(l[1])))
+    return specs
+
+
 def _defunc(obj, *args, path=None, **kwargs):  # FIXME add tests
     if isinstance(obj, types.FunctionType):
         return asStr(ast.parse(inspect.getsource(obj).strip().strip(',')))
