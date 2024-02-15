@@ -798,7 +798,10 @@ note of course that you don't get dynamic binding with version since it is not t
    (define (lb-cols ds)
      (list
       (dataset-pi-name-lf ds)
-      (dataset-title ds)
+      (let ([dt (dataset-title ds)]) ; must meet label-string? requirements
+        (if (<= (string-length dt) 200)
+            dt
+            (string-append (substring dt 0 196) " ...")))
       (id-short ds)
       (updated-short ds)
       (dataset-publication-status ds)))
