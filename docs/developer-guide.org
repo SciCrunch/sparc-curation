@@ -4179,9 +4179,11 @@ def main(id=None, **kwargs):
                 project_ids = [project_id]
 
         datasets = []
+        project_meta = []
         for project_id in project_ids:
             PennsieveRemote = backend_pennsieve(project_id)
             root = PennsieveRemote(project_id)
+            project_meta.append((root.id, root.name))
             datasets.extend(root.children)
 
     if ik('datasets'):
@@ -4267,6 +4269,8 @@ def main(id=None, **kwargs):
                                   ")")
                                 for d in sorted(datasets, key=key, reverse=True)])
             dsmeta = f"({_dsmeta})"
+            _projmeta = '\n'.join([f"({json.dumps(id)} {json.dumps(name)})" for id, name in project_meta])
+            dsmeta += f"\n({_projmeta})"
             print(dsmeta)
 
     if ik('check_names'):

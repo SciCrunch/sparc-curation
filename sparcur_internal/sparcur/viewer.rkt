@@ -72,6 +72,7 @@ note of course that you don't get dynamic binding with version since it is not t
 (define url-prod-datasets (make-parameter "https://cassava.ucsd.edu/sparc/datasets"))
 
 ; true global variables that should not be thread local
+(define current-projects (make-lexical-parameter)) ; FIXME check that default value ???
 (define current-blob (make-lexical-parameter))
 (define current-dataset (make-lexical-parameter))
 (define current-datasets (make-lexical-parameter)) ; FIXME check that default value ???
@@ -324,23 +325,30 @@ note of course that you don't get dynamic binding with version since it is not t
 
 (define (populate-datasets)
   (let* ([pcd (path-cache-datasets)]
-         [result (if (file-exists? pcd)
+         [result-projects (if (file-exists? pcd)
                      (with-input-from-file pcd
-                       (λ () (read)))
+                       (λ () (list (read) (read))))
                      (begin
                        (let ([pc-dir (path-cache-dir)])
                          (unless (directory-exists? pc-dir)
                            ; `make-directory*' will make parents but
                            ; only if pc-dir is not a relative path
                            (make-directory* pc-dir)))
-                       (let ([result (get-dataset-list)])
+                       (let* ([result-projects (get-dataset-project-list)]
+                              [result (car result-projects)]
+                              [projects (cadr result-projects)])
                          (with-output-to-file pcd
                            #:exists 'replace ; yes if you run multiple of these you could have a data race
-                           (λ () (pretty-write result)))
+                           (λ ()
+                             (pretty-write result)
+                             (pretty-write projects)))
                          ; just to confuse everyone
-                         result))
+                         result-projects))
                      )]
+         [result (car result-projects)]
+         [projects (cadr result-projects)]
          [datasets (result->dataset-list result)])
+    (current-projects projects)
     (current-datasets datasets)
     (set-datasets-view! lview (current-datasets)) ; FIXME TODO have to store elsewhere for search so we
     result))
@@ -462,9 +470,12 @@ note of course that you don't get dynamic binding with version since it is not t
     (dynamic-wind
       (thunk (send button-refresh-datasets enable #f))
       (thunk
-       (let* ([result (get-dataset-list)]
+       (let* ([result-projects (get-dataset-project-list)]
+              [result (car result-projects)]
+              [projects (cadr result-projects)]
               [datasets (result->dataset-list result)]
               [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
+         (current-projects projects)
          (current-datasets datasets)
          (if unfiltered?
              (call-with-semaphore
@@ -475,7 +486,9 @@ note of course that you don't get dynamic binding with version since it is not t
          (println "dataset metadata has been refreshed") ; TODO gui viz on this (beyond updating the number)
          (with-output-to-file (path-cache-datasets)
            #:exists 'replace ; yes if you run multiple of these you could have a data race
-           (λ () (pretty-write result)))))
+           (λ ()
+             (pretty-write result)
+             (pretty-write projects)))))
       (thunk (send button-refresh-datasets enable #t))))))
 
 (define (get-path-err)
@@ -778,6 +791,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (dataset-latest-log-path ds)
   (dataset-export-latest-path ds)
   (dataset-cleaned-latest-path ds)
+  (dataset-project-name ds)
   (fetch-export-dataset ds)
   (fetch-dataset ds)
   (clean-metadata-files ds)
@@ -811,6 +825,8 @@ note of course that you don't get dynamic binding with version since it is not t
    (define (lb-data ds)
      ; TODO we may want to return more stuff here
      ds)
+   (define (dataset-project-name ds)
+     (cadr (assoc (dataset-id-project ds) (current-projects))))
    (define (dataset-export-latest-path ds)
      (let* ([uuid (id-uuid ds)]
             [lp (build-path (path-export-datasets)
@@ -1250,16 +1266,21 @@ note of course that you don't get dynamic binding with version since it is not t
              (apply dataset (append ti pad))))
          result)))
 
-(define (get-dataset-list)
+(define (get-dataset-project-list)
   (let* ([argv argv-simple-for-racket]
          [status #f]
          [result-string
           (parameterize ()
+            ; FIXME if the viewer is closed before this finishes then bad things happen
+            ; with regard to printing error messages etc. pretty sure we need a way to
+            ; send a signal to subprocesses on exit (annoyingly)
             (with-output-to-string (λ () (set! status (apply py-system* argv)))))]
-         [result (read (open-input-string result-string))])
+         [string-port (open-input-string result-string)]
+         [result (read string-port)]
+         [projects (read string-port)])
     (unless status
       (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
-    result))
+    (list result projects)))
 
 (define (get-path-meta path)
   (let* ([path-string (path->string path)]
@@ -1500,6 +1521,9 @@ note of course that you don't get dynamic binding with version since it is not t
                                                 (string-contains? (string-downcase (dataset-title d))
                                                                   downcased-text)
                                                 (string-contains? (string-downcase (dataset-pi-name-lf d))
+                                                                  downcased-text)
+                                                (string-contains? (dataset-id-project d) text)
+                                                (string-contains? (string-downcase (dataset-project-name d))
                                                                   downcased-text)))
                             d)])
             (if (null? matches)
