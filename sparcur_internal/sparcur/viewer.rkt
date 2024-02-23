@@ -166,7 +166,10 @@ note of course that you don't get dynamic binding with version since it is not t
                    (path->string (dataset-working-dir-path ds))))
 (define argv-simple-git-repos-update (python-mod-args "sparcur.simple.utils" "git-repos" "update"))
 (define argv-spc-export (python-mod-args "sparcur.cli" "export"))
-(define (argv-simple-retrieve ds) (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1" "--dataset-id" (dataset-id ds)))
+(define (argv-simple-retrieve ds)
+  (python-mod-args "sparcur.simple.retrieve" "--sparse-limit" "-1"
+                   "--dataset-id" (dataset-id ds)
+                   "--project-id" (dataset-id-project ds)))
 (define argv-spc-find-meta
   (python-mod-args
    "sparcur.cli"
