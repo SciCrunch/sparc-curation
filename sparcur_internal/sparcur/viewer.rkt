@@ -1113,7 +1113,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (current-datasets-view datasets)
   (define sorted (sort datasets (current-dataset-sort)))
   (send/apply list-box set (apply map list (map lb-cols sorted)))
-  (for ([ds datasets]
+  (for ([ds sorted]
         [n (in-naturals)])
     (send list-box set-data n (lb-data ds)))
   (send button-refresh-datasets set-label
