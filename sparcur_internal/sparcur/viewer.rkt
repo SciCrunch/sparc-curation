@@ -80,6 +80,7 @@ note of course that you don't get dynamic binding with version since it is not t
 (define current-jview (make-lexical-parameter))
 (define current-mode-panel ; TODO read from config/history
   (make-lexical-parameter))
+(define remote-org-keys (make-lexical-parameter))
 
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
@@ -415,8 +416,8 @@ note of course that you don't get dynamic binding with version since it is not t
   ; TODO various configuration options
   (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")])
     (define config (oa-read-auth-config))
-    (let ([org (oa-get config 'remote-organization)]
-          [orgs (oa-get config 'remote-organizations)] ; TODO
+    (let ([org (oa-get config 'remote-organization)] ; TODO make sure in orgs
+          [orgs (oa-get config 'remote-organizations)]
           [never-update (oa-get config 'never-update)])
       (allow-update? (not never-update))
       (send menu-item-update-viewer enable (allow-update?))
@@ -432,9 +433,22 @@ note of course that you don't get dynamic binding with version since it is not t
              (substring str 0 ends)
              (make-string (- ls (* 2 ends)) #\*)
              (substring str (- ls ends) ls))))
-        (send text-prefs-remote-organization set-value (*->string org))
-        (send text-prefs-api-key set-value (obfus (*->string (oa-get-sath 'pennsieve org 'key))))
-        (send text-prefs-api-sec set-value (obfus (*->string (oa-get-sath 'pennsieve org 'secret))))
+        ; FIXME very confusing error message if there is no value for org in sparcur config (i.e. it is #f)
+        (send choice-prefs-remote-organization clear)
+        (let ([rok '()])
+          (for ([o orgs])
+            ; FIXME TODO append org name
+            (send choice-prefs-remote-organization append (*->string o))
+            (set! rok
+              (cons
+               (cons
+                ; FIXME confusing error message from a make-string contract if the key or secret are too short
+                (obfus (*->string (oa-get-sath 'pennsieve o 'key)))
+                (obfus (*->string (oa-get-sath 'pennsieve o 'secret))))
+               rok)))
+          (send choice-prefs-remote-organization set-selection 0) ; reset selection to avoid stale ?
+          (remote-org-keys (reverse rok))
+          (cb-select-remote-org choice-prefs-remote-organization #f))
         #;
         (send text-prefs-path-? set-value "egads")
         (send text-prefs-path-config set-value (path->string (path-config)))
@@ -1298,7 +1312,31 @@ note of course that you don't get dynamic binding with version since it is not t
   (let ([do-show? (not (send frame-preferences is-shown?))])
     (when do-show? ; resync with any external changes
       (load-config!))
-    (send frame-preferences show do-show?)))
+    (send frame-preferences show do-show?)
+    (for ([sigh (list text-prefs-api-key text-prefs-api-sec)])
+      ; FIXME HACK workaround for text-field% value not updating if frame is not shown
+      (send sigh set-value (send sigh get-value)))))
+
+(define (cb-select-remote-org o e)
+  (define index (send o get-selection))
+  #;
+  (println (list "before"
+                 index
+                 (send text-prefs-api-key get-value)
+                 (send text-prefs-api-sec get-value)
+                 ))
+  (define key-sec (list-ref (remote-org-keys) index))
+  ; FIXME gui bug this fails to actually update the field in some cases !?!??!
+  ; for example if the prefs window is not visible ?!?!
+  (send text-prefs-api-key set-value (car key-sec))
+  (send text-prefs-api-sec set-value (cdr key-sec))
+  #;
+  (println (list "after"
+                 key-sec
+                 (send text-prefs-api-key get-value)
+                 (send text-prefs-api-sec get-value)
+                 )))
+
 
 (define iconize-hack (eq? 'unix (system-type)))
 (define (cb-toggle-upload o e #:show? [show? #f])
@@ -2466,12 +2504,14 @@ switch to that"
 (define panel-prefs-right (new vertical-panel%
                          [parent panel-prefs-holder]))
 
-(define text-prefs-remote-organization
-  (new text-field%
+(define choice-prefs-remote-organization
+  (new choice%
        [font (make-object font% 10 'modern)]
        [label "Remote Org "]
-       [enabled #f]
-       [init-value ""]
+       [enabled #t]
+       [stretchable-width #t] ; needed for correct alignment
+       [choices '()]
+       [callback cb-select-remote-org]
        [parent panel-prefs-holder])
   )
 
