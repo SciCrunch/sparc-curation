@@ -436,7 +436,7 @@ note of course that you don't get dynamic binding with version since it is not t
         ; FIXME very confusing error message if there is no value for org in sparcur config (i.e. it is #f)
         (send choice-prefs-remote-organization clear)
         (let ([rok '()])
-          (for ([o orgs])
+          (for ([o (or orgs (list org))])
             ; FIXME TODO append org name
             (send choice-prefs-remote-organization append (*->string o))
             (set! rok
