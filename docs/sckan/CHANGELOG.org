@@ -3,18 +3,26 @@
 #+todo: DEV RC | PROD PLAN
 #+options: p:t
 
-* PLAN 2023-08-04 :future:
+* PLAN 2024-??-?? :future:
+- NPO adjacency issues
+- NPO cardinality issues
+
 - NPO hasInstanceInTaxon
 - ApiNATOMY models use wbrcm
-- ApiNATOMY aacar new version
 - ApiNATOMY publication metadata
+
+- NPO connections from composer
+- NPO mmset1:11 fix the combinatorial paths explosion currently ~(expt 5 4)~
+
 - alpha :: NPO synaptic connectivity
-- maybe :: NPO connections from composer
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
-- if-needed :: vagus round 2
-* DEV 2023-08-??
-- TODO mmset1:11 fix the combinatorial paths explosion currently ~(expt 5 4)~
-- TODO NPO aacar pig dog human, not mouse not rat
+* RC 2024-03-05
+- ApiNATOMY splen fixed layer ordering issue for neruon 1
+- ApiNATOMY aacar added new populations updated existing populations
+- NPO aacar updated hasInstanceInTaxon axioms, added new and updated existing populations, updated partial orders
+- NPO add populations for human and rat female reproductive system
+- NPO populations now include alerts with information about e.g. uncertainty or interpretational issues
+- Add vagus terms for REVA annotation use cases
 * RC 2023-08-03
 - NPO fix partial orders for ApiNATOMY populations that have multiple branches and intrinsic neurons
   *Note that the fix for intrinsic neurons means that partial orders now can and do contain cycles!*
