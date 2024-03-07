@@ -5673,6 +5673,162 @@ qq = [OntTerm(a) for a in asdf]
 #+end_src
 
 ** ApiNATOMY
+*** sparql extract ApiNATOMY partial orders for use in NPO
+start of a query that is similar to [[neru-7]] but allows direct extraction of partial orders using sparql instead of needing
+to do an extended cypher load, this can probably be simplified significantly by deriving the partial order using only links
+and then finding the housing region/layer for each link
+see also [[region-populations]]
+#+name: sparql-apinat-partial-orders
+#+begin_src sparql
+select distinct
+?pop
+#?link
+#?region
+#?link1
+#?link2
+#?l1
+?region1 ?term_layer1
+#?l2
+?region2 ?term_layer2
+where {
+  #?pop rdfs:subClassOf+ ilxtr:Neuron .
+  ?pop apinatomy:annotates ?ngrp .
+  ?ngrp apinatomy:description ?dyn .
+  filter contains(str(?dyn), "dynamic")
+
+
+
+{
+  ?ngrp apinatomy:lyphs ?lyph .
+  ?lyph a elements:Lyph .
+{
+  ?lyph apinatomy:internalIn ?housing_lyph .
+}
+union
+{
+  ?lyph apinatomy:internalIn ?housing_layer .
+  ?housing_layer apinatomy:layerIn ?housing_lyph .
+  ?housing_layer apinatomy:ontologyTerms ?term_layer1
+}
+
+  ?housing_lyph apinatomy:conveys ?s_link0 .
+  ?housing_lyph apinatomy:ontologyTerms ?region1 .
+
+  ?lyph apinatomy:conveys ?soma_link .
+  #?soma_link apinatomy:source/apinatomy:targetOf|apinatomy:target/apinatomy:sourceOf ?soma_next .  # XXX this doesn't work, because the apinatomy representation has explicit directionality when working with node/link graphs so we use rootOf which is bad because it assumes a chain, which is an abstraction that probably shouldn't be used for queries, but whatever
+  ?soma_link apinatomy:source|apinatomy:target ?soma_node .
+  ?soma_node apinatomy:rootOf ?some_chain .
+  ?soma_node apinatomy:sourceOf|apinatomy:targetOf ?soma_next_link .
+  ?some_chain apinatomy:levels ?soma_next_link .
+  ?soma_next_link a elements:Link .
+  ?soma_next_link apinatomy:conveyingLyph ?soma_next_lyph .
+
+{
+  ?soma_next_lyph apinatomy:internalIn ?snx_housing_lyph .
+}
+union
+{
+  ?soma_next_lyph apinatomy:internalIn ?snx_housing_layer .
+  ?snx_housing_layer apinatomy:layerIn ?snx_housing_lyph .
+  ?snx_housing_layer apinatomy:ontologyTerms ?term_layer2
+}
+
+  ?snx_housing_lyph apinatomy:conveys ?s_link3 .
+  ?snx_housing_lyph apinatomy:ontologyTerms ?region2 .
+
+}
+union
+{
+  ?ngrp apinatomy:links ?link .
+  ?link a elements:Link .
+  #?link (apinatomy:fasciculatesIn|apinatomy:endsIn)* ?lyph_or_layer .
+  #?lyph_or_layer apinatomy:layerIn* ?lyph .
+  #?lyph apinatomy:conveys* ?some_other_link .
+  #?lyph apinatomy:ontologyTerms ?region .
+  #?link apinatomy:conveyingLyph ?cl .
+  #?cl apinatomy:topology ?cl_topo ;
+  #apinatomy:interitedOntologyTerms* ?cl_iot .
+
+  ?link (apinatomy:next|apinatomy:nextChainStartLevels)* ?link1 .
+  #?link1 apinatomy:target+ ?node1 .
+  #?node1 apinatomy:rootOf+ ?chain1 .
+  #?chain1 apinatomy:levels+ ?link2 .
+  #?ngrp apinatomy:links ?b3 .  # this line doesn't work quite the same way it does in cypher because it implies ?b3 = ?link
+  filter (?l1 = ?link1)
+  ?l1 apinatomy:next|apinatomy:nextChainStartLevels ?l2 .
+
+  ?l1 a elements:Link .
+
+  {
+  ?l1 apinatomy:fasciculatesIn|apinatomy:endsIn ?lyph1 .
+  ?lyph1 apinatomy:conveys ?some_other_link1 ;
+         apinatomy:ontologyTerms ?region1 .
+  }
+  union
+  {
+  ?l1 apinatomy:fasciculatesIn|apinatomy:endsIn ?layer1 .
+  ?layer1 apinatomy:layerIn ?lyph1 .
+  ?layer1 apinatomy:ontologyTerms ?term_layer1 .
+
+  ?lyph1 apinatomy:conveys ?some_other_link1 ;
+         apinatomy:ontologyTerms ?region1 .
+  }
+
+  ?l2 a elements:Link .
+  {
+  ?l2 apinatomy:fasciculatesIn|apinatomy:endsIn ?lyph2 .
+  ?lyph2 apinatomy:conveys ?some_other_link2 ;
+         apinatomy:ontologyTerms ?region2 .
+  }
+  union
+  {
+  ?l2 apinatomy:fasciculatesIn|apinatomy:endsIn ?layer2 .
+  ?layer2 apinatomy:layerIn ?lyph2 .
+  ?layer2 apinatomy:ontologyTerms ?term_layer2 .
+
+  ?lyph2 apinatomy:conveys ?some_other_link2 ;
+         apinatomy:ontologyTerms ?region2 .
+  }
+  #union  # don't run this it will be a disaster
+  #{
+  #?lyph apinatomy:internalIn ?housing_lyph .
+  #?housing_lyph apinatomy:ontologyTerms ?region1 .  # FIXME this is surely wrong
+  #}
+
+
+
+  # TODO need soma links
+
+  #apinatomy:fasciculatesIn|apinatomy:endsIn ?lyph_or_layer1 .
+  #?lyph_or_layer1 apinatomy:layerIn* ?lyph1 .
+  #?lyph1 apinatomy:conveys* ?some_other_link1 .
+  #?lyph1 apinatomy:ontologyTerms ?region1 .
+
+  #?l2 a elements:Link ;
+  #(apinatomy:fasciculatesIn|apinatomy:endsIn)? ?lyph_or_layer2 .
+  #?lyph_or_layer2 apinatomy:layerIn* ?lyph2 .
+  #?lyph2 apinatomy:conveys* ?some_other_link2 .
+  #?lyph2 apinatomy:ontologyTerms ?region2 .
+
+}
+
+
+}
+order by str(?pop)
+#limit 99
+#+end_src
+
+#+header: :depends py-query-helper
+#+begin_src jupyter-python :session pys :noweb yes
+q_sn7 = """
+<<sparql-neru-7>>
+"""
+q_sn7_out = query(q_sn7)
+
+pops = set(r[0] for r in q_sn7_out[1:])  # XXX clearly missing some populations from the list such as aacar-10v aacar-14 etc.
+#print(sorted(pops))
+#+end_src
+
 *** Coverage of FMA by the TOO map.
 Unclaimed regions from FMA/UBERON in the TOO map
 
