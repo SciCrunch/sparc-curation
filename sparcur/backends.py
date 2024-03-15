@@ -669,6 +669,29 @@ class BlackfynnRemote(aug.RemotePath):
                         self._errors.append(msg)
 
     @property
+    def checksum_cypher(self):
+        def detect_pennsieve_cypher(checksum):  # FIXME may also need/want size in here
+            """ this is a bad hueristic specifically for dealing with the
+                dataset packages endpoint """
+            if type(checksum) != bytes:
+                # len(bytes) and len(str) for hex str vs bytes causes mass confusion
+                raise TypeError(f'{type(checksum)} is not bytes!')
+
+            if len(checksum) == 16:
+                return 'md5'
+            elif len(checksum) == 32:
+                return 'sha256'
+            else:
+                raise NotImplementedError(f'unknown cypher for {checksum!r}')
+
+        checksum = self.checksum
+        if checksum is None:
+            return
+        else:
+            # technically returns cypher_name or cypher_algo or something ...
+            return detect_pennsieve_cypher(checksum)
+
+    @property
     def etag(self):
         """ NOTE returns checksum, count since it is an etag"""
         # FIXME rename to etag in the event that we get proper checksumming ??
@@ -1631,6 +1654,7 @@ class BlackfynnRemote(aug.RemotePath):
                         created=self.created,
                         updated=self.updated,
                         checksum=self.checksum,
+                        checksum_cypher=self.checksum_cypher,
                         etag=self.etag,
                         chunksize=self.chunksize,
                         parent_id=self.parent_id,
