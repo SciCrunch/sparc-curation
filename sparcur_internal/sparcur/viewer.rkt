@@ -159,6 +159,7 @@ note of course that you don't get dynamic binding with version since it is not t
     (python-mod-args "sparcur.simple.utils" "for-racket" "meta" path-string)))
 (define (argv-simple-diff ds)
   (python-mod-args "sparcur.simple.utils" "for-racket" "diff"
+                   ; "--log-level=-1" ; for debug on cli
                    (path->string (dataset-working-dir-path ds))))
 (define (argv-simple-make-push-manifest ds updated-transitive push-id)
   (python-mod-args "sparcur.simple.utils" "for-racket" "make-push-manifest"

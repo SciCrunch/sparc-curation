@@ -1797,11 +1797,23 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         self._reindex_done_manifest(manifest, remotes)
 
     def _transitive_changes(self, do_expensive_operations=False):
-        def changedp(c, cache_size, cache_checksum):
+        _warned = False
+        def changedp(c, cache_size, cache_checksum, cache_checksum_cypher=None):
             size = aug.FileSize(c.size)
+            if cache_checksum_cypher is None:
+                if cache_checksum:
+                    nonlocal _warned
+                    if not _warned:
+                        msg = f'please refetch: file meta missing checksum_cypher for {self}'
+                        log.warning(msg)
+                        _warned = True
+
+                cypher = self._cache_class.cypher
+            else:
+                cypher = aug.utils.cypher_lookup[cache_checksum_cypher]
             return (size != cache_size or
                     ((do_expensive_operations or size.mb < 2) and
-                     c.checksum() != cache_checksum))
+                     c.checksum(cypher=cypher) != cache_checksum))
 
         _lattr = self._cache_class._local_xattr
         #tm = self._transitive_metadata(do_expensive_operations=do_expensive_operations)
@@ -1849,17 +1861,35 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
                 # XXX hard coded to symlink cache mdv3
                 expected_local_name, id, rest = symlink.parts
+                #breakpoint()
                 fields = rest.split('.')
-                cache_parent_id = fields[9]
-                cache_updated = fields[5]
+                md_version = fields[1]
+                if md_version == 'mdv3':
+                    _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
+                        9, 5, 2, 3, 6, None, 14,)
+                    _i_checksum_cypher
+                elif md_version == 'mdv4':
+                    _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
+                        10, 5, 2, 3, 6, 7, 15,)
+                else:
+                    msg = f'unknown metadata version {md_version}'
+                    raise NotImplementedError(msg)
+
+                cache_parent_id = fields[_i_parent_id]
+                cache_updated = fields[_i_updated]
                 # don't need file_id for symlinks since they can't loose xattrs
                 # but DO need it to detect if a new symlink appeared which would
                 # be weird, but can happen if the index is not regenerated
-                cache_file_id = int(fields[2]) if fields[2] != '#' else None  # '#' remote-unavailable error case
+                cache_file_id = (
+                    int(fields[_i_file_id])
+                    if fields[_i_file_id] != '#'
+                    else None)  # '#' remote-unavailable error case
                 id = id, cache_file_id
-                cache_size = fields[3]
-                cache_checksum = fields[6]
-                cache_name = fields[14].replace('|', '.')
+                cache_size = fields[_i_size]
+                cache_checksum = fields[_i_checksum]
+                cache_checksum_cypher = (
+                    None if _i_checksum_cypher is None else fields[_i_checksum_cypher])
+                cache_name = fields[_i_name].replace('|', '.')
                 if local_name != cache_name:
                     ops.append(rename)
                     renames.append(c)
@@ -1890,6 +1920,13 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                         cache_checksum = (
                             xattrs[b'bf.checksum']
                             if b'bf.checksum' in xattrs
+                            # FIXME if this is missing very bad news all change
+                            # the issue of course is that there are a whole bunch of empty files
+                            # due to the as yet to be resolved issue with bulk downloads
+                            else None)
+                        cache_checksum_cypher = (
+                            xattrs[b'bf.checksum_cypher'].decode()
+                            if b'bf.checksum_cypher' in xattrs
                             else None)
                         cache_file_id = int(xattrs[b'bf.file_id'].decode())
                         id = id, cache_file_id
@@ -1926,7 +1963,8 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                         uuid = self._cache_class._id_class(id).uuid
                         ck = self._cache_class._cache_key(uuid, file_id)
                         ocp = self.cache.local_objects_dir / ck
-                        if (noe := not ocp.exists()) or changedp(c, cache_size, cache_checksum):
+                        if ((noe := not ocp.exists()) or
+                            changedp(c, cache_size, cache_checksum, cache_checksum_cypher)):
                             if noe:
                                 log.warning(f'old_id found but no object cache? {c} {old_id}')
                             ops.extend((change, {'old-id': old_id[0]}))
@@ -1989,10 +2027,22 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     reparents.append(c)
 
                 if c.is_file():
+                    # FIXME abstract determining cypher ...
+                    if cache_checksum_cypher is None:
+                        if cache_checksum:
+                            if not _warned:
+                                msg = f'please refetch: file meta missing checksum_cypher for {self}'
+                                log.warning(msg)
+                                _warned = True
+
+                        cypher = self._cache_class.cypher  # XXX can't use None here
+                    else:
+                        cypher = aug.utils.cypher_lookup[cache_checksum_cypher]
+
                     size = aug.FileSize(c.size)
                     if (size != cache_size or
                         ((do_expensive_operations or size.mb < 2) and
-                        c.checksum() != cache_checksum)):
+                        c.checksum(cypher=cypher) != cache_checksum)):
                         ops.append(change)  # racket side must handle this
                         changes.append(c)
 
