@@ -1920,7 +1920,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     elif old_id := [id for id in parent_children[local_parent_id] if id_name[id] == local_name]:
                         if len(old_id) > 1:
                             msg = f'multiple files with the same name and parent? {old_id}'
-                            log.warning()
+                            log.warning(msg)
 
                         id, file_id = old_id[0]
                         uuid = self._cache_class._id_class(id).uuid
@@ -1929,7 +1929,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                         if (noe := not ocp.exists()) or changedp(c, cache_size, cache_checksum):
                             if noe:
                                 log.warning(f'old_id found but no object cache? {c} {old_id}')
-                            ops.extend(('change', {'old-id': old_id[0]}))
+                            ops.extend((change, {'old-id': old_id[0]}))
                             changes.append(c)
                         else:
                             ops.append(nochange)
@@ -1993,7 +1993,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                     if (size != cache_size or
                         ((do_expensive_operations or size.mb < 2) and
                         c.checksum() != cache_checksum)):
-                        ops.append(change)
+                        ops.append(change)  # racket side must handle this
                         changes.append(c)
 
             if not ops:

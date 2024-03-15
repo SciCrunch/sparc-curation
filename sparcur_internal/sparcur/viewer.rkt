@@ -2303,19 +2303,22 @@ switch to that"
       (define raw-ops (hash-ref record 'ops))
       (define-values (old-id ops)
         (if (member "change" raw-ops)
-            (values #f raw-ops) ; XXX TEMP FIX
-            #; ; TODO
             (let* ((rrops (reverse raw-ops))
-                   (old-meta (car rrops)) ; FIXME I don' think this is actually included anymore?
-                   (old-id (let ([hr (hash-ref old-meta 'old-id)])
-                             (let-values ([(N type uuid)
-                                           (apply values (string-split (car hr) ":"))])
-                               (string-append
-                                (substring uuid 0 4)
-                                " ... "
-                                (let ([slu (string-length uuid)])
-                                  (substring uuid (- slu 4) slu))))))
-                   (ops (reverse (cdr rrops))))
+                   (old-meta (car rrops))
+                   (old-id
+                    (if (hash? old-meta)
+                        (let ([hr (hash-ref old-meta 'old-id)])
+                          (let-values ([(N type uuid)
+                                        (apply values (string-split (car hr) ":"))])
+                            (string-append
+                             (substring uuid 0 4)
+                             " ... "
+                             (let ([slu (string-length uuid)])
+                               (substring uuid (- slu 4) slu)))))
+                        ; the alternative is that "change" itself is provided an meta id is still present
+                        #f
+                        ))
+                   (ops (if old-id (reverse (cdr rrops)) raw-ops)))
               (values old-id ops))
             (values #f raw-ops)))
       (set! record (hash-set record 'ops ops))
@@ -2333,15 +2336,19 @@ switch to that"
         (if (member "change" raw-ops)
             (let* ((rrops (reverse raw-ops))
                    (old-meta (car rrops))
-                   (old-id (let ([hr (hash-ref old-meta 'old-id)])
-                             (let-values ([(N type uuid)
-                                           (apply values (string-split (car hr) ":"))])
-                               (string-append
-                                (substring uuid 0 4)
-                                " ... "
-                                (let ([slu (string-length uuid)])
-                                  (substring uuid (- slu 4) slu))))))
-                   (ops (reverse (cdr rrops))))
+                   (old-id
+                    (if (hash? old-meta)
+                        (let ([hr (hash-ref old-meta 'old-id)])
+                          (let-values ([(N type uuid)
+                                        (apply values (string-split (car hr) ":"))])
+                            (string-append
+                             (substring uuid 0 4)
+                             " ... "
+                             (let ([slu (string-length uuid)])
+                               (substring uuid (- slu 4) slu)))))
+                        ; the alternative is that "change" itself is provided an meta id is still present
+                        ""))
+                   (ops (if (non-empty-string? old-id) (reverse (cdr rrops)) raw-ops)))
               (values old-id ops))
             (values (or (hash-ref record 'old-id) "") raw-ops)))
       #; ; TODO determine whether to display this maybe for use in sorting?
