@@ -3,7 +3,6 @@ import io
 import sys
 import json
 from copy import deepcopy
-from future.utils import string_types
 import requests
 from requests import Session
 from requests.adapters import HTTPAdapter
@@ -135,7 +134,7 @@ def PackagesAPI_get(self, pkg, include='files,source'):
 
     params = {'includeAncestors': 'true'}
     if include is not None:
-        if isinstance(include, string_types):
+        if isinstance(include, str):
             params.update({'include': include})
         elif hasattr(include, '__iter__'):
             params.update({'include': ','.join(include)})
