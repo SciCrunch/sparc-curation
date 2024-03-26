@@ -481,13 +481,14 @@ class BlackfynnRemote(aug.RemotePath):
             # having to repeatedly check the same files over and over
             # again, but at least this way we can determine whether
             # there is a fixed date that we could use as a proxy
-            f = self.bfobject.filename
-            n = self.bfobject.name
+            f = bfo.filename
+            n = bfo.name
             pf = PurePath(f)
             pn = PurePath(n)
             sf = pf.suffix
             sn = pn.suffix
             filename = f
+            real_out_name = n
             if (sf and not sn or
                 sn and sf != sn or
                 not sf and not sn):
@@ -500,21 +501,42 @@ class BlackfynnRemote(aug.RemotePath):
             #elif sf == sn and len(pf.suffixes) > 1:
                 #return n
             else:
-                log.log(9, 'New /packages schema detected')  # too verbose for debug
+                if not hasattr(self, '_nps_log'):
+                    msg = f'New /packages schema detected {self!r}'
+                    log.log(9, msg)  # too verbose for debug
+                    self._nps_log = True
+
                 out = n #return n
+        if isinstance(bfo, self._File) and hasattr(bfo.package, '_json'):
+            # this is the case where we had to get files for a package
+            # directly because the packages endpoint did not include any files
+            f = bfo.name  # XXX this is inverted bfo.name when bfo is a package >_<
+            n = bfo.package.name
+            out = f  # trigger the log critical, for real we want the package name
+            filename = f
+            real_out_name = n
+            if filename != real_out_name and not hasattr(self, '_ni_logged_1'):
+                msg = f'package-missing-files-name-issue {real_out_name} != {filename}'
+                log.log(9, msg)
+                self._ni_logged_1 = True
         else:
             out = self.stem + self.suffix #return self.stem + self.suffix
+            real_out_name = bfo.name
 
-        if out != bfo.name:
+        if out != real_out_name and not hasattr(self, '_log_name_mismatch'):
             # sed 's/\(bfo.name\|out\|filename\|uri_human\): /\n\1: /g'  # or grep -A 4 ?
+            # have to use real_out_name because
+            # File.name -> Package.filename and not File.package.name
+            # see old discussion of the inhomogneous nature of the design
             msg = (f'name-check '
-                   f'bfo.name: {bfo.name!r} '
+                   f'real_out_name: {real_out_name!r} '
                    f'out:      {out!r} '
                    f'filename: {filename!r} '
                    f'uri_human: {self.uri_human}')
             logd.critical(msg)
+            self._log_name_mismatch = True
 
-        return bfo.name
+        return real_out_name
 
     @property
     def id(self):
@@ -628,11 +650,16 @@ class BlackfynnRemote(aug.RemotePath):
         return (isinstance(bfo, self._File) or
                 isinstance(bfo, self._DataPackage) and
                 (hasattr(bfo, 'fake_files') and bfo.fake_files
-                    or
+                 or
+                 hasattr(bfo, '_json') and
+                 not log.log(9, 'going to network for files') and
+                 self._has_remote_files()  # reminder: this will replace self._bfobject to point to the file
+                 or
+                 (  # FIXME this clause seems to be completely broken
                  not hasattr(bfo, '_json') and
-                 not (not log.warning('going to network for files') and self._has_remote_files())
+                 not (not log.log(9, 'going to network for files') and self._has_remote_files())
                  # massively inefficient but probably shouldn't get here?
-                ))
+                 )))
 
     def _has_remote_files(self):
         """ this will fetch """
@@ -652,6 +679,11 @@ class BlackfynnRemote(aug.RemotePath):
         file.parent = bfobject.parent
         file.dataset = bfobject.dataset
         file.package = bfobject
+        if bfobject.name != file.name and not hasattr(self, '_ni_logged_0'):
+            msg = f'package-missing-files-name-issue {bfobject.name} != {file.name}'
+            log.log(9, msg)
+            self._ni_logged_0 = True
+
         self._bfobject = file
         return True
 

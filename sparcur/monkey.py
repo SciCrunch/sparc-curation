@@ -378,7 +378,9 @@ def bind_packages_File(File):
                                 log.debug('No parent no dataset\n' +
                                           json.dumps(bfobject._json, indent=2))
                             index[bfobject.id] = bfobject
-                            log.log(9, f'what is going on 3 {bfobject}')
+                            if bfobject.type != 'Collection':
+                                log.log(9, f'what is going on 3 {bfobject}')
+
                             yield bfobject
                         else:
                             out_of_order.append(bfobject)
