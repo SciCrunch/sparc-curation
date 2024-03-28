@@ -364,11 +364,16 @@ def bind_packages_File(File):
                                     bfobject.state = 'PARENT-DELETING'
 
                             log.log(9, f'what is going on 1 {bfobject}')
-                            #breakpoint()
-                            yield bfobject  # only yield if we can get a parent
+                            if bfobject.state == 'DELETED':
+                                log.log(9, f'object was deleted {bfobject}')
+                            else:
+                                yield bfobject  # only yield if we can get a parent
                         elif out_of_order is None:  # filename case
                             log.log(9, f'what is going on 2 {bfobject}')
-                            yield bfobject
+                            if bfobject.state == 'DELETED':
+                                log.log(9, f'object was deleted {bfobject}')
+                            else:
+                                yield bfobject
                         elif bfobject.parent is None:
                             # both collections and packages can be at the top
                             # level dataset was set to its bfobject repr above
@@ -380,7 +385,10 @@ def bind_packages_File(File):
                             if bfobject.type != 'Collection':
                                 log.log(9, f'what is going on 3 {bfobject}')
 
-                            yield bfobject
+                            if bfobject.state == 'DELETED':
+                                log.log(9, f'object was deleted {bfobject}')
+                            else:
+                                yield bfobject
                         else:
                             out_of_order.append(bfobject)
                             continue
