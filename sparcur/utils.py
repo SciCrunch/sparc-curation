@@ -651,7 +651,7 @@ def make_bf_id_regex(top_level_domain):
 
     uuid4_regex = ('([0-9a-f]{8}-'
                    '[0-9a-f]{4}-'
-                   '4[0-9a-f]{3}-'
+                   '[14][0-9a-f]{3}-'  # XXX NOTE CHANGE TO BE v1 OR v4 2023-03-27
                    '[89ab][0-9a-f]{3}-'
                    '[0-9a-f]{12})')
     canonical_regex = (
