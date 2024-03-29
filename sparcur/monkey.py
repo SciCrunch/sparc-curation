@@ -164,9 +164,9 @@ def bind_packages_File(File):
                     kwargs[t] = kwargs.pop(f)
 
             move(('createdAt', 'created_at'),
-                ('updatedAt', 'updated_at'),
-                ('fileType', 'type'),
-                ('packageId', 'pkg_id'),
+                 ('updatedAt', 'updated_at'),
+                 ('fileType', 'type'),
+                 ('packageId', 'pkg_id'),
             )
 
             if 'size' not in kwargs:
@@ -343,9 +343,10 @@ def bind_packages_File(File):
                         else:
                             bfobject = package
 
-                        if (
-                                isinstance(bfobject.parent, str)
-                                and bfobject.parent in index):
+                        to_yield = None
+                        if (isinstance(bfobject.parent, str)
+                            and bfobject.parent in index):
+
                             parent = index[bfobject.parent]
                             if parent._items is None:
                                 parent._items = []
@@ -363,17 +364,20 @@ def bind_packages_File(File):
                                 if not bfobject.state == 'DELETING':
                                     bfobject.state = 'PARENT-DELETING'
 
-                            log.log(9, f'what is going on 1 {bfobject}')
+                            if bfobject.type != 'Collection':
+                                log.log(9, f'what is going on 1 {bfobject}')
+
                             if bfobject.state == 'DELETED':
                                 log.log(9, f'object was deleted {bfobject}')
                             else:
-                                yield bfobject  # only yield if we can get a parent
+                                to_yield = bfobject  # only yield if we can get a parent
+
                         elif out_of_order is None:  # filename case
                             log.log(9, f'what is going on 2 {bfobject}')
                             if bfobject.state == 'DELETED':
                                 log.log(9, f'object was deleted {bfobject}')
                             else:
-                                yield bfobject
+                                to_yield = bfobject
                         elif bfobject.parent is None:
                             # both collections and packages can be at the top
                             # level dataset was set to its bfobject repr above
@@ -388,13 +392,14 @@ def bind_packages_File(File):
                             if bfobject.state == 'DELETED':
                                 log.log(9, f'object was deleted {bfobject}')
                             else:
-                                yield bfobject
+                                to_yield = bfobject
                         else:
                             out_of_order.append(bfobject)
                             continue
 
                         if isinstance(bfobject, self._dp_class):
                             bfobject.fake_files = []
+                            bfobject._has_multiple_files = False
                             if 'objects' not in bfobject._json:
                                 log.error(f'{bfobject} has no files!??!')
                             else:
@@ -402,18 +407,25 @@ def bind_packages_File(File):
                                         bfobject._json['objects']['source']):
                                     # TODO package id?
                                     if len(source) > 1:
+                                        # normally source has a single key "content"
                                         log.info('more than one key in source '
                                                  f'{sorted(source)}')
 
                                     ff = FakeBFile(
                                         bfobject, **source['content'])
                                     bfobject.fake_files.append(ff)
-                                    yield ff
+                                    #yield ff  # XXX don't yield here because we need to know if there are multiple files first
 
                                     if i == 1:  # only log once
+                                        bfobject._has_multiple_files = True  # this needs to be detected BEFORE we yield the package
                                         msg = ('MORE THAN ONE FILE IN PACKAGE '
                                                f'{bfobject.id}')
                                         log.critical(msg)
+
+                        if to_yield is not None:
+                            yield to_yield
+                            if isinstance(to_yield, self._dp_class):
+                                yield from to_yield.fake_files
 
                 if 'cursor' in j:
                     cursor = j['cursor']

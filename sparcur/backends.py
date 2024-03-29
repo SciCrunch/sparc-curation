@@ -507,6 +507,7 @@ class BlackfynnRemote(aug.RemotePath):
                     self._nps_log = True
 
                 out = n #return n
+
         if isinstance(bfo, self._File) and hasattr(bfo.package, '_json'):
             # this is the case where we had to get files for a package
             # directly because the packages endpoint did not include any files
@@ -638,7 +639,8 @@ class BlackfynnRemote(aug.RemotePath):
     def is_dir(self):
         try:
             bfo = self.bfobject
-            return not isinstance(bfo, self._File) and not isinstance(bfo, self._DataPackage)
+            return (not isinstance(bfo, self._File) and
+                    not isinstance(bfo, self._DataPackage))
         except exc.NoRemoteFileWithThatIdError as e:
             raise e
         except Exception as e:
@@ -647,33 +649,25 @@ class BlackfynnRemote(aug.RemotePath):
 
     def is_file(self):
         bfo = self.bfobject
-        return (isinstance(bfo, self._File) or
-                isinstance(bfo, self._DataPackage) and
-                (hasattr(bfo, 'fake_files') and bfo.fake_files
-                 or
-                 hasattr(bfo, '_json') and
-                 not log.log(9, 'going to network for files') and
-                 self._has_remote_files()  # reminder: this will replace self._bfobject to point to the file
-                 or
-                 (  # FIXME this clause seems to be completely broken
-                 not hasattr(bfo, '_json') and
-                 not (not log.log(9, 'going to network for files') and self._has_remote_files())
-                 # massively inefficient but probably shouldn't get here?
-                 )))
+        # given how self.bfobject works the only time we see
+        # a data package is if something is in error in which
+        # case it it definitely not a file
+        return isinstance(bfo, self._File)
 
-    def _has_remote_files(self):
+    def _has_a_single_remote_file(self):
         """ this will fetch """
         bfobject = self.bfobject
         if not isinstance(bfobject, self._DataPackage):
             return False
 
-        files = bfobject.files
+        log.log(9, 'going to network for files')
+        files = bfobject.files  # FIXME this is NOT the right place to do this because packages with multiple files become a massive problem especailly for determining the actual name we give the file, I have cases where there seem to be two identical files added to the same package, they have the same name ...
         if not files:
             return False
 
         if len(files) > 1:
             log.critical(f'{self} has more than one file! Not switching bfobject!')
-            return True
+            return False  # would need to be a folder or unpack individual files
 
         file, = files
         file.parent = bfobject.parent
