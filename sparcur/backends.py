@@ -517,7 +517,7 @@ class BlackfynnRemote(aug.RemotePath):
 
                 out = n #return n
 
-        if isinstance(bfo, self._File) and hasattr(bfo.package, '_json'):
+        elif isinstance(bfo, self._File) and hasattr(bfo.package, '_json'):
             # this is the case where we had to get files for a package
             # directly because the packages endpoint did not include any files
             f = bfo.name  # XXX this is inverted bfo.name when bfo is a package >_<
