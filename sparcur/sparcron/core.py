@@ -219,8 +219,10 @@ def populate_existing_redis(conn):
             fs_version = (int(blob['prov']['sparcur_file_translation_version'])
                           if 'sparcur_file_translation_version' in blob['prov']
                           else 0)
-            rd_version = (int(blob['rmeta']['_meta_version'])
-                          if '_meta_version' in blob['_rmeta']
+            rd_version = (int(blob['inputs']['remote_dataset_metadata']['_meta_version'])
+                          if ('inputs' in blob and
+                              'remote_dataset_metadata' in blob['inputs'] and
+                              '_meta_version' in blob['inputs']['remote_dataset_metadata'])
                           else 0)
 
             sid = 'state-' + dataset_id
