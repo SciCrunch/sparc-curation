@@ -54,6 +54,7 @@ from sparcur.cli import Main, Options, __doc__ as clidoc
 from sparcur.utils import PennsieveId, GetTimeNow, log
 from sparcur.paths import Path, PennsieveCache
 from sparcur.config import auth
+from sparcur.backends import PennsieveDatasetData as RemoteDatasetData, BlackfynnRemote as Remote
 from sparcur.simple.utils import backend_pennsieve
 from sparcur.simple.retrieve import main as retrieve
 from sparcur.sheets import Sheet, Organs, Affiliations
@@ -215,16 +216,27 @@ def populate_existing_redis(conn):
             internal_version = (int(blob['prov']['sparcur_internal_version'])
                                 if 'sparcur_internal_version' in blob['prov']
                                 else 0)
+            fs_version = (int(blob['prov']['sparcur_file_translation_version'])
+                          if 'sparcur_file_translation_version' in blob['prov']
+                          else 0)
+            rd_version = (int(blob['rmeta']['_meta_version'])
+                          if '_meta_version' in blob['_rmeta']
+                          else 0)
+
             sid = 'state-' + dataset_id
             uid = 'updated-' + dataset_id
             fid = 'failed-' + dataset_id
             vid = 'verpi-' + dataset_id
+            vfid = 'verfs-' + dataset_id
+            vrid = 'verrd-' + dataset_id
             eid = 'sheet-' + dataset_id
             initd.update(
                 {sid: _none,
                  uid: updated,
                  fid: '',
                  vid: internal_version,
+                 vfid: fs_version,
+                 vrid: rd_version,
                  eid: 0,
                  })
 
@@ -316,6 +328,19 @@ def argv_simple_retrieve(dataset_id):
         '--parent-parent-path',
         path_source_dir]
 
+
+def argv_simple_fetch_remote_metadata_all(dataset_id):
+    project_id = dataset_project[dataset_id]
+    return [
+        sys.executable,
+        '-m',
+        'sparcur.simple.fetch_remote_metadata_all',
+        '--project-id',
+        project_id,
+        '--dataset-id',
+        dataset_id]
+
+
 argv_spc_find_meta = [
     sys.executable,
     '-m',
@@ -349,13 +374,15 @@ class SubprocessException(Exception):
     """ something went wrong in a subprocess """
 
 
-def ret_val_exp(dataset_id, updated, time_now, fetch=True):
+def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     log.info(f'START {dataset_id} {timestamp}')
     did = PennsieveId(dataset_id)
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
     vid = 'verpi-' + dataset_id
+    vfid = 'verfs-' + dataset_id
+    vrid = 'verrd-' + dataset_id
 
     # FIXME detect cases where we have already pulled the latest and don't pull again
     # FIXME TODO smart retrieve so we don't pull if we failed during
@@ -420,6 +447,18 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
                 except KeyboardInterrupt as e:
                     p2.send_signal(signal.SIGINT)
                     raise e
+            elif fetch_rmeta:
+                # fetch_rmeta really means "fetch rmeta even if we didn't fetch all"
+                try:
+                    p1r = subprocess.Popen(
+                        argv_simple_fetch_remote_metadata_all(dataset_id),
+                        stderr=subprocess.STDOUT, stdout=logfd)
+                    out1r = p1r.communicate()
+                    if p1r.returncode != 0:
+                        raise SubprocessException(f'oops retr return code was {p1r.returncode}')
+                except KeyboardInterrupt as e:
+                    p1r.send_signal(signal.SIGINT)
+                    raise e
             else:
                 # sheet updated case
                 dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
@@ -434,13 +473,22 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
                 p3.send_signal(signal.SIGINT)
                 raise e
 
-        conn.set(uid, updated)
+        toset = {
+            uid: updated,
+            # XXX for vid some weird environment thing could mean that the internal
+            # version might not match what was embedded in prov, but really that
+            # should never happen, we just don't want to have to open the json file
+            # in this process
+            # XXX one way this can happen is if the subprocess calls run a new
+            # version of the code when the celery process has not been restarted
+            vid: sparcur.__internal_version__,
+            # XXX similar issues with these if there is some inherited class that
+            # overwrites so don't do that
+            vfid: Remote._translation_version,
+            vrid: RemoteDatasetData._translation_version,
+        }
+        conn.mset(toset)
         conn.delete(fid)
-        # XXX for vid some weird environment thing could mean that the internal
-        # version might not match what was embedded in prov, but really that
-        # should never happen, we just don't want to have to open the json file
-        # in this process
-        conn.set(vid, sparcur.__internal_version__)
         log.info(f'DONE: u: {uid} {updated}')
     except SubprocessException as e:
         log.critical(f'FAIL: {fid} {updated}')
@@ -450,12 +498,10 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True):
 
 @cel.task
 def export_single_dataset(dataset_id, qupdated_when_called):
-    # have to calculate fetch here because a sheet change may arrive
-    # immediately before a data change and fetch is based on all events
-    # that trigger a run, not just the first
-    qid = 'queued-' + dataset_id
-    _qupdated = conn.get(qid)
-    if _qupdated is None:
+    (updated, qupdated, _, _, _, fs_version, rd_version,
+     _, _, _, _, _) = mget_all(dataset_id)
+
+    if qupdated is None:
         #  conn.set(qid, dataset.updated) is called IMMEDIATELY before
         # export_single_dataset.delay, so it should ALWAYS find a value
         # ... if _qupdated is None this means redis and rabbit are out of
@@ -467,15 +513,21 @@ def export_single_dataset(dataset_id, qupdated_when_called):
         log.info(msg)
         return
 
-    qupdated = _qupdated.decode()
     if qupdated_when_called < qupdated:
         log.debug(f'queue updated changed between call and run')
 
-    uid = 'updated-' + dataset_id
-    _updated = conn.get(uid)
-    updated = _updated.decode() if _updated is not None else None
+    # have to calculate fetch here because a sheet change may arrive
+    # immediately before a data change and fetch is based on all events
+    # that trigger a run, not just the first
     # < can be false if only the sheet changed
-    fetch = updated < qupdated if updated is not None else True
+    fetch = ((updated < qupdated if updated is not None else True) or
+             (fs_version < Remote._translation_version))
+
+    rdd = RemoteDatasetData(dataset_id)
+    fetch_rmeta = (
+        # rmeta cache can be missing even if fs data is fresh
+        not rdd.cache.exists() or
+        rd_version < RemoteDatasetData._translation_version)
 
     sid = 'state-' + dataset_id
     eid = 'sheet-' + dataset_id
@@ -485,12 +537,13 @@ def export_single_dataset(dataset_id, qupdated_when_called):
     #log.critical(f'STATE INCRED TO: {conn.get(sid)}')
     status_report()
 
-    ret_val_exp(dataset_id, qupdated, time_now, fetch)
+    ret_val_exp(dataset_id, qupdated, time_now, fetch, fetch_rmeta)
     _sid = conn.get(sid)
     state = int(_sid) if _sid is not None else None
     conn.decr(sid)  # we always go back 2 either to none or queued
     conn.decr(sid)
     if state == _qed_run:
+        qid = 'queued-' + dataset_id
         _qupdated = conn.get(qid)
         # there are race conditions here, but we don't care because we
         # can't get a sane file list snapshot anyway
@@ -597,17 +650,18 @@ def check_discover_updates():  # TODO
     pass
 
 
-def mget_all(dataset):
-    dataset_id = dataset.id
+def mget_all(dataset_id):
     sid = 'state-' + dataset_id
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
     vid = 'verpi-' + dataset_id
+    vfid = 'verfs-' + dataset_id
+    vrid = 'verrd-' + dataset_id
     qid = 'queued-' + dataset_id
     eid = 'sheet-' + dataset_id
 
-    (_updated, _qupdated, _failed, _state, _internal_version, _sheet_changed
-     ) = conn.mget(uid, qid, fid, sid, vid, eid)
+    (_updated, _qupdated, _failed, _state, _internal_version, _fs_version, _rd_version, _sheet_changed
+     ) = conn.mget(uid, qid, fid, sid, vid, vfid, vrid, eid)
     updated = _updated.decode() if _updated is not None else None
     qupdated = _qupdated.decode() if _qupdated is not None else None
     failed = _failed.decode() if _failed is not None else None
@@ -615,14 +669,21 @@ def mget_all(dataset):
     internal_version = (int(_internal_version.decode())
                         if _internal_version is not None
                         else 0)  # FIXME new dataset case?
+    fs_version = (int(_fs_version.decode())
+                  if _fs_version is not None
+                  else 0)  # FIXME new dataset case?
+    rd_version = (int(_rd_version.decode())
+                  if _rd_version is not None
+                  else 0)  # FIXME new dataset case?
     sheet_changed = int(_sheet_changed) if _sheet_changed is not None else None
-    pipeline_changed = internal_version < sparcur.__internal_version__
-
+    pipeline_changed = (internal_version < sparcur.__internal_version__ or
+                        fs_version < Remote._translation_version or
+                        rd_version < RemoteDatasetData._translation_version)
     rq = state == _qed_run
     running = state == _run or rq
     queued = state == _qed or rq
-    return (updated, qupdated, failed, state, internal_version, sheet_changed,
-            pipeline_changed, rq, running, queued)
+    return (updated, qupdated, failed, state, internal_version, fs_version, rd_version,
+            sheet_changed, pipeline_changed, rq, running, queued)
 
 
 def check_single_dataset(dataset):
@@ -630,8 +691,8 @@ def check_single_dataset(dataset):
     sid = 'state-' + dataset_id
     qid = 'queued-' + dataset_id
     # FIXME there are so many potential race conditions here ...
-    (updated, qupdated, failed, state, internal_version, sheet_changed,
-     pipeline_changed, rq, running, queued) = mget_all(dataset)
+    (updated, qupdated, failed, state, internal_version, fs_version, rd_version,
+     sheet_changed, pipeline_changed, rq, running, queued) = mget_all(dataset_id)
 
     # XXX race condition if export_single_dataset conn.incr(sid) is called
     # while this function is after the call conn.get(sid) and the logic below
@@ -730,6 +791,8 @@ def status_report():
         uid = 'updated-' + dataset_id
         fid = 'failed-' + dataset_id
         vid = 'verpi-' + dataset_id
+        vfid = 'verfs-' + dataset_id
+        vrid = 'verrd-' + dataset_id
 
         _updated = conn.get(uid)
         updated = _updated.decode() if _updated is not None else _updated

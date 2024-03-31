@@ -255,7 +255,7 @@ def bind_packages_File(File):
                     f'includeSourceFiles={str(includeSourceFiles).lower()}'
                     f'{filename_args}'
                     f'{cursor_args}')
-                resp = session.get(_url)
+                resp = session.get(_url)  # XXX FIXME infinite hang here due to SSL issue?
                 log.log(9, f'wat:\n{resp.url}')
             except requests.exceptions.ChunkedEncodingError as e:
                 # this fails stochastically during pypy3 -m sparcur.simple.retrieve

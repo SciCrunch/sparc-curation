@@ -91,6 +91,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
 
     _suffix_mimetypes = suffix_mimetypes
 
+    _xattr_fs_version = b'sparcur.fsversion'
     _local_xattr = b'sparcur.from_local'
 
     @classmethod
@@ -142,6 +143,28 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         lid.mkdir(exist_ok=True)
         for type in ('pull',):
             (self.local_index_dir / type).mkdir(exist_ok=True)
+
+    def _set_fs_version(self, version=None):
+        """ materialize the file system translation version to xattrs
+        """
+        # FIXME this WILL go stale if only called on the anchor
+        # because the anchor xattrs are not updated when datasets
+        # are pulled later
+        if version is None:
+            version = self._remote_class._translation_version
+
+        self.setxattr(self._xattr_fs_version, str(version).encode())
+
+    def _fs_version(self):
+        try:
+            _fs_version = self.getxattr(self._xattr_fs_version)
+            fs_version = int(_fs_version)
+            return fs_version
+        except exc.NoStreamError as e:
+            if self == self.anchor:
+                return 0
+            else:
+                return self.parent._fs_version()
 
     @property
     def anchor(self):
@@ -1436,6 +1459,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             #working_children = [c.local.relative_to(parent)
                                 #for c in caches]
             self._generate_pull_index(self, working_c_children)
+            self.cache._set_fs_version()
             # not sure why we return something here we don't return anything below
             return working_c_children  # XXX FIXME inconsistent return value
 
@@ -1469,6 +1493,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # to this function are not stopped by an existing directory
         # that failed to be cleaned up
         upstream.setxattrs(working.xattrs())  # handy way to copy xattrs
+        upstream.cache._set_fs_version()  # fs version can change
         # pull and prep for comparison of relative paths
         upstream_c_children = list(upstream.cache.rchildren)  # XXX actual pull happens here
         self._generate_pull_index(upstream, upstream_c_children)

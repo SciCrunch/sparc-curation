@@ -85,6 +85,7 @@ def base_data(self):
 class BlackfynnRemote(aug.RemotePath):
 
     _remote_type = 'blackfynn'
+    _translation_version = 1  # XXX increment if O,D,C,P,F -> D,F translation changes
     _id_class = BlackfynnId
     _api_class = None  # set in _setup
     _async_rate = None
@@ -109,6 +110,14 @@ class BlackfynnRemote(aug.RemotePath):
     def init(cls, *args, **kwargs):
         cls._setup(*args, **kwargs)
         super().init(*args, **kwargs)
+
+# XXX it is not actually meaningful to set fs version at project level since
+# it is only meaningful to set it when we call pull at the dataset level
+#    @classmethod
+#    def dropAnchor(cls, parent_path=None):
+#        cache_anchor = super().dropAnchor(parent_path=parent_path)
+#        cache_anchor._set_fs_version(cls._translation_version)
+#        return cache_anchor
 
     @staticmethod
     def _setup(*args, **kwargs):
@@ -977,6 +986,7 @@ class BlackfynnRemote(aug.RemotePath):
                         yield from reversed(parents)
 
                 return
+            # end if sparse
 
             for bfobject in self.bfobject.packages:
                 child = self.__class__(bfobject)
@@ -1712,6 +1722,8 @@ class RemoteDatasetData:
     cache_path = auth.get_path('cache-path')
     cache_base = cache_path / 'remote-meta'
 
+    _translation_version = 1  # XXX increment if contents of rmeta change
+
     @classmethod
     def _setup(cls, *args, **kwargs):
         from sparcur.core import JEncode
@@ -1797,6 +1809,7 @@ class RemoteDatasetData:
         blob = {'id': self.remote.id,
                 'id_int': cont['intId'],
                 'type': self.__class__.__name__,  # registered as IdentityJsonType in core
+                '_meta_version': self._translation_version,
                 'name': cont['name'],  # title
                 'readme': self.bfobject.readme,
                 # 'banner': self.bfobject.banner,  # FIXME not persistent ...
@@ -2005,6 +2018,8 @@ class PennsieveDiscoverRemote(aug.RemotePath):
     _remote_type = 'pennsieve-discover'
     'https://api.pennsieve.io/discover/datasets/292/versions/1/download?downloadOrigin=SPARC'
     's3://prd-sparc-discover-use1/292/1/'
+
+    _translation_version = 1
 
     _uri_api_template = 'https://api.pennsieve.io/discover/datasets/{identifier}/versions/{version}/metadata'
     _uri_api_template = (

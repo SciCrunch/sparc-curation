@@ -137,8 +137,12 @@ class DatasetMetadata(HasErrors):
                     # FIXME if we move to allow datasets at top level without enclosing org will
                     # likely need to pull this from the xattrs
                     id_organization=self._path.parent.cache_identifier,
-                    sparse=self.cache.is_sparse(),
-                ))
+                    sparse=self.cache.is_sparse(),  # FIXME probably move this to prov
+                ),
+                prov=dict(
+                    sparcur_fs_translation_version=self.cache._fs_version(),
+                ),
+            )
         else:
             raise NotImplementedError('use CacheL instead')
             path = self._path

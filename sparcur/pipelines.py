@@ -904,7 +904,7 @@ class JSONPipeline(Pipeline):
             pipelines failed or not """
 
         data = self.pipeline_end
-        adds = [[path, function(self.lifters)] for path, function in self.adds]
+        adds = [[path, function(self)] for path, function in self.adds]
         DictTransformer.add(data, adds)
         return data
 
@@ -1258,13 +1258,13 @@ class SDSPipeline(JSONPipeline):
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
     # FIXME replace this with something common from sparcur.simple.export.add_prov
-    adds = [[['prov', 'timestamp_export_start'], lambda lifters: lifters.timestamp_export_start],
+    adds = [[['prov', 'timestamp_export_start'], lambda self: self.lifters.timestamp_export_start],
             [['prov', 'sparcur_version'], lambda _: sparcur.__version__],
             [['prov', 'sparcur_internal_version'], lambda _: sparcur.__internal_version__],
             [['prov', 'export_system_identifier'], lambda _: Path.sysid],
             [['prov', 'export_hostname'], lambda _: gethostname()],
             #[['prov', 'export_project_path'], lambda _: None],  # FIXME XXX added in curation.py atm
-            [['prov', 'remote'], lambda lifters: lifters.remote],
+            [['prov', 'remote'], lambda self: self.lifters.remote],
             ]
 
     __filerp = aug.RepoPath(__file__)
@@ -1515,7 +1515,7 @@ class PipelineExtras(JSONPipeline):
 
     )
 
-    adds = [[['meta', 'techniques'], lambda lifters: lifters.techniques]]
+    adds = [[['meta', 'techniques'], lambda self: self.lifters.techniques]]
 
     filter_failures = (  # XXX TODO implement this for other pipelines as well ?
         # FIXME this is silly, there only needs to be a single lambda for this DUH
@@ -1957,12 +1957,12 @@ class ToJsonLdPipeline(JSONPipeline):
                     collect=__includes)
 
     adds = (
-        [['@context'], lambda l: copy.deepcopy(sc.base_context)],  # FIXME should be a link
-        [['meta', '@context'], lambda l: sc.MetaOutExportSchema.context()],
-        [['contributors', '@context'], lambda l: sc.ContributorExportSchema.context()],
-        [['performances', '@context'], lambda l: sc.PerformancesExportSchema.context()],
-        [['subjects', '@context'], lambda l: sc.SubjectsExportSchema.context()],
-        [['samples', '@context'], lambda l: sc.SamplesFileExportSchema.context()],
+        [['@context'], lambda _: copy.deepcopy(sc.base_context)],  # FIXME should be a link
+        [['meta', '@context'], lambda _: sc.MetaOutExportSchema.context()],
+        [['contributors', '@context'], lambda _: sc.ContributorExportSchema.context()],
+        [['performances', '@context'], lambda _: sc.PerformancesExportSchema.context()],
+        [['subjects', '@context'], lambda _: sc.SubjectsExportSchema.context()],
+        [['samples', '@context'], lambda _: sc.SamplesFileExportSchema.context()],
         #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()]
         *__includes  # owl:NamedIndividual in here ... FIXME would be nice to not have to hack it in this way
     )

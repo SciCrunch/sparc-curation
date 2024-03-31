@@ -825,6 +825,7 @@ class ProvSchema(JSONSchema):
                              'sparcur_version': {'type': 'string'},
                              'sparcur_internal_version': {'type': 'integer'},
                              'sparcur_commit': {'type': 'string'},
+                             'sparcur_fs_translation_version': {'type': 'integer'},
                              'ontology_mappings': {
                                  'type': 'array',
                                  'minItems': 1,
@@ -1987,7 +1988,7 @@ class MetaOutExportSchema(JSONSchema):
                       'contributor_count',
                       'uri_human',  # from DatasetMetadata
                       'uri_api',  # from DatasetMetadata
-                      'sparse',  # tells you whether files/dirs/size is reliable
+                      'sparse',  # tells you whether files/dirs/size is reliable XXX FIXME probably move to prov
                       'files',
                       'dirs',
                       'size',
