@@ -1661,6 +1661,9 @@ switch to that"
 (define (k-export-dataset receiver event)
   (export-current-dataset))
 
+(define (k-next-thing r e)
+  "do nothing")
+
 (define (backward-kill-word receiver event)
   (when (eq? receiver text-search-box)
     (let* ([ed (send receiver get-editor)]
@@ -1673,8 +1676,18 @@ switch to that"
       ; delete from epos to the backward word break
       )))
 
-(define (k-next-thing r e)
-  "do nothing")
+(define (cb-select-all obj e)
+  (when (is-a? obj editor-canvas%)
+    (send (send obj get-editor) select-all)))
+
+(define (cb-copy-value obj e)
+  ; TODO proper chaining
+  (when (is-a? obj json-hierlist%)
+    (let* ([raw-value (node-data-value (send (send obj get-selected) user-data))]
+           [value (*->string raw-value)])
+      (send the-clipboard set-clipboard-string value (current-milliseconds))))
+  (when (is-a? obj editor-canvas%)
+    (send (send obj get-editor) copy)))
 
 ; add functions
 (send* keymap
@@ -1684,12 +1697,7 @@ switch to that"
   (add-function "export-dataset" k-export-dataset)
   (add-function "quit" k-quit)
   (add-function "test-backspace" (λ (a b) (displayln (format "delete all the things! ~a ~a" a b))))
-  (add-function "copy-value" (λ (obj event)
-                               ; TODO proper chaining
-                               (when (is-a? obj json-hierlist%)
-                                 (let* ([raw-value (node-data-value (send (send obj get-selected) user-data))]
-                                        [value (*->string raw-value)])
-                                   (send the-clipboard set-clipboard-string value (current-milliseconds))))))
+  (add-function "copy-value" cb-copy-value)
   (add-function "backward-kill-word" backward-kill-word)
   (add-function "next-thing" k-next-thing)
   (add-function "focus-search-box" (λ (a b) (send text-search-box focus)))
@@ -1718,6 +1726,7 @@ switch to that"
   #;
   (map-function "c:r"     "refresh-datasets")
   (map-function (fox "c:c")     "copy-value") ; FIXME osx cmd:c
+  (map-function "c:a"     "select-all")
   (map-function "c:t"     "test")
   (map-function "f5"      "fetch-export-dataset")
   (map-function "c:t"     "fetch-dataset")
