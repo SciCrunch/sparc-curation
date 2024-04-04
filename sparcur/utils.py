@@ -1,8 +1,10 @@
 import os
 import re
 import sys
+import base64
 import logging
 import warnings
+from uuid import UUID
 import idlib
 from idlib.utils import log as _ilog
 from augpathlib.utils import log as _alog
@@ -821,6 +823,30 @@ class BlackfynnId(idlib.Identifier):
         # local and unqualified, but use uuids which are unique
         #return self.uri_api
         return self.id
+
+    def base64uuid(self):
+        """ use urlsafe base64 to produce a 22 byte repr of the uuid """
+        if not hasattr(self, '_sb64uuid'):
+            self._sb64uuid = base64.urlsafe_b64encode(UUID(self.uuid).bytes)[:-2].decode()
+
+        return self._sb64uuid
+
+    def uuid_cache_path_string(self, chars, count, use_base64=False):
+        """ generate a cache path with count directories of chars chars
+        usually you want to tune the numbers so the combinatorics are friendly
+        e.g. chars=3, count=2, use_base64=False => 16 ** 3 ** 2
+        or   chars=2, count=2, use_base64=True  => 64 ** 2 ** 2
+
+        for the regular uuid repr chars * count should be less than 8 to avoid the dash
+        """
+
+        # assert count * chars <= 8  # for raw uuid
+        id = self.base64uuid() if use_base64 else self.uuid
+        parents = [
+            id[start:stop] for start, stop in
+            zip(range(0, (chars * count + 1), chars), range(chars, (chars * count + 1), chars))]
+        prefix = '/'.join(parents)
+        return f'{prefix}/{id}'
 
 
 class PennsieveId(BlackfynnId):

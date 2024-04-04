@@ -898,7 +898,7 @@ class PathHelper:
         if simple_meta:
             return max(m.updated for m in simple_meta)
         else:
-            # in the even that the current folder is empty
+            # in the event that the current folder is empty
             updated = self.getxattr('bf.updated').decode()
             return aug.PathMeta(updated=updated).updated
 
@@ -954,13 +954,15 @@ class PathHelper:
         if meta.size is not None:
             blob['size_bytes'] = meta.size
 
-        if (self.is_file() or self.is_broken_symlink()) and meta.checksum is not None:
-            # FIXME known checksum failures !!!!!!!
-            blob['checksums'] = [{'type': 'checksum',
-                                  # FIXME cypher should ALWAYS travel with checksum
-                                  # not be implicit and based on the implementation
-                                  'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
-                                  'hex': meta.checksum.hex(),}]
+        if (self.is_file() or self.is_broken_symlink()):
+            blob['remote_inode_id'] = remote_id.file_id
+            if meta.checksum is not None:
+                # FIXME known checksum failures !!!!!!!
+                blob['checksums'] = [{'type': 'checksum',
+                                    # FIXME cypher should ALWAYS travel with checksum
+                                    # not be implicit and based on the implementation
+                                    'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
+                                    'hex': meta.checksum.hex(),}]
 
         return blob
 
