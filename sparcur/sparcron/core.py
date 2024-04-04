@@ -50,6 +50,7 @@ from celery.signals import worker_process_init, worker_process_shutdown
 from celery.schedules import crontab
 
 import sparcur
+from sparcur import exceptions as exc
 from sparcur.cli import Main, Options, __doc__ as clidoc
 from sparcur.utils import PennsieveId, GetTimeNow, log as _log
 from sparcur.paths import Path, PennsieveCache
@@ -373,10 +374,6 @@ argv_spc_export = [
     '--jobs', '1']
 
 
-class SubprocessException(Exception):
-    """ something went wrong in a subprocess """
-
-
 def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     log.info(f'START {dataset_id} {timestamp}')
@@ -433,7 +430,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
                         stderr=subprocess.STDOUT, stdout=logfd)
                     out1 = p1.communicate()
                     if p1.returncode != 0:
-                        raise SubprocessException(f'oops retr return code was {p1.returncode}')
+                        raise exc.SubprocessException(f'oops retr return code was {p1.returncode}')
                 except KeyboardInterrupt as e:
                     p1.send_signal(signal.SIGINT)
                     raise e
@@ -446,7 +443,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
                         stderr=subprocess.STDOUT, stdout=logfd)
                     out2 = p2.communicate()
                     if p2.returncode != 0:
-                        raise SubprocessException(f'oops find return code was {p2.returncode}')
+                        raise exc.SubprocessException(f'oops find return code was {p2.returncode}')
                 except KeyboardInterrupt as e:
                     p2.send_signal(signal.SIGINT)
                     raise e
@@ -458,7 +455,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
                         stderr=subprocess.STDOUT, stdout=logfd)
                     out1r = p1r.communicate()
                     if p1r.returncode != 0:
-                        raise SubprocessException(f'oops retr return code was {p1r.returncode}')
+                        raise exc.SubprocessException(f'oops retr return code was {p1r.returncode}')
                 except KeyboardInterrupt as e:
                     p1r.send_signal(signal.SIGINT)
                     raise e
@@ -471,7 +468,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
                                       stderr=subprocess.STDOUT, stdout=logfd)
                 out3 = p3.communicate()
                 if p3.returncode != 0:
-                    raise SubprocessException(f'oops expr return code was {p3.returncode}')
+                    raise exc.SubprocessException(f'oops expr return code was {p3.returncode}')
             except KeyboardInterrupt as e:
                 p3.send_signal(signal.SIGINT)
                 raise e
@@ -493,7 +490,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
         conn.mset(toset)
         conn.delete(fid)
         log.info(f'DONE: u: {uid} {updated}')
-    except SubprocessException as e:
+    except exc.SubprocessException as e:
         log.critical(f'FAIL: {fid} {updated}')
         conn.set(fid, updated)
         log.exception(e)

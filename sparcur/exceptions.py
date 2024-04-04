@@ -6,6 +6,10 @@ class SparCurError(Exception):
     """ base class for sparcur errors """
 
 
+class SubprocessException(SparCurError):
+    """ something went wrong in a subprocess """
+
+
 class ValidationError(SparCurError):
     def __init__(self, errors):
         self.errors = errors

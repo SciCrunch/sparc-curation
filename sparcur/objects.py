@@ -29,12 +29,21 @@ e.g. we could have a file in each dataset
 folder in combine that holds the latest
 updated cache transitive or something
 """
+import json
 import base64
+import subprocess
 from uuid import UUID
 import augpathlib as aug
+from pyontutils.asyncd import Async, deferred
+from sparcur import exceptions as exc
 from sparcur.paths import Path
 from sparcur.utils import register_type, log as _log
 from sparcur.config import auth
+from sparcur.core import JEncode
+from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId
+
+
+
 
 log = _log.getChild('sob')
 
@@ -262,14 +271,6 @@ def index_obj_symlink_archive(dataset_id, object_id, index_version=None):
     return caep.relative_path_from(icp)
 
 
-import json
-import subprocess
-from sparcur.core import JEncode
-from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId
-from pyontutils.asyncd import Async, deferred
-from sparcur.sparcron.core import SubprocessException  # FIXME move to sparcur.exceptions
-
-
 def do_actually_extract(path):
     # TODO this determines whether a path should be extracted
     # fetch_fun and extract_fun are separate so that we can
@@ -462,7 +463,7 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False):
                 p = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=logfd)
                 out = p.communicate()
                 if p.returncode != 0:
-                    raise SubprocessException(f'oops objs return code was {p.returncode}')
+                    raise exc.SubprocessException(f'oops objs return code was {p.returncode}')
 
                 extracted = True
             except KeyboardInterrupt as e:
@@ -470,7 +471,7 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False):
                 raise e
 
         log.info(f'DONE: {object_id}')
-    except SubprocessException as e:
+    except exc.SubprocessException as e:
         log.critical(f'FAIL: {dataset_id} {object_id} | {dataset_id.base64uuid()} {object_id.base64uuid()}')
         log.exception(e)
         extracted = False
