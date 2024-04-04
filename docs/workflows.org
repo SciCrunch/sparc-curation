@@ -279,8 +279,27 @@ pushd ~/files/sparc-datasets-test
 # shows how much space can be recovered by removing old dataset folders
 find */SPARC*/ -mindepth 1 -maxdepth 1 -type d -not -name '.operations' -not -exec sh -c 'test "$(readlink "${1}"/../../dataset)" = "${1#*/}"' _ {} \; -exec du -hd0 --total {} \+ | sort -h
 
-# sh -c 'echo "${1#*/}"' _ {} \;
+# sh -c 'echo "${1#*/}"' _ {} \;  # remove everything before the first slash
 
+# actually delete, DO NOT PASTE THE OUTPUT TO RUN!!! there are spaces !!! remove the echo '#' bit
+find */SPARC*/ -mindepth 1 -maxdepth 1 -type d -not -name '.operations' -not -exec sh -c 'test "$(readlink "${1}"/../../dataset)" = "${1#*/}"' _ {} \; -exec echo '#' rm -rf {} \;
+#+end_src
+
+*** dedupe =.operations/objects=
+Check to see if objects already exist in =SPARC/.operations/objects=
+and if not move them there from =SPARC Consortium/.operations/objects=
+leaving duplicates to be removed.
+#+begin_src bash
+pushd ~/files/sparc-datasets-test
+
+# list files that would be moved because they are not in SPARC/.objects
+find */SPARC\ Consortium/.operations/objects -type f ! -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -print
+
+# see the distribution of sizes for files that would be moved
+find */SPARC\ Consortium/.operations/objects -type f ! -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -exec ls -alhS {} \+
+
+# actually move the files, when running for real remove the echos AGAIN --- DO NOT PASTE
+find */SPARC\ Consortium/.operations/objects -type f -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}" || { echo mkdir -p "${target%/*}" && echo mv "${1}" "${target}"; }' _ {} \;
 #+end_src
 *** clean up old =SPARC Consortium= folders
 #+begin_src bash
