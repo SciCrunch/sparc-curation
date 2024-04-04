@@ -271,6 +271,36 @@ bs = [
     if rc.is_broken_symlink()]
 _ = [b.unlink() for b in bs]
 #+end_src
+*** clean up folders with old dataset names
+This preserves the old =.operations= folders in =SPARC Consortium= for the time being.
+#+begin_src bash
+pushd ~/files/sparc-datasets-test
+
+# shows how much space can be recovered by removing old dataset folders
+find */SPARC*/ -mindepth 1 -maxdepth 1 -type d -not -name '.operations' -not -exec sh -c 'test "$(readlink "${1}"/../../dataset)" = "${1#*/}"' _ {} \; -exec du -hd0 --total {} \+ | sort -h
+
+# sh -c 'echo "${1#*/}"' _ {} \;
+
+#+end_src
+*** clean up old =SPARC Consortium= folders
+#+begin_src bash
+pushd ~/files/sparc-datasets-test
+
+# get modified dates for all consort variants
+find -mindepth 3 -maxdepth 3 -path '*SPARC\ Consortium*' -not -name '.operations' -exec ls -alhtrd {} \+
+
+# SPARC Consortium only cases
+find -maxdepth 2 -type d -name 'SPARC*' | sort -u | grep Consort -B1 | grep -v -- '--' | sort | cut -d\/ -f2 | uniq -u | xargs -I[] find [] -mindepth 1 -maxdepth 1 -type d | grep Consort | cut -d\/ -f1
+
+# no consort cases
+find -maxdepth 2 -type d -name 'SPARC*' | sort -u | grep Consort -B1 | grep -v -- '--' | sort | cut -d\/ -f2 | uniq -u | xargs -I[] find [] -mindepth 1 -maxdepth 1 -type d | grep -v Consort | cut -d\/ -f1
+
+# only both SPARC and SPARC Consortium cases
+find -mindepth 2 -maxdepth 2 -type d -name 'SPARC' -exec test -d {}/../SPARC\ Consortium \; -exec ls {}/.. \;
+
+# get sizes of the consort folders
+find -mindepth 2 -maxdepth 2 -type d -name 'SPARC' -exec test -d {}/../SPARC\ Consortium \; -exec du -hd0 {}\ Consortium \; | sort -h
+#+end_src
 ** datasets causing issues with fetching files
 :PROPERTIES:
 :CREATED:  [2022-02-08 Tue 13:58]
