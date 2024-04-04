@@ -1710,6 +1710,7 @@ switch to that"
   (add-function "open-dataset-latest-log" cb-open-dataset-lastest-log)
   (add-function "toggle-prefs" cb-toggle-prefs)
   (add-function "toggle-upload" cb-toggle-upload)
+  (add-function "select-all" cb-select-all)
   )
 
 (define (fox key-string)
