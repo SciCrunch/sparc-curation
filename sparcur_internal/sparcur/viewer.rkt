@@ -515,8 +515,40 @@ note of course that you don't get dynamic binding with version since it is not t
    'path_error_report
    #f))
 
+(define ok-ws '(#\space #\newline))
+(define (render-ws char)
+  (cond
+    [(char=? char #\tab) '(#\\ #\t)]
+    ;[(char=? char #\Newline) '(#\\ #\n)]
+    [else (cons #\\ (cons #\x (string->list (number->string (char->integer char) 16))))]))
+
+(define (expand-abnormal-whitespace str)
+  ; FIXME horribly inefficient
+  ; TODO apparently text extents can have style<%> ? will have to review
+  ; i know it can be done using a draw context directly ...
+  (let ([l '()]
+        [hit #f])
+    (for ([char (in-string str)])
+      (if (and (char-whitespace? char)
+               (not (for/or ([wsc (in-list ok-ws)])
+                      ; basically anything not a space or newline is evil
+                      ; newline is evil too, but is present in the target text
+                      (char=? wsc char))))
+          (begin
+            (set! hit #t)
+            (for ([char-char (in-list (render-ws char))])
+              (set! l (cons char-char l))))
+          (set! l (cons char l))))
+    (if hit
+        (list->string (reverse l))
+        str)))
+
 (define (paths-report)
-  (for-each (λ (m) (displayln (regexp-replace #rx"SPARC( Consortium)?/[^/]+/" m "\\0\n")) (newline))
+  (for-each (λ (m)
+              (displayln
+               (expand-abnormal-whitespace
+                (regexp-replace #rx"SPARC( Consortium)?/[^/]+/" m "\\0\n")))
+              (newline))
             ; FIXME use my hr function from elsewhere
             (let ([ihr (get-path-err)])
               (if ihr
@@ -526,7 +558,11 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (manifest-report)
   ; FIXME this will fail if one of the keys isn't quite right
   ; TODO displayln this into a text% I think?
-  (for-each (λ (m) (displayln (regexp-replace #rx"SPARC( Consortium)?/[^/]+/" m "\\0\n")) (newline))
+  (for-each (λ (m)
+              (displayln
+               (expand-abnormal-whitespace
+                (regexp-replace #rx"SPARC( Consortium)?/[^/]+/" m "\\0\n")))
+              (newline))
             ; FIXME use my hr function from elsewhere
             (let ([ihr (get-path-err)])
               (if ihr
