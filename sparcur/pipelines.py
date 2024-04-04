@@ -400,9 +400,10 @@ class PathTransitiveMetadataPipeline(PathPipeline):
         def data(self):
             # TODO dataset_id probably
             blob = {'type': 'path-metadata',}
-            records = self.path._transitive_metadata()
+            records, transitive_updated = self.path._transitive_metadata()
             if records:
                 blob['data'] = records
+                blob['timestamp_updated_contents'] = transitive_updated
                 Path.validate_path_json_metadata(blob)
             else:
                 # FIXME TODO errors

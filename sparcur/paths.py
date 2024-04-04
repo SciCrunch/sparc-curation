@@ -996,6 +996,7 @@ class PathHelper:
         metadata = this_metadata + rc_metadata
         index = {b['dataset_relative_path']:b for b in metadata}
         pid = this_metadata[0]['remote_id']
+        transitive_updated = 'FIXME-TODO'  # XXX
         for m in metadata:
             p = m.pop('parent_drp', None)
             if p in index:
@@ -1003,7 +1004,7 @@ class PathHelper:
             else:
                 m['parent_id'] = pid
 
-        return metadata
+        return metadata, transitive_updated
 
 
 class DiscoverPath(aug.XopenPath, aug.LocalPath, PathHelper):

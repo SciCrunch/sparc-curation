@@ -51,7 +51,7 @@ from celery.schedules import crontab
 
 import sparcur
 from sparcur.cli import Main, Options, __doc__ as clidoc
-from sparcur.utils import PennsieveId, GetTimeNow, log
+from sparcur.utils import PennsieveId, GetTimeNow, log as _log
 from sparcur.paths import Path, PennsieveCache
 from sparcur.config import auth
 from sparcur.backends import PennsieveDatasetData as RemoteDatasetData, BlackfynnRemote as Remote
@@ -61,6 +61,7 @@ from sparcur.sheets import Sheet, Organs, Affiliations
 from sparcur.sparcron import get_redis_conn
 from sparcur.sparcron import _none, _qed, _run, _qed_run
 
+log = _log.getChild('cron')
 
 # we set only cache here to avoid hitting rate limits the cache should
 # be updated in another process to keep things simple

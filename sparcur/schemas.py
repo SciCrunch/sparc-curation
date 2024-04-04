@@ -1924,6 +1924,10 @@ class PathTransitiveMetadataSchema(JSONSchema):
               'properties': {
                   'type': {'type': 'string',
                            'enum': ('path-metadata',),},
+                  'timestamp_updated_contents': {  # internally called updated_cache_transitive
+                      'type': 'string',
+                      'pattern': iso8601pattern,
+                  },
                   'records': {'type': 'array',
                               'items': PathSchema.schema,
                               'minItems': 1,},},}

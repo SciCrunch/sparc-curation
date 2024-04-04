@@ -52,7 +52,6 @@ combine_dir_name = 'combine'
 combine_latest_dir_name = 'L'  # short to keep symlinks small enough to fit in inodes
 combine_archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
 
-objects_dir_name = 'obj'  # collection and package
 index_dir_name = 'index'
 
 latest_link_name = 'L'  # short to keep symlinks small enough to fit in inodes
@@ -83,9 +82,9 @@ def test():
          ]
     ]
 
-    p = (Path('/home/tom/files/sparc-datasets/') / ttds / 'dataset').resolve()
-    cs = list(p.rchildren)
-    dataset_uuid = p.cache.identifier.uuid
+    dataset_path = (Path('/home/tom/files/sparc-datasets/') / ttds / 'dataset').resolve()
+    cs = list(dataset_path.rchildren)
+    dataset_uuid = dataset_path.cache.identifier.uuid
 
 
     def all_paths(c):
@@ -100,12 +99,12 @@ def test():
             index_obj_symlink_latest(dataset_uuid, c.cache.identifier.uuid),
             index_obj_symlink_archive(dataset_uuid, c.cache.identifier.uuid),
         ]
-    
 
     aps = top_paths + [all_paths(c) for c in cs]
     [print(p) for paths in aps for p in paths]
-    create_current_version_paths()
+    #create_current_version_paths()
 
+    from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=True)
 
 def create_current_version_paths():
     log.debug('setup test')
@@ -223,7 +222,6 @@ def index_combine_latest_export_path(dataset_uuid, object_uuid, index_version=No
     obj_path = uuid_cache_branch(1, 1, object_uuid, dob64=True)
     #dataset_dir = b64uuid(dataset_uuid)
     dataset_dir = uuid_cache_branch(1, 1, dataset_uuid, dob64=True)
-    #relative = f'{combine_dir_name}/{dataset_dir}/{objects_dir_name}/{latest_link_name}/{obj_path}'
     # we keep these in the index dir to save 3 bytes of ../
     base_path = index_combine_latest_path(index_version=index_version)
     #relative = f'{dataset_dir}/{obj_path}'
@@ -235,7 +233,6 @@ def index_combine_archive_export_path(dataset_uuid, object_uuid, index_version=N
     obj_path = uuid_cache_branch(1, 1, object_uuid, dob64=True)
     #dataset_dir = b64uuid(dataset_uuid)
     dataset_dir = uuid_cache_branch(1, 1, dataset_uuid, dob64=True)
-    #relative = f'{combine_dir_name}/{dataset_dir}/{objects_dir_name}/{archive_dir_name}/{obj_path}'
     # we keep these in the index dir to save 3 bytes of ../
     base_path = index_combine_archive_path(index_version=index_version)
     return base_path / dataset_dir / obj_path
@@ -270,6 +267,130 @@ def index_obj_symlink_archive(dataset_uuid, object_uuid, index_version=None):
     caep = index_combine_archive_export_path(dataset_uuid, object_uuid)
     icp = index_obj_path(object_uuid, index_version=index_version)
     return caep.relative_path_from(icp)
+
+
+import json
+import subprocess
+from sparcur.core import JEncode
+from sparcur.utils import transitive_files, GetTimeNow, PennsieveId as RemoteId
+from pyontutils.asyncd import Async, deferred
+from sparcur.sparcron.core import SubprocessException  # FIXME move to sparcur.exceptions
+
+
+def extract(dataset_uuid, path_string, force=False):
+    """ actually run extraction for a single path
+    see also sparcur.pipelines.XmlFilePipeline._do_xml_metadata
+    """
+    path = Path(path_string)
+    id = path.cache_identifier #RemoteId(path.cache_id)
+    msg = f'yes we get here for {path}'
+    log.info(msg)
+    # first pass just dump the path json meta
+    not_done = True
+    if not_done or force:
+        cjm = path._cache_jsonMetadata()
+        path = extract_export_path(dataset_uuid, id.uuid)
+        if not path.parent.exists():
+            path.parent.mkdir(exist_ok=True, parents=True)
+
+        # TODO almost certainly need parent_drp so that it can be resolved in combine
+        # TODO likely need to modify the type to be "object_meta" instead of path
+        # and there will be no reverse mapping to an object at the moment
+        # the alternative would be to have a top level "path_metadata" property
+        # that simply contained the path meta, and we can pull remote_id out as the
+        # id for the object itself, then we can put "contents" for files that we
+        # extract from and have another property for "derived_from_elsewhere" or whatever
+        with open(path, 'wt') as f:
+            # JEncode minimally needed to deal with Path :/
+            json.dump(cjm, f, sort_keys=True, indent=2, cls=JEncode)
+
+        msg = f'object metadata written to {path}'
+        log.info(msg)
+
+
+import sys
+
+def argv_extract(dataset_uuid, path, force=False):
+    return sys.executable, '-c', (
+        'from sparcur.objects import extract;'  # FIXME TODO move to another file to avoid import overhead
+        f'extract({dataset_uuid!r}, {path.as_posix()!r}, force={force})')
+
+
+path_log_base = auth.get_path('log-path')
+path_log_objects = path_log_base / 'objs'
+
+def subprocess_extract(dataset_uuid, path, time_now, force=False, debug=False):
+    # FIXME TODO probably wire this into sparcron more directly
+    # to avoid calling this via Async deferred
+    id = path.cache_identifier #RemoteId(path.cache_id)
+
+    timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
+    logdir = path_log_objects / uuid_cache_branch(2, 3, id.uuid)
+    logfile = logdir / timestamp / 'stdout.log'
+    latest = logdir / 'LATEST'
+    if not logfile.parent.exists():
+        logfile.parent.mkdir(parents=True)
+
+    if latest.exists():
+        latest.unlink()
+
+    latest.symlink_to(timestamp)
+
+    if debug:
+        try:
+            extract(dataset_uuid, path.as_posix(), force=force)
+            extracted = True
+        except Exception as e:
+            extracted = False
+            log.exception(e)
+
+        return path, extracted
+
+    argv = argv_extract(dataset_uuid, path, force=force)
+    try:
+        with open(logfile, 'wt') as logfd:
+            try:
+                p = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=logfd)
+                out = p.communicate()
+                if p.returncode != 0:
+                    raise SubprocessException(f'oops objs return code was {p.returncode}')
+
+                extracted = True
+            except KeyboardInterrupt as e:
+                p.send_signal(signal.SIGINT)
+                raise e
+
+        log.info(f'DONE: {id}')
+    except SubprocessException as e:
+        log.critical(f'FAIL: {RemoteId(type="dataset", uuid=dataset_uuid)} {id} | {b64uuid(dataset_uuid)}  {base64uuid(id.uuid)}')
+        log.exception(e)
+        extracted = False
+
+    return path, extracted
+
+
+def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False):
+    """ given a dataset_path extract path-metadata and object-metadata
+
+    this is a braindead implementation that ignores the existing way
+    in which path-metadata.json populated and is a clean sheet impl
+
+    that can be check for consistency with the current path-metadata.json
+    process and then we can switch over one way or the other
+    for reference: sparcur.pipelines.PathTransitiveMetadataPipeline
+    and sparcur.paths.PathHelper._transitive_metadata
+    """
+    if time_now is None:
+        time_now = GetTimeNow()
+
+    dataset_uuid = dataset_path.cache_identifier.uuid
+    rfiles = transitive_files(dataset_path)
+    if debug:
+        result = [subprocess_extract(dataset_uuid, path, time_now, force=force, debug=debug) for path in rfiles]
+    else:
+        result = Async()(deferred(subprocess_extract)(dataset_uuid, path, time_now, force=force) for path in rfiles)
+
+    breakpoint()
 
 
 def single_file_extract(
