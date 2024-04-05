@@ -76,14 +76,15 @@ Commands:
 
     meta        display the metadata the current folder or specified paths
 
-                options: --diff     diff the local and cached metadata
-                       : --uri      render the uri for the remote
-                       : --browser  navigate to the human uri for this file
+                options: --diff      diff the local and cached metadata
+                       : --only-diff only print if content different (implies --diff)
+                       : --uri       render the uri for the remote
+                       : --browser   navigate to the human uri for this file
                        : --human
-                       : --context  include context, e.g. dataset
-                       : --fake     make fake metadata to keep pipeline happy
+                       : --context   include context, e.g. dataset
+                       : --fake      make fake metadata to keep pipeline happy
                        : --meta-from-local   check if cached metadata from local
-                       : --for-racket    format output as sxpr
+                       : --for-racket        format output as sxpr
 
     rmeta       retrieve metadata about files/folders from the remote
 
@@ -234,6 +235,7 @@ Options:
     -U --upload             update remote target (e.g. a google sheet) if one exists
     -N --no-google          hack for ipv6 issues
     -D --diff               diff local vs cache
+    --only-diff             only print if content different (implies --diff)
     --force                 force the regeneration of a cached file
 
     --port=PORT             server port [default: 7250]
@@ -1604,7 +1606,7 @@ done"""
                            and path.cache.meta_from_local())
                     title = (path.relative_to(path.cwd()).as_posix() + ' *mfl*'
                              if mfl else None)
-                    if self.options.diff:
+                    if self.options.diff or self.options.only_diff:
                         if path.is_dir():
                             print('It is not meaningful to diff directory metadata.')
                             return
@@ -1644,6 +1646,10 @@ done"""
                         # id and file_id are fake in this instance
                         setattr(lmeta, 'id', None)
                         setattr(lmeta, 'file_id', None)
+                        if (self.options.only_diff and
+                            not lmeta.content_different(cmeta)):
+                            return
+
                         print(lmeta.as_pretty_diff(cmeta, pathobject=path,
                                                    title=title,
                                                    human=self.options.human))
