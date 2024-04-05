@@ -1647,12 +1647,16 @@ done"""
                         setattr(lmeta, 'id', None)
                         setattr(lmeta, 'file_id', None)
                         if (self.options.only_diff and
-                            not lmeta.content_different(cmeta)):
+                            not (different := lmeta.content_different(cmeta))):
                             return
 
                         print(lmeta.as_pretty_diff(cmeta, pathobject=path,
                                                    title=title,
                                                    human=self.options.human))
+
+                        if different:
+                            return path, lmeta, cmeta
+
                     elif self.options.for_racket:
                         from augpathlib import meta as apmeta
                         out = '('
@@ -1695,8 +1699,13 @@ done"""
             except exc.NoCachedMetadataError:
                 print(f'No metadata for {path}. Run `spc refresh {path}`')
 
-        for path in paths:
-            inner(path)
+        if self.options.only_diff:
+            different = [
+                diff for path in paths
+                if (diff := inner(path)) is not None]
+        else:
+            for path in paths:
+                inner(path)
 
         log.setLevel(old_level)
 
