@@ -1649,6 +1649,8 @@ done"""
                         if (self.options.only_diff and
                             not (different := lmeta.content_different(cmeta))):
                             return
+                        else:
+                            different = None
 
                         print(lmeta.as_pretty_diff(cmeta, pathobject=path,
                                                    title=title,
