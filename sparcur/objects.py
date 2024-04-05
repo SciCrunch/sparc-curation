@@ -658,7 +658,14 @@ def pex_manifests(dataset_id, oids):
         #ir = fromJson(blob)  # indeed we can't load type: path
         manifest_drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
         manifest_parent = manifest_drp.parent  # FIXME top level
-        contents = blob['extracted']['contents']  # FIXME could be missing ...
+        if 'extracted' not in blob:
+            continue  # TODO logging
+
+        extracted = blob['extracted']
+        if 'contents' not in extracted:
+            continue  # TODO logging
+
+        contents = extracted['contents']
         for c in contents:
             drp, rec = add_drp(manifest_drp, manifest_parent, c)
             if drp in drp_manifest_record_index:
@@ -681,8 +688,16 @@ def pex_xmls(dataset_id, oids):
     for object_id in oids:
         blob = path_json(extract_export_path(dataset_id, object_id))
         xml_drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
+
+        if 'extracted' not in blob:
+            continue
+
         extracted = blob['extracted']  # FIXME could be missing ... ??
         mimetype = extracted['mimetype'] if 'mimetype' in extracted else None
+        if 'contents' not in extracted:
+            # FIXME TODO logging
+            continue
+
         contents = extracted['contents']  # FIXME could be missing ...
         if mimetype in (
                 'application/x.vnd.mbfbioscience.metadata+xml',
@@ -693,9 +708,10 @@ def pex_xmls(dataset_id, oids):
             for drp in drps:
                 rec = {
                     'type': 'mbf_xml_path_ref',
-                    'source': xml_drp,
+                    'source': xml_drp,  # FIXME probably want source index id and other prov stuff as well for quick deref
                     #'dataset_relative_path': 'LOL',  # yeah ... no way this is going to work
-                    'input': contents,
+                    'input': extracted,  # FIXME not quite right, maybe prefer just the pointer and deref later? or maybe just the image section?
+                    # TODO contours go here i think
                 }
                 if drp in drp_xml_ref_index:
                     msg = 'NotImplementedError TODO multiple seg files per images is possible'
