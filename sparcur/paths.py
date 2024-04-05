@@ -1523,6 +1523,42 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
         # or by symlinking unmodified files to their package cache
         old._symlink_packages_transitive()
 
+        if not hasattr(old, 'rmdirtree'):
+            # remove this branch once new version of augpathlib is published
+            def rmdirtree(path):
+                """ like rmtree but only for empty folders
+                find path -type d -empty -delete
+                """
+                if path.is_symlink():
+                    # match behavior of find ${symlink}
+                    msg = f'{self} is a symlink'
+                    raise NotADirectoryError(msg)
+
+                deleted = set()
+                for path_string, subs, files in os.walk(path, topdown=False):
+                    has_subs = False
+                    sps = set()
+                    for sub in subs:
+                        sub_path_string = os.path.join(path_string, sub)
+                        if sub_path_string not in deleted:
+                            has_subs = True
+                            break
+                        else:
+                            sps.add(sub_path_string)
+
+                    if not files and not has_subs:
+                        path.__class__(path_string).rmdir()
+                        deleted.add(path_string)
+                        # remove any deleted subs because the next
+                        # level up only cares about this level
+                        # keeps potential memory usage down
+                        deleted.difference_update(sps)
+
+            rmdirtree(old)
+
+        else:
+            old.rmdirtree()
+
     def _eq_data(self, other):
         for schunk, ochunk in zip(self.data, other.data):
             if schunk != ochunk:
