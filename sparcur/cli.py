@@ -1608,12 +1608,38 @@ done"""
                         if path.is_dir():
                             print('It is not meaningful to diff directory metadata.')
                             return
+
                         if cmeta.checksum is None:
                             if not path.cache.local_object_cache_path.exists():
                                 # we are going to have to go to network
                                 self._setup()
 
                             cmeta.checksum = path.cache.checksum()  # FIXME :/
+
+                        if cmeta.checksum_cypher:
+                            # don't set cmeta.checksum_cypher so it is clear we filled it
+                            # in here and that it is not in the metadata on disk
+                            cypher_algo = cmeta.checksum_cypher
+                        else:
+                            log.log(9, 'oldmeta')
+                            # see backends.BlackfynnRemote.checksum_cypher
+                            # it is not abstracted because the hueristic is bad
+                            if len(cmeta.checksum) == 16:
+                                cypher_algo = 'md5'
+                            elif len(cmeta.checksum) == 32:
+                                cypher_algo = 'sha256'
+                            else:
+                                raise NotImplementedError(f'unknown cypher for {cmeta.checksum!r}')
+
+                        cypher = aug.utils.cypher_lookup[cypher_algo]
+                        if cypher != path._cache_class.cypher:
+                            # XXX FIXME HACK yet again around bad cypher impl stuff
+                            # who loves irregular verbs? hrm ... !
+                            path._cache_class = type(
+                                path._cache_class.__name__ + 'ChecksumHack',
+                                (path._cache_class,),
+                                dict(cypher=cypher))
+
                         lmeta = path.meta
                         # id and file_id are fake in this instance
                         setattr(lmeta, 'id', None)
