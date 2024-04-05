@@ -2211,6 +2211,7 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
     _asserted_anchor = None
     _dataset_dirs = []
 
+    _xattr_fs_version = BFPNCacheBase._xattr_fs_version
     _jsonMetadata = BFPNCacheBase._jsonMetadata
     populateJsonMetadata = BFPNCacheBase.populateJsonMetadata
     cypher = BFPNCacheBase.cypher
@@ -2269,6 +2270,8 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
 
     def is_dataset(self):
         return self._type() == 'dataset'
+
+    _fs_version = BFPNCacheBase._fs_version
 
 
 CacheL._bind_flavours()

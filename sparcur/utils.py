@@ -192,15 +192,23 @@ def write_manifests(*args, parents=None, parents_rows=None, suffix='.csv',
                         for path in parents]
 
     manifests_rendered = []
-    if suffix == '.csv':  # FIXME deal with different suffixes
+    if suffix in ('.csv', '.tsv'):
         import csv
+        if suffix == '.csv':
+            delimiter = ','
+        elif suffix == '.tsv':
+            delimiter = '\t'
+        else:
+            f'how did we manage to get here!?! {suffix}'
+            raise NotImplementedError(msg)
+
         paths_rendered = [(path, render_manifest(manifest))
                           for path, manifest in parents_rows]
         for path, rendered in paths_rendered:
             manifest = parent / f'manifest{suffix}'
             manifests_rendered.append((manifest, rendered))
             with open(manifest, 'wt') as f:
-                csv.writer(f).writerows([header] + rendered)
+                csv.writer(f, delimiter=delimiter, lineterminator='\n').writerows([header] + rendered)
     else:
         raise NotImplementedError(f"Don't know how to export {suffix}")
 
@@ -230,6 +238,27 @@ def levenshteinDistance(s1, s2):
                                            distances_[-1])))
         distances = distances_
     return distances[-1]
+
+
+def change_rcs(read_path, write_path, row_column_funs):
+    """ write a csv to a new file changing specific cells
+    row_column_funs: [[r, c, lambda cell: new_value] ...] """
+    import csv
+    rcf = {}
+    for r, c, f in row_column_funs:
+        if r not in rcf:
+            rcf[r] = {}
+
+        rcf[r][c] = f
+
+    with open(read_path, 'rt') as fr, open(write_path, 'wt') as fw:
+        writer = csv.writer(fw, delimiter=',', lineterminator='\n')
+        for i, row in enumerate(csv.reader(fr)):
+            if i in rcf:
+                cf = rcf[r]
+                row = [cf[j](cell) if j in cf else cell for j, cell in enumerate(row)]
+
+            writer.writerow(row)
 
 
 class GetTimeNow:
@@ -344,7 +373,11 @@ def symlink_latest(dump_path, path, relative=True):
             raise TypeError(f'Why is {path.name} not a symlink? '
                             f'{path!r}')
 
-        path.unlink()
+        try:
+            path.unlink()
+        except FileNotFoundError as e:
+            msg = 'weird symlink race condition !?!??!'
+            log.warning(9, msg)
 
     path.symlink_to(dump_path)
 

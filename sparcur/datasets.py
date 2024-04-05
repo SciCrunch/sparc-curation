@@ -587,7 +587,11 @@ class Tabular(HasErrors):
                 with open(self.path, 'rt', encoding=encoding) as f:
                     rows_orig = list(csv.reader(f, delimiter=delimiter))
 
-                rows = [row for row in rows_orig if row and any(row)]
+                rows = [[None if cell == '' else cell for cell in row]
+                        # normalize empty string to None for consistency
+                        # with parsers for other formats, I'm sure this will
+                        # cause issues downstream with NoneType vs str ...
+                        for row in rows_orig if row and any(row)]
                 diff = len(rows_orig) - len(rows)
                 if diff:
                     # LOL THE FILE WITH > 1 million empty rows, 8mb of commas
@@ -1249,9 +1253,9 @@ class MetadataFile(HasErrors):
 
                     cant_go_wrong[nh] = v
 
-                {nh:(value if number == numberN or i <= number else '')
-                 for i, nh in enumerate(self.norm_to_orig_header)
-                 if nh != self.record_type_key_header}
+                #{nh:(value if number == numberN or i <= number else '')
+                 #for i, nh in enumerate(self.norm_to_orig_header)
+                 #if nh != self.record_type_key_header}
                 #print(cant_go_wrong)
                 cant_go_wrong[self.record_type_key_header] = nah
                 objects.append(cant_go_wrong)
@@ -1324,6 +1328,19 @@ class MetadataFile(HasErrors):
 
             return out
 
+        def null_check(h, alt=False):
+            if None in h:
+                # if header contains None fail immediately
+                # no gaps are allowed in tables
+                i = h.index(None) + 1
+                rt = self.default_record_type == ROW_TYPE
+                # yes the naming of default_record_type is confusing
+                header_is_a_row = rt and alt or not rt and not alt  # i.e. index is column number
+                ht = 'row' if header_is_a_row else 'col'
+                r, c = (1, i) if header_is_a_row else (i, 1)
+                msg = f'NULL value detected in header {ht} at R{r}C{c} in {self.path}'
+                raise exc.MalformedHeaderError(msg)
+
         t = self._t()
 
         if self.default_record_type == ROW_TYPE:
@@ -1347,6 +1364,7 @@ class MetadataFile(HasErrors):
         except StopIteration as e:
             raise exc.NoDataError(f'{self.path}') from e
 
+        null_check(self.alt_header, alt=True)
         self._alt_header = Header(self.alt_header,
                                   normalize=self.normalize_alt,
                                   alt=True,
@@ -1373,6 +1391,7 @@ class MetadataFile(HasErrors):
         # this will fail see version 1.1 subjects template for this
         # with a note that 1.1 had many issues
         self.header = next(gen)
+        null_check(self.header)
         self._header = Header(self.header,
                               normalize=self.normalize_header,
                               normalize_first_cell=self.normalize_alt)

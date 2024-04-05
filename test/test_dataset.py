@@ -13,7 +13,7 @@ from sparcur.datasets import (Tabular,
 from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
 from sparcur.core import JEncode
-from sparcur.utils import fromJson
+from sparcur.utils import fromJson, change_rcs
 from sparcur.paths import PathL
 from .common import examples_root, template_root, project_path, temp_path, dpie_path
 from .test_pipelines import PipelineHelper as PH
@@ -208,6 +208,28 @@ class TestDatasetDescription(Helper, unittest.TestCase):
         pprint.pprint(value)
         ser_deser(value)
 
+    def test_dd_cry_alt(self):
+        base = examples_root / 'dd-pie.csv'
+        tf = temp_path / 'dd-cry-null-alt.csv'
+        change_rcs(base, tf, [[0, 3, lambda _: '']])
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
+
+    def test_dd_cry_header(self):
+        base = examples_root / 'dd-pie.csv'
+        tf = examples_root / 'dd-cry-null-header.csv'
+        change_rcs(base, tf, [[3, 0, lambda _: '']])
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
+
     def test_dd_pie_pipeline(self):
         tf = examples_root / 'dd-pie.csv'
         pipeline = self.pipe(tf, None, None)
@@ -239,6 +261,28 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         pprint.pprint(value)
         ser_deser(value)
         assert [s for s in value['subjects'] if 'subject_id' in s]
+
+    def test_su_cry_alt(self):
+        base = examples_root / 'su-pie.csv'
+        tf = temp_path / 'su-cry-null-alt.csv'
+        change_rcs(base, tf, [[0, 4, lambda _: '']])
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
+
+    def test_su_cry_header(self):
+        base = examples_root / 'su-pie.csv'
+        tf = temp_path / 'su-cry-null-header.csv'
+        change_rcs(base, tf, [[4, 0, lambda _: '']])
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
 
     def test_versions(self):
         self._versions()
