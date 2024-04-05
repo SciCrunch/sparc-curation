@@ -29,8 +29,11 @@ e.g. we could have a file in each dataset
 folder in combine that holds the latest
 updated cache transitive or something
 """
+import os
+import sys
 import json
 import base64
+import pathlib
 import subprocess
 from uuid import UUID
 import augpathlib as aug
@@ -41,9 +44,6 @@ from sparcur.utils import register_type, log as _log
 from sparcur.config import auth
 from sparcur.core import JEncode
 from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId
-
-
-
 
 log = _log.getChild('sob')
 
@@ -93,9 +93,12 @@ def test():
 
     #tds = ttds
     tds = '645267cb-0684-4317-b22f-dd431c6de323'  # small dataset with lots of manifests
+    # tds = '21cd1d1b-9434-4957-b1d2-07af75ad3546'  # big xml test sadly too many files (> 80k) to be practical for testing
+    tds = '57466879-2cdd-4af2-8bd6-7d867423c709'  # has vesselucida files
+    tds = '3bb4788f-edab-4f04-8e96-bfc87d69e4e5'  # much better, only 100ish files with xmls
     dataset_path = (Path('/home/tom/files/sparc-datasets/') / tds / 'dataset').resolve()
     cs = list(dataset_path.rchildren)
-    dataset_id = dataset_path.cache.identifier
+    dataset_id = dataset_path.cache_identifier
 
 
     def all_paths(c):
@@ -113,30 +116,37 @@ def test():
 
     aps = top_paths + [all_paths(c) for c in cs]
     [print(p) for paths in aps for p in paths]
-    #create_current_version_paths()
 
-    updated_cache_transitive, object_ids = from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=True)
-    from_dataset_id_object_ids_combine(dataset_id, object_ids, updated_cache_transitive)
+    create_current_version_paths()
+
+    updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=False, debug=True)
+    from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive)
+
 
 def create_current_version_paths():
-    log.debug('setup test')
+    #log.debug('setup test')
     ext_path = extract_path()
     com_path = combine_path()
     idx_path = index_path()
     archive_path = index_combine_archive_path()
 
-    log.debug(('mkdir', ext_path))
-    # ext_path.mkdir()
+    #log.debug(('mkdir', ext_path))
+    if not ext_path.exists():
+        ext_path.mkdir()
 
-    log.debug(('mkdir', com_path))
-    # com_path.mkdir()
+    #log.debug(('mkdir', com_path))
+    if not com_path.exists():
+        com_path.mkdir()
 
-    log.debug(('mkdir', idx_path))
-    # idx_path.mkdir()
+    #log.debug(('mkdir', idx_path))
+    if not idx_path.exists():
+        idx_path.mkdir()
 
-    log.debug(('mkdir', archive_path))  # archive_path.mkdir()
+    #log.debug(('mkdir', archive_path))
+    if not archive_path.exists():
+        archive_path.mkdir()
 
-    resymlink_index_combine_latest()
+    resymlink_index_combine_latest()  # FIXME should this always run?
 
 
 def b64uuid(uuid):  # XXX moved onto the id class
@@ -159,9 +169,13 @@ def resymlink_index_combine_latest(index_version=None):
     clp = index_combine_latest_path(index_version=index_version)
     cp = combine_path()
     target = cp.relative_path_from(clp)
-    log.debug(('ln -s', target, clp))
-    #if cp.exists()
-    # clp.symlink_to(target)
+
+    if clp.exists() or clp.is_symlink():
+        # unsymlink old
+        clp.unlink()
+
+    #log.debug(('ln -s', target, clp))
+    clp.symlink_to(target)
 
     # FIXME TODO issue with when to run this
     # is it as soon as a new version shows up
@@ -193,6 +207,7 @@ def archive_symlink_to_combine():
     # anything not linked into latest or archive can then be culled
     cap = combine_archive_path()  # index latest should always be the real directory
 
+
 def index_resymlink_archive(object_uuid):
     pass
 
@@ -202,24 +217,29 @@ def extract_path(extract_version=None):
     #relative = f'{extract_dir_name}/{extract_version}'
     return sf_export_base / extract_dir_name / extract_version
 
+
 def _dataset_path_obj_path(dataset_id, object_id):
     dataset_path = dataset_id.uuid_cache_path_string(1, 1, use_base64=True)
     obj_path = object_id.uuid_cache_path_string(1, 1, use_base64=True)
     return dataset_path, obj_path
+
 
 def extract_export_path(dataset_id, object_id, extract_version=None):
     dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
     base_path = extract_path(extract_version=extract_version)
     return base_path / dataset_path / obj_path
 
+
 def combine_path(combine_version=None):
     combine_version = str(__combine_version__ if combine_version is None else combine_version)
     return sf_export_base / combine_dir_name / combine_version
+
 
 def combine_version_export_path(dataset_id, object_id, combine_version=None):
     dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
     base_path = combine_path(combine_version=combine_version)
     return base_path / dataset_path / obj_path
+
 
 def index_combine_latest_path(index_version=None):
     base_path = index_path(index_version=index_version)
@@ -259,16 +279,35 @@ def index_obj_path(object_id, index_version=None):
     return index_path(index_version=index_version) / obj_path
 
 
-def index_obj_symlink_latest(dataset_id, object_id, index_version=None):
+def index_obj_symlink_latest(dataset_id, object_id, index_version=None, do_link=False):
+    # FIXME design with the keyword is not the greatest ... but mimnizes dupe calls
     clep = index_combine_latest_export_path(dataset_id, object_id)
-    icp = index_obj_path(object_id, index_version=index_version)
-    return clep.relative_path_from(icp)
+    iop = index_obj_path(object_id, index_version=index_version)
+    target = clep.relative_path_from(iop)
+    if do_link:
+        if not iop.parent.exists():
+            iop.parent.mkdir(exist_ok=True, parents=True)
+
+        if not iop.exists() and not iop.is_symlink():
+            # can fail if we didn't also symlink the combine latest
+            iop.symlink_to(target)
+
+    return target
 
 
-def index_obj_symlink_archive(dataset_id, object_id, index_version=None):
+def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link=False):
     caep = index_combine_archive_export_path(dataset_id, object_id)
-    icp = index_obj_path(object_id, index_version=index_version)
-    return caep.relative_path_from(icp)
+    iop = index_obj_path(object_id, index_version=index_version)
+    target = caep.relative_path_from(iop)
+    if do_link:
+        if not iop.parent.exists():
+            iop.parent.mkdir(exist_ok=True, parents=True)
+
+        if not iop.exists() and not iop.is_symlink():
+            # can fail if we didn't also symlink the combine latest
+            iop.symlink_to(target)
+
+    return target
 
 
 def do_actually_extract(path):
@@ -278,9 +317,13 @@ def do_actually_extract(path):
 
     fetch_fun = None
 
-    if path.name == 'manifest.xlsx':
+    if path.is_dir():
+        object_type_raw = 'inode/directory'
+        extract_fun = None
+    elif path.name == 'manifest.xlsx':
         object_type_raw = 'manifest'
         # FIXME need to match more name patterns
+        # see sc.metadata_filename_pattern
         from sparcur import datasets as dat
         def extract_fun(path):
             # FIXME this need the template schema version to work ... at least in theory
@@ -341,7 +384,7 @@ def do_actually_extract(path):
 
 
 register_type(None, 'object-metadata-raw')  # currently unmapped
-def extract(dataset_uuid, path_string, force=False):
+def extract(dataset_uuid, path_string, extract_fun=None):
     """ actually run extraction for a single path
     see also sparcur.pipelines.XmlFilePipeline._do_xml_metadata
 
@@ -350,65 +393,62 @@ def extract(dataset_uuid, path_string, force=False):
     dataset_id = RemoteId(dataset_uuid, type='dataset')
     path = Path(path_string)
     object_id = path.cache_identifier
-    msg = f'yes we get here for {path}'
-    log.info(msg)
-    # first pass just dump the path json meta
-    not_done = True
-    if not_done or force:
-        cjm = path._cache_jsonMetadata()
-        p = cjm['dataset_relative_path'].parent
-        if p.name != '':  # we are at the root of the relative path aka '.'
-            cjm['parent_drp'] = p
 
-        blob = {
-            'type': 'object-metadata-raw',
-            'path_metadata': cjm,
-        }
-        object_type, fetch_fun, extract_fun = do_actually_extract(path)
-        if not path.is_dir() and extract_fun:
-            if path.is_file():
-                # FIXME TODO ... kind of external vs internal type ...
-                extracted = extract_fun(path)  # FIXME really should be extract_fun(path)
-                blob['extracted'] = extracted
-                # expects type, extracted_type, contents
-                # and have "extracted": {"type": "extracted-metadata-type", "object_type": "mbfxml", "some_property": "derp", "contents": [{}...]}
+    cjm = path._cache_jsonMetadata()
+    p = cjm['dataset_relative_path'].parent
+    if p.name != '':  # we are at the root of the relative path aka '.'
+        cjm['parent_drp'] = p
 
-                # XXX FIXME so much tangling in here ...
-                #object_type, contents = extract_fun(path, blob)
-                # FIXME where to put expected content type ...
-                # e.g. that this is a manifest ... the current approach is not so great iirc
-                # things we know how to process, manifest, xml, jpx, etc.
-                #blob['object_type_raw'] = object_type_raw   # FIXME naming also expected vs post analysis re: types of xml
-                #blob['object_type'] = object_type   # FIXME naming XXX or maybe object_type_raw can imply other top level keys?
-                #blob['contents'] = contents
-            else:
-                # XXX FIXME TODO right now we only process files that
-                # we have already retrieved because setting up the
-                # iterative extract, fetch, extract, fetch process is
-                # too much
-                msg = f'not extracting because not fetched {path.name}'
-                log.warning(msg)
+    blob = {
+        'type': 'object-metadata-raw',
+        'path_metadata': cjm,
+    }
 
-        export_path = extract_export_path(dataset_id, object_id)
-        if not export_path.parent.exists():
-            export_path.parent.mkdir(exist_ok=True, parents=True)
+    if extract_fun is None:  # subprocess case
+        object_type_raw, fetch_fun, extract_fun = do_actually_extract(path)
 
-        # TODO almost certainly need parent_drp so that it can be resolved in combine
-        # TODO likely need to modify the type to be "object_meta" instead of path
-        # and there will be no reverse mapping to an object at the moment
-        # the alternative would be to have a top level "path_metadata" property
-        # that simply contained the path meta, and we can pull remote_id out as the
-        # id for the object itself, then we can put "contents" for files that we
-        # extract from and have another property for "derived_from_elsewhere" or whatever
-        with open(export_path, 'wt') as f:
-            # JEncode minimally needed to deal with Path :/
-            json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+    if extract_fun:
+        if path.is_file():
+            # FIXME TODO ... kind of external vs internal type ...
+            extracted = extract_fun(path)  # FIXME really should be extract_fun(path)
+            blob['extracted'] = extracted
+            # expects type, extracted_type, contents
+            # and have "extracted": {"type": "extracted-metadata-type", "object_type": "mbfxml", "some_property": "derp", "contents": [{}...]}
 
-        msg = f'object metadata written to {export_path}'
-        log.info(msg)
+            # XXX FIXME so much tangling in here ...
+            #object_type, contents = extract_fun(path, blob)
+            # FIXME where to put expected content type ...
+            # e.g. that this is a manifest ... the current approach is not so great iirc
+            # things we know how to process, manifest, xml, jpx, etc.
+            #blob['object_type_raw'] = object_type_raw   # FIXME naming also expected vs post analysis re: types of xml
+            #blob['object_type'] = object_type   # FIXME naming XXX or maybe object_type_raw can imply other top level keys?
+            #blob['contents'] = contents
+        else:
+            # XXX FIXME TODO right now we only process files that
+            # we have already retrieved because setting up the
+            # iterative extract, fetch, extract, fetch process is
+            # too much
+            msg = f'not extracting because not fetched {path.name}'
+            log.warning(msg)
 
+    export_path = extract_export_path(dataset_id, object_id)
+    if not export_path.parent.exists():
+        export_path.parent.mkdir(exist_ok=True, parents=True)
 
-import sys
+    # TODO almost certainly need parent_drp so that it can be resolved in combine
+    # TODO likely need to modify the type to be "object_meta" instead of path
+    # and there will be no reverse mapping to an object at the moment
+    # the alternative would be to have a top level "path_metadata" property
+    # that simply contained the path meta, and we can pull remote_id out as the
+    # id for the object itself, then we can put "contents" for files that we
+    # extract from and have another property for "derived_from_elsewhere" or whatever
+    with open(export_path, 'wt') as f:
+        # JEncode minimally needed to deal with Path :/
+        json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+
+    msg = f'object metadata written to {export_path}'
+    log.log(9, msg)
+
 
 def argv_extract(dataset_uuid, path, force=False):
     return sys.executable, '-c', (
@@ -424,7 +464,7 @@ def object_logdir(object_id):
     return path_log_objects / object_id.uuid_cache_path_string(2, 3)
 
 
-def subprocess_extract(dataset_id, path, time_now, force=False, debug=False):
+def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, subprocess=False):
     # FIXME TODO probably wire this into sparcron more directly
     # to avoid calling this via Async deferred
     object_id = path.cache_identifier #RemoteId(path.cache_id)
@@ -434,6 +474,38 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False):
     else:
         updated = path.updated_cache_transitive()  # something of a hack
 
+    export_path = extract_export_path(dataset_id, object_id)
+    done = export_path.exists()
+    object_type_raw, fetch_fun, extract_fun = do_actually_extract(path)
+    # FIXME hard to pass extract_fun directly so would have to
+    # rederive in subprocess version not that I think we will be using
+    # that variant
+
+    if done and not force:
+        success = 'already-done'
+        msg = f'{object_id} already done {path}'
+        log.log(9, msg)
+        return path, object_id, object_type_raw, success, updated
+
+    if debug or not subprocess:  # TODO or raw object_type_raw in IMPORTANT i.e. stuff that should be in memory ... but that is and optimization
+        try:
+            extract(dataset_id.uuid, path.as_posix(), extract_fun=extract_fun)
+            success = True
+        except Exception as e:
+            success = False
+            log.exception(e)
+
+        return path, object_id, object_type_raw, success, updated
+
+    msg = "don't do this right now"
+    # likely not needed
+    # has resource issues, creates too many log files, etc.
+    # the log issue can sort of be dealt with, but not easily
+    # from inside python if you want all processes to write to
+    # the same log file, have to log to socket or something
+    raise NotImplementedError(msg)
+    # XXX start the subprocess variant which we likely do not want
+    # since it is usually the wrong cut point
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     logdir = object_logdir(object_id)
     logfile = logdir / timestamp / 'stdout.log'
@@ -446,16 +518,6 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False):
 
     latest.symlink_to(timestamp)
 
-    if debug:
-        try:
-            extract(dataset_id.uuid, path.as_posix(), force=force)
-            extracted = True
-        except Exception as e:
-            extracted = False
-            log.exception(e)
-
-        return path, object_id, extracted, updated
-
     argv = argv_extract(dataset_id.uuid, path, force=force)
     try:
         with open(logfile, 'wt') as logfd:
@@ -465,18 +527,22 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False):
                 if p.returncode != 0:
                     raise exc.SubprocessException(f'oops objs return code was {p.returncode}')
 
-                extracted = True
+                success = True
             except KeyboardInterrupt as e:
                 p.send_signal(signal.SIGINT)
                 raise e
+
+        # FIXME the boundary for this needs to happend only when there is an actual
+        # extract going on, not if we are just dumping path meta, and i think we aren't
+        # going to subprocess this at all, so the logging will be in the parent dataset export log
 
         log.info(f'DONE: {object_id}')
     except exc.SubprocessException as e:
         log.critical(f'FAIL: {dataset_id} {object_id} | {dataset_id.base64uuid()} {object_id.base64uuid()}')
         log.exception(e)
-        extracted = False
+        success = False
 
-    return path, object_id, extracted, updated
+    return path, object_id, object_type_raw, success, updated
 
 
 def from_dataset_path_get_path_to_fetch_and_extract():
@@ -517,19 +583,24 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     # but in a sense that is ok because we also want to pull the path metadata here as well since it will end up
     # being more efficient to start from here
     rchildren = transitive_paths(dataset_path)
-    if debug:
-        results = [subprocess_extract(dataset_id, path, time_now, force=force, debug=debug) for path in rchildren]
+    if True:  # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
+        results = [subprocess_extract(dataset_id, path, time_now, force=force, debug=debug, subprocess=False) for path in rchildren]
     else:
-        results = Async()(deferred(subprocess_extract)(dataset_id, path, time_now, force=force) for path in rchildren)
+        # XXX FIXME LOL yeah, maybe don't run this with a completely open async because it will spawn n processes
+        # where n = THE NUMBER OF FILES IN A DATASET EEEEE !??!?! pypy3 has non-trivial minimal memory usage
+        # FIXME it is also quite likely that we don't actually need to run in a subprocess (except for the logging bit maybe)
+        # because the overhead of spinning up a whole new pypy3 vm for a single file is silly, we already spin up one
+        # for export which protects from the memory issues with e.g. lxml
+        results = Async(rate=20)(deferred(subprocess_extract)(dataset_id, path, time_now, force=force) for path in rchildren)
 
     updated_cache_transitive = None
     bads = []
-    object_ids = []
-    for path, id, ok, updated in results:
+    object_id_types = []
+    for path, id, type, ok, updated in results:
         if not ok:
             bads.append((path, id))
             updated_cache_transitive = None
-            object_ids = []
+            object_id_types = []
             continue
         elif bads:
             continue
@@ -539,8 +610,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         elif updated > updated_cache_transitive:
             updated_cache_transitive = updated
 
-        object_ids.append(id)
-
+        object_id_types.append((id, type))
 
     if bads:
         fails = '\n'.join(f'{id} {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"} {path}' for path, id in bads)
@@ -550,10 +620,177 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         breakpoint()
         raise ValueError(msg)  # FIXME error type
     else:
-        return updated_cache_transitive, object_ids
+        return updated_cache_transitive, object_id_types
 
 
-def from_dataset_id_object_ids_combine(dataset_id, object_ids, updated_cache_transitive=None):
+# these variants imply a certain amount of rework
+def from_dataset_id_combine(dataset_id): pass
+def from_dataset_path_combine(dataset_id): pass
+def from_dataset_id_object_ids_combine(dataset_id): pass
+
+
+def path_json(path):
+    with open(path, 'rt') as f:
+        return json.load(f)
+
+
+def pex_manifests(dataset_id, oids):
+    # manifest data
+    # construct the individual manifest paths
+    # merge into a single global manifest
+
+    def add_drp(manifest_drp, manifest_parent, rec):
+        # XXX ah yes, that's why I wanted to implement my own PurePath variant ...
+        # who the heck leaves simplify/normpath out !?!?!
+        drp = manifest_parent.__class__(os.path.normpath(manifest_parent / rec['filename']))
+        out = {
+            'type': 'manifest_record',  # a single manifest record for a file
+            'source': manifest_drp,
+            'dataset_relative_path': drp,  # make it easy to check consistency without fancy steps
+            'input': rec,  # FIXME vs inputs: [rec] to support multiple inputs technically allowed ... no, we need another way to handle that
+        }
+        return drp, out
+
+    # we don't use .utils.fromJson here, I don't think we need it? or at least don't need it yet?
+    drp_manifest_record_index = {}
+    for object_id in oids:
+        blob = path_json(extract_export_path(dataset_id, object_id))
+        #ir = fromJson(blob)  # indeed we can't load type: path
+        manifest_drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
+        manifest_parent = manifest_drp.parent  # FIXME top level
+        contents = blob['extracted']['contents']  # FIXME could be missing ...
+        for c in contents:
+            drp, rec = add_drp(manifest_drp, manifest_parent, c)
+            if drp in drp_manifest_record_index:
+                msg = 'NotImplementedError TODO merge multiple to same file'
+                log.info(msg)
+                msg = (
+                    f'multiple manifest records for {dataset_id}:{drp} '
+                    f'from {manifest_drp} and {drp_manifest_record_index[drp]["source"]}')
+                log.error(msg)
+                # FIXME TODO embed error in rec
+                continue
+            else:
+                drp_manifest_record_index[drp] = rec
+
+    return drp_manifest_record_index
+
+
+def pex_xmls(dataset_id, oids):
+    drp_xml_ref_index = {}
+    for object_id in oids:
+        blob = path_json(extract_export_path(dataset_id, object_id))
+        xml_drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
+        extracted = blob['extracted']  # FIXME could be missing ... ??
+        mimetype = extracted['mimetype'] if 'mimetype' in extracted else None
+        contents = extracted['contents']  # FIXME could be missing ...
+        if mimetype in (
+                'application/x.vnd.mbfbioscience.metadata+xml',
+                'application/x.vnd.mbfbioscience.neurolucida+xml',
+                'application/x.vnd.mbfbioscience.vesselucida+xml',  # does have path_mbf
+        ):
+            drps = [p for i in contents['images'] if 'path_mbf' in i for p in i['path_mbf']]
+            for drp in drps:
+                rec = {
+                    'type': 'mbf_xml_path_ref',
+                    'source': xml_drp,
+                    #'dataset_relative_path': 'LOL',  # yeah ... no way this is going to work
+                    'input': contents,
+                }
+                if drp in drp_xml_ref_index:
+                    msg = 'NotImplementedError TODO multiple seg files per images is possible'
+                    log.info(msg)
+                    msg = (
+                        f'multiple xml refs for {dataset_id}:{drp} '  # lol
+                        f'from {xml_drp} and {drp_xml_ref_index[drp]["source"]}')
+                    log.error(msg)
+                    continue
+                else:
+                    drp_xml_ref_index[drp] = rec
+
+    return drp_xml_ref_index  # the keys here are going to have to be matched or something
+
+
+def _pex_dirs(dataset_id, oids):
+    # XXX pretty sure we don't need this by itself
+    # because all types are needed to resolve parent_drp
+    pass
+
+def combine(dataset_id, object_id, type, drp_index):
+    blob = path_json(extract_export_path(dataset_id, object_id))
+    blob['type'] = 'combined-metadata'
+    drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
+    if (has_recs := drp in drp_index):
+        blob['external_records'] = drp_index.pop(drp)
+    else:
+        # manifests technically aren't required as of 2.1.0
+        msg = f'{dataset_id} {object_id} {drp} has no records of any kind'
+        log.warning(msg)  # TODO embed error
+
+    combine_path = combine_version_export_path(dataset_id, object_id)
+    if not combine_path.parent.exists():
+        combine_path.parent.mkdir(exist_ok=True, parents=True)
+
+    with open(combine_path, 'wt') as f:
+        # JEncode minimally needed to deal with Path :/
+        json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+
+    return drp, has_recs
+
+
+def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive=None):
+    types = {}
+    for oid, type in object_id_types:
+        if type is None:
+            continue
+
+        if type not in types:
+            types[type] = []
+
+        types[type].append(oid)
+
+    pex = {
+        'manifest': pex_manifests,
+        'xml': pex_xmls,
+        'inode/directory': None,
+    }
+    drp_index = {}
+    xml_index = None
+    # first pass
+    for type, oids in types.items():
+        process_extracted = pex[type]
+        if process_extracted is not None:
+            index = process_extracted(dataset_id, oids)
+            if index is not None:
+                if type == 'xml':
+                    xml_index = index
+                else:
+                    for drp, rec in index.items():
+                        if drp not in drp_index:
+                            drp_index[drp] = {'type': 'internal_references'}  # FIXME what is the name for this type ...
+
+                        drp_index[drp][type] = rec
+
+    # TODO do something about the xml index here
+    # passing object_id_type_drps into this function
+    # would avoid the need to load all the jsons
+    # to retrieve that information ...
+
+    drps = []
+    for object_id, type in object_id_types:  # TODO sort these in reverse order so that errors can be added to e.g. manifests
+        drp, has_recs = combine(dataset_id, object_id, type, drp_index)
+        target = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
+        drps.append((drp, has_recs, type, target))
+
+    missing_drps = [d for d, h, ty, ta in drps if not h and ty not in ('inode/directory', 'manifest')]
+    if missing_drps:
+        log.error('missing_drps:\n' + '\n'.join(sorted([d.as_posix() for d in missing_drps])))
+    if drp_index:
+        # e.g. manifest records with no corresponding path
+        log.error('drp_index:\n' + '\n'.join(sorted([k.as_posix() for k in drp_index.keys()])))
+        # TODO embed somewhere somehow, probably in the dataset-uuid/dataset-uuid record?
+        # i.e. combine_export_path(dataset_id, datset_id)
+
     breakpoint()
     pass
 

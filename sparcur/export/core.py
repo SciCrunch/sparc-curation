@@ -360,6 +360,17 @@ class Export(ExportBase):
             with open(dump_path / 'path-metadata.json', 'wt') as f:
                 jdump(blob_path_transitive_metadata, f)
 
+            do_objects = True
+            if do_objects:
+                # XXX FIXME TODO this is just a first pass
+                # the fetch issue prevents us from leveraging the full power
+                from sparcur import objects as objs
+                objs.create_current_version_paths()
+                dataset_path = self.export_source_path
+                dataset_id = dataset_path.cache_identifier
+                updated_cache_transitive, object_id_types = objs.from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=False)
+                objs.from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive)
+
         # TODO a converter that doesn't care about higher level structure
         #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data
         #breakpoint()
