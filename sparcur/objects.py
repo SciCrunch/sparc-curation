@@ -400,6 +400,7 @@ def extract(dataset_uuid, path_string, extract_fun=None):
         cjm['parent_drp'] = p
 
     blob = {
+        '__extract_version__': __extract_version__,  # both wind up embedded at the end
         'type': 'object-metadata-raw',
         'path_metadata': cjm,
     }
@@ -727,14 +728,15 @@ def pex_xmls(dataset_id, oids):
     return drp_xml_ref_index  # the keys here are going to have to be matched or something
 
 
-def _pex_dirs(dataset_id, oids):
-    # XXX pretty sure we don't need this by itself
-    # because all types are needed to resolve parent_drp
-    pass
+def pex_dirs(dataset_id, oids):
+    # TODO build the parent lookup index to replace parent_drp
+    return {}
+
 
 def combine(dataset_id, object_id, type, drp_index):
     blob = path_json(extract_export_path(dataset_id, object_id))
-    blob['type'] = 'combined-metadata'
+    blob['type'] = 'object-metadata'  #'combined-metadata'
+    blob['__combine_version__'] = __combine_version__
     drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
     if (has_recs := drp in drp_index):
         blob['external_records'] = drp_index.pop(drp)
@@ -768,10 +770,11 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
     pex = {
         'manifest': pex_manifests,
         'xml': pex_xmls,
-        'inode/directory': None,
+        'inode/directory': pex_dirs,
     }
     drp_index = {}
     xml_index = None
+    parent_index = None
     # first pass
     for type, oids in types.items():
         process_extracted = pex[type]
@@ -780,6 +783,8 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
             if index is not None:
                 if type == 'xml':
                     xml_index = index
+                elif type == 'inode/directory':
+                    parent_index = index
                 else:
                     for drp, rec in index.items():
                         if drp not in drp_index:
