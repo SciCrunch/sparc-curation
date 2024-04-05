@@ -271,6 +271,18 @@ bs = [
     if rc.is_broken_symlink()]
 _ = [b.unlink() for b in bs]
 #+end_src
+*** clean up empty folders in temp-upstream
+We already unlink the broken symlinks after completing the swap when
+we pull a fresh copy, however when there are lots of changes the
+folders themselves start to add up, so consider cleaning those out too
+since mainly the use case is to keep a record of the metadata files
+from a given date.
+#+begin_src bash
+pushd ~/files/sparc-datasets-test
+
+# list empty directories in temp-upstream add -delete to remove them
+find */SPARC/.operations/temp-upstream -type d -empty
+#+end_src
 *** clean up folders with old dataset names
 This preserves the old =.operations= folders in =SPARC Consortium= for the time being.
 #+begin_src bash
@@ -293,14 +305,24 @@ leaving duplicates to be removed.
 pushd ~/files/sparc-datasets-test
 
 # list files that would be moved because they are not in SPARC/.objects
-find */SPARC\ Consortium/.operations/objects -type f ! -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -print
+find */SPARC\ Consortium/.operations/objects -type f -not -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -print
 
 # see the distribution of sizes for files that would be moved
-find */SPARC\ Consortium/.operations/objects -type f ! -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -exec ls -alhS {} \+
+find */SPARC\ Consortium/.operations/objects -type f -not -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -exec ls -alhS {} \+
 
 # actually move the files, when running for real remove the echos AGAIN --- DO NOT PASTE
 find */SPARC\ Consortium/.operations/objects -type f -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}" || { echo mkdir -p "${target%/*}" && echo mv "${1}" "${target}"; }' _ {} \;
+
+# internal consistency check (usually detects issues coming from upstream)
+find */SPARC/.operations/objects -type f -exec spc meta --only-diff {} \+
+
+# see if there are any cases where the files are not the same
+find */SPARC\ Consortium/.operations/objects -type f -not -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}" && { sha256sum "${1}" | sed "s/ Consortium//" | sha256sum --check --status; } ' _ {} \; -print
+
+# delete files where the target exists (make sure all files are actually identical) change -print to -delete when ready to go for real
+find */SPARC\ Consortium/.operations/objects -type f -exec bash -c 'target="${1/\ Consortium}"; test -f "${target}"' _ {} \; -print
 #+end_src
+
 *** clean up old =SPARC Consortium= folders
 #+begin_src bash
 pushd ~/files/sparc-datasets-test
