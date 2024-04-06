@@ -284,6 +284,22 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         except exc.MalformedHeaderError as e:
             print(e)
 
+    def test_su_cry_multi(self):
+        base = examples_root / 'su-pie.csv'
+        tf = temp_path / 'su-cry-multi.csv'
+        change_rcs(base, tf,
+                   [[0, 4, lambda _: ''],  # null_alt
+                    [4, 0, lambda _: ''],  # null_header
+                    [0, 5, lambda _: 'strain'],  # dupe_alt
+                    [6, 0, lambda _: 'bb-1'],  # dupe_header
+                    ])
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
+
     def test_versions(self):
         self._versions()
 
@@ -310,6 +326,23 @@ class TestSamplesFile(Helper, unittest.TestCase):
         ser_deser(value)
         derp = list(value['samples'][0])
         assert 'same_header' in derp, derp
+
+    def test_sa_cry_multi(self):
+        base = examples_root / 'sa-pie.csv'
+        tf = temp_path / 'sa-cry-multi.csv'
+        change_rcs(base, tf,
+                   [[0, 4, lambda _: ''],  # null_alt
+                    [4, 0, lambda _: ''],  # null_header
+                    [0, 5, lambda _: 'specimen anatomical location'],  # dupe_alt
+                    [6, 1, lambda _: 'slice-3'],  # dupe_header
+                    ])
+        obj = self.metadata_file_class(tf)
+        breakpoint()
+        try:
+            value = obj.data
+            assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
 
     def test_versions(self):
         self._versions()

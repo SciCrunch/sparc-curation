@@ -255,7 +255,7 @@ def change_rcs(read_path, write_path, row_column_funs):
         writer = csv.writer(fw, delimiter=',', lineterminator='\n')
         for i, row in enumerate(csv.reader(fr)):
             if i in rcf:
-                cf = rcf[r]
+                cf = rcf[i]
                 row = [cf[j](cell) if j in cf else cell for j, cell in enumerate(row)]
 
             writer.writerow(row)

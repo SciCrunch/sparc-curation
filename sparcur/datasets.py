@@ -17,6 +17,11 @@ from .core import log, logd, HasErrors
 from .paths import Path, PennsieveCache
 from .utils import is_list_or_tuple
 
+ROW_TYPE = object()
+COLUMN_TYPE = object()
+numberN = object()
+GROUP_ALL = object()
+
 
 # FIXME review this :/ it is not a good implementation at all
 def tos(hrm):
@@ -42,11 +47,28 @@ hasSchema = sc.HasSchema()
 class Header:
     """ generic header normalization for python """
     # FIXME this is a really a pipeline stage
-    def __init__(self, first_row_or_column, normalize=True, alt=False, normalize_first_cell=False):
+    def __init__(self, first_row_or_column, normalize=True, alt=False, normalize_first_cell=False, allow_dupes=False, record_type=ROW_TYPE):
+        """ allow_dupes only matters if normalize == True
+        if normalize == False then allow_dupes is implicitly False
+        """
         self.pipeline_start = first_row_or_column
         self._normalize = normalize
+        self._header_is_a_row = record_type is ROW_TYPE and alt or record_type is not ROW_TYPE and not alt
+        # record is row and type is alt or record is col and type is header, since row/col alt/header are complements ... etc.
+        #       row col
+        # alt    x
+        # header     x  not alt
+        #     not col
+        # the name of xnor is dumb, it should be nxor
+        # r a hiar c h hiac nand xor xnor nor rnor anor ranor
+        # 0 0 1    1 1 0    1    0   1    1   0    0    1
+        # 1 1 1    0 0 0    0    0   1    0   0    0    1
+        # 0 1 0    1 0 1    1    1   0    0   1    0    0
+        # 1 0 0    0 1 1    1    1   0    0   0    1    0
         self._alt = alt
+        self._record_type = record_type
         self._normalize_first_cell = normalize or normalize_first_cell
+        self._allow_dupes = allow_dupes
 
     @property
     def normalized(self):
@@ -63,6 +85,8 @@ class Header:
                     c = f'{prefix}_{i}'
 
                 if c in header:
+                    msg = f'duplicate {"alt" if self._alt else "header"} values {c!r}'
+                    log.warning(msg)  # FIXME this should be caught earlier as a malformed header issue
                     c = c + f'_{prefix}_{i}'
 
                 header.append(c)
@@ -79,27 +103,54 @@ class Header:
     def _lut(self):
         return {n:h for n, h in zip(self.data, self.pipeline_start)}
 
-    def lut(self, **renames):
+    def lut(self, ignore_errors=False, **renames):
         if self._normalize:
-            return self._lut_normalize(renames)
+            return self._lut_normalize(renames, ignore_errors)
         else:
-            return self._lut_original(renames)
+            return self._lut_original(renames, ignore_errors)
 
-    def _lut_normalize(self, renames):
-        """ do any renames beyond the specific normalization """
-        return {renames[n] if n in renames else n:h
-                for n, h in zip(self.data, self.pipeline_start)}
-
-    def _lut_original(self, renames):
-        original = self.pipeline_start
-        normalized = self.normalized
-        if len(set(original)) != len(original):
+    def _nodupes(self, original, normalized, ignore_errors):
+        # FIXME normalized might be duped too if there are case variants ... sigh
+        if len(set(original)) != len(original) and not ignore_errors:
             dupes = [v for v, c in Counter(original).most_common() if c > 1]
-            msg = f'Original header is not unique.\nDuplicate entries: {dupes}'
+            inds = [(i, v) for i, v in enumerate(original) if v in dupes]
+            lu = {}
+            for i, v in inds:
+                if v not in lu:
+                    lu[v] = []
+                lu[v].append(i)
+
+            if self._header_is_a_row:
+                fstr = "R1C{}"
+            else:
+                fstr = "R{}C1"
+
+            dm = '; '.join([f'dupes of {v!r} at {" ".join([fstr.format(i + 1) for i in ii])}'
+                            for v, ii in lu.items()])
+            msg = f'Original header is not unique.\n{dm}'
             if None in dupes:
                 msg += '\nThere may be multiple records without a primary key.'
-            raise exc.MalformedHeaderError(msg)
 
+            if self._allow_dupes and self._normalize:
+                log.warning(msg)  # FIXME TODO embed
+            else:
+                raise exc.MalformedHeaderError(msg)
+
+    def _lut_normalize(self, renames, ignore_errors):
+        """ do any renames beyond the specific normalization """
+        normalized = {
+            renames[n] if n in renames else n:h
+            for n, h in zip(self.data, self.pipeline_start)}
+        self._nodupes(self.pipeline_start, normalized, ignore_errors)
+        return normalized
+
+    def _lut_original(self, renames, ignore_errors):
+        """ ignore_errors allows things to proceed in a broken state
+        under the expectation that an error will be raised before the resulting
+        lut is used """
+        original = self.pipeline_start
+        normalized = self.normalized
+        self._nodupes(original, normalized, ignore_errors)
         if self._normalize_first_cell:
             norm_first = (*normalized[:1], *original[1:])
             return {renames[n] if n in renames else n:h
@@ -774,7 +825,7 @@ class Tabular(HasErrors):
                 # representation of dates and midnight indistinguishable !?!?
                 if cell.value and cell.is_date and
                 cell.number_format in ('yyyy\\-mm\\-dd;@', 'YYYY\\-MM\\-DD')
-                else (cell.hyperlink.target if cell.hyperlink else cell.value)
+                else (cell.hyperlink.target if cell.hyperlink else cell.value)  # FIXME need to warn about mismatched link and label
                 for cell in row]
             # NOTE '@' != 'General' but apparently openpyxl converts @ to number incorrectly
             #breakpoint()
@@ -917,12 +968,6 @@ class Tabular(HasErrors):
         return table.table
 
 
-ROW_TYPE = object()
-COLUMN_TYPE = object()
-numberN = object()
-GROUP_ALL = object()
-
-
 def remove_rule(blob, rule):
     # FIXME this should be in _DictTransformer
     previous_target = blob
@@ -950,7 +995,7 @@ def remove_rule(blob, rule):
 
 class PrimaryKey:
     def __init__(self, name, column_names, combine_function,
-                 nalt_header, agen, gen):
+                 nalt_header, agen, gen, header_is_a_row):
         self.name = name
         # because we add the primary key to alt header we remove it again here
         # because the rest of the generator values don't have a blank prepended
@@ -964,12 +1009,37 @@ class PrimaryKey:
         self.combine_function = combine_function
         self._agen = agen
         self._gen = gen
+        self._header_is_a_row = header_is_a_row
+        self._errors = []
+        self._ignore_errors = False
 
-    def compute_primary(self, arecord):
-        return self.combine_function(tuple(arecord[index] for index in self.indexes))
+    def _compute_primary(self, arecord, i):
+        t = tuple(arecord[index] for index in self.indexes)
+        if bad_js := [j for j, v in zip(self.indexes, t) if v is None]:
+            mr, mcs = i + 1, [j + 1 for j in bad_js]  # FIXME row type vs col type
+            oof = ' '.join([
+                f'R{mc}C{mr}' if self._header_is_a_row else
+                f'R{mr}C{mc}' for mc in mcs])
+            msg = f'NULL detect in header primary key {oof}'
+            self._errors.append(msg)
+            ek = '-'.join([f'{i}:{j}' for j in bad_js])
+            return f'ERROR-KEY-{ek}'
+
+        return self.combine_function(t)
 
     def __iter__(self):
-        yield (self.name, *[self.compute_primary(ar) for ar in self._agen])
+        if self._ignore_errors:
+            if not hasattr(self, '_thing'):
+                raise AttributeError('should have already called this once ...')
+            yield (self.name, *self._thing)
+        else:
+            self._thing = [self._compute_primary(ar, i) for i, ar in enumerate(self._agen)]
+            if self._errors:
+                msg = '; '.join(self._errors)
+                raise exc.MalformedHeaderError(msg)
+
+            yield (self.name, *self._thing)
+
         yield from self._gen
 
     @property
@@ -996,6 +1066,8 @@ class MetadataFile(HasErrors):
     normalize_header = True
     normalize_mismatch_ok = tuple()
     normalize_alt_mismatch_ok = tuple()
+    allow_dupes_alt = False  # FIXME TODO allow_dupes will likely need to be version dependent
+    allow_dupes_header = False  # NOTE allow_dupes cannot override primary key non-normalized cases
     _expect_single = tuple()
 
     def __new__(cls, path, template_schema_version=None):
@@ -1333,13 +1405,13 @@ class MetadataFile(HasErrors):
                 # if header contains None fail immediately
                 # no gaps are allowed in tables
                 i = h.index(None) + 1
-                rt = self.default_record_type == ROW_TYPE
+                rt = self.default_record_type is ROW_TYPE
                 # yes the naming of default_record_type is confusing
                 header_is_a_row = rt and alt or not rt and not alt  # i.e. index is column number
                 ht = 'row' if header_is_a_row else 'col'
                 r, c = (1, i) if header_is_a_row else (i, 1)
-                msg = f'NULL value detected in header {ht} at R{r}C{c} in {self.path}'
-                raise exc.MalformedHeaderError(msg)
+                msg = f'NULL detected in header {ht} at R{r}C{c} in {self.path}'
+                return exc.MalformedHeaderError(msg)
 
         t = self._t()
 
@@ -1364,12 +1436,20 @@ class MetadataFile(HasErrors):
         except StopIteration as e:
             raise exc.NoDataError(f'{self.path}') from e
 
-        null_check(self.alt_header, alt=True)
+        null_alt = null_check(self.alt_header, alt=True)
         self._alt_header = Header(self.alt_header,
                                   normalize=self.normalize_alt,
                                   alt=True,
-                                  normalize_first_cell=self.normalize_header)
-        self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
+                                  normalize_first_cell=self.normalize_header,
+                                  allow_dupes=self.allow_dupes_alt,
+                                  record_type=self.default_record_type)
+        try:
+            self.norm_to_orig_alt = self._alt_header.lut(**self.renames_alt)
+            dupe_alt = None
+        except exc.MalformedHeaderError as e:
+            dupe_alt = e
+            self.norm_to_orig_alt = self._alt_header.lut(ignore_errors=True, **self.renames_alt)
+
         self.orig_to_norm_alt = safe_invert(self.norm_to_orig_alt)
         if self.normalize_header and self.alt_header[0] != self._alt_header.data[0]:
             msg = (f'Potentially bad alt header value {self.alt_header[0]!r} '
@@ -1383,20 +1463,43 @@ class MetadataFile(HasErrors):
                 logd.debug(msg)
 
         if self.primary_key_rule is not None:
-            nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]
-            gen = PrimaryKey(pk_name, combine_names, combine_function,
-                             nalt_header, agen, gen).generator
+            nalt_header = [self.orig_to_norm_alt[ah] for ah in self.alt_header]  # FIXME attr error incoming
+            pk = PrimaryKey(pk_name, combine_names, combine_function,
+                            nalt_header, agen, gen, self.default_record_type != ROW_TYPE)
+            gen = pk.generator  # XXX warning, stateful generator here
 
         # FIXME if the 'header' column is not at position zero
         # this will fail see version 1.1 subjects template for this
         # with a note that 1.1 had many issues
-        self.header = next(gen)
-        null_check(self.header)
+        try:
+            self.header = next(gen)
+            null_header = null_check(self.header)
+        except exc.MalformedHeaderError as e:
+            if self.primary_key_rule is not None:
+                null_header = e
+                # don't reassign gen as insurace that it will error if
+                # we somehow escape this function
+                pk._ignore_errors = True
+                self.header = next(pk.generator)  # XXX warning, stateful generator here
+                pk._ignore_errors = False  # reset to prevent leak
+            else:
+                # this branch should never happen but on the off
+                # chance that it does, just forward the issue
+                raise e
+
         self._header = Header(self.header,
                               normalize=self.normalize_header,
-                              normalize_first_cell=self.normalize_alt)
+                              normalize_first_cell=self.normalize_alt,
+                              allow_dupes=self.allow_dupes_header,
+                              record_type=self.default_record_type)
         # FIXME the case where someone has a capitalized subject_id
-        self.norm_to_orig_header = self._header.lut(**self.renames_header)
+        try:
+            self.norm_to_orig_header = self._header.lut(**self.renames_header)
+            dupe_header = None
+        except exc.MalformedHeaderError as e:
+            dupe_header = e
+            self.norm_to_orig_header = self._header.lut(ignore_errors=True, **self.renames_header)
+
         self.orig_to_norm_header = safe_invert(self.norm_to_orig_header)
         if self.normalize_alt and self.header[0] != self._header.data[0]:
             msg = (f'Potentially bad header value {self.header[0]!r} '
@@ -1405,7 +1508,8 @@ class MetadataFile(HasErrors):
             if self._header.data[0] not in self.normalize_alt_mismatch_ok:
                 logd.debug(msg)
 
-        _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)
+        common_cells = None
+        _matched = set(self.norm_to_orig_alt) & set(self.norm_to_orig_header)  # FIXME attr error incoming
         if _matched:
             if (self.record_type_key_header == self.record_type_key_alt and
                 {self.record_type_key_header} == _matched):
@@ -1419,7 +1523,13 @@ class MetadataFile(HasErrors):
                 # we may be able to fix this in the future but skip for now
                 msg = f'Common cells between alt header and header! {_matched}'
                 #log.warning(msg)  # can't quite error yet due to metadata_element
-                raise exc.MalformedHeaderError(msg)
+                common_cells = exc.MalformedHeaderError(msg)
+
+        mals = null_alt, dupe_alt, null_header, dupe_header, common_cells
+        if any(mals):
+            errors = [m for m in mals if m is not None]
+            msg = '; '.join([e.args[0] for e in errors])
+            raise exc.MalformedHeaderError(msg)
 
         yield self.header
         yield from gen
@@ -1450,6 +1560,8 @@ class SubmissionFile(MetadataFile):
 
     normalize_mismatch_ok = 'submission_item',
     normalize_alt_mismatch_ok = normalize_mismatch_ok
+    allow_dupes_alt = False
+    allow_dupes_header = False
 
     @property
     def data(self):
@@ -1541,6 +1653,7 @@ class DatasetDescriptionFile(MetadataFile):
     normalization_class = nml.NormDatasetDescriptionFile
     normalize_mismatch_ok = 'metadata_element',
     normalize_alt_mismatch_ok = normalize_mismatch_ok
+    allow_dupes_alt = False
     _expect_single = _nddfes
 
     @property
@@ -1569,6 +1682,7 @@ class PerformancesFile(MetadataFile):
     groups_alt = {'performances': GROUP_ALL,}
     normalization_class = nml.NormPerformancesFile
     normalize_header = False
+    allow_dupes_alt = False
     _expect_single = _nsffes
 
 
@@ -1599,6 +1713,7 @@ class SubjectsFile(MetadataFile):
     raw_json_class = rj.RawJsonSubjects
     normalization_class = nml.NormSubjectsFile
     normalize_header = False
+    allow_dupes_alt = False
     _expect_single = _nsffes
 
     @property
@@ -1614,10 +1729,6 @@ class SubjectsFilePath(ObjectPath):
 def join_cast(sep):
     """ oh look, you still can't use list comprehension in class scope """
     def sigh(t, sep=sep):
-        for _ in t:
-            if _ is None:
-                raise exc.BadDataError('A primary key value was None!')
-
         return sep.join(tuple(str(_) for _ in t))
 
     return sigh
@@ -1652,6 +1763,7 @@ class SamplesFile(SubjectsFile):
                       'handedness': 'right',}]]
     normalization_class = nml.NormSamplesFile
     normalize_header = False
+    allow_dupes_alt = False
     _expect_single = _nsffes
 
 
@@ -1669,6 +1781,7 @@ class SitesFile(SubjectsFile):
     ignore_alt = 'additional_fields_e_g__minds',
     ignore_match = []
     normalize_header = False
+    allow_dupes_alt = False
     _expect_single = _nsffes
 
 
@@ -1687,6 +1800,7 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
     record_type_key_header = 'metadata_element'
     groups_alt = {'manifest_records': GROUP_ALL}
     normalize_header = False
+    allow_dupes_alt = False
     #raw_json_class = rj.RawJsonManifestFile  # FIXME TODO sigh
     #_expect_single = _nsman
 
@@ -1742,6 +1856,7 @@ class PatternManifestFile(ManifestFile):
     record_type_key_header = 'metadata_element'
     groups_alt = {'manifest_records': GROUP_ALL}
     normalize_header = False
+    allow_dupes_alt = False
 
 
 class ManifestFilePath(ObjectPath):
