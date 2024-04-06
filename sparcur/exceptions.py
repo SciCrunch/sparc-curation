@@ -114,13 +114,15 @@ class CouldNotNormalizeError(SparCurError):
 
 class TabularCellError(SparCurError):
     """ signal that an error has occured in a particular cell """
-    def __init__(self, msg, *, value=None, location=None):
+    def __init__(self, msg, *, value=None, location=tuple(), debug_site=None):
+        self.debug_site = debug_site
         self.value = value
-        self.location = location  # usually set after the fact
-        if location:
-            msg = f'{msg} at {location}'
+        self.location = location
 
         super().__init__(msg)
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self.location} {self.debug_site} {self.value!r} {self.args}>'
 
 
 class LengthMismatchError(SparCurError):

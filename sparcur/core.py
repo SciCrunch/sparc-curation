@@ -9,6 +9,7 @@ from collections import deque, defaultdict
 import idlib
 import rdflib
 import ontquery as oq
+import augpathlib as aug
 from idlib.formats import rdf as _bind_rdf  # imported for side effect
 from ttlser import CustomTurtleSerializer
 from xlsx2csv import Xlsx2csv, SheetNotFoundException
@@ -304,12 +305,14 @@ class HasErrors:
             #o['error_type'] = None  # FIXME probably want our own? XXX nearly all error objects do not have type as a key
 
         elif isinstance(e, BaseException):
-            o['message'] = str(e)
-            o['error_type'] = str(type(e))
+            # we should deal with conversion in JEncode not here
+            o['message'] = e
+            o['error_type'] = type(e)
 
         else:
             raise TypeError(repr(e))
 
+        # XXX FIXME inability to check manifest on sparse produces many errors that defeats the purpose of sparse
         log.log(9, o)  # too verbose for normal debug
         return o
 
@@ -504,6 +507,14 @@ def json_export_type_converter(obj):
     elif isinstance(obj, BaseException):
         # FIXME hunt down where these are sneeking in from
         return repr(obj)
+    elif isinstance(obj, type):
+        # it's a class
+        if issubclass(obj, aug.AugmentedPath):
+            obj = obj._abstract_class()
+        return {
+            'type': 'python_class',
+            'module.name': f'{obj.__module__}.{obj.__name__}',
+        }
 
 
 class JEncode(json.JSONEncoder):
@@ -1540,11 +1551,14 @@ def get_by_invariant_path(errors):
 def make_path_error_report(by_invariant_path):
     # FIXME to obtain the full final path you have to know where
     # if anywhere the schema being validated is located in the output
+    def key(v):
+        return str(v)
+
     path_error_report = {JPointer.fromList(['-1' if e is int else str(e)
                                             # -1 to indicate all instead of *
                                             for e in k]):
                          {'error_count': len(v),
-                          'messages': sorted(set(e['message'] for e in v))}
+                          'messages': sorted(set(e['message'] for e in v), key=key)}
                          for k, v in by_invariant_path.items()}
     return path_error_report
 

@@ -1,6 +1,7 @@
 import io
 import csv
 import copy
+from json import dumps as jd
 from types import GeneratorType
 from itertools import chain, zip_longest
 from collections import Counter, defaultdict
@@ -962,7 +963,7 @@ class Tabular(HasErrors):
     def __repr__(self):
         limit = 30
         rows = [[c[:limit] + ' ...' if isinstance(c, str)
-                 and len(c) > limit else c
+                 and len(c) > limit else ('' if c is None else c)
                  for c in r] for r in self]
         table = AsciiTable(rows, title=self.title)
         return table.table
@@ -1209,8 +1210,61 @@ class MetadataFile(HasErrors):
         return crv
 
     def _normalize_values(self):
-        nc = self.normalization_class(self)  # calls _normalize_keys internally
-        return nc.data
+        nc = self.normalization_class(self)  # calls _clean internally
+        d = nc.data
+
+        def munge(eblob):
+            e = eblob['message']
+            path = eblob['file_path']
+            r, c, rn, cn = process_path(e.location[-1])
+            new_message = f'Problem with tabular cell :at R{r}C{c} {jd(rn)} {jd(cn)} :issue {e.args[0]} :in {jd(path.as_posix())}'
+            eblob['message'] = new_message
+            eblob['row'] = r
+            eblob['col'] = c
+            eblob['row_name'] = rn
+            eblob['col_name'] = cn
+            logd.error(new_message)
+            return eblob
+
+        # TODO now we are close to being able to invert the flow and
+        # write the normalized values back to the tabular rep and
+        # possibly even highlight bad values in red ...
+        def process_path(path):
+            a = None
+            h = None
+            an = None
+            hn = None
+            for elem in path:
+                if elem in self.groups_alt:
+                    pass
+
+                elif elem in self.norm_to_orig_header:
+                    if h is not None:
+                        raise ValueError('wat? how?')
+                    hn = self.norm_to_orig_header[elem]
+                    h = self.header.index(hn)
+
+                elif elem in self.norm_to_orig_alt:
+                    if a is not None:
+                        raise ValueError('wat? how?')
+                    an = self.norm_to_orig_alt[elem]
+                    a = self.alt_header.index(an)
+
+            r, c = a + 1, h + 1
+            rn, cn = an, hn
+            if not self._header._header_is_a_row:
+                r, c = c, r
+                rn, cn = cn, rn
+
+            return r, c, rn, cn
+
+        if errors := 'errors' in d and d['errors']:
+            d['errors'] = [
+                munge(e)
+                if 'error_type' in e and e['error_type'] is exc.TabularCellError
+                else e for e in errors]
+
+        return d
 
     def _clean(self):
         data_in = self._expand_string_lists()
@@ -1521,7 +1575,7 @@ class MetadataFile(HasErrors):
                 # this has to be fatal because it violates assumptions made by
                 # downstream code that are useful to deal with nesting
                 # we may be able to fix this in the future but skip for now
-                msg = f'Common cells between alt header and header! {_matched}'
+                msg = f'Common cells between alt and header! {_matched}'
                 #log.warning(msg)  # can't quite error yet due to metadata_element
                 common_cells = exc.MalformedHeaderError(msg)
 
@@ -1529,7 +1583,13 @@ class MetadataFile(HasErrors):
         if any(mals):
             errors = [m for m in mals if m is not None]
             msg = '; '.join([e.args[0] for e in errors])
-            raise exc.MalformedHeaderError(msg)
+            e = exc.MalformedHeaderError(msg)
+            # TODO figure out which of these are actually fatal? (e.g. bijection failures)
+            if self.addError(
+                    e, pipeline_stage='MetadataFile._headers',
+                    blame='submission',
+                    path=self.path):
+                logd.error(msg)
 
         yield self.header
         yield from gen

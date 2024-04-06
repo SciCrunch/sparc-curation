@@ -243,6 +243,11 @@ def levenshteinDistance(s1, s2):
 def change_rcs(read_path, write_path, row_column_funs):
     """ write a csv to a new file changing specific cells
     row_column_funs: [[r, c, lambda cell: new_value] ...] """
+    if read_path == write_path:
+        # TODO either all into memory or tmp and mv after
+        msg = 'no one likes suddenly empty files'
+        raise NotImplementedError(msg)
+
     import csv
     rcf = {}
     for r, c, f in row_column_funs:

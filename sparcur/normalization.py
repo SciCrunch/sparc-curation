@@ -3,6 +3,7 @@
 import numbers
 import datetime
 from ast import literal_eval
+from json import dumps as jd
 from types import GeneratorType
 from html.parser import HTMLParser
 import idlib
@@ -256,7 +257,7 @@ class NormAward(NormSimple):
             n = n[:-2]
 
         if n.endswith('D23864'):  # FIXME another trailing zero
-            log.critical(_ovalue)
+            logd.critical(_ovalue)
             n = n.replace('D23864', 'D023864')
 
         if n != _ovalue:
@@ -362,7 +363,7 @@ class NormContributorRole(str):
             normalized = best[1]
             cutoff = len(value) / 2
             if distance > cutoff:
-                msg = (f'"{value}" could not be normalized, best was {normalized} '
+                msg = (f'{jd(str(value))} could not be normalized, best was {normalized} '
                        f'with distance {distance} cutoff was {cutoff}')
                 raise exc.CouldNotNormalizeError(msg)
 
@@ -448,9 +449,7 @@ class NormValues(HasErrors):
             return value
 
     def _normv(self, thing, key=None, rec=None, path=tuple()):
-        cell_errors = []
-        #if 'software_rrid' in path:
-            #breakpoint()
+
         def skipt(th, _types=(numbers.Number, datetime.datetime, datetime.date, datetime.time)):
             # FIXME _types should cover all the extraneous types that thing could take on
             # specifically those produced by openpyxl
@@ -466,7 +465,7 @@ class NormValues(HasErrors):
                 if k == self._record_type_key_header:
                     gnv = lambda : v
                 elif intermediate:
-                    gnv = lambda : self._normv(v, key, rec, path)
+                    gnv = lambda : self._normv(v, key, rec, path + (k,))
                 elif k in self._norm_to_orig_alt:
                     gnv = lambda : self._normv(v, k, i, path + (k,))
                 elif process_group:
@@ -479,42 +478,8 @@ class NormValues(HasErrors):
                     out[k] = nv
                 except exc.NotApplicableError:
                     pass
-                except exc.TabularCellError as e:
-                    # strip the error and log it
-                    out[k] = e.value
-                    # since out is mutable here it will continue to update
-                    if rec is None or process_group:  # aka rec is None
-                        if rec is None:
-                            kmsg = f'.{k}'
-                        else:
-                            kmsg = f'.{key}'
-
-                        if self.addError(str(e),
-                                         pipeline_stage=f'{self.__class__.__name__}{kmsg}',
-                                         blame='submission'):
-                            log.critical(e)
-                        #if isinstance(out[k], dict):
-                            #self.embedLastError(out[k])
-
-                    else:
-                        if not intermediate and self.embed_bad_key_message:
-                            self.errorInKey(out, k)
-
-                        location = rec, i
-                        new_e = exc.TabularCellError(str(e), value=out, location=location)
-                        cell_errors.append(new_e)
 
             # end for
-            if cell_errors:
-                if len(cell_errors) != 1:
-                    e = exc.TabularCellError(str(cell_errors),
-                                             value=out,
-                                             location=[e.location for e in cell_errors])
-                else:
-                    e = cell_errors[0]
-
-                raise e 
-
             return out
 
         elif is_list_or_tuple(thing):
@@ -523,26 +488,9 @@ class NormValues(HasErrors):
             out = []
             _errors = []
             for i, v in enumerate(thing):
-                try:
-                    o = self._normv(v, key, i, path + (list,))
-                    out.append(o)
-                except exc.TabularCellError as e:
-                    out.append(None)  # will be replaced in the if errors block
-                    _errors.append((i, e))
-
-            errors = [(i, e) for i, e in enumerate(out)
-                      if isinstance(e, exc.TabularCellError)]
-            errors = errors + _errors
-
-            if errors:
-                cell_errors = [e for i, e in errors]
-                for i, e in errors:
-                    out[i] = e.value
-
-                e = exc.TabularCellError(str(cell_errors),
-                                         value=out,
-                                         location=[e.location for e in cell_errors])
-                raise e
+                #o = self._normv(v, key, i, path + (list,))
+                o = self._normv(v, key, i, path + (i,))
+                out.append(o)
 
             return out
 
@@ -561,25 +509,16 @@ class NormValues(HasErrors):
 
             if isinstance(key, str) and hasattr(self, key):
 
+                self._context = rec, key, path  # FIXME lol evil
                 out = getattr(self, key)(thing)
+                delattr(self, '_context')
 
                 if isinstance(out, GeneratorType):
+                    self._context = rec, key, path  # FIXME evil due
+                    # to generators allowing other things to proceed
+                    # which might have different _context
                     out = tuple(out)
-                    errors = [(i, e) for i, e in enumerate(out)
-                              if isinstance(e, exc.TabularCellError)]
-
-                    if errors:
-                        cell_errors = [e for i, e in errors]
-                        out = [_ for _ in out]
-                        for i, e in errors:
-                            out[i] = e.value
-
-                        out = tuple(out)
-                        e = exc.TabularCellError(str(cell_errors),
-                                                 value=out,
-                                                 location=[e.location for e in cell_errors])
-                        # FIXME this appears to cause double wrapping in tuples again >_<
-                        raise e
+                    delattr(self, '_context')
 
                     if (len(out) == 1 and (key in self._obj_inst._expect_single or
                                            isinstance(out[0], Quantity))
@@ -589,12 +528,13 @@ class NormValues(HasErrors):
                         # but keep an eye out in which case we can check the schema type
                         # FIXME bad test around Quantity
                         out = out[0]
+
                     elif not out:
                         if isinstance(thing, str):
                             thing = thing.strip() # sigh
 
                         if thing is not None and thing != '':
-                            msg = f'Normalization {key} returned None for input "{thing}"'
+                            msg = f'Normalization {key} returned None for input {jd(str(thing))}'
                             if self.addError(msg,
                                              pipeline_stage=f'{self.__class__.__name__}.{key}',
                                              blame='pipeline',):
@@ -604,9 +544,6 @@ class NormValues(HasErrors):
 
             else:
                 out = thing
-
-            if isinstance(out, exc.TabularCellError):
-                raise out
 
             return out
 
@@ -655,7 +592,7 @@ class NormDatasetDescriptionFile(NormValues):
         try:
             return int(value)
         except ValueError as e:
-            if self.addError(str(e),
+            if self.addError(e,
                              pipeline_stage=f'{self.__class__.__name__}',
                              blame='submission',):
                 logd.exception(e)
@@ -734,7 +671,6 @@ class NormDatasetDescriptionFile(NormValues):
                 return
 
         try:
-            #log.debug(f"{v} '{self.path}'")
             orcid = idlib.Orcid(v)  # XXX possible encapsulation issue
             if not orcid.identifier.checksumValid:  # FIXME should not handle this with ifs ...
                 # FIXME json schema can't do this ...
@@ -754,36 +690,31 @@ class NormDatasetDescriptionFile(NormValues):
     def contributor_role(self, value):
         # FIXME normalizing here momentarily to squash annoying errors
         cell_error = ''
-        def echeck(original):
+        def echeck(original, j):
             orig = original.strip()
             try:
                 return NormContributorRole(orig)
             except exc.CouldNotNormalizeError as e:
-                #self.addError(e,
-                              #pipeline_stage=f'{self.__class__.__name__}.contributor_role',
-                              #blame='submission',
-                              #path=self._path)
-                emsg = f'Bad value: "{orig}"'
-                nonlocal cell_error
-                if cell_error:
-                    cell_error = cell_error + ', ' + emsg
-                else:
-                    cell_error = emsg
+                ne = exc.TabularCellError(
+                    e.args[0],
+                    value=orig,
+                    location=(j, *self._context),
+                    debug_site=800,)
+                self.addError(ne,  # logged later when coords can be reconstructed
+                              pipeline_stage=f'{self.__class__.__name__}.contributor_role',
+                              blame='submission',
+                              path=self._path,)
 
                 return orig
 
         def elist(vl):
-            rv = tuple(sorted([o for o in set(echeck(e) for e in vl
+            rv = tuple(sorted([o for o in set(echeck(e, j) for j, e in enumerate(vl)
                                               # have to filter here ourselves
                                               # since clean didn't function ...
                                               # unless ... we add an expand lists step ...
                                               # HRM, interesting
                                               if e is not None and e != '')
                                if o]))
-            nonlocal cell_error
-            if cell_error:
-                rv = tuple(exc.TabularCellError(cell_error, value=v) for v in rv)
-
             return rv
 
         if is_list_or_tuple(value):
@@ -836,7 +767,7 @@ class NormDatasetDescriptionFile(NormValues):
                     #yield f'ERROR VALUE: {value}'  # FIXME not sure if this is a good idea ...
                     # it is not ...
                     _ps = f'{self.__class__.__name__}.protocol_url_or_doi'
-                    if self.addError(str(e), pipeline_stage=_ps):
+                    if self.addError(e, pipeline_stage=_ps):
                         logd.error(e)
 
                     _pp = self._path.as_posix()
@@ -960,7 +891,7 @@ class NormSubjectsFile(NormValues):
             pv = self.pyru.UnitsParser(value, rest_ok=False).asPython()
         except self.pyru.UnitsParser.IncompleteParse as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
-            msg = f'Incomplete parse for "{value}" for {caller_name}'
+            msg = f'Incomplete parse for {jd(str(value))} for {caller_name}'
             if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline'):
                 log.error(msg)
 
@@ -969,7 +900,7 @@ class NormSubjectsFile(NormValues):
 
         except self.pyru.UnitsParser.ParseFailure as e:
             caller_name = e.__traceback__.tb_frame.f_back.f_code.co_name
-            msg = f'Unexpected and unhandled value "{value}" for {caller_name}'
+            msg = f'Unexpected and unhandled value {jd(str(value))} for {caller_name}'
             if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='pipeline'):
                 log.error(msg)
 
@@ -996,7 +927,7 @@ class NormSubjectsFile(NormValues):
     def age(self, value):
         if value in ('adult',):
             msg = (f'Bad value for age: {value}\ndid you want to put that in age_cagegory instead?\n'
-                   f'"{self._path}"')
+                   f'{jd(self._path.as_posix())}')
             logd.error(msg)
             self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
                           path=self._path)
@@ -1022,7 +953,7 @@ class NormSubjectsFile(NormValues):
         if value in ('Normal',):
             msg = (f'Bad value for age_range_max: {value}\n'
                    'did you want to put that in age_cagegory instead?\n'
-                   f'"{self._path}"')
+                   f'{jd(str(self._path.as_posix()))}')
             if self.addError(msg, pipeline_stage=self.__class__.__name__, blame='submission',
                              path=self._path):
                 logd.error(msg)
