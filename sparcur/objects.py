@@ -40,12 +40,13 @@ import augpathlib as aug
 from pyontutils.asyncd import Async, deferred
 from sparcur import exceptions as exc
 from sparcur.paths import Path
-from sparcur.utils import register_type, log as _log
+from sparcur.utils import register_type, log as _log, logd as _logd
 from sparcur.config import auth
-from sparcur.core import JEncode
+from sparcur.core import JEncode, HasErrors
 from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId
 
 log = _log.getChild('sob')
+logd = _logd.getChild('sob')
 
 __extract_version__ = 0
 __combine_version__ = 0
@@ -94,6 +95,7 @@ def test():
     #tds = ttds
     tds = '645267cb-0684-4317-b22f-dd431c6de323'  # small dataset with lots of manifests
     # tds = '21cd1d1b-9434-4957-b1d2-07af75ad3546'  # big xml test sadly too many files (> 80k) to be practical for testing
+    #tds = '46bcac1d-3e45-499b-82a8-0ee1852bcc4d'  # manifest column naming issues
     tds = '57466879-2cdd-4af2-8bd6-7d867423c709'  # has vesselucida files
     tds = '3bb4788f-edab-4f04-8e96-bfc87d69e4e5'  # much better, only 100ish files with xmls
     dataset_path = (Path('/home/tom/files/sparc-datasets/') / tds / 'dataset').resolve()
@@ -119,8 +121,30 @@ def test():
 
     create_current_version_paths()
 
-    updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=False, debug=True)
-    from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive)
+    updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=True)
+    drps, drp_index = from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive, keep_in_mem=True)
+
+    missing_from_inds = [d for d, h, ty, ta, mb in drps if not h and
+                         # we don't usually expect manifest entires for themselves
+                         # and we don't expect them for folders though they can be
+                         # used to apply metadata to folders
+                         ty not in ('inode/directory', 'manifest')]
+    if missing_from_inds:
+        log.error('missing_from_inds:\n' + '\n'.join(sorted([d.as_posix() for d in missing_from_inds])))
+    if drp_index:
+        # e.g. manifest records with no corresponding path
+        log.error('drp_index:\n' + '\n'.join(sorted([k.as_posix() for k in drp_index.keys()])))
+        # TODO embed somewhere somehow, probably in the dataset-uuid/dataset-uuid record?
+        # i.e. combine_export_path(dataset_id, datset_id)
+
+    blobs = [d[-1] for d in drps]
+    #with_xml_ref = [b for b in blobs if 'extracted' in b and 'xml' in b['extracted']['type']]
+    xml_files = [b for b in blobs if pathlib.PurePath(b['path_metadata']['dataset_relative_path']).suffix == '.xml']
+    xml_sources = [b for b in blobs if 'extracted' in b and 'xml' == b['extracted']['object_type']]  # FIXME annoying to query
+    apparent_targets = [x['external_records']['manifest']['input']['description'][26:] for x in xml_sources]
+    maybe_matches = [b for b in blobs if b['path_metadata']['basename'] in apparent_targets]
+
+    breakpoint()
 
 
 def create_current_version_paths():
@@ -328,12 +352,21 @@ def do_actually_extract(path):
         def extract_fun(path):
             # FIXME this need the template schema version to work ... at least in theory
             # the internals of the implementation mean that if it is missing it isn't fatal
-            mf = dat.ManifestFile(path)
-            data = mf.data
             extracted = {
                 'type': 'extracted-metadata',
                 'object_type': 'manifest',
             }
+            mf = dat.ManifestFile(path)
+            try:
+                data = mf.data
+            except Exception as e:
+                he = HasErrors(pipeline_stage='objects.manifest.extract_fun')
+                if he.addError(e, path=path):
+                    logd.exception(e)
+
+                he.embedErrors(extracted)
+                return extracted
+
             if 'manifest_records' in data:
                 # FIXME does contents have a defined type and is an object
                 # or can it very by object_type? at the moment it certainly
@@ -367,8 +400,10 @@ def do_actually_extract(path):
                     extracted['contents'] = e.asDict()
                     extracted['mimetype'] = e.mimetype
             except NotImplementedError as e:
-                he = dat.HasErrors(pipeline_stage='objects.xml.extract_fun')
-                he.addError(e, path=path)
+                he = HasErrors(pipeline_stage='objects.xml.extract_fun')
+                if he.addError(e, path=path):
+                    logd.exception(e)
+
                 he.embedErrors(extracted)
             except Exception as e:
                 log.error(f'xml extraction failure for {path!r}')
@@ -390,6 +425,8 @@ def extract(dataset_uuid, path_string, extract_fun=None):
 
     we convert back from dataset_uuid to simplify passing to subprocess
     """
+    he = HasErrors(pipeline_stage='objects.extract')
+
     dataset_id = RemoteId(dataset_uuid, type='dataset')
     path = Path(path_string)
     object_id = path.cache_identifier
@@ -411,8 +448,16 @@ def extract(dataset_uuid, path_string, extract_fun=None):
     if extract_fun:
         if path.is_file():
             # FIXME TODO ... kind of external vs internal type ...
-            extracted = extract_fun(path)  # FIXME really should be extract_fun(path)
-            blob['extracted'] = extracted
+            try:
+                extracted = extract_fun(path)  # FIXME really should be extract_fun(path)
+                blob['extracted'] = extracted
+            except Exception as e:
+                # unhandled excpetions case
+                if he.addError(e, path=path, pipeline_stage='objects.extract.extract_fun'):
+                    logd.exception(e)
+
+                he.embedErrors(blob)
+
             # expects type, extracted_type, contents
             # and have "extracted": {"type": "extracted-metadata-type", "object_type": "mbfxml", "some_property": "derp", "contents": [{}...]}
 
@@ -447,7 +492,7 @@ def extract(dataset_uuid, path_string, extract_fun=None):
         # JEncode minimally needed to deal with Path :/
         json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
-    msg = f'object metadata written to {export_path}'
+    msg = f'extract object metadata written to {export_path}'
     log.log(9, msg)
 
 
@@ -643,14 +688,23 @@ def pex_manifests(dataset_id, oids):
     def add_drp(manifest_drp, manifest_parent, rec):
         # XXX ah yes, that's why I wanted to implement my own PurePath variant ...
         # who the heck leaves simplify/normpath out !?!?!
-        drp = manifest_parent.__class__(os.path.normpath(manifest_parent / rec['filename']))
-        out = {
-            'type': 'manifest_record',  # a single manifest record for a file
-            'source': manifest_drp,
-            'dataset_relative_path': drp,  # make it easy to check consistency without fancy steps
-            'input': rec,  # FIXME vs inputs: [rec] to support multiple inputs technically allowed ... no, we need another way to handle that
-        }
-        return drp, out
+        if 'filename' in rec:
+            drp = manifest_parent.__class__(os.path.normpath(manifest_parent / rec['filename']))
+            out = {
+                'type': 'manifest_record',  # a single manifest record for a file
+                'source': manifest_drp,
+                'dataset_relative_path': drp,  # make it easy to check consistency without fancy steps
+                'input': rec,  # FIXME vs inputs: [rec] to support multiple inputs technically allowed ... no, we need another way to handle that
+            }
+            return drp, out
+        else:
+            # might be an improperly filled out pattern manifest
+            # the blob itself should already have an error though?
+            # but TODO we might want to embed again to be sure?
+            msg = ('manifest record is missing "filename" column !??!\n'
+                   f'{manifest_drp} {rec}')
+            log.warning(msg)
+            return None, None
 
     # we don't use .utils.fromJson here, I don't think we need it? or at least don't need it yet?
     drp_manifest_record_index = {}
@@ -669,7 +723,12 @@ def pex_manifests(dataset_id, oids):
         contents = extracted['contents']
         for c in contents:
             drp, rec = add_drp(manifest_drp, manifest_parent, c)
-            if drp in drp_manifest_record_index:
+            if drp is None:
+                # log.error('a malformed manifest has made it through to this stage')
+                # we logged above so just pass here or TODO embed an error in the
+                # manifest blob itself to be written during manifest combine?
+                pass
+            elif drp in drp_manifest_record_index:
                 msg = 'NotImplementedError TODO merge multiple to same file'
                 log.info(msg)
                 msg = (
@@ -705,6 +764,10 @@ def pex_xmls(dataset_id, oids):
                 'application/x.vnd.mbfbioscience.neurolucida+xml',
                 'application/x.vnd.mbfbioscience.vesselucida+xml',  # does have path_mbf
         ):
+            if 'images' not in contents:
+                # FIXME TODO logging
+                continue
+
             drps = [p for i in contents['images'] if 'path_mbf' in i for p in i['path_mbf']]
             for drp in drps:
                 rec = {
@@ -753,10 +816,13 @@ def combine(dataset_id, object_id, type, drp_index):
         # JEncode minimally needed to deal with Path :/
         json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
-    return drp, has_recs
+    msg = f'combine object metadata written to {combine_path}'
+    log.log(9, msg)
+
+    return drp, has_recs, blob
 
 
-def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive=None):
+def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive=None, keep_in_mem=False):
     types = {}
     for oid, type in object_id_types:
         if type is None:
@@ -799,21 +865,11 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
 
     drps = []
     for object_id, type in object_id_types:  # TODO sort these in reverse order so that errors can be added to e.g. manifests
-        drp, has_recs = combine(dataset_id, object_id, type, drp_index)
+        drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index)
         target = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
-        drps.append((drp, has_recs, type, target))
+        drps.append((drp, has_recs, type, target, (blob if keep_in_mem else None)))
 
-    missing_drps = [d for d, h, ty, ta in drps if not h and ty not in ('inode/directory', 'manifest')]
-    if missing_drps:
-        log.error('missing_drps:\n' + '\n'.join(sorted([d.as_posix() for d in missing_drps])))
-    if drp_index:
-        # e.g. manifest records with no corresponding path
-        log.error('drp_index:\n' + '\n'.join(sorted([k.as_posix() for k in drp_index.keys()])))
-        # TODO embed somewhere somehow, probably in the dataset-uuid/dataset-uuid record?
-        # i.e. combine_export_path(dataset_id, datset_id)
-
-    breakpoint()
-    pass
+    return drps, drp_index
 
 
 def single_file_extract(
