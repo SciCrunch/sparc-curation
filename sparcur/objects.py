@@ -813,7 +813,7 @@ def combine(dataset_id, object_id, type, drp_index):
     drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
     if (has_recs := drp in drp_index):
         blob['external_records'] = drp_index.pop(drp)
-    elif blob['path_metadata']['mimetype'] == 'inode/directory':
+    elif 'mimetype' in blob['path_metadata'] and blob['path_metadata']['mimetype'] == 'inode/directory':
         pass  # we don't expect dirs to have metadata (though they can)
     else:
         # manifests technically aren't required as of 2.1.0
