@@ -124,7 +124,7 @@ def test():
     updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=True)
     drps, drp_index = from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive, keep_in_mem=True)
 
-    missing_from_inds = [d for d, h, ty, ta, mb in drps if not h and
+    missing_from_inds = [d for d, h, ty, ta, ne, mb in drps if not h and
                          # we don't usually expect manifest entires for themselves
                          # and we don't expect them for folders though they can be
                          # used to apply metadata to folders
@@ -308,6 +308,7 @@ def index_obj_symlink_latest(dataset_id, object_id, index_version=None, do_link=
     clep = index_combine_latest_export_path(dataset_id, object_id)
     iop = index_obj_path(object_id, index_version=index_version)
     target = clep.relative_path_from(iop)
+    new = False
     if do_link:
         if not iop.parent.exists():
             iop.parent.mkdir(exist_ok=True, parents=True)
@@ -315,14 +316,16 @@ def index_obj_symlink_latest(dataset_id, object_id, index_version=None, do_link=
         if not iop.exists() and not iop.is_symlink():
             # can fail if we didn't also symlink the combine latest
             iop.symlink_to(target)
+            new = True
 
-    return target
+    return target, new
 
 
 def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link=False):
     caep = index_combine_archive_export_path(dataset_id, object_id)
     iop = index_obj_path(object_id, index_version=index_version)
     target = caep.relative_path_from(iop)
+    new = False
     if do_link:
         if not iop.parent.exists():
             iop.parent.mkdir(exist_ok=True, parents=True)
@@ -330,6 +333,7 @@ def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link
         if not iop.exists() and not iop.is_symlink():
             # can fail if we didn't also symlink the combine latest
             iop.symlink_to(target)
+            new = True
 
     return target
 
@@ -793,6 +797,12 @@ def pex_xmls(dataset_id, oids):
 
 def pex_dirs(dataset_id, oids):
     # TODO build the parent lookup index to replace parent_drp
+    # i think what we want to do is embed all the parents up to
+    # the one just before primary/derivative etc. since we have
+    # the sub- and sam- prefixes that can make it a single
+    # lookup to pull full subject metadata, because the id
+    # will literally be in the parents ... that turns out to
+    # be quite useful
     return {}
 
 
@@ -803,6 +813,8 @@ def combine(dataset_id, object_id, type, drp_index):
     drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
     if (has_recs := drp in drp_index):
         blob['external_records'] = drp_index.pop(drp)
+    elif blob['path_metadata']['mimetype'] == 'inode/directory':
+        pass  # we don't expect dirs to have metadata (though they can)
     else:
         # manifests technically aren't required as of 2.1.0
         msg = f'{dataset_id} {object_id} {drp} has no records of any kind'
@@ -864,11 +876,17 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
     # to retrieve that information ...
 
     drps = []
+    news = 0
     for object_id, type in object_id_types:  # TODO sort these in reverse order so that errors can be added to e.g. manifests
         drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index)
-        target = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
-        drps.append((drp, has_recs, type, target, (blob if keep_in_mem else None)))
+        target, new_link = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
+        if new_link:
+            news += 1
+        drps.append((drp, has_recs, type, target, new_link, (blob if keep_in_mem else None)))
 
+    log.info(f'finished combining and writing {len(drps)} and linking {new} object records for dataset {dataset_id}')
+    # TODO flag the objects that were deleted since the previous run and probably stick an xattr on them to
+    # make cleanup as simple as possible
     return drps, drp_index
 
 
