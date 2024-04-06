@@ -100,7 +100,7 @@ def description(value):
     return value
 
 
-def protocol_url_or_doi(value):
+def protocol_url_or_doi(value, __logged=set()):
     # FIXME network sandbox violation
     # FIXME can't use idlib.get_right_id because it is
     # totally broken with regard to dereferencing
@@ -123,7 +123,11 @@ def protocol_url_or_doi(value):
             raise exc.CouldNotNormalizeError(f'should already be in stream form {v!r}')
 
         try:
-            normed = v.dereference(idlib.get_right_id)  # TODO general check for resolvability?
+            normed = v.dereference(idlib.get_right_id)  # FIXME network sandbox issue
+            resp = normed.progenitor(type='stream-http')
+            if resp.status_code >= 400:  # REMINDER pio 400 + interal 1 == 404 >_<
+                resp.raise_for_status()
+
         except idlib.exc.MalformedIdentifierError as e:
             logd.error(e)
             # XXX WARNING returning value here might cause unexpcted errors
@@ -132,7 +136,10 @@ def protocol_url_or_doi(value):
             # will catch the error at a later stage
             return value
         except Exception as e:
-            logd.error(e)
+            se = str(e)
+            if se not in __logged:
+                logd.error(e)
+                __logged.add(se)
             return value
 
         if isinstance(normed, idlib.Pio):
