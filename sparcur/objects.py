@@ -884,7 +884,7 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
             news += 1
         drps.append((drp, has_recs, type, target, new_link, (blob if keep_in_mem else None)))
 
-    log.info(f'finished combining and writing {len(drps)} and linking {new} object records for dataset {dataset_id}')
+    log.info(f'finished combining and writing {len(drps)} and linking {news} object records for dataset {dataset_id}')
     # TODO flag the objects that were deleted since the previous run and probably stick an xattr on them to
     # make cleanup as simple as possible
     return drps, drp_index
