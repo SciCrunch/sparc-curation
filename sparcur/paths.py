@@ -604,6 +604,7 @@ class PennsieveDiscoverCache(PrimaryCache, EatCache):
 
     _jsonMetadata = BFPNCacheBase._jsonMetadata
     populateJsonMetadata = BFPNCacheBase.populateJsonMetadata
+    cypher = None
 
     @property
     def identifier(self):
@@ -822,7 +823,7 @@ class PathHelper:
 
         blob = {
             'type': 'path',
-            'dataset_id': dsid.curie,
+            'dataset_id': dsid,
             'dataset_relative_path': drp,
             'basename': self.name,  # for sanity's sake
         }
@@ -915,6 +916,7 @@ class PathHelper:
             return self._xattr_meta
 
     def _cache_jsonMetadata(self, do_expensive_operations=False):
+        # XXX REMINDER changes here should bump __pathmeta_version__ in objects.py
         blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
         project_meta = project_path.cache_meta
         meta = self.cache_meta  # FIXME this is very risky
@@ -931,10 +933,21 @@ class PathHelper:
         if self.xattr_prefix in ('bf', 'pn'):
             _, bf_id = meta.id.split(':', 1)  # FIXME SODA use case
             idc = self._cache_class._id_class
-            remote_id = (idc(bf_id, file_id=meta.file_id)
-                        if self.is_file() or self.is_broken_symlink() else
-                        idc(bf_id))
+            if meta.parent_id:
+                _, bf_parent = meta.parent_id.split(':', 1)
+                parent_id = idc(bf_parent)
+            else:
+                parent_id = None
+
+            try:
+                remote_id = (idc(bf_id, file_id=meta.file_id)
+                             if self.is_file() or self.is_broken_symlink() else
+                             idc(bf_id))
+            except Exception as e:
+                breakpoint()
+                raise e
         elif self.xattr_prefix in ('pd',):
+            parent_id = None  # missing from discover
             remote_id = self.cache_identifier
         else:
             msg = f'unknown xattr prefix {self.xattr_prefix!r}'
@@ -945,6 +958,12 @@ class PathHelper:
         uri_human = remote_id.uri_human(
             organization=project_path.cache_identifier,
             dataset=dsid)
+
+        if parent_id:  # FIXME parent_id should probably be required
+            # given that we try to keep transitive meta closed under
+            # it, but in some cases (e.g. pd) we can't eforce it here?
+            blob['parent_id'] = parent_id
+
         blob['remote_id'] = remote_id
         #blob['timestamp_created'] = meta.created  # leaving this out
         blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
@@ -974,11 +993,20 @@ class PathHelper:
                 # FIXME TODO figure out when to log this
                 # probably only log when there is a dataset id
                 return
+            except Exception as e:
+                breakpoint()
+                pass
             # this is not always needed so it is not included by default
             # but we do need it here for when we generate the rdf export
             p = cjm['dataset_relative_path'].parent
             if p.name != '':  # we are at the root of the relative path aka '.'
                 cjm['parent_drp'] = p
+                # FIXME parent_id is embedded in the meta now right?
+                # however the question is what we should do if something
+                # has been reparented locally ...
+                # XXX the fact that we don't use _transitive_metadata for diff and push
+                # is probably why this has splipped through until now but might need to
+                # need to differentiate current_parent_id from cache_parent_id !!!
             return cjm
 
         def sort_dirs_first(d):
@@ -1002,8 +1030,21 @@ class PathHelper:
         for m in metadata:
             p = m.pop('parent_drp', None)
             if p in index:
-                m['parent_id'] = index[p]['remote_id']
+                current_parent_id = index[p]['remote_id']
+                if current_parent_id != m['parent_id']:
+                    msg = f'SOMETHING MOVED! {current_parent_id} != {parent_id} for {self}'
+                    log.critical(msg)
+                    m['current_parent_id'] = current_parent_id
             else:
+                # this branch correctly resets parent_id to pid
+                # while it is technically wrong for subfolders,
+                # and is even technically wrong for datasets,
+                # it means that there will not be a null pointer
+                # to something which is not in the full list
+                if 'parent_id' in m:
+                    # put the null pointer somewhere else
+                    m['external_parent_id'] = m['parent_id']
+
                 m['parent_id'] = pid
 
         return metadata, transitive_updated

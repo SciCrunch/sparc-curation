@@ -57,7 +57,7 @@ __combine_version__ = 0
 __index_version__ = 0
 
 sf_dir_name = 'objs'  # this really is more of an objects index ...
-sf_export_base = Path(auth.get_path('export-path')) / sf_dir_name
+sf_export_base = Path(auth.get_path('export-path')) / sf_dir_name  # TODO ensure configable for testing switching versions
 
 pathmeta_dir_name = 'pathmeta'
 extract_dir_name = 'extract'
@@ -446,6 +446,7 @@ def extract(dataset_uuid, path_string, object_type_raw=None, extract_fun=None):
         blob = {  # FIXME duplicate hierarchies here, all this holds is that there was a generic extract here allow individuale extract funs to return whatever they want ... and have differnt keys ...
             '__extract_version__': __extract_version__,
             'type': 'extract-object-metadata',
+            'remote_id': object_id,
         }
         # FIXME TODO ... kind of external vs internal type ...
         try:
@@ -458,29 +459,53 @@ def extract(dataset_uuid, path_string, object_type_raw=None, extract_fun=None):
 
             he.embedErrors(blob)
 
-        # expects type, extracted_type, contents
-        # and have "extracted": {"type": "extracted-metadata-type", "object_type": "mbfxml", "some_property": "derp", "contents": [{}...]}
-
-        # XXX FIXME so much tangling in here ...
-        #object_type, contents = extract_fun(path, blob)
-        # FIXME where to put expected content type ...
-        # e.g. that this is a manifest ... the current approach is not so great iirc
-        # things we know how to process, manifest, xml, jpx, etc.
-        #blob['object_type_raw'] = object_type_raw   # FIXME naming also expected vs post analysis re: types of xml
-        #blob['object_type'] = object_type   # FIXME naming XXX or maybe object_type_raw can imply other top level keys?
-        #blob['contents'] = contents
-
         export_path = extract_export_path(dataset_id, object_id)
         if not export_path.parent.exists():
             export_path.parent.mkdir(exist_ok=True, parents=True)
 
-        # TODO almost certainly need parent_drp so that it can be resolved in combine
-        # TODO likely need to modify the type to be "object_meta" instead of path
-        # and there will be no reverse mapping to an object at the moment
-        # the alternative would be to have a top level "path_metadata" property
-        # that simply contained the path meta, and we can pull remote_id out as the
-        # id for the object itself, then we can put "contents" for files that we
-        # extract from and have another property for "derived_from_elsewhere" or whatever
+        # FIXME TODO depending on what the workloads look like in prod
+        # we can optimize to avoid writes by taking an extra read in cases
+        # where we ignore the version, if nothing changed for that file
+        # in particular, in those cases we will want to create a symlink
+        # from the new version to the old version which will take up much
+        # less space, and provide a clear record of what actually changed
+        # it also means that the embedded version number and the path can
+        # differ, but if they do it means that the version update did not
+        # affect that file ...
+        previous_version = __extract_version__ - 1
+        if previous_version >= 0:
+            previous_path = extract_export_path(extract_version=previous_version)
+            if previous_path.exists():
+                previous_blob = path_json(previous_path)
+                for_comparison = json.loads(json.dumps(blob, cls=JEncode))
+                # FIXME TODO ... if this winds up being more efficient
+                # then do we need to embed the version at all ????
+                # the key question is about the cost of storage and
+                # network calls required to rerun an extract and avoiding
+                # doing that every time if we know nothing has changed ...
+                # so yes, I think we still need versions to minimize
+                # reruns, and we might need to roll with more inodes than
+                # default, but otherwise the space cost for the symlinks
+                # should be effectively zero because they are preallocated
+                # by the filesystem (if in the ext lineage)
+
+                # TODO a routine that detects old version folders where
+                # all files are symlinks and relinks the folder as a whole
+                # so that e.g. a whole dataset could be linked if all its
+                # objects were links with no files
+                previous_blob.pop('__extract_version__')
+                for_comparison.pop('__extract_version__')
+                if previous_blob == for_comparison:
+                    fp = previous_path.resolve()
+                    target = fp.relative_path_from(export_path)
+                    breakpoint()
+                    export_path.symlink_to(target)
+                    msg = f'extract object metadata matches previous so linked to {target}'
+                    log.log(9, msg)
+                    return
+                else:
+                    breakpoint()
+
         with open(export_path, 'wt') as f:
             json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
@@ -488,10 +513,9 @@ def extract(dataset_uuid, path_string, object_type_raw=None, extract_fun=None):
         log.log(9, msg)
 
     else:
-        # XXX FIXME TODO right now we only process files that
-        # we have already retrieved because setting up the
-        # iterative extract, fetch, extract, fetch process is
-        # too much
+        # XXX FIXME TODO atm we only process files that
+        # have been fetched because setting up the iterative
+        # extract, fetch, extract, fetch process is too much
         msg = f'not extracting because not fetched {path.name}'
         log.warning(msg)
 
@@ -512,12 +536,11 @@ def object_logdir(object_id):
 
 def pathmeta_ir(blob):
     keyf = {
-        #'dataset_id': RemoteId,  # FIXME for some reason _cache_jsonMeta doesn't convert this ???
+        'dataset_id': RemoteId,
         'dataset_relative_path': Path,
-        #'remote_id': RemoteId,
+        'parent_id': RemoteId,
         'size_bytes': aug.FileSize,
         'timestamp_updated': dateparser.parse,
-        'parent_drp': Path, 
     }
     nb = {k: (keyf[k](v) if k in keyf else v) for k, v in blob.items()}
 
@@ -540,12 +563,16 @@ register_type(_pathmeta_ir, 'pathmeta')
 
 
 def pathmeta_refresh(dataset_id, object_id, path, force=False):
+
     blob = path._cache_jsonMetadata()
     blob['type'] = 'pathmeta'  # you can't actually invert everything back to Path because Path is only the name
     blob['__pathmeta_version__'] = __pathmeta_version__
-    p = blob['dataset_relative_path'].parent
-    if p.name != '':  # we are at the root of the relative path aka '.'
-        blob['parent_drp'] = p
+
+    # XXX note that the inclusion of dataset_relative_path means that
+    # any moves or renames that happen up the hierarchy will cause
+    # pathmeta to change this is probably ok since it avoids the many
+    # network calls that would otherwise be required to reconstruct
+    # the drp
 
     export_path = pathmeta_version_export_path(dataset_id, object_id)
     changed = True  # default true so nothing -> something is changed
@@ -585,10 +612,11 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
         updated = path.updated_cache_transitive()  # something of a hack
 
 
-    pathmeta_blob, pathmeta_changed = pathmeta_refresh(dataset_id, object_id, path)
+    pathmeta_blob, pathmeta_changed = pathmeta_refresh(dataset_id, object_id, path)  # FIXME TODO in point of fact this can run in parallel with extract because there is not any necessary interaction until combine
 
     export_path = extract_export_path(dataset_id, object_id)
-    done = export_path.exists() and not pathmeta_changed  # FIXME this is obviously wrong, e.g. what happens if the remote changes the file name or moves a file? we need a bit more info related update times or reparents, for now we will have to run time force=True to avoid stale, or we run with force=True when it is publication time, OR we don't store pathmeta at all and always rederive it during extract ... that seems better, yes ...
+    done = export_path.exists()  # and not pathmeta_changed  # FIXME we don't need to rerun the export if the pathmeta changed ... the id does not change
+    # FIXME this is obviously wrong, e.g. what happens if the remote changes the file name or moves a file? we need a bit more info related update times or reparents, for now we will have to run time force=True to avoid stale, or we run with force=True when it is publication time, OR we don't store pathmeta at all and always rederive it during extract ... that seems better, yes ...
     object_type_raw, fetch_fun, extract_fun = do_actually_extract(path)
     # FIXME hard to pass extract_fun directly so would have to
     # rederive in subprocess version not that I think we will be using
@@ -704,6 +732,9 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     # being more efficient to start from here
     rchildren = transitive_paths(dataset_path)
     if True:  # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
+        # how do we handle the dataset itself (it would be nice to just put the metadata there ...)
+        # also, how do we deal with organizations, there is nothing to extract so to speak ... maybe they are dealt with at the
+        # combine level ... yes, I think we are ok to skip dataset and org at this point and deal with them at combine
         results = [subprocess_extract(dataset_id, path, time_now, force=force, debug=debug, subprocess=False) for path in rchildren]
     else:
         # XXX FIXME LOL yeah, maybe don't run this with a completely open async because it will spawn n processes
@@ -829,6 +860,7 @@ def pex_manifests(dataset_id, oids, name_drp_index=None, **inds):
                     f'from {drp} and {drp_manifest_record_index[target_drp]["prov"]["source_drp"]}')
                 log.error(msg)
                 # FIXME TODO embed error in rec
+                breakpoint()
                 continue
             else:
                 drp_manifest_record_index[target_drp] = rec
@@ -921,6 +953,7 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                         rec['prov']['mapped_by'] = 'exact-pathname-match'
                         target_drp, = candidates
                     else:
+                        log.log(9, f'multiple candidates for mbf path in {drp} {target_mbf_path} {candidates}')
                         breakpoint()
                 else:
 
@@ -930,7 +963,7 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                         return nn, nums, set(nums)
 
                     def entcomp(nums1, nums2):
-                        both = set(nums1) & set(nums2)
+                        both = nums1 & nums2
                         return sum(log2(n) for n in both)
 
                     suffix = target_mbf_path.suffix
@@ -940,41 +973,35 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                         jn = [n[0] for n in lev_subset]
                         tmpname = target_mbf_path.name
                         tmp_no, tmp_nums, tmp_sn = numonly(tmpname)
+                        tmp_self_comp = entcomp(tmp_sn, tmp_sn)
                         #[(n, no) for n, no in lev_subset if all([num in no.split() for num in tmp_no.split()])]
                         #hrm = sorted([(entcomp(tmp_nums, nums), n, nums) for n, no, nums in lev_subset], reverse=True)
-
+                        log.log(9, f'tmp_self_comp {tmp_self_comp}')
                         levs = sorted((
-                            - entcomp(tmp_nums, snums),
-                            #levenshteinDistance(tmp_no, no),
+                            1 - ((
+                                #comp :=
+                                entcomp(tmp_sn, snums)) / tmp_self_comp),
                             levenshteinDistance(tmpname, n),
+                            #comp,
                             n, no) for n, no, nums, snums in lev_subset)
 
-                        rep = [(0, 0, 0, tmpname, tmp_no)] + levs
+                        rep = [(0.0,
+                                0.0,
+                                #tmp_self_comp,
+                                tmpname,
+                                tmp_no,
+                                )] + levs
                         rep[:10]
-                        log.log(9, '\n' + pprint.pformat(rep[:5]))
+                        log.log(9, '\n' + pprint.pformat(
+                            rep[:5],
+                            #[(f'{a:1.2f}', f'{b:1.2f}', *r) for a, b, *r in rep[:5]],
+                            width=120))
                     else:
                         # sometimes maybe they get the suffix wrong?
                         msg = ('somehow there are no files that even match the '
                                'extension of an mbf path !?!??! maybe your princess is in another dataset ??? '
                                f'{dataset_id} {object_id} {drp} {target_mbf_path}')
                         log.log(9, msg)
-
-                    if False:
-                        #cutoff = 10
-                        # XXX super expensive
-                        levdists = sorted((levenshteinDistance(tmpname, n), n) for n in levdist_subset)
-                        if levdists[0][0] > cutoff and ' ' in tmpname and ' ' not in levdists[0][1]:
-                            # try again with underscore
-                            tmpname_us = tmpname.replace(' ', '_')
-                            levdists_us = sorted((levenshteinDistance(tmpname_us, n), n) for n in levdist_subset)
-
-
-                        # also not actually good if there are numbers, because those have
-                        # super high weight compared to the rest, you can't just mutate them
-                        lev_numonly = [numonly(n) for n in levdist_subset]
-                        levno = sorted((levenshteinDistance(tmp_numonly, n), n) for n in lev_numonly)
-
-                        breakpoint()
 
                 if target_drp is None:
                     add_to_ind(dataset_id, drp, unmapped, target_mbf_path_string, rec)
@@ -1015,15 +1042,17 @@ def pex_dirs(dataset_id, oids, **inds):
     # will literally be in the parents ... that turns out to
     # be quite useful
     id_drp = {}
-    did_index = {}
+    did_index = {}  # FIXME unused
+    parent_index = {}
     for object_id in oids:
         blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
         drp = pathlib.PurePath(blob['dataset_relative_path'])
         #dirs[drp] = blob  # FIXME check on memory sizes here
         #id_drp[object_id] = drp
         did_index[drp] = object_id
+        parent_index[object_id] = RemoteId(blob['parent_id'])
 
-    return id_drp, did_index
+    return id_drp, did_index, parent_index
 
 
 def pex_default(dataset_id, oids, did_index=None, **inds):
@@ -1039,7 +1068,7 @@ def pex_default(dataset_id, oids, did_index=None, **inds):
     return id_drp, None
 
 
-def combine(dataset_id, object_id, type, drp_index):
+def combine(dataset_id, object_id, type, drp_index, parent_index):
     blob = {}
     blob['type'] = 'combine-object-metadata'  #'combined-metadata'
     blob['__combine_version__'] = __combine_version__
@@ -1047,15 +1076,33 @@ def combine(dataset_id, object_id, type, drp_index):
     pathmeta_blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
     blob['path_metadata'] = pathmeta_blob
 
+    # embed the parent ids so that they can be used without
+    # having to deconstruct dataset_relative_path and reconstruct
+    # other indexes from scratch, this does mean that changes to
+    # the file structure are reflected here, but that is expected
+    # at this phase (we manage to avoid it for extract)
+    _pids = [pathmeta_blob['parent_id']]
+    while _pids[-1] in parent_index:
+        _pm1 = _pids[-1]
+        _pid = parent_index[_pm1]
+        _pids.append(_pid)
+        if _pid == _pm1:
+            break
+
+    # parent_ids are indexed so that the the first
+    # parent id is the immediate parent and the
+    # last parent id is the highest in the hierachy
+    blob['parent_ids'] = _pids
+
     extract_path = extract_export_path(dataset_id, object_id)
     if extract_path.exists():
         extract_blob = path_json(extract_path)
         blob['extracted'] = extract_blob  # FIXME duped keys
 
-    drp = pathlib.PurePath(blob['path_metadata']['dataset_relative_path'])
+    drp = pathlib.PurePath(pathmeta_blob['dataset_relative_path'])
     if (has_recs := drp in drp_index):
         blob['external_records'] = drp_index.pop(drp)
-    elif 'mimetype' in blob['path_metadata'] and blob['path_metadata']['mimetype'] == 'inode/directory':
+    elif 'mimetype' in pathmeta_blob and pathmeta_blob['mimetype'] == 'inode/directory':
         pass  # we don't expect dirs to have metadata (though they can)
     else:
         # manifests technically aren't required as of 2.1.0
@@ -1109,6 +1156,7 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
         name_drps_index[drp.name].append(drp)
 
     did_index = None
+    parent_index = None
     xml_index = None
     xml_unmapped = None
     drp_index = {}
@@ -1121,7 +1169,8 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
         oids = types[type]
         process_extracted = pex[type]
         inds = dict(
-            did_index=did_index,
+            #did_index=did_index,
+            parent_index=parent_index,  # parent_index is only over dirs since files already have parent_id
             name_drps_index=name_drps_index,
             drp_index=drp_index,
             xml_index=xml_index,
@@ -1130,6 +1179,7 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
         if index is not None:
             if type == 'inode/directory':
                 did_index = index
+                parent_index, = rest
                 continue
             elif type == 'xml':
                 xml_index = index  # TODO figure out how we can get to the point where this can be included in drp index
@@ -1149,16 +1199,11 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
 
                 drp_index[drp][type] = rec
 
-    #breakpoint()
-    # TODO do something about the xml index here
-    # passing object_id_type_drps into this function
-    # would avoid the need to load all the jsons
-    # to retrieve that information ...
-
+    # TODO processing of dataset and organization level ids
     drps = []
     news = 0
     for object_id, type in object_id_types:  # TODO sort these in reverse order so that errors can be added to e.g. manifests
-        drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index)
+        drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index, parent_index)
         target, new_link = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
         if new_link:
             news += 1
