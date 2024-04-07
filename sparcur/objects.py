@@ -41,12 +41,15 @@ from math import log as log2
 import augpathlib as aug
 from dateutil import parser as dateparser
 from pyontutils.asyncd import Async, deferred
+from sparcur import datasets as dat
 from sparcur import exceptions as exc
+from sparcur import pipelines as pipes
+from sparcur.core import JEncode, HasErrors
 from sparcur.paths import Path
 from sparcur.utils import fromJson, register_type, log as _log, logd as _logd
-from sparcur.config import auth
-from sparcur.core import JEncode, HasErrors
 from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId, levenshteinDistance
+from sparcur.config import auth
+from sparcur.extract import xml as exml
 
 log = _log.getChild('sob')
 logd = _logd.getChild('sob')
@@ -72,6 +75,23 @@ index_dir_name = 'index'
 latest_link_name = 'L'  # short to keep symlinks small enough to fit in inodes
 archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
 
+
+_expex_types = (  # aka expex_type
+    None,
+    'inode/directory',
+    'manifest',
+    'xml',
+
+    'dataset_description',
+    'submission',
+    'subjects',
+    'samples',
+)
+_metadata_file_types = (
+    'manifest', 'dataset_description', 'subjects', 'samples', 'sites',
+    'performances', 'code_description', 'submission',
+)
+
 def test():
     # make sure we have the basics right
     # sourcing of the uuids will ultimately be different
@@ -86,20 +106,32 @@ def test():
             
          ]
     ]
+    [print(p) for p in top_paths[0]]
 
-    tds = '645267cb-0684-4317-b22f-dd431c6de323'  # small dataset with lots of manifests
-    # tds = '21cd1d1b-9434-4957-b1d2-07af75ad3546'  # big xml test sadly too many files (> 80k) to be practical for testing
-    # tds = '46bcac1d-3e45-499b-82a8-0ee1852bcc4d'  # manifest column naming issues
-    tds = '3bb4788f-edab-4f04-8e96-bfc87d69e4e5'  # much better, only 100ish files with xmls
-    tds = '57466879-2cdd-4af2-8bd6-7d867423c709'  # has vesselucida files
-    tds = '75133e23-a572-42ee-876c-7dc127d280db'  # some segmentation
-    tds = 'a95b4304-c457-4fa3-9bc9-cc557a220d3e'  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
-    tds = 'd484110a-e6e3-4574-aab2-418703c978e2'  # many xmls ~200 files, but only the segmentations ... no data
-    tds = 'f58c75a2-7d86-439a-8883-e9a4ee33d7fa'  # jpegs might correspond to subject id ??? ... ya subjects and samples but oof oof
+    tdss = [
+        'a95b4304-c457-4fa3-9bc9-cc557a220d3e',  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
+        # also has a case where we get exracted without extracted but with errors because it has the mbf xml with no namespace
 
-    tds = 'bec4d335-9377-4863-9017-ecd01170f354'
+        '645267cb-0684-4317-b22f-dd431c6de323',  # small dataset with lots of manifests
+        # '21cd1d1b-9434-4957-b1d2-07af75ad3546',  # big xml test sadly too many files (> 80k) to be practical for testing
+        # '46bcac1d-3e45-499b-82a8-0ee1852bcc4d',  # manifest column naming issues
+        '3bb4788f-edab-4f04-8e96-bfc87d69e4e5',  # much better, only 100ish files with xmls
+        '57466879-2cdd-4af2-8bd6-7d867423c709',  # has vesselucida files
+        '75133e23-a572-42ee-876c-7dc127d280db',  # some segmentation
 
-    tds = 'ded103ed-e02d-41fd-8c3e-3ef54989da81'
+
+        'e4bfb720-a367-42ab-92dd-31fd7eefb82e',  # XXX big memory usage ... its going to be lxml again isn't it
+        'f58c75a2-7d86-439a-8883-e9a4ee33d7fa',  # jpegs might correspond to subject id ??? ... ya subjects and samples but oof oof
+
+        'bec4d335-9377-4863-9017-ecd01170f354',
+        'ded103ed-e02d-41fd-8c3e-3ef54989da81',
+        'd484110a-e6e3-4574-aab2-418703c978e2',  # many xmls ~200 files, but only the segmentations ... no data
+    ]
+
+    for tds in tdss:
+        inner_test(tds)
+
+def inner_test(tds, force=True, debug=True):
 
     dataset_path = (Path('~/files/sparc-datasets-test/').expanduser() / tds / 'dataset').resolve()
     cs = list(dataset_path.rchildren)
@@ -119,19 +151,19 @@ def test():
             index_obj_symlink_archive(dataset_id, c.cache_identifier),
         ]
 
-    aps = top_paths + [all_paths(c) for c in cs]
+    aps = [all_paths(c) for c in cs]
     [print(p) for paths in aps for p in paths]
 
     create_current_version_paths()
 
-    updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=True)
+    updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=force, debug=debug)
     drps, drp_index = from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive, keep_in_mem=True)
 
     missing_from_inds = [d for d, h, ty, ta, ne, mb in drps if not h and
                          # we don't usually expect manifest entires for themselves
                          # and we don't expect them for folders though they can be
                          # used to apply metadata to folders
-                         ty not in ('inode/directory', 'manifest')]
+                         ty not in ('inode/directory', *_metadata_file_types)]
     if missing_from_inds:
         log.error('missing_from_inds:\n' + '\n'.join(sorted([d.as_posix() for d in missing_from_inds])))
     if drp_index:
@@ -141,11 +173,15 @@ def test():
         # i.e. combine_export_path(dataset_id, datset_id)
 
     blobs = [d[-1] for d in drps]
-    #with_xml_ref = [b for b in blobs if 'extracted' in b and 'xml' in b['extracted']['type']]
+    #with_xml_ref = [b for b in blobs
+    #                if 'external_records' in b and
+    #                'xml' in b['external_records']['extracted']['object_type']]
     xml_files = [b for b in blobs if pathlib.PurePath(b['path_metadata']['dataset_relative_path']).suffix == '.xml']
     xml_sources = [b for b in blobs if 'extracted' in b and 'xml' == b['extracted']['extracted']['object_type']]  # FIXME annoying to query
     apparent_targets = [x['external_records']['manifest']['input']['description'][26:] for x in xml_sources
-                        if 'description' in x['external_records']['manifest']['input']]
+                        if 'external_records' in x and
+                        'manifest' in x['external_records'] and
+                        'description' in x['external_records']['manifest']['input']]
     maybe_matches = [b for b in blobs if b['path_metadata']['basename'] in apparent_targets]
 
     breakpoint()
@@ -336,8 +372,109 @@ def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link
 
     return target
 
+def extract_fun_manifest(path):
+    # FIXME this need the template schema version to work ... at least in theory
+    # the internals of the implementation mean that if it is missing it isn't fatal
+    extracted = {
+        'type': 'extracted-manifest',
+        'object_type': 'manifest',  # FIXME figure out how to enforce
+    }
+    mf = dat.ManifestFile(path)
+    try:
+        data = mf.data
+    except Exception as e:
+        he = HasErrors(pipeline_stage='objects.manifest.extract_fun')
+        if he.addError(e, path=path):
+            logd.exception(e)
 
-def do_actually_extract(path):
+        he.embedErrors(extracted)
+        return extracted
+
+    if 'manifest_records' in data:
+        # FIXME does contents have a defined type and is an object
+        # or can it very by object_type? at the moment it certainly
+        # varies by object_type ...
+        extracted['contents'] = data['manifest_records']
+    else:
+        # contents is a required property but it
+        # can be anything including an empty list
+        # since this phase of the pipeline is internal
+        extracted['contents'] = []
+
+    if 'errors' in data:
+        extracted['errors'] = data['errors']
+
+    return extracted
+
+
+def extract_fun_xml(path):
+    # TODO yes, in theory this could write the extracted bits
+    # to disk directly, but this is a workaround for a memory leak
+    # not a rearchitecting of the pipeline ...
+    blob = pipes.XmlFilePipeline._do_subprocess(path)
+    extracted = {
+        'type': 'extracted-xml',
+        'object_type': 'xml',  # FIXME figure out how to enforce
+    }
+
+    if 'contents' in blob:
+        if 'errors' in blob['contents']:
+            log.warning('sigh errors in contents ???')
+            extracted['errors'] = blob['contents'].pop(errors)
+
+        extracted['contents'] = blob['contents']
+
+    if 'mimetype' in blob:
+        extracted['mimetype'] = blob['mimetype']
+
+    if 'errors' in blob:
+        if 'errors' not in extracted:
+            extracted['errors'] = []
+
+        extracted['errors'] += blob['errors']
+        log.error(extracted['errors'])  # FIXME these inherit
+        if 'contents' not in blob or not blob['contents']:
+            #breakpoint()
+            #extract_fun_xml_debug(path)
+
+            # raise here to match non-subpipeline behavior
+            # TODO find a way to forward this information
+            # to combine, i think we can just check for things
+            # that should have some extracted content since
+            # their type matches by they have no extracted file
+            # that sould be sufficient to elicit a log check
+            raise Exception(extracted['errors'])
+
+    return extracted
+
+
+def extract_fun_xml_debug(path):
+    extracted = {
+        'type': 'extracted-xml',
+        'object_type': 'xml',
+    }
+    # XXX adapted from sparcur.pipelines.XmlFilePipeline._path_to_json_meta
+    try:
+        e = exml.ExtractXml(path)
+        if e.mimetype:
+            extracted['contents'] = e.asDict()
+            extracted['mimetype'] = e.mimetype
+    except NotImplementedError as e:
+        he = HasErrors(pipeline_stage='objects.xml.extract_fun')
+        if he.addError(e, path=path):
+            logd.exception(e)
+
+        he.embedErrors(extracted)
+    except Exception as e:
+        log.error(f'xml extraction failure for {path!r}')
+        raise e
+
+    return extracted
+
+
+def do_actually_extract(path):  # FIXME naming
+    # FIXME this is a horrible way to dispatch pipelines ...
+
     # TODO this determines whether a path should be extracted
     # fetch_fun and extract_fun are separate so that we can
     # run the fetch funs together outside the network sandbox
@@ -345,92 +482,46 @@ def do_actually_extract(path):
     fetch_fun = None
 
     if path.is_dir():
-        object_type_raw = 'inode/directory'
+        expex_type = 'inode/directory'
         extract_fun = None
+
     elif path.stem == 'manifest':  # FIXME do a proper match, XXX reminder that any change here _WILL_ require reextraction unless we split path_metadata only blobs from the rest, which we probably should to avoid exact this kind of issue
-        object_type_raw = 'manifest'
+        expex_type = 'manifest'
+        extract_fun = extract_fun_manifest
         # FIXME need to match more name patterns
         # see sc.metadata_filename_pattern
-        from sparcur import datasets as dat
-        def extract_fun(path):
-            # FIXME this need the template schema version to work ... at least in theory
-            # the internals of the implementation mean that if it is missing it isn't fatal
-            extracted = {
-                'type': 'extracted-manifest',
-                'object_type': 'manifest',
-            }
-            mf = dat.ManifestFile(path)
-            try:
-                data = mf.data
-            except Exception as e:
-                he = HasErrors(pipeline_stage='objects.manifest.extract_fun')
-                if he.addError(e, path=path):
-                    logd.exception(e)
 
-                he.embedErrors(extracted)
-                return extracted
-
-            if 'manifest_records' in data:
-                # FIXME does contents have a defined type and is an object
-                # or can it very by object_type? at the moment it certainly
-                # varies by object_type ...
-                extracted['contents'] = data['manifest_records']
-            else:
-                # contents is a required property but it
-                # can be anything including an empty list
-                # since this phase of the pipeline is internal
-                extracted['contents'] = []
-
-            if 'errors' in data:
-                extracted['errors'] = data['errors']
-
-            return extracted
-
-    elif path.suffix == '.xml':
-        object_type_raw = 'xml'
-
-        from sparcur.extract import xml as exml
-        from sparcur import datasets as dat
-        def extract_fun(path):
-            extracted = {
-                'type': 'extracted-xml',
-                'object_type': 'xml',
-            }
-            # XXX adapted from sparcur.pipelines.XmlFilePipeline._path_to_json_meta
-            try:
-                e = exml.ExtractXml(path)
-                if e.mimetype:
-                    extracted['contents'] = e.asDict()
-                    extracted['mimetype'] = e.mimetype
-            except NotImplementedError as e:
-                he = HasErrors(pipeline_stage='objects.xml.extract_fun')
-                if he.addError(e, path=path):
-                    logd.exception(e)
-
-                he.embedErrors(extracted)
-            except Exception as e:
-                log.error(f'xml extraction failure for {path!r}')
-                raise e
-
-            return extracted
-
-    else:
-        object_type_raw = None
+    elif path.stem in _metadata_file_types:  # FIXME overly restrictive match
+        # also not clear we need to differentiate the expex type really here?
+        # but also kind of why not ?
+        expex_type = path.stem
         extract_fun = None
 
-    return object_type_raw, fetch_fun, extract_fun
+    elif path.suffix == '.xml':
+        expex_type = 'xml'
+        extract_fun = extract_fun_xml
+
+    else:
+        expex_type = None
+        extract_fun = None
+
+    if expex_type not in _expex_types:
+        msg = f'expex_type {expex_type} not in {_expex_types}'
+        raise ValueError(msg)
+
+    return expex_type, fetch_fun, extract_fun
 
 
 register_type(None, 'extract-object-metadata')  # currently unmapped
-def extract(dataset_uuid, path_string, object_type_raw=None, extract_fun=None):
+def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
     """ actually run extraction for a single path
     see also sparcur.pipelines.XmlFilePipeline._do_xml_metadata
 
     we convert back from dataset_uuid to simplify passing to subprocess
     """
 
-    if extract_fun is None or object_type_raw is None:  # subprocess case
-        object_type_raw, fetch_fun, extract_fun = do_actually_extract(path)
+    if extract_fun is None or expex_type is None:  # subprocess case
+        expex_type, fetch_fun, extract_fun = do_actually_extract(path)
         if extract_fun is None:
             msg = f'no extract_fun known for {path}'
             raise TypeError(msg)
@@ -458,6 +549,8 @@ def extract(dataset_uuid, path_string, object_type_raw=None, extract_fun=None):
                 logd.exception(e)
 
             he.embedErrors(blob)
+            # we return early becase any failure here means we didn't actually extract
+            return
 
         export_path = extract_export_path(dataset_id, object_id)
         if not export_path.parent.exists():
@@ -617,7 +710,7 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
     export_path = extract_export_path(dataset_id, object_id)
     done = export_path.exists()  # and not pathmeta_changed  # FIXME we don't need to rerun the export if the pathmeta changed ... the id does not change
     # FIXME this is obviously wrong, e.g. what happens if the remote changes the file name or moves a file? we need a bit more info related update times or reparents, for now we will have to run time force=True to avoid stale, or we run with force=True when it is publication time, OR we don't store pathmeta at all and always rederive it during extract ... that seems better, yes ...
-    object_type_raw, fetch_fun, extract_fun = do_actually_extract(path)
+    expex_type, fetch_fun, extract_fun = do_actually_extract(path)
     # FIXME hard to pass extract_fun directly so would have to
     # rederive in subprocess version not that I think we will be using
     # that variant
@@ -626,24 +719,24 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
         success = 'already-done'
         msg = f'{object_id} already done {path}'
         log.log(9, msg)
-        return path, object_id, object_type_raw, success, updated
+        return path, object_id, expex_type, success, updated
 
     elif extract_fun is None:
         success = 'no-extract-fun-and-pathmeta-already-written'
         msg = f'{object_id} pathmeta already written and no extract_fun {path}'
         log.log(9, msg)
-        return path, object_id, object_type_raw, success, updated
+        return path, object_id, expex_type, success, updated
 
     elif debug or not subprocess:
-        # TODO or raw object_type_raw in IMPORTANT i.e. stuff that should be in memory ... but that is and optimization
+        # TODO or raw expex_type in IMPORTANT i.e. stuff that should be in memory ... but that is and optimization
         try:
-            extract(dataset_id.uuid, path.as_posix(), object_type_raw, extract_fun=extract_fun)
+            extract(dataset_id.uuid, path.as_posix(), expex_type, extract_fun=extract_fun)
             success = True
         except Exception as e:
             success = False
             log.exception(e)
 
-        return path, object_id, object_type_raw, success, updated
+        return path, object_id, expex_type, success, updated
 
     msg = "don't do this right now"
     # likely not needed
@@ -690,7 +783,7 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
         log.exception(e)
         success = False
 
-    return path, object_id, object_type_raw, success, updated
+    return path, object_id, expex_type, success, updated
 
 
 def from_dataset_path_get_path_to_fetch_and_extract():
@@ -731,18 +824,23 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     # but in a sense that is ok because we also want to pull the path metadata here as well since it will end up
     # being more efficient to start from here
     rchildren = transitive_paths(dataset_path)
-    if True:  # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
-        # how do we handle the dataset itself (it would be nice to just put the metadata there ...)
-        # also, how do we deal with organizations, there is nothing to extract so to speak ... maybe they are dealt with at the
-        # combine level ... yes, I think we are ok to skip dataset and org at this point and deal with them at combine
-        results = [subprocess_extract(dataset_id, path, time_now, force=force, debug=debug, subprocess=False) for path in rchildren]
-    else:
-        # XXX FIXME LOL yeah, maybe don't run this with a completely open async because it will spawn n processes
-        # where n = THE NUMBER OF FILES IN A DATASET EEEEE !??!?! pypy3 has non-trivial minimal memory usage
-        # FIXME it is also quite likely that we don't actually need to run in a subprocess (except for the logging bit maybe)
-        # because the overhead of spinning up a whole new pypy3 vm for a single file is silly, we already spin up one
-        # for export which protects from the memory issues with e.g. lxml
-        results = Async(rate=20)(deferred(subprocess_extract)(dataset_id, path, time_now, force=force) for path in rchildren)
+
+    # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
+    # how do we handle the dataset itself (it would be nice to just put the metadata there ...)
+    # also, how do we deal with organizations, there is nothing to extract so to speak ... maybe they are dealt with at the
+    # combine level ... yes, I think we are ok to skip dataset and org at this point and deal with them at combine
+
+    results = Async(rate=False)( # we need Async and deferred to prevent processing
+        # of hundres/thousands of xmls files in a subprocess from taking an eternity
+        # unfortunately this means that each spc export will use a full worker count
+        # assuming that it is the only process on the system, which is already handled
+        # by celery ... so yeah FIXME TODO sort out balacing how to run this becase
+        # parallel execution requires coordinate to avoid resource exhaustion, pulling
+        # it out of the spc export path is likely going to be part of the solution
+        # since that was also mostly just to get a quick and dirty entrypoint
+        deferred(subprocess_extract)
+        (dataset_id, path, time_now, force=force, debug=debug)
+        for path in rchildren)
 
     updated_cache_transitive = None
     bads = []
@@ -907,6 +1005,13 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
 
         #xmls[drp] = blob  # FIXME memory usage issues here
         #id_drp[object_id] = drp
+
+        if 'extracted' not in blob:
+            breakpoint()
+            # we're expecting embedded errors or something?
+            msg = ('malformed data that should never have been writen'
+                   f'{dataset_id} {object_id} {extract_path}\n{blob}')
+            raise ValueError(msg)
 
         extracted = blob['extracted']  # FIXME could be missing ... ??
         mimetype = extracted['mimetype'] if 'mimetype' in extracted else None
@@ -1081,7 +1186,7 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
     # other indexes from scratch, this does mean that changes to
     # the file structure are reflected here, but that is expected
     # at this phase (we manage to avoid it for extract)
-    _pids = [pathmeta_blob['parent_id']]
+    _pids = [RemoteId(pathmeta_blob['parent_id'])]
     while _pids[-1] in parent_index:
         _pm1 = _pids[-1]
         _pid = parent_index[_pm1]
@@ -1104,6 +1209,8 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
         blob['external_records'] = drp_index.pop(drp)
     elif 'mimetype' in pathmeta_blob and pathmeta_blob['mimetype'] == 'inode/directory':
         pass  # we don't expect dirs to have metadata (though they can)
+    elif type in _metadata_file_types:
+        pass  # don't expect metadata for metadata files ... usually
     else:
         # manifests technically aren't required as of 2.1.0
         msg = f'{dataset_id} {object_id} {drp} has no records of any kind'
@@ -1123,6 +1230,21 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
     return drp, has_recs, blob
 
 
+pex_funs = {
+    None: pex_default,
+    'inode/directory': pex_dirs,
+    'manifest': pex_manifests,
+    'xml': pex_xmls,
+    'dataset_description': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'samples': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'subjects': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'submission': lambda did, oids, **inds: (log.debug('TODO'), None),
+}
+
+if (__spf := set(pex_funs)) != (__sxt := set(_expex_types)):
+    raise ValueError(f'pex_funs != _expex_types {__spf} != {__sxt}')
+
+
 def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive=None, keep_in_mem=False):
     types = {}
     for oid, type in object_id_types:
@@ -1133,13 +1255,6 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
             types[type] = []
 
         types[type].append(oid)
-
-    pex = {
-        'inode/directory': pex_dirs,
-        None: pex_default,
-        'manifest': pex_manifests,
-        'xml': pex_xmls,
-    }
 
     # we _have_ to load this first for everything, we can optimize out fs reads in the future as needed
     # use for trying to find potential matches from fuzzy data in manifests and xmls
@@ -1155,6 +1270,19 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
 
         name_drps_index[drp.name].append(drp)
 
+    # FIXME TODO pathmeta_changed is useful for determining whether we need to rerun combine?
+    # sort of no, because the reason why we blindly rerun combine right now is becase of the long range effects changes in manifests,
+    # TODO to do the full changes properly we would have to know
+    # three things
+    # 1. whether pathmeta changed (drp change here captures any reparenting up the hierarchy)
+    # 2. whether any manifests changed
+    # 3. whether manifests that did change affected specific drps
+    # I think we can short circuit this by dumping the joint manifest
+    # index and the comparing to the previous version and that will
+    # be sufficient, or rather dumping the full drp_index and comparing
+    # but we can do better than that because for non-manifest stuff
+    # we realy only care about additions and deletions, and maybe moves
+
     did_index = None
     parent_index = None
     xml_index = None
@@ -1167,7 +1295,7 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
             continue
 
         oids = types[type]
-        process_extracted = pex[type]
+        process_extracted = pex_funs[type]
         inds = dict(
             #did_index=did_index,
             parent_index=parent_index,  # parent_index is only over dirs since files already have parent_id
@@ -1196,6 +1324,12 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
             for drp, rec in index.items():
                 if drp not in drp_index:
                     drp_index[drp] = {'type': 'internal_references'}  # FIXME what is the name for this type ...
+
+                if type in drp_index[drp]:
+                    breakpoint()
+                    msg = ('TODO probably shouldn\'t happen, '
+                           'should have been handled during e.g. pex_manifests')
+                    raise NotImplementedError(msg)
 
                 drp_index[drp][type] = rec
 

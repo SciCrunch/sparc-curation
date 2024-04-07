@@ -567,8 +567,14 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             'import json;from sparcur import pipelines as p, core;'
             f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}));'
             'print(json.dumps(m, cls=core.JEncode))')
-        p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = p.communicate()
+
+        try:
+            p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=sys.stderr)
+            out, err = p.communicate()
+        except KeyboardInterrupt as e:
+            p.send_signal(signal.SIGINT)
+            raise e
+
         if not out and err:
             log.error(f'xml pipeline failures for {path!r}')
             raise Exception(err.decode())

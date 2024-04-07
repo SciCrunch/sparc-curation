@@ -345,33 +345,41 @@ def argv_simple_fetch_remote_metadata_all(dataset_id):
         dataset_id]
 
 
-argv_spc_find_meta = [
-    sys.executable,
-    '-m',
-    'sparcur.cli',
-    "find",
-    "--name", "*.xml",
-    "--name", "submission*",
-    "--name", "code_description*",
-    "--name", "dataset_description*",
-    "--name", "subjects*",
-    "--name", "samples*",
-    "--name", "performances*",
-    "--name", "manifest*",
-    "--name", "resources*",
-    "--name", "README*",
-    '--no-network',
-    "--limit", "-1",
-    "--fetch"]
+def argv_spc_find_meta(dataset_id):
+    argv = [
+        sys.executable,
+        '-m',
+        'sparcur.cli',
+        "find",
+        '--dataset-id', dataset_id.uuid,  # nop, debug memory issues
+        "--name", "*.xml",
+        "--name", "submission*",
+        "--name", "code_description*",
+        "--name", "dataset_description*",
+        "--name", "subjects*",
+        "--name", "samples*",
+        "--name", "performances*",
+        "--name", "manifest*",
+        "--name", "resources*",
+        "--name", "README*",
+        '--no-network',
+        "--limit", "-1",
+        "--fetch"]
+    return argv
 
-argv_spc_export = [
-    sys.executable,
-    '-m',
-    'sparcur.cli',
-    'export',
-    '--no-network',
-    # explicitly avoid joblib which induces absurd process overhead
-    '--jobs', '1']
+
+def argv_spc_export(dataset_id):
+    argv = [
+        sys.executable,
+        '-m',
+        'sparcur.cli',
+        'export',
+        '--no-network',
+        # explicitly avoid joblib which induces absurd process overhead
+        '--jobs', '1',
+        '--dataset-id', dataset_id.uuid,  # nop, debug memory issues
+    ]
+    return argv
 
 
 def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
@@ -439,7 +447,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
                 try:
                     os.sync()  # try to avoid missing xattr metadata
                     p2 = subprocess.Popen(
-                        argv_spc_find_meta, cwd=dataset_path,
+                        argv_spc_find_meta(did.uuid), cwd=dataset_path,
                         stderr=subprocess.STDOUT, stdout=logfd)
                     out2 = p2.communicate()
                     if p2.returncode != 0:
@@ -464,7 +472,7 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
                 dataset_path = (path_source_dir / did.uuid / 'dataset').resolve()
 
             try:
-                p3 = subprocess.Popen(argv_spc_export, cwd=dataset_path,
+                p3 = subprocess.Popen(argv_spc_export(did.uuid), cwd=dataset_path,
                                       stderr=subprocess.STDOUT, stdout=logfd)
                 out3 = p3.communicate()
                 if p3.returncode != 0:

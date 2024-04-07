@@ -207,7 +207,9 @@ class XmlSource(HasErrors):
                 # usually is submission, but can't always tell
                 log.exception(e)
 
-            return {}
+            out = {}
+            self.embedErrors(out)
+            return out  # errors w/o content a sign that its a real error
 
         data_out = condense(data_in)
         for k, v in tuple(data_out.items()):
@@ -300,6 +302,14 @@ class ExtractNeurolucida(ExtractMBF):
 
     top_tag = '{http://www.mbfbioscience.com/2007/neurolucida}mbf'
     mimetype = 'application/x.vnd.mbfbioscience.neurolucida+xml'
+
+    _bv = {'version': '4.0', 'appname': 'Neurolucida 360', 'appversion': '2019.1.1 (64-bit)'}
+
+    def typeMatches(self):
+        """ handle missing xmlns files >_< """
+        return (super().typeMatches or
+                (top_tag == 'mbf' and self.e.getroot().attrib == _bv
+                 and not logd.error(f'bad mbf xml for neurolucida in {self.path}')))  # XXX make sure it still actually matches the type ...
 
     @hasSchema.f(sc.NeurolucidaSchema)
     def asDict(self, unique=True, guid=False):

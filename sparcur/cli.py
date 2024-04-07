@@ -260,6 +260,7 @@ Options:
     --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
 
     --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
+    --dataset-id=DID        pass did on cli to match simple.utils (currently a nop)
 
     --discover              work with pennsieve discover remote
 
