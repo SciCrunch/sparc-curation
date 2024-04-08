@@ -112,9 +112,10 @@ def test():
     [print(p) for p in top_paths[0]]
 
     tdss = [
+        'a95b4304-c457-4fa3-9bc9-cc557a220d3e',  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
+
         '3bb4788f-edab-4f04-8e96-bfc87d69e4e5',  # much better, only 100ish files with xmls, XXX woo! this one has xml_index not empty!
         'ded103ed-e02d-41fd-8c3e-3ef54989da81',  # ooo, has a non-empty xml_index :D
-        'a95b4304-c457-4fa3-9bc9-cc557a220d3e',  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
         # also has a case where we get exracted without extracted but with errors because it has the mbf xml with no namespace
 
         '645267cb-0684-4317-b22f-dd431c6de323',  # small dataset with lots of manifests
@@ -134,7 +135,7 @@ def test():
         inner_test(tds)
 
 def inner_test(tds, force=True, debug=True):
-
+    log.info(f'running {tds}')
     dataset_path = (Path('~/files/sparc-datasets-test/').expanduser() / tds / 'dataset').resolve()
     cs = list(dataset_path.rchildren)
     dataset_id = dataset_path.cache_identifier
@@ -411,7 +412,7 @@ def extract_fun_xml(path):
     # TODO yes, in theory this could write the extracted bits
     # to disk directly, but this is a workaround for a memory leak
     # not a rearchitecting of the pipeline ...
-    blob = pipes.XmlFilePipeline._do_subprocess(path)
+    blob = pipes.XmlFilePipeline._do_subprocess(path, raise_on_error=True)
     extracted = {
         'type': 'extracted-xml',
         'object_type': 'xml',  # FIXME figure out how to enforce
@@ -420,7 +421,7 @@ def extract_fun_xml(path):
     if 'contents' in blob:
         if 'errors' in blob['contents']:
             log.warning('sigh errors in contents ???')
-            extracted['errors'] = blob['contents'].pop(errors)
+            extracted['errors'] = blob['contents'].pop('errors')
 
         extracted['contents'] = blob['contents']
 
@@ -457,7 +458,7 @@ def extract_fun_xml_debug(path):
     try:
         e = exml.ExtractXml(path)
         if e.mimetype:
-            extracted['contents'] = e.asDict(_fail=True)
+            extracted['contents'] = e.asDict(_fail=True, raise_on_error=True)
             extracted['mimetype'] = e.mimetype
     except NotImplementedError as e:
         he = HasErrors(pipeline_stage='objects.xml.extract_fun')

@@ -200,16 +200,10 @@ class XmlSource(HasErrors):
                 return thing
 
         try:
-            prefix = '_:' if '_' in self.namespaces else ''
-            data_in = self._extract(*args, prefix=prefix, **kwargs)
+            data_in = self._extract(*args, **kwargs)
         except Exception as e:
-            # this is almost always run in a subprocess so print and raise
-            log.exception(e)
-            if 'insub' in kwargs and kwargs['insub'] or True:
-                import json
-                print(json.dumps({'error': str(e)}))
-
-            raise e
+            if 'raise_on_error' in kwargs and kwargs['raise_on_error']:
+                raise e
 
             msg = f'extract failed with {e}'
             if self.addError(msg, blame='stage', path=self.path):
@@ -242,6 +236,8 @@ class ExtractMBF(XmlSource):
     )
     mimetype = 'application/x.vnd.mbfbioscience.metadata+xml'
     # neurolucida and vesselucida have appeared instead of .metadata but no longer used
+
+    _prefix = '_:'
 
     def typeMatches(self):
         if not self._isXml:

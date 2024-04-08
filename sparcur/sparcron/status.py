@@ -1,5 +1,5 @@
 from sparcur.utils import PennsieveId
-from sparcur.sparcron import get_redis_conn, state_lut
+from sparcur.sparcron import get_redis_conn, state_lut, _qed, _run, _qed_run
 
 
 def dataset_status(conn, rawid):
@@ -23,8 +23,7 @@ def dataset_status(conn, rawid):
 
 
 def dataset_fails(conn):
-    keys = conn.keys()
-    _fkeys = [k for k in keys if b'failed-' in k]
+    _fkeys = list(conn.scan_iter('failed-*'))
     fvals = [v for v in conn.mget(_fkeys)]
     _fails = [(PennsieveId(('dataset:' + k.split(b':')[-1].decode())), v)
               for k, v in zip(_fkeys, fvals) if v]
@@ -34,17 +33,42 @@ def dataset_fails(conn):
     return fails
 
 
+def _dataset_thinging(conn, thing):
+    _skeys = list(conn.scan_iter('state-*'))
+    svals = [v for v in conn.mget(_skeys)]
+    running = [PennsieveId(('dataset:' + k.split(b':')[-1].decode()))
+               for k, v in zip(_skeys, svals) if int(v) in thing]
+    return running
+
+
+def dataset_running(conn):
+    return _dataset_thinging(conn, (_run, _qed_run))
+
+
+def dataset_queued(conn):
+    return _dataset_thinging(conn, (_qed, _qed_run))
+
+
 def main():
     from pprint import pprint
     conn = get_redis_conn()
     fails = dataset_fails(conn)
+    running = dataset_running(conn)
+    queued = dataset_queued(conn)
     if fails:
-        pprint(fails)
+        _f = '\n'.join(sorted([f.uuid for f in fails]))
+        print(f':fails (\n{_f}\n)')
         pprint(dataset_status(conn, fails[0].uuid))
 
-    if False:
-        pprint(dataset_status(
-            conn, keys[0].split(b':')[-1].decode()))
+    if running:
+        _r = '\n'.join(sorted([r.uuid for r in running]))
+        print(f':running (\n{_r}\n)')
+        pprint(dataset_status(conn, running[0].uuid))
+
+    if queued:
+        _r = '\n'.join(sorted([q.uuid for q in queued]))
+        print(f':queued (\n{_r}\n)')
+        pprint(dataset_status(conn, queued[0].uuid))
 
 
 if __name__ == '__main__':

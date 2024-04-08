@@ -541,14 +541,14 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         return self.do_xml_metadata(self.path, self.id)
 
     @staticmethod
-    def _path_to_json_meta(path, insub=False):
+    def _path_to_json_meta(path, insub=False, raise_on_error=False):
         metadata = path._jsonMetadata(do_expensive_operations=False)
         try:
             e = exml.ExtractXml(path)
             # XXX sideeffects to retrieve path metadata
             # FIXME expensive operations is hardcoded & blocked
             if e.mimetype:
-                metadata['contents'] = e.asDict(_fail=True, insub=insub)
+                metadata['contents'] = e.asDict(_fail=True, raise_on_error=raise_on_error)
                 # FIXME TODO probably want to check that the mimetypes are compatible when overwriting?
                 metadata['mimetype'] = e.mimetype  # overwrites the type
         except NotImplementedError as e:
@@ -556,7 +556,8 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             he.addError(e, path=path)
             he.embedErrors(metadata)
             if insub:
-                json.dumps(metadata)
+                print(json.dumps(metadata))
+            if raise_on_error:
                 raise e
         except Exception as e:
             log.error(f'xml pipeline failure for {path!r}')
@@ -565,11 +566,12 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         return metadata
 
     @staticmethod
-    def _do_subprocess(path):
+    def _do_subprocess(path, raise_on_error=False):
         # hooray for lazy devlopers and lxml leaking memory like wild
+        roe = ', raise_on_error=True' if raise_on_error else ''
         argv = sys.executable, '-c', (
             'import json;from sparcur import pipelines as p, core;'
-            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}, insub=True));'
+            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}, insub=True{roe}));'
             'print(json.dumps(m, cls=core.JEncode))')
 
         try:
@@ -581,7 +583,8 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
 
         if p.returncode != 0:
             log.error(f'xml pipeline failures for {path!r}')
-            raise Exception(out.decode())
+            if raise_on_error:
+                raise Exception(out.decode())
 
         return json.loads(out.decode())
 
@@ -600,7 +603,7 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         blob = {'type': 'all-xml-files',  # FIXME not quite correct use of type here
                 'dataset_id': id,
                 'xml': tuple()}
-        blob['xml'] = Async()(deferred(cls._do_subprocess)(path) for path in local_xmls)
+        blob['xml'] = Async(rate=False)(deferred(cls._do_subprocess)(path) for path in local_xmls)
         return blob
 
 

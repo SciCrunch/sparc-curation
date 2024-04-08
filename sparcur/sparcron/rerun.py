@@ -12,6 +12,7 @@ from sparcur.sparcron.core import (
     mget_all,
     export_single_dataset
 )
+from sparcur.sparcron.status import dataset_fails
 
 us = timedelta(microseconds=1)
 
@@ -40,7 +41,11 @@ def main():
     all_datasets = datasets_remote_from_project_ids(project_ids)
     args = sys.argv[1:]
     if args:
-        to_run = [PennsieveId('dataset:' + rawid.split(':')[-1]) for rawid in args]
+        if '--all' in args:
+            to_run = dataset_fails(conn)
+        else:
+            to_run = [PennsieveId('dataset:' + rawid.split(':')[-1]) for rawid in args]
+
         datasets = [d for d in all_datasets if d.identifier in to_run]
     else:
         datasets = all_datasets
