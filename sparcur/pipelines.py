@@ -584,7 +584,10 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         if p.returncode != 0:
             log.error(f'xml pipeline failures for {path!r}')
             if raise_on_error:
-                raise Exception(out.decode())
+                msg = (
+                    out.decode() if out else
+                    f'check logs prior to this for cause {path!r}')
+                raise Exception(msg)
 
         return json.loads(out.decode())
 

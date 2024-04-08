@@ -891,7 +891,7 @@ class MbfTracingSchema(JSONSchema):
             'contours': {'type': 'array',
                          'items': {'type': 'object',
                                    'properties': {
-                                       'name': string_noltws,
+                                       'name': {'type': 'string'},
                                        'guid': {'type': 'string'},
                                        'id_ontology': {'type': 'string'},},
                                    },},
@@ -908,6 +908,12 @@ class MbfTracingSchema(JSONSchema):
                                       'channel': {'type': 'string'},
                                   },},},
         },}
+
+
+class MbfTracingSchemaStrict(JSONSchema):
+    schema = copy.deepcopy(MbfTracingSchema.schema)
+    # use this after extraction to embed errors
+    schema['properties']['contours']['items']['properties']['name'] = string_noltws
 
 
 class DatasetStructureSchema(JSONSchema):

@@ -44,7 +44,7 @@ from pyontutils.asyncd import Async, deferred
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur import pipelines as pipes
-from sparcur.core import JEncode, HasErrors
+from sparcur.core import HasErrors, JEncode, JApplyRecursive, get_nested_by_key
 from sparcur.paths import Path
 from sparcur.utils import fromJson, register_type, log as _log, logd as _logd
 from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId, levenshteinDistance
@@ -54,8 +54,11 @@ from sparcur.extract import xml as exml
 log = _log.getChild('sob')
 logd = _logd.getChild('sob')
 
+# TODO HAH, with the addition of errors aka failed we can reuse the
+# sparcron run logic for whole datasets on individual objects now ...
 __pathmeta_version__ = 0
 __extract_version__ = 0
+__errors_version__ = 0  # this one should probably never change
 __combine_version__ = 0
 __index_version__ = 0
 
@@ -64,6 +67,7 @@ sf_export_base = Path(auth.get_path('export-path')) / sf_dir_name  # TODO ensure
 
 pathmeta_dir_name = 'pathmeta'
 extract_dir_name = 'extract'
+errors_dir_name = 'errors'
 combine_dir_name = 'combine'
 
 # this approach requires
@@ -101,6 +105,7 @@ def test():
     top_paths = [
         [
             extract_path(),  # FIXME these are really x_version_path ...
+            errors_version_path(),
             combine_path(),
             index_path(),
 
@@ -109,9 +114,10 @@ def test():
             
          ]
     ]
-    [print(p) for p in top_paths[0]]
+    [log.debug(p) for p in top_paths[0]]
 
     tdss = [
+        'c549b42b-9a92-4b6d-bf35-4cc2a11f5352',  # xml with trailing whitespace in an identifier >_< ooo or better yet <<mbf instead of <mbf
         'a95b4304-c457-4fa3-9bc9-cc557a220d3e',  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
 
         '3bb4788f-edab-4f04-8e96-bfc87d69e4e5',  # much better, only 100ish files with xmls, XXX woo! this one has xml_index not empty!
@@ -134,6 +140,13 @@ def test():
     for tds in tdss:
         inner_test(tds)
 
+
+def object_source_cache_path(datset_id, object_id, parent_parent_path=Path('~/files/sparc-datasets-test/').expanduser()):
+    # FIXME should probably actually use auth.get_path('data-path') since that is what it use supposed to be used for ...
+    # even if you don't have the drp handy you can still find the object in the data-path objects cache
+    return parent_parent_path / datset_id.uuid / f'dataset/../.operations/objects/{object_id.uuid_cache_path_string(2, 1)}'
+
+
 def inner_test(tds, force=True, debug=True):
     log.info(f'running {tds}')
     dataset_path = (Path('~/files/sparc-datasets-test/').expanduser() / tds / 'dataset').resolve()
@@ -155,7 +168,7 @@ def inner_test(tds, force=True, debug=True):
 
     aps = [all_paths(c) for c in cs]
     if False:
-        [print(p) for paths in aps for p in paths]
+        [log.debug(p) for paths in aps for p in paths]
 
     create_current_version_paths()
 
@@ -173,12 +186,12 @@ def inner_test(tds, force=True, debug=True):
         # e.g. manifest records with no corresponding path
         log.error('drp_index:\n' + '\n'.join(sorted([k.as_posix() for k in drp_index.keys()])))
         # TODO embed somewhere somehow, probably in the dataset-uuid/dataset-uuid record?
-        # i.e. combine_export_path(dataset_id, datset_id)
+        # i.e. combine_export_path(dataset_id, dataset_id)
 
     blobs = [d[-1] for d in drps]
     with_xml_ref = [b for b in blobs if 'external_records' in b and 'xml' in b['external_records']]
     xml_files = [b for b in blobs if pathlib.PurePath(b['path_metadata']['dataset_relative_path']).suffix == '.xml']
-    xml_sources = [b for b in blobs if 'extracted' in b and 'xml' == b['extracted']['extracted']['object_type']]  # FIXME annoying to query
+    xml_sources = [b for b in blobs if 'extracted' in b and 'xml' == b['extracted']['object_type']]
     apparent_targets = [x['external_records']['manifest']['input']['description'][26:] for x in xml_sources
                         if 'external_records' in x and
                         'manifest' in x['external_records'] and
@@ -190,18 +203,22 @@ def inner_test(tds, force=True, debug=True):
 
 def create_current_version_paths():
     ext_path = extract_path()
+    err_path = errors_version_path()
     com_path = combine_path()
     idx_path = index_path()
     archive_path = index_combine_archive_path()
 
     if not ext_path.exists():
-        ext_path.mkdir()
+        ext_path.mkdir(parents=True)
+
+    if not err_path.exists():
+        err_path.mkdir(parents=True)
 
     if not com_path.exists():
-        com_path.mkdir()
+        com_path.mkdir(parents=True)
 
     if not idx_path.exists():
-        idx_path.mkdir()
+        idx_path.mkdir(parents=True)
 
     if not archive_path.exists():
         archive_path.mkdir()
@@ -268,6 +285,17 @@ def _dataset_path_obj_path(dataset_id, object_id):
     return dataset_path, obj_path
 
 
+def _dump_path(dataset_id, object_id, blob, version_export_path):
+    path = version_export_path(dataset_id, object_id)
+    if not path.parent.exists():
+        path.parent.mkdir(exist_ok=True, parents=True)
+
+    with open(path, 'wt') as f:
+        json.dump(blob, f, sort_keys=True, cls=JEncode)
+
+    return path
+
+
 def pathmeta_version_path(pathmeta_version=None):
     pathmeta_version = str(__pathmeta_version__ if pathmeta_version is None else pathmeta_version)
     return sf_export_base / pathmeta_dir_name / pathmeta_version
@@ -290,6 +318,21 @@ def extract_export_path(dataset_id, object_id, extract_version=None):
     return base_path / dataset_path / obj_path
 
 
+def errors_version_path(errors_version=None):  # always the latest but put version there for consistency
+    errors_version = str(__errors_version__ if errors_version is None else errors_version)
+    return sf_export_base / errors_dir_name / errors_version
+
+
+def errors_version_export_path(dataset_id, object_id, errors_version=None):
+    base_path = errors_version_path(errors_version=errors_version)
+    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
+    return base_path / dataset_path / obj_path
+
+
+def dump_error_path(dataset_id, object_id, blob):
+    return _dump_path(dataset_id, object_id, blob, errors_version_export_path)
+
+
 def combine_path(combine_version=None):
     combine_version = str(__combine_version__ if combine_version is None else combine_version)
     return sf_export_base / combine_dir_name / combine_version
@@ -299,6 +342,10 @@ def combine_version_export_path(dataset_id, object_id, combine_version=None):
     base_path = combine_path(combine_version=combine_version)
     dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
     return base_path / dataset_path / obj_path
+
+
+def dump_combine_path(dataset_id, object_id, blob):
+    return _dump_path(dataset_id, object_id, blob, combine_version_export_path)
 
 
 def index_combine_latest_path(index_version=None):
@@ -376,14 +423,13 @@ def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link
 def extract_fun_manifest(path):
     # FIXME this need the template schema version to work ... at least in theory
     # the internals of the implementation mean that if it is missing it isn't fatal
-    extracted = {
-        'type': 'extracted-manifest',
-        'object_type': 'manifest',  # FIXME figure out how to enforce
-    }
+    extracted = {}
     mf = dat.ManifestFile(path)
     try:
         data = mf.data
     except Exception as e:
+        # FIXME should not be embedding errors at this stage at all
+        # however this is pretty much impossible for manifests?
         he = HasErrors(pipeline_stage='objects.manifest.extract_fun')
         if he.addError(e, path=path):
             logd.exception(e)
@@ -412,15 +458,12 @@ def extract_fun_xml(path):
     # TODO yes, in theory this could write the extracted bits
     # to disk directly, but this is a workaround for a memory leak
     # not a rearchitecting of the pipeline ...
-    blob = pipes.XmlFilePipeline._do_subprocess(path, raise_on_error=True)
-    extracted = {
-        'type': 'extracted-xml',
-        'object_type': 'xml',  # FIXME figure out how to enforce
-    }
-
+    blob = pipes.XmlFilePipeline._do_subprocess(path, raise_on_error=True) # FIXME this pulls pathmeta again internally
+    extracted = {}
     if 'contents' in blob:
         if 'errors' in blob['contents']:
             log.warning('sigh errors in contents ???')
+            breakpoint()
             extracted['errors'] = blob['contents'].pop('errors')
 
         extracted['contents'] = blob['contents']
@@ -450,10 +493,7 @@ def extract_fun_xml(path):
 
 
 def extract_fun_xml_debug(path):
-    extracted = {
-        'type': 'extracted-xml',
-        'object_type': 'xml',
-    }
+    extracted = {}
     # XXX adapted from sparcur.pipelines.XmlFilePipeline._path_to_json_meta
     try:
         e = exml.ExtractXml(path)
@@ -461,11 +501,6 @@ def extract_fun_xml_debug(path):
             extracted['contents'] = e.asDict(_fail=True, raise_on_error=True)
             extracted['mimetype'] = e.mimetype
     except NotImplementedError as e:
-        he = HasErrors(pipeline_stage='objects.xml.extract_fun')
-        if he.addError(e, path=path):
-            logd.exception(e)
-
-        he.embedErrors(extracted)
         raise e  # always fatal now
     except Exception as e:
         log.error(f'xml extraction failure for {path!r}')
@@ -533,25 +568,47 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
     dataset_id = RemoteId(dataset_uuid, type='dataset')
     path = Path(path_string)
     object_id = path.cache_identifier
-    #if extract_fun: # no longer needed because extract is only called if extract_fun is NOT None since pathmeta has moved up a level
 
     if path.is_file():  # catch symlink case
-        blob = {  # FIXME duplicate hierarchies here, all this holds is that there was a generic extract here allow individuale extract funs to return whatever they want ... and have differnt keys ...
+        _blob = {
             '__extract_version__': __extract_version__,
             'type': 'extract-object-metadata',
             'remote_id': object_id,
+            'object_type': expex_type,
         }
+
         # FIXME TODO ... kind of external vs internal type ...
         try:
-            extracted = extract_fun(path)  # FIXME really should be extract_fun(path)
-            blob['extracted'] = extracted  # FIXME still doubled ...
+            blob = extract_fun(path)
+            blob.update(_blob)
+        except KeyboardInterrupt as e:
+            raise e
         except Exception as e:
             # unhandled excpetions case
             if he.addError(e, path=path, pipeline_stage='objects.extract.extract_fun'):
                 logd.exception(e)
 
+            he.embedErrors(_blob)
+            error_path = dump_error_path(dataset_id, object_id, _blob)
+            msg = f'error object metadata written to {error_path}'
+            log.log(9, msg)
+            # TODO it would be nice if we could unlink any existing export paths
+            # here for convenience during development, but unfortunately the most
+            # likely cause of a write to the error path is that there was a bug
+            # in the code, so we should retain the export path, and during dev
+            # just remove stale or known bad trees manually
+            return
+
+        try:
+            validate_extract(blob)
+        except exc.ExtractionValidationError as e:
+            if he.addError(e, path=path, pipeline_stage='objects.extract.validate_extract'):
+                logd.exception(e)
+
             he.embedErrors(blob)
-            # we return early becase any failure here means we didn't actually extract
+            error_path = dump_error_path(dataset_id, object_id, blob)
+            msg = f'error object metadata written to {error_path}'
+            log.log(9, msg)
             return
 
         export_path = extract_export_path(dataset_id, object_id)
@@ -601,9 +658,14 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
                 else:
                     breakpoint()
 
-        validate_extract(blob)
         with open(export_path, 'wt') as f:
             json.dump(blob, f, sort_keys=True, cls=JEncode)
+
+        # if we succeed in writing a blob unlink any previous
+        # error blob to keep things tidy
+        errors_path = errors_version_export_path(dataset_id, object_id)
+        if errors_path.exists():
+            errors_path.unlink()
 
         msg = f'extract object metadata written to {export_path}'
         log.log(9, msg)
@@ -618,25 +680,38 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
 
 def validate_extract(blob):
     bads = []
-    def ce(msg): raise ValueError(msg)  # LOL PYTHON can't raise in lambda ...
+    def ce(msg): raise KeyError(msg)  # LOL PYTHON can't raise in lambda ...
     for f in (
             (lambda : blob['type']),
             (lambda : blob['__extract_version__']),
             (lambda : blob['remote_id']),
-            (lambda : blob['extracted']['type']),
-            (lambda : blob['extracted']['object_type']),
-            (lambda : blob['extracted']['contents']),
-            (lambda : True if list(blob['extracted']['contents']) != ['errors'] else ce('ceo')),
+            (lambda : blob['object_type']),
+            (lambda : blob['contents']),
+            (lambda : True if list(blob['contents']) != ['errors'] else ce('ceo')),
     ):
         try:
             f()
-        except Exception as e:
+        except KeyError as e:
             bads.append(e)
 
+    # FIXME TODO we need to remove all embedding of errors from the extraction
+    # phase because either the conversion conforms or it does not and if it does
+    # not then it is assumed that the data is malformed beyond our ability to
+    # proceed in which case we log an error and don't write the file or there
+    # is a bug in the code, using the json schema to detect issues with the
+    # content that was extracted is exactly what should happen in the combine step
+    collect = []
+    JApplyRecursive(get_nested_by_key, blob, 'errors', collect=collect)
+    if collect:
+        # if remote_id is missing we might as well raise here anyway
+        msg = f'errors key detected in extract for {blob["remote_id"]}!\n{collect}'
+        log.warning(msg)
+
     if bads:
-        [log.exception(b) for b in bads]
+        [log.error(b) for b in bads]  # don't use exception because there is not traceback
         # this is an internal error because we control the format of everything we get here
-        raise Exception(f'validate failed for\n{json.dumps(blob, sort_keys=True, indent=2, cls=JEncode)}\n')
+        msg = f'validate failed for\n{json.dumps(blob, sort_keys=True, indent=2, cls=JEncode)}\n'
+        raise exc.ExtractionValidationError(msg)
 
 
 def argv_extract(dataset_uuid, path, force=False):
@@ -975,16 +1050,11 @@ def pex_manifests(dataset_id, oids, name_drp_index=None, **inds):
             continue
 
         blob = path_json(extract_path)  # FIXME might not exist
-        if 'extracted' not in blob:  # FIXME this should never happen now ...
-            breakpoint()
-            continue
 
-        extracted = blob['extracted']
-
-        if 'contents' not in extracted:
+        if 'contents' not in blob:
             continue  # TODO logging
 
-        contents = extracted['contents']
+        contents = blob['contents']
 
         pathmeta_blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
         drp = pathlib.PurePath(pathmeta_blob['dataset_relative_path'])
@@ -1056,16 +1126,15 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
         #xmls[drp] = blob  # FIXME memory usage issues here
         #id_drp[object_id] = drp
 
-        if 'extracted' not in blob:
+        if 'contents' not in blob:
             breakpoint()
             # we're expecting embedded errors or something?
             msg = ('malformed data that should never have been writen'
                    f'{dataset_id} {object_id} {extract_path}\n{blob}')
             raise ValueError(msg)
 
-        extracted = blob['extracted']  # FIXME could be missing ... ??
-        mimetype = extracted['mimetype'] if 'mimetype' in extracted else None
-        if 'contents' not in extracted:
+        mimetype = blob['mimetype'] if 'mimetype' in blob else None
+        if 'contents' not in blob:
             # FIXME TODO logging
             continue
 
@@ -1076,7 +1145,7 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
         else:
             internal_references = {}
 
-        contents = extracted['contents']  # FIXME could be missing ...
+        contents = blob['contents']  # FIXME could be missing ...
         if mimetype == 'application/x.vnd.mbfbioscience.metadata+xml':
             if 'images' not in contents:
                 # FIXME TODO logging and embedding errors in combined for review
@@ -1092,7 +1161,7 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                         'source_drp': drp,
                     },
                     #'dataset_relative_path': 'LOL',  # yeah ... no way this is going to work
-                    'input': extracted,  # FIXME TODO don't embed the whole file, figure out what to extract or just leave it as a pointer
+                    'input': blob,  # FIXME TODO don't embed the whole file, figure out what to extract or just leave it as a pointer
                 }
 
                 target_mbf_path = pathlib.PurePath(target_mbf_path_string)
@@ -1248,7 +1317,12 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
     extract_path = extract_export_path(dataset_id, object_id)
     if extract_path.exists():
         extract_blob = path_json(extract_path)
-        blob['extracted'] = extract_blob  # FIXME duped keys
+        blob['extracted'] = extract_blob
+
+    errors_path = errors_version_export_path(dataset_id, object_id)
+    if errors_path.exists():
+        errors_blob = path_json(errors_path)
+        blob['extract_errors'] = errors_blob
 
     drp = pathlib.PurePath(pathmeta_blob['dataset_relative_path'])
     if (has_recs := drp in drp_index):
@@ -1262,14 +1336,7 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
         msg = f'{dataset_id} {object_id} {drp} has no records of any kind'
         log.warning(msg)  # TODO embed error
 
-    combine_path = combine_version_export_path(dataset_id, object_id)
-    if not combine_path.parent.exists():
-        combine_path.parent.mkdir(exist_ok=True, parents=True)
-
-    with open(combine_path, 'wt') as f:
-        # JEncode minimally needed to deal with Path :/
-        json.dump(blob, f, sort_keys=True, cls=JEncode)
-
+    combine_path = dump_combine_path(dataset_id, object_id, blob)
     msg = f'combine object metadata written to {combine_path}'
     log.log(9, msg)
 
@@ -1334,7 +1401,7 @@ def from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated
     # we realy only care about additions and deletions, and maybe moves
 
     did_index = None
-    parent_index = None
+    parent_index = None  # can remain None if there are only files at the top level
     xml_index = None
     xml_unmapped = None
     drp_index = {}

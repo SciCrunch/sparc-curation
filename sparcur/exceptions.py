@@ -59,6 +59,10 @@ class ValidationError(SparCurError):
         return error.message
 
 
+class ExtractionValidationError(SparCurError):
+    """ objects extraction validation failed """
+
+
 class MissingSecretError(SparCurError):
     """ key not in secrets """
 
