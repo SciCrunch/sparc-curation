@@ -373,7 +373,9 @@ def symlink_latest(dump_path, path, relative=True):
     if relative:
         dump_path = dump_path.relative_path_from(path)
 
-    if path.exists():
+    if path.exists() or path.is_symlink():
+        # when we clean up using sparcur.simple.compact if there is
+        # LATEST_PARTIAL then it make become broken symlink
         if not path.is_symlink():
             raise TypeError(f'Why is {path.name} not a symlink? '
                             f'{path!r}')

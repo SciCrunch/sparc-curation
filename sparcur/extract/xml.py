@@ -361,7 +361,7 @@ class ExtractZen(XmlSource):
     top_tag = 'CellCounter_Marker_File'
     mimetype = 'application/x.vnd.unknown.zen+xml'  # TODO
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         images = [{'path_zen':
                    [pathlib.PurePath(p) for p in
                     self.xpath('Image_Properties/Image_Filename/text()')],}]
@@ -380,7 +380,7 @@ class ExtractLAS(XmlSource):
         return (super().typeMatches() and
                 'LAS AF' in self.xpath('/Data/Image/Attachment/@Application'))
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         images = [{'path_las':
                    [pathlib.PureWindowsPath(p) for p in
                     self.xpath('ImageDescription/FileLocation/text()')],
@@ -401,7 +401,7 @@ class ExtractPVScan(XmlSource):
     top_tag = 'PVScan'  # probably not sufficient ...
     mimetype = 'application/x.vnd.bruker.pvscan+xml'  # TODO
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         # TODO nothing of obvious relevance for metadata
         return {}
 
@@ -412,7 +412,7 @@ class ExtractPVVrecSE(XmlSource):
     top_tag = 'VRecSessionEntry'
     mimetype = 'application/x.vnd.bruker.vrecsessionentry+xml'  # TODO
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         # TODO nothing of obvious relevance for metadata
         return {}
 
@@ -428,7 +428,7 @@ class ExtractPVExperiment(XmlSource):
     top_tag = 'Experiment'  # very helpful xml schema creator guy >_<
     mimetype = 'application/x.vnd.bruker.experiment+xml'  # TODO
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         # TODO nothing of obvious relevance for metadata
         return {}
 
@@ -441,7 +441,7 @@ class ExtractZISRAWSUBBLOCK_METADATA(XmlSource):
     
     mimetype = 'application/x.vnd.zeiss.czi.ZISRAWSUBBLOCK.METADATA+xml'  # TODO
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         # TODO has time information and stage and focus
         # seems to be using file naming conventions to match
         # sidecar to tiff (urg)
@@ -457,7 +457,7 @@ class ExtractMSXMLExcel(XmlSource):
     # not clear that this is really xml metadata, it might count as data
     mimetype = 'application/vnd.ms-excel+xml'  # this isn't real, but close enough
 
-    def _extract(self):
+    def _extract(self, *args, **kwargs):
         return {}
 
 

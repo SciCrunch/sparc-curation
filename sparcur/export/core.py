@@ -368,8 +368,11 @@ class Export(ExportBase):
                 objs.create_current_version_paths()
                 dataset_path = self.export_source_path
                 dataset_id = dataset_path.cache_identifier
-                updated_cache_transitive, object_id_types = objs.from_dataset_path_extract_object_metadata(dataset_path, force=True, debug=False)
-                objs.from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive)
+                (updated_cache_transitive, object_id_types, some_failed
+                 ) = objs.from_dataset_path_extract_object_metadata(
+                     dataset_path, force=True, debug=False)
+                objs.from_dataset_id_object_id_types_combine(
+                    dataset_id, object_id_types, updated_cache_transitive)
 
         # TODO a converter that doesn't care about higher level structure
         #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data

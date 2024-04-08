@@ -75,7 +75,6 @@ index_dir_name = 'index'
 latest_link_name = 'L'  # short to keep symlinks small enough to fit in inodes
 archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
 
-
 _expex_types = (  # aka expex_type
     None,
     'inode/directory',
@@ -86,6 +85,10 @@ _expex_types = (  # aka expex_type
     'submission',
     'subjects',
     'samples',
+    'sites',
+    'performances',
+    'code_description',
+    'submission',
 )
 _metadata_file_types = (
     'manifest', 'dataset_description', 'subjects', 'samples', 'sites',
@@ -155,7 +158,7 @@ def inner_test(tds, force=True, debug=True):
 
     create_current_version_paths()
 
-    updated_cache_transitive, object_id_types = from_dataset_path_extract_object_metadata(dataset_path, force=force, debug=debug)
+    updated_cache_transitive, object_id_types, some_failed = from_dataset_path_extract_object_metadata(dataset_path, force=force, debug=debug)
     drps, drp_index = from_dataset_id_object_id_types_combine(dataset_id, object_id_types, updated_cache_transitive, keep_in_mem=True)
 
     missing_from_inds = [d for d, h, ty, ta, ne, mb in drps if not h and
@@ -599,7 +602,7 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
 
         validate_extract(blob)
         with open(export_path, 'wt') as f:
-            json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+            json.dump(blob, f, sort_keys=True, cls=JEncode)
 
         msg = f'extract object metadata written to {export_path}'
         log.log(9, msg)
@@ -711,7 +714,7 @@ def pathmeta_refresh(dataset_id, object_id, path, force=False):
             export_path.parent.mkdir(exist_ok=True, parents=True)
 
         with open(export_path, 'wt') as f:
-            json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+            json.dump(blob, f, sort_keys=True, cls=JEncode)
 
     return blob, changed
 
@@ -827,7 +830,7 @@ def from_paths_extract_object_metadata(paths, time_now, force=False, debug=False
     # FIXME TODO, right now this makes way too many hardcore assumptions
 
 
-def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False):
+def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False, _Async=Async, _deferred=deferred):
     """ given a dataset_path extract path-metadata and extract-object-metadata
 
     this is a braindead implementation that ignores the existing way
@@ -859,6 +862,10 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
             def i(gen):
                 return list(gen)
             return i
+    else:
+        # LOL PYTHON what is even the point
+        Async = _Async
+        deferred = _deferred
 
     results = Async(rate=False)( # we need Async and deferred to prevent processing
         # of hundres/thousands of xmls files in a subprocess from taking an eternity
@@ -876,12 +883,18 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     bads = []
     object_id_types = []
     for path, id, type, ok, updated in results:
+        if updated_cache_transitive is None:
+            updated_cache_transitive = updated
+        elif updated > updated_cache_transitive:
+            updated_cache_transitive = updated
+
         if not ok:
+            # pretend like the file doesn't exist
+            # or at least doesn't have any relevant content
+            # e.g. we don't not run export because there is no manifest ...
+            # but do update cache transitive because that expects to be
+            # calculated over all paths regardless
             bads.append((path, id))
-            updated_cache_transitive = None
-            object_id_types = []
-            continue
-        elif bads:
             continue
 
         if updated_cache_transitive is None:
@@ -894,13 +907,18 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     if bads:
         # {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"}
         fails = '\n'.join(f'{id} {path}' for path, id in bads)
-        msg = f'{dataset_id} object meta fails:\n{fails}'
-        log.error(msg)
-        msg = f'cannot continue for {dataset_id}'
-        breakpoint()
-        raise ValueError(msg)  # FIXME error type
-    else:
-        return updated_cache_transitive, object_id_types
+        msg = (f'{dataset_id} {len(bads)} object meta fails:\n{fails}\n'
+               'those files will be treated as if they do not exist so '
+               'proceed with caution')
+        log.warning(msg)
+        # should we try to continue anyway and run combine knowing that
+        # we may have to rerun when a file is fixed? do we just pretend like it
+        # never existed in the first place? I think it is safe to continue here
+        # but callers should catch ... except for that thing about return values
+        # and partial failures :/ so instead we return bads and the caller
+        # has to check
+
+    return updated_cache_transitive, object_id_types, bads
 
 
 # these variants imply a certain amount of rework
@@ -1213,12 +1231,13 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
     # the file structure are reflected here, but that is expected
     # at this phase (we manage to avoid it for extract)
     _pids = [RemoteId(pathmeta_blob['parent_id'])]
-    while _pids[-1] in parent_index:
-        _pm1 = _pids[-1]
-        _pid = parent_index[_pm1]
-        _pids.append(_pid)
-        if _pid == _pm1:
-            break
+    if parent_index is not None:  # can happen if there are only files in a dataset at the top level
+        while _pids[-1] in parent_index:
+            _pm1 = _pids[-1]
+            _pid = parent_index[_pm1]
+            _pids.append(_pid)
+            if _pid == _pm1:
+                break
 
     # parent_ids are indexed so that the the first
     # parent id is the immediate parent and the
@@ -1248,7 +1267,7 @@ def combine(dataset_id, object_id, type, drp_index, parent_index):
 
     with open(combine_path, 'wt') as f:
         # JEncode minimally needed to deal with Path :/
-        json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
+        json.dump(blob, f, sort_keys=True, cls=JEncode)
 
     msg = f'combine object metadata written to {combine_path}'
     log.log(9, msg)
@@ -1264,6 +1283,10 @@ pex_funs = {
     'dataset_description': lambda did, oids, **inds: (log.debug('TODO'), None),
     'samples': lambda did, oids, **inds: (log.debug('TODO'), None),
     'subjects': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'submission': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'sites': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'performances': lambda did, oids, **inds: (log.debug('TODO'), None),
+    'code_description': lambda did, oids, **inds: (log.debug('TODO'), None),
     'submission': lambda did, oids, **inds: (log.debug('TODO'), None),
 }
 

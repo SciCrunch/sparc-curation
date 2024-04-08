@@ -351,7 +351,7 @@ def argv_spc_find_meta(dataset_id):
         '-m',
         'sparcur.cli',
         "find",
-        '--dataset-id', dataset_id.uuid,  # nop, debug memory issues
+        '--dataset-id', dataset_id,  # nop, debug memory issues
         "--name", "*.xml",
         "--name", "submission*",
         "--name", "code_description*",
@@ -377,7 +377,7 @@ def argv_spc_export(dataset_id):
         '--no-network',
         # explicitly avoid joblib which induces absurd process overhead
         '--jobs', '1',
-        '--dataset-id', dataset_id.uuid,  # nop, debug memory issues
+        '--dataset-id', dataset_id,  # nop, debug memory issues
     ]
     return argv
 
