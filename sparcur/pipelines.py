@@ -558,7 +558,7 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             he.addError(e, path=path)
             he.embedErrors(metadata)
             if insub:
-                print(json.dumps(metadata))
+                print(json.dumps(metadata, sort_keys=True, indent=2, cls=JEncode))
             if raise_on_error:
                 raise e
         except Exception as e:

@@ -1258,7 +1258,7 @@ class MetadataFile(HasErrors):
 
             return r, c, rn, cn
 
-        if errors := 'errors' in d and d['errors']:
+        if d and (errors := ('errors' in d and d['errors'])):  # FIXME norm returned None ??? was None?
             d['errors'] = [
                 munge(e)
                 if 'error_type' in e and e['error_type'] is exc.TabularCellError

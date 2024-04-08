@@ -117,6 +117,16 @@ def test():
     [log.debug(p) for p in top_paths[0]]
 
     tdss = [
+        # bugs
+        '0c4fc5e8-c332-47d8-9fd8-1fbeb624078c',  # dat norm values returning None???
+        '0967e3b7-09db-4b91-9caf-1090c9d0c437',  # log2(0)
+        '41ca18b1-c991-4709-892e-8ae98907549b',  # JEncode
+        '5942f61b-03f0-4fd6-a116-1de400af7422',  # json decode
+        'a996cdac-2d00-4ad4-9699-8a75ce29c2f1',  # datset description no alt
+        'aa43eda8-b29a-4c25-9840-ecbd57598afc',  # ft reva ultrasound xml format TODO
+        'c3072708-13f4-45ed-992c-b9a744f6a5f3',  # no nums in name for entcomp
+        'd088ed64-4f9f-47ee-bf6d-7d53e1863fc4',  # another json decode
+
         'c549b42b-9a92-4b6d-bf35-4cc2a11f5352',  # xml with trailing whitespace in an identifier >_< ooo or better yet <<mbf instead of <mbf
         'a95b4304-c457-4fa3-9bc9-cc557a220d3e',  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
 
@@ -1210,7 +1220,7 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
 
                     def entcomp(nums1, nums2):
                         both = nums1 & nums2
-                        return sum(log2(n) for n in both)
+                        return sum(log2(1 if n == 0 else n) for n in both)
 
                     suffix = target_mbf_path.suffix
                     suffixes.add(suffix)
@@ -1224,9 +1234,9 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                         #hrm = sorted([(entcomp(tmp_nums, nums), n, nums) for n, no, nums in lev_subset], reverse=True)
                         log.log(9, f'tmp_self_comp {tmp_self_comp}')
                         levs = sorted((
-                            1 - ((
+                            1 - (((
                                 #comp :=
-                                entcomp(tmp_sn, snums)) / tmp_self_comp),
+                                entcomp(tmp_sn, snums)) / tmp_self_comp) if tmp_self_comp else 1),
                             levenshteinDistance(tmpname, n),
                             #comp,
                             n, no) for n, no, nums, snums in lev_subset)
