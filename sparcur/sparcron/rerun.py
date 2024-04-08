@@ -17,9 +17,9 @@ us = timedelta(microseconds=1)
 
 
 def rerun_dataset(conn, dataset):
-    updated, qupdated, *_, rq, running, queued = mget_all(dataset)
+    dataset_id = dataset.id
+    updated, qupdated, *_, rq, running, queued = mget_all(dataset_id)
     if not (rq or running or queued):
-        dataset_id = dataset.id
         sid = 'state-' + dataset_id
         uid = 'updated-' + dataset_id
         qid = 'queued-' + dataset_id
