@@ -1041,8 +1041,13 @@ def from_dataset_id_object_ids_combine(dataset_id): pass
 
 
 def path_json(path):
-    with open(path, 'rt') as f:
-        return json.load(f)
+    try:
+        with open(path, 'rt') as f:
+            return json.load(f)
+    except Exception as e:
+        log.critical(f'json load error for {path!r}')
+        log.exception(e)
+        raise e
 
 
 def pex_manifests(dataset_id, oids, name_drp_index=None, **inds):

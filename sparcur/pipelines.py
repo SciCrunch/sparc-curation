@@ -557,9 +557,10 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             he = dat.HasErrors(pipeline_stage='XmlFilePipeline._path_to_json_meta')
             he.addError(e, path=path)
             he.embedErrors(metadata)
-            if insub:
-                print(json.dumps(metadata, sort_keys=True, indent=2, cls=JEncode))
             if raise_on_error:
+                if insub:
+                    print(json.dumps(metadata, sort_keys=True, indent=2, cls=JEncode))
+
                 raise e
         except Exception as e:
             log.error(f'xml pipeline failure for {path!r}')
@@ -591,7 +592,12 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
                     f'check logs prior to this for cause {path!r}')
                 raise Exception(msg)
 
-        return json.loads(out.decode())
+        try:
+            return json.loads(out.decode())
+        except Exception as e:
+            log.critical(out.decode())
+            breakpoint()
+            raise e
 
     @classmethod
     def do_xml_metadata(cls, local, id):
