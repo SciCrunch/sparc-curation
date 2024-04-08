@@ -137,19 +137,39 @@ def test():
         'd484110a-e6e3-4574-aab2-418703c978e2',  # many xmls ~200 files, but only the segmentations ... no data
     ]
 
+
+    parent_parent_path = Path('~/files/sparc-datasets-test/').expanduser()
+
+    for ecp in (
+            'c549b42b-9a92-4b6d-bf35-4cc2a11f5352/SPARC/High-throughput segmentation of rat unmyelinated axons by deep learning/primary/sub-131/sam-12/131L_F7_metadata.xml',
+    ):
+        err_causing_path = parent_parent_path / ecp
+        try:
+            extract_fun_xml(err_causing_path)
+            assert False, 'should have failed'
+        except AssertionError as e:
+            raise e
+        except Exception as e:
+            pass
+
+        try:
+            extract_fun_xml_debug(err_causing_path)
+            assert False, 'should have failed'
+        except AssertionError as e:
+            raise e
+        except Exception as e:
+            pass
+
+        #extract('c549b42b-9a92-4b6d-bf35-4cc2a11f5352', err_causing_path.as_posix(), expex_type='xml', extract_fun=extract_fun_xml_debug)
+
     for tds in tdss:
-        inner_test(tds)
+        inner_test(tds, parent_parent_path=parent_parent_path)
 
 
-def object_source_cache_path(datset_id, object_id, parent_parent_path=Path('~/files/sparc-datasets-test/').expanduser()):
-    # FIXME should probably actually use auth.get_path('data-path') since that is what it use supposed to be used for ...
-    # even if you don't have the drp handy you can still find the object in the data-path objects cache
-    return parent_parent_path / datset_id.uuid / f'dataset/../.operations/objects/{object_id.uuid_cache_path_string(2, 1)}'
-
-
-def inner_test(tds, force=True, debug=True):
+def inner_test(tds, force=True, debug=True, parent_parent_path=None):
     log.info(f'running {tds}')
-    dataset_path = (Path('~/files/sparc-datasets-test/').expanduser() / tds / 'dataset').resolve()
+
+    dataset_path = (parent_parent_path / tds / 'dataset').resolve()
     cs = list(dataset_path.rchildren)
     dataset_id = dataset_path.cache_identifier
 
@@ -198,7 +218,11 @@ def inner_test(tds, force=True, debug=True):
                         'description' in x['external_records']['manifest']['input']]
     maybe_matches = [b for b in blobs if b['path_metadata']['basename'] in apparent_targets]
 
-    breakpoint()
+
+def object_source_cache_path(datset_id, object_id, parent_parent_path=None):  # TODO
+    # FIXME should probably actually use auth.get_path('data-path') since that is what it use supposed to be used for ...
+    # even if you don't have the drp handy you can still find the object in the data-path objects cache
+    return parent_parent_path / datset_id.uuid / f'dataset/../.operations/objects/{object_id.uuid_cache_path_string(2, 1)}'
 
 
 def create_current_version_paths():
@@ -500,6 +524,8 @@ def extract_fun_xml_debug(path):
         if e.mimetype:
             extracted['contents'] = e.asDict(_fail=True, raise_on_error=True)
             extracted['mimetype'] = e.mimetype
+        elif isinstance(e, exml.NotXml):  # pretty sure this is exactly (not e.mimetype)
+            raise exc.BadDataError(f'xml suffix but not xml data in {path}')
     except NotImplementedError as e:
         raise e  # always fatal now
     except Exception as e:
@@ -585,13 +611,13 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
             raise e
         except Exception as e:
             # unhandled excpetions case
-            if he.addError(e, path=path, pipeline_stage='objects.extract.extract_fun'):
+            if he.addError(e, blame='submission', path=path, pipeline_stage='objects.extract.extract_fun'):
                 logd.exception(e)
 
             he.embedErrors(_blob)
             error_path = dump_error_path(dataset_id, object_id, _blob)
-            msg = f'error object metadata written to {error_path}'
-            log.log(9, msg)
+            msg = f'extract error metadata written to {error_path}'
+            log.debug(msg)  # can caused by user data
             # TODO it would be nice if we could unlink any existing export paths
             # here for convenience during development, but unfortunately the most
             # likely cause of a write to the error path is that there was a bug
@@ -602,13 +628,14 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
         try:
             validate_extract(blob)
         except exc.ExtractionValidationError as e:
-            if he.addError(e, path=path, pipeline_stage='objects.extract.validate_extract'):
-                logd.exception(e)
+            if he.addError(e, blame='pipeline', path=path, pipeline_stage='objects.extract.validate_extract'):
+                log.exception(e)
 
             he.embedErrors(blob)
             error_path = dump_error_path(dataset_id, object_id, blob)
-            msg = f'error object metadata written to {error_path}'
-            log.log(9, msg)
+            msg = f'validate extract error written to {error_path}'
+            log.info(msg)  # 99% of the time caused by us
+            # raise e  # this one is on us but grep for theh pipeline stage
             return
 
         export_path = extract_export_path(dataset_id, object_id)

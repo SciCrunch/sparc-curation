@@ -551,6 +551,8 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
                 metadata['contents'] = e.asDict(_fail=True, raise_on_error=raise_on_error)
                 # FIXME TODO probably want to check that the mimetypes are compatible when overwriting?
                 metadata['mimetype'] = e.mimetype  # overwrites the type
+            elif raise_on_error and isinstance(e, exml.NotXml):
+                raise exc.BadDataError(f'xml suffix but not xml data in {path}')
         except NotImplementedError as e:
             he = dat.HasErrors(pipeline_stage='XmlFilePipeline._path_to_json_meta')
             he.addError(e, path=path)
@@ -570,8 +572,8 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         # hooray for lazy devlopers and lxml leaking memory like wild
         roe = ', raise_on_error=True' if raise_on_error else ''
         argv = sys.executable, '-c', (
-            'import json;from sparcur import pipelines as p, core;'
-            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}, insub=True{roe}));'
+            'import json\nfrom sparcur import pipelines as p, core\n'
+            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}), insub=True{roe})\n'
             'print(json.dumps(m, cls=core.JEncode))')
 
         try:
