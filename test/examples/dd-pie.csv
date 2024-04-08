@@ -1,4 +1,4 @@
-Metadata element,Description,Example,same header,same header,same header
+Metadata element,Description,Example,value 1,value 2,value 3
 Name,Descriptive title for the data set. Equivalent to the title of a scientific paper. The metadata associated with the published version of this dataset does not currently make use of this field.,My SPARC dataset,test dataset 1,,
 Description,"NOTE This field is not currently used when publishing a SPARC dataset. Brief description of the study and the data set. Equivalent to the abstract of a scientific paper. Include the rationale for the approach, the types of data collected, the techniques used, formats and number of files and an approximate size. The metadata associated with the published version of this dataset does not currently make use of this field.",A really cool dataset that I collected to answer some question.,some data,,
 Keywords,A set of 3-5 keywords other than the above that will aid in search,"spinal cord, electrophysiology, RNA-seq, mouse",test,data,sparc

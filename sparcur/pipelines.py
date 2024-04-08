@@ -2,6 +2,7 @@ import re
 import sys
 import copy
 import json
+import signal
 import pathlib
 import subprocess
 from socket import gethostname
@@ -540,20 +541,23 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         return self.do_xml_metadata(self.path, self.id)
 
     @staticmethod
-    def _path_to_json_meta(path):
+    def _path_to_json_meta(path, insub=False):
         metadata = path._jsonMetadata(do_expensive_operations=False)
         try:
             e = exml.ExtractXml(path)
             # XXX sideeffects to retrieve path metadata
             # FIXME expensive operations is hardcoded & blocked
             if e.mimetype:
-                metadata['contents'] = e.asDict()
+                metadata['contents'] = e.asDict(_fail=True, insub=insub)
                 # FIXME TODO probably want to check that the mimetypes are compatible when overwriting?
                 metadata['mimetype'] = e.mimetype  # overwrites the type
         except NotImplementedError as e:
             he = dat.HasErrors(pipeline_stage='XmlFilePipeline._path_to_json_meta')
             he.addError(e, path=path)
             he.embedErrors(metadata)
+            if insub:
+                json.dumps(metadata)
+                raise e
         except Exception as e:
             log.error(f'xml pipeline failure for {path!r}')
             raise e
@@ -565,7 +569,7 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         # hooray for lazy devlopers and lxml leaking memory like wild
         argv = sys.executable, '-c', (
             'import json;from sparcur import pipelines as p, core;'
-            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}));'
+            f'm = p.XmlFilePipeline._path_to_json_meta(p.Path({path.as_posix()!r}, insub=True));'
             'print(json.dumps(m, cls=core.JEncode))')
 
         try:
@@ -575,9 +579,9 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             p.send_signal(signal.SIGINT)
             raise e
 
-        if not out and err:
+        if p.returncode != 0:
             log.error(f'xml pipeline failures for {path!r}')
-            raise Exception(err.decode())
+            raise Exception(out.decode())
 
         return json.loads(out.decode())
 

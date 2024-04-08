@@ -57,6 +57,8 @@ class Helper:
             'dataset-template-2.1.0',
             'HEAD',)
 
+    _cry_base = None
+
     def setUp(self):
         if temp_path.exists():
             temp_path.rmtree()
@@ -67,6 +69,22 @@ class Helper:
 
     def tearDown(self):
         temp_path.rmtree()
+
+    def _cry(self, tfn, rcfs, should_embed=True):
+        base = examples_root / self._cry_base
+        tf = temp_path / tfn
+        change_rcs(base, tf, rcfs)
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            if should_embed:
+                assert 'errors' in value, 'should have embedded errors'
+                blobs = [eb for eb in value['errors'] if 'error_type' in eb and eb['error_type'] == exc.MalformedHeaderError]
+                assert blobs, 'embedded errors should be MalformedHeaderError'
+            else:
+                assert False, 'should have failed'
+        except exc.MalformedHeaderError as e:
+            print(e)
 
     def _versions(self):
         tf = temp_path / 'test-file.xlsx'
@@ -155,7 +173,10 @@ class TestSubmissionFile(Helper, unittest.TestCase):
         obj = self.metadata_file_class(tf)
         try:
             value = obj.data
-            assert False, "Should have failed."
+            assert 'errors' in value, 'should have embedded errors'
+            blobs = [eb for eb in value['errors'] if 'error_type' in eb and eb['error_type'] == exc.MalformedHeaderError]
+            assert blobs, 'embedded errors should be MalformedHeaderError'
+            assert 'submission' not in value, 'this file should be empty'
         except exc.MalformedHeaderError:
             pass
 
@@ -197,6 +218,7 @@ class TestDatasetDescription(Helper, unittest.TestCase):
     pipe = pipes.DatasetDescriptionFilePipeline
     use_examples = 2
     canary_key = 'contributors'
+    _cry_base = 'dd-pie.csv'
     
     def test_dataset_description(self):
         pass
@@ -208,27 +230,23 @@ class TestDatasetDescription(Helper, unittest.TestCase):
         pprint.pprint(value)
         ser_deser(value)
 
-    def test_dd_cry_alt(self):
-        base = examples_root / 'dd-pie.csv'
-        tf = temp_path / 'dd-cry-null-alt.csv'
-        change_rcs(base, tf, [[0, 3, lambda _: '']])
-        obj = self.metadata_file_class(tf)
-        try:
-            value = obj.data
-            assert False, 'should have failed'
-        except exc.MalformedHeaderError as e:
-            print(e)
+    def test_dd_cry_null_alt(self):
+        self._cry('dd-cry-null-alt.csv', [[0, 3, lambda _: '']])
 
-    def test_dd_cry_header(self):
-        base = examples_root / 'dd-pie.csv'
-        tf = examples_root / 'dd-cry-null-header.csv'
-        change_rcs(base, tf, [[3, 0, lambda _: '']])
-        obj = self.metadata_file_class(tf)
-        try:
-            value = obj.data
-            assert False, 'should have failed'
-        except exc.MalformedHeaderError as e:
-            print(e)
+    def test_dd_cry_null_header(self):
+        self._cry('dd-cry-null-header.csv', [[3, 0, lambda _: '']])
+
+    def test_dd_cry_dupe_header(self):
+        self._cry('dd-cry-dupe-header.csv', [[6, 0, lambda _: 'Contributor ORCID ID']])
+
+    def test_dd_cry_multi(self):
+        self._cry(
+            'dd-cry-multi.csv',
+            [[0, 4, lambda _: ''],  # null_alt
+             [3, 0, lambda _: ''],  # null_header
+             [6, 0, lambda _: 'Contributor ORCID ID'],  # dupe_header
+             # dupe_alt not fatal here
+             ])
 
     def test_dd_pie_pipeline(self):
         tf = examples_root / 'dd-pie.csv'
@@ -245,6 +263,7 @@ class TestSubjectsFile(Helper, unittest.TestCase):
     template = 'subjects.xlsx'
     metadata_file_class = SubjectsFile
     pipe = pipes.SubjectsFilePipeline
+    _cry_base = 'su-pie.csv'
 
     def test_su_pie(self):
         tf = examples_root / 'su-pie.csv'
@@ -263,42 +282,19 @@ class TestSubjectsFile(Helper, unittest.TestCase):
         assert [s for s in value['subjects'] if 'subject_id' in s]
 
     def test_su_cry_alt(self):
-        base = examples_root / 'su-pie.csv'
-        tf = temp_path / 'su-cry-null-alt.csv'
-        change_rcs(base, tf, [[0, 4, lambda _: '']])
-        obj = self.metadata_file_class(tf)
-        try:
-            value = obj.data
-            assert False, 'should have failed'
-        except exc.MalformedHeaderError as e:
-            print(e)
+        self._cry('su-cry-null-alt.csv', [[0, 4, lambda _: '']])
 
     def test_su_cry_header(self):
-        base = examples_root / 'su-pie.csv'
-        tf = temp_path / 'su-cry-null-header.csv'
-        change_rcs(base, tf, [[4, 0, lambda _: '']])
-        obj = self.metadata_file_class(tf)
-        try:
-            value = obj.data
-            assert False, 'should have failed'
-        except exc.MalformedHeaderError as e:
-            print(e)
+        self._cry('su-cry-null-header.csv', [[4, 0, lambda _: '']])
 
     def test_su_cry_multi(self):
-        base = examples_root / 'su-pie.csv'
-        tf = temp_path / 'su-cry-multi.csv'
-        change_rcs(base, tf,
-                   [[0, 4, lambda _: ''],  # null_alt
-                    [4, 0, lambda _: ''],  # null_header
-                    [0, 5, lambda _: 'strain'],  # dupe_alt
-                    [6, 0, lambda _: 'bb-1'],  # dupe_header
-                    ])
-        obj = self.metadata_file_class(tf)
-        try:
-            value = obj.data
-            assert False, 'should have failed'
-        except exc.MalformedHeaderError as e:
-            print(e)
+        self._cry(
+            'su-cry-multi.csv',
+            [[0, 3, lambda _: ''],  # null_alt
+             [4, 0, lambda _: ''],  # null_header
+             [0, 5, lambda _: 'strain'],  # dupe_alt  # not fatal
+             [6, 0, lambda _: 'bb-2'],  # dupe_header
+             ])
 
     def test_versions(self):
         self._versions()
@@ -308,6 +304,7 @@ class TestSamplesFile(Helper, unittest.TestCase):
     template = 'samples.xlsx'
     metadata_file_class = SamplesFile
     pipe = pipes.SamplesFilePipeline
+    _cry_base = 'sa-pie.csv'
 
     def test_samples_duplicate_ids(self):
         tf = examples_root / 'samples-duplicate-ids.csv'
@@ -325,24 +322,41 @@ class TestSamplesFile(Helper, unittest.TestCase):
         pprint.pprint(value)
         ser_deser(value)
         derp = list(value['samples'][0])
-        assert 'same_header' in derp, derp
+
+    def test_sa_pie_no_overwrite(self):
+        base = examples_root / 'sa-pie.csv'
+        tf = temp_path / 'sa-cry-no-overwrite-on-dupe.csv'
+        change_rcs(base, tf, [[0, 23, lambda _: 'header 1']])
+        obj = self.metadata_file_class(tf)
+        # print([(i, c) for i, c in enumerate(list(obj._t())[0])])
+        value = obj.data
+        derp = list(value['samples'][0])
+        assert 'header_1' in derp, derp
+        assert len([h for h in derp if h.startswith('header_1')]) > 1, 'silent overwrite happening'
+
+    def test_sa_cry_null_pk_0(self):
+        self._cry('sa-cry-null-pk-0.csv', [[4, 0, lambda _: '']])
+
+    def test_sa_cry_null_pk_1(self):
+        self._cry('sa-cry-null-pk-1.csv', [[4, 1, lambda _: '']])
+
+    def test_sa_cry_dupe_pk(self):
+        self._cry('sa-cry-dupe-pk.csv', [[6, 1, lambda _: 'slice-3']])
+
+    def test_sa_cry_dupe_alt(self):
+        # alt dupes are warnings instead of fatal?
+        # should this be the case? probably not, it should be fatal
+        self._cry('sa-cry-dupe-alt.csv', [[0, 5, lambda _: 'specimen anatomical location']])
 
     def test_sa_cry_multi(self):
-        base = examples_root / 'sa-pie.csv'
-        tf = temp_path / 'sa-cry-multi.csv'
-        change_rcs(base, tf,
-                   [[0, 4, lambda _: ''],  # null_alt
-                    [4, 0, lambda _: ''],  # null_header
-                    [0, 5, lambda _: 'specimen anatomical location'],  # dupe_alt
-                    [6, 1, lambda _: 'slice-3'],  # dupe_header
-                    ])
-        obj = self.metadata_file_class(tf)
-        breakpoint()
-        try:
-            value = obj.data
-            assert False, 'should have failed'
-        except exc.MalformedHeaderError as e:
-            print(e)
+        self._cry(
+            'sa-cry-multi.csv',
+            [[0, 3, lambda _: ''],  # null_alt
+             [4, 0, lambda _: ''],  # null_header 0
+             [8, 1, lambda _: ''],  # null_header 1
+             [0, 5, lambda _: 'specimen anatomical location'],  # dupe_alt  # not fatal atm
+             [6, 1, lambda _: 'slice-3'],  # dupe_header
+             ])
 
     def test_versions(self):
         self._versions()

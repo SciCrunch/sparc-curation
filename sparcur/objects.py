@@ -109,22 +109,21 @@ def test():
     [print(p) for p in top_paths[0]]
 
     tdss = [
+        '3bb4788f-edab-4f04-8e96-bfc87d69e4e5',  # much better, only 100ish files with xmls, XXX woo! this one has xml_index not empty!
+        'ded103ed-e02d-41fd-8c3e-3ef54989da81',  # ooo, has a non-empty xml_index :D
         'a95b4304-c457-4fa3-9bc9-cc557a220d3e',  # many xmls ~2k files so good balance, but lol ZERO of the files actually traced are provided ???
         # also has a case where we get exracted without extracted but with errors because it has the mbf xml with no namespace
 
         '645267cb-0684-4317-b22f-dd431c6de323',  # small dataset with lots of manifests
         # '21cd1d1b-9434-4957-b1d2-07af75ad3546',  # big xml test sadly too many files (> 80k) to be practical for testing
         # '46bcac1d-3e45-499b-82a8-0ee1852bcc4d',  # manifest column naming issues
-        '3bb4788f-edab-4f04-8e96-bfc87d69e4e5',  # much better, only 100ish files with xmls
         '57466879-2cdd-4af2-8bd6-7d867423c709',  # has vesselucida files
         '75133e23-a572-42ee-876c-7dc127d280db',  # some segmentation
-
 
         'e4bfb720-a367-42ab-92dd-31fd7eefb82e',  # XXX big memory usage ... its going to be lxml again isn't it
         'f58c75a2-7d86-439a-8883-e9a4ee33d7fa',  # jpegs might correspond to subject id ??? ... ya subjects and samples but oof oof
 
         'bec4d335-9377-4863-9017-ecd01170f354',
-        'ded103ed-e02d-41fd-8c3e-3ef54989da81',
         'd484110a-e6e3-4574-aab2-418703c978e2',  # many xmls ~200 files, but only the segmentations ... no data
     ]
 
@@ -136,7 +135,6 @@ def inner_test(tds, force=True, debug=True):
     dataset_path = (Path('~/files/sparc-datasets-test/').expanduser() / tds / 'dataset').resolve()
     cs = list(dataset_path.rchildren)
     dataset_id = dataset_path.cache_identifier
-
 
     def all_paths(c):
         return [
@@ -152,7 +150,8 @@ def inner_test(tds, force=True, debug=True):
         ]
 
     aps = [all_paths(c) for c in cs]
-    [print(p) for paths in aps for p in paths]
+    if False:
+        [print(p) for paths in aps for p in paths]
 
     create_current_version_paths()
 
@@ -173,9 +172,7 @@ def inner_test(tds, force=True, debug=True):
         # i.e. combine_export_path(dataset_id, datset_id)
 
     blobs = [d[-1] for d in drps]
-    #with_xml_ref = [b for b in blobs
-    #                if 'external_records' in b and
-    #                'xml' in b['external_records']['extracted']['object_type']]
+    with_xml_ref = [b for b in blobs if 'external_records' in b and 'xml' in b['external_records']]
     xml_files = [b for b in blobs if pathlib.PurePath(b['path_metadata']['dataset_relative_path']).suffix == '.xml']
     xml_sources = [b for b in blobs if 'extracted' in b and 'xml' == b['extracted']['extracted']['object_type']]  # FIXME annoying to query
     apparent_targets = [x['external_records']['manifest']['input']['description'][26:] for x in xml_sources
@@ -457,7 +454,7 @@ def extract_fun_xml_debug(path):
     try:
         e = exml.ExtractXml(path)
         if e.mimetype:
-            extracted['contents'] = e.asDict()
+            extracted['contents'] = e.asDict(_fail=True)
             extracted['mimetype'] = e.mimetype
     except NotImplementedError as e:
         he = HasErrors(pipeline_stage='objects.xml.extract_fun')
@@ -465,6 +462,7 @@ def extract_fun_xml_debug(path):
             logd.exception(e)
 
         he.embedErrors(extracted)
+        raise e  # always fatal now
     except Exception as e:
         log.error(f'xml extraction failure for {path!r}')
         raise e
@@ -599,6 +597,7 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
                 else:
                     breakpoint()
 
+        validate_extract(blob)
         with open(export_path, 'wt') as f:
             json.dump(blob, f, sort_keys=True, indent=2, cls=JEncode)
 
@@ -611,6 +610,29 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
         # extract, fetch, extract, fetch process is too much
         msg = f'not extracting because not fetched {path.name}'
         log.warning(msg)
+
+
+def validate_extract(blob):
+    bads = []
+    def ce(msg): raise ValueError(msg)  # LOL PYTHON can't raise in lambda ...
+    for f in (
+            (lambda : blob['type']),
+            (lambda : blob['__extract_version__']),
+            (lambda : blob['remote_id']),
+            (lambda : blob['extracted']['type']),
+            (lambda : blob['extracted']['object_type']),
+            (lambda : blob['extracted']['contents']),
+            (lambda : True if list(blob['extracted']['contents']) != ['errors'] else ce('ceo')),
+    ):
+        try:
+            f()
+        except Exception as e:
+            bads.append(e)
+
+    if bads:
+        [log.exception(b) for b in bads]
+        # this is an internal error because we control the format of everything we get here
+        raise Exception(f'validate failed for\n{json.dumps(blob, sort_keys=True, indent=2, cls=JEncode)}\n')
 
 
 def argv_extract(dataset_uuid, path, force=False):
@@ -830,6 +852,14 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     # also, how do we deal with organizations, there is nothing to extract so to speak ... maybe they are dealt with at the
     # combine level ... yes, I think we are ok to skip dataset and org at this point and deal with them at combine
 
+    if debug:
+        # breakpoint and Async still not cooperating
+        def deferred(f): return f
+        def Async(**kwargs):
+            def i(gen):
+                return list(gen)
+            return i
+
     results = Async(rate=False)( # we need Async and deferred to prevent processing
         # of hundres/thousands of xmls files in a subprocess from taking an eternity
         # unfortunately this means that each spc export will use a full worker count
@@ -862,7 +892,8 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         object_id_types.append((id, type))
 
     if bads:
-        fails = '\n'.join(f'{id} {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"} {path}' for path, id in bads)
+        # {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"}
+        fails = '\n'.join(f'{id} {path}' for path, id in bads)
         msg = f'{dataset_id} object meta fails:\n{fails}'
         log.error(msg)
         msg = f'cannot continue for {dataset_id}'
@@ -1027,13 +1058,9 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
             internal_references = {}
 
         contents = extracted['contents']  # FIXME could be missing ...
-        if mimetype in (
-                'application/x.vnd.mbfbioscience.metadata+xml',
-                'application/x.vnd.mbfbioscience.neurolucida+xml',
-                'application/x.vnd.mbfbioscience.vesselucida+xml',  # does have path_mbf
-        ):
+        if mimetype == 'application/x.vnd.mbfbioscience.metadata+xml':
             if 'images' not in contents:
-                # FIXME TODO logging
+                # FIXME TODO logging and embedding errors in combined for review
                 continue
 
             suffixes = set()
@@ -1046,8 +1073,7 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                         'source_drp': drp,
                     },
                     #'dataset_relative_path': 'LOL',  # yeah ... no way this is going to work
-                    'input': extracted,  # FIXME not quite right, maybe prefer just the pointer and deref later? or maybe just the image section?
-                    # TODO contours go here i think
+                    'input': extracted,  # FIXME TODO don't embed the whole file, figure out what to extract or just leave it as a pointer
                 }
 
                 target_mbf_path = pathlib.PurePath(target_mbf_path_string)

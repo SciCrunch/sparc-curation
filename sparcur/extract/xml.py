@@ -57,7 +57,7 @@ class NotXml(HasErrors):
         super().__init__()
         self.path = path
 
-    def asDict(self):
+    def asDict(self, **kwargs):
         out = {}
         self.embedErrors(out)
         return out
@@ -200,8 +200,17 @@ class XmlSource(HasErrors):
                 return thing
 
         try:
-            data_in = self._extract(*args, **kwargs)
+            prefix = '_:' if '_' in self.namespaces else ''
+            data_in = self._extract(*args, prefix=prefix, **kwargs)
         except Exception as e:
+            # this is almost always run in a subprocess so print and raise
+            log.exception(e)
+            if 'insub' in kwargs and kwargs['insub'] or True:
+                import json
+                print(json.dumps({'error': str(e)}))
+
+            raise e
+
             msg = f'extract failed with {e}'
             if self.addError(msg, blame='stage', path=self.path):
                 # usually is submission, but can't always tell
@@ -226,34 +235,61 @@ hasSchema = sc.HasSchema()
 @hasSchema.mark
 class ExtractMBF(XmlSource):
 
-    top_tag = '{http://www.mbfbioscience.com}mbf'
+    top_tags = (
+        '{http://www.mbfbioscience.com}mbf',
+        '{http://www.mbfbioscience.com/2007/neurolucida}mbf',
+        'mbf',
+    )
     mimetype = 'application/x.vnd.mbfbioscience.metadata+xml'
+    # neurolucida and vesselucida have appeared instead of .metadata but no longer used
+
+    def typeMatches(self):
+        if not self._isXml:
+            return False
+
+        top_tag = self.e.getroot().tag
+        if top_tag == 'mbf':
+            self._prefix = ''
+
+        for tt in self.top_tags:
+            if tt == top_tag:
+                return True
+
+        #_p = '_:' if self.top_tag.startswith('{') else ''
+        #return self._isXml and self.e.getroot().tag == self.top_tag and self.appname in self.xpath(f'/{_p}mbf/@appname')
 
     @hasSchema.f(sc.MbfTracingSchema)
-    def asDict(self, unique=True, guid=False):
-        return self._condense(unique=unique, guid=guid)
+    def asDict(self, unique=True, guid=False, **kwargs):
+        return self._condense(unique=unique, guid=guid, **kwargs)
 
-    def _condense(self, unique=True, guid=False):
-        data_in = super()._condense(unique=unique, guid=guid)
-        if 'contours' in data_in:
-            if not guid:
-                # remove guid fields if present
-                # option to retain if a use case for this appears
-                for c in data_in['contours']:
-                    c.pop('guid', None)
+    def _condense(self, unique=True, guid=False, **kwargs):
+        data_in = super()._condense(unique=unique, guid=guid, **kwargs)
+        to_dedupe = 'contours', 'trees', 'vessels'
+        for key in to_dedupe:
+            if key in data_in:
+                if not guid:
+                    # remove guid fields if present
+                    # option to retain if a use case for this appears
+                    for c in data_in[key]:
+                        c.pop('guid', None)
 
-            if unique:
-                # by default only store uniquely identified contours,
-                # they may be identified by their list index but we
-                # don't need that for this part of the metadata
-                data_in['contours'] = [dict(s) for s in
-                                       set(frozenset(d.items())
-                                           for d in data_in['contours'])]
+                if unique:
+                    # by default only store uniquely identified contours,
+                    # they may be identified by their list index but we
+                    # don't need that for this part of the metadata
+                    data_in[key] = [
+                        dict(s) for s in
+                        set(frozenset(d.items())
+                            for d in data_in[key])]
 
         return data_in
 
-    def _extract(self, *args, prefix='_:', **kwargs):
-        _p = prefix
+    def _extract(self, *args, prefix=None, **kwargs):
+        _p = self._prefix if prefix is None else prefix
+        appname = self.xpath(f'/{_p}mbf/@appname')
+        appversion = self.xpath(f'/{_p}mbf/@appversion')
+        apprrid = self.xpath(f'/{_p}mbf/@apprrid')
+        insrrid = self.xpath(f'/{_p}mbf/@insrrid')
         subject = {
             'id':      self.xpath(f'{_p}sparcdata/{_p}subject/@subjectid'),
             'species': self.xpath(f'{_p}sparcdata/{_p}subject/@species'),
@@ -288,49 +324,36 @@ class ExtractMBF(XmlSource):
             for contour in self.xpath(f'{_p}contour')
             for xpath in (self.mkx(contour),)]
 
+        trees = [
+            {'entity_type': xpath('@type'),
+             'leaf': xpath('@leaf'),
+             }
+            for i, tree in enumerate(self.xpath(f'{_p}tree'))
+            for xpath in (self.mkx(tree),)
+        ]
+
+        vessels = [
+            {'entity_type': xpath('@type'),
+             'channel':        xpath(f'{_p}property[@name="Channel"]/{_p}s/text()'),
+             }
+            for vessel in self.xpath(f'{_p}vessel')
+            for xpath in (self.mkx(vessel),)
+        ]
+
         return {
+            'meta': {
+                'appname': appname,
+                'appversion': appversion,
+                'apprrid': apprrid,
+                'insrrid': insrrid,
+            },
             'subject':  subject,
             'atlas':    atlas,
             'images':   images,
             'contours': contours,
+            'trees': trees,
+            'vessels': vessels,
         }
-
-
-hasSchema = sc.HasSchema()
-@hasSchema.mark
-class ExtractNeurolucida(ExtractMBF):
-
-    top_tag = '{http://www.mbfbioscience.com/2007/neurolucida}mbf'
-    mimetype = 'application/x.vnd.mbfbioscience.neurolucida+xml'
-
-    _bv = {'version': '4.0', 'appname': 'Neurolucida 360', 'appversion': '2019.1.1 (64-bit)'}
-
-    def typeMatches(self):
-        """ handle missing xmlns files >_< """
-        return (super().typeMatches or
-                (top_tag == 'mbf' and self.e.getroot().attrib == _bv
-                 and not logd.error(f'bad mbf xml for neurolucida in {self.path}')))  # XXX make sure it still actually matches the type ...
-
-    @hasSchema.f(sc.NeurolucidaSchema)
-    def asDict(self, unique=True, guid=False):
-        # pretty sure we can't use super().asDict() here because
-        # the schemas will fight with eachother
-        data_in = self._condense(unique=unique, guid=guid)
-        self.embedErrors(data_in)
-        return data_in
-
-
-class ExtractVesselucida(ExtractMBF):
-
-    top_tag = 'mbf'
-    mimetype = 'application/x.vnd.mbfbioscience.vesselucida+xml'
-
-    def typeMatches(self):
-        return (super().typeMatches() and
-                'Vesselucida' in self.xpath('/mbf/@appname'))
-
-    def _extract(self, *args, prefix='', **kwargs):
-        return super()._extract(*args, prefix=prefix, **kwargs)
 
 
 class ExtractZen(XmlSource):

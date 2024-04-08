@@ -421,7 +421,7 @@ class HasSchema:
         def decorator(function):
             pipeline_stage_name = function.__qualname__
             @wraps(function)
-            def schema_wrapped_property(_self, *args, **kwargs):
+            def schema_wrapped_property(_self, *args, __fail=fail, _fail=False, **kwargs):
                 if schema_wrapped_property.schema == schema_class:
                     schema_wrapped_property.schema = schema_class()
 
@@ -429,9 +429,10 @@ class HasSchema:
                 data = function(_self, *args, **kwargs)
                 ok, norm_or_error, data = schema.validate(data)
                 if not ok:
-                    if fail:
+                    if __fail or _fail:
                         logd.error('schema validation has failed and fail=True')
-                        logd.critical(f'failing dataset is {data["id"]}')
+                        if 'id' in data:
+                            logd.critical(f'failing dataset is {data["id"]}')
                         raise norm_or_error
 
                     # I have no idea why this if statement used to be in
@@ -680,6 +681,9 @@ class ToExport(RuntimeSchema):
         cls.schema = json_version(version)
 
 
+# FIXME not quite right if someone puts a manifest at the bottom in
+# a folder with spaces in the name, or if it is in an sds id folder
+# that has numbers in the id
 metadata_filename_pattern = r'^.+\/[A-Za-z-_\/]+\.(xlsx|csv|tsv|json)$'
 
 simple_url_pattern = r'^(https?):\/\/([^\s\/]+)\/([^\s]*)'
@@ -848,8 +852,15 @@ class ProvSchema(JSONSchema):
 class MbfTracingSchema(JSONSchema):
     schema = {
         'type': 'object',
-        'required': ['subject', 'atlas', 'images', 'contours'],
+        #'required': ['subject', 'atlas', 'images', 'contours'],  # NOTHING IS REQUIRED but everything is not permitted
         'properties': {
+            'meta': {'type': 'object',
+                     'properties': {
+                         'appname': {'type': 'string'},
+                         'appversion': {'type': 'string'},
+                         'apprrid': {'type': 'string'},
+                         'insrrid': {'type': 'string'},
+                     },},
             'subject': {'type': 'object',
                         'required': ['id'],
                         'properties': {'id': {'type': 'string'},
@@ -883,12 +894,20 @@ class MbfTracingSchema(JSONSchema):
                                        'name': string_noltws,
                                        'guid': {'type': 'string'},
                                        'id_ontology': {'type': 'string'},},
-                                   },},},}
-
-
-class NeurolucidaSchema(JSONSchema):
-    schema = copy.deepcopy(MbfTracingSchema.schema)
-    schema['required'] = ['images', 'contours']
+                                   },},
+            'trees': {'type': 'array',
+                      'items': {'type': 'object',
+                                'properties': {
+                                    'entity_type': {'type': 'string'},
+                                    'leaf': {'type': 'string'},
+                                    },},},
+            'vessels': {'type': 'array',
+                        'items': {'type': 'object',
+                                  'properties': {
+                                      'entity_type': {'type': 'string'},
+                                      'channel': {'type': 'string'},
+                                  },},},
+        },}
 
 
 class DatasetStructureSchema(JSONSchema):

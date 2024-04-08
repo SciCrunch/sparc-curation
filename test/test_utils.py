@@ -78,6 +78,17 @@ class TestBlackfynnId(unittest.TestCase):
         thing = self._id_class(self.cases[0])
         ac = thing.asCell()
 
+    def test_uuid_cache_path_string(self):
+        ttds = self._id_class('7b2165ef-5153-4a0e-8476-10888d3bb1a5', type='dataset')
+        ttds_b64 = 'eyFl71FTSg6EdhCIjTuxpQ'
+        assert ttds.uuid_cache_path_string(2, 3) == '7b/21/65/7b2165ef-5153-4a0e-8476-10888d3bb1a5'
+        assert ttds.uuid_cache_path_string(2, 1) == '7b/7b2165ef-5153-4a0e-8476-10888d3bb1a5'
+        assert ttds.uuid_cache_path_string(1, 5) == '7/b/2/1/6/7b2165ef-5153-4a0e-8476-10888d3bb1a5'
+
+        assert ttds.uuid_cache_path_string(2, 3, use_base64=True) == 'ey/Fl/71/eyFl71FTSg6EdhCIjTuxpQ'
+        assert ttds.uuid_cache_path_string(2, 1, use_base64=True) == 'ey/eyFl71FTSg6EdhCIjTuxpQ'
+        assert ttds.uuid_cache_path_string(1, 5, use_base64=True) == 'e/y/F/l/7/eyFl71FTSg6EdhCIjTuxpQ'
+
 
 class TestPennsieveId(TestBlackfynnId):
 
