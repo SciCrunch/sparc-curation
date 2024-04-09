@@ -218,8 +218,8 @@ def populate_existing_redis(conn):
             internal_version = (int(blob['prov']['sparcur_internal_version'])
                                 if 'sparcur_internal_version' in blob['prov']
                                 else 0)
-            fs_version = (int(blob['prov']['sparcur_file_translation_version'])
-                          if 'sparcur_file_translation_version' in blob['prov']
+            fs_version = (int(blob['prov']['sparcur_fs_translation_version'])
+                          if 'sparcur_fs_translation_version' in blob['prov']
                           else 0)
             rd_version = (int(blob['inputs']['remote_dataset_metadata']['_meta_version'])
                           if ('inputs' in blob and
@@ -247,9 +247,9 @@ def populate_existing_redis(conn):
     conn.mset(initd)
 
     _keys = [k for k in sorted(conn.keys()) if b'N:dataset' in k]
-    _values = conn.mget(keys)
+    _values = conn.mget(_keys)
     _inits = {k:v for k, v in zip(_keys, _values)}
-    log.info(pprint.ppformat(_inits, width=120))
+    log.info(pprint.pformat(_inits, width=120))
 
 
 @cel.on_after_finalize.connect
@@ -684,9 +684,18 @@ def mget_all(dataset_id):
                   if _rd_version is not None
                   else 0)  # FIXME new dataset case?
     sheet_changed = int(_sheet_changed) if _sheet_changed is not None else None
-    pipeline_changed = (internal_version < sparcur.__internal_version__ or
-                        fs_version < Remote._translation_version or
-                        rd_version < RemoteDatasetData._translation_version)
+    ivc = internal_version < sparcur.__internal_version__
+    fvc = fs_version < Remote._translation_version
+    rvc = rd_version < RemoteDatasetData._translation_version
+    log.debug((
+        ivc,
+        fvc,
+        rvc,
+        internal_version, sparcur.__internal_version__,
+        fs_version, Remote._translation_version,
+        rd_version, RemoteDatasetData._translation_version,
+    ))
+    pipeline_changed = (ivc or fvc or rvc)
     rq = state == _qed_run
     running = state == _run or rq
     queued = state == _qed or rq
