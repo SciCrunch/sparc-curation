@@ -687,7 +687,7 @@ def mget_all(dataset_id):
     ivc = internal_version < sparcur.__internal_version__
     fvc = fs_version < Remote._translation_version
     rvc = rd_version < RemoteDatasetData._translation_version
-    log.debug((
+    log.log(9, (
         ivc,
         fvc,
         rvc,
