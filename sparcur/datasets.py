@@ -1213,18 +1213,28 @@ class MetadataFile(HasErrors):
         nc = self.normalization_class(self)  # calls _clean internally
         d = nc.data
 
-        def munge(eblob):
-            e = eblob['message']
-            path = eblob['file_path']
-            r, c, rn, cn = process_path(e.location[-1])
-            new_message = f'Problem with tabular cell :at R{r}C{c} {jd(rn)} {jd(cn)} :issue {e.args[0]} :in {jd(path.as_posix())}'
-            eblob['message'] = new_message
-            eblob['row'] = r
-            eblob['col'] = c
-            eblob['row_name'] = rn
-            eblob['col_name'] = cn
-            logd.error(new_message)
-            return eblob
+
+        if self.path.suffix == '.json':
+            def munge(eblob):
+                if 'path' not in eblob:
+                    # FIXME TODO add json path also just put this there in the first place
+                    e = eblob['message']
+                    eblob['path'] = e.location[-1]
+                return eblob
+
+        else:
+            def munge(eblob):
+                e = eblob['message']
+                path = eblob['file_path']
+                r, c, rn, cn = process_path(e.location[-1])
+                new_message = f'Problem with tabular cell :at R{r}C{c} {jd(rn)} {jd(cn)} :issue {e.args[0]} :in {jd(path.as_posix())}'
+                eblob['message'] = new_message
+                eblob['row'] = r
+                eblob['col'] = c
+                eblob['row_name'] = rn
+                eblob['col_name'] = cn
+                logd.error(new_message)
+                return eblob
 
         # TODO now we are close to being able to invert the flow and
         # write the normalized values back to the tabular rep and
