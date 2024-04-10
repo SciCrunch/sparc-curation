@@ -352,6 +352,10 @@ def extract_export_path(dataset_id, object_id, extract_version=None):
     return base_path / dataset_path / obj_path
 
 
+def dump_extract_path(dataset_id, object_id, blob):
+    return _dump_path(dataset_id, object_id, blob, extract_export_path)
+
+
 def errors_version_path(errors_version=None):  # always the latest but put version there for consistency
     errors_version = str(__errors_version__ if errors_version is None else errors_version)
     return sf_export_base / errors_dir_name / errors_version
@@ -648,10 +652,6 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
             # raise e  # this one is on us but grep for theh pipeline stage
             return
 
-        export_path = extract_export_path(dataset_id, object_id)
-        if not export_path.parent.exists():
-            export_path.parent.mkdir(exist_ok=True, parents=True)
-
         # FIXME TODO depending on what the workloads look like in prod
         # we can optimize to avoid writes by taking an extra read in cases
         # where we ignore the version, if nothing changed for that file
@@ -685,6 +685,10 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
                 previous_blob.pop('__extract_version__')
                 for_comparison.pop('__extract_version__')
                 if previous_blob == for_comparison:
+                    export_path = extract_export_path(dataset_id, object_id)
+                    if not export_path.parent.exists():
+                        export_path.parent.mkdir(exist_ok=True, parents=True)
+
                     fp = previous_path.resolve()
                     target = fp.relative_path_from(export_path)
                     breakpoint()
@@ -695,8 +699,7 @@ def extract(dataset_uuid, path_string, expex_type=None, extract_fun=None):
                 else:
                     breakpoint()
 
-        with open(export_path, 'wt') as f:
-            json.dump(blob, f, sort_keys=True, cls=JEncode)
+        export_path = dump_extract_path(dataset_id, object_id, blob)
 
         # if we succeed in writing a blob unlink any previous
         # error blob to keep things tidy
