@@ -360,7 +360,7 @@ class Export(ExportBase):
             with open(dump_path / 'path-metadata.json', 'wt') as f:
                 jdump(blob_path_transitive_metadata, f)
 
-            do_objects = True
+            do_objects = False
             if do_objects:
                 # XXX FIXME TODO this is just a first pass
                 # the fetch issue prevents us from leveraging the full power
