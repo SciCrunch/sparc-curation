@@ -249,7 +249,7 @@ def populate_existing_redis(conn):
     _keys = [k for k in sorted(conn.keys()) if b'N:dataset' in k]
     _values = conn.mget(_keys)
     _inits = {k:v for k, v in zip(_keys, _values)}
-    log.info(pprint.pformat(_inits, width=120))
+    log.log(9, pprint.pformat(_inits, width=120))
 
 
 @cel.on_after_finalize.connect
