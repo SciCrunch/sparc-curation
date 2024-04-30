@@ -156,7 +156,7 @@ def test():
         'f58c75a2-7d86-439a-8883-e9a4ee33d7fa',  # jpegs might correspond to subject id ??? ... ya subjects and samples but oof oof
 
         'bec4d335-9377-4863-9017-ecd01170f354',
-        'd484110a-e6e3-4574-aab2-418703c978e2',  # many xmls ~200 files, but only the segmentations ... no data
+        'd484110a-e6e3-4574-aab2-418703c978e2',  # many xmls ~200 files, but only the segmentations ... no data, also a csv that is actually a tsv
     ]
 
 
@@ -1882,7 +1882,9 @@ def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=
     else:
         # manifests technically aren't required as of 2.1.0
         msg = f'{dataset_id} {object_id} {drp} has no records of any kind'
-        log.warning(msg)  # TODO embed error
+        # FIXME this is way to verbose to log :/
+        # TODO log an error once or something ... ?
+        log.log(9, msg)  # TODO embed error
 
     combine_path = dump_combine_path(dataset_id, object_id, blob)
     msg = f'combine object metadata written to {combine_path}'
