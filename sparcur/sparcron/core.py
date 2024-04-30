@@ -375,6 +375,7 @@ def argv_spc_export(dataset_id):
         'sparcur.cli',
         'export',
         '--no-network',
+        '--do-objects',
         # explicitly avoid joblib which induces absurd process overhead
         '--jobs', '1',
         '--dataset-id', dataset_id,  # nop, debug memory issues

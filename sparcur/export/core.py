@@ -100,7 +100,9 @@ class ExportBase:
                  # not quite as dump as passing it to the methods
                  no_network=False,
                  discover=False,
-                 fast=False,):
+                 fast=False,
+                 do_objects=False,
+                 debug=False,):
 
         # FIXME ugh the logic here for handling discover is aweful
         if discover:
@@ -126,6 +128,8 @@ class ExportBase:
         self.no_network = no_network
         self.discover = discover
         self.fast = fast
+        self.do_objects = do_objects
+        self.debug = debug
 
         self._dsp = 'discover' if self.discover else 'datasets'  # FIXME hardcoded
         self._args = dict(export_path=export_path,
@@ -139,7 +143,10 @@ class ExportBase:
                           export_protcur_base=export_protcur_base,
                           export_base=export_base,
                           no_network=no_network,
-                          discover=discover,)
+                          discover=discover,
+                          fast=fast,
+                          do_objects=do_objects,
+                          debug=debug,)
 
     @staticmethod
     def make_dump_path(dump_path):
@@ -360,19 +367,23 @@ class Export(ExportBase):
             with open(dump_path / 'path-metadata.json', 'wt') as f:
                 jdump(blob_path_transitive_metadata, f)
 
-            do_objects = False
-            if do_objects:
+            if self.do_objects:
                 # XXX FIXME TODO this is just a first pass
                 # the fetch issue prevents us from leveraging the full power
                 from sparcur import objects as objs
                 objs.create_current_version_paths()
                 dataset_path = self.export_source_path
                 dataset_id = dataset_path.cache_identifier
-                (updated_cache_transitive, object_id_types, some_failed
+
+                (updated_cache_transitive, indicies, some_failed
                  ) = objs.from_dataset_path_extract_object_metadata(
-                     dataset_path, force=True, debug=False)
-                objs.from_dataset_id_object_id_types_combine(
-                    dataset_id, object_id_types, updated_cache_transitive)
+                     dataset_path, force=True, debug=self.debug)
+
+                if self.debug:
+                    _drps, _drp_index = objs.from_dataset_id_combine(dataset_id, updated_cache_transitive)
+
+                drps, drp_index = objs.from_dataset_id_indicies_combine(
+                    dataset_id, indicies, updated_cache_transitive)
 
         # TODO a converter that doesn't care about higher level structure
         #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data

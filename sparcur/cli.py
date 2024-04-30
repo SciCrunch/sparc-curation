@@ -99,6 +99,7 @@ Commands:
                        : --mbf      extract and export mbf embedded metadata
                        : --fast     don't export path metadata
                        : --fill-cache-metadata  cache metadata from local
+                       : --do-objects           run single object export
 
     report      generate reports
 
@@ -248,6 +249,7 @@ Options:
     --no-network            do not make any network requests (incomplete impl)
     --mbf                   fetch/export mbf related metadata
     --fast                  don't export path metadata
+    --do-objects            run single object export
     --unique                return a unique set of values without additional info
     --fake                  make fake file system metadata to keep pipelines happy
     --meta-from-local       check if cached metadata from local
@@ -448,6 +450,9 @@ class Dispatcher(clif.Dispatcher):
             self.options.export_protcur_base,
             no_network=(self.options.no_network or self.options.no_google),
             discover=self.options.discover,
+            fast=self.options.fast,
+            do_objects=self.options.do_objects,
+            debug=self.options.debug,
         )
         return export
 
