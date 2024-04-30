@@ -916,7 +916,7 @@ class PathHelper:
         else:
             return self._xattr_meta
 
-    def _cache_jsonMetadata(self, do_expensive_operations=False):
+    def _cache_jsonMetadata(self, do_expensive_operations=False, with_created=False):
         # XXX REMINDER changes here should bump __pathmeta_version__ in objects.py
         blob, project_path, dsid = self._jm_common(do_expensive_operations=do_expensive_operations)
         project_meta = project_path.cache_meta
@@ -966,7 +966,9 @@ class PathHelper:
             blob['parent_id'] = parent_id
 
         blob['remote_id'] = remote_id
-        #blob['timestamp_created'] = meta.created  # leaving this out
+        if with_created:
+            blob['timestamp_created'] = meta.created  # leaving this out
+
         blob['timestamp_updated'] = meta.updated  # needed to simplify transitive update
         blob['uri_api'] = uri_api
         blob['uri_human'] = uri_human
@@ -1135,7 +1137,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
             return
 
         try:
-            return (self.getxattr('bf.file_id').decode()
+            return (int(self.getxattr('bf.file_id').decode())
                     if self.is_file() else
                     self.cache_meta.file_id)
         except FileNotFoundError as e:

@@ -738,14 +738,19 @@ class BlackfynnId(idlib.Identifier):
     def __reduce__(self):
         return self.__class__, (self.id, self.type, self.file_id)
 
-    def __new__(cls, id_uri_curie_uuid, type=None, file_id=None):
+    def __new__(cls, id_uri_curie_uuid, type=None, file_id=None, _type=type):
         # TODO validate structure
         # TODO binary uuid
         if isinstance(id_uri_curie_uuid, cls):
             return id_uri_curie_uuid
 
         for rx, match_type in cls.compiled:
-            match = rx.match(id_uri_curie_uuid)
+            try:
+                match = rx.match(id_uri_curie_uuid)
+            except TypeError as e:
+                raise TypeError(f'wat {_type(id_uri_curie_uuid)} {id_uri_curie_uuid!r}') from e
+
+            #log.critical((rx, match_type, match, id_uri_curie_uuid))
             if match is not None:
                 break
         else:
@@ -753,6 +758,10 @@ class BlackfynnId(idlib.Identifier):
             raise idlib.exc.MalformedIdentifierError(msg)
 
         groups = [g for g in match.groups() if g is not None]
+
+        if file_id is not None and not isinstance(file_id, int):
+            msg = f'file_id {file_id!r} must be an integer but is a {_type(file_id)}'
+            raise TypeError(msg)
 
         if match_type == 'uuid':
             if type is None:
@@ -764,7 +773,12 @@ class BlackfynnId(idlib.Identifier):
 
         elif match_type == 'uri_api' and 'files' in groups:
             *_, id_type, uuid, _, file_id_string = groups
-            file_id = int(file_id_string)
+            _file_id = int(file_id_string)
+            if file_id is not None:
+                assert _file_id == file_id, f'{_file_id!r} != {file_id!r}'
+            else:
+                file_id = _file_id
+
         elif match_type == 'uri_human':
             # strip trailing garbage that is not a uuid
             _mgs = groups
