@@ -258,6 +258,17 @@ class TestDatasetDescription(Helper, unittest.TestCase):
     def test_versions(self):
         self._versions()
 
+    def test_ext_mismatch(self):
+        # they really do manage to come up with every possible mistake
+        tf = temp_path / 'dd-pie.tsv'
+        tf.copy_from(examples_root / self._cry_base)
+        obj = self.metadata_file_class(tf)
+        try:
+            value = obj.data
+            raise AssertionError('should have failed')
+        except exc.WrongFileExtensionError as e:
+            pass
+
 
 class TestSubjectsFile(Helper, unittest.TestCase):
     template = 'subjects.xlsx'

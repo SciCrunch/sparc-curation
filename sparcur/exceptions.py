@@ -95,6 +95,10 @@ class FileTypeError(SparCurError):
     """ File type is not allowed """
 
 
+class WrongFileExtensionError(SparCurError):
+    """ a file's extension does not match its contents """
+
+
 class MissingFileError(SparCurError):
     """ A file required to proceed is missing. """
 

@@ -614,13 +614,17 @@ class Tabular(HasErrors):
         import openpyxl
         Tabular._openpyxl = openpyxl
 
-    def __init__(self, path, rotate=False):
+    def __init__(self, path, rotate=False, force_ext=None):
         super().__init__()
         self.path = path
         self._rotate = rotate
+        self._force_ext = force_ext
 
     @property
     def file_extension(self):
+        if self._force_ext:
+            return self._force_ext
+
         if self.path.suffixes:
             ext = self.path.suffixes[0]  # FIXME filenames with dots in them ...
             if ext != '.fake':
@@ -668,8 +672,9 @@ class Tabular(HasErrors):
                     return
 
                 if len(rows[0]) == 1 and ('\t' if delimiter == ',' else ',') in rows[0][0]:
+                    rsuf = 'tsv' if delimiter == ',' else 'csv'
                     message = (f'Possible wrong file extension in {self.path.id} '
-                               f'{self.path.project_relative_path}')
+                               f'{self.path.project_relative_path} should be {rsuf}?')
                     if self.addError(message,
                                      blame='submission',
                                      path=self.path):
@@ -921,7 +926,7 @@ class Tabular(HasErrors):
 
     @property
     def T(self):
-        return self.__class__(self.path, rotate=True)
+        return self.__class__(self.path, rotate=True, force_ext=self._force_ext)
 
     def __iter__(self):
         yield from self._iter_(normalize=True)
@@ -1071,7 +1076,7 @@ class MetadataFile(HasErrors):
     allow_dupes_header = False  # NOTE allow_dupes cannot override primary key non-normalized cases
     _expect_single = tuple()
 
-    def __new__(cls, path, template_schema_version=None):
+    def __new__(cls, path, template_schema_version=None, force_ext=None):
         if template_schema_version is not None:  # and template_schema_version < latest  # TODO
             logd.debug(f'{template_schema_version} {path}')  # TODO warn
 
@@ -1083,10 +1088,11 @@ class MetadataFile(HasErrors):
 
         return super().__new__(cls)
 
-    def __init__(self, path, template_schema_version=None):
+    def __init__(self, path, template_schema_version=None, force_ext=None):
         super().__init__()
         self.path = path
         self.template_schema_version = template_schema_version
+        self._force_ext = force_ext
 
     def xopen(self):
         self.path.xopen()
@@ -1406,9 +1412,32 @@ class MetadataFile(HasErrors):
         for n, rtk, norm_dict in (('alt_header', self.record_type_key_alt, self.norm_to_orig_alt),
                                   ('header', self.record_type_key_header, self.norm_to_orig_header)):
             if rtk not in norm_dict:
-                #breakpoint()  # XXX TODO enable this on debug
                 msg = (f'Could not find record primary key for {n} in\n"{self.path}"\n\n'
                        f'{rtk}\nnot in\n{list(norm_dict)}')
+
+                if self._force_ext is None and self.path.suffix in ('.csv', '.tsv'):
+                    # see if the file extension was wrong
+                    if self.path.suffix == '.csv':
+                        rsuf = 'tsv'
+                    elif self.path.suffix == '.tsv':
+                        rsuf = 'csv'
+
+                    ac = self.__class__(
+                        self.path,
+                        template_schema_version=self.template_schema_version,
+                        force_ext=rsuf)
+
+                    rsuf_ok = True
+                    try:
+                        ac.data
+                    except Exception as e:
+                        rsuf_ok = False
+                        pass
+
+                    if rsuf_ok:
+                        msg = (f'Wrong file extension for {self.path}, '
+                               f'contents appear to be {rsuf}')
+                        raise exc.WrongFileExtensionError(msg)
 
                 raise exc.MalformedHeaderError(msg)
 
@@ -1607,6 +1636,11 @@ class MetadataFile(HasErrors):
     def _t(self):
         if self.path.suffix == '.json':
             return  # TODO json -> tabular conversion
+        elif self._force_ext is not None:
+            # FIXME this demonstrates the absolutely horrible
+            # way that this was designed, way too inflexible
+            # should be able to pass t in ... etc. sigh
+            return Tabular(self.path, force_ext=self._force_ext)
         else:
             return Tabular(self.path)
 
