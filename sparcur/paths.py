@@ -96,9 +96,12 @@ class BFPNCacheBase(PrimaryCache, EatCache):
     _local_xattr = b'sparcur.from_local'
 
     @classmethod
-    def fromLocal(cls, path):
+    def fromLocal(cls, path, update=False):
         existing = path.xattrs()
-        if existing:
+        if update and not existing:
+            'cannot update an cache that does not exist'
+            raise exc.CacheNotFoundError(msg)
+        elif not update and existing:
             msg = f'Cache exists! Not seeting fromLocal for {path}'
             # calling cls(path, meta=meta) below in a case where
             # there is existing metadata is extremely dangerous and
@@ -115,8 +118,21 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         else:
             type = 'package'
 
-        meta.__dict__['id'] = f'N:{type}:' + uuid.uuid4().urn[9:]
-        meta.__dict__['parent_id'] = path.parent.cache_id
+        if update:
+            meta.__dict__['id'] = existing[b'bf.id'].decode()
+            meta.__dict__['parent_id'] = existing[b'bf.parent_id'].decode()
+        else:
+            meta.__dict__['id'] = f'N:{type}:' + uuid.uuid4().urn[9:]
+            meta.__dict__['parent_id'] = path.parent.cache_id
+
+        if update:
+            # do this as close in time as possible
+            # to minimize error risk
+            [path.delxattr(k) for k in existing]
+            if path.xattrs():
+                # something has gone very wrong
+                breakpoint()
+
         self = cls(path, meta=meta)
         self.setxattr(cls._local_xattr, b'1')
         return self
@@ -594,6 +610,7 @@ PennsieveCache._bind_flavours()
 class PennsieveDiscoverCache(PrimaryCache, EatCache):
 
     xattr_prefix = 'pd'
+    _xattr_fs_version = b'sparcur.fsversion'  # XXX not clear we actually need this but whatever
 
     uri_human = backends.PennsieveDiscoverRemote.uri_human
     uri_api = backends.PennsieveDiscoverRemote.uri_api
@@ -755,6 +772,9 @@ class PennsieveDiscoverCache(PrimaryCache, EatCache):
     def fetch(self):
         msg = 'you probably want pull_fetch for discover'
         raise NotImplementedError(msg)
+
+    _fs_version = BFPNCacheBase._fs_version
+    _set_fs_version = BFPNCacheBase._set_fs_version
 
 
 PennsieveDiscoverCache._bind_flavours()
@@ -1034,7 +1054,8 @@ class PathHelper:
             p = m.pop('parent_drp', None)
             if p in index:
                 current_parent_id = index[p]['remote_id']
-                if current_parent_id != m['parent_id']:
+                if 'parent_id' in m and current_parent_id != m['parent_id']:
+                    # not all remotes have parent_id
                     msg = f'SOMETHING MOVED! {current_parent_id} != {parent_id} for {self}'
                     log.critical(msg)
                     m['current_parent_id'] = current_parent_id
@@ -1975,8 +1996,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 if md_version == 'mdv3':
                     _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
                         9, 5, 2, 3, 6, None, 14,)
-                    _i_checksum_cypher
-                elif md_version == 'mdv4':
+                elif md_version in ('mdv4', 'mdv5'):
                     _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
                         10, 5, 2, 3, 6, 7, 15,)
                 else:
@@ -2316,6 +2336,7 @@ class CacheL(aug.caches.ReflectiveCache, EatCache):
         return self._type() == 'dataset'
 
     _fs_version = BFPNCacheBase._fs_version
+    _set_fs_version = BFPNCacheBase._set_fs_version
 
 
 CacheL._bind_flavours()

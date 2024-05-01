@@ -58,6 +58,7 @@ def register_all_types():
     # sigh doing anything in the top level of python :/
     import sparcur.core
     import sparcur.paths  # also a top level registration
+    import sparcur.objects
 
     # this is not done at top level because it is quite slow
     from pysercomb.pyr import units as pyru
@@ -916,12 +917,21 @@ class PennsieveId(BlackfynnId):
 class PDId(idlib.Identifier):
     # discover dataset id
 
+    def __new__(cls, id):
+        if id.startswith('N:package:'):
+            return PennsieveId(id)
+        else:
+            return super().__new__(cls, id)
+
     def __init__(self, id):
-        self.id = id
-        self.curie = f'discover.api.dataset:{self.id}'
-        self.uri_api = f'https://api.pennsieve.io/discover/datasets/{self.id}'
-        self._uri_human = f'https://discover.pennsieve.io/datasets/{self.id}'
-        self._identifier = self.uri_api
+        if id.startswith('N:package:'):
+            pass
+        else:
+            self.id = id
+            self.curie = f'discover.api.dataset:{self.id}'
+            self.uri_api = f'https://api.pennsieve.io/discover/datasets/{self.id}'
+            self._uri_human = f'https://discover.pennsieve.io/datasets/{self.id}'
+            self._identifier = self.uri_api
 
     def uri_human(self, *args, **kwargs):
         return self._uri_human

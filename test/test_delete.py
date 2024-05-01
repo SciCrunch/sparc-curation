@@ -12,7 +12,7 @@ from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow, log
 from sparcur.paths import PennsieveCache, LocalPath, Path
 from sparcur.backends import PennsieveRemote
-from .common import test_organization, test_dataset, _pid, temp_path
+from .common import test_organization, test_dataset, _pid
 from .common import skipif_ci, skipif_no_net
 import pytest
 
@@ -588,10 +588,10 @@ class _ChangesHelper:
         # TODO expected outcome after stage probably
 
         if self._local_only:
-            def populate_cache(p, change=False):
+            def populate_cache(p, change=False, update=False):
                 # FIXME TODO change=True case may need special handling
                 # and probably represents a strange case of some kind
-                return p._cache_class.fromLocal(p)
+                return p._cache_class.fromLocal(p, update=update)
 
             def norm_path(p):
                 return self.project_path / p.replace('project/', '')
@@ -605,7 +605,7 @@ class _ChangesHelper:
             # tearDown fails to trigger if failure happens in setUp which is useless
             # so use atexit instead
             atexit.register(lambda : remote_dataset.rmdir(force=True))
-            def populate_cache(p, change=False):
+            def populate_cache(p, change=False, update=False):
                 # FIXME TODO change=True case may need special handling
                 # and probably represents a strange case of some kind
                 if change:
@@ -656,7 +656,9 @@ class _ChangesHelper:
             if data:
                 f.data = iter((make_rand(100),))
 
-            if metadata is None or metadata:
+            if metadata == 'touch':
+                pass
+            elif metadata is None or metadata:
                 # must set xattrs to nothing if
                 # we want to change metadata otherwise
                 # PrimaryCache._meta_updater will go haywire and
@@ -677,8 +679,7 @@ class _ChangesHelper:
                     f.touch()
 
                 try:
-                    populate_cache(f, change=True)
-                    #f._cache_class.fromLocal(f)
+                    populate_cache(f, change=True, update=metadata == 'touch')
                 except Exception as e:
                     breakpoint()
                     raise e
@@ -691,6 +692,7 @@ class _ChangesHelper:
 
         def index(ds):
             if self._local_only:
+                assert ds.cache_identifier == self.dataset.cache_identifier
                 caches = [l.cache for l in ds.rchildren]  # XXX reminder, NEVER use ds.cache.rchildren that will pull
                 class fakeremote:
                     def __init__(self, id, name, parent_id, file_id, updated, local):
@@ -717,8 +719,11 @@ class _ChangesHelper:
             else:
                 # this is safe at this stage since everything should match upstream
                 caches = [c.cache for c in local_dataset.rchildren]
+                assert ds == local_dataset
 
             ds._generate_pull_index(ds, caches)
+            assert ds.cache_identifier.uuid in list(ds.cache.local_index_dir.rchildren)[-1].parts
+            self._indexed_id = ds.cache_identifier
 
         fops = {
             'mkdir': mkdir,
@@ -753,7 +758,7 @@ class _ChangesHelper:
 
         pops = [(stage, op, norm_path(s), *cargs(args)) for stage, op, s, *args in ops]
         init = set([path for stage, op, path, *args in pops if stage == 0])
-        test = set([p for stage, op, path, *args in pops if stage >= 1.5 for p in (path, *args) if isinstance(p, self.project_path.__class__)])
+        test = set([p for stage, op, path, *args in pops if stage > 0.5 for p in (path, *args) if isinstance(p, self.project_path.__class__)])
         nochange = init - test
         add_rename_reparent = test - init
         change_remove = test - add_rename_reparent
@@ -781,6 +786,7 @@ class TestChanges(_ChangesHelper, _TestOperation, unittest.TestCase):
     def test_changes(self):
         from dateutil import parser as dateparser
         dataset = self.dataset
+        assert dataset.cache_identifier == self._indexed_id, (breakpoint(), 'sigh')
         dataset_id, id_name, parent_children, name_id, updated_transitive = dataset._read_indexes()
         # XXX updated_transitive from _read_indexes is a string because that is what
         # _transitive_changes needs internally and then transforms to a datetime object
@@ -807,22 +813,7 @@ class TestObjects(_ChangesHelper, _TestOperation, unittest.TestCase):
     def setUp(self):
         _TestOperation.setUp(self)
         self.Path = self.Remote._local_class
-
-        if temp_path.exists():
-            temp_path.rmtree()
-
-        temp_path.mkdir()
-
-        self.export_path = temp_path / 'export' / objs.sf_dir_name
-        objs.sf_export_base= self.export_path
         objs.fsmeta_max_delta = 10  # lower number to test keyframes
-
-    def tearDown(self):
-        keep_for_review = True
-        if not keep_for_review:
-            temp_path.rmtree()
-        else:
-            log.info(f'kept for review: {self.export_path}')
 
     def do_objects(self, dataset_path):
         objs.from_dataset_path_extract_combine(dataset_path, force=True, debug=True)

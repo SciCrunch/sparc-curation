@@ -1,13 +1,48 @@
 import os
+import copy
 import uuid
 import atexit
 import shutil
+import pathlib
 from tempfile import gettempdir
-from pathlib import PurePosixPath
 import pytest
 from augpathlib import PathMeta
 from augpathlib.utils import onerror_windows_readwrite_remove
 from sparcur import config
+_pid = os.getpid()
+temp_path_base = pathlib.Path(gettempdir(), f'.sparcur-testing-base-{_pid}')
+
+
+def config_auth_for_test():
+    # FIXME yeah, for clifun integration it is going to be so much easier
+    # if we just make it possible to override variables in auth at runtime
+    # and make sure that we throw an error if someone tries to change runtime
+    # config info after it is set once unless they explicitly pass a kwarg to
+    resources_path = config.auth.get_path('resources')  # force load and resolve relative path
+    arc = config.auth._runtime_config = copy.deepcopy(config.auth._blob)
+    delattr(config.auth, '_blob')
+    config.auth._path = None
+    config.auth._load_type = config.auth._load_runtime
+    urc = config.auth._user_config._runtime_config = copy.deepcopy(config.auth._user_config._blob)
+    delattr(config.auth._user_config, '_blob')
+    config.auth._user_config._path = None
+    config.auth._user_config._load_type = config.auth._user_config._load_runtime
+    keys = 'export-path', 'cache-path', 'cleaned-path', 'log-path', 'resources'
+    envars = {k: arc['auth-variables'][k]['environment-variables'].split(' ')[0] for k in keys}
+    arc['auth-variables']['resources'] = resources_path.as_posix()
+    arc['auth-variables']['export-path'] = (temp_path_base / 'ops' / 'export').as_posix()
+    arc['auth-variables']['cache-path'] = (temp_path_base / 'ops' / 'cache').as_posix()
+    arc['auth-variables']['cleaned-path'] = (temp_path_base / 'ops' / 'cleaned').as_posix()
+    arc['auth-variables']['log-path'] = (temp_path_base / 'ops' / 'log').as_posix()
+    for k in keys:
+        # ensure that subprocesses get the message
+        os.environ[envars[k]] = arc['auth-variables'][k]
+        if k in urc['auth-variables']:
+            urc['auth-variables'].pop(k)
+
+
+config_auth_for_test()
+
 from sparcur import exceptions as exc
 from sparcur.paths import Path, PathL
 from sparcur.state import State
@@ -19,11 +54,12 @@ from sparcur.pennsieve_api import FakeBFLocal
 # XXX calling register_all_types here will mask errors where we fail to call in
 # a certain context but not much we can do about that
 register_all_types()
+temp_path_base = PathL(temp_path_base)
+temp_path = PathL(temp_path_base) / 'sandbox'
 this_file = PathL(__file__).resolve()  # ARGH PYTHON ARGH NO LOL BAD PYTHON
 examples_root = this_file.parent / 'examples'
 template_root = this_file.parent.parent / 'resources/DatasetTemplate'
 log.debug(template_root)
-_pid = os.getpid()
 path_project_container = this_file.parent / f'test_local-{_pid}'
 project_path = PathL(path_project_container) / 'test_project'
 fake_org_uuid4 = '0000dead-f00d-4bad-beef-00f000000000'
@@ -32,9 +68,9 @@ PennsieveId(fake_organization)  # canary
 project_path_real = path_project_container / 'UCSD'
 test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:aa859fe9-02d0-4518-981b-012ef8f35c34'
-temp_path = PathL(gettempdir(), f'.sparcur-testing-base-{_pid}')
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
+atexit.register(lambda : temp_path_base.rmtree(onerror=onerror))
 
 SKIP_NETWORK = ('SKIP_NETWORK' in os.environ or
                 'FEATURES' in os.environ and 'network-sandbox' in os.environ['FEATURES'])

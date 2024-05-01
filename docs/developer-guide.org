@@ -4427,7 +4427,11 @@ if __name__ == '__main__':
     pipe_main(main)
 #+end_src
 *** _*Test*_
+#+begin_src python :tangle ../test/simple/__init__.py
+#+end_src
+
 #+begin_src python :tangle ../test/simple/test_utils.py
+from .. import common
 from sparcur.simple.utils import pipe_main
 
 def test_pipe_main():
