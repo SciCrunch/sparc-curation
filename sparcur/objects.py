@@ -39,6 +39,7 @@ import pathlib
 import subprocess
 from uuid import UUID
 from math import log as log2
+from datetime import datetime
 from itertools import chain
 from collections import defaultdict
 import orthauth as oa
@@ -903,6 +904,29 @@ def objmeta(dataset_id, object_id, path, force=False):
     return blob
 
 
+def mrecs(inrecs):
+    def escn(n):
+        # cannot use json.dumps because it escapes all unicode in a way that breaks sxpr
+        if '"' in n:
+            nn = n.replace('"', '\\"')
+        else:
+            nn = n
+        return f'"{nn}"'
+
+    recs = '\n'.join(
+        f'({o.curie} {p.curie} "{timeformat_friendly(u)}" {escn(n)})'
+        # put news changes at the top of the file
+        for o, p, u, n in sorted(inrecs, key=kupd, reverse=True))
+    return recs
+
+
+# most of our change sets are a single file removed and added in curation
+# TODO figure out how to tune this for performance, most changes are a single
+# file at a time, which is fine, but at some point we will want to repack
+# in addition to the current keyframe approach
+fsmeta_max_delta = 40
+
+
 def fsmeta(dataset_id, dataset_path=None, force=True, records=None, updated_cache_transitive=None, debug=False):
     """
 (:type fsmeta :version 0 :dataset uuid :updated-transitive ut (:repack-from rfut :repack 0)? :delta 0 :from previous-ut)
@@ -963,8 +987,37 @@ for this particular use case we may want to use epoch instead of a full timestam
 
             rec = object_id, cache_parent, updated, path.name
             records.append(rec)
+
     elif updated_cache_transitive is None:
+        if len(records) == 1:
+            dud = timeformat_friendly(records[0][2])
+            header = fsmeta_header(dataset_id, dud, 0, 1, 0)
+            removes = f'(:remove "{dud}" :ids ())\n'  # leave it empty for regularity
+            recs = mrecs(records)
+            derp = fsmeta_version_export_path(dataset_id, dud)
+            if not derp.parent.exists():
+                derp.parent.mkdir(exist_ok=True, parents=True)
+
+            # FIXME bad code duplication
+            with open(derp, 'wt') as f:
+                f.write(header)
+                if removes:
+                    f.write(removes)
+                f.write(recs)
+
+            if not latest.exists():
+                # XXX I'm sure a race could happen here ...
+                latest.symlink_to(derp.name)
+            else:
+                old_latest.symlink_to(derp.name)
+                latest.swap(old_latest)
+                old_latest.unlink()
+
+            return
+
         raise TypeError('updated_cache_transitive must provided if records is provided')
+
+    typecheck_fsmeta_records(records)
 
     uct_friendly = timeformat_friendly(updated_cache_transitive)
     # we want to write updated transitive in the header
@@ -973,77 +1026,43 @@ for this particular use case we may want to use epoch instead of a full timestam
     puct_friendly = None
     previous_updated_cache_transitive = None
     delta = 0
-    if previous is not None:
+    for i in (range(2) if previous is not None else []):
         (previous_header, _, *previous_records), old_recs = path_fsmeta(previous, return_index=True)
-        puct_friendly = previous_header['updated-transitive']
+        previous_updated_cache_transitive = previous_header['updated-transitive']
+        puct_friendly = timeformat_friendly(previous_updated_cache_transitive)
         #assert previous.stem == puct_friendly, 'oops'  # don't really need to check this, and if we did it would be in path_fsmeta
         previous_updated_cache_transitive = dateparser.parse(puct_friendly)
         delta = previous_header['delta']
         if previous_updated_cache_transitive < updated_cache_transitive:
-            # puct doesn't usually need to be converted
             # we do this before we check force so if force is set we need
             # to make sure that we don't increment delta because uct has
             # not actually changed
             delta += 1
 
-    #puct_friendly = timeformat_friendly(previous_updated_cache_transitive)  # FIXME None
+        if previous_updated_cache_transitive == updated_cache_transitive:
+            if not force:
+                # we're done here
+                return
 
-    """
-    if False:
-        prevs = []
-        _previous = latest
-        cdelta = 1
-        while cdelta > 0:
-            previous_sxpr = path_fsmeta(_previous)
-            prev_header = previous_sxpr[0]
-            cdelta = prev_header['delta']
-
-            if not prevs:
-                delta = cdelta + 1
-                previous_updated_cache_transitive = prev_header['updated-transitive']
-
-            prevs.append(previous_sxpr)
-            if cdelta > 0:
-                delta_from = prev_header['from']
-                _previous = fsmeta_version_export_path(dataset, delta_from)
-    """
-
-    if previous_updated_cache_transitive == updated_cache_transitive:
-        # if we're forcing update reset these to None to avoid issues
-        puct_friendly = None
-        previous_updated_cache_transitive = None
-        if not force:
-            # we're done here
-            return
+            previous_updated_cache_transitive = previous_header['from']
+            puct_friendly = timeformat_friendly(previous_updated_cache_transitive)
+            previous = fsmeta_version_export_path(dataset_id, puct_friendly)
+        else:
+            break
 
     new = fsmeta_version_export_path(dataset_id, uct_friendly)
     newxz = new.with_suffix('.xz')
-    max_delta = 40  # most of our change sets are a single file removed and added in curation 
     do_repack = False
     # only xz if delta will be zero and records will serialize to something
     # larger than a single block (4096) (estimated of course since names vary in length)
-    xz = (delta == 0 or delta >= max_delta) and len(records) > 28  # FIXME we can do better than guessing at 28
+    xz = (delta == 0 or delta >= fsmeta_max_delta) and len(records) > 28  # FIXME we can do better than guessing at 28
     test_xz = True
     if not force and (new.exists() or xz and newxz.exists()):
         breakpoint()
         raise Exception('sigh')
 
-    def mrecs(inrecs):
-        def escn(n):
-            # cannot use json.dumps because it escapes all unicode in a way the breaks sxpr
-            if '"' in n:
-                nn = n.replace('"', '\\"')
-            else:
-                nn = n
-            return f'"{nn}"'
-
-        recs = '\n'.join(
-            f'({o.curie} {p.curie} "{timeformat_friendly(u)}" {escn(n)})'
-            # put news changes at the top of the file
-            for o, p, u, n in sorted(inrecs, key=kupd, reverse=True))
-        return recs
-
-    if delta == 0 or delta >= max_delta:
+    n_records = len(records)
+    if delta == 0 or delta >= fsmeta_max_delta:
         # >= if we are doing repack then we want repack = max_delta I think ...
         # and if we take len(prevs) since delta starts at zero it should be equal to max_delta ... but TODO check this
         repack = delta
@@ -1053,40 +1072,22 @@ for this particular use case we may want to use epoch instead of a full timestam
         else:  # new keyframe
             removes = f'(:remove "{uct_friendly}" :ids ())\n'  # leave it empty for regularity
             n_removed = 0
-            n_records = len(records)
             recs = mrecs(records)
     else:
-        # reconstruct the state for previous
-        # hash last one wins on id to dedupe changes
-        if False:
-            old_recs = {}
-            old_rems = set()
-            for olr in prevs:
-                oh = olr[0]
-                if oh['delta'] > 0:
-                    orem = olr[1]['ids']
-                    old_rems.update(orem)
-                    _recs = olr[2:]
-                else:
-                    _recs = olr[1:]
-
-                for r in _recs:
-                    # we could reverse the list and pop stuff off
-                    # but because we go in reverse chronological order
-                    # we know that we will always see the latest first
-                    if r[0] not in old_recs and r[0] not in old_rems:
-                        old_recs[r[0]] = r
-
-        new_recs = {v[0].curie: v for v in records}  # XXX NOTE .curie drops the file id
+        new_recs = {v[0]: v for v in records}
         sor, snr = set(old_recs), set(new_recs)
         removed = sor - snr
         added = [new_recs[k] for k in (snr - sor)]
-        changed = [new_recs[k] for k in (sor & snr) if old_recs[k] != new_recs[k]]
+        both = (sor & snr)
+        _old_new = [(k, old_recs[k], new_recs[k]) for k in both if old_recs[k] != new_recs[k]]
+        changed = [new_recs[k] for k in both if old_recs[k] != new_recs[k]]
+        unchanged = [new_recs[k] for k in both if old_recs[k] == new_recs[k]]
         diff_records = added + changed
+        alt_n_records = len(diff_records) + len(unchanged)
+        assert n_records == alt_n_records, f'{n_records} != {alt_n_records}'
         n_removed = len(removed)
-        n_records = len(diff_records)
         recs = mrecs(diff_records)
-        if removed:  # FIXME uuid vs type:uuid I think we want type:uuid for sanity
+        if removed:
             remids = ' '.join(_.curie for _ in sorted(removed))
             # reminder: we embed uct_friendly in :remove to simplify the (future) repacking process
             removes = f'(:remove "{uct_friendly}" :ids ({remids}))\n'
@@ -1454,7 +1455,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     bads = []
     #object_id_type = []
     _type_oids = defaultdict(list)
-    records = []
+    fsmeta_records = []
     pathmeta_blob_index = {}
     parent_index = {}
     id_drp = {}
@@ -1477,7 +1478,10 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
             continue
 
         parent = pathmeta_blob['parent_id']
-        records.append((id, parent, updated, path.name))
+        # we have to drop file_id here, could be used as a cross
+        # reference to pathmeta sourced id later, they are all derived
+        # from the same source so no point really
+        fsmeta_records.append((RemoteId(id.curie) if id.type == 'package' else id, parent, updated, path.name))
         _type_oids[expex_type].append(id)
         #object_id_type.append((id, expex_type))
         pathmeta_blob_index[id] = pathmeta_blob
@@ -1486,7 +1490,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
 
     type_oids = dict(_type_oids)
     indicies = type_oids, pathmeta_blob_index, parent_index, id_drp
-    fsmeta(dataset_id, records=records, updated_cache_transitive=updated_cache_transitive, debug=debug)
+    fsmeta(dataset_id, records=fsmeta_records, updated_cache_transitive=updated_cache_transitive, debug=debug)
 
     if bads:
         # {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"}
@@ -1975,6 +1979,8 @@ def kupd(t):
 
 
 def fsmeta_header(dataset_id, uct_friendly, n_removed, n_records, delta, puct_friendly=None):
+    # XXX n_records is the final expected number of records AFTER resolving all changes (duh)
+
     # FIXME TODO ideally we also want to check to make sure that the uct is not
     # coming from the dataset, but if dataset updated == real uct in some other system
     # e.g. because of atomic ops on say, removing a folder, then we have a problem
@@ -2002,21 +2008,37 @@ def path_fsmeta(path, return_index=False):
     previous = path
     cdelta = 1
     dataset_id = None
+    delta = None
+    n_seen = 0
     while cdelta > 0:
         try:
+            if (cdelta - 1) == 0:
+                # have to handle the case where the first previous was a keyframe
+                previousxz = previous.with_suffix('.xz')
+                if previousxz.exists():
+                    previous = previousxz
+
             previous_sxpr = path_sxpr(previous)
         except Exception as e:
             breakpoint()
             raise e
+
         prev_header = previous_sxpr[0]
-        log.debug(prev_header)
+        log.log(9, prev_header)
         cdelta = int(prev_header['delta'])
 
         if not prevs:
             delta = cdelta
-            _header = prev_header
+            _header = {**prev_header}
             dataset_id = RemoteId(prev_header['dataset'])
             #previous_updated_cache_transitive = prev_header['updated-transitive']
+        else:
+            n_seen += 1
+
+        if n_seen > delta:
+            msg = f'number of previous traversed exceeds expected {n_seen} > {delta}'
+            breakpoint()
+            raise ValueError(msg)
 
         prevs.append(previous_sxpr)
         if cdelta > 0:
@@ -2043,66 +2065,147 @@ def path_fsmeta(path, return_index=False):
             # but because we go in reverse chronological order
             # we know that we will always see the latest first
             if r[0] not in old_recs and r[0] not in old_rems:
-                old_recs[r[0]] = tuple(r)
+                _o, _p, _u, n = r
+                o = RemoteId(_o)
+                p = RemoteId(_p)
+                u = dateparser.parse(_u)
+                old_recs[o] = (o, p, u, n)
 
-    _header['delta'] = 0
+    #_header['delta'] = 0  # we can't do this here and we don't need to
+    # because this is the only function that resolves deltas
+    # and I don't think we care that something is reconstructed
+    # but we can mark it as such or we could drop the from ... or something
+    hcaste = (('version', int),
+              ('dataset', RemoteId),
+              ('updated-transitive', dateparser.parse),
+              ('removes', int),
+              ('records', int),
+              ('delta', int),
+              ('from', dateparser.parse),
+              )
+    for k, t in hcaste:
+        if k in _header:
+            _header[k] = t(_header[k])
+
     header = _header
     removed = {'remove': header['updated-transitive'], 'ids': None}
     records = list(old_recs.values()) if True else sorted(old_recs.values(), key=kupdt, reverse=True)
+    if len(records) != header['records']:
+        msg = f'number of records does not match expected {len(records)} {header["records"]}'
+        raise ValueError(msg)
+
     fsmeta_blob = [header, removed, *records]
+    typecheck_fsmeta_blob(fsmeta_blob)
     if return_index:
         return fsmeta_blob, old_recs
     else:
         return fsmeta_blob
 
 
+def typecheck_fsmeta_records(recs):
+    try:
+        _typecheck_fsmeta_records(recs)
+    except AssertionError as e:
+        breakpoint()
+        raise e
+
+
+def _typecheck_fsmeta_records(recs):
+    rbads = []
+    for rec in recs:
+        o, p, u, n = rec
+        to = (type(o) == RemoteId and o.file_id is None) # this is what we want, drop the file id, we need the type to match for operational reasons
+            #type(o) == RemoteId and o.type != 'package')
+            #type(o) == str and o.startswith('package:') or
+              # XXX ARHG the bad design continues to permeate everything it touches
+              # let this be a reminder for any future person who thinks it is a good idea
+              # to have "files" with multiple internal things that are actually folders
+              # and then not give them the full folder abstraction >_<
+              #(or type(o.file_id)== int)  # can't do this, fsmeta doesn't know about file_id at all
+              # so if there is a file_id it literally cannot be fsmeta
+        tp = type(p) == RemoteId
+        tu = type(u) == datetime # datetime
+        tn = type(n) == str
+        viols = ''
+        for var, ok in (('o', to), ('p', tp), ('u', tu), ('n', tn)):
+            if not ok:
+                viols += var
+
+        if viols:
+            rbads.append((rec, viols))
+
+    assert not rbads, rbads
+
+
+def typecheck_fsmeta_blob(blob):
+    try:
+        _typecheck_fsmeta_blob(blob)
+    except AssertionError as e:
+        breakpoint()
+        raise e
+
+
+def _typecheck_fsmeta_blob(blob):
+    header, rem, *recs = blob
+
+    assert type(header) == dict
+    assert type(rem) == dict
+    hkeys = (('type', str),
+             ('version', int),
+             ('dataset', RemoteId),
+             ('updated-transitive', datetime),  # parse don't validate
+             #('updated-transitive', str),  # FIXME uct_friendly is needed in both places, keeping str here seems less work? but risk of inconsistency?
+             ('removes', int),
+             ('records', int),
+             ('delta', int),
+             ('from', datetime),
+             #('from', str),  # XXX same issue as with uct_friendly
+             )
+    hcond = {'from': lambda h: h['delta'] > 0}
+    assert not (hbads := [k for k, t in hkeys if (k not in hcond
+                                                  or k in hcond and hcond[k](header))
+                          and k not in header]), hbads
+
+    htbads = []
+    for k, t in hkeys:
+        if k in hcond and not hcond[k](header):
+            continue
+
+        v = header[k]
+        if type(v) != t:
+            htbads.append((k, v, t))
+
+    assert not htbads, htbads
+
+    typecheck_fsmeta_records(recs)
+
+
 def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
     # technically don't need dataset_id but can be used as a check
-    header, _, *recs = fsmeta_blob
-    assert dataset_id.curie == header['dataset'], f'dataset mismatch {dataset_id.curie!r} != {header["dataset"]!r}'
+    typecheck_fsmeta_blob(fsmeta_blob)
+    header, _rem, *recs = fsmeta_blob
+    assert dataset_id == header['dataset'], f'dataset mismatch {dataset_id.curie!r} != {header["dataset"]!r}'
 
-    ir_recs = []
     idn = {}
     parent_index = {}
     for o, p, u, n in recs:
-        oi = RemoteId(o)
-        pi = RemoteId(p)
-        ir_recs.append((oi, pi, u, n))  # FIXME maybe move the parsing to objects earlier e.g. in path_fsmeta? parsing overhead is probably small ...
-        idn[oi] = n
-        if oi == pi:  # dataset case
+        idn[o] = n
+        if o != p:  # skip the dataset case
             # no parent means datset is parent
             # which simplifies things later
-            #parent_index[oi] = None
-            pass
-        else:
-            parent_index[oi] = pi
+            parent_index[o] = p
 
     dd = defaultdict(list)
-    for o, p, u, n in ir_recs:
+    for o, p, u, n in recs:
         _pids = [p]
         while _pids[-1] in parent_index:
             _pm1 = _pids[-1]
             _pid = parent_index[_pm1]
             _pids.append(_pid)
-            #if _pid == _pm1:  # was datset case
+            #if _pid == _pm1:  # was datset case which we deal with above
                 #break
 
         dd[o] = _pids
-
-        #if o not in dd:
-        #    expars = dd[o]
-        #    np = p
-        #    while np in parent_index:
-        #        if np not in dd:  # prevent dupes
-        #            for _p in expars:
-        #                dd[_p].append(np)
-
-        #            #dd[np]
-
-        #        expars.append(np)
-        #        np = parent_index[np]
-        #    if np not in dd:
-        #        dd[np]  # should be level below dataset
 
     tpar = dict(dd)
     id_drp = {o: pathlib.Path(*[idn[p] for p in pars[-2::-1]],  # somehow tpar already excludes dataset?
@@ -2115,15 +2218,15 @@ def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
     #log.debug('\n'.join(p.as_posix() for p in sorted(id_drp.values())))
     _type_oids = defaultdict(list)
     pathmeta_blob_index = {}
-    for _temp_object_id, parent_id, updated, name in ir_recs:
+    for _temp_object_id, parent_id, updated, name in recs:
         # FIXME issue with {dataset_id}/{dataset_id} case not having objmeta ... which it should? just for closure?
         blob = path_json(objmeta_version_export_path(dataset_id, _temp_object_id))  # XXX evidence that we should run fsmeta after objmeta
         ir = fromJson(blob)
         ir['dataset_relative_path'] = id_drp[_temp_object_id]
         ir['parent_id'] = parent_id
-        ir['timestamp_updated'] = dateparser.parse(updated)
+        ir['timestamp_updated'] = updated
         ir['basename'] = name
-        object_id = ir['remote_id']
+        object_id = ir['remote_id']  # XXX this is where fsmeta and objmeta are combined and we get package + file_id
         pathmeta_blob_index[object_id] = ir
         if object_id != _temp_object_id:
             # fsmeta does not include the file_id
@@ -2148,6 +2251,8 @@ def indicies_from_dataset_id(dataset_id, updated_cache_transitive=None):
         if fsmeta_pathxz.exists():
             fsmeta_path = fsmeta_pathxz
 
+    # FIXME need a good warning here for case where the file does not exist
+    # e.g. because something go messed up and no fsmeta was written
     fsmeta_blob = path_fsmeta(fsmeta_path)
     type_oids, pathmeta_blob_index, parent_index, id_drp = indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob)
 
@@ -2277,6 +2382,22 @@ def from_dataset_id_indicies_combine(dataset_id, indicies, updated_cache_transit
     # TODO flag the objects that were deleted since the previous run and probably stick an xattr on them to
     # make cleanup as simple as possible
     return drps, drp_index
+
+
+def from_dataset_path_extract_combine(dataset_path, force=False, debug=False):
+    create_current_version_paths()
+
+    (updated_cache_transitive, indicies, some_failed
+        ) = from_dataset_path_extract_object_metadata(
+            dataset_path, force=force, debug=debug)
+
+    dataset_id = dataset_path.cache_identifier
+
+    if debug:
+        _drps, _drp_index = from_dataset_id_combine(dataset_id, updated_cache_transitive)
+
+    drps, drp_index = from_dataset_id_indicies_combine(
+        dataset_id, indicies, updated_cache_transitive)
 
 
 def single_file_extract(

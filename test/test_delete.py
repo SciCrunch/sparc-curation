@@ -7,11 +7,12 @@ import augpathlib as aug
 from sxpyr import sxpyr
 from pyontutils.utils import Async, deferred  # TODO -> asyncd in future
 from pyontutils.utils_fast import isoformat
+from sparcur import objects as objs
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow, log
 from sparcur.paths import PennsieveCache, LocalPath, Path
 from sparcur.backends import PennsieveRemote
-from .common import test_organization, test_dataset, _pid
+from .common import test_organization, test_dataset, _pid, temp_path
 from .common import skipif_ci, skipif_no_net
 import pytest
 
@@ -503,13 +504,13 @@ class _ChangesHelper:
         (1, 'rename', f1_2, 'project/dataset/dire-2/file-1-2-rp.ext'),  # rp
         (1, 'rename', f1_3, 'project/dataset/dire-2/file-1-3-np-r.ext'),  # rnp
 
-        (1, 'rename', l1_1, 'project/dataset/dire-1/link-1-1-rn-r.ext'),  # rn
+        (1.2, 'rename', l1_1, 'project/dataset/dire-1/link-1-1-rn-r.ext'),  # rn
         (1, 'rename', l1_2, 'project/dataset/dire-2/link-1-2-rp.ext'),  # rp
-        (1, 'rename', l1_3, 'project/dataset/dire-2/link-1-3-np-r.ext'),  # rnp
+        (1.2, 'rename', l1_3, 'project/dataset/dire-2/link-1-3-np-r.ext'),  # rnp
 
         # add
-        (1, 'mkdir',  'project/dataset/dire-6/dire-7-add'),
-        (1, 'mkfile', 'project/dataset/dire-6/file-4-add.ext'),
+        (1.2, 'mkdir',  'project/dataset/dire-6/dire-7-add'),
+        (1.2, 'mkfile', 'project/dataset/dire-6/file-4-add.ext'),
         (2, 'mklink', 'project/dataset/dire-6/link-4-add.ext'),  # XXX this causes an error because it looks like the index is out of synx
         )
 
@@ -530,9 +531,9 @@ class _ChangesHelper:
         # TODO probably also change size
         (1, 'change', f5_1, True, False),  # data
         (1, 'change', f5_2, False, True),  # metadata
-        (1, 'change', f5_3, False, None),  # no metadata # can handle this from objects cache
+        (1.2, 'change', f5_3, False, None),  # no metadata # can handle this from objects cache
         (1, 'change', f5_4, True, True),  # data metadata
-        (1, 'change', f5_5, True, None),  # data no metadata
+        (1.2, 'change', f5_5, True, None),  # data no metadata
         )
 
         # remove
@@ -540,13 +541,15 @@ class _ChangesHelper:
         f6 = 'project/dataset/dire-6/file-6-rem.ext'
         l6 = 'project/dataset/dire-6/link-6-rem.ext'
         ops += (
-        (0, 'mkdir', d9),
+        (0, 'mkdir',  d9),
         (0, 'mkfile', f6),
         (0, 'mklink', l6),
 
-        (1, 'remove', d9),
-        (1, 'remove', f6),
-        (1, 'remove', l6),
+        (1.09, 'change', d9, False, 'touch'),  # simulate removing the most recently changed folder
+
+        (1.1, 'remove', d9),
+        (1.1, 'remove', f6),
+        (1.1, 'remove', l6),
         )
 
         # build the indexes so we can do the diff
@@ -556,9 +559,13 @@ class _ChangesHelper:
         return ops
 
     def setUp(self):
-        # TODO construct the template we need
         super().setUp()
         self.Path = self.Remote._local_class
+        ops = self._make_ops()
+        self._execute_ops(ops)
+
+    def _execute_ops(self, ops, ret_scs=False):
+        # TODO construct the template we need
 
         #sigh = list(self.project_path.remote.children)
         #[s.rmdir(force=True) for s in sigh if '2023' in s.name]
@@ -653,6 +660,9 @@ class _ChangesHelper:
                 if not f.exists():
                     raise FileNotFoundError(f)
 
+                if metadata == 'touch':
+                    f.touch()
+
                 try:
                     populate_cache(f, change=True)
                     #f._cache_class.fromLocal(f)
@@ -717,7 +727,7 @@ class _ChangesHelper:
 
             @wraps(f)
             def inner():
-                f(path, *args, **kwargs)
+                f(obj, *args, **kwargs)
 
             return inner
 
@@ -728,25 +738,29 @@ class _ChangesHelper:
                 else:
                     yield a
 
-        ops = self._make_ops()
         pops = [(stage, op, norm_path(s), *cargs(args)) for stage, op, s, *args in ops]
         init = set([path for stage, op, path, *args in pops if stage == 0])
-        test = set([p for stage, op, path, *args in pops if stage >= 1 for p in (path, *args) if isinstance(p, self.project_path.__class__)])
+        test = set([p for stage, op, path, *args in pops if stage >= 1.5 for p in (path, *args) if isinstance(p, self.project_path.__class__)])
         nochange = init - test
         add_rename_reparent = test - init
         change_remove = test - add_rename_reparent
 
         cs = [(stage, path, make_closure(stage, op, path, args)) for stage, op, path, *args in pops]
         scs = sorted(cs, key=(lambda abc: (abc[0], len(abc[1].parts))))
+
+        self.dataset = pops[0][-1]
+
+        if ret_scs:
+            return scs
+
         will_fails = []
         for stage, path, fun in scs:
-            if stage > 1:
+            if stage > 1.5:
                 will_fails.append(fun)
             else:
                 fun()
 
         self._will_fails = will_fails
-        self.dataset = pops[0][-1]
 
 
 class TestChanges(_ChangesHelper, _TestOperation, unittest.TestCase):
@@ -773,6 +787,50 @@ class TestChanges(_ChangesHelper, _TestOperation, unittest.TestCase):
         #pl = sxpyr.python_to_sxpr(diff, str_as_string=True)
         #sxpr = pl._print(sxpyr.configure_print_plist(newline_keyword=False))
         breakpoint()
+
+
+class TestObjects(_ChangesHelper, _TestOperation, unittest.TestCase):
+
+    def setUp(self):
+        _TestOperation.setUp(self)
+        self.Path = self.Remote._local_class
+
+        if temp_path.exists():
+            temp_path.rmtree()
+
+        temp_path.mkdir()
+
+        self.export_path = temp_path / 'export' / objs.sf_dir_name
+        objs.sf_export_base= self.export_path
+        objs.fsmeta_max_delta = 10  # lower number to test keyframes
+
+    def tearDown(self):
+        keep_for_review = True
+        if not keep_for_review:
+            temp_path.rmtree()
+        else:
+            log.info(f'kept for review: {self.export_path}')
+
+    def do_objects(self, dataset_path):
+        objs.from_dataset_path_extract_combine(dataset_path, force=True, debug=True)
+
+    def test_objall(self):
+        ops = self._make_ops()
+        scs = self._execute_ops(ops, ret_scs=True)
+        dataset_path = self.dataset
+
+        will_fails = []
+        for stage, path, fun in scs:
+            if stage > 1.1:
+                will_fails.append(fun)
+            else:
+                fun()
+                try:
+                    self.do_objects(dataset_path)
+                except Exception as e:
+                    msg = f'failed at stage {stage} path {path} fun {fun}'
+                    log.debug(msg)
+                    raise e
 
 
 class _WorkflowHelper:
@@ -857,7 +915,6 @@ class TestWorkflow(_ChangesHelper, _WorkflowHelper, _TestOperation, unittest.Tes
 class TestWithRemoteWorkflow(TestWorkflow):
 
     _local_only = False
-
 
 
 class TestRemote(_TestOperation, unittest.TestCase):

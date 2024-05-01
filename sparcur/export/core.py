@@ -371,19 +371,7 @@ class Export(ExportBase):
                 # XXX FIXME TODO this is just a first pass
                 # the fetch issue prevents us from leveraging the full power
                 from sparcur import objects as objs
-                objs.create_current_version_paths()
-                dataset_path = self.export_source_path
-                dataset_id = dataset_path.cache_identifier
-
-                (updated_cache_transitive, indicies, some_failed
-                 ) = objs.from_dataset_path_extract_object_metadata(
-                     dataset_path, force=True, debug=self.debug)
-
-                if self.debug:
-                    _drps, _drp_index = objs.from_dataset_id_combine(dataset_id, updated_cache_transitive)
-
-                drps, drp_index = objs.from_dataset_id_indicies_combine(
-                    dataset_id, indicies, updated_cache_transitive)
+                objs.from_dataset_path_extract_combine(dataset_path, debug=self.debug)
 
         # TODO a converter that doesn't care about higher level structure
         #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data
