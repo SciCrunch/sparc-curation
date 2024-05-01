@@ -39,7 +39,7 @@ import pathlib
 import subprocess
 from uuid import UUID
 from math import log as log2
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import chain
 from collections import defaultdict
 import orthauth as oa
@@ -990,11 +990,12 @@ for this particular use case we may want to use epoch instead of a full timestam
 
     elif updated_cache_transitive is None:
         if len(records) == 1:
-            dud = timeformat_friendly(records[0][2])
-            header = fsmeta_header(dataset_id, dud, 0, 1, 0)
-            removes = f'(:remove "{dud}" :ids ())\n'  # leave it empty for regularity
+            dud = records[0][2]
+            dud_friendly = timeformat_friendly(dud)
+            header = fsmeta_header(dataset_id, dud_friendly, 0, 1, 0)
+            removes = f'(:remove "{dud_friendly}" :ids ())\n'  # leave it empty for regularity
             recs = mrecs(records)
-            derp = fsmeta_version_export_path(dataset_id, dud)
+            derp = fsmeta_version_export_path(dataset_id, dud_friendly)
             if not derp.parent.exists():
                 derp.parent.mkdir(exist_ok=True, parents=True)
 
@@ -1013,13 +1014,12 @@ for this particular use case we may want to use epoch instead of a full timestam
                 latest.swap(old_latest)
                 old_latest.unlink()
 
-            return
+            return dud, records
 
         raise TypeError('updated_cache_transitive must provided if records is provided')
 
     typecheck_fsmeta_records(records)
 
-    uct_friendly = timeformat_friendly(updated_cache_transitive)
     # we want to write updated transitive in the header
     # so we either have to traverse the list twice or hold everything in memory
     # we choose to hold everything in memory since these usually aren't giant
@@ -1027,13 +1027,18 @@ for this particular use case we may want to use epoch instead of a full timestam
     previous_updated_cache_transitive = None
     delta = 0
     for i in (range(2) if previous is not None else []):
-        (previous_header, _, *previous_records), old_recs = path_fsmeta(previous, return_index=True)
+        (previous_header, previous_remove, *previous_records), old_recs = path_fsmeta(previous, return_index=True)
         previous_updated_cache_transitive = previous_header['updated-transitive']
         puct_friendly = timeformat_friendly(previous_updated_cache_transitive)
         #assert previous.stem == puct_friendly, 'oops'  # don't really need to check this, and if we did it would be in path_fsmeta
         previous_updated_cache_transitive = dateparser.parse(puct_friendly)
         delta = previous_header['delta']
-        if previous_updated_cache_transitive < updated_cache_transitive:
+        if previous_updated_cache_transitive != updated_cache_transitive:
+            # we test for inequality instead of < because of the last updated delete
+            # case where puct > uct can happen, this way we don't have to fiddle
+            # with incrementing delta again, and if something is very wrong
+            # we will error out anyway
+
             # we do this before we check force so if force is set we need
             # to make sure that we don't increment delta because uct has
             # not actually changed
@@ -1042,7 +1047,13 @@ for this particular use case we may want to use epoch instead of a full timestam
         if previous_updated_cache_transitive == updated_cache_transitive:
             if not force:
                 # we're done here
-                return
+                return updated_cache_transitive, records
+
+            if 'from' not in previous_header:
+                # we hit a keyframe
+                previous_updated_cache_transitive = None
+                puct_friendly = None
+                break
 
             previous_updated_cache_transitive = previous_header['from']
             puct_friendly = timeformat_friendly(previous_updated_cache_transitive)
@@ -1050,6 +1061,91 @@ for this particular use case we may want to use epoch instead of a full timestam
         else:
             break
 
+    new_recs = {v[0]: v for v in records}
+    if (previous_updated_cache_transitive is not None and
+        updated_cache_transitive < previous_updated_cache_transitive):  # we're fuct!
+        # this can actually happen and the dataset updated time
+        # will be the only thing that changes so we need a solution
+        # which I think is that the :removed time will be set to
+        # 1 us less than the dataset updated time and in this case
+        # we just need to make sure that the new uct is > puct
+        # the other option would be to use 1 us greater than the
+        # puct since that puct must be for the same file, however
+        # I think it makes more sense to use the dataset updated
+        # relative time since it could be arbitrariliy far away
+        # in the future
+
+        # one note is that this approach means that sometimes uct
+        # will not actually appear in any of the records at all but
+        # may instead happen on the :removed time
+        # it seems like we might be able to use the dataset updated
+        # time in this one instance here but I'm not 100% sure, will
+        # need to explore, answer yes, this is better, we already use
+        # it in the empty dataset case, so we are ok
+
+        # the other thing that we do in this scenario is to make sure
+        # that the file removed is indeed the bearer of the uct from
+        # old_recs
+
+        # and another future option would be to hit the packages endpoint
+        # directly because I think they have modified time for deleted files
+        # which of course we don't track here
+
+        # this is always true because it is literally how we define
+        # the remove time so we have to check to see if there are removes
+        #ru = previous_remove['remove']
+        #if previous_updated_cache_transitive == ru:
+            #log.info('You hit the slud double lottery!')
+        #else:
+        for nth, (o, p, u, n) in enumerate(previous_records):
+            # FIXME there is another edge case where somehow this happens
+            # twice in a row where you get last updated delete and then
+            # second to last updated delete which means that the remove
+            # time is actually what we need
+            if u == updated_cache_transitive:
+                msg = ("if it isn't an nth lud then the removed, dataset, and obj "
+                        f'can be first/second/third but instead is {nth}')
+                if nth >= 3:
+                    breakpoint()
+                assert nth < 3, msg
+                break
+
+        else:  # for loop else
+            if previous_header['removes'] >= 1:
+                log.info('You hit the slud double lottery!')
+            else:
+                # major issue incoming because somehow we aren't in the
+                # last updated delete case we though we were in
+                raise Exception('ut oh')
+
+        # another thing we could check is that
+        # previous_records[1] == current uct bearer (non-dataset) aka sorted_records[2]
+        # the issue is that we don't know where the dataset itself falls and the behavior
+        # of unix is different, but I think missing from new_recs is probably sufficient
+        log.info('You hit the last updated delete lottery!')
+        dr = do, dp, du, dn = new_recs[dataset_id]
+        #dt_1us = timedelta(microseconds=1)
+        #new_ucts = {v[2]: v for v in records}
+        #old_puct = previous_updated_cache_transitive
+        #previous_updated_cache_transitive = updated_cache_transitive  # XXX no ... puct is puct
+        updated_cache_transitive = du #- dt_1us  # so we already use dud
+        # for the empty dataset case, so this is ok and doesn't create a
+        # fake time that could break stuff if it went to the remote system
+        if updated_cache_transitive <= previous_updated_cache_transitive:
+            # believe your own error messages people, we weren't setting
+            # dataset updated correctly in the test witness the dataset
+            # appearing second in old records
+            #owat = sorted(old_recs.values(), key=kupd, reverse=True)
+            #nwat = sorted(new_recs.values(), key=kupd, reverse=True)
+            #assert previous_updated_cache_transitive not in new_ucts, 'sigh'
+            #ur = new_ucts[old_uct]
+            #breakpoint()
+            msg = ('wow that was a really fast delete ... '
+                    'or somehow dataset updated did not get set properly?\n'
+                    f'{updated_cache_transitive} <= {previous_updated_cache_transitive}')
+            raise ValueError(msg)
+
+    uct_friendly = timeformat_friendly(updated_cache_transitive)
     new = fsmeta_version_export_path(dataset_id, uct_friendly)
     newxz = new.with_suffix('.xz')
     do_repack = False
@@ -1074,7 +1170,6 @@ for this particular use case we may want to use epoch instead of a full timestam
             n_removed = 0
             recs = mrecs(records)
     else:
-        new_recs = {v[0]: v for v in records}
         sor, snr = set(old_recs), set(new_recs)
         removed = sor - snr
         added = [new_recs[k] for k in (snr - sor)]
@@ -1174,7 +1269,7 @@ for this particular use case we may want to use epoch instead of a full timestam
             latest.swap(old_latest)
             old_latest.unlink()
 
-        return records  # we always return records because we need that to write the latest package-index file which doesn't care about history
+        return updated_cache_transitive, records  # we always return records because we need that to write the latest package-index file which doesn't care about history
     except Exception as e:
         # if we don't symlink to latest cleanup after
         if not latest.exists():
@@ -1490,7 +1585,8 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
 
     type_oids = dict(_type_oids)
     indicies = type_oids, pathmeta_blob_index, parent_index, id_drp
-    fsmeta(dataset_id, records=fsmeta_records, updated_cache_transitive=updated_cache_transitive, debug=debug)
+    in_updated_cache_transitive = updated_cache_transitive  # fsmeta may modify uct due to lud cases
+    updated_cache_transitive, _ = fsmeta(dataset_id, records=fsmeta_records, updated_cache_transitive=updated_cache_transitive, debug=debug)
 
     if bads:
         # {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"}
@@ -2088,7 +2184,7 @@ def path_fsmeta(path, return_index=False):
             _header[k] = t(_header[k])
 
     header = _header
-    removed = {'remove': header['updated-transitive'], 'ids': None}
+    removed = {'remove': header['updated-transitive'], 'ids': []}
     records = list(old_recs.values()) if True else sorted(old_recs.values(), key=kupdt, reverse=True)
     if len(records) != header['records']:
         msg = f'number of records does not match expected {len(records)} {header["records"]}'
@@ -2100,6 +2196,29 @@ def path_fsmeta(path, return_index=False):
         return fsmeta_blob, old_recs
     else:
         return fsmeta_blob
+
+def typecheck_fsmeta_remove(rem):
+    try:
+        _typecheck_fsmeta_remove(rem)
+    except AssertionError as e:
+        breakpoint()
+        raise e
+
+
+def _typecheck_fsmeta_remove(rem):
+    checks = (
+        ('remove' in rem, 'missing remove key'),
+        ('ids' in rem, 'missing ids'),
+        ((tr := type(rem['remove'])) == datetime, f'remove a {tr} not a datetime '),
+        ((ti := type(rem['ids'])) == list, f'ids a {tr} not a list '),
+        #(id, type(id)) for id in rem['ids'] if type(id) != RemoteId
+    )
+    bads = []
+    for check, msg in checks:
+        if not check:
+            bads.append(msg)
+
+    assert not bads, bads
 
 
 def typecheck_fsmeta_records(recs):
@@ -2177,6 +2296,7 @@ def _typecheck_fsmeta_blob(blob):
 
     assert not htbads, htbads
 
+    typecheck_fsmeta_remove(rem)
     typecheck_fsmeta_records(recs)
 
 
@@ -2378,7 +2498,7 @@ def from_dataset_id_indicies_combine(dataset_id, indicies, updated_cache_transit
                 news += 1
             drps.append((drp, has_recs, type, target, new_link, (blob if keep_in_mem else None)))
 
-    log.info(f'finished combining and writing {len(drps)} and linking {news} object records for dataset {dataset_id}')
+    log.debug(f'finished combining and writing {len(drps)} and linking {news} object records for dataset {dataset_id}')
     # TODO flag the objects that were deleted since the previous run and probably stick an xattr on them to
     # make cleanup as simple as possible
     return drps, drp_index
@@ -2394,6 +2514,16 @@ def from_dataset_path_extract_combine(dataset_path, force=False, debug=False):
     dataset_id = dataset_path.cache_identifier
 
     if debug:
+        uct_friendly = timeformat_friendly(updated_cache_transitive)
+        uct_p = fsmeta_version_export_path(dataset_id, uct_friendly)
+        latest = fsmeta_version_export_path(dataset_id, 'LATEST')
+        # the issue was that uct from from_dataset_path_extract_object_metadata
+        # didn't account for the nth last updated delete problem, that is now
+        # fixed by always using the value for updated_cache_transitive returned
+        # from the call to fsmeta
+        assert latest.exists(), 'uh'
+        assert uct_p.exists(), 'wat'
+        assert uct_p == latest.resolve(), 'argh?!'
         _drps, _drp_index = from_dataset_id_combine(dataset_id, updated_cache_transitive)
 
     drps, drp_index = from_dataset_id_indicies_combine(

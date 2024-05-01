@@ -538,18 +538,31 @@ class _ChangesHelper:
 
         # remove
         d9 = 'project/dataset/dire-6/dire-9-rem'
+        d10 = 'project/dataset/dire-6/dire-10-rem'
         f6 = 'project/dataset/dire-6/file-6-rem.ext'
         l6 = 'project/dataset/dire-6/link-6-rem.ext'
+        self._skip_inds = 1.07, 1.09, 1.096
         ops += (
         (0, 'mkdir',  d9),
+        (0, 'mkdir',  d10),
         (0, 'mkfile', f6),
         (0, 'mklink', l6),
 
-        (1.09, 'change', d9, False, 'touch'),  # simulate removing the most recently changed folder
+        (1.03, 'change', d10, False, 'touch'),
+        (1.04, 'change', f6, False, 'touch'),  # test last updated delete and then second to last updated delete (oof)
+        (1.05, 'change', d9, False, 'touch'),  # simulate removing the most recently changed folder
+        (1.06, 'change', dataset, False, 'touch'),  # simulate dataset updated being the only change
 
-        (1.1, 'remove', d9),
-        (1.1, 'remove', f6),
-        (1.1, 'remove', l6),
+        (self._skip_inds[0], 'remove', d9),
+        (1.08, 'change', dataset, False, 'touch'),
+
+        (self._skip_inds[1], 'remove', f6),  # must not run immediately after this to replicate remote behavior
+        (1.095, 'change', dataset, False, 'touch'),
+        # TODO we need a few more removes so that we can test crossing the keyframe boundary
+        # and see what happens
+        (self._skip_inds[2], 'remove', d10),
+        (1.0961, 'change', dataset, False, 'touch'),
+        (1.10, 'remove', l6),
         )
 
         # build the indexes so we can do the diff
@@ -821,11 +834,23 @@ class TestObjects(_ChangesHelper, _TestOperation, unittest.TestCase):
 
         will_fails = []
         for stage, path, fun in scs:
+            log.debug((stage, path, fun))
             if stage > 1.1:
                 will_fails.append(fun)
             else:
                 fun()
                 try:
+                    if stage in self._skip_inds:
+                        # don't run immediately after these
+                        # to replicate remote behavior, there
+                        # is of course a chance that we might
+                        # hit just the right microsecond to
+                        # cause a violation, but let's pretend
+                        # that actually will not happen and that
+                        # the call to the web api to touch the
+                        # dataset is blocking ... (heh)
+                        continue
+
                     self.do_objects(dataset_path)
                 except Exception as e:
                     msg = f'failed at stage {stage} path {path} fun {fun}'
