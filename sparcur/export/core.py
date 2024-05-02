@@ -371,7 +371,7 @@ class Export(ExportBase):
                 # XXX FIXME TODO this is just a first pass
                 # the fetch issue prevents us from leveraging the full power
                 from sparcur import objects as objs
-                objs.from_dataset_path_extract_combine(dataset_path, debug=self.debug)
+                objs.from_dataset_path_extract_combine(self.export_source_path, debug=self.debug)
 
         # TODO a converter that doesn't care about higher level structure
         #blob_ptm_jsonld = pipes.IrToExportJsonPipeline(blob_path_transitive_metadata).data
