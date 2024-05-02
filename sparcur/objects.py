@@ -938,7 +938,7 @@ def mrecs(inrecs):
         return f'"{nn}"'
 
     recs = '\n'.join(
-        f'({o.curie} {p.curie} "{timeformat_friendly(u)}" {escn(n)})'
+        f'({o.curie:<47} {p.curie:<47} "{timeformat_friendly(u)}" {escn(n)})'
         # put news changes at the top of the file
         for o, p, u, n in sorted(inrecs, key=kupd, reverse=True))
     return recs
@@ -1134,6 +1134,8 @@ for this particular use case we may want to use epoch instead of a full timestam
 
         else:  # for loop else
             if previous_header['removes'] >= 1:
+                # somehow I think this case only triggers when
+                # the very last thing is removed from a dataset
                 log.info('You hit the slud double lottery!')
             else:
                 # major issue incoming because somehow we aren't in the
@@ -1150,6 +1152,7 @@ for this particular use case we may want to use epoch instead of a full timestam
         #new_ucts = {v[2]: v for v in records}
         #old_puct = previous_updated_cache_transitive
         #previous_updated_cache_transitive = updated_cache_transitive  # XXX no ... puct is puct
+        old_uct = updated_cache_transitive
         updated_cache_transitive = du #- dt_1us  # so we already use dud
         # for the empty dataset case, so this is ok and doesn't create a
         # fake time that could break stuff if it went to the remote system
@@ -1157,6 +1160,7 @@ for this particular use case we may want to use epoch instead of a full timestam
             # believe your own error messages people, we weren't setting
             # dataset updated correctly in the test witness the dataset
             # appearing second in old records
+
             #owat = sorted(old_recs.values(), key=kupd, reverse=True)
             #nwat = sorted(new_recs.values(), key=kupd, reverse=True)
             #assert previous_updated_cache_transitive not in new_ucts, 'sigh'
@@ -1204,6 +1208,42 @@ for this particular use case we may want to use epoch instead of a full timestam
         assert n_records == alt_n_records, f'{n_records} != {alt_n_records}'
         n_removed = len(removed)
         recs = mrecs(diff_records)
+
+        if False:
+            # XXXXXXXXXXXXXXXXX
+            previousxz = previous.with_suffix('.xz')
+            if previousxz.exists():
+                previous = previousxz
+
+            raw_ph, raw_prem, *raw_precs = path_sxpr(previous)
+            precs = [ir_from_fsmeta_rec(r) for r in raw_precs]
+            if precs[-1] == (sigh := sorted(diff_records, key=kupd, reverse=True))[-1]:
+                # WAT
+                # ok, so it looks like my logic for reconstructing is off
+                previous_records
+                latest_not_in = []
+                for pr in precs:
+                    if pr not in previous_records:
+                        latest_not_in.append((pr, old_recs[pr[0]]))
+
+                assert not latest_not_in, (breakpoint(), 'sigh')[1]
+
+                diff = [(a, b) for a, b in zip(precs[::-1], sigh[::-1]) if a != b]
+                prevs, _header = path_prevs(previous)
+                ir_prevs = [(*prev[:2], *[ir_from_fsmeta_rec(r) for r in prev[2:]]) for prev in prevs]
+                breakpoint()
+
+            # XXXXXXXXXXXXXXXXX
+
+        #if not rerun and not (removed or diff_records):
+            # FIXME nothing happened so why are were here at all?
+            #old_asdf = sorted(old_recs.values(), key=kupd, reverse=True)
+            #asdf = sorted(records, key=kupd, reverse=True)  # dataset invariably shows up top
+            #wat = [p for p in records if p[2] == updated_cache_transitive]
+            #assert wat[0] == asdf[0]  # XXX likely won't work when using remote updated/created
+            #breakpoint()
+            #raise NotImplementedError('wat')
+
         if removed:
             remids = ' '.join(_.curie for _ in sorted(removed))
             # reminder: we embed uct_friendly in :remove to simplify the (future) repacking process
@@ -2293,26 +2333,34 @@ def path_prevs(path):
 
 def path_fsmeta(path, return_index=False):
     prevs, _header = path_prevs(path)
+    return fsmeta_from_prevs_header(prevs, _header, return_index=return_index)
 
+
+def ir_from_fsmeta_rec(r):
+    _o, _p, _u, n = r
+    o = RemoteId(_o)
+    p = RemoteId(_p)
+    u = dateparser.parse(_u)
+    return o, p, u, n
+
+
+
+def fsmeta_from_prevs_header(prevs, _header, return_index=False):
     old_recs = {}
     old_rems = set()
-    for olr in prevs:
-        oh = olr[0]
-        _orem = olr[1]['ids']
+    for old_header, old_rem, *old_raw_records in prevs:
+        _orem = old_rem['ids']
         orem = [] if _orem is None else _orem
         old_rems.update(orem)
-        _recs = olr[2:]
 
-        for r in _recs:
+        for r in old_raw_records:
+            # convert first so that the types for o match in old_recs (duh)
+            irrec = o, p, u, n = ir_from_fsmeta_rec(r)
             # we could reverse the list and pop stuff off
             # but because we go in reverse chronological order
             # we know that we will always see the latest first
-            if r[0] not in old_recs and r[0] not in old_rems:
-                _o, _p, _u, n = r
-                o = RemoteId(_o)
-                p = RemoteId(_p)
-                u = dateparser.parse(_u)
-                old_recs[o] = (o, p, u, n)
+            if o not in old_recs and r[0] not in old_rems:
+                old_recs[o] = irrec
 
     #_header['delta'] = 0  # we can't do this here and we don't need to
     # because this is the only function that resolves deltas
@@ -2343,6 +2391,7 @@ def path_fsmeta(path, return_index=False):
         return fsmeta_blob, old_recs
     else:
         return fsmeta_blob
+
 
 def typecheck_fsmeta_remove(rem):
     try:

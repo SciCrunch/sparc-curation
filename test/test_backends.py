@@ -2,11 +2,10 @@ import os
 import sys
 import unittest
 import pytest
+# for DatasetData
+from .common import test_organization, project_path_real as ppr, RDHPN
 from sparcur.paths import Path, BlackfynnCache as BFC, PennsieveCache as PFC, PennsieveDiscoverCache as PDFC
 from sparcur.backends import BlackfynnRemote, PennsieveRemote, PennsieveDiscoverRemote
-from .common import test_organization, project_path_real as ppr
-# for DatasetData
-from .common import RDHPN
 from sparcur.backends import PennsieveDatasetData
 
 

@@ -4,6 +4,7 @@ import pprint
 import unittest
 import pytest
 import augpathlib as aug
+from .common import examples_root, template_root, project_path, temp_path, dpie_path
 from sparcur.datasets import (Tabular,
                               DatasetDescriptionFile,
                               SubmissionFile,
@@ -15,7 +16,6 @@ from sparcur import exceptions as exc
 from sparcur.core import JEncode
 from sparcur.utils import fromJson, change_rcs
 from sparcur.paths import PathL
-from .common import examples_root, template_root, project_path, temp_path, dpie_path
 from .test_pipelines import PipelineHelper as PH
 
 template_root = aug.RepoPath(template_root)

@@ -7,13 +7,13 @@ import augpathlib as aug
 from sxpyr import sxpyr
 from pyontutils.utils import Async, deferred  # TODO -> asyncd in future
 from pyontutils.utils_fast import isoformat
+from .common import test_organization, test_dataset, _pid
+from .common import skipif_ci, skipif_no_net
 from sparcur import objects as objs
 from sparcur import exceptions as exc
 from sparcur.utils import GetTimeNow, log
 from sparcur.paths import PennsieveCache, LocalPath, Path
 from sparcur.backends import PennsieveRemote
-from .common import test_organization, test_dataset, _pid
-from .common import skipif_ci, skipif_no_net
 import pytest
 
 
@@ -541,7 +541,7 @@ class _ChangesHelper:
         d10 = 'project/dataset/dire-6/dire-10-rem'
         f6 = 'project/dataset/dire-6/file-6-rem.ext'
         l6 = 'project/dataset/dire-6/link-6-rem.ext'
-        self._skip_inds = 1.07, 1.09, 1.096
+        self._skip_inds = 1.07, 1.09, 1.096, 1.0962
         ops += (
         (0, 'mkdir',  d9),
         (0, 'mkdir',  d10),
@@ -562,7 +562,9 @@ class _ChangesHelper:
         # and see what happens
         (self._skip_inds[2], 'remove', d10),
         (1.0961, 'change', dataset, False, 'touch'),
-        (1.10, 'remove', l6),
+
+        (self._skip_inds[3], 'remove', l6),
+        (1.0961, 'change', dataset, False, 'touch'),
         )
 
         # build the indexes so we can do the diff

@@ -13,7 +13,7 @@ _pid = os.getpid()
 temp_path_base = pathlib.Path(gettempdir(), f'.sparcur-testing-base-{_pid}')
 
 
-def config_auth_for_test():
+def config_auth_for_test(nocache=hasattr(config, 'test_nocache')):
     # FIXME yeah, for clifun integration it is going to be so much easier
     # if we just make it possible to override variables in auth at runtime
     # and make sure that we throw an error if someone tries to change runtime
@@ -27,13 +27,18 @@ def config_auth_for_test():
     delattr(config.auth._user_config, '_blob')
     config.auth._user_config._path = None
     config.auth._user_config._load_type = config.auth._user_config._load_runtime
-    keys = 'export-path', 'cache-path', 'cleaned-path', 'log-path', 'resources'
+    keys = 'export-path', 'cleaned-path', 'log-path', 'resources',
+    if nocache:
+        keys += 'cache-path',
+
     envars = {k: arc['auth-variables'][k]['environment-variables'].split(' ')[0] for k in keys}
     arc['auth-variables']['resources'] = resources_path.as_posix()
     arc['auth-variables']['export-path'] = (temp_path_base / 'ops' / 'export').as_posix()
-    arc['auth-variables']['cache-path'] = (temp_path_base / 'ops' / 'cache').as_posix()
     arc['auth-variables']['cleaned-path'] = (temp_path_base / 'ops' / 'cleaned').as_posix()
     arc['auth-variables']['log-path'] = (temp_path_base / 'ops' / 'log').as_posix()
+    if nocache:
+        arc['auth-variables']['cache-path'] = (temp_path_base / 'ops' / 'cache').as_posix()
+
     for k in keys:
         # ensure that subprocesses get the message
         os.environ[envars[k]] = arc['auth-variables'][k]

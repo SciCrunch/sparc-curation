@@ -1,8 +1,8 @@
 import unittest
-from sparcur.curation import Summary
-from sparcur.pennsieve_api import FakeBFLocal
 from .common import skipif_no_net, skipif_ci
 from .common import template_root, project_path
+from sparcur.curation import Summary
+from sparcur.pennsieve_api import FakeBFLocal
 
 
 @skipif_ci

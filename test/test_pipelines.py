@@ -1,11 +1,11 @@
 import unittest
 from pathlib import Path
 import pytest
-from sparcur import pipelines as pipes
 from .common import (examples_root,
                      project_path,
                      RDHPN,
                      )
+from sparcur import pipelines as pipes
 from sparcur.utils import log
 
 

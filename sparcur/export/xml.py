@@ -50,6 +50,8 @@ def xml(dataset_blobs):
             #return v
         elif isinstance(v, BaseException):
             return repr(v)
+        elif isinstance(v, type):  # classes
+            return repr(v)
         else:
             #loge.debug(repr(v))
             return v
@@ -93,7 +95,7 @@ def xml(dataset_blobs):
     xs = dicttoxml.dicttoxml({'subjects': subjects})
     xr = dicttoxml.dicttoxml({'resources': resources})
     xe = dicttoxml.dicttoxml({'errors': errors})
-    xer = dicttoxml.dicttoxml({'error_reports': error_reports})
+    xer = dicttoxml.dicttoxml({'error_reports': normv(error_reports)})
     return (('subjects', xs),
             ('resources', xr),
             ('errors', xe),
