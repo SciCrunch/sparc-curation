@@ -178,3 +178,8 @@ class NotUploadedToRemoteYetError(SparCurError):
 
 class NotMappedError(SparCurError):
     """ an input value has no known mapping where you are searching """
+
+
+class MultiFilePackageError(SparCurError):
+    """ multi-file package ... bad news """
+

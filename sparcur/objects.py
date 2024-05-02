@@ -63,6 +63,7 @@ logd = _logd.getChild('sob')
 # TODO HAH, with the addition of errors aka failed we can reuse the
 # sparcron run logic for whole datasets on individual objects now ...
 __objmeta_version__ = 0
+#__objerr_version__ = 0  # this one should probably never change
 __fsmeta_version__ = 0  # fsmeta is a bit different and will have version embedded because fsmeta is the part that can change and is like a wal, but on a very rare occasion fsmeta might require a forced global update and this way we can avoid having to read every single file? probably embedded not in the path
 __pathmeta_version__ = 0
 __extract_version__ = 0
@@ -73,9 +74,10 @@ __index_version__ = 0
 sf_dir_name = 'objs'  # this really is more of an objects index ...
 sf_export_base = Path(auth.get_path('export-path')) / sf_dir_name  # TODO ensure configable for testing switching versions
 
-fsmeta_dir_name = 'fsmeta'
 objmeta_dir_name = 'objmeta'
-pathmeta_dir_name = 'pathmeta'
+#objerr_dir_name = 'objerr'
+fsmeta_dir_name = 'fsmeta'
+#pathmeta_dir_name = 'pathmeta'
 extract_dir_name = 'extract'
 errors_dir_name = 'errors'
 combine_dir_name = 'combine'
@@ -114,9 +116,10 @@ def test():
     # sourcing of the uuids will ultimately be different
     top_paths = [
         [
-            fsmeta_version_path(),
             objmeta_version_path(),
-            pathmeta_version_path(),
+            #objerr_version_path(),
+            fsmeta_version_path(),
+            #pathmeta_version_path(),
             extract_path(),  # FIXME these are really x_version_path ...
             errors_version_path(),
             combine_path(),
@@ -130,13 +133,16 @@ def test():
     [log.debug(p) for p in top_paths[0]]
 
     tdss = [
+
+        '5942f61b-03f0-4fd6-a116-1de400af7422',  # json decode XXX multiple files per package !!!! this explains the issue we were seeing perfectly
+        '3703c889-1f1b-47df-aebb-a67d80f1e9c2',  # erroring missing tc
+
         # bugs
         '0c4fc5e8-c332-47d8-9fd8-1fbeb624078c',  # dat norm values returning None??? also .DS_Store
         #'0967e3b7-09db-4b91-9caf-1090c9d0c437',  # jdec, log2(0) also giant 31k files XXX good bench for using sxpr ...
         '41ca18b1-c991-4709-892e-8ae98907549b',  # JEncode
-        '5942f61b-03f0-4fd6-a116-1de400af7422',  # json decode
         'a996cdac-2d00-4ad4-9699-8a75ce29c2f1',  # datset description no alt
-        'aa43eda8-b29a-4c25-9840-ecbd57598afc',  # ft reva ultrasound xml format TODO
+        'aa43eda8-b29a-4c25-9840-ecbd57598afc',  # ft reva ultrasound xml format TODO, uuid v1 issues in this one
         'c3072708-13f4-45ed-992c-b9a744f6a5f3',  # no nums in name for entcomp
         'd088ed64-4f9f-47ee-bf6d-7d53e1863fc4',  # another json decode
 
@@ -262,8 +268,9 @@ def object_source_cache_path(datset_id, object_id, parent_parent_path=None):  # 
 
 
 def create_current_version_paths():
-    fsm_path = fsmeta_version_path()
     obj_path = objmeta_version_path()
+    #oer_path = objerr_version_path()
+    fsm_path = fsmeta_version_path()
     #pm_path = pathmeta_version_path()
     ext_path = extract_path()
     err_path = errors_version_path()
@@ -273,6 +280,9 @@ def create_current_version_paths():
 
     if not obj_path.exists():
         obj_path.mkdir(parents=True)
+
+    #if not oer_path.exists():
+        #oer_path.mkdir(parents=True)
 
     if not fsm_path.exists():
         fsm_path.mkdir(parents=True)
@@ -359,6 +369,9 @@ def _dataset_path_obj_path(dataset_id, object_id):
 
 
 def _dump_path(dataset_id, object_id, blob, version_export_path):
+    # this intentionally does not accept a version kwarg because
+    # should always happen to the latests version when using this
+    # use something else for testing this fun is made to be safe
     path = version_export_path(dataset_id, object_id)
     if not path.parent.exists():
         path.parent.mkdir(exist_ok=True, parents=True)
@@ -391,15 +404,19 @@ def objmeta_version_export_path(dataset_id, object_id, objmeta_version=None):
     return base_path / dataset_path / obj_path
 
 
-def pathmeta_version_path(pathmeta_version=None):
-    pathmeta_version = str(__pathmeta_version__ if pathmeta_version is None else pathmeta_version)
-    return sf_export_base / pathmeta_dir_name / pathmeta_version
+def dump_objmeta_version_path(dataset_id, object_id, blob):
+    return _dump_path(dataset_id, object_id, blob, objmeta_version_export_path)
 
 
-def pathmeta_version_export_path(dataset_id, object_id, pathmeta_version=None):
-    base_path = pathmeta_version_path(pathmeta_version=pathmeta_version)
-    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
-    return base_path / dataset_path / obj_path
+#def pathmeta_version_path(pathmeta_version=None):
+    #pathmeta_version = str(__pathmeta_version__ if pathmeta_version is None else pathmeta_version)
+    #return sf_export_base / pathmeta_dir_name / pathmeta_version
+
+
+#def pathmeta_version_export_path(dataset_id, object_id, pathmeta_version=None):
+    #base_path = pathmeta_version_path(pathmeta_version=pathmeta_version)
+    #dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
+    #return base_path / dataset_path / obj_path
 
 
 def extract_path(extract_version=None):
@@ -415,6 +432,17 @@ def extract_export_path(dataset_id, object_id, extract_version=None):
 
 def dump_extract_path(dataset_id, object_id, blob):
     return _dump_path(dataset_id, object_id, blob, extract_export_path)
+
+
+#def objerr_version_path(objerr_version=None):  # always the latest but put version there for consistency
+#    objerr_version = str(__objerr_version__ if objerr_version is None else objerr_version)
+#    return sf_export_base / objerr_dir_name / objerr_version
+
+
+#def objerr_version_export_path(dataset_id, object_id, objerr_version=None):
+#    base_path = objerr_version_path(objerr_version=objerr_version)
+#    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
+#    return base_path / dataset_path / obj_path
 
 
 def errors_version_path(errors_version=None):  # always the latest but put version there for consistency
@@ -890,12 +918,8 @@ def objmeta(dataset_id, object_id, path, force=False):
 
     # FIXME this could be sourced from the packages endpoint directly in many cases
     # so going through the filesystem is wasted step
-    blob = path._cache_jsonMetadata(with_created=True)
-    do_not_want = 'dataset_relative_path', 'timestamp_updated', 'basename', 'parent_id'
-    [blob.pop(k) for k in do_not_want]
-    blob['type'] = 'objmeta'  # you can't actually invert everything back to Path because Path is only the name
-    blob['__objmeta_version__'] = __pathmeta_version__
-
+    pathmeta_blob = path._cache_jsonMetadata(with_created=True)
+    blob = objmeta_from_pathmeta(pathmeta_blob)
     export_path.parent.mkdir(exist_ok=True, parents=True)
 
     with open(export_path, 'wt') as f:
@@ -980,9 +1004,7 @@ for this particular use case we may want to use epoch instead of a full timestam
                 # we want parent closed within dataset so we loop here
                 # a similar fix is applied in pathmeta_objmeta
                 cache_parent = object_id
-            elif updated_cache_transitive is None:
-                updated_cache_transitive = updated
-            elif updated > updated_cache_transitive:
+            elif updated_cache_transitive is None or updated > updated_cache_transitive:
                 updated_cache_transitive = updated
 
             rec = object_id, cache_parent, updated, path.name
@@ -1026,7 +1048,7 @@ for this particular use case we may want to use epoch instead of a full timestam
     puct_friendly = None
     previous_updated_cache_transitive = None
     delta = 0
-    for i in (range(2) if previous is not None else []):
+    for safety_var in (range(2) if previous is not None else []):
         (previous_header, previous_remove, *previous_records), old_recs = path_fsmeta(previous, return_index=True)
         previous_updated_cache_transitive = previous_header['updated-transitive']
         puct_friendly = timeformat_friendly(previous_updated_cache_transitive)
@@ -1301,15 +1323,20 @@ for this particular use case we may want to use epoch instead of a full timestam
     # reconstruct the full state of the file
 
 
+def objmeta_from_pathmeta(pathmeta_blob, keep=tuple()):
+    do_not_want = 'dataset_relative_path', 'timestamp_updated', 'basename', 'parent_id', '__pathmeta_version__', 'type'
+    blob = {k: v for k, v in pathmeta_blob.items() if k not in do_not_want or k in keep}
+    blob['type'] = 'objmeta'
+    blob['__objmeta_version__'] = __objmeta_version__
+    return blob
+
+
 def objmeta_write_from_pathmeta(dataset_id, object_id, pathmeta_blob, force=False):
     export_path = objmeta_version_export_path(dataset_id, object_id)
     if export_path.exists() and not force:  # objmeta is invariant so if we have it we have it
         return
 
-    do_not_want = 'dataset_relative_path', 'timestamp_updated', 'basename', 'parent_id', '__pathmeta_version__', 'type'
-    blob = {k: v for k, v in pathmeta_blob.items() if k not in do_not_want}
-    blob['type'] = 'objmeta'
-    blob['__objmeta_version__'] = __pathmeta_version__
+    blob = objmeta_from_pathmeta(pathmeta_blob)
 
     if not export_path.parent.exists():
         export_path.parent.mkdir(exist_ok=True, parents=True)
@@ -1496,6 +1523,101 @@ def from_paths_extract_object_metadata(paths, time_now, force=False, debug=False
 
     # FIXME TODO, right now this makes way too many hardcore assumptions
 
+def multibads(dataset_id, rchildren, force=False):
+    # we have to dedupe the package ids before we run ... sigh
+    dd = defaultdict(list)
+    sigh = defaultdict(list)
+    for c in rchildren:
+        i = c.cache_identifier
+        u = i.curie
+        dd[u].append(c)
+        sigh[u].append(i)
+
+    safe_rchildren = []
+    bads_multi = {}
+    for u, paths in dd.items():
+        if len(paths) > 1:
+            bads_multi[u] = paths
+        else:
+            sigh.pop(u)
+            safe_rchildren.append(paths[0])
+
+    #for curie, oids in sigh.items():
+    #    export_path = objerr_version_export_path(dataset_id, oids[0])
+    #    if force or not export_path.exists():
+    #        fids = sorted(o.file_id for o in oids)
+    #        blob = {
+    #            '__objerr_version__': __objerr_version__,
+    #            'type': 'objerr',
+    #            'id': curie,
+    #            'error': f'multiple files in package {fids}'
+    #        }
+    #        if not export_path.parent.exists():
+    #            export_path.parent.mkdir(exist_ok=True, parents=True)
+
+    #        with open(export_path, 'wt') as f:
+    #            json.dump(blob, f, sort_keys=True)
+
+    updated_cache_transitive = None
+    bad_fsmeta_records = []
+    if bads_multi:
+        #bad_curies = ' '.join(sigh)
+        msg = f'dataset {dataset_id} has {len(sigh)} packages with multiple files' #: {bad_curies}
+        logd.warning(msg)
+
+        # process the bad packages so that we at least have a consistent view
+        # FIXME TODO check how we handle file updated vs package updated times
+        # for single file packages we should almost certainly be taking the
+        # package updated time to account for reparents and such ... I don't
+        # think the current fs interpreation actually does this
+        for oiuuid, paths in bads_multi.items():
+            o = RemoteId(oiuuid)
+            u = None
+            ipnames = []
+            objmeta_blobs = []
+            export_path = objmeta_version_export_path(dataset_id, o)
+            objdone = export_path.exists()
+            for path in paths:
+                pathmeta_blob = path._cache_jsonMetadata(with_created=True)
+                p = pathmeta_blob['parent_id']
+                _u = pathmeta_blob['timestamp_updated']
+                if u is None or _u > u:
+                    u = _u
+
+                ipnames.append((pathmeta_blob['remote_inode_id'], pathmeta_blob['basename']))
+                if objdone and not force:
+                    continue
+
+                pathmeta_blob['type'] = 'pathmeta'
+                pathmeta_blob['__pathmeta_version__'] = __pathmeta_version__
+                # we keep timestamp_updated in this case because files in packages should never change
+                # so technically updated is immutable in this case ??? (derp?)
+                # FIXME TODO now it would seem that we also need to store package updated or something
+                # so we can detect rename or ... sigh who knows
+                _blob = objmeta_from_pathmeta(pathmeta_blob, keep=('timestamp_updated',))
+                objmeta_blobs.append(_blob)
+
+            if not objdone or force:
+                # XXX both name and remote_inode_id should be static for these
+                # so I think this will be safe since multipackage files can't
+                # really change names (yet another lol)
+                multi = sorted(objmeta_blobs, key=(lambda o:o['remote_inode_id']), reverse=True)
+                blob = {
+                    'type': 'multi-objmeta',
+                    'remote_id': o,
+                    'multi': multi,
+                }
+                dump_objmeta_version_path(dataset_id, o, blob)
+
+            if updated_cache_transitive is None or u > updated_cache_transitive:
+                updated_cache_transitive = u
+
+            pnames = [n for u, n in sorted(ipnames, reverse=True)]
+            n = '/' + '/'.join(pnames)
+            bad_fsmeta_records.append((o, p, u, n))
+
+    return safe_rchildren, bad_fsmeta_records, updated_cache_transitive
+
 
 def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False, _Async=Async, _deferred=deferred):
     """ given a dataset_path extract path-metadata and extract-object-metadata
@@ -1516,6 +1638,10 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     # but in a sense that is ok because we also want to pull the path metadata here as well since it will end up
     # being more efficient to start from here
     rchildren = transitive_paths(dataset_path)
+    safe_rchildren, bad_fsmeta_records, bad_updated_cache_transitive = multibads(dataset_id, rchildren, force=force)
+    del rchildren
+
+    #assert len(rchildren) == len(set(rchildren)), 'shit'
 
     # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
     # how do we handle the dataset itself (it would be nice to just put the metadata there ...)
@@ -1544,13 +1670,12 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         # since that was also mostly just to get a quick and dirty entrypoint
         deferred(subprocess_extract)
         (dataset_id, path, time_now, force=force, debug=debug)
-        for path in chain((dataset_path,), rchildren))
+        for path in chain((dataset_path,), safe_rchildren))
 
-    updated_cache_transitive = None
+    updated_cache_transitive = bad_updated_cache_transitive
     bads = []
-    #object_id_type = []
     _type_oids = defaultdict(list)
-    fsmeta_records = []
+    good_fsmeta_records = []
     pathmeta_blob_index = {}
     parent_index = {}
     id_drp = {}
@@ -1576,13 +1701,28 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         # we have to drop file_id here, could be used as a cross
         # reference to pathmeta sourced id later, they are all derived
         # from the same source so no point really
-        fsmeta_records.append((RemoteId(id.curie) if id.type == 'package' else id, parent, updated, path.name))
+
+        # this means we also have to exclude all packages with multiple files
+        # from the index, and this is the first place we can detect this from
+        # our fs repr, because we unpack to something sane seriously we need to
+        # disable packages entirely they are utterly stupid ... a folder that you
+        # can't actually move anything in or out of? that you didn't actually create
+        # yourself? that you can't fix by just moving? that has n + 1 updated times?
+        # and n + 1 names? and that you can't put other folders in? what? also, I'm
+        # betting that there is yet another potential source of error where package
+        # renames won't actually show up in our updated time because we use the file
+        # updated time ... which shouldn't even be a thing ??? WAT
+
+        fsmeta_safe_id = RemoteId(id.curie) if id.type == 'package' else id
+        good_fsmeta_records.append((fsmeta_safe_id, parent, updated, path.name))
+
         _type_oids[expex_type].append(id)
         #object_id_type.append((id, expex_type))
         pathmeta_blob_index[id] = pathmeta_blob
         parent_index[id] = parent
         id_drp[id] = pathmeta_blob['dataset_relative_path']
 
+    fsmeta_records = good_fsmeta_records + bad_fsmeta_records
     type_oids = dict(_type_oids)
     indicies = type_oids, pathmeta_blob_index, parent_index, id_drp
     in_updated_cache_transitive = updated_cache_transitive  # fsmeta may modify uct due to lud cases
@@ -1747,7 +1887,8 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
         if not extract_path.exists():
             continue
 
-        pathmeta_blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
+        #pathmeta_blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
+        pathmeta_blob = inds['pathmeta_blob_index'][object_id]
         blob = path_json(extract_path)
         drp = pathlib.PurePath(pathmeta_blob['dataset_relative_path'])
 
@@ -2099,7 +2240,7 @@ def fsmeta_header(dataset_id, uct_friendly, n_removed, n_records, delta, puct_fr
     return header
 
 
-def path_fsmeta(path, return_index=False):
+def path_prevs(path):
     prevs = []
     previous = path
     cdelta = 1
@@ -2146,6 +2287,12 @@ def path_fsmeta(path, return_index=False):
                 raise ValueError(msg)
 
             previous = fsmeta_version_export_path(dataset_id, delta_from)
+
+    return prevs, _header
+
+
+def path_fsmeta(path, return_index=False):
+    prevs, _header = path_prevs(path)
 
     old_recs = {}
     old_rems = set()
@@ -2231,6 +2378,8 @@ def typecheck_fsmeta_records(recs):
 
 def _typecheck_fsmeta_records(recs):
     rbads = []
+    multi = set()
+    seen = set()
     for rec in recs:
         o, p, u, n = rec
         to = (type(o) == RemoteId and o.file_id is None) # this is what we want, drop the file id, we need the type to match for operational reasons
@@ -2243,8 +2392,17 @@ def _typecheck_fsmeta_records(recs):
               #(or type(o.file_id)== int)  # can't do this, fsmeta doesn't know about file_id at all
               # so if there is a file_id it literally cannot be fsmeta
         tp = type(p) == RemoteId
-        tu = type(u) == datetime # datetime
+        tu = type(u) == datetime
         tn = type(n) == str
+        if o in seen:
+            # this should be handled before we ever get to this step now
+            # though it means that fsmeta always excludes multi-file packages
+            # which is probably going to lead to some confusion where only the
+            # dataset appears to change
+            multi.add(o)
+        else:
+            seen.add(o)
+
         viols = ''
         for var, ok in (('o', to), ('p', tp), ('u', tu), ('n', tn)):
             if not ok:
@@ -2252,6 +2410,11 @@ def _typecheck_fsmeta_records(recs):
 
         if viols:
             rbads.append((rec, viols))
+
+    if multi:
+        # this should be handle in advance but
+        # is retained here as a backstop
+        raise exc.MultiFilePackageError(multi)
 
     assert not rbads, rbads
 
@@ -2307,9 +2470,16 @@ def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
     assert dataset_id == header['dataset'], f'dataset mismatch {dataset_id.curie!r} != {header["dataset"]!r}'
 
     idn = {}
+    muidn = {}
     parent_index = {}
     for o, p, u, n in recs:
-        idn[o] = n
+        if n.startswith('/'):  # multi case
+            #idn[o] = n.split()
+            # FIXME TODO this is tricky to deal with ... AS IS TRADITION WITH PACKAGES >_<
+            muidn[o] = n
+        else:
+            idn[o] = n
+
         if o != p:  # skip the dataset case
             # no parent means datset is parent
             # which simplifies things later
@@ -2328,21 +2498,41 @@ def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
         dd[o] = _pids
 
     tpar = dict(dd)
-    id_drp = {o: pathlib.Path(*[idn[p] for p in pars[-2::-1]],  # somehow tpar already excludes dataset?
-                            (idn[o] if o in parent_index else ''))  # hack so that dataset doesn't have its full name and is the base
-            for o, pars in tpar.items()}
+    id_drp = {o: (
+        pathlib.Path(*[idn[p] for p in pars[-2::-1]],  # somehow tpar already excludes dataset?
+                      (idn[o] if o in parent_index else ''))  # hack so that dataset doesn't have its full name and is the base
+    ) for o, pars in tpar.items()
+              if o in idn  # avoid dupes so that asstest can still work
+              }
+    muid_drp = {o: (
+        pathlib.Path(*[idn[p] for p in pars[-2::-1]],
+                      muidn[o])
+    ) for o, pars in tpar.items()
+               if o in muidn
+               }
     asstest = len(set(id_drp.values())) == len(id_drp)
     if not asstest:
+        from collections import Counter
+        mc = Counter(list(id_drp.values())).most_common()
+        mcg1 = [(p, c) for p, c in mc if c > 1]
         breakpoint()
+
     assert asstest, 'ut oh' + '\n'.join(p.as_posix() for p in sorted(id_drp.values()))
     #log.debug('\n'.join(p.as_posix() for p in sorted(id_drp.values())))
     _type_oids = defaultdict(list)
     pathmeta_blob_index = {}
-    for _temp_object_id, parent_id, updated, name in recs:
-        # FIXME issue with {dataset_id}/{dataset_id} case not having objmeta ... which it should? just for closure?
-        blob = path_json(objmeta_version_export_path(dataset_id, _temp_object_id))  # XXX evidence that we should run fsmeta after objmeta
-        ir = fromJson(blob)
-        ir['dataset_relative_path'] = id_drp[_temp_object_id]
+    def procblob(_temp_object_id, parent_id, updated, name, blob, multi=False):
+        try:
+            ir = fromJson(blob)
+        except Exception as e:
+            breakpoint()
+            raise e
+
+        if multi:
+            ir['dataset_relative_path'] = muid_drp[_temp_object_id] / name
+        else:
+            ir['dataset_relative_path'] = id_drp[_temp_object_id]
+
         ir['parent_id'] = parent_id
         ir['timestamp_updated'] = updated
         ir['basename'] = name
@@ -2350,11 +2540,32 @@ def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
         pathmeta_blob_index[object_id] = ir
         if object_id != _temp_object_id:
             # fsmeta does not include the file_id
-            parent_index[object_id] = parent_index.pop(_temp_object_id)
-            id_drp[object_id] = id_drp.pop(_temp_object_id)
+            if multi:
+                id_drp[object_id] = muid_drp[_temp_object_id] / name
+                # don't pop in this case because we need to reuse AND because
+                # we might need the one with the file id again too ...
+                parent_index[object_id] = parent_index[_temp_object_id]
+            else:
+                id_drp[object_id] = id_drp.pop(_temp_object_id)
+                parent_index[object_id] = parent_index.pop(_temp_object_id)
 
         expex_type = expex_type_from_pathmeta_blob(ir)
         _type_oids[expex_type].append(object_id)
+
+    for _temp_object_id, parent_id, updated, name in recs:
+        # FIXME issue with {dataset_id}/{dataset_id} case not having objmeta ... which it should? just for closure?
+        blob = path_json(objmeta_version_export_path(dataset_id, _temp_object_id))  # XXX evidence that we should run fsmeta after objmeta
+        if name.startswith('/'):  # multi case
+            assert blob['type'] == 'multi-objmeta'
+            names = name.split('/')[1:]
+            multi = blob['multi']
+            assert len(names) == len(multi)
+            for b, n in zip(multi, names):
+                # these are both sorted by remote_inode_id so should realign here
+                procblob(_temp_object_id, parent_id, updated, n, b, multi=True)
+
+        else:
+            procblob(_temp_object_id, parent_id, updated, name, blob)
 
     type_oids = _type_oids
     return type_oids, pathmeta_blob_index, parent_index, id_drp
