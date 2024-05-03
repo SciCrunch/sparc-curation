@@ -67,6 +67,7 @@ inh = None  # variable for watching filesystem changes
 __objmeta_version__ = 0
 #__objerr_version__ = 0  # this one should probably never change
 __fsmeta_version__ = 0  # fsmeta is a bit different and will have version embedded because fsmeta is the part that can change and is like a wal, but on a very rare occasion fsmeta might require a forced global update and this way we can avoid having to read every single file? probably embedded not in the path
+__objind_version__ = 0
 __pathmeta_version__ = 0
 __extract_version__ = 0
 __errors_version__ = 0  # this one should probably never change
@@ -86,12 +87,12 @@ combine_dir_name = 'combine'
 
 # this approach requires
 combine_latest_dir_name = 'L'  # short to keep symlinks small enough to fit in inodes
-combine_archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
+#combine_archive_dir_name = 'A'  # XXX this is no longer relevant as old are swapped out
 
 index_dir_name = 'index'
 
 latest_link_name = 'L'  # short to keep symlinks small enough to fit in inodes
-archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
+#archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
 
 _expex_types = (  # aka expex_type
     None,
@@ -131,7 +132,7 @@ def test():
             index_path(),
 
             index_combine_latest_path(),
-            index_combine_archive_path(),
+            #index_combine_archive_path(),
             
          ]
     ]
@@ -215,11 +216,11 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
 
             combine_version_export_path(dataset_id, c.cache_identifier),
             index_combine_latest_export_path(dataset_id, c.cache_identifier),
-            index_combine_archive_export_path(dataset_id, c.cache_identifier),
+            #index_combine_archive_export_path(dataset_id, c.cache_identifier),
 
             index_obj_path(c.cache_identifier),
             index_obj_symlink_latest(dataset_id, c.cache_identifier),
-            index_obj_symlink_archive(dataset_id, c.cache_identifier),
+            #index_obj_symlink_archive(dataset_id, c.cache_identifier),
         ]
 
     aps = [all_paths(c) for c in cs]
@@ -290,7 +291,7 @@ def create_current_version_paths():
     cot_path = combine_temp_path()
     com_path = combine_version_path()
     idx_path = index_path()
-    archive_path = index_combine_archive_path()
+    #archive_path = index_combine_archive_path()
 
     if not obj_path.exists():
         obj_path.mkdir(parents=True)
@@ -316,8 +317,8 @@ def create_current_version_paths():
     if not idx_path.exists():
         idx_path.mkdir(parents=True)
 
-    if not archive_path.exists():
-        archive_path.mkdir()
+    #if not archive_path.exists():
+        #archive_path.mkdir()
 
     resymlink_index_combine_latest()
 
@@ -363,16 +364,16 @@ def index_move_and_resymlink_archive(index_version=None):
     pass
 
 
-def archive_symlink_to_combine():
+#def archive_symlink_to_combine():
     # when objects are removed we will only have and old
     # version so it will have to be moved to archive and
     # better to symlink so that we can retrieve prov if needed
-    # anything not linked into latest or archive can then be culled
+    ## anything not linked into latest or archive can then be culled
     cap = combine_archive_path()  # index latest should always be the real directory
 
 
-def index_resymlink_archive(object_uuid):
-    pass
+#def index_resymlink_archive(object_uuid):
+    #pass
 
 
 def _dataset_path(dataset_id):
@@ -520,7 +521,7 @@ def combine_temp_dataset_path(dataset_id):
     return base_path / dataset_path
 
 
-def combine_temp_object_index_path(dataset_id):
+def combine_temp_objind_path(dataset_id):
     base_path = combine_temp_dataset_path(dataset_id)
     return base_path / 'object-index'
 
@@ -550,9 +551,9 @@ def index_combine_latest_path(index_version=None):
     return base_path / combine_latest_dir_name
 
 
-def index_combine_archive_path(index_version=None):
-    base_path = index_path(index_version=index_version)
-    return base_path / combine_archive_dir_name
+#def index_combine_archive_path(index_version=None):
+#    base_path = index_path(index_version=index_version)
+#    return base_path / combine_archive_dir_name
 
 
 def index_combine_latest_export_path(dataset_id, object_id, index_version=None):
@@ -562,11 +563,11 @@ def index_combine_latest_export_path(dataset_id, object_id, index_version=None):
     return base_path / dataset_path / obj_path
 
 
-def index_combine_archive_export_path(dataset_id, object_id, index_version=None):
-    # we keep this in the index dir to save 3 bytes of ../
-    base_path = index_combine_archive_path(index_version=index_version)
-    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
-    return base_path / dataset_path / obj_path
+#def index_combine_archive_export_path(dataset_id, object_id, index_version=None):
+#    # we keep this in the index dir to save 3 bytes of ../
+#    base_path = index_combine_archive_path(index_version=index_version)
+#    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
+#    return base_path / dataset_path / obj_path
 
 
 def index_path(index_version=None):
@@ -1450,15 +1451,56 @@ for this particular use case we may want to use epoch instead of a full timestam
     # reconstruct the full state of the file
 
 
+def path_objind(path):
+    with open(path, 'wt') as f:
+        hstring = f.readline()
+        yield objind_header_from_string(hstring)
+        while (ln := f.readline()):
+            yield RemoteId.fromCompact(ln)
+
+def objind_from_string(string):
+    header_string, *ids = string.split('\n')
+    header = objind_header_from_string(header_string)
+    yield header
+    for raw_id in ids:
+        yield RemoteId.fromCompact(raw_id)
+
+
+def objind_header_from_string(string):
+    raw_header = oa.utils.sxpr_to_python(string)
+    hcaste = (
+        ('v', int),
+        ('r', int),
+        ('u', dateparser.parse),
+        ('e', dateparser.parse),
+    )
+    for k, t in hcaste:
+        if k in raw_header:
+            raw_header[k] = t(raw_header[k])
+
+    return raw_header
+
+
 def string_from_objind(objind):
-    (dataset_id, updated_cache_transitive, time_now), *ids = objind
+    header, dataset_id, *ids = objind
     # FIXME ... shouldn't the embedded times be isoformat instead of timeformat?
+    # FIXME this is almost certainly not the actual on-disk format we want
+    # TODO need to validate that the index matches disk
+    # 1. it needs a real header with a record count and version (record count maybe ok to skip since we have the actual folders)
+    # 2. we very likely want the compact version of everything, the urlsafe base64 and single letter types
+    # 3. heck why not go binary, everything's a uuid anyway (only sort of kidding)
+    header = f'(:t {header["t"]} :v {header["v"]} :r {header["r"]} :u "{timeformat_friendly(header["u"])}" :e "{timeformat_friendly(header["e"])}")'
+    return '\n'.join((
+        header, f'd:{dataset_id.base64uuid()}',
+        # *[id.base64uuid for id in ids]  # do we want the type prefix or not ... more work to look up but also a sanity check
+        *[f'{id.type[0]}:{id.base64uuid()}' for id in ids]))
+
     return '\n'.join((
         f'{dataset_id.curie} {timeformat_friendly(updated_cache_transitive)} {timeformat_friendly(time_now)}',
         *[id.curie for id in ids]))
 
 
-def object_index_from_fsmeta(fsmeta_blob, time_now):
+def objind_from_fsmeta(fsmeta_blob, time_now):
     # what will wind up happening with this is that
     # there may be old combined blobs from previous
     # exports, the combined blob should always embed
@@ -1499,7 +1541,9 @@ def object_index_from_fsmeta(fsmeta_blob, time_now):
         raise Exception(msg)
 
     ids = [r[0] for r in srecords if r[0].type != 'dataset']  # don't double write it
-    return (dataset_id, updated_cache_transitive, time_now), *ids
+    objind_header = {'t': 'objind', 'v': __objind_version__, 'r': len(ids),
+                     'u': updated_cache_transitive, 'e': time_now}
+    return objind_header, dataset_id, *ids
 
 
 def objmeta_from_pathmeta(pathmeta_blob, keep=tuple()):
@@ -2973,18 +3017,23 @@ def from_dataset_id_fsmeta_indicies_combine(
         assert len(inh._happenings) == 3, inh._happenings
 
     sanity(1)
-    objind_path = combine_temp_object_index_path(dataset_id)
-    objind = object_index_from_fsmeta(fsmeta_blob, time_now)
-    objind_string = string_from_objind(objind)
-    assert not objind_path.exists(), 'wat'
-    assert objind_path != cvdp / 'object-index', 'sigh'
-    with open(objind_path, 'wt') as f:
-        f.write(objind_string)
-
+    objind_write(dataset_id, fsmeta_blob, time_now)
     sanity(2)
     drps = combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=test_combine)
 
     return drps, drp_index
+
+
+def objind_write(dataset_id, fsmeta_blob, time_now):
+    objind_path = combine_temp_objind_path(dataset_id)
+    objind = objind_from_fsmeta(fsmeta_blob, time_now)
+    objind_string = string_from_objind(objind)
+    objind_rtt = list(objind_from_string(objind_string))
+    assert objind == objind_rtt, ('sigh', breakpoint())[0]
+    assert not objind_path.exists(), 'wat'
+    assert objind_path != cvdp / 'object-index', 'sigh'
+    with open(objind_path, 'wt') as f:
+        f.write(objind_string)
 
 
 def path_objind_header(path):
@@ -3014,14 +3063,14 @@ def check_combine_swap(old, new):
     paths = old, new
     res = []
     for path in paths:
-        object_index_path = path / 'object-index'
-        if not object_index_path.exists():
-            msg = f'malformed combine dir missing objects-index: {object_index_path}'
+        objind_path = path / 'object-index'
+        if not objind_path.exists():
+            msg = f'malformed combine dir missing objects-index: {objind_path}'
             # you probably want to clean it up manually because something went wrong in dev
             raise FileNotFoundError(msg)
 
-        dataset_id, *times = path_objind_header(object_index_path)
-        res.append((object_index_path, dataset_id, *times))
+        dataset_id, *times = path_objind_header(objind_path)
+        res.append((objind_path, dataset_id, *times))
 
     (old_p, old_d, old_u, old_t), (new_p, new_d, new_u, new_t) = res
 

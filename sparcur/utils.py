@@ -739,6 +739,28 @@ class BlackfynnId(idlib.Identifier):
     def __reduce__(self):
         return self.__class__, (self.id, self.type, self.file_id)
 
+    @classmethod
+    def fromCompact(cls, string):
+        # FIXME TODO integrate this into __new__
+        # and update the regex to detect and handle
+
+        try:
+            prefix, b64uuid = string.split(':')
+        except Exception as e:
+            breakpoint()
+
+        uuid_in = base64.urlsafe_b64decode(b64uuid + '==')
+        decuuid = UUID(uuid_in.hex())
+        prefs = {
+            'o': 'organization',
+            'd': 'dataset',
+            'c': 'collection',
+            'p': 'package',
+            'u': 'user',
+         }
+
+        return cls(str(decuuid), type=prefs[prefix])
+
     def __new__(cls, id_uri_curie_uuid, type=None, file_id=None, _type=type):
         # TODO validate structure
         # TODO binary uuid
@@ -861,7 +883,7 @@ class BlackfynnId(idlib.Identifier):
     def uri_human(self, organization=None, dataset=None):
         if self.type == 'package':
             # FIXME file_id?
-            endpoint = f'/{organization.id}/datasets/{dataset.id}/files/v/{self.id}'
+            endpoint = f'/{organization.id}/datasets/{dataset.id}/files/{self.id}/details'
         elif self.type == 'collection':
             endpoint = f'/{organization.id}/datasets/{dataset.id}/files/{self.id}'
         elif self.type == 'dataset':
