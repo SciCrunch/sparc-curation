@@ -183,3 +183,7 @@ class NotMappedError(SparCurError):
 class MultiFilePackageError(SparCurError):
     """ multi-file package ... bad news """
 
+
+class CombineTestMismatchError(SparCurError):
+    """ WHOOPS """
+

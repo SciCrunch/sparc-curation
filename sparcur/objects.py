@@ -53,12 +53,14 @@ from sparcur import pipelines as pipes
 from sparcur.core import HasErrors, JEncode, JApplyRecursive, get_nested_by_key
 from sparcur.paths import Path
 from sparcur.utils import fromJson, register_type, log as _log, logd as _logd
-from sparcur.utils import transitive_paths, GetTimeNow, PennsieveId as RemoteId, levenshteinDistance
+from sparcur.utils import transitive_paths, GetTimeNow as _GetTimeNow, PennsieveId as RemoteId, levenshteinDistance
 from sparcur.config import auth
 from sparcur.extract import xml as exml
 
 log = _log.getChild('sob')
 logd = _logd.getChild('sob')
+
+inh = None  # variable for watching filesystem changes
 
 # TODO HAH, with the addition of errors aka failed we can reuse the
 # sparcron run logic for whole datasets on individual objects now ...
@@ -111,6 +113,9 @@ _metadata_file_types = (
     'performances', 'code_description', 'submission',
 )
 
+def GetTimeNow():
+    return _GetTimeNow()._start_time
+
 def test():
     # make sure we have the basics right
     # sourcing of the uuids will ultimately be different
@@ -122,7 +127,7 @@ def test():
             #pathmeta_version_path(),
             extract_path(),  # FIXME these are really x_version_path ...
             errors_version_path(),
-            combine_path(),
+            combine_version_path(),
             index_path(),
 
             index_combine_latest_path(),
@@ -221,19 +226,27 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
     if False:
         [log.debug(p) for paths in aps for p in paths]
 
+    time_now = GetTimeNow()
+
     create_current_version_paths()
 
-    (updated_cache_transitive, indicies, some_failed
+    (updated_cache_transitive, fsmeta_blob, indicies, some_failed
      ) = from_dataset_path_extract_object_metadata(
-         dataset_path, force=force, debug=debug)
+         dataset_path, time_now=time_now, force=force, debug=debug)
 
     if debug:
         # force loading from fsmeta + objmeta store to ensure that we got those codepaths right and compare to
         #object_id_types = [(o, t) for o, t, b in object_id_type_pathmeta_blobs]
-        d_drps, d_drp_index = from_dataset_id_combine(dataset_id, updated_cache_transitive, keep_in_mem=True)
+        #_time_now = GetTimeNow()  # have to pass a different time now otherwise invariant checks on combine objects-index will be violated
+        # XXX OR we actually have a perfect situation where we have two file system trees that should be exactly identical and we test
+        # before swap ... yes, that seems better
+        _time_now = time_now
+        _d_drps, _d_drp_index = from_dataset_id_combine(dataset_id, _time_now, updated_cache_transitive, keep_in_mem=True)
 
-    drps, drp_index = from_dataset_id_indicies_combine(
-        dataset_id, indicies, updated_cache_transitive, keep_in_mem=True)
+    drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, keep_in_mem=True, test_combine=debug)
+
+
 
     missing_from_inds = [d for d, h, ty, ta, ne, mb in drps if not h and
                          # we don't usually expect manifest entires for themselves
@@ -274,7 +287,8 @@ def create_current_version_paths():
     #pm_path = pathmeta_version_path()
     ext_path = extract_path()
     err_path = errors_version_path()
-    com_path = combine_path()
+    cot_path = combine_temp_path()
+    com_path = combine_version_path()
     idx_path = index_path()
     archive_path = index_combine_archive_path()
 
@@ -293,6 +307,9 @@ def create_current_version_paths():
     if not err_path.exists():
         err_path.mkdir(parents=True)
 
+    if not cot_path.exists():
+        cot_path.mkdir(parents=True)
+
     if not com_path.exists():
         com_path.mkdir(parents=True)
 
@@ -307,7 +324,7 @@ def create_current_version_paths():
 
 def resymlink_index_combine_latest(index_version=None):
     clp = index_combine_latest_path(index_version=index_version)
-    cp = combine_path()
+    cp = combine_version_path()
     target = cp.relative_path_from(clp)
 
     up_to_date = False
@@ -460,19 +477,72 @@ def dump_error_path(dataset_id, object_id, blob):
     return _dump_path(dataset_id, object_id, blob, errors_version_export_path)
 
 
-def combine_path(combine_version=None):
+def combine_version_path(combine_version=None):
     combine_version = str(__combine_version__ if combine_version is None else combine_version)
     return sf_export_base / combine_dir_name / combine_version
 
 
+def combine_version_dataset_path(dataset_id, combine_version=None):
+    # this is needed for symlinking to the index but should never be used for writing
+    base_path = combine_version_path(combine_version=combine_version)
+    dataset_path = _dataset_path(dataset_id)
+    return base_path / dataset_path
+
+
 def combine_version_export_path(dataset_id, object_id, combine_version=None):
-    base_path = combine_path(combine_version=combine_version)
+    # this is needed for symlinking to the index but should never be used for writing
+    base_path = combine_version_path(combine_version=combine_version)
     dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
     return base_path / dataset_path / obj_path
 
 
-def dump_combine_path(dataset_id, object_id, blob):
-    return _dump_path(dataset_id, object_id, blob, combine_version_export_path)
+def combine_temp_path():
+    # you can't set the version but we retain it so that if for some
+    # reason we are somehow running two different versions at the same
+    # time on the same system they won't fight if they hit the same dataset
+    combine_version = str(__combine_version__)
+    return sf_export_base / combine_dir_name / 'TEMP' / combine_version
+
+
+def combine_temp_export_path(dataset_id, object_id):
+    base_path = combine_temp_path()
+    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
+    return base_path / dataset_path / obj_path
+
+
+def dump_combine_temp_path(dataset_id, object_id, blob):
+    return _dump_path(dataset_id, object_id, blob, combine_temp_export_path)
+
+
+def combine_temp_dataset_path(dataset_id):
+    base_path = combine_temp_path()
+    dataset_path = _dataset_path(dataset_id)
+    return base_path / dataset_path
+
+
+def combine_temp_object_index_path(dataset_id):
+    base_path = combine_temp_dataset_path(dataset_id)
+    return base_path / 'object-index'
+
+
+def combine_temp_move_or_swap(dataset_id):
+    source_path = combine_temp_dataset_path(dataset_id)
+    target_path = combine_version_dataset_path(dataset_id)
+    if not source_path.exists():
+        raise FileNotFoundError(source_path)
+
+    if not target_path.exists():
+        if not target_path.parent.exists():
+            # for this I'm pretty sure we should never encounter a race
+            # and the parent should aways already exist, let's see what happens!
+            target_path.parent.mkdir()
+            #target_path.parent.mkdir(exist_ok=True, parents=True)
+
+        source_path.rename(target_path)
+    else:
+        source_path.swap(target_path)
+
+    return source_path, target_path
 
 
 def index_combine_latest_path(index_version=None):
@@ -546,6 +616,7 @@ def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link
             new = True
 
     return target
+
 
 def extract_fun_manifest(path):
     # FIXME this need the template schema version to work ... at least in theory
@@ -1192,6 +1263,7 @@ for this particular use case we may want to use epoch instead of a full timestam
         if do_repack:
             raise NotImplementedError('TODO')
         else:  # new keyframe
+            removed = set()
             removes = f'(:remove "{uct_friendly}" :ids ())\n'  # leave it empty for regularity
             n_removed = 0
             recs = mrecs(records)
@@ -1251,6 +1323,24 @@ for this particular use case we may want to use epoch instead of a full timestam
         else:
             removes = f'(:remove "{uct_friendly}" :ids ())\n'  # leave it empty for regularity
 
+    fsmeta_blob_header = {
+        'type': 'fsmeta',
+        'version': __fsmeta_version__,
+        'dataset': dataset_id,
+        'updated-transitive': updated_cache_transitive,
+        'removes': n_removed,
+        'records': n_records,
+        'delta': delta,
+    }
+    if previous_updated_cache_transitive is not None:
+        fsmeta_blob_header['from'] = previous_updated_cache_transitive
+
+    # FIXME TODO go direct from fsmeta_blob -> fsmeta_diff_blob -> out_string instead of the nonsense we do above
+    # TODO we need three separate types for fsmeta internal, diff, and diff repack or at least for interna and diff-repack
+    fsmeta_blob = (fsmeta_blob_header,
+                   {'remove': updated_cache_transitive, 'ids': sorted(removed)},
+                   *sorted(records, key=kupd, reverse=True))
+    typecheck_fsmeta_blob(fsmeta_blob)
     header = fsmeta_header(dataset_id, uct_friendly, n_removed, n_records, delta, puct_friendly=puct_friendly)
     out_string = header + removes + recs
 
@@ -1331,7 +1421,8 @@ for this particular use case we may want to use epoch instead of a full timestam
             latest.swap(old_latest)
             old_latest.unlink()
 
-        return updated_cache_transitive, records  # we always return records because we need that to write the latest package-index file which doesn't care about history
+         # we always fsmeta_blob records because we need that to write the latest package-index file which doesn't care about history
+        return updated_cache_transitive, fsmeta_blob
     except Exception as e:
         # if we don't symlink to latest cleanup after
         if not latest.exists():
@@ -1361,6 +1452,50 @@ for this particular use case we may want to use epoch instead of a full timestam
     # if delta
     # check if delta count is beyond max delta count (tune for performance based on cost of file reads probably)
     # reconstruct the full state of the file
+
+
+def string_from_objind(objind):
+    (dataset_id, updated_cache_transitive, time_now), *ids = objind
+    # FIXME ... shouldn't the embedded times be isoformat instead of timeformat?
+    return '\n'.join((
+        f'{dataset_id.curie} {timeformat_friendly(updated_cache_transitive)} {timeformat_friendly(time_now)}',
+        *[id.curie for id in ids]))
+
+
+def object_index_from_fsmeta(fsmeta_blob, time_now):
+    # what will wind up happening with this is that
+    # there may be old combined blobs from previous
+    # exports, the combined blob should always embed
+    # dataset uct as a reference for debugging, so
+    # need to confirm that, but there will then be
+    # old blobs for packages that were removed, this
+    # is expected, we can cull them at some point and
+    # replace things with the uct reconstruction version
+    # in a sense running combine is just a check to make
+    # sure that a future retrospective combine will work
+
+    # TODO
+    # we will use the atomic swap on a single dataset folder
+    # to ensure that the view is always consistent so we
+    # won't actually write combineded metadata we will
+    # only ever swap in, so we need to update the paths
+    # to reflect that, this means we can write the index first
+    # and if there were combine failures we will know in a
+    # final check
+    header, rems, *records  = fsmeta_blob
+
+    if lrem := len(rems['ids']):
+        f'fsmeta is not fully resolved: {lrem} rems present'
+        raise TypeError(msg)  # FIXME error type
+
+    if (erec := header['records']) != (lrec := len(records)):
+        f'fsmeta is not fully resolved: expected number of records {erec} not present! {lrec} != {erec}'
+        raise TypeError(msg)  # FIXME error type
+
+    dataset_id = header['dataset']
+    updated_cache_transitive = header['updated-transitive']  # this number should also be what is embedded in blobs
+    ids = [r[0] for r in records if r[0].type != 'dataset']  # don't double write it
+    return (dataset_id, updated_cache_transitive, time_now), *ids
 
 
 def objmeta_from_pathmeta(pathmeta_blob, keep=tuple()):
@@ -1670,7 +1805,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     for reference: sparcur.pipelines.PathTransitiveMetadataPipeline
     and sparcur.paths.PathHelper._transitive_metadata
     """
-    if time_now is None:
+    if time_now is None:  # FIXME this should be required?
         time_now = GetTimeNow()
 
     dataset_id = dataset_path.cache_identifier
@@ -1766,7 +1901,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     type_oids = dict(_type_oids)
     indicies = type_oids, pathmeta_blob_index, parent_index, id_drp
     in_updated_cache_transitive = updated_cache_transitive  # fsmeta may modify uct due to lud cases
-    updated_cache_transitive, _ = fsmeta(dataset_id, records=fsmeta_records, updated_cache_transitive=updated_cache_transitive, debug=debug)
+    updated_cache_transitive, fsmeta_blob = fsmeta(dataset_id, records=fsmeta_records, updated_cache_transitive=updated_cache_transitive, debug=debug)
 
     if bads:
         # {"" if debug else object_logdir(id) / "LATEST" / "stdout.log"}
@@ -1782,7 +1917,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         # and partial failures :/ so instead we return bads and the caller
         # has to check
 
-    return updated_cache_transitive, indicies, bads
+    return updated_cache_transitive, fsmeta_blob, indicies, bads
 
 
 # these variants imply a certain amount of rework
@@ -2102,10 +2237,11 @@ def combine_at_updated():
     """ TODO historical version """
 
 
-def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=None):
+def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=None, updated_cache_transitive=None):
     blob = {}
     blob['type'] = 'combine-object-metadata'  #'combined-metadata'
     blob['__combine_version__'] = __combine_version__
+    blob['dataset_updated_transitive'] = updated_cache_transitive
 
     #objmeta_blob = path_json(objmeta_version_export_path(dataset_id, object_id))
     # XXX I have this sense that we really only want objmeta and fsmeta for historical
@@ -2167,8 +2303,8 @@ def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=
         # TODO log an error once or something ... ?
         log.log(9, msg)  # TODO embed error
 
-    combine_path = dump_combine_path(dataset_id, object_id, blob)
-    msg = f'combine object metadata written to {combine_path}'
+    obj_combine_temp_path = dump_combine_temp_path(dataset_id, object_id, blob)
+    msg = f'combine object metadata written to {obj_combine_temp_path}'
     log.log(9, msg)
 
     return drp, has_recs, blob
@@ -2344,7 +2480,6 @@ def ir_from_fsmeta_rec(r):
     return o, p, u, n
 
 
-
 def fsmeta_from_prevs_header(prevs, _header, return_index=False):
     old_recs = {}
     old_rems = set()
@@ -2511,6 +2646,10 @@ def _typecheck_fsmeta_blob(blob):
     typecheck_fsmeta_remove(rem)
     typecheck_fsmeta_records(recs)
 
+    # combined invariant checks
+    assert header['records'] == len(recs)
+    assert header['removes'] == len(rem['ids'])  # XXX FIXME when this particular function sees these rems should always be zero ...
+
 
 def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
     # technically don't need dataset_id but can be used as a check
@@ -2620,7 +2759,7 @@ def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
     return type_oids, pathmeta_blob_index, parent_index, id_drp
 
 
-def indicies_from_dataset_id(dataset_id, updated_cache_transitive=None):
+def indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=None):
     # load fsmeta at updated_cache_transitive or latest
     _l = 'LATEST'
     name = _l if updated_cache_transitive is None else timeformat_friendly(updated_cache_transitive)
@@ -2647,16 +2786,17 @@ def indicies_from_dataset_id(dataset_id, updated_cache_transitive=None):
         #(object_id, type, pathmeta_blob_index[object_id]) for object_id, type in object_id_types
     #]
     #return object_id_type_pathmeta_blobs
-    return type_oids, pathmeta_blob_index, parent_index, id_drp
+    return fsmeta_blob, type_oids, pathmeta_blob_index, parent_index, id_drp
 
 
-def from_dataset_id_combine(dataset_id, updated_cache_transitive=None, keep_in_mem=False):
-    indicies = indicies_from_dataset_id(dataset_id, updated_cache_transitive=updated_cache_transitive)
-    return from_dataset_id_indicies_combine(
-        dataset_id, indicies, updated_cache_transitive=updated_cache_transitive, keep_in_mem=keep_in_mem)
+def from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive=None, keep_in_mem=False):
+    fsmeta_blob, *indicies = indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=updated_cache_transitive)
+    return from_dataset_id_fsmeta_indicies_combine(
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=updated_cache_transitive, keep_in_mem=keep_in_mem)
 
 
-def from_dataset_id_indicies_combine(dataset_id, indicies, updated_cache_transitive=None, keep_in_mem=False):
+def from_dataset_id_fsmeta_indicies_combine(
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=None, keep_in_mem=False, test_combine=False):
     type_oids, pathmeta_blob_index, parent_index, id_drp_all = indicies
     #for oid, type, pathmeta_blob in object_id_type_pathmeta_blobs:
         # FIXME why do oids for packages have a file_id associated when we go to put them in source_id ???
@@ -2747,29 +2887,211 @@ def from_dataset_id_indicies_combine(dataset_id, indicies, updated_cache_transit
                 drp_index[drp][type] = rec
 
     # TODO processing of dataset and organization level ids
-    drps = []
-    news = 0
-    for expex_type, oids in type_oids.items():  # TODO sort these in reverse order so that errors can be added to e.g. manifests
-        for object_id in oids:
-            pathmeta_blob = pathmeta_blob_index[object_id]
-            drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob)
+
+    cvdp = combine_version_dataset_path(dataset_id)
+    def sanity(n):
+        # this is violated when running debug because this
+        # function is called twice, once sourcing from disk
+        # once from memory with the exact same time_now
+        # i.e. once indirectly via from_dataset_id_combine
+        # and once directly via from_dataset_id_fsmeta_indicies_combine
+        log.debug(f'yeah testing {n}')
+        if cvdp.exists():
+            assert cvdp.resolve() != ds_combine_temp_path.resolve()
+            oip = cvdp / 'object-index'
+            assert oip.exists(), 'sigh'
+            did, uct, tn = path_objind_header(oip)
+            assert did == dataset_id, 'wat dataset'
+            assert uct <= updated_cache_transitive, 'wat uct'
+            if test_combine:
+                assert tn == time_now, 'are we really testing combine here?'
+            else:
+                #assert tn != time_now, f'wat time_now {tn} == {time_now}'
+                assert tn < time_now, f'wat time_now {tn} >= {time_now}'
+
+    ds_combine_temp_path = combine_temp_dataset_path(dataset_id)
+    if ds_combine_temp_path.exists():
+        msg = f'someone didn\'t clean up after themselves: {ds_combine_temp_path}'
+        log.warning(msg)
+        ds_combine_temp_path.rmtree()
+
+    sanity(0)  # what in the ... is going on ? RIGHT we literally run the same process twice because we are in debug ...
+    if inh is not None:
+        cvp = combine_version_path()
+        if inh._happenings:
+            inh._happenings.clear()
+
+    try:
+        if inh is not None:
+            # prevent false negative results
+            (cvp / 'test').mkdir()
+            (cvp / 'test').touch()
+            (cvp / 'test').rmdir()
+
+        intermediates = []
+        for expex_type, oids in type_oids.items():  # TODO sort these in reverse order so that errors can be added to e.g. manifests
+            for object_id in oids:
+                pathmeta_blob = pathmeta_blob_index[object_id]
+                drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob, updated_cache_transitive)
+                next(iter(range(1)))  # give async a chance if it needs it
+                intermediates.append((object_id, drp, has_recs, type, (blob if keep_in_mem else None)))
+    except Exception as e:
+        if ds_combine_temp_path.exists():
+            ds_combine_temp_path.rmtree()
+        raise e
+
+    if inh is not None:
+        assert len(inh._happenings) == 3, inh._happenings
+
+    sanity(1)
+    objind_path = combine_temp_object_index_path(dataset_id)
+    objind = object_index_from_fsmeta(fsmeta_blob, time_now)
+    objind_string = string_from_objind(objind)
+    assert not objind_path.exists(), 'wat'
+    assert objind_path != cvdp / 'object-index', 'sigh'
+    with open(objind_path, 'wt') as f:
+        f.write(objind_string)
+
+    sanity(2)
+    drps = combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=test_combine)
+
+    return drps, drp_index
+
+
+def path_objind_header(path):
+    return next(path_objind(path))
+
+
+def _objind_header_from_l1(l1):
+    dataset_curie, *_times = [_ for _ in l1.split() if _]
+    times = updated_cache_transitive, time_now = [dateparser.parse(_) for _ in _times]
+    return RemoteId(dataset_curie), *times
+
+
+def path_objind(path):
+    with open(path, 'rt') as f:
+        l1 = f.readline()
+        header = dataset_id, updated_cache_transitive, time_now = _objind_header_from_l1(l1)
+        yield header
+        while (ln := f.readline()):
+            yield RemoteId(ln)
+
+
+def check_combine_swap(old, new):
+    if not old.exists():
+        # cannot check
+        return
+
+    paths = old, new
+    res = []
+    for path in paths:
+        object_index_path = path / 'object-index'
+        if not object_index_path.exists():
+            msg = f'malformed combine dir missing objects-index: {object_index_path}'
+            # you probably want to clean it up manually because something went wrong in dev
+            raise FileNotFoundError(msg)
+
+        dataset_id, *times = path_objind_header(object_index_path)
+        res.append((object_index_path, dataset_id, *times))
+
+    (old_p, old_d, old_u, old_t), (new_p, new_d, new_u, new_t) = res
+
+    assert old_d == new_d, f'dataset mismatch {old_d} != {new_d}, {old_p} {new_p}'
+    assert old_u <= new_u, f'updated went backward {old_u} > {new_u}, {old_p} {new_p}'
+    assert old_t < new_t, (f'old export time same or newer {old_t} >= {new_t}, {old_p} {new_p}', breakpoint())[0]
+
+
+def check_test_combine(source_path, target_path):
+    import filecmp
+    def _do_cmp(a, b):
+        c = Path(a)
+        d = Path(b)
+        return c.checksum() == d.checksum()
+
+    #filecmp._do_cmp = _do_cmp  # no point, faster to compare the bytes directly for things this small
+    class dircmp(filecmp.dircmp):
+        def phase3(self):
+            xx = filecmp.cmpfiles(self.left, self.right, self.common_files, shallow=False)
+            self.same_files, self.diff_files, self.funny_files = xx
+
+    def first_different(a, b):
+        cmp_res = dircmp(a, b)
+        if oops := (cmp_res.left_only or
+                    cmp_res.right_only or
+                    cmp_res.diff_files or
+                    cmp_res.funny_files):
+            return oops
+
+        for d in cmp_res.common_dirs:
+            if not (oops := first_different(a / d, b / d)):
+                return oops
+
+        return None
+
+    oops = first_different(source_path, target_path)
+    if oops is not None:
+        breakpoint()
+        raise exc.CombineTestMismatchError(oops)
+
+
+def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=False):
+    # TODO it should be fairly striaght forward to switch these out for path function that will
+    # work with a specific historical updated cache transitive, will also need a way to pass
+    # such a function to combine itself, but should be pretty straight forward
+    source_path = combine_temp_dataset_path(dataset_id)
+    target_path = combine_version_dataset_path(dataset_id)
+    assert source_path != target_path, 'oof'
+    if test_combine:
+        check_test_combine(source_path, target_path)
+        # this will fail and we abort, or if it succeeds
+        # then everything is identical and we clean up
+    else:
+        check_combine_swap(target_path, source_path)
+
+    temp_path_now_with_old, version_path_now_with_new = combine_temp_move_or_swap(dataset_id)
+    assert source_path == temp_path_now_with_old and target_path == version_path_now_with_new, 'derp'
+    assert temp_path_now_with_old != version_path_now_with_new, 'double derp'
+    # we don't actually need to recheck check at this step
+    # check_combine_swap(temp_path_now_with_old, version_path_now_with_new)
+
+    try:
+        if temp_path_now_with_old.exists():
+            # if we don't get an error from swap then we are good to
+            # remove the old directory, if we need it again we can
+            # reconstruct it from fsmeta and objmeta
+            temp_path_now_with_old.rmtree()
+
+        # now we can safely symlink to the index
+        # NOTE this approach will produce broken symlinks which is good
+        # because it means the system has the property that we want which
+        # is that the old ids don't have to just 404
+        drps = []
+        news = 0
+        for object_id, drp, has_recs, type, blob_or_none in intermediates:
             target, new_link = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
             if new_link:
                 news += 1
-            drps.append((drp, has_recs, type, target, new_link, (blob if keep_in_mem else None)))
+            drps.append((drp, has_recs, type, target, new_link, blob_or_none))
+    except Exception as e:
+        msg = f'index_obj_symlink_latest may not have completed for {dataset_id}'
+        log.error(msg)
+        raise e
 
     log.debug(f'finished combining and writing {len(drps)} and linking {news} object records for dataset {dataset_id}')
     # TODO flag the objects that were deleted since the previous run and probably stick an xattr on them to
     # make cleanup as simple as possible
-    return drps, drp_index
+    return drps
 
 
-def from_dataset_path_extract_combine(dataset_path, force=False, debug=False):
+def from_dataset_path_extract_combine(dataset_path, time_now=None, force=False, debug=False):
+    if time_now is None:
+        time_now = GetTimeNow()
+
     create_current_version_paths()
 
-    (updated_cache_transitive, indicies, some_failed
+    (updated_cache_transitive, fsmeta_blob, indicies, some_failed
         ) = from_dataset_path_extract_object_metadata(
-            dataset_path, force=force, debug=debug)
+            dataset_path, time_now=time_now, force=force, debug=debug)
 
     dataset_id = dataset_path.cache_identifier
 
@@ -2784,10 +3106,10 @@ def from_dataset_path_extract_combine(dataset_path, force=False, debug=False):
         assert latest.exists(), 'uh'
         assert uct_p.exists(), 'wat'
         assert uct_p == latest.resolve(), 'argh?!'
-        _drps, _drp_index = from_dataset_id_combine(dataset_id, updated_cache_transitive)
+        _drps, _drp_index = from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive)
 
-    drps, drp_index = from_dataset_id_indicies_combine(
-        dataset_id, indicies, updated_cache_transitive)
+    drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, test_combine=debug)
 
 
 def single_file_extract(
@@ -2860,9 +3182,74 @@ def single_file_combine(
     pass
 
 
+def watch_combine():
+    import pyinotify, asyncio, threading, time
+    loop = asyncio.get_event_loop()
+    inwm = pyinotify.WatchManager()
+    class Do(pyinotify.ProcessEvent):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._happenings = []
+
+        def _process_IN_CREATE(self, evt):
+            pass
+        def _process_IN_MOVED_TO(self, evt):
+            pass
+        def process_default(self, evt):
+            self._happenings.append(evt)
+            log.debug(evt)
+            print()
+
+    inh = Do()
+
+    anoti = pyinotify.AsyncioNotifier(inwm, loop)
+    _cvp = combine_version_path()
+    if not _cvp.exists():
+        _cvp.mkdir(exist_ok=True, parents=True)
+
+    watch_desc_dict = inwm.add_watch(_cvp.as_posix(), pyinotify.ALL_EVENTS, proc_fun=inh)
+    nothrd = threading.Thread(target=loop.run_forever)
+    nothrd.start()
+
+    (_cvp / 'test').mkdir()
+    (_cvp / 'test').touch()
+    (_cvp / 'test').rmdir()
+
+
+    time.sleep(0.001)
+    next(iter(range(1)))
+
+    try:
+        assert len(inh._happenings) == 3, inh._happenings
+        inh._happenings.clear()
+    except BaseException as e:
+        anoti.loop.call_soon_threadsafe(anoti.loop.stop)
+        anoti.stop()
+        nothrd.join()
+        raise e
+
+    return inh, anoti, nothrd
+
+
 def main():
-    test()
+    # when the paranoia strikes ...
+    cvp, ctp = combine_version_path(), combine_temp_path()
+    assert cvp.resolve() != ctp.resolve(), '...'
+
+    try:
+        test()
+    finally:
+        if inh is not None:
+            anoti.loop.call_soon_threadsafe(anoti.loop.stop)
+            anoti.stop()
+            nothrd.join()
 
 
 if __name__ == '__main__':
+    #_log.setLevel(-1)
+    #_logd.setLevel(-1)
+    do_watch = False  # set to True to check file system modification invariants
+    if do_watch:
+        inh, anoti, nothrd = watch_combine()
+
     main()
